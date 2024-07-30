@@ -157,7 +157,7 @@ namespace Orleans.Streams
 
             await ((this.observer != null)
                 ? NextItem(typedItem, currentToken)
-                : NextItems(new[] { Tuple.Create(typedItem, currentToken) }));
+                : NextItems([Tuple.Create(typedItem, currentToken)]));
 
             // check again, in case the expectedToken was changed indiretly via ResumeAsync()
             if (this.expectedToken != null)

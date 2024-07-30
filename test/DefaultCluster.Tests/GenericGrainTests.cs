@@ -798,7 +798,7 @@ namespace DefaultCluster.Tests.General
             {
                 var grain = this.GrainFactory.GetGrain<IGrainWithTwoGenArgs<string, int>>(Guid.NewGuid());
                 var concreteGenArgs = await GetConcreteGenArgs(grain);
-                Assert.True(concreteGenArgs.SequenceEqual(new[] { typeof(int) }));
+                Assert.True(concreteGenArgs.SequenceEqual([typeof(int)]));
             }
 
             [Fact(Skip = "Currently unsupported")]
@@ -807,7 +807,7 @@ namespace DefaultCluster.Tests.General
                 // Resolves correctly but can't be activated: too many gen args supplied for concrete class
                 var grain = this.GrainFactory.GetGrain<IGrainReceivingRepeatedGenArgs<int, int>>(Guid.NewGuid());
                 var concreteGenArgs = await GetConcreteGenArgs(grain);
-                Assert.True(concreteGenArgs.SequenceEqual(new[] { typeof(int) }));
+                Assert.True(concreteGenArgs.SequenceEqual([typeof(int)]));
             }
 
             [Fact]
@@ -837,7 +837,7 @@ namespace DefaultCluster.Tests.General
                 // gen args aren't being properly inferred from matched concrete type
                 var grain = this.GrainFactory.GetGrain<IReceivingRepeatedGenArgsAmongstOthers<int, string, int>>(Guid.NewGuid());
                 var concreteGenArgs = await GetConcreteGenArgs(grain);
-                Assert.True(concreteGenArgs.SequenceEqual(new[] { typeof(string), typeof(int) }));
+                Assert.True(concreteGenArgs.SequenceEqual([typeof(string), typeof(int)]));
             }
 
             [Fact]
@@ -872,7 +872,7 @@ namespace DefaultCluster.Tests.General
             {
                 var grain = this.GrainFactory.GetGrain<IReceivingRearrangedGenArgs<int, long>>(Guid.NewGuid());
                 var concreteGenArgs = await GetConcreteGenArgs(grain);
-                Assert.True(concreteGenArgs.SequenceEqual(new[] { typeof(long), typeof(int) }));
+                Assert.True(concreteGenArgs.SequenceEqual([typeof(long), typeof(int)]));
             }
 
             [Fact]
@@ -939,7 +939,7 @@ namespace DefaultCluster.Tests.General
             {
                 var grain = this.GrainFactory.GetGrain<IInterfaceTakingFurtherSpecializedGenArg<List<int>>>(Guid.NewGuid());
                 var concreteGenArgs = await GetConcreteGenArgs(grain);
-                Assert.True(concreteGenArgs.SequenceEqual(new[] { typeof(int) }));
+                Assert.True(concreteGenArgs.SequenceEqual([typeof(int)]));
             }
 
             [Fact(Skip = "Currently unsupported")]
@@ -947,7 +947,7 @@ namespace DefaultCluster.Tests.General
             {
                 var grain = this.GrainFactory.GetGrain<IInterfaceTakingFurtherSpecializedGenArg<long[]>>(Guid.NewGuid());
                 var concreteGenArgs = await GetConcreteGenArgs(grain);
-                Assert.True(concreteGenArgs.SequenceEqual(new[] { typeof(long) }));
+                Assert.True(concreteGenArgs.SequenceEqual([typeof(long)]));
             }
 
             [Fact(Skip = "Currently unsupported")]

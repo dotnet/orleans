@@ -340,7 +340,7 @@ namespace Orleans.CodeGenerator
                             }));
             }
 
-            var usings = List(new[] { UsingDirective(ParseName("global::Orleans.Serialization.Codecs")), UsingDirective(ParseName("global::Orleans.Serialization.GeneratedCodeHelpers")) });
+            var usings = List([UsingDirective(ParseName("global::Orleans.Serialization.Codecs")), UsingDirective(ParseName("global::Orleans.Serialization.GeneratedCodeHelpers"))]);
             var namespaces = new List<MemberDeclarationSyntax>(_namespacedMembers.Count);
             foreach (var pair in _namespacedMembers)
             {

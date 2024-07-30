@@ -99,14 +99,14 @@ namespace Orleans.CodeGenerator
             foreach (var type in MetadataModel.WellKnownTypeIds)
             {
                 body.Add(ExpressionStatement(InvocationExpression(addWellKnownTypeIdMethod,
-                    ArgumentList(SeparatedList(new[] { Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(type.Id))), Argument(TypeOfExpression(type.Type)) })))));
+                    ArgumentList(SeparatedList([Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(type.Id))), Argument(TypeOfExpression(type.Type))])))));
             }
 
             var addTypeAliasMethod = configParam.Member("WellKnownTypeAliases").Member("Add");
             foreach (var type in MetadataModel.TypeAliases)
             {
                 body.Add(ExpressionStatement(InvocationExpression(addTypeAliasMethod,
-                    ArgumentList(SeparatedList(new[] { Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(type.Alias))), Argument(TypeOfExpression(type.Type)) })))));
+                    ArgumentList(SeparatedList([Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(type.Alias))), Argument(TypeOfExpression(type.Type))])))));
             }
 
             AddCompoundTypeAliases(configParam, body);

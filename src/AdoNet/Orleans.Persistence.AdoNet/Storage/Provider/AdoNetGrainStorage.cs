@@ -118,7 +118,7 @@ namespace Orleans.Storage
         /// <summary>
         /// The hash generator used to hash natural keys, grain ID and grain type to a more narrow index.
         /// </summary>
-        public IStorageHasherPicker HashPicker { get; set; } = new StorageHasherPicker(new[] { new OrleansDefaultHasher() });
+        public IStorageHasherPicker HashPicker { get; set; } = new StorageHasherPicker([new OrleansDefaultHasher()]);
 
         private readonly AdoNetGrainStorageOptions options;
         private readonly IProviderRuntime providerRuntime;

@@ -58,7 +58,7 @@ namespace Orleans.Providers.Streams.Generator
         /// <inheritdoc />
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
-            return new[] { Tuple.Create((T)Payload, SequenceToken) };
+            return [Tuple.Create((T)Payload, SequenceToken)];
         }
 
         /// <inheritdoc />

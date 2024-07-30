@@ -69,6 +69,6 @@ namespace Orleans.Serialization.TestKit
         [Pure]
         public ReadOnlySequence<byte> GetReadOnlySequence(int maxSegmentSize) => _committed.SelectMany(b => b).Batch(maxSegmentSize).ToReadOnlySequence();
 
-        public ReadOnlySequence<byte> PeekAllBuffers() => _committed.Concat(new[] { _current }).ToReadOnlySequence();
+        public ReadOnlySequence<byte> PeekAllBuffers() => _committed.Concat([_current]).ToReadOnlySequence();
     }
 }

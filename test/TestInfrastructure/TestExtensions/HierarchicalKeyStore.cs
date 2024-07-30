@@ -133,7 +133,7 @@ namespace Orleans.Storage
         {
             if (numKeyLayers == keys.Count)
             {
-                return new[] { GetDataStore(keys) };
+                return [GetDataStore(keys)];
             }
 
             var results = new List<IDictionary<string, object>>();

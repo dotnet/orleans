@@ -183,7 +183,7 @@ namespace Orleans.Clustering.DynamoDB
                 };
 
                 var entries = await storage.GetEntriesTxAsync(this.options.TableName,
-                    new[] {siloEntryKeys, versionEntryKeys}, fields => new SiloInstanceRecord(fields));
+                    [siloEntryKeys, versionEntryKeys], fields => new SiloInstanceRecord(fields));
 
                 MembershipTableData data = Convert(entries.ToList());
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Read my entry {SiloAddress} Table: {TableData}", siloAddress.ToString(), data.ToString());
@@ -287,7 +287,7 @@ namespace Orleans.Clustering.DynamoDB
                     (versionEntryUpdate.UpdateExpression, versionEntryUpdate.ExpressionAttributeValues) =
                         this.storage.ConvertUpdate(versionEntry.GetFields(), conditionalValues);
 
-                    await this.storage.WriteTxAsync(new[] {tableEntryInsert}, new[] {versionEntryUpdate});
+                    await this.storage.WriteTxAsync([tableEntryInsert], [versionEntryUpdate]);
 
                     result = true;
                 }
@@ -378,7 +378,7 @@ namespace Orleans.Clustering.DynamoDB
                     (versionEntryUpdate.UpdateExpression, versionEntryUpdate.ExpressionAttributeValues) =
                         this.storage.ConvertUpdate(versionEntry.GetFields(), versionConditionalValues);
 
-                    await this.storage.WriteTxAsync(updates: new[] {siloEntryUpdate, versionEntryUpdate});
+                    await this.storage.WriteTxAsync(updates: [siloEntryUpdate, versionEntryUpdate]);
                     result = true;
                 }
                 catch (TransactionCanceledException canceledException)

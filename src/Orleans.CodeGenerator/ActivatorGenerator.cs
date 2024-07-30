@@ -98,7 +98,7 @@ namespace Orleans.CodeGenerator
             {
                 return InvocationExpression(
                     MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), IdentifierName("UnwrapService")),
-                    ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(expr) })));
+                    ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(expr)])));
             }
         }
 

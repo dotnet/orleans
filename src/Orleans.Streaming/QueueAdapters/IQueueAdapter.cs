@@ -62,7 +62,7 @@ namespace Orleans.Streams
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
         public static Task QueueMessageAsync<T>(this IQueueAdapter adapter, StreamId streamId, T evt, StreamSequenceToken token, Dictionary<string, object> requestContext)
         {
-            return adapter.QueueMessageBatchAsync(streamId, new[] { evt }, token, requestContext);
+            return adapter.QueueMessageBatchAsync(streamId, [evt], token, requestContext);
         }
     }
 }

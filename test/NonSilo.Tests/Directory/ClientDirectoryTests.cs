@@ -184,7 +184,7 @@ namespace NonSilo.Tests.Directory
                 Assert.Equal(0, remoteSiloVersion);
 
                 var result = ImmutableDictionary.CreateBuilder<SiloAddress, (ImmutableHashSet<GrainId>, long)>();
-                result[remoteSilo] = (ImmutableHashSet.CreateRange(new[] { remoteClientId, remoteClientId2 }), 2);
+                result[remoteSilo] = (ImmutableHashSet.CreateRange([remoteClientId, remoteClientId2]), 2);
                 return Task.FromResult(result.ToImmutable());
             });
 
@@ -234,7 +234,7 @@ namespace NonSilo.Tests.Directory
                     }
 
                     var result = ImmutableDictionary.CreateBuilder<SiloAddress, (ImmutableHashSet<GrainId>, long)>();
-                    result[remoteSilo] = (ImmutableHashSet.CreateRange(new[] { remoteClientId, remoteClientId2 }), 2);
+                    result[remoteSilo] = (ImmutableHashSet.CreateRange([remoteClientId, remoteClientId2]), 2);
                     return Task.FromResult(result.ToImmutable());
                 });
 
@@ -283,7 +283,7 @@ namespace NonSilo.Tests.Directory
                 remoteDirectory.GetClientRoutes(default).ReturnsForAnyArgs(info =>
                 {
                     var result = ImmutableDictionary.CreateBuilder<SiloAddress, (ImmutableHashSet<GrainId>, long)>();
-                    result[silo] = (ImmutableHashSet.CreateRange(new[] { remoteClientId }), 2);
+                    result[silo] = (ImmutableHashSet.CreateRange([remoteClientId]), 2);
                     return Task.FromResult(result.ToImmutable());
                 });
 
@@ -323,8 +323,8 @@ namespace NonSilo.Tests.Directory
             _clusterMembershipService.UpdateSiloStatus(remoteSilo2, SiloStatus.Active, "remoteSilo2");
 
             var builder = ImmutableDictionary.CreateBuilder<SiloAddress, (ImmutableHashSet<GrainId>, long)>();
-            builder[remoteSilo] = (ImmutableHashSet.CreateRange(new[] { remoteClientId, remoteClientId2 }), 3);
-            builder[remoteSilo2] = (ImmutableHashSet.CreateRange(new[] { remoteClientId, remoteClientId2 }), 3);
+            builder[remoteSilo] = (ImmutableHashSet.CreateRange([remoteClientId, remoteClientId2]), 3);
+            builder[remoteSilo2] = (ImmutableHashSet.CreateRange([remoteClientId, remoteClientId2]), 3);
             await _directory.OnUpdateClientRoutes(builder.ToImmutable());
             Assert.Equal(1, totalUpdateCalls[0]);
 
@@ -336,7 +336,7 @@ namespace NonSilo.Tests.Directory
             // Add clients locally and see that they are propagated to the new successor.
             SetLocalClients([remoteClientId, remoteClientId2]);
             builder = ImmutableDictionary.CreateBuilder<SiloAddress, (ImmutableHashSet<GrainId>, long)>();
-            builder[oldSuccessor] = (ImmutableHashSet.CreateRange(new[] { remoteClientId2 }), 4);
+            builder[oldSuccessor] = (ImmutableHashSet.CreateRange([remoteClientId2]), 4);
             await _directory.OnUpdateClientRoutes(builder.ToImmutable());
             Assert.Equal(1, totalUpdateCalls[0]);
         }

@@ -53,8 +53,8 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         public TestEnvironmentSettings DefaultSettings { get; } = new TestEnvironmentSettings
         {
-            ConnectionStrings = new Collection<StorageConnection>(new List<StorageConnection>(new[]
-            {
+            ConnectionStrings = new Collection<StorageConnection>(new List<StorageConnection>(
+            [
                 new StorageConnection
                 {
                     StorageInvariant = AdoNetInvariants.InvariantNameSqlServer,
@@ -70,7 +70,7 @@ namespace UnitTests.StorageTests.Relational
                     StorageInvariant = AdoNetInvariants.InvariantNamePostgreSql,
                     ConnectionString = TestDefaultConfiguration.PostgresConnectionString
                 }
-            })),
+            ])),
             EnvironmentId = "Default"
         };
 

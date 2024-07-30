@@ -170,7 +170,7 @@ namespace Orleans
 
         public MembershipTableData(Tuple<MembershipEntry, string> tuple, TableVersion version)
         {
-            Members = new[] { tuple };
+            Members = [tuple];
             Version = version;
         }
 

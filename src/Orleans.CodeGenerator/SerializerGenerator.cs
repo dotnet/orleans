@@ -175,7 +175,7 @@ namespace Orleans.CodeGenerator
 
                         var codec = InvocationExpression(
                             IdentifierName("OrleansGeneratedCodeHelper").Member(GenericName(Identifier("GetService"), TypeArgumentList(SingletonSeparatedList(field.FieldType)))),
-                            ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(IdentifierName("codecProvider")) })));
+                            ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(IdentifierName("codecProvider"))])));
 
                         statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), codec)));
                         break;
@@ -191,7 +191,7 @@ namespace Orleans.CodeGenerator
             {
                 return InvocationExpression(
                     IdentifierName("OrleansGeneratedCodeHelper").Member("UnwrapService"),
-                    ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(expr) })));
+                    ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(expr)])));
             }
         }
 
@@ -325,7 +325,7 @@ namespace Orleans.CodeGenerator
                     ExpressionStatement(
                         InvocationExpression(
                             BaseTypeSerializerFieldName.ToIdentifierName().Member(SerializeMethodName),
-                            ArgumentList(SeparatedList(new[] { Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)), Argument(instanceParam) })))));
+                            ArgumentList(SeparatedList([Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)), Argument(instanceParam)])))));
                 body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
             }
 
@@ -603,7 +603,7 @@ namespace Orleans.CodeGenerator
 
                     ExpressionSyntax readValueExpression = InvocationExpression(
                         codecExpression.Member("ReadValue"),
-                        ArgumentList(SeparatedList(new[] { Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)), Argument(headerVar) })));
+                        ArgumentList(SeparatedList([Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)), Argument(headerVar)])));
 
                     var memberAssignment = ExpressionStatement(member.GetSetter(instanceParam, readValueExpression));
 
@@ -665,7 +665,7 @@ namespace Orleans.CodeGenerator
 
                 body.Add(ExpressionStatement(InvocationExpression(
                     IdentifierName($"_hook{hookIndex}").Member(callbackMethodName),
-                    ArgumentList(SeparatedList(new[] { argument })))));
+                    ArgumentList(SeparatedList([argument])))));
             }
         }
 
@@ -854,7 +854,7 @@ namespace Orleans.CodeGenerator
             if (type.TrackReferences)
             {
                 // C#: ReferenceCodec.RecordObject(reader.Session, result);
-                innerBody.Add(ExpressionStatement(InvocationExpression(IdentifierName("ReferenceCodec").Member("RecordObject"), ArgumentList(SeparatedList(new[] { Argument(readerParam.Member("Session")), Argument(resultVar) })))));
+                innerBody.Add(ExpressionStatement(InvocationExpression(IdentifierName("ReferenceCodec").Member("RecordObject"), ArgumentList(SeparatedList([Argument(readerParam.Member("Session")), Argument(resultVar)])))));
             }
             else
             {
@@ -979,7 +979,7 @@ namespace Orleans.CodeGenerator
             ExpressionSyntax codecExpression = staticCodec.CodecType.ToNameSyntax();
             ExpressionSyntax readValueExpression = InvocationExpression(
                 codecExpression.Member("ReadValue"),
-                ArgumentList(SeparatedList(new[] { Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)), Argument(fieldParam) })));
+                ArgumentList(SeparatedList([Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)), Argument(fieldParam)])));
 
             readValueExpression = CastExpression(type.TypeSyntax, readValueExpression);
             var body = new List<StatementSyntax>

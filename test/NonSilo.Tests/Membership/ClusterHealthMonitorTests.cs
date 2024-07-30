@@ -33,7 +33,7 @@ namespace NonSilo.Tests.Membership
         public ClusterHealthMonitorTests(ITestOutputHelper output)
         {
             this.output = output;
-            this.loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(this.output) });
+            this.loggerFactory = new LoggerFactory([new XunitLoggerProvider(this.output)]);
 
             this.localSiloDetails = Substitute.For<ILocalSiloDetails>();
             this.localSilo = Silo("127.0.0.1:100@100");

@@ -31,14 +31,14 @@ namespace Orleans.Transactions.Tests
             ITransactionAttributionGrain top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid());
             List<ITransactionAttributionGrain>[] tiers = 
             [
-                new List<ITransactionAttributionGrain>(new[] {
+                new List<ITransactionAttributionGrain>([
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid()),
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Suppress),
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin),
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create),
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Supported),
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.NotAllowed)
-                    })
+                    ])
             ];
 
             List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
@@ -90,14 +90,14 @@ namespace Orleans.Transactions.Tests
             ITransactionAttributionGrain top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
             List<ITransactionAttributionGrain>[] tiers =
             [
-                new List<ITransactionAttributionGrain>(new[] {
+                new List<ITransactionAttributionGrain>([
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid()),
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Suppress),
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin),
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create),
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Join),
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Supported)
-                    })
+                    ])
             ];
 
             List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
@@ -145,10 +145,10 @@ namespace Orleans.Transactions.Tests
             ITransactionAttributionGrain top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin);
             List<ITransactionAttributionGrain>[] tiers =
             [
-                new List<ITransactionAttributionGrain>(new[] {
+                new List<ITransactionAttributionGrain>([
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin),
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin),
-                    })
+                    ])
             ];
 
             List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
@@ -180,10 +180,10 @@ namespace Orleans.Transactions.Tests
             ITransactionAttributionGrain top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
             List<ITransactionAttributionGrain>[] tiers =
             [
-                new List<ITransactionAttributionGrain>(new[] {
+                new List<ITransactionAttributionGrain>([
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create),
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create),
-                    })
+                    ])
             ];
 
             List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
@@ -221,12 +221,12 @@ namespace Orleans.Transactions.Tests
             ITransactionAttributionGrain top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
             List<ITransactionAttributionGrain>[] tiers =
             [
-                new List<ITransactionAttributionGrain>(new[] {
+                new List<ITransactionAttributionGrain>([
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Supported),
-                    }),
-                new List<ITransactionAttributionGrain>(new[] {
+                    ]),
+                new List<ITransactionAttributionGrain>([
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin),
-                    })
+                    ])
             ];
 
             List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
@@ -262,9 +262,9 @@ namespace Orleans.Transactions.Tests
             ITransactionAttributionGrain fail = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid());
             List<ITransactionAttributionGrain>[] tiers =
             [
-                new List<ITransactionAttributionGrain>(new[] {
+                new List<ITransactionAttributionGrain>([
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Join),
-                    })
+                    ])
             ];
 
             await Assert.ThrowsAsync<NotSupportedException>(() => fail.GetNestedTransactionIds(0, tiers));
@@ -276,9 +276,9 @@ namespace Orleans.Transactions.Tests
             ITransactionAttributionGrain fail = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
             List<ITransactionAttributionGrain>[] tiers =
             [
-                new List<ITransactionAttributionGrain>(new[] {
+                new List<ITransactionAttributionGrain>([
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.NotAllowed),
-                    })
+                    ])
             ];
 
             OrleansTransactionAbortedException exception = await Assert.ThrowsAsync<OrleansTransactionAbortedException>(() => fail.GetNestedTransactionIds(0, tiers));

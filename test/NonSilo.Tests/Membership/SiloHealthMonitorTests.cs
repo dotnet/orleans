@@ -36,7 +36,7 @@ namespace NonSilo.Tests.Membership
         public SiloHealthMonitorTests(ITestOutputHelper output)
         {
             _output = output;
-            _loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(_output) });
+            _loggerFactory = new LoggerFactory([new XunitLoggerProvider(_output)]);
 
             _localSiloDetails = Substitute.For<ILocalSiloDetails>();
             _localSilo = Silo("127.0.0.1:100@100");

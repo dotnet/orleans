@@ -23,8 +23,8 @@ namespace Orleans.Transactions.TestKit
             ITransactionTestGrain grain1 = RandomTestGrain(grainStates);
             ITransactionTestGrain grain2 = RandomTestGrain(grainStates);
             ITransactionTestGrain sharedGrain = RandomTestGrain(grainStates);
-            List<ITransactionTestGrain> transaction1Members = new List<ITransactionTestGrain>(new[] { grain1, sharedGrain });
-            List<ITransactionTestGrain> transaction2Members = new List<ITransactionTestGrain>(new[] { grain2, sharedGrain });
+            List<ITransactionTestGrain> transaction1Members = new List<ITransactionTestGrain>([grain1, sharedGrain]);
+            List<ITransactionTestGrain> transaction2Members = new List<ITransactionTestGrain>([grain2, sharedGrain]);
             
             ITransactionCoordinatorGrain coordinator1 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
             ITransactionCoordinatorGrain coordinator2 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
@@ -54,10 +54,10 @@ namespace Orleans.Transactions.TestKit
             ITransactionTestGrain grain3 = RandomTestGrain(grainStates);
             ITransactionTestGrain grain4 = RandomTestGrain(grainStates);
             ITransactionTestGrain grain5 = RandomTestGrain(grainStates);
-            List<ITransactionTestGrain> transaction1Members = new List<ITransactionTestGrain>(new[] { grain1, grain2 });
-            List<ITransactionTestGrain> transaction2Members = new List<ITransactionTestGrain>(new[] { grain2, grain3 });
-            List<ITransactionTestGrain> transaction3Members = new List<ITransactionTestGrain>(new[] { grain3, grain4 });
-            List<ITransactionTestGrain> transaction4Members = new List<ITransactionTestGrain>(new[] { grain4, grain5 });
+            List<ITransactionTestGrain> transaction1Members = new List<ITransactionTestGrain>([grain1, grain2]);
+            List<ITransactionTestGrain> transaction2Members = new List<ITransactionTestGrain>([grain2, grain3]);
+            List<ITransactionTestGrain> transaction3Members = new List<ITransactionTestGrain>([grain3, grain4]);
+            List<ITransactionTestGrain> transaction4Members = new List<ITransactionTestGrain>([grain4, grain5]);
 
             ITransactionCoordinatorGrain coordinator1 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
             ITransactionCoordinatorGrain coordinator2 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
@@ -94,9 +94,9 @@ namespace Orleans.Transactions.TestKit
             ITransactionTestGrain grain2 = RandomTestGrain(grainStates);
             ITransactionTestGrain grain3 = RandomTestGrain(grainStates);
             ITransactionTestGrain grain4 = RandomTestGrain(grainStates);
-            List<ITransactionTestGrain> transaction1Members = new List<ITransactionTestGrain>(new[] { grain1, grain2 });
-            List<ITransactionTestGrain> transaction2Members = new List<ITransactionTestGrain>(new[] { grain3, grain4 });
-            List<ITransactionTestGrain> transaction3Members = new List<ITransactionTestGrain>(new[] { grain2, grain3 });
+            List<ITransactionTestGrain> transaction1Members = new List<ITransactionTestGrain>([grain1, grain2]);
+            List<ITransactionTestGrain> transaction2Members = new List<ITransactionTestGrain>([grain3, grain4]);
+            List<ITransactionTestGrain> transaction3Members = new List<ITransactionTestGrain>([grain2, grain3]);
 
             ITransactionCoordinatorGrain coordinator1 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
             ITransactionCoordinatorGrain coordinator2 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());

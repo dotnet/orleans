@@ -8,7 +8,7 @@ namespace Analyzers.Tests
     public class AlwaysInterleaveDiagnosticAnalyzerTest : DiagnosticAnalyzerTestBase<AlwaysInterleaveDiagnosticAnalyzer>
     {
         protected override Task<(Diagnostic[], string)> GetDiagnosticsAsync(string source, params string[] extraUsings)
-            => base.GetDiagnosticsAsync(source, extraUsings.Concat(new[] { "Orleans.Concurrency" }).ToArray());
+            => base.GetDiagnosticsAsync(source, extraUsings.Concat(["Orleans.Concurrency"]).ToArray());
 
         [Fact]
         public async Task AlwaysInterleave_Analyzer_NoWarningsIfAttributeIsNotUsed() => await this.AssertNoDiagnostics(@"

@@ -400,15 +400,14 @@ namespace Orleans.CodeGenerator
                     SwitchSection(
                         SingletonList<SwitchLabelSyntax>(label),
                         new SyntaxList<StatementSyntax>(
-                            new StatementSyntax[]
-                            {
+                            [
                                 ExpressionStatement(
                                     AssignmentExpression(
                                         SyntaxKind.SimpleAssignmentExpression,
                                         IdentifierName(parameter.FieldName),
                                         CastExpression(parameter.FieldType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions), value))),
                                 ReturnStatement()
-                            })));
+                            ])));
             }
 
             // C#: default: OrleansGeneratedCodeHelper.InvokableThrowArgumentOutOfRange(index, {maxArgs})
@@ -421,8 +420,7 @@ namespace Orleans.CodeGenerator
                 SwitchSection(
                     SingletonList<SwitchLabelSyntax>(DefaultSwitchLabel()),
                     new SyntaxList<StatementSyntax>(
-                        new StatementSyntax[]
-                        {
+                        [
                             ExpressionStatement(
                                 InvocationExpression(
                                     throwHelperMethod,
@@ -437,7 +435,7 @@ namespace Orleans.CodeGenerator
                                                         Literal(maxArgs)))
                                             })))),
                             ReturnStatement()
-                        })));
+                        ])));
             var body = SwitchStatement(index, new SyntaxList<SwitchSectionSyntax>(cases));
             return MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "SetArgument")
                 .WithParameterList(
@@ -687,7 +685,7 @@ namespace Orleans.CodeGenerator
             foreach (var (methodName, methodArgument) in method.CustomInitializerMethods)
             {
                 var argumentExpression = methodArgument.ToExpression();
-                body.Add(ExpressionStatement(InvocationExpression(IdentifierName(methodName), ArgumentList(SeparatedList(new[] { Argument(argumentExpression) })))));
+                body.Add(ExpressionStatement(InvocationExpression(IdentifierName(methodName), ArgumentList(SeparatedList([Argument(argumentExpression)])))));
             }
 
             if (body.Count == 0 && parameters.Count == 0)

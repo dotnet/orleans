@@ -14,7 +14,7 @@ namespace UnitTests.StorageTests.Relational
     /// </summary>
     public abstract class RelationalStorageTests
     {
-        private IStorageHasherPicker ConstantHasher { get; } = new StorageHasherPicker(new[] { new ConstantHasher() });
+        private IStorageHasherPicker ConstantHasher { get; } = new StorageHasherPicker([new ConstantHasher()]);
 
         /// <summary>
         /// The tests and assertions common across all back-ends are here.

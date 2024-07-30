@@ -22,12 +22,12 @@ namespace Orleans.Configuration
         /// </summary>
         public static void ParseConnectionString(this DynamoDBReminderStorageOptions options, string connectionString)
         {
-            var parameters = connectionString.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+            var parameters = connectionString.Split([ ';' ], StringSplitOptions.RemoveEmptyEntries);
 
             var serviceConfig = parameters.Where(p => p.Contains(ServicePropertyName)).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(serviceConfig))
             {
-                var value = serviceConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                var value = serviceConfig.Split([ '=' ], StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     options.Service = value[1];
             }
@@ -35,7 +35,7 @@ namespace Orleans.Configuration
             var secretKeyConfig = parameters.Where(p => p.Contains(SecretKeyPropertyName)).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(secretKeyConfig))
             {
-                var value = secretKeyConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                var value = secretKeyConfig.Split([ '=' ], StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     options.SecretKey = value[1];
             }
@@ -43,7 +43,7 @@ namespace Orleans.Configuration
             var accessKeyConfig = parameters.Where(p => p.Contains(AccessKeyPropertyName)).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(accessKeyConfig))
             {
-                var value = accessKeyConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                var value = accessKeyConfig.Split([ '=' ], StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     options.AccessKey = value[1];
             }
@@ -51,7 +51,7 @@ namespace Orleans.Configuration
             var readCapacityUnitsConfig = parameters.Where(p => p.Contains(ReadCapacityUnitsPropertyName)).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(readCapacityUnitsConfig))
             {
-                var value = readCapacityUnitsConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                var value = readCapacityUnitsConfig.Split([ '=' ], StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     options.ReadCapacityUnits = int.Parse(value[1]);
             }
@@ -59,7 +59,7 @@ namespace Orleans.Configuration
             var writeCapacityUnitsConfig = parameters.Where(p => p.Contains(WriteCapacityUnitsPropertyName)).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(writeCapacityUnitsConfig))
             {
-                var value = writeCapacityUnitsConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                var value = writeCapacityUnitsConfig.Split([ '=' ], StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     options.WriteCapacityUnits = int.Parse(value[1]);
             }
@@ -67,7 +67,7 @@ namespace Orleans.Configuration
             var useProvisionedThroughputConfig = parameters.Where(p => p.Contains(UseProvisionedThroughputPropertyName)).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(useProvisionedThroughputConfig))
             {
-                var value = useProvisionedThroughputConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                var value = useProvisionedThroughputConfig.Split([ '=' ], StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     options.UseProvisionedThroughput = bool.Parse(value[1]);
             }
@@ -75,7 +75,7 @@ namespace Orleans.Configuration
             var createIfNotExistsPropertyNameConfig = parameters.Where(p => p.Contains(CreateIfNotExistsPropertyName)).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(createIfNotExistsPropertyNameConfig))
             {
-                var value = createIfNotExistsPropertyNameConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                var value = createIfNotExistsPropertyNameConfig.Split([ '=' ], StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     options.CreateIfNotExists = bool.Parse(value[1]);
             }
@@ -83,7 +83,7 @@ namespace Orleans.Configuration
             var updateIfExistsPropertyNameConfig = parameters.Where(p => p.Contains(UpdateIfExistsPropertyName)).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(updateIfExistsPropertyNameConfig))
             {
-                var value = updateIfExistsPropertyNameConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                var value = updateIfExistsPropertyNameConfig.Split([ '=' ], StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     options.UpdateIfExists = bool.Parse(value[1]);
             }
