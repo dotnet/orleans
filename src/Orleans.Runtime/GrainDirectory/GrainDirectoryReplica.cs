@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
@@ -148,8 +149,8 @@ internal sealed partial class GrainDirectoryReplica(
     private void AssertOwnership(GrainId grainId)
     {
         var view = _view;
-        Debug.Assert(view.TryGetOwnerIndex(grainId, out var index));
-        Debug.Assert(_id.Equals(view.Members[index]));
+        Debug.Assert(view.TryGetOwnerIndex(grainId, out var owner));
+        Debug.Assert(_id.Equals(owner));
     }
 
     private ValueTask WaitForRange(GrainId grainId, MembershipVersion version) => WaitForRange(RingRange.FromPoint(grainId.GetUniformHashCode()), version);
@@ -311,43 +312,26 @@ internal sealed partial class GrainDirectoryReplica(
         var previous = _view;
         _view = current;
 
-        var previousRange = previous.GetRingRange(_id);
-        var currentRange = current.GetRingRange(_id);
+        var previousRanges = previous.GetRingRanges(_id);
+        var currentRanges = current.GetRingRanges(_id);
 
-        if (!previousRange.Equals(currentRange))
-        {
-            EvictUnownedRanges(current, currentRange, previous, previousRange);
-        }
-
-        foreach (var addedRange in currentRange.GetAdditions(previousRange))
-        {
-            if (_logger.IsEnabled(LogLevel.Trace))
-            {
-                _logger.LogTrace("Accepting ownership of range '{Range}' (current: '{Current}', previous: '{Previous}').", addedRange, currentRange, previousRange);
-            }
-
-            // Suspend this range and transfer state from the previous owner.
-            // If the predecessor becomes unavailable or membership advances quickly, we will declare data loss and un-wedge the range.
-            tasks.Add(TransferOwnershipAsync(previous, current.Version, addedRange));
-        }
-    }
-
-    private void EvictUnownedRanges(DirectoryMembershipSnapshot current, RingRange currentRange, DirectoryMembershipSnapshot previous, RingRange previousRange)
-    {
         // Snapshot & remove everything not in the current range.
         // The new owner will have the opportunity to retrieve the snapshot as they take ownership.
         List<GrainAddress> removedAddresses = [];
         HashSet<SiloAddress> transferPartners = [];
-        foreach (var removedRange in currentRange.GetRemovals(previousRange))
+        foreach (var removedRange in currentRanges.HashRingRemovals(previousRanges))
         {
-            for (var i = 0; i < current.Ranges.Length; ++i)
+            if (_logger.IsEnabled(LogLevel.Trace))
             {
-                if (current.Ranges[i].Overlaps(removedRange))
+                _logger.LogTrace("Relinquishing ownership of range '{Range}'.", removedRange);
+            }
+
+            foreach (var (range, owner) in current.RangeOwners)
+            {
+                if (range.Overlaps(removedRange))
                 {
-                    var owner = current.Members[i];
                     Debug.Assert(!_id.Equals(owner));
                     transferPartners.Add(owner);
-                    continue;
                 }
             }
 
@@ -371,6 +355,18 @@ internal sealed partial class GrainDirectoryReplica(
         {
             _partitionSnapshots.Add(new PartitionSnapshotState(previous.Version, removedAddresses, transferPartners));
         }
+
+        foreach (var addedRange in currentRanges.HashRingAdditions(previousRanges))
+        {
+            if (_logger.IsEnabled(LogLevel.Trace))
+            {
+                _logger.LogTrace("Accepting ownership of range '{Range}'.", addedRange);
+            }
+
+            // Suspend this range and transfer state from the previous owner.
+            // If the predecessor becomes unavailable or membership advances quickly, we will declare data loss and un-wedge the range.
+            tasks.Add(TransferOwnershipAsync(previous, current.Version, addedRange));
+        }
     }
 
     private async Task TransferOwnershipAsync(DirectoryMembershipSnapshot previous, MembershipVersion currentVersion, RingRange addedRange)
@@ -384,7 +380,6 @@ internal sealed partial class GrainDirectoryReplica(
         var stopwatch = CoarseStopwatch.StartNew();
         try
         {
-            var tasks = new List<Task<bool>>();
             bool success;
 
             // The view change is contiguous if the new version is exactly one greater than the previous version.
@@ -393,15 +388,14 @@ internal sealed partial class GrainDirectoryReplica(
             if (isContiguous)
             {
                 // Transfer subranges previous owners.
-                for (var i = 0; i < previous.Ranges.Length; i++)
+                var tasks = new List<Task<bool>>();
+                foreach (var (previousRange, previousOwner) in previous.RangeOwners)
                 {
-                    var previousRange = previous.Ranges[i];
                     if (!previousRange.Overlaps(addedRange))
                     {
                         continue;
                     }
 
-                    var previousOwner = previous.Members[i];
                     var previousVersion = previous.Version;
                     tasks.Add(TransferRangeAsync(currentVersion, addedRange, previousOwner, previousVersion));
                 }
@@ -511,7 +505,7 @@ internal sealed partial class GrainDirectoryReplica(
         var members = clusterMembershipSnapshot.Members.Values.ToList();
         foreach (var member in members)
         {
-            if (member.Status is not SiloStatus.Active or SiloStatus.Joining)
+            if (member.Status is not (SiloStatus.Active or SiloStatus.Joining))
             {
                 continue;
             }
@@ -572,7 +566,7 @@ internal sealed partial class GrainDirectoryReplica(
                 await _clusterMembershipService.Refresh(default);
                 if (_clusterMembershipService.CurrentSnapshot.Version == clusterMembershipSnapshot.Version)
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(1));
+                    await Task.Delay(TimeSpan.FromMilliseconds(100));
                 }
 
                 clusterMembershipSnapshot = _clusterMembershipService.CurrentSnapshot;

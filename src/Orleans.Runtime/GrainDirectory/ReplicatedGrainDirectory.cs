@@ -10,9 +10,8 @@ namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed partial class ReplicatedGrainDirectory(
     GrainDirectoryReplica localReplica,
-    ILogger<ReplicatedGrainDirectory> logger
-    /*,
-    IServiceProvider serviceProvider*/) : IGrainDirectory
+    ILogger<ReplicatedGrainDirectory> logger)
+    : IGrainDirectory
 {
     public async Task<GrainAddress?> Lookup(GrainId grainId) => await InvokeAsync(
         grainId,
@@ -46,7 +45,7 @@ internal sealed partial class ReplicatedGrainDirectory(
         var view = localReplica.CurrentView;
         while (true)
         {
-            if (!view.TryGetOwnerIndex(grainId, out var ownerIndex))
+            if (!view.TryGetOwnerIndex(grainId, out var owner))
             {
                 if (view.Members.Length == 0 && view.Version.Value > 0)
                 {
@@ -57,7 +56,6 @@ internal sealed partial class ReplicatedGrainDirectory(
                 continue;
             }
 
-            var owner = view.Members[ownerIndex];
             if (logger.IsEnabled(LogLevel.Trace))
             {
                 logger.LogTrace("Invoking '{Operation}' on '{Owner}' for grain '{GrainId}'.", operation, owner, grainId);

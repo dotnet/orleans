@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory;
@@ -43,7 +44,7 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
         _end = start == end && start > 1 ? 1 : end;
     }
 
-    // For testing only.
+    // For internal use only.
     internal static RingRange Create(uint start, uint end) => new (start, end);
 
     public static RingRange CreateEquallyDividedRange(int count, int index)
@@ -118,7 +119,7 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
         }
     }
 
-    internal int Compare(uint n)
+    internal int CompareTo(uint n)
     {
         if (Contains(n))
         {
@@ -126,7 +127,7 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
         }
 
         var start = Start;
-        if (start >= End)
+        if (IsWrapped)
         {
             // Start > End (wrap-around case)
             if (n <= start)
@@ -290,7 +291,6 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
             yield return removal;
         }
     }
-
     public static bool operator ==(RingRange left, RingRange right) => left.Equals(right);
 
     public static bool operator !=(RingRange left, RingRange right) => !(left == right);
