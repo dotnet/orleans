@@ -19,7 +19,7 @@ namespace Tester.AzureUtils
         public static TableServiceClient GetTableServiceClient()
         {
             return TestDefaultConfiguration.UseAadAuthentication
-                ? new(TestDefaultConfiguration.TableEndpoint, Credential)
+                ? new(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential)
                 : new(TestDefaultConfiguration.DataConnectionString);
         }
 
@@ -48,7 +48,7 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.BlobServiceClient = new(TestDefaultConfiguration.DataBlobUri, Credential);
+                options.BlobServiceClient = new(TestDefaultConfiguration.DataBlobUri, TestDefaultConfiguration.TokenCredential);
             }
             else
             {
@@ -62,7 +62,7 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.QueueServiceClient = new(TestDefaultConfiguration.DataQueueUri, Credential);
+                options.QueueServiceClient = new(TestDefaultConfiguration.DataQueueUri, TestDefaultConfiguration.TokenCredential);
             }
             else
             {
@@ -76,7 +76,7 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.BlobServiceClient = new(TestDefaultConfiguration.DataBlobUri, Credential);
+                options.BlobServiceClient = new(TestDefaultConfiguration.DataBlobUri, TestDefaultConfiguration.TokenCredential);
             }
             else
             {

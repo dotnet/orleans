@@ -36,7 +36,7 @@ namespace Tester.Forwarding
             private static TableServiceClient GetTableServiceClient()
             {
                 return TestDefaultConfiguration.UseAadAuthentication
-                    ? new(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential())
+                    ? new(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential)
                     : new(TestDefaultConfiguration.DataConnectionString);
             }
         }
