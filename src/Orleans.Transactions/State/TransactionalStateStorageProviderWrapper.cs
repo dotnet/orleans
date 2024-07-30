@@ -117,6 +117,6 @@ namespace Orleans.Transactions
         public TransactionalStateMetaData Metadata { get; set; } = new TransactionalStateMetaData();
 
         [Id(3)]
-        public List<PendingTransactionState<TState>> PendingStates { get; set; } = new List<PendingTransactionState<TState>>();
+        public List<PendingTransactionState<TState>> PendingStates { get; set; } = [];
     }
 }

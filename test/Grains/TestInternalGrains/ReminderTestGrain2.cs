@@ -41,8 +41,8 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this._id = Guid.NewGuid().ToString();
-            this.allReminders = new Dictionary<string, ReminderState>();
-            this.sequence = new Dictionary<string, long>();
+            this.allReminders = [];
+            this.sequence = [];
             this.period = GetDefaultPeriod(this.logger);
             this.logger.LogInformation("OnActivateAsync.");
             this.filePrefix = "g" + this.GrainId.ToString().Replace('/', '_') + "_";
@@ -252,8 +252,8 @@ namespace UnitTests.Grains
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.myId = new Random().Next();
-            this.allReminders = new Dictionary<string, IGrainReminder>();
-            this.sequence = new Dictionary<string, long>();
+            this.allReminders = [];
+            this.sequence = [];
             this.period = ReminderTestGrain2.GetDefaultPeriod(this.logger);
             this.logger.LogInformation("OnActivateAsync.");
             this.filePrefix = "gc" + this.GrainId.Key + "_";

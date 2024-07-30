@@ -83,16 +83,14 @@ namespace Orleans.Storage
                     this.options.UpdateIfExists);
 
                 await storage.InitializeTable(this.options.TableName,
-                    new List<KeySchemaElement>
-                    {
+                    [
                         new KeySchemaElement { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, KeyType = KeyType.HASH },
                         new KeySchemaElement { AttributeName = GRAIN_TYPE_PROPERTY_NAME, KeyType = KeyType.RANGE }
-                    },
-                    new List<AttributeDefinition>
-                    {
+                    ],
+                    [
                         new AttributeDefinition { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
                         new AttributeDefinition { AttributeName = GRAIN_TYPE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
-                    },
+                    ],
                     secondaryIndexes: null,
                     ttlAttributeName: this.options.TimeToLive.HasValue ? GRAIN_TTL_PROPERTY_NAME : null);
                 stopWatch.Stop();
@@ -232,9 +230,11 @@ namespace Orleans.Storage
             }
             else
             {
-                var keys = new Dictionary<string, AttributeValue>();
-                keys.Add(GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(record.GrainReference));
-                keys.Add(GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType));
+                var keys = new Dictionary<string, AttributeValue>
+                {
+                    { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(record.GrainReference) },
+                    { GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType) }
+                };
 
                 int currentEtag;
                 int.TryParse(grainState.ETag, out currentEtag);
@@ -284,9 +284,11 @@ namespace Orleans.Storage
                 if (this.options.DeleteStateOnClear)
                 {
                     operation = "Deleting";
-                    var keys = new Dictionary<string, AttributeValue>();
-                    keys.Add(GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(record.GrainReference));
-                    keys.Add(GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType));
+                    var keys = new Dictionary<string, AttributeValue>
+                    {
+                        { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(record.GrainReference) },
+                        { GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType) }
+                    };
 
                     await this.storage.DeleteEntryAsync(this.options.TableName, keys).ConfigureAwait(false);
                     grainState.ETag = null;

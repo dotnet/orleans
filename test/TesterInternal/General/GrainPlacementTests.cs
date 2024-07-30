@@ -24,7 +24,7 @@ namespace UnitTests.General
                 Select(
                     n =>
                         _fixture.GrainFactory.GetGrain<IRandomPlacementTestGrain>(Guid.NewGuid()));
-            List<string> places = new();
+            List<string> places = [];
             foreach (var grain in grains)
             {
                 places.Add(await grain.GetRuntimeInstanceId());
@@ -140,7 +140,7 @@ namespace UnitTests.General
             const int sampleSize = 5;
             var placement = new StatelessWorkerPlacement(sampleSize);
             var proxy = _fixture.GrainFactory.GetGrain<IRandomPlacementTestGrain>(Guid.NewGuid());
-            await proxy.StartLocalGrains(new List<Guid> { Guid.Empty });
+            await proxy.StartLocalGrains([Guid.Empty]);
             var expected = await proxy.GetEndpoint();
             // locally placed grains are multi-activation and stateless. this means that we have to sample the value of
             // the result, rather than simply ask for it once in order to get a consensus of the result.

@@ -119,7 +119,7 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task Reentrancy_Deadlock_1()
         {
-            List<Task> done = new List<Task>();
+            List<Task> done = [];
             var grain1 = this.fixture.GrainFactory.GetGrain<IReentrantSelfManagedGrain>(1);
             await grain1.SetDestination(2);
             done.Add(grain1.Ping(15));
@@ -136,7 +136,7 @@ namespace UnitTests
         [Fact(Skip = "Ignore"), TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task Reentrancy_Deadlock_2()
         {
-            List<Task> done = new List<Task>();
+            List<Task> done = [];
             var grain1 = this.fixture.GrainFactory.GetGrain<INonReentrantSelfManagedGrain>(1);
             await grain1.SetDestination(2);
 
@@ -317,7 +317,7 @@ namespace UnitTests
             bool doNonReentrant, bool doAC)
         {
             Stopwatch totalTime = Stopwatch.StartNew();
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             for (int i = 0; i < numLoops; i++)
             {
                 output.WriteLine("Start loop {0}", i);

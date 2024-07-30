@@ -103,7 +103,7 @@ namespace Orleans.Storage
         /// that is either <see cref="Type.AssemblyQualifiedName"/> or <see cref="Type.FullName"/>.
         /// <see cref="ExtractBaseClass(string)"/>.
         /// </summary>
-        private static char[] BaseClassExtractionSplitDelimeters { get; } = new[] { '[', ']' };
+        private static char[] BaseClassExtractionSplitDelimeters { get; } = ['[', ']'];
 
         /// <summary>
         /// The default query to initialize this structure from the Orleans database.

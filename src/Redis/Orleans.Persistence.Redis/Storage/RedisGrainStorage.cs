@@ -241,7 +241,7 @@ namespace Orleans.Persistence
                           return -1
                         end
                         """;
-                    response = await _db.ScriptEvaluateAsync(DeleteScript, keys: new[] { key }, values: new[] { etag }).ConfigureAwait(false);
+                    response = await _db.ScriptEvaluateAsync(DeleteScript, keys: [key], values: [etag]).ConfigureAwait(false);
                     newETag = null;
                 }
                 else
@@ -257,7 +257,7 @@ namespace Orleans.Persistence
                         end
                         """;
                     newETag = Guid.NewGuid().ToString("N");
-                    response = await _db.ScriptEvaluateAsync(ClearScript, keys: new[] { key }, values: new RedisValue[] { etag, newETag }).ConfigureAwait(false);
+                    response = await _db.ScriptEvaluateAsync(ClearScript, keys: [key], values: [etag, newETag]).ConfigureAwait(false);
                 }
 
                 if (response is not null && (int)response == -1)

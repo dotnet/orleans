@@ -136,7 +136,7 @@ namespace Orleans.Streams
             ConcurrentDictionary<SiloAddress, bool> immatureSilos, 
             Dictionary<string, List<QueueId>> idealDistribution)
         {
-            HashSet<QueueId> queuesOfImmatureSilos = new HashSet<QueueId>();
+            HashSet<QueueId> queuesOfImmatureSilos = [];
             foreach (var silo in immatureSilos.Where(s => s.Value)) // take only those from immature set that have their immature status bit set
             {
                 string siloName;
@@ -159,7 +159,7 @@ namespace Orleans.Streams
 
         private async Task SignalClusterChange(HashSet<SiloAddress> activeSilos)
         {
-            List<Task> tasks = new List<Task>();
+            List<Task> tasks = [];
             // look at all currently active silos not including myself
             foreach (var silo in activeSilos)
             {

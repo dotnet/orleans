@@ -258,7 +258,7 @@ namespace Orleans.Runtime.Versions
 
                     if (!available.TryGetValue(id, out var versions))
                     {
-                        available[id] = new List<ushort> { version };
+                        available[id] = [version];
                     }
                     else if (!versions.Contains(version))
                     {
@@ -267,7 +267,7 @@ namespace Orleans.Runtime.Versions
 
                     if (!supportedInterfaces.TryGetValue((id, version), out var supportedSilos))
                     {
-                        supportedInterfaces[(id, version)] = new List<SiloAddress> { silo };
+                        supportedInterfaces[(id, version)] = [silo];
                     }
                     else if (!supportedSilos.Contains(silo))
                     {
@@ -280,7 +280,7 @@ namespace Orleans.Runtime.Versions
                     var id = grainType.Key;
                     if (!supportedGrains.TryGetValue(id, out var supportedSilos))
                     {
-                        supportedGrains[id] = new List<SiloAddress> { silo };
+                        supportedGrains[id] = [silo];
                     }
                     else if (!supportedSilos.Contains(silo))
                     {
@@ -329,8 +329,8 @@ namespace Orleans.Runtime.Versions
 
             public MajorMinorVersion Version { get; }
             public Dictionary<GrainInterfaceType, ushort[]> AvailableVersions { get; } 
-            public Dictionary<(GrainInterfaceType, ushort), SiloAddress[]> SupportedSilosByInterface { get; } = new Dictionary<(GrainInterfaceType, ushort), SiloAddress[]>();
-            public Dictionary<GrainType, SiloAddress[]> SupportedSilosByGrainType { get; } = new Dictionary<GrainType, SiloAddress[]>();
+            public Dictionary<(GrainInterfaceType, ushort), SiloAddress[]> SupportedSilosByInterface { get; } = [];
+            public Dictionary<GrainType, SiloAddress[]> SupportedSilosByGrainType { get; } = [];
         }
     }
 }

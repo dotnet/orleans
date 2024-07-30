@@ -19,7 +19,7 @@ namespace Tester.StorageFacet.Infrastructure
             }
             // use generic type args to define collection type.
             MethodInfo genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
-            object[] args = new object[] {attribute.StorageProviderName, config};
+            object[] args = [attribute.StorageProviderName, config];
             return context => Create(context, genericCreate, args);
         }
 

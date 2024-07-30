@@ -181,7 +181,7 @@ namespace UnitTests.Grains
         {
             _logger = logger;
             _observer = null;
-            _timers = new Dictionary<IDisposable, TimerState>();
+            _timers = [];
 
             _itemsProduced = 0;
             _expectedItemsProduced = 0;
@@ -467,7 +467,7 @@ namespace UnitTests.Grains
             var activationId = _grainContext.ActivationId;
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ProducerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + activationId);
             _logger.LogInformation("OnActivateAsync");
-             _producers = new List<IProducerObserver>();
+             _producers = [];
             _cleanedUpFlag = new InterlockedFlag();
             return Task.CompletedTask;
         }
@@ -586,7 +586,7 @@ namespace UnitTests.Grains
             _logger.LogInformation("OnActivateAsync");
             if (State.Producers == null)
             {
-                State.Producers = new List<IProducerObserver>();
+                State.Producers = [];
                 _producers = State.Producers;
             }
             else
@@ -658,7 +658,7 @@ namespace UnitTests.Grains
             var activationId = _grainContext.ActivationId;
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + activationId);
             _logger.LogInformation("OnActivateAsync");
-            _observers = new List<IConsumerObserver>();
+            _observers = [];
             return Task.CompletedTask;
         }
 
@@ -725,7 +725,7 @@ namespace UnitTests.Grains
 
             if (State.Consumers == null)
             {
-                State.Consumers = new List<IConsumerObserver>();
+                State.Consumers = [];
                 _observers = State.Consumers;
             }
             else
@@ -897,7 +897,7 @@ namespace UnitTests.Grains
             var activationId = RuntimeContext.Current.ActivationId;
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ImplicitConsumerGrain1 " + RuntimeIdentity + "/" + IdentityString + "/" + activationId);
             _logger.LogInformation("{Type}.OnActivateAsync", GetType().FullName);
-            _observers = new Dictionary<string, IConsumerObserver>();
+            _observers = [];
             return Task.CompletedTask;
         }
 

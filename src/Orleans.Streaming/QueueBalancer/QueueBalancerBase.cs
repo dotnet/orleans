@@ -39,7 +39,7 @@ namespace Orleans.Streams
             this.clusterMembershipUpdates = clusterMembership.MembershipUpdates;
             this.SiloAddress = localSiloDetails.SiloAddress;
             this.Logger = logger;
-            this.queueBalanceListeners = new List<IStreamQueueBalanceListener>();
+            this.queueBalanceListeners = [];
             this.cts = new CancellationTokenSource();
         }
 

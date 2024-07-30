@@ -161,15 +161,15 @@ namespace Orleans.CodeGenerator
                             { } argument => new[] { Argument(TypeOfExpression(typeKey.TypeValue.ToOpenTypeSyntax())), argument },
 
                             // Call the one-argument Add overload to add only a key.
-                            _ => new[] { Argument(TypeOfExpression(typeKey.TypeValue.ToOpenTypeSyntax())) },
+                            _ => [Argument(TypeOfExpression(typeKey.TypeValue.ToOpenTypeSyntax()))],
                         },
                         { IsString: true } stringKey => valueExpression switch
                         {
                             // Call the two-argument Add overload to add a key and value.
-                            { } argument => new[] { Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(stringKey.StringValue))), argument },
+                            { } argument => [Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(stringKey.StringValue))), argument],
 
                             // Call the one-argument Add overload to add only a key.
-                            _ => new[] { Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(stringKey.StringValue))) },
+                            _ => [Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(stringKey.StringValue)))],
                         },
                         _ => throw new InvalidOperationException("Unexpected alias key")
                     };

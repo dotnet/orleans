@@ -10,7 +10,7 @@ namespace UnitTests.Grains
         public List<string> Names { get; set; }
         public Initialized_State()
         {
-            Names = new List<string>();
+            Names = [];
         }
     }
 

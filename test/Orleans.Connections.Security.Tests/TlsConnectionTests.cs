@@ -17,7 +17,7 @@ namespace Orleans.Connections.Security.Tests
         {
             var original = TestCertificateHelper.CreateSelfSignedCertificate(
                 CertificateSubjectName,
-                new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid });
+                [TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid]);
             var encoded = TestCertificateHelper.ConvertToBase64(original);
             var decoded = TestCertificateHelper.ConvertFromBase64(encoded);
             Assert.Equal(original, decoded);

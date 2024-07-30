@@ -11,10 +11,10 @@ namespace Orleans.Connections.Security
     {
         internal SslServerAuthenticationOptions Value { get; } = new SslServerAuthenticationOptions
         {
-            ApplicationProtocols = new List<SslApplicationProtocol>
-            {
+            ApplicationProtocols =
+            [
                 OrleansApplicationProtocol.Orleans1
-            }
+            ]
         };
 
         public X509Certificate ServerCertificate

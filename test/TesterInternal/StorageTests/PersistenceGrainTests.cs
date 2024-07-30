@@ -1051,11 +1051,12 @@ namespace UnitTests.StorageTests
         public void Serialize_GrainState_DeepCopy()
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
-            IUser[] grains = new IUser[3];
-            grains[0] = this.HostedCluster.GrainFactory.GetGrain<IUser>(Guid.NewGuid());
-            grains[1] = this.HostedCluster.GrainFactory.GetGrain<IUser>(Guid.NewGuid());
-            grains[2] = this.HostedCluster.GrainFactory.GetGrain<IUser>(Guid.NewGuid());
-
+            IUser[] grains =
+            [
+                this.HostedCluster.GrainFactory.GetGrain<IUser>(Guid.NewGuid()),
+                this.HostedCluster.GrainFactory.GetGrain<IUser>(Guid.NewGuid()),
+                this.HostedCluster.GrainFactory.GetGrain<IUser>(Guid.NewGuid()),
+            ];
             GrainStateContainingGrainReferences initialState = new GrainStateContainingGrainReferences();
             foreach (var g in grains)
             {
@@ -1082,7 +1083,7 @@ namespace UnitTests.StorageTests
                 states[i].GrainDict.Add(grain.GetPrimaryKey().ToString(), grain);
             }
 
-            List<Task> tasks = new List<Task>();
+            List<Task> tasks = [];
             for (int i = 0; i < loops; i++)
             {
                 int idx = Random.Shared.Next(num);

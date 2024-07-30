@@ -25,7 +25,7 @@ namespace Orleans.Runtime.Messaging
     {
         private const int FramingLength = Message.LENGTH_HEADER_SIZE;
         private const int MessageSizeHint = 4096;
-        private readonly Dictionary<Type, ResponseCodec> _rawResponseCodecs = new();
+        private readonly Dictionary<Type, ResponseCodec> _rawResponseCodecs = [];
         private readonly CodecProvider _codecProvider;
         private readonly IFieldCodec<GrainAddressCacheUpdate> _activationAddressCodec;
         private readonly CachingSiloAddressCodec _readerSiloAddressCodec = new();
@@ -314,7 +314,7 @@ namespace Orleans.Runtime.Messaging
                 return list;
             }
 
-            return new List<GrainAddressCacheUpdate>();
+            return [];
         }
 
         internal void WriteCacheInvalidationHeaders<TBufferWriter>(ref Writer<TBufferWriter> writer, List<GrainAddressCacheUpdate> value) where TBufferWriter : IBufferWriter<byte>

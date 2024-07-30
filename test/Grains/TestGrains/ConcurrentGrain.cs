@@ -22,7 +22,7 @@ namespace UnitTests.Grains
             logger.LogInformation("Initialize({Index})", index);
             if (index == 0)
             {
-                children = new List<IConcurrentGrain>();
+                children = [];
                 for (int i = 0; i < 1; i++)
                 {
                     IConcurrentGrain grain = GrainFactory.GetGrain<IConcurrentGrain>((new Random()).Next());
@@ -57,7 +57,7 @@ namespace UnitTests.Grains
             return Task.FromResult(1);
         }
 
-        private readonly List<int> m_list = new List<int>();
+        private readonly List<int> m_list = [];
 
         public Task<List<int>> ModifyReturnList_Test()
         {

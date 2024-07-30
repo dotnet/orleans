@@ -24,7 +24,7 @@ namespace BenchmarkGrains.Transaction
 
         private async Task<Report> RunGeneration(int run, int transactions, int conncurrent)
         {
-            List<Task> pending = new List<Task>();
+            List<Task> pending = [];
             Report report = new Report();
             Stopwatch sw = Stopwatch.StartNew();
             int generated = run * transactions * 2;
@@ -56,7 +56,7 @@ namespace BenchmarkGrains.Transaction
                     await Task.WhenAny(pending);
                 }
             } catch (Exception) {}
-            List<Task> remaining = new List<Task>();
+            List<Task> remaining = [];
             foreach (Task t in pending)
             {
                 if (t.IsFaulted || t.IsCanceled)
@@ -86,7 +86,7 @@ namespace BenchmarkGrains.Transaction
         {
             try
             {
-                await GrainFactory.GetGrain<ITransactionRootGrain>(Guid.Empty).Run(new List<int>() { index * 2, index * 2 + 1 });
+                await GrainFactory.GetGrain<ITransactionRootGrain>(Guid.Empty).Run([index * 2, index * 2 + 1]);
             } catch(OrleansStartTransactionFailedException)
             {
                 // Depay before retry

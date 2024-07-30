@@ -96,7 +96,7 @@ namespace Orleans.Serialization.Codecs
 
             if (result is null)
             {
-                result = new();
+                result = [];
                 ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             }
 

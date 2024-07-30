@@ -38,7 +38,7 @@ namespace Orleans.Transactions.State
             this.logger = logger;
             this.timerManager = timerManager;
             this.activationLifetime = activationLifetime;
-            this.pending = new HashSet<Guid>();
+            this.pending = [];
         }
 
         public void Add(Guid transactionId, DateTime timestamp, List<ParticipantId> participants)

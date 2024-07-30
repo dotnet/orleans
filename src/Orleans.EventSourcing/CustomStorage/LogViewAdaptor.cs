@@ -280,7 +280,7 @@ namespace Orleans.EventSourcing.CustomStorage
             }
         }
    
-        private readonly SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long,UpdateNotificationMessage>();
+        private readonly SortedList<long, UpdateNotificationMessage> notifications = [];
 
         /// <inheritdoc/>
         protected override void OnNotificationReceived(INotificationMessage payload)

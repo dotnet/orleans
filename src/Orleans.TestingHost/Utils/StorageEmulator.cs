@@ -18,19 +18,19 @@ namespace Orleans.TestingHost.Utils
         /// Get-Process | Format-Table Id, ProcessName -autosize. If there were multiple storage emulator
         /// processes running, they would named WASTOR~1, WASTOR~2, ... WASTOR~n.
         /// </summary>
-        private static readonly string[] storageEmulatorProcessNames = new[]
-        {
+        private static readonly string[] storageEmulatorProcessNames =
+        [
             "AzureStorageEmulator", // newest
             "Windows Azure Storage Emulator Service", // >= 2.7
             "WAStorageEmulator", // < 2.7
-        };
+        ];
 
         //The file names aren't the same as process names.
-        private static readonly string[] storageEmulatorFilenames = new[]
-        {
+        private static readonly string[] storageEmulatorFilenames =
+        [
             "AzureStorageEmulator.exe", // >= 2.7
             "WAStorageEmulator.exe", // < 2.7
-        };
+        ];
 
         /// <summary>
         /// Is the storage emulator already started.

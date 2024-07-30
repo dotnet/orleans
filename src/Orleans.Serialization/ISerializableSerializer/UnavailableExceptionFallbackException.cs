@@ -36,7 +36,7 @@ namespace Orleans.Serialization
         /// <summary>
         /// Gets the serialized properties of the exception.
         /// </summary>
-        public Dictionary<string, object> Properties { get; } = new();
+        public Dictionary<string, object> Properties { get; } = [];
 
         /// <summary>
         /// Gets the exception type name.

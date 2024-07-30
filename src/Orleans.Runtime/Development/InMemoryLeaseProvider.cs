@@ -78,7 +78,7 @@ namespace Orleans.Runtime.Development
     /// </summary>
     internal class DevelopmentLeaseProviderGrain : Grain, IDevelopmentLeaseProviderGrain
     {
-        private readonly Dictionary<Tuple<string, string>, Lease> leases = new Dictionary<Tuple<string, string>, Lease>();
+        private readonly Dictionary<Tuple<string, string>, Lease> leases = [];
 
         public Task<AcquireLeaseResult[]> Acquire(string category, LeaseRequest[] leaseRequests)
         {

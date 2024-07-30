@@ -182,7 +182,7 @@ namespace Orleans.Reminders.Redis
 
                 var (newETag, value) = ConvertFromEntry(entry);
                 var (from, to) = GetFilter(entry.GrainId, entry.ReminderName);
-                var res = await _db.ScriptEvaluateAsync(UpsertScript, keys: new[] { _hashSetKey }, values: new[] { from, to, value });
+                var res = await _db.ScriptEvaluateAsync(UpsertScript, keys: [_hashSetKey], values: [from, to, value]);
                 return newETag;
             }
             catch (Exception exception) when (exception is not ReminderException)
@@ -235,15 +235,15 @@ namespace Orleans.Reminders.Redis
         {
             string grainHash = entry.GrainId.GetUniformHashCode().ToString("X8");
             string eTag = Guid.NewGuid().ToString();
-            string[] segments = new string[]
-            {
+            string[] segments =
+            [
                 grainHash,
                 entry.GrainId.ToString(),
                 entry.ReminderName,
                 eTag,
                 entry.StartAt.ToString("O"),
                 entry.Period.ToString()
-            };
+            ];
 
             return (eTag, JsonConvert.SerializeObject(segments, _jsonSettings)[1..^1]);
         }

@@ -11,7 +11,7 @@ namespace Orleans.Runtime.GrainDirectory
 {
     internal class GrainDirectoryResolver
     {
-        private readonly Dictionary<string, IGrainDirectory> directoryPerName = new Dictionary<string, IGrainDirectory>();
+        private readonly Dictionary<string, IGrainDirectory> directoryPerName = [];
         private readonly ConcurrentDictionary<GrainType, IGrainDirectory> directoryPerType = new();
         private readonly GrainPropertiesResolver grainPropertiesResolver;
         private readonly IGrainDirectoryResolver[] resolvers;

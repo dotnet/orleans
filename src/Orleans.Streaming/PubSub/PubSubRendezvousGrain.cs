@@ -64,9 +64,9 @@ namespace Orleans.Streams
     internal sealed class PubSubGrainState
     {
         [Id(0)]
-        public HashSet<PubSubPublisherState> Producers { get; set; } = new HashSet<PubSubPublisherState>();
+        public HashSet<PubSubPublisherState> Producers { get; set; } = [];
         [Id(1)]
-        public HashSet<PubSubSubscriptionState> Consumers { get; set; } = new HashSet<PubSubSubscriptionState>();
+        public HashSet<PubSubSubscriptionState> Consumers { get; set; } = [];
     }
 
     [GrainType("pubsubrendezvous")]

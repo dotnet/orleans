@@ -6,8 +6,8 @@ namespace UnitTests.Grains
 {
     public class StreamingHistoryGrain : Grain, IStreamingHistoryGrain, IAsyncObserver<int>
     {
-        private readonly List<int> receivedItems = new List<int>();
-        private readonly List<StreamSubscriptionHandle<int>> subscriptionHandles = new List<StreamSubscriptionHandle<int>>();
+        private readonly List<int> receivedItems = [];
+        private readonly List<StreamSubscriptionHandle<int>> subscriptionHandles = [];
 
         public async Task BecomeConsumer(StreamId streamId, string provider, string filterData = null)
         {

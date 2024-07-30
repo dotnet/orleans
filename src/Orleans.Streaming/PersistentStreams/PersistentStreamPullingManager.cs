@@ -21,7 +21,7 @@ namespace Orleans.Streams
         private static readonly TimeSpan QUEUES_PRINT_PERIOD = TimeSpan.FromMinutes(5);
 
         private readonly Dictionary<QueueId, PersistentStreamPullingAgent> queuesToAgentsMap;
-        private readonly Dictionary<QueueId, PersistentStreamPullingAgent> deactivatedAgents = new();
+        private readonly Dictionary<QueueId, PersistentStreamPullingAgent> deactivatedAgents = [];
         private readonly string streamProviderName;
         private readonly IStreamPubSub pubSub;
 
@@ -73,7 +73,7 @@ namespace Orleans.Streams
                 throw new ArgumentNullException(nameof(streamQueueBalancer), "IStreamQueueBalancer streamQueueBalancer reference should not be null");
             }
 
-            queuesToAgentsMap = new Dictionary<QueueId, PersistentStreamPullingAgent>();
+            queuesToAgentsMap = [];
             streamProviderName = strProviderName;
             pubSub = streamPubSub;
             this.options = options;

@@ -28,7 +28,7 @@ namespace Orleans
         private object Create(IGrainContext context, MethodInfo genericCreate, IPersistentStateConfiguration config)
         {
             IPersistentStateFactory factory = context.ActivationServices.GetRequiredService<IPersistentStateFactory>();
-            object[] args = new object[] { context, config };
+            object[] args = [context, config];
             return genericCreate.Invoke(factory, args);
         }
 

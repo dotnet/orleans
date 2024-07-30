@@ -135,7 +135,7 @@ namespace DefaultCluster.Tests
         {
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId());
             bool once = true;
-            List<Task> tasks = new List<Task>();
+            List<Task> tasks = [];
             for (int i = 0; i < 500; i++)
             {
                 Task promise = grain.DelayMethod(1);
@@ -154,7 +154,7 @@ namespace DefaultCluster.Tests
         public async Task ArgumentTypes_ListOfGrainReferences()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
-            List<IErrorGrain> list = new List<IErrorGrain>();
+            List<IErrorGrain> list = [];
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
             list.Add(this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName));
             list.Add(this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName));

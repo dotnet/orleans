@@ -44,7 +44,7 @@ namespace Tester.AzureUtils.Utilities
         {
             if (capacity < 1)
                 throw new ArgumentOutOfRangeException(nameof(capacity), "The pipeline size must be larger than 0.");
-            running = new HashSet<Task>();
+            running = [];
             waiting = new LinkedList<Tuple<Task, TaskCompletionSource<bool>>>();
             this.capacity = capacity;
             lockable = new object();

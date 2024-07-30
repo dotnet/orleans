@@ -14,7 +14,7 @@ namespace UnitTests.Grains
         public MultipleSubscriptionConsumerGrain(ILoggerFactory loggerFactory)
         {
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
-            consumedMessageCounts = new Dictionary<StreamSubscriptionHandle<int>, Tuple<Counter, Counter>>();
+            consumedMessageCounts = [];
         }
 
         private class Counter

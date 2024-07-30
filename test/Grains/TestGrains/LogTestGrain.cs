@@ -22,7 +22,7 @@ namespace TestGrains
 
         public MyGrainState()
         {
-            Reservations = new Dictionary<string, int>();
+            Reservations = [];
         }
 
         public override string ToString()

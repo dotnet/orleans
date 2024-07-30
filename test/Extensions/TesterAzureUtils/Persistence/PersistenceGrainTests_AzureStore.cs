@@ -221,7 +221,7 @@ namespace Tester.AzureUtils.Persistence
 
         private void RunIterations(string testName, int n, Func<int, Task> action)
         {
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             Stopwatch sw = Stopwatch.StartNew();
             // Fire off requests in batches
             for (int i = 0; i < n; i++)

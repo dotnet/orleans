@@ -157,8 +157,8 @@ namespace UnitTests.StreamingTests
             Guid streamId = Guid.NewGuid();
             Guid grain1 = Guid.NewGuid();
             Guid grain2 = Guid.NewGuid();
-            Guid[] consumerGrainIds = new Guid[] { grain1, grain1, grain1 };
-            Guid[] producerGrainIds = new Guid[] { grain2, grain2, grain2 };
+            Guid[] consumerGrainIds = [grain1, grain1, grain1];
+            Guid[] producerGrainIds = [grain2, grain2, grain2];
             // producer joins first, consumer later
             this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds);
             this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds);
@@ -172,8 +172,8 @@ namespace UnitTests.StreamingTests
             Guid streamId = Guid.NewGuid();
             Guid grain1 = Guid.NewGuid();
             Guid grain2 = Guid.NewGuid();
-            Guid[] consumerGrainIds = new Guid[] { grain1, grain1, grain1 };
-            Guid[] producerGrainIds = new Guid[] { grain2, grain2, grain2 };
+            Guid[] consumerGrainIds = [grain1, grain1, grain1];
+            Guid[] producerGrainIds = [grain2, grain2, grain2];
             // consumer joins first, producer later
             this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds);
             this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds);
@@ -186,7 +186,7 @@ namespace UnitTests.StreamingTests
             Heading("StreamTest_11_ManySame_ManyProducerGrainsManyConsumerClients");
             Guid streamId = Guid.NewGuid();
             Guid grain1 = Guid.NewGuid();
-            Guid[] producerGrainIds = new Guid[] { grain1, grain1, grain1, grain1 };
+            Guid[] producerGrainIds = [grain1, grain1, grain1, grain1];
             this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds);
             consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client, Many);
             await BasicTestAsync();
@@ -198,7 +198,7 @@ namespace UnitTests.StreamingTests
             Heading("StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains");
             Guid streamId = Guid.NewGuid();
             Guid grain1 = Guid.NewGuid();
-            Guid[] consumerGrainIds = new Guid[] { grain1, grain1, grain1 };
+            Guid[] consumerGrainIds = [grain1, grain1, grain1];
             this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds);
             producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client, Many);
             await BasicTestAsync();
@@ -212,7 +212,7 @@ namespace UnitTests.StreamingTests
             Heading("StreamTest_13_SameGrain_ConsumerFirstProducerLater");
             Guid streamId = Guid.NewGuid();
             int grain1 = Random.Shared.Next();
-            int[] grainIds = new int[] { grain1 };
+            int[] grainIds = [grain1];
             // consumer joins first, producer later
             this.consumer = await ConsumerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client);
             this.producer = await ProducerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client);
@@ -225,7 +225,7 @@ namespace UnitTests.StreamingTests
             Heading("StreamTest_14_SameGrain_ProducerFirstConsumerLater");
             Guid streamId = Guid.NewGuid();
             int grain1 = Random.Shared.Next();
-            int[] grainIds = new int[] { grain1 };
+            int[] grainIds = [grain1];
             // produce joins first, consumer later
             this.producer = await ProducerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client);
             this.consumer = await ConsumerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client);
@@ -261,8 +261,8 @@ namespace UnitTests.StreamingTests
         {
             Heading("StreamTest_16_Deactivation_OneProducerGrainOneConsumerGrain");
             Guid streamId = Guid.NewGuid();
-            Guid[] consumerGrainIds = { Guid.NewGuid() };
-            Guid[] producerGrainIds = { Guid.NewGuid() };
+            Guid[] consumerGrainIds = [Guid.NewGuid()];
+            Guid[] producerGrainIds = [Guid.NewGuid()];
 
             // consumer joins first, producer later
             this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds);

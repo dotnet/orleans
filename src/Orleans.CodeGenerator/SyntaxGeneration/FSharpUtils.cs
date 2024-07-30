@@ -113,7 +113,7 @@ namespace Orleans.CodeGenerator
 
             private static IEnumerable<IMemberDescription> GetUnionCaseDataMembers(LibraryTypes libraryTypes, INamedTypeSymbol symbol)
             {
-                List<IPropertySymbol> dataMembers = new();
+                List<IPropertySymbol> dataMembers = [];
                 foreach (var property in symbol.GetDeclaredInstanceMembers<IPropertySymbol>())
                 {
                     if (!property.Name.StartsWith("Item", System.StringComparison.Ordinal))
@@ -251,7 +251,7 @@ namespace Orleans.CodeGenerator
 
             private static IEnumerable<IMemberDescription> GetRecordDataMembers(LibraryTypes libraryTypes, INamedTypeSymbol symbol)
             {
-                List<(IPropertySymbol, uint)> dataMembers = new();
+                List<(IPropertySymbol, uint)> dataMembers = [];
                 foreach (var property in symbol.GetDeclaredInstanceMembers<IPropertySymbol>())
                 {
                     var id = CodeGenerator.GetId(libraryTypes, property);

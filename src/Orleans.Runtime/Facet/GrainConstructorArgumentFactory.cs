@@ -22,7 +22,7 @@ namespace Orleans.Runtime
         /// <param name="grainType">The grain type.</param>
         public GrainConstructorArgumentFactory(IServiceProvider serviceProvider, Type grainType)
         {
-            _argumentFactories = new List<Factory<IGrainContext, object>>();
+            _argumentFactories = [];
 
             // Find the constructor - supports only single public constructor.
             var parameters = grainType.GetConstructors().FirstOrDefault()?.GetParameters() ?? Enumerable.Empty<ParameterInfo>();
@@ -37,7 +37,7 @@ namespace Orleans.Runtime
 
                 // Since the IAttributeToFactoryMapper is specific to the attribute specialization, we create a generic method to provide a attribute independent call pattern.
                 var getFactory = GetFactoryMethod.MakeGenericMethod(attribute.GetType());
-                var argumentFactory = (Factory<IGrainContext, object>)getFactory.Invoke(this, new object[] { serviceProvider, parameter, attribute, grainType });
+                var argumentFactory = (Factory<IGrainContext, object>)getFactory.Invoke(this, [serviceProvider, parameter, attribute, grainType]);
 
                 // Record the argument factory
                 _argumentFactories.Add(argumentFactory);

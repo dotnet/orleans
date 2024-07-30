@@ -89,7 +89,7 @@ namespace Orleans.Runtime
                     }
 
                     var properties = _resolver.GetGrainProperties(grainType);
-                    List<IConfigureGrainContext> configureActions = new List<IConfigureGrainContext>();
+                    List<IConfigureGrainContext> configureActions = [];
                     foreach (var provider in _configuratorProviders)
                     {
                         if (provider.TryGetConfigurator(grainType, properties, out var configurator))
@@ -370,7 +370,7 @@ namespace Orleans.Runtime
 
     internal class GrainCanInterleave
     {
-        public List<IMayInterleavePredicate> MayInterleavePredicates { get; } = new List<IMayInterleavePredicate>();
+        public List<IMayInterleavePredicate> MayInterleavePredicates { get; } = [];
         public bool MayInterleave(object instance, Message message)
         {
             foreach (var predicate in this.MayInterleavePredicates)

@@ -21,7 +21,7 @@ namespace Orleans.Runtime
         {
             lock (this)
             {
-                _migrationParticipants ??= new();
+                _migrationParticipants ??= [];
                 _migrationParticipants.Add(participant);
             }
         }

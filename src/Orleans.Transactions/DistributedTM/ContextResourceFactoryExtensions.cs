@@ -19,7 +19,7 @@ namespace Orleans.Transactions
             ResourceFactoryRegistry<T> result = context.GetComponent<ResourceFactoryRegistry<T>>();
             if (createIfNotExists && result == null)
             {
-                result = new ResourceFactoryRegistry<T>();
+                result = [];
                 context.SetComponent(result);
             }
 

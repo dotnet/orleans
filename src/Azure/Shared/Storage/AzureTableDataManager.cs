@@ -654,8 +654,10 @@ namespace Orleans.GrainDirectory.AzureStorage
                 try
                 {
                     data1.ETag = new ETag(data1Etag);
-                    var entityBatch = new List<TableTransactionAction>(2);
-                    entityBatch.Add(new TableTransactionAction(TableTransactionActionType.UpdateReplace, data1, data1.ETag));
+                    var entityBatch = new List<TableTransactionAction>(2)
+                    {
+                        new TableTransactionAction(TableTransactionActionType.UpdateReplace, data1, data1.ETag)
+                    };
 
                     if (data2 != null && data2Etag != null)
                     {

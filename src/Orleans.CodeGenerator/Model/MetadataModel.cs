@@ -10,18 +10,18 @@ namespace Orleans.CodeGenerator
         public List<ISerializableTypeDescription> SerializableTypes { get; } = new(1024);
         public Dictionary<INamedTypeSymbol, ProxyInterfaceDescription> InvokableInterfaces { get; } = new(SymbolEqualityComparer.Default);
         public List<INamedTypeSymbol> InvokableInterfaceImplementations { get; } = new(1024);
-        public Dictionary<InvokableMethodId, GeneratedInvokableDescription> GeneratedInvokables { get; } = new();
+        public Dictionary<InvokableMethodId, GeneratedInvokableDescription> GeneratedInvokables { get; } = [];
         public List<GeneratedProxyDescription> GeneratedProxies { get; } = new(1024);
         public List<ISerializableTypeDescription> ActivatableTypes { get; } = new(1024);
-        public List<INamedTypeSymbol> DetectedSerializers { get; } = new();
-        public List<INamedTypeSymbol> DetectedActivators { get; } = new();
-        public Dictionary<ISerializableTypeDescription, TypeSyntax> DefaultCopiers { get; } = new();
-        public List<INamedTypeSymbol> DetectedCopiers { get; } = new();
-        public List<INamedTypeSymbol> DetectedConverters { get; } = new();
+        public List<INamedTypeSymbol> DetectedSerializers { get; } = [];
+        public List<INamedTypeSymbol> DetectedActivators { get; } = [];
+        public Dictionary<ISerializableTypeDescription, TypeSyntax> DefaultCopiers { get; } = [];
+        public List<INamedTypeSymbol> DetectedCopiers { get; } = [];
+        public List<INamedTypeSymbol> DetectedConverters { get; } = [];
         public List<(TypeSyntax Type, string Alias)> TypeAliases { get; } = new(1024);
         public CompoundTypeAliasTree CompoundTypeAliases { get; } = CompoundTypeAliasTree.Create();
         public List<(TypeSyntax Type, uint Id)> WellKnownTypeIds { get; } = new(1024);
-        public HashSet<string> ApplicationParts { get; } = new();
+        public HashSet<string> ApplicationParts { get; } = [];
         internal Dictionary<INamedTypeSymbol, Dictionary<INamedTypeSymbol, INamedTypeSymbol>> ProxyBaseTypeInvokableBaseTypes { get; } = new (SymbolEqualityComparer.Default);
     }
 
@@ -128,7 +128,7 @@ namespace Orleans.CodeGenerator
         private CompoundTypeAliasTree AddInternal(CompoundTypeAliasComponent key) => AddInternal(key, default);
         private CompoundTypeAliasTree AddInternal(CompoundTypeAliasComponent key, TypeSyntax value)
         {
-            _children ??= new();
+            _children ??= [];
 
             if (_children.TryGetValue(key, out var existing))
             {

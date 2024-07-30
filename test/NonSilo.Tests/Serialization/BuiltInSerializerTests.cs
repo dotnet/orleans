@@ -74,19 +74,19 @@ namespace UnitTests.Serialization
                 Enum = SomeAbstractClass.SomeEnum.Something,
             };
 
-            expected.Classes = new SomeAbstractClass[]
-            {
+            expected.Classes =
+            [
                 expected,
                 new AnotherConcreteClass
                 {
                     AnotherString = "hi",
-                    Interfaces = new List<ISomeInterface> { expected }
+                    Interfaces = [expected]
                 }
-            };
-            expected.Interfaces = new List<ISomeInterface>
-            {
+            ];
+            expected.Interfaces =
+            [
                 expected.Classes[1]
-            };
+            ];
             expected.SetObsoleteInt(38);
 
             var actual = (AnotherConcreteClass)OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, expected);
@@ -153,15 +153,19 @@ namespace UnitTests.Serialization
         public void Serialize_BasicDictionaries()
         {
 
-            Dictionary<string, string> source1 = new Dictionary<string, string>();
-            source1["Hello"] = "Yes";
-            source1["Goodbye"] = "No";
+            Dictionary<string, string> source1 = new Dictionary<string, string>
+            {
+                ["Hello"] = "Yes",
+                ["Goodbye"] = "No"
+            };
             var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             ValidateDictionary<string, string>(source1, deserialized, "string/string");
 
-            Dictionary<int, DateTime> source2 = new Dictionary<int, DateTime>();
-            source2[3] = DateTime.Now;
-            source2[27] = DateTime.Now.AddHours(2);
+            Dictionary<int, DateTime> source2 = new Dictionary<int, DateTime>
+            {
+                [3] = DateTime.Now,
+                [27] = DateTime.Now.AddHours(2)
+            };
             deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source2);
             ValidateDictionary<int, DateTime>(source2, deserialized, "int/date");
         }
@@ -169,16 +173,20 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("Functional")]
         public void Serialize_ReadOnlyDictionary()
         {
-            Dictionary<string, string> source1 = new Dictionary<string, string>();
-            source1["Hello"] = "Yes";
-            source1["Goodbye"] = "No";
+            Dictionary<string, string> source1 = new Dictionary<string, string>
+            {
+                ["Hello"] = "Yes",
+                ["Goodbye"] = "No"
+            };
             var readOnlySource1 = new ReadOnlyDictionary<string, string>(source1);
             var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, readOnlySource1);
             ValidateReadOnlyDictionary(readOnlySource1, deserialized, "string/string");
 
-            Dictionary<int, DateTime> source2 = new Dictionary<int, DateTime>();
-            source2[3] = DateTime.Now;
-            source2[27] = DateTime.Now.AddHours(2);
+            Dictionary<int, DateTime> source2 = new Dictionary<int, DateTime>
+            {
+                [3] = DateTime.Now,
+                [27] = DateTime.Now.AddHours(2)
+            };
             var readOnlySource2 = new ReadOnlyDictionary<int, DateTime>(source2);
             deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, readOnlySource2);
             ValidateReadOnlyDictionary(readOnlySource2, deserialized, "int/date");
@@ -187,17 +195,21 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("Functional")]
         public void Serialize_DictionaryWithComparer()
         {
-            Dictionary<string, string> source1 = new Dictionary<string, string>(new CaseInsensitiveStringEquality());
-            source1["Hello"] = "Yes";
-            source1["Goodbye"] = "No";
+            Dictionary<string, string> source1 = new Dictionary<string, string>(new CaseInsensitiveStringEquality())
+            {
+                ["Hello"] = "Yes",
+                ["Goodbye"] = "No"
+            };
             var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             ValidateDictionary<string, string>(source1, deserialized, "case-insensitive string/string");
             Dictionary<string, string> result1 = deserialized as Dictionary<string, string>;
             Assert.Equal(source1["Hello"], result1["hElLo"]); //Round trip for case insensitive string/string dictionary lost the custom comparer
 
-            Dictionary<int, DateTime> source2 = new Dictionary<int, DateTime>(new Mod5IntegerComparer());
-            source2[3] = DateTime.Now;
-            source2[27] = DateTime.Now.AddHours(2);
+            Dictionary<int, DateTime> source2 = new Dictionary<int, DateTime>(new Mod5IntegerComparer())
+            {
+                [3] = DateTime.Now,
+                [27] = DateTime.Now.AddHours(2)
+            };
             deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source2);
             ValidateDictionary<int, DateTime>(source2, deserialized, "int/date");
             Dictionary<int, DateTime> result2 = (Dictionary<int, DateTime>)deserialized;
@@ -207,9 +219,11 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("Functional")]
         public void Serialize_SortedDictionaryWithComparer()
         {
-            var source1 = new SortedDictionary<string, string>(new CaseInsensitiveStringComparer());
-            source1["Hello"] = "Yes";
-            source1["Goodbye"] = "No";
+            var source1 = new SortedDictionary<string, string>(new CaseInsensitiveStringComparer())
+            {
+                ["Hello"] = "Yes",
+                ["Goodbye"] = "No"
+            };
             object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             ValidateSortedDictionary<string, string>(source1, deserialized, "string/string");
         }
@@ -217,9 +231,11 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("Functional")]
         public void Serialize_SortedListWithComparer()
         {
-            var source1 = new SortedList<string, string>(new CaseInsensitiveStringComparer());
-            source1["Hello"] = "Yes";
-            source1["Goodbye"] = "No";
+            var source1 = new SortedList<string, string>(new CaseInsensitiveStringComparer())
+            {
+                ["Hello"] = "Yes",
+                ["Goodbye"] = "No"
+            };
             object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             ValidateSortedList<string, string>(source1, deserialized, "string/string");
         }
@@ -227,10 +243,12 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("Functional")]
         public void Serialize_HashSetWithComparer()
         {
-            var source1 = new HashSet<string>(new CaseInsensitiveStringEquality());
-            source1.Add("one");
-            source1.Add("two");
-            source1.Add("three");
+            var source1 = new HashSet<string>(new CaseInsensitiveStringEquality())
+            {
+                "one",
+                "two",
+                "three"
+            };
             var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             Assert.IsAssignableFrom(source1.GetType(), deserialized); //Type is wrong after round-trip of string hash set with comparer
             var result = deserialized as HashSet<string>;
@@ -285,10 +303,12 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("Functional")]
         public void Serialize_SortedSetWithComparer()
         {
-            var source1 = new SortedSet<string>(new CaseInsensitiveStringComparer());
-            source1.Add("one");
-            source1.Add("two");
-            source1.Add("three");
+            var source1 = new SortedSet<string>(new CaseInsensitiveStringComparer())
+            {
+                "one",
+                "two",
+                "three"
+            };
             object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             Assert.IsAssignableFrom(source1.GetType(), deserialized); //Type is wrong after round-trip of string sorted set with comparer
             var result = (SortedSet<string>)deserialized;
@@ -325,11 +345,11 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("Functional")]
         public void Serialize_ArrayOfArrays()
         {
-            var source1 = new[] { new[] { 1, 3, 5 }, new[] { 10, 20, 30 }, new[] { 17, 13, 11, 7, 5, 3, 2 } };
+            var source1 = new[] { new[] { 1, 3, 5 }, [10, 20, 30], [17, 13, 11, 7, 5, 3, 2] };
             object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             ValidateArrayOfArrays(source1, deserialized, "int");
 
-            var source2 = new[] { new[] { "hello", "goodbye", "yes", "no", "", "I don't know" }, new[] { "yes" } };
+            var source2 = new[] { new[] { "hello", "goodbye", "yes", "no", "", "I don't know" }, ["yes"] };
             deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source2);
             ValidateArrayOfArrays(source2, deserialized, "string");
 
@@ -337,12 +357,12 @@ namespace UnitTests.Serialization
             source3[0] = new HashSet<string>[2];
             source3[1] = new HashSet<string>[3];
             source3[2] = new HashSet<string>[1];
-            source3[0][0] = new HashSet<string>();
-            source3[0][1] = new HashSet<string>();
-            source3[1][0] = new HashSet<string>();
+            source3[0][0] = [];
+            source3[0][1] = [];
+            source3[1][0] = [];
             source3[1][1] = null;
-            source3[1][2] = new HashSet<string>();
-            source3[2][0] = new HashSet<string>();
+            source3[1][2] = [];
+            source3[2][0] = [];
             source3[0][0].Add("this");
             source3[0][0].Add("that");
             source3[1][0].Add("the other");
@@ -387,9 +407,9 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("Functional")]
         public void Serialize_ArrayOfArrayOfArrays()
         {
-            var source1 = new[] { new[] { 1, 3, 5 }, new[] { 10, 20, 30 }, new[] { 17, 13, 11, 7, 5, 3, 2 } };
-            var source2 = new[] { new[] { 1, 3 }, new[] { 10, 20 }, new[] { 17, 13, 11, 7, 5 } };
-            var source3 = new[] { new[] { 1, 3, 5 }, new[] { 10, 20, 30 } };
+            var source1 = new[] { new[] { 1, 3, 5 }, [10, 20, 30], [17, 13, 11, 7, 5, 3, 2] };
+            var source2 = new[] { new[] { 1, 3 }, [10, 20], [17, 13, 11, 7, 5] };
+            var source3 = new[] { new[] { 1, 3, 5 }, [10, 20, 30] };
             var source = new[] { source1, source2, source3 };
             object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source);
             ValidateArrayOfArrayOfArrays(source, deserialized, "int");
@@ -411,11 +431,7 @@ namespace UnitTests.Serialization
 
             public BanningTypeResolver(params Type[] blockedTypes)
             {
-                _blockedTypes = new HashSet<Type>();
-                foreach (var type in blockedTypes ?? Array.Empty<Type>())
-                {
-                    _blockedTypes.Add(type);
-                }
+                _blockedTypes = [.. blockedTypes ?? Array.Empty<Type>()];
             }
 
             public override Type ResolveType(string name)
@@ -453,10 +469,12 @@ namespace UnitTests.Serialization
 
             var val2 = new List<string> { "first", "second" };
 
-            var source = new Dictionary<string, List<string>>();
-            source["one"] = val;
-            source["two"] = val;
-            source["three"] = val2;
+            var source = new Dictionary<string, List<string>>
+            {
+                ["one"] = val,
+                ["two"] = val,
+                ["three"] = val2
+            };
             Assert.Same(source["one"], source["two"]); //Object identity lost before round trip of string/list dict!!!
 
             var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier,  source);
@@ -533,7 +551,7 @@ namespace UnitTests.Serialization
             Assert.Same(test4.Immutable, ((ClassWithEmbeddedImmutable)raw).Immutable); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer
             Assert.NotSame(test4.Mutable, ((ClassWithEmbeddedImmutable)raw).Mutable);
 
-            var test5 = new StructWithEmbeddedImmutable { Immutable = new byte[] { 1 }, Mutable = new byte[] { 2 } };
+            var test5 = new StructWithEmbeddedImmutable { Immutable = [1], Mutable = [2] };
             raw = environment.DeepCopier.Copy<object>(test5);
             Assert.IsAssignableFrom<StructWithEmbeddedImmutable>(raw); //Type is wrong after deep copy of type containing an Immutable<> field
             Assert.Same(test5.Immutable, ((StructWithEmbeddedImmutable)raw).Immutable); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer

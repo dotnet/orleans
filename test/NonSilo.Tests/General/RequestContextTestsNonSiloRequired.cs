@@ -10,7 +10,7 @@ namespace UnitTests.General
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class RequestContextTests_Local : IDisposable
     {
-        private readonly Dictionary<string, object> headers = new Dictionary<string, object>();
+        private readonly Dictionary<string, object> headers = [];
 
 
         private readonly TestEnvironmentFixture fixture;

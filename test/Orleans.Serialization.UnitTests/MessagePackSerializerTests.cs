@@ -24,13 +24,13 @@ public class MessagePackCodecTests : FieldCodecTester<MyMessagePackClass?, IFiel
 
     protected override MyMessagePackClass? CreateValue() => new() { IntProperty = 30, StringProperty = "hello", SubClass = new() { Id = Guid.NewGuid() } };
 
-    protected override MyMessagePackClass?[] TestValues => new MyMessagePackClass?[]
-    {
+    protected override MyMessagePackClass?[] TestValues =>
+    [
         null,
         new() { SubClass = new() { Id = Guid.NewGuid() } },
         new() { IntProperty = 150, StringProperty = new string('c', 20), SubClass = new() { Id = Guid.NewGuid() } },
         new() { IntProperty = 150_000, StringProperty = new string('c', 6_000), SubClass = new() { Id = Guid.NewGuid() } },
-    };
+    ];
 
     [Fact]
     public void MessagePackSerializerDeepCopyTyped()
@@ -94,11 +94,11 @@ public class MessagePackCodecCopierTests : CopierTester<MyMessagePackClass?, IDe
 
     protected override MyMessagePackClass? CreateValue() => new() { IntProperty = 30, StringProperty = "hello", SubClass = new() { Id = Guid.NewGuid() } };
 
-    protected override MyMessagePackClass?[] TestValues => new MyMessagePackClass?[]
-    {
+    protected override MyMessagePackClass?[] TestValues =>
+    [
         null,
         new() { SubClass = new() { Id = Guid.NewGuid() } },
         new() { IntProperty = 150, StringProperty = new string('c', 20), SubClass = new() { Id = Guid.NewGuid() } },
         new() { IntProperty = 150_000, StringProperty = new string('c', 6_000), SubClass = new() { Id = Guid.NewGuid() } },
-    };
+    ];
 }

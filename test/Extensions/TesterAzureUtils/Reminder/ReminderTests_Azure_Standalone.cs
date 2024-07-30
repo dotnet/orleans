@@ -84,7 +84,7 @@ namespace Tester.AzureUtils.TimerTests
 
             try
             {
-                List<Task<bool>> promises = new List<Task<bool>>();
+                List<Task<bool>> promises = [];
                 for (int i = 0; i < numOfInserts; i++)
                 {
                     //"177BF46E-D06D-44C0-943B-C12F26DF5373"

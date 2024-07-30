@@ -20,7 +20,7 @@ namespace Orleans.Runtime;
 public class GrainTypeSharedContext
 {
     private readonly IServiceProvider _serviceProvider;
-    private readonly Dictionary<Type, object> _components = new();
+    private readonly Dictionary<Type, object> _components = [];
     private InternalGrainRuntime? _internalGrainRuntime;
 
     public GrainTypeSharedContext(

@@ -36,7 +36,7 @@ namespace Orleans.CodeGenerator
             }
 
             Accessibility = accessibility;
-            TypeParameters = new();
+            TypeParameters = [];
             var names = new HashSet<string>(StringComparer.Ordinal);
             foreach (var tp in type.GetAllTypeParameters())
             {
@@ -44,7 +44,7 @@ namespace Orleans.CodeGenerator
                 TypeParameters.Add((tpName, tp));
             }
 
-            SerializationHooks = new();
+            SerializationHooks = [];
             if (type.GetAttributes(libraryTypes.SerializationCallbacksAttribute, out var hookAttributes))
             {
                 foreach (var hookAttribute in hookAttributes)
@@ -80,7 +80,7 @@ namespace Orleans.CodeGenerator
                         foreach (var parameter in constructor.Parameters)
                         {
                             var argumentType = parameter.Type.ToTypeSyntax();
-                            (parameters ??= new()).Add(argumentType);
+                            (parameters ??= []).Add(argumentType);
                         }
 
                         break;

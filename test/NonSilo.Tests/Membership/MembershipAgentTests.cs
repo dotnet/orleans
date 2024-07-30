@@ -52,7 +52,7 @@ namespace NonSilo.Tests.Membership
             this.fatalErrorHandler.IsUnexpected(default).ReturnsForAnyArgs(true);
             this.membershipGossiper = Substitute.For<IMembershipGossiper>();
             this.lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
-            this.timers = new List<DelegateAsyncTimer>();
+            this.timers = [];
             this.timerCalls = new ConcurrentDictionary<string, ConcurrentQueue<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)>>();
             this.timerFactory = new DelegateAsyncTimerFactory(
                 (period, name) =>

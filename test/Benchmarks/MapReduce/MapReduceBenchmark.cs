@@ -44,7 +44,7 @@ namespace Benchmarks.MapReduce
 
         private async Task BenchCore()
         {
-            List<Task> initializationTasks = new List<Task>();
+            List<Task> initializationTasks = [];
             var mapper = _host.GrainFactory.GetGrain<ITransformGrain<string, List<string>>>(Guid.NewGuid());
             initializationTasks.Add(mapper.Initialize(new MapProcessor()));
             var reducer =
@@ -85,7 +85,7 @@ namespace Benchmarks.MapReduce
 
             await Task.WhenAll(initializationTasks);
 
-            List<Dictionary<string, int>> resultList = new List<Dictionary<string, int>>();
+            List<Dictionary<string, int>> resultList = [];
 
             while (Interlocked.Increment(ref this._currentRepeat) < this._repeats)
             {

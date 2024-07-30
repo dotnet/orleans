@@ -197,11 +197,7 @@ namespace Orleans.Serialization.UnitTests
 
             public BanningTypeResolver(params Type[] blockedTypes)
             {
-                _blockedTypes = new HashSet<Type>();
-                foreach (var type in blockedTypes ?? Array.Empty<Type>())
-                {
-                    _blockedTypes.Add(type);
-                }
+                _blockedTypes = [.. blockedTypes ?? Array.Empty<Type>()];
             }
 
             public override Type ResolveType(string name)
@@ -313,8 +309,8 @@ namespace Orleans.Serialization.UnitTests
                 Payload = info.GetString(nameof(Payload));
             }
 
-            public List<string> History => _history ??= new List<string>();
-            public List<StreamingContext> Contexts => _contexts ??= new List<StreamingContext>();
+            public List<string> History => _history ??= [];
+            public List<StreamingContext> Contexts => _contexts ??= [];
 
             public string Payload { get; set; }
 
@@ -370,8 +366,8 @@ namespace Orleans.Serialization.UnitTests
                 Contexts.Add(context);
             }
 
-            public List<string> History => _history ??= new List<string>();
-            public List<StreamingContext> Contexts => _contexts ??= new List<StreamingContext>();
+            public List<string> History => _history ??= [];
+            public List<StreamingContext> Contexts => _contexts ??= [];
 
             public string Payload { get; set; }
 

@@ -42,7 +42,7 @@ namespace UnitTests.Grains
 
         public StreamReliabilityTestGrainState()
         {
-            ConsumerSubscriptionHandles = new HashSet<StreamSubscriptionHandle<int>>();
+            ConsumerSubscriptionHandles = [];
         }
 #endif
     }
@@ -87,7 +87,7 @@ namespace UnitTests.Grains
 #if USE_GENERICS
                 Observers = new Dictionary<StreamSubscriptionHandle<T>, MyStreamObserver<T>>();
 #else
-                Observers = new Dictionary<StreamSubscriptionHandle<int>, MyStreamObserver<int>>();
+                Observers = [];
 #endif
 
             if (State.Stream != null && State.StreamProviderName != null)

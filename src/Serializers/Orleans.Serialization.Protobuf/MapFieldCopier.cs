@@ -38,7 +38,7 @@ public sealed class MapFieldCopier<TKey, TValue> : IDeepCopier<MapField<TKey, TV
             return context.DeepCopy(input);
         }
 
-        result = new MapField<TKey, TValue>();
+        result = [];
         context.RecordCopy(input, result);
         foreach (var pair in input)
         {

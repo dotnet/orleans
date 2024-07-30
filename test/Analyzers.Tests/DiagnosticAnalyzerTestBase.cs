@@ -18,11 +18,11 @@ namespace Analyzers.Tests
     public abstract class DiagnosticAnalyzerTestBase<TDiagnosticAnalyzer>
         where TDiagnosticAnalyzer : DiagnosticAnalyzer, new()
     {
-        private static readonly string[] Usings = new[] {
+        private static readonly string[] Usings = [
             "System",
             "System.Threading.Tasks",
             "Orleans"
-        };
+        ];
 
         public static IEnumerable<object[]> GrainInterfaces =>
             new List<object[]>

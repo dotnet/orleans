@@ -44,7 +44,7 @@ namespace NonSilo.Tests.Membership
             _localSiloDetails.DnsHostName.Returns("MyServer11");
             _localSiloDetails.Name.Returns(Guid.NewGuid().ToString("N"));
 
-            _timers = new List<DelegateAsyncTimer>();
+            _timers = [];
             _timerCalls = Channel.CreateUnbounded<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)>();
             _timerFactory = new DelegateAsyncTimerFactory(
                 (period, name) =>

@@ -151,7 +151,7 @@ namespace Tester.Redis.Persistence
             var data = await grain.DoRead();
 
             var key = $"{ServiceId}/state/{grain.GetGrainId()}/state";
-            await database.HashSetAsync(key, new[] { new HashEntry("etag", "derp") });
+            await database.HashSetAsync(key, [new HashEntry("etag", "derp")]);
 
             await Assert.ThrowsAsync<InconsistentStateException>(() => grain.DoWrite(state));
         }

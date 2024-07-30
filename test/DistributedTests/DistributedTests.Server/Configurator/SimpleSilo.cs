@@ -6,7 +6,7 @@ namespace DistributedTests.Server.Configurator
     {
         public string Name => nameof(SimpleSilo);
 
-        public List<Option> Options => new();
+        public List<Option> Options => [];
 
         public void Configure(ISiloBuilder siloBuilder, object parameters)
         {

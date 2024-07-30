@@ -139,7 +139,7 @@ namespace Orleans.Runtime.GrainDirectory
                     if (winner.Address is not { } winnerAddress || !winnerAddress.Equals(singleActivations[i]))
                     {
                         var duplicate = singleActivations[i];
-                        (CollectionsMarshal.GetValueRefOrAddDefault(duplicates ??= new(), duplicate.SiloAddress!, out _) ??= new()).Add(duplicate);
+                        (CollectionsMarshal.GetValueRefOrAddDefault(duplicates ??= [], duplicate.SiloAddress!, out _) ??= []).Add(duplicate);
                     }
 
                     // Remove tasks which completed.

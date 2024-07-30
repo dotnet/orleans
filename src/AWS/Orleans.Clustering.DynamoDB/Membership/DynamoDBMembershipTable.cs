@@ -54,16 +54,14 @@ namespace Orleans.Clustering.DynamoDB
 
             logger.LogInformation((int)ErrorCode.MembershipBase, "Initializing AWS DynamoDB Membership Table");
             await storage.InitializeTable(this.options.TableName,
-                new List<KeySchemaElement>
-                {
+                [
                     new KeySchemaElement { AttributeName = SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME, KeyType = KeyType.HASH },
                     new KeySchemaElement { AttributeName = SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME, KeyType = KeyType.RANGE }
-                },
-                new List<AttributeDefinition>
-                {
+                ],
+                [
                     new AttributeDefinition { AttributeName = SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
                     new AttributeDefinition { AttributeName = SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
-                });
+                ]);
 
             // even if I am not the one who created the table,
             // try to insert an initial table version if it is not already there,
@@ -149,7 +147,7 @@ namespace Orleans.Clustering.DynamoDB
                     toDelete.Add(record.GetKeys());
                 }
 
-                List<Task> tasks = new List<Task>();
+                List<Task> tasks = [];
                 foreach (var batch in toDelete.BatchIEnumerable(MAX_BATCH_SIZE))
                 {
                     tasks.Add(storage.DeleteEntriesAsync(this.options.TableName, batch));

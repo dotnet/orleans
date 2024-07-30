@@ -4,7 +4,7 @@ namespace BenchmarkGrains.MapReduce
 {
     public class BufferGrain<T> : DataflowGrain, IBufferGrain<T>
     {
-        private readonly List<T> _items = new List<T>();
+        private readonly List<T> _items = [];
         public Task<GrainDataflowMessageStatus> OfferMessage(T messageValue, bool consumeToAccept)
         {
             throw new NotImplementedException();

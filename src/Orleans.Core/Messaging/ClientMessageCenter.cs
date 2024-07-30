@@ -107,8 +107,10 @@ namespace Orleans.Messaging
                 throw new ConnectionFailedException("There are no available gateways");
             }
 
-            var pendingTasks = new List<Task>(liveGateways.Count + 1);
-            pendingTasks.Add(cancellationTask);
+            var pendingTasks = new List<Task>(liveGateways.Count + 1)
+            {
+                cancellationTask
+            };
             foreach (var gateway in liveGateways)
             {
                 pendingTasks.Add(connectionManager.GetConnection(gateway).AsTask());

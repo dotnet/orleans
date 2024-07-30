@@ -129,7 +129,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // Try one last time to find the requested client's routes.
                 if (result is null && !TryLocalLookup(grainId, out result))
                 {
-                    result = new List<GrainAddress>(0);
+                    result = [];
                 }
 
                 return result;
@@ -303,7 +303,7 @@ namespace Orleans.Runtime.GrainDirectory
                         {
                             if (!clientsBuilder.TryGetValue(client, out var clientRoutes))
                             {
-                                clientRoutes = clientsBuilder[client] = new List<GrainAddress>();
+                                clientRoutes = clientsBuilder[client] = [];
                             }
 
                             clientRoutes.Add(Gateway.GetClientActivationAddress(client, entry.Key));

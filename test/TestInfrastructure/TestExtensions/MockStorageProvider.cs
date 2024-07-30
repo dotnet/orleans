@@ -150,7 +150,7 @@ namespace UnitTests.StorageTests
 
                 var storedState = storedDict[stateStoreKey];
                 var field = storedState.GetType().GetProperty(name).GetSetMethod(true);
-                field.Invoke(storedState, new[] { val });
+                field.Invoke(storedState, [val]);
                 LastId = GetId(grainId);
                 LastState = storedState;
             }

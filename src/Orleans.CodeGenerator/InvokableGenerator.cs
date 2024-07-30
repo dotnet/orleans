@@ -36,7 +36,7 @@ namespace Orleans.CodeGenerator
             var accessibility = GetAccessibility(method);
             var compoundTypeAliases = GetCompoundTypeAliasAttributeArguments(invokableMethodInfo, invokableMethodInfo.Key);
 
-            List<INamedTypeSymbol> serializationHooks = new();
+            List<INamedTypeSymbol> serializationHooks = [];
             if (baseClassType.GetAttributes(LibraryTypes.SerializationCallbacksAttribute, out var hookAttributes))
             {
                 foreach (var hookAttribute in hookAttributes)
@@ -183,7 +183,7 @@ namespace Orleans.CodeGenerator
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
                 .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword));
 ;
-            return new MemberDeclarationSyntax[] { timespanField, responseTimeoutProperty };
+            return [timespanField, responseTimeoutProperty];
         }
 
         private ClassDeclarationSyntax AddOptionalMembers(ClassDeclarationSyntax decl, params MemberDeclarationSyntax[] items)
@@ -658,8 +658,8 @@ namespace Orleans.CodeGenerator
 
             var body = new List<StatementSyntax>();
 
-            List<TypeSyntax> constructorArgumentTypes = new();
-            List<ArgumentSyntax> baseConstructorArguments = new();
+            List<TypeSyntax> constructorArgumentTypes = [];
+            List<ArgumentSyntax> baseConstructorArguments = [];
             foreach (var constructor in baseClassType.GetAllMembers<IMethodSymbol>())
             {
                 if (constructor.MethodKind != MethodKind.Constructor || constructor.DeclaredAccessibility == Accessibility.Private || constructor.IsImplicitlyDeclared)

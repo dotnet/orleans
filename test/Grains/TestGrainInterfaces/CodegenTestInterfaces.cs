@@ -115,11 +115,13 @@ namespace UnitTests.GrainInterfaces
     {
         public RootType()
         {
-            MyDictionary = new Dictionary<string, object>();
-            MyDictionary.Add("obj1", new InnerType());
-            MyDictionary.Add("obj2", new InnerType());
-            MyDictionary.Add("obj3", new InnerType());
-            MyDictionary.Add("obj4", new InnerType());
+            MyDictionary = new Dictionary<string, object>
+            {
+                { "obj1", new InnerType() },
+                { "obj2", new InnerType() },
+                { "obj3", new InnerType() },
+                { "obj4", new InnerType() }
+            };
         }
 
         [Id(0)]
@@ -314,10 +316,10 @@ namespace UnitTests.GrainInterfaces
     [Serializable]
     public class ClassWithNestedPrivateClassInListField
     {
-        private readonly List<NestedPrivateClass> _coolBeans = new List<NestedPrivateClass>
-        {
+        private readonly List<NestedPrivateClass> _coolBeans =
+        [
             new NestedPrivateClass()
-        };
+        ];
 
         public IEnumerable CoolBeans => this._coolBeans;
 

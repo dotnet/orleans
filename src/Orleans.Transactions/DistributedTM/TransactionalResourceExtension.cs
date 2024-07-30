@@ -15,7 +15,7 @@ namespace Orleans.Transactions
         public TransactionalResourceExtension(IGrainContextAccessor contextAccessor)
         {
             this.factories = contextAccessor.GrainContext.GetResourceFactoryRegistry<ITransactionalResource>();
-            this.resources = new Dictionary<string, ITransactionalResource>();
+            this.resources = [];
         }
 
         public Task<TransactionalStatus> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp)

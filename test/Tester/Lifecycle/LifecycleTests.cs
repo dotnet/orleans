@@ -9,7 +9,7 @@ namespace Tester
         public async Task FullLifecycleTest()
         {
             const int observersPerStage = 2;
-            Dictionary<TestStages, int> observerCountByStage = new Dictionary<TestStages, int>();
+            Dictionary<TestStages, int> observerCountByStage = [];
             foreach (TestStages stage in Enum.GetValues(typeof(TestStages)))
             {
                 observerCountByStage[stage] = observersPerStage;
@@ -31,7 +31,7 @@ namespace Tester
         public async Task FailOnStartOnEachStageLifecycleTest()
         {
             const int observersPerStage = 2;
-            Dictionary<TestStages, int> observerCountByStage = new Dictionary<TestStages, int>();
+            Dictionary<TestStages, int> observerCountByStage = [];
             foreach (TestStages stage in Enum.GetValues(typeof(TestStages)))
             {
                 observerCountByStage[stage] = observersPerStage;
@@ -72,7 +72,7 @@ namespace Tester
         public async Task FailOnStopOnEachStageLifecycleTest()
         {
             const int observersPerStage = 2;
-            Dictionary<TestStages, int> observerCountByStage = new Dictionary<TestStages, int>();
+            Dictionary<TestStages, int> observerCountByStage = [];
             foreach (TestStages stage in Enum.GetValues(typeof(TestStages)))
             {
                 observerCountByStage[stage] = observersPerStage;
@@ -201,8 +201,8 @@ namespace Tester
         /// </summary>
         private class MultiStageObserver : ILifecycleParticipant<ILifecycleObservable>
         {
-            public Dictionary<TestStages,bool> Started { get; } = new Dictionary<TestStages, bool>(); 
-            public Dictionary<TestStages, bool> Stopped { get; } = new Dictionary<TestStages, bool>();
+            public Dictionary<TestStages,bool> Started { get; } = []; 
+            public Dictionary<TestStages, bool> Stopped { get; } = [];
 
 
             private Task OnStartStage(TestStages stage)

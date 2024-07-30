@@ -261,11 +261,10 @@ namespace UnitTests.MembershipTests
                 var siloEntry = CreateMembershipEntryForTest();
 
                 siloEntry.SuspectTimes =
-                    new List<Tuple<SiloAddress, DateTime>>
-                    {
+                    [
                         new Tuple<SiloAddress, DateTime>(CreateSiloAddressForTest(), GetUtcNowWithSecondsResolution().AddSeconds(1)),
                         new Tuple<SiloAddress, DateTime>(CreateSiloAddressForTest(), GetUtcNowWithSecondsResolution().AddSeconds(2))
-                    };
+                    ];
 
                 TableVersion tableVersion = tableData.Version.Next();
 

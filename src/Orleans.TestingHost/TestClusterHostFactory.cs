@@ -211,7 +211,7 @@ namespace Orleans.TestingHost
                     }
                     else
                     {
-                        options.Gateways = new List<Uri> { new IPEndPoint(IPAddress.Loopback, baseGatewayPort).ToGatewayUri() };
+                        options.Gateways = [new IPEndPoint(IPAddress.Loopback, baseGatewayPort).ToGatewayUri()];
                     }
                 };
 

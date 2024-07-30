@@ -189,8 +189,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private void InitForTesting()
         {
             _hostEnvironmentStatistics = new NoOpEnvironmentStatisticsProvider();
-            this.cacheList = new ConcurrentBag<EventHubQueueCacheForTesting>();
-            this.evictionStrategyList = new List<EHEvictionStrategyForTesting>();
+            this.cacheList = [];
+            this.evictionStrategyList = [];
             var monitorDimensions = new EventHubReceiverMonitorDimensions
             {
                 EventHubPartition = this.ehSettings.Partition,
@@ -226,7 +226,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
         private EventData MakeEventData(long sequenceNumber)
         {
-            byte[] ignore = { 12, 23 };
+            byte[] ignore = [12, 23];
             var now = DateTime.UtcNow;
             var eventData = new TestEventData(ignore,
                 offset: now.Ticks,

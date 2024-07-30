@@ -151,9 +151,11 @@ namespace Orleans.Runtime.MembershipService
 
         public Dictionary<string, AttributeValue> GetKeys()
         {
-            var keys = new Dictionary<string, AttributeValue>();
-            keys.Add(DEPLOYMENT_ID_PROPERTY_NAME, new AttributeValue(DeploymentId));
-            keys.Add(SILO_IDENTITY_PROPERTY_NAME, new AttributeValue(SiloIdentity));
+            var keys = new Dictionary<string, AttributeValue>
+            {
+                { DEPLOYMENT_ID_PROPERTY_NAME, new AttributeValue(DeploymentId) },
+                { SILO_IDENTITY_PROPERTY_NAME, new AttributeValue(SiloIdentity) }
+            };
             return keys;
         }
 

@@ -36,7 +36,7 @@ namespace Orleans.Transactions.TestKit
             [TransactionalState("data2", TransactionTestConstants.TransactionStore)]
             ITransactionalState<GrainData> data2,
             ILoggerFactory loggerFactory)
-            : base(new ITransactionalState<GrainData>[2] { data1, data2 }, loggerFactory)
+            : base([data1, data2], loggerFactory)
         {
         }
     }
@@ -47,7 +47,7 @@ namespace Orleans.Transactions.TestKit
             [TransactionalState("data", TransactionTestConstants.TransactionStore)]
             ITransactionalState<GrainData> data,
             ILoggerFactory loggerFactory)
-            : base(new ITransactionalState<GrainData>[1] { data }, loggerFactory)
+            : base([data], loggerFactory)
         {
         }
     }

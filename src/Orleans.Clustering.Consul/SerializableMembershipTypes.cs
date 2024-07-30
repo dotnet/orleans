@@ -63,7 +63,7 @@ namespace Orleans.Runtime.Host
         [JsonConstructor]
         internal ConsulSiloRegistration()
         {
-            SuspectingSilos = new List<SuspectingSilo>();
+            SuspectingSilos = [];
         }
     }
 

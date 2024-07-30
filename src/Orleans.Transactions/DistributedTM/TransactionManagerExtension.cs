@@ -15,7 +15,7 @@ namespace Orleans.Transactions
         public TransactionManagerExtension(IGrainContextAccessor contextAccessor)
         {
             this.factories = contextAccessor.GrainContext.GetResourceFactoryRegistry<ITransactionManager>();
-            this.managers = new Dictionary<string, ITransactionManager>();
+            this.managers = [];
         }
 
         public Task Ping(string resourceId, Guid transactionId, DateTime timeStamp, ParticipantId resource)

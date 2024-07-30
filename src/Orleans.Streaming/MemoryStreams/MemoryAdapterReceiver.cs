@@ -23,7 +23,7 @@ namespace Orleans.Providers
             this.queueGrain = queueGrain;
             this.logger = logger;
             this.serializer = serializer;
-            awaitingTasks = new List<Task>();
+            awaitingTasks = [];
             this.receiverMonitor = receiverMonitor;
         }
 

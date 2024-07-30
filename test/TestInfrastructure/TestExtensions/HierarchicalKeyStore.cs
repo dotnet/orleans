@@ -13,7 +13,7 @@ namespace Orleans.Storage
 
         private long lastETagCounter = 1;
         [NonSerialized]
-        private readonly Dictionary<string, Dictionary<string, object>> dataTable = new();
+        private readonly Dictionary<string, Dictionary<string, object>> dataTable = [];
         private readonly int numKeyLayers;
         private readonly object lockable = new object();
 
@@ -122,7 +122,7 @@ namespace Orleans.Storage
             {
                 if (!dataTable.TryGetValue(keyStr, out var data))
                 {
-                    data = new Dictionary<string, object>(); // Empty data set
+                    data = []; // Empty data set
                     dataTable[keyStr] = data;
                 }
                 return data;

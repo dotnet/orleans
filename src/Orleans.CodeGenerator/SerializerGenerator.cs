@@ -766,8 +766,8 @@ namespace Orleans.CodeGenerator
             else
             {
                 // For types which are not sealed/value types, add some extra logic to support sub-types:
-                body = new()
-                {
+                body =
+                [
                     // C#: if (value is null || value.GetType() == typeof(TField)) { <inner body> }
                     // C#: else writer.SerializeUnexpectedType(fieldIdDelta, expectedType, value);
                     IfStatement(
@@ -785,7 +785,7 @@ namespace Orleans.CodeGenerator
                                         Argument(valueParam)
                                     })))
                         )))
-                };
+                ];
             }
 
             var parameters = new[]
@@ -815,7 +815,7 @@ namespace Orleans.CodeGenerator
             var readerInputTypeParam = ParseTypeName("TReaderInput");
 
             var body = new List<StatementSyntax>();
-            var innerBody = type.IsSealedType ? body : new List<StatementSyntax>();
+            var innerBody = type.IsSealedType ? body : [];
 
             if (!type.IsValueType)
             {
@@ -824,7 +824,7 @@ namespace Orleans.CodeGenerator
                     IfStatement(
                         fieldParam.Member("IsReference"),
                         ReturnStatement(InvocationExpression(
-                            IdentifierName("ReferenceCodec").Member("ReadReference", new[] { type.TypeSyntax, readerInputTypeParam }),
+                            IdentifierName("ReferenceCodec").Member("ReadReference", [type.TypeSyntax, readerInputTypeParam]),
                             ArgumentList(SeparatedList(new[]
                             {
                                 Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
@@ -901,7 +901,7 @@ namespace Orleans.CodeGenerator
 
                 body.Add(ReturnStatement(
                                 InvocationExpression(
-                                    readerParam.Member("DeserializeUnexpectedType", new[] { readerInputTypeParam, type.TypeSyntax }),
+                                    readerParam.Member("DeserializeUnexpectedType", [readerInputTypeParam, type.TypeSyntax]),
                                     ArgumentList(
                                         SingletonSeparatedList(Argument(null, Token(SyntaxKind.RefKeyword), fieldParam))))));
             }

@@ -43,7 +43,7 @@ namespace Tester.EventSourcingTests
             await ConcurrentIncrementsRunner(grain, 50, false);
         }
 
-        private static readonly string[] keys = { "a", "b", "c", "d", "e", "f", "g", "h" };
+        private static readonly string[] keys = ["a", "b", "c", "d", "e", "f", "g", "h"];
         private string RandomKey() { return keys[Random.Shared.Next(keys.Length)]; }
 
 

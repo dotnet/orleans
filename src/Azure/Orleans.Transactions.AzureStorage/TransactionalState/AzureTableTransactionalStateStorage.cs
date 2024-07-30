@@ -280,7 +280,7 @@ namespace Orleans.Transactions.AzureStorage
 
             public BatchOperation(ILogger logger, KeyEntity key, TableClient table)
             {
-                this.batchOperation = new();
+                this.batchOperation = [];
                 this.logger = logger;
                 this.key = key;
                 this.table = table;

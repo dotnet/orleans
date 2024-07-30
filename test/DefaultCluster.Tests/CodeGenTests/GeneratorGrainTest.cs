@@ -137,7 +137,7 @@ namespace Tester.CodeGenTests
             strPromise = await grain.StringConcat("Begin", "Cont", "End");
             Assert.Equal("BeginContEnd", strPromise);
 
-            string[] strArray = { "Begin", "Cont", "Cont", "End" };
+            string[] strArray = ["Begin", "Cont", "Cont", "End"];
             strPromise = await grain.StringNConcat(strArray);
             Assert.Equal("BeginContContEnd", strPromise);
 
@@ -172,9 +172,9 @@ namespace Tester.CodeGenTests
             var grain = this.GrainFactory.GetGrain<IGrainWithGenericMethods>(Guid.NewGuid());
             Assert.Equal("default string", await grain.Default());
             Assert.Equal(-8, await grain.RoundTrip(8));
-            Assert.Equal(new[] { typeof(IGrain), typeof(string), typeof(DateTime) }, await grain.GetTypesExplicit<IGrain, string, DateTime>());
-            Assert.Equal(new[] { typeof(IGrain), typeof(string), typeof(DateTime) }, await grain.GetTypesInferred((IGrain)grain, default(string), default(DateTime)));
-            Assert.Equal(new[] { typeof(IGrain), typeof(string) }, await grain.GetTypesInferred(default(IGrain), default(string), 0));
+            Assert.Equal([typeof(IGrain), typeof(string), typeof(DateTime)], await grain.GetTypesExplicit<IGrain, string, DateTime>());
+            Assert.Equal([typeof(IGrain), typeof(string), typeof(DateTime)], await grain.GetTypesInferred((IGrain)grain, default(string), default(DateTime)));
+            Assert.Equal([typeof(IGrain), typeof(string)], await grain.GetTypesInferred(default(IGrain), default(string), 0));
             var now = DateTime.Now;
             Assert.Equal(now, await grain.RoundTrip(now));
             Assert.Equal(default, await grain.Default<DateTime>());

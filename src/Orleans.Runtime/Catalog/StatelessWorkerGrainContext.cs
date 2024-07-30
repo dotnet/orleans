@@ -15,7 +15,7 @@ namespace Orleans.Runtime
         private readonly GrainTypeSharedContext _shared;
         private readonly IGrainContextActivator _innerActivator;
         private readonly int _maxWorkers;
-        private readonly List<ActivationData> _workers = new();
+        private readonly List<ActivationData> _workers = [];
         private readonly ConcurrentQueue<(WorkItemType Type, object State)> _workItems = new();
         private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = false };
 
@@ -239,7 +239,7 @@ namespace Orleans.Runtime
             newWorker.SetComponent<IActivationLifecycleObserver>(this);
 
             // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
-            var requestContext = (message as Message)?.RequestContextData ?? new Dictionary<string, object>();
+            var requestContext = (message as Message)?.RequestContextData ?? [];
             var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
             newWorker.Activate(requestContext, cancellation.Token);
 

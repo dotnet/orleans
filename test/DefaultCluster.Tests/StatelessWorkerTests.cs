@@ -42,7 +42,7 @@ namespace DefaultCluster.Tests.General
             int numberOfCalls = ExpectedMaxLocalActivations * 3 * gatewaysCount; 
 
             IStatelessWorkerGrain grain = this.GrainFactory.GetGrain<IStatelessWorkerGrain>(GetRandomGrainId());
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
 
             // warmup
             for (int i = 0; i < gatewaysCount; i++)
@@ -74,7 +74,7 @@ namespace DefaultCluster.Tests.General
             {
                 var silo = siloGroup.Key;
 
-                HashSet<Guid> activations = new HashSet<Guid>();
+                HashSet<Guid> activations = [];
 
                 foreach (var response in siloGroup)
                 {
@@ -122,7 +122,7 @@ namespace DefaultCluster.Tests.General
             int numberOfCalls = ExpectedMaxLocalActivations * 3 * gatewaysCount;
 
             IStatelessWorkerGrain grain = this.GrainFactory.GetGrain<IStatelessWorkerGrain>(GetRandomGrainId());
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             
             for (int i = 0; i < numberOfCalls; i++)
                 promises.Add(grain.LongCall());

@@ -333,11 +333,11 @@ namespace Orleans.CodeGenerator
                 {
                     case Accessibility.Public:
                     case Accessibility.Protected:
-                        return new[] { Token(SyntaxKind.PublicKeyword) };
+                        return [Token(SyntaxKind.PublicKeyword)];
                     case Accessibility.Internal:
                     case Accessibility.ProtectedOrInternal:
                     case Accessibility.ProtectedAndInternal:
-                        return new[] { Token(SyntaxKind.InternalKeyword) };
+                        return [Token(SyntaxKind.InternalKeyword)];
                     default:
                         return Array.Empty<SyntaxToken>();
                 }

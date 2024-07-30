@@ -45,7 +45,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
 
         [JsonProperty("v")]
         [Id(0)]
-        private int[] value = { 0 };
+        private int[] value = [0];
 
         [JsonIgnore]
         public int[] Value => value;
@@ -182,7 +182,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
             [TransactionalState("data2", TransactionTestConstants.TransactionStore)]
             ITransactionalState<BitArrayState> data2,
             ILoggerFactory loggerFactory)
-            : base(new ITransactionalState<BitArrayState>[2] { data1, data2 }, loggerFactory)
+            : base([data1, data2], loggerFactory)
         {
         }
     }
@@ -194,7 +194,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
             [TransactionalState("data", TransactionTestConstants.TransactionStore)]
             ITransactionalState<BitArrayState> data,
             ILoggerFactory loggerFactory)
-            : base(new ITransactionalState<BitArrayState>[1] { data }, loggerFactory)
+            : base([data], loggerFactory)
         {
         }
     }

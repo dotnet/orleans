@@ -139,7 +139,7 @@ public class GrainDirectoryPartitionTests
 
     private class MockSiloStatusOracle : ISiloStatusOracle
     {
-        private readonly Dictionary<SiloAddress, SiloStatus> _content = new();
+        private readonly Dictionary<SiloAddress, SiloStatus> _content = [];
 
         public MockSiloStatusOracle(SiloAddress siloAddress = null)
         {

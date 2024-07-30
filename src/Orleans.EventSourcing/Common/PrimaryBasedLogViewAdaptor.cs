@@ -202,7 +202,7 @@ namespace Orleans.EventSourcing.Common
 
 
         // the currently submitted, unconfirmed entries. 
-        private readonly List<TSubmissionEntry> pending = new List<TSubmissionEntry>();
+        private readonly List<TSubmissionEntry> pending = [];
 
 
         /// called at beginning of WriteAsync to the current tentative state
@@ -458,8 +458,8 @@ namespace Orleans.EventSourcing.Common
 
             stats = new LogConsistencyStatistics()
             {
-                EventCounters = new Dictionary<string, long>(),
-                StabilizationLatenciesInMsecs = new List<int>()
+                EventCounters = [],
+                StabilizationLatenciesInMsecs = []
             };
 
             stats.EventCounters.Add("TentativeViewCalled", 0);
@@ -474,7 +474,7 @@ namespace Orleans.EventSourcing.Common
 
             stats.EventCounters.Add("WritebackEvents", 0);
 
-            stats.StabilizationLatenciesInMsecs = new List<int>();
+            stats.StabilizationLatenciesInMsecs = [];
         }
 
         /// <summary>

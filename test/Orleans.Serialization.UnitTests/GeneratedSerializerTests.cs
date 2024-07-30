@@ -252,7 +252,7 @@ public class GeneratedSerializerTests : IDisposable
     {
         var original = new GenericPoco<string>
         {
-            ArrayField = new[] { "a", "bb", "ccc" },
+            ArrayField = ["a", "bb", "ccc"],
             Field = Guid.NewGuid().ToString("N")
         };
         var result = (GenericPoco<string>)RoundTripThroughUntypedSerializer(original, out var formattedBitStream);
@@ -305,12 +305,12 @@ public class GeneratedSerializerTests : IDisposable
     {
         var original = new ArrayPoco<int>
         {
-            Array = new[] { 1, 2, 3 },
+            Array = [1, 2, 3],
             Dim2 = new int[,] { { 1 }, { 2 } },
             Dim3 = new int[,,] { { { 2 } } },
             Dim4 = new int[,,,] { { { { 4 } } } },
             Dim32 = new int[,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,] { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { { 809 } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } },
-            Jagged = new int[][] { new int[] { 909 } }
+            Jagged = [[909]]
         };
         var result = (ArrayPoco<int>)RoundTripThroughUntypedSerializer(original, out _);
 
@@ -354,8 +354,8 @@ public class GeneratedSerializerTests : IDisposable
 
         var original = new SystemCollectionsClass
         {
-            hashSetField = new HashSet<string> { "one" },
-            HashSetProperty = new HashSet<string> { "two", "three" },
+            hashSetField = ["one"],
+            HashSetProperty = ["two", "three"],
             concurrentQueueField = concurrentQueueField,
             ConcurrentQueueProperty = concurrentQueueProperty,
             concurrentDictField = concurrentDictField,

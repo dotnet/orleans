@@ -122,8 +122,10 @@ namespace DefaultCluster.Tests.General
         {
 
             var grain = GetGrain<ISimpleGenericGrain<List<float>>>();
-            var list = new List<float>();
-            list.Add(0.1f);
+            var list = new List<float>
+            {
+                0.1f
+            };
             await grain.Set(list);
 
             var result = await grain.Get();
@@ -499,7 +501,7 @@ namespace DefaultCluster.Tests.General
 
             await g1.Foo(Guid.Empty, "", 1);
             await g2.Foo(Guid.Empty, 0, 2);
-            await g3.Foo(Guid.Empty, new byte[] { }, 3);
+            await g3.Foo(Guid.Empty, [], 3);
 
             Assert.Equal(1, await g1.GetX());
             Assert.Equal(2, await g2.GetX());

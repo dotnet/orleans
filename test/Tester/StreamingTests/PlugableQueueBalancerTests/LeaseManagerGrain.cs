@@ -27,8 +27,8 @@ namespace Tester.StreamingTests
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.siloStatusOracle = base.ServiceProvider.GetRequiredService<ISiloStatusOracle>();
-            this.queueLeaseToRenewTimeMap = new Dictionary<QueueId, DateTime>();
-            this.responsibilityMap = new Dictionary<string, int>();
+            this.queueLeaseToRenewTimeMap = [];
+            this.responsibilityMap = [];
             return Task.CompletedTask;
         }
         public Task<int> GetLeaseResposibility()

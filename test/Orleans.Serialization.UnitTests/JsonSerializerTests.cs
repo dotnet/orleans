@@ -26,13 +26,13 @@ namespace Orleans.Serialization.UnitTests
 
         protected override MyJsonClass? CreateValue() => new MyJsonClass { IntProperty = 30, SubTypeProperty = "hello", Id = new(Guid.NewGuid()) };
 
-        protected override MyJsonClass?[] TestValues => new MyJsonClass?[]
-        {
+        protected override MyJsonClass?[] TestValues =>
+        [
             null,
             new MyJsonClass() { Id = new(Guid.NewGuid()) },
             new MyJsonClass() { IntProperty = 150, SubTypeProperty = new string('c', 20), Id = new(Guid.NewGuid()) },
             new MyJsonClass() { IntProperty = -150_000, SubTypeProperty = new string('c', 6_000), Id = new(Guid.NewGuid()) },
-        };
+        ];
 
         [Fact]
         public void JsonSerializerDeepCopyTyped()
@@ -103,13 +103,13 @@ namespace Orleans.Serialization.UnitTests
 
         protected override MyJsonClass? CreateValue() => new MyJsonClass { IntProperty = 30, SubTypeProperty = "hello", Id = new(Guid.NewGuid()) };
 
-        protected override MyJsonClass?[] TestValues => new MyJsonClass?[]
-        {
+        protected override MyJsonClass?[] TestValues =>
+        [
             null,
             new MyJsonClass() { Id = new(Guid.NewGuid()) },
             new MyJsonClass() { IntProperty = 150, SubTypeProperty = new string('c', 20), Id = new(Guid.NewGuid()) },
             new MyJsonClass() { IntProperty = -150_000, SubTypeProperty = new string('c', 6_000), Id = new(Guid.NewGuid()) },
-        };
+        ];
 
         [Fact]
         public void CanCopyNativeJsonTypes()

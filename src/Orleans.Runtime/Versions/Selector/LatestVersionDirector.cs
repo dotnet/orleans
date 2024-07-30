@@ -19,7 +19,7 @@ namespace Orleans.Runtime.Versions.Selector
 
             if (max < 0) return Array.Empty<ushort>();
 
-            return new[] { (ushort)max };
+            return [(ushort)max];
         }
     }
 }

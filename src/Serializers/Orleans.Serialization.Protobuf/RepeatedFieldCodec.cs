@@ -104,7 +104,7 @@ public sealed class RepeatedFieldCodec<T> : IFieldCodec<RepeatedField<T>>
 
         if (result is null)
         {
-            result = new();
+            result = [];
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
         }
 

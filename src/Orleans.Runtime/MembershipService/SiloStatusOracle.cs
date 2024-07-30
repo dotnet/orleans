@@ -13,8 +13,8 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILogger log;
         private readonly object cacheUpdateLock = new object();
         private MembershipTableSnapshot cachedSnapshot;
-        private Dictionary<SiloAddress, SiloStatus> siloStatusCache = new Dictionary<SiloAddress, SiloStatus>();
-        private Dictionary<SiloAddress, SiloStatus> siloStatusCacheOnlyActive = new Dictionary<SiloAddress, SiloStatus>();
+        private Dictionary<SiloAddress, SiloStatus> siloStatusCache = [];
+        private Dictionary<SiloAddress, SiloStatus> siloStatusCacheOnlyActive = [];
         private ImmutableArray<SiloAddress> _activeSilos = [];
 
         public SiloStatusOracle(

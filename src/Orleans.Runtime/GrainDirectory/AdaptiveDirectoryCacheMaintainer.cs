@@ -125,7 +125,7 @@ namespace Orleans.Runtime.GrainDirectory
                             // 3. If the entry is expired and was accessed in the last time interval, put into "fetch-batch-requests" list
                             if (!fetchInBatchList.TryGetValue(owner, out var list))
                             {
-                                fetchInBatchList[owner] = list = new List<GrainId>();
+                                fetchInBatchList[owner] = list = [];
                             }
 
                             list.Add(grain);

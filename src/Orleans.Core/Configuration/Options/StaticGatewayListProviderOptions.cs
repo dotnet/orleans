@@ -15,6 +15,6 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the list of gateway addresses.
         /// </summary>
-        public List<Uri> Gateways { get; set; } = new List<Uri>();
+        public List<Uri> Gateways { get; set; } = [];
     }
 }

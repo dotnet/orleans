@@ -15,7 +15,7 @@ namespace Orleans.Runtime.ReminderService
     internal sealed class ReminderTableGrain : Grain, IReminderTableGrain, IGrainMigrationParticipant
     {
         private readonly ILogger _logger;
-        private Dictionary<GrainId, Dictionary<string, ReminderEntry>> _reminderTable = new();
+        private Dictionary<GrainId, Dictionary<string, ReminderEntry>> _reminderTable = [];
 
         public ReminderTableGrain(ILogger<ReminderTableGrain> logger)
         {
@@ -113,7 +113,7 @@ namespace Orleans.Runtime.ReminderService
         public Task<string> UpsertRow(ReminderEntry entry)
         {
             entry.ETag = Guid.NewGuid().ToString();
-            var d = CollectionsMarshal.GetValueRefOrAddDefault(_reminderTable, entry.GrainId, out _) ??= new();
+            var d = CollectionsMarshal.GetValueRefOrAddDefault(_reminderTable, entry.GrainId, out _) ??= [];
             ref var entryRef = ref CollectionsMarshal.GetValueRefOrAddDefault(d, entry.ReminderName, out _);
 
             var old = entryRef; // tracing purposes only

@@ -50,7 +50,7 @@ namespace TestGrains
 
         public ReservationState()
         {
-            Reservations = new Dictionary<int, SeatReservation>();
+            Reservations = [];
         }
 
         private void Apply(SeatReservation reservation)

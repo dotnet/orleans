@@ -125,7 +125,7 @@ namespace Tester.CustomPlacementTests
             const int nGrains = 100;
 
             Task<SiloAddress>[] tasks = new Task<SiloAddress>[nGrains];
-            List<GrainId> grains = new List<GrainId>();
+            List<GrainId> grains = [];
             for (int i = 0; i < nGrains; i++)
             {
                 var g = this.fixture.GrainFactory.GetGrain<IHashBasedPlacementGrain>(Guid.NewGuid(),

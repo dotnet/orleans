@@ -26,9 +26,10 @@ namespace TestGrains
 
             var spouseData = await spouse.GetTentativePersonalAttributes();
 
-            var events = new List<IPersonEvent>();
-
-            events.Add(new PersonMarried(spouse.GetPrimaryKey(), spouseData.FirstName, spouseData.LastName));
+            var events = new List<IPersonEvent>
+            {
+                new PersonMarried(spouse.GetPrimaryKey(), spouseData.FirstName, spouseData.LastName)
+            };
 
             if (State.LastName != spouseData.LastName)
             {

@@ -23,56 +23,56 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void RingStandalone_Failures()
         {
-            TestChurn(new int[] { 0 }, new int[] { });    // 1 failure in the beginning
-            TestChurn(new int[] { 0, 1 }, new int[] { }); // 2 failures in the beginning
+            TestChurn([0], []);    // 1 failure in the beginning
+            TestChurn([0, 1], []); // 2 failures in the beginning
 
-            TestChurn(new int[] { count - 1 }, new int[] { });            // 1 failure at the end
-            TestChurn(new int[] { count - 1, count - 2 }, new int[] { }); // 2 failures at the end
+            TestChurn([count - 1], []);            // 1 failure at the end
+            TestChurn([count - 1, count - 2], []); // 2 failures at the end
 
-            TestChurn(new int[] { count / 2 }, new int[] { });                // 1 failure in the middle
-            TestChurn(new int[] { count / 2, 1 + count / 2 }, new int[] { }); // 2 failures in the middle
+            TestChurn([count / 2], []);                // 1 failure in the middle
+            TestChurn([count / 2, 1 + count / 2], []); // 2 failures in the middle
 
-            TestChurn(new int[] { 1, count - 2 }, new int[] { }); // 2 failures at some distance
-            TestChurn(new int[] { 0, count - 1 }, new int[] { }); // 2 failures at some distance
+            TestChurn([1, count - 2], []); // 2 failures at some distance
+            TestChurn([0, count - 1], []); // 2 failures at some distance
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void RingStandalone_Joins()
         {
-            TestChurn(new int[] { }, new int[] { 0 });     // 1 join in the beginning
-            TestChurn(new int[] { }, new int[] { 0, 1 });  // 2 joins in the beginning
+            TestChurn([], [0]);     // 1 join in the beginning
+            TestChurn([], [0, 1]);  // 2 joins in the beginning
 
-            TestChurn(new int[] { }, new int[] { count - 1 });             // 1 join at the end
-            TestChurn(new int[] { }, new int[] { count - 1, count - 2 });  // 2 joins at the end
+            TestChurn([], [count - 1]);             // 1 join at the end
+            TestChurn([], [count - 1, count - 2]);  // 2 joins at the end
 
-            TestChurn(new int[] { }, new int[] { count / 2 });                 // 1 join in the middle
-            TestChurn(new int[] { }, new int[] { count / 2, 1 + count / 2 });  // 2 joins in the middle
+            TestChurn([], [count / 2]);                 // 1 join in the middle
+            TestChurn([], [count / 2, 1 + count / 2]);  // 2 joins in the middle
 
-            TestChurn(new int[] { }, new int[] { 1, count - 2 });  // 2 joins at some distance
-            TestChurn(new int[] { }, new int[] { 0, count - 1 });  // 2 joins at some distance
+            TestChurn([], [1, count - 2]);  // 2 joins at some distance
+            TestChurn([], [0, count - 1]);  // 2 joins at some distance
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void RingStandalone_Mixed()
         {
-            TestChurn(new int[] { 0 }, new int[] { 1 });     // FJ in the beginning
-            TestChurn(new int[] { 1 }, new int[] { 0 });     // JF in the beginning
+            TestChurn([0], [1]);     // FJ in the beginning
+            TestChurn([1], [0]);     // JF in the beginning
 
-            TestChurn(new int[] { count - 2 }, new int[] { count - 1 });     // FJ at the end
-            TestChurn(new int[] { count - 1 }, new int[] { count - 2 });     // JF at the end
+            TestChurn([count - 2], [count - 1]);     // FJ at the end
+            TestChurn([count - 1], [count - 2]);     // JF at the end
 
-            TestChurn(new int[] { count / 2 }, new int[] { 1 + count / 2 });     // FJ in the middle
-            TestChurn(new int[] { 1 + count / 2 }, new int[] { count / 2 });     // JF in the middle
+            TestChurn([count / 2], [1 + count / 2]);     // FJ in the middle
+            TestChurn([1 + count / 2], [count / 2]);     // JF in the middle
 
-            TestChurn(new int[] { 0 }, new int[] { count - 1 });     // F first, J at the end
-            TestChurn(new int[] { count - 1 }, new int[] { 0 });     // F last, J at the beginning
+            TestChurn([0], [count - 1]);     // F first, J at the end
+            TestChurn([count - 1], [0]);     // F last, J at the beginning
 
         }
 
         private void TestChurn(int[] indexesFails, int[] indexesJoins)
         {
-            Dictionary<SiloAddress, ConsistentRingProvider> rings, holder = new Dictionary<SiloAddress, ConsistentRingProvider>();
-            List<SiloAddress> sortedServers, fail = new List<SiloAddress>();
+            Dictionary<SiloAddress, ConsistentRingProvider> rings, holder = [];
+            List<SiloAddress> sortedServers, fail = [];
 
             rings = CreateServers(count);
 
@@ -97,7 +97,7 @@ namespace UnitTests.General
 
         private Dictionary<SiloAddress, ConsistentRingProvider> CreateServers(int n)
         {
-            Dictionary<SiloAddress, ConsistentRingProvider> rings = new Dictionary<SiloAddress, ConsistentRingProvider>();
+            Dictionary<SiloAddress, ConsistentRingProvider> rings = [];
 
             for (int i = 1; i <= n; i++)
             {
@@ -270,8 +270,7 @@ namespace UnitTests.General
 
         public RangeBreakable()
         {
-            ranges = new List<SingleRange>(1);
-            ranges.Add(RangeFactory.CreateFullRange() as SingleRange);
+            ranges = [RangeFactory.CreateFullRange() as SingleRange];
         }
 
         public bool Remove(IRingRange range)

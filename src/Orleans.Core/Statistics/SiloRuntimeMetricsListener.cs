@@ -20,11 +20,11 @@ public static class SiloRuntimeMetricsListener
     public static long MessageSentTotal => _messageSentTotal;
 
     private static readonly string[] MetricNames =
-    {
+    [
         // orleans
         InstrumentNames.GATEWAY_CONNECTED_CLIENTS,
         InstrumentNames.MESSAGING_RECEIVED_MESSAGES_SIZE,
-    };
+    ];
 
     static SiloRuntimeMetricsListener()
     {

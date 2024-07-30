@@ -50,7 +50,7 @@ namespace UnitTests.Grains
 
         public Task PingOthers(long[] others)
         {
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             foreach (long key in others)
             {
                 IStressTestGrain g1 = this.GrainFactory.GetGrain<IStressTestGrain>(key);

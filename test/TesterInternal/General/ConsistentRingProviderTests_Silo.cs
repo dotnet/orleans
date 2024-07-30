@@ -102,7 +102,7 @@ namespace UnitTests.General
                 numOfFailures,
                 failCode,
                 Utils.EnumerableToString(failures, handle => handle.SiloAddress.ToString()));
-            List<uint> keysToTest = new List<uint>();
+            List<uint> keysToTest = [];
             foreach (SiloHandle fail in failures) // verify before failure
             {
                 keysToTest.Add(PickKey(fail.SiloAddress)); //fail.SiloAddress.GetConsistentHashCode());
@@ -222,7 +222,7 @@ namespace UnitTests.General
         private void VerificationScenario(uint testKey)
         {
             // setup
-            List<SiloAddress> silos = new List<SiloAddress>();
+            List<SiloAddress> silos = [];
 
             foreach (var siloHandle in this.HostedCluster.GetActiveSilos())
             {
@@ -271,7 +271,7 @@ namespace UnitTests.General
 
         private async Task<List<SiloHandle>> getSilosToFail(Fail fail, int numOfFailures)
         {
-            List<SiloHandle> failures = new List<SiloHandle>();
+            List<SiloHandle> failures = [];
             int count = 0;
 
             // Figure out the primary directory partition and the silo hosting the ReminderTableGrain.
@@ -286,7 +286,7 @@ namespace UnitTests.General
             var address = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.GetSiloForAddress(reminderTableGrainPrimaryDirectoryAddress))).LocalDirectoryActivationAddress;
             GrainAddress reminderGrainActivation = address;
 
-            SortedList<int, SiloHandle> ids = new SortedList<int, SiloHandle>();
+            SortedList<int, SiloHandle> ids = [];
             foreach (var siloHandle in this.HostedCluster.GetActiveSilos())
             {
                 SiloAddress siloAddress = siloHandle.SiloAddress;

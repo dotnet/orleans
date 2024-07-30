@@ -11,7 +11,7 @@ namespace Orleans.CodeGenerator
     [DebuggerDisplay("{InterfaceType} (proxy base {ProxyBaseType})")]
     internal class ProxyInterfaceDescription : IEquatable<ProxyInterfaceDescription>
     {
-        private static readonly char[] FilteredNameChars = new char[] { '`', '.' };
+        private static readonly char[] FilteredNameChars = ['`', '.'];
         private List<ProxyMethodDescription> _methods;
 
         public ProxyInterfaceDescription(
@@ -48,7 +48,7 @@ namespace Orleans.CodeGenerator
             };
 
             var names = new HashSet<string>(StringComparer.Ordinal);
-            TypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
+            TypeParameters = [];
 
             foreach (var tp in interfaceType.GetAllTypeParameters())
             {

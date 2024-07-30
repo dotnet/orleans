@@ -23,7 +23,7 @@ namespace Orleans.Runtime
         private readonly HashSet<IGrainTimer> _timers = [];
         private GrainReference selfReference;
         private Message running;
-        private Dictionary<Type, object> _components = new Dictionary<Type, object>();
+        private Dictionary<Type, object> _components = [];
 
         /// <summary>Silo address of the system target.</summary>
         public SiloAddress Silo { get; }
@@ -140,7 +140,7 @@ namespace Orleans.Runtime
                 return;
             }
 
-            if (_components is null) _components = new Dictionary<Type, object>();
+            if (_components is null) _components = [];
             _components[typeof(TComponent)] = instance;
         }
 

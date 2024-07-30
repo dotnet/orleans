@@ -111,9 +111,11 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
         
         internal static Dictionary<string, AttributeValue> GetKeys(UnitTestDynamoDBTableData data)
         {
-            var keys = new Dictionary<string, AttributeValue>();
-            keys.Add("PartitionKey", new AttributeValue(data.PartitionKey));
-            keys.Add("RowKey", new AttributeValue(data.RowKey));
+            var keys = new Dictionary<string, AttributeValue>
+            {
+                { "PartitionKey", new AttributeValue(data.PartitionKey) },
+                { "RowKey", new AttributeValue(data.RowKey) }
+            };
             return keys;
         }
 

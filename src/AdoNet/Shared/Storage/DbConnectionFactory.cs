@@ -93,7 +93,7 @@ namespace Orleans.Tests.SqlUtils
             {
                 if (exceptions == null)
                 {
-                    exceptions = new List<Exception>();
+                    exceptions = [];
                 }
                 exceptions.Add(ex);
             }

@@ -16,7 +16,7 @@ namespace Orleans.TestingHost
     {
         private bool disposed;
         private readonly object lockObj = new object();
-        private readonly Dictionary<int, string> allocatedPorts = new Dictionary<int, string>();
+        private readonly Dictionary<int, string> allocatedPorts = [];
 
         /// <inheritdoc />
         public (int, int) AllocateConsecutivePortPairs(int numPorts = 5)
@@ -134,8 +134,8 @@ namespace Orleans.TestingHost
 
         private class MutexManager
         {
-            private readonly Dictionary<string, Mutex> _mutexes = new Dictionary<string, Mutex>();
-            private readonly BlockingCollection<Action> _workItems = new BlockingCollection<Action>();
+            private readonly Dictionary<string, Mutex> _mutexes = [];
+            private readonly BlockingCollection<Action> _workItems = [];
             private readonly Thread _thread;
 
             public static MutexManager Instance { get; } = new MutexManager();

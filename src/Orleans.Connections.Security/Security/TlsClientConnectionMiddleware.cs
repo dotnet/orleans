@@ -131,7 +131,7 @@ namespace Orleans.Connections.Security
 
                     var sslOptions = new TlsClientAuthenticationOptions
                     {
-                        ClientCertificates = _certificate == null || _certificateSelector != null ? null : new X509CertificateCollection { _certificate },
+                        ClientCertificates = _certificate == null || _certificateSelector != null ? null : [_certificate],
                         LocalCertificateSelectionCallback = selector,
                         EnabledSslProtocols = _options.SslProtocols,
                     };

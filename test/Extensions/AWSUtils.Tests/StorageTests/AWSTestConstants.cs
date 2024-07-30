@@ -30,12 +30,12 @@ namespace AWSUtils.Tests.StorageTests
                 }
                 storage.InitializeTable(
                     "TestTable",
-                    new List<KeySchemaElement> {
+                    [
                         new KeySchemaElement { AttributeName = "PartitionKey", KeyType = KeyType.HASH }
-                    },
-                    new List<AttributeDefinition> {
+                    ],
+                    [
                         new AttributeDefinition { AttributeName = "PartitionKey", AttributeType = ScalarAttributeType.S }
-                    })
+                    ])
                 .WithTimeout(TimeSpan.FromSeconds(2)).Wait();
                 return true;
             }

@@ -22,9 +22,9 @@ namespace Orleans.Runtime.Versions
     internal sealed class VersionStoreGrainState
     {
         [Id(0)]
-        public readonly Dictionary<GrainInterfaceType, CompatibilityStrategy> CompatibilityStrategies = new();
+        public readonly Dictionary<GrainInterfaceType, CompatibilityStrategy> CompatibilityStrategies = [];
         [Id(1)]
-        public readonly Dictionary<GrainInterfaceType, VersionSelectorStrategy> VersionSelectorStrategies = new();
+        public readonly Dictionary<GrainInterfaceType, VersionSelectorStrategy> VersionSelectorStrategies = [];
         [Id(2)]
         public VersionSelectorStrategy SelectorOverride;
         [Id(3)]

@@ -98,7 +98,7 @@ namespace Benchmarks.GrainStorage
             bool running = true;
             bool isRunning() => running;
             var runTask = Task.WhenAll(Enumerable.Range(0, concurrent).Select(i => RunAsync(i, isRunning)).ToList());
-            Task[] waitTasks = { runTask, Task.Delay(duration) };
+            Task[] waitTasks = [runTask, Task.Delay(duration)];
             await Task.WhenAny(waitTasks);
             running = false;
             var runResults = await runTask;

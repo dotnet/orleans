@@ -25,7 +25,7 @@ namespace TestGrains
 
             public GrainState()
             {
-                Counts = new Dictionary<string, int>();
+                Counts = [];
             }
 
             public void Apply(UpdatedEvent e)

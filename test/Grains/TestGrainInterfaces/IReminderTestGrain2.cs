@@ -7,8 +7,8 @@ namespace UnitTests.GrainInterfaces
     {
         [Id(1)] public DateTime? Registered { get; init; } = null;
         [Id(2)] public DateTime? Unregistered { get; init; } = null;
-        [Id(3)] public List<DateTime> Fired { get; init; } = new();
-        [Id(4)] public List<(DateTime, string)> Log { get; init; } = new();
+        [Id(3)] public List<DateTime> Fired { get; init; } = [];
+        [Id(4)] public List<(DateTime, string)> Log { get; init; } = [];
     }
 
     public interface IReminderTestGrain2 : IGrainWithGuidKey

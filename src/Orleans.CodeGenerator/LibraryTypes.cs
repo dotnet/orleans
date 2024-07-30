@@ -125,37 +125,37 @@ namespace Orleans.CodeGenerator
                     new(TypeOrDefault("System.Half"), TypeOrDefault("Orleans.Serialization.Codecs.HalfCodec")),
                     new(Type("System.Uri"), Type("Orleans.Serialization.Codecs.UriCodec")),
                 }.Where(desc => desc.UnderlyingType is { } && desc.CodecType is { }).ToArray();
-            WellKnownCodecs = new WellKnownCodecDescription[]
-            {
+            WellKnownCodecs =
+            [
                     new(Type("System.Exception"), Type("Orleans.Serialization.ExceptionCodec")),
                     new(Type("System.Collections.Generic.Dictionary`2"), Type("Orleans.Serialization.Codecs.DictionaryCodec`2")),
                     new(Type("System.Collections.Generic.List`1"), Type("Orleans.Serialization.Codecs.ListCodec`1")),
                     new(Type("System.Collections.Generic.HashSet`1"), Type("Orleans.Serialization.Codecs.HashSetCodec`1")),
                     new(compilation.GetSpecialType(SpecialType.System_Nullable_T), Type("Orleans.Serialization.Codecs.NullableCodec`1")),
-            };
-            StaticCopiers = new WellKnownCopierDescription[]
-            {
+            ];
+            StaticCopiers =
+            [
                     new(compilation.GetSpecialType(SpecialType.System_Object), Type("Orleans.Serialization.Codecs.ObjectCopier")),
                     new(compilation.CreateArrayTypeSymbol(compilation.GetSpecialType(SpecialType.System_Byte), 1), Type("Orleans.Serialization.Codecs.ByteArrayCopier")),
                     new(Type("System.ReadOnlyMemory`1").Construct(compilation.GetSpecialType(SpecialType.System_Byte)), Type("Orleans.Serialization.Codecs.ReadOnlyMemoryOfByteCopier")),
                     new(Type("System.Memory`1").Construct(compilation.GetSpecialType(SpecialType.System_Byte)), Type("Orleans.Serialization.Codecs.MemoryOfByteCopier")),
-            };
-            WellKnownCopiers = new WellKnownCopierDescription[]
-            {
+            ];
+            WellKnownCopiers =
+            [
                     new(Type("System.Exception"), Type("Orleans.Serialization.ExceptionCodec")),
                     new(Type("System.Collections.Generic.Dictionary`2"), Type("Orleans.Serialization.Codecs.DictionaryCopier`2")),
                     new(Type("System.Collections.Generic.List`1"), Type("Orleans.Serialization.Codecs.ListCopier`1")),
                     new(Type("System.Collections.Generic.HashSet`1"), Type("Orleans.Serialization.Codecs.HashSetCopier`1")),
                     new(compilation.GetSpecialType(SpecialType.System_Nullable_T), Type("Orleans.Serialization.Codecs.NullableCopier`1")),
-            };
+            ];
             Exception = Type("System.Exception");
             ImmutableAttributes = options.ImmutableAttributes.Select(Type).ToArray();
             TimeSpan = Type("System.TimeSpan");
             _ipAddress = Type("System.Net.IPAddress");
             _ipEndPoint = Type("System.Net.IPEndPoint");
             _cancellationToken = Type("System.Threading.CancellationToken");
-            _immutableContainerTypes = new[]
-            {
+            _immutableContainerTypes =
+            [
                     compilation.GetSpecialType(SpecialType.System_Nullable_T),
                     Type("System.Tuple`1"),
                     Type("System.Tuple`2"),
@@ -181,7 +181,7 @@ namespace Orleans.CodeGenerator
                     Type("System.Collections.Immutable.ImmutableSortedDictionary`2"),
                     Type("System.Collections.Immutable.ImmutableSortedSet`1"),
                     Type("System.Collections.Immutable.ImmutableStack`1"),
-                };
+                ];
 
             LanguageVersion = (compilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions)?.LanguageVersion;
             GenerateSerializerAttributes = options.GenerateSerializerAttributes.Select(compilation.GetTypeByMetadataName).ToArray();

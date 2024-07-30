@@ -11,15 +11,15 @@ namespace Orleans.Analyzers
     public class GrainInterfaceMethodReturnTypeDiagnosticAnalyzer : DiagnosticAnalyzer
     {
         private const string BaseInterfaceName = "Orleans.Runtime.IAddressable";
-        private static readonly (string[] Namespace, string MetadataName)[] SupportedReturnTypes = new[]
-        {
+        private static readonly (string[] Namespace, string MetadataName)[] SupportedReturnTypes =
+        [
             (new [] { "System", "Threading", "Tasks" }, "Task"),
-            (new [] { "System", "Threading", "Tasks" }, "Task`1"),
-            (new [] { "System", "Threading", "Tasks" }, "ValueTask"),
-            (new [] { "System", "Threading", "Tasks" }, "ValueTask`1"),
-            (new [] { "System", "Collections", "Generic" }, "IAsyncEnumerable`1"),
-            (new [] { "System" }, "Void")
-        };
+            (["System", "Threading", "Tasks"], "Task`1"),
+            (["System", "Threading", "Tasks"], "ValueTask"),
+            (["System", "Threading", "Tasks"], "ValueTask`1"),
+            (["System", "Collections", "Generic"], "IAsyncEnumerable`1"),
+            (["System"], "Void")
+        ];
         public const string DiagnosticId = "ORLEANS0009";
         public const string Title = "Grain interfaces methods must return a compatible type";
         public const string MessageFormat = $"Grain interfaces methods must return a compatible type, such as Task, Task<T>, ValueTask, ValueTask<T>, or void";

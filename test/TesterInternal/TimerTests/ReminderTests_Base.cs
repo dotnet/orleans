@@ -139,13 +139,13 @@ namespace UnitTests.TimerTests
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
             Task<bool>[] tasks =
-            {
+            [
                 Task.Run(() => this.PerGrainMultiReminderTestChurn(g1)),
                 Task.Run(() => this.PerGrainMultiReminderTestChurn(g2)),
                 Task.Run(() => this.PerGrainMultiReminderTestChurn(g3)),
                 Task.Run(() => this.PerGrainMultiReminderTestChurn(g4)),
                 Task.Run(() => this.PerGrainMultiReminderTestChurn(g5)),
-            };
+            ];
 
             await Task.Delay(period.Multiply(5));
 

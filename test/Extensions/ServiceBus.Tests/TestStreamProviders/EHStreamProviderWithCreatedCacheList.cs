@@ -12,7 +12,7 @@ namespace ServiceBus.Tests.TestStreamProviders
 {
     public class EHStreamProviderWithCreatedCacheListAdapterFactory : EventDataGeneratorAdapterFactory
     {
-        private readonly ConcurrentBag<QueueCacheForTesting> createdCaches = new ConcurrentBag<QueueCacheForTesting>();
+        private readonly ConcurrentBag<QueueCacheForTesting> createdCaches = [];
         private readonly EventHubStreamCachePressureOptions cacheOptions;
         private readonly StreamStatisticOptions staticticOptions;
         private readonly EventHubOptions ehOptions;
@@ -32,7 +32,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             : base(name, options, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdatper, serviceProvider, loggerFactory, environmentStatisticsProvider)
 
         {
-            this.createdCaches = new ConcurrentBag<QueueCacheForTesting>();
+            this.createdCaches = [];
             this.cacheOptions = cacheOptions;
             this.staticticOptions = statisticOptions;
             this.ehOptions = ehOptions;

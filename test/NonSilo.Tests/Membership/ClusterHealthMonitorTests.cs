@@ -44,7 +44,7 @@ namespace NonSilo.Tests.Membership
             this.fatalErrorHandler = Substitute.For<IFatalErrorHandler>();
             this.membershipGossiper = Substitute.For<IMembershipGossiper>();
             this.lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
-            this.timers = new List<DelegateAsyncTimer>();
+            this.timers = [];
             this.timerCalls = new ConcurrentQueue<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)>();
             this.timerFactory = new DelegateAsyncTimerFactory(
                 (period, name) =>

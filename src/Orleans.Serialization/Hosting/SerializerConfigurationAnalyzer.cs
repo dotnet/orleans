@@ -75,7 +75,7 @@ namespace Orleans.Serialization
 
                     if (!complaint.Methods.TryGetValue(methodInfo.DeclaringType, out var methodList))
                     {
-                        methodList = complaint.Methods[methodInfo.DeclaringType] = new HashSet<MethodInfo>();
+                        methodList = complaint.Methods[methodInfo.DeclaringType] = [];
                     }
 
                     methodList.Add(methodInfo);
@@ -101,7 +101,7 @@ namespace Orleans.Serialization
             /// <summary>
             /// Gets a collection of interface types which reference the type this complaint represents.
             /// </summary>
-            public Dictionary<Type, HashSet<MethodInfo>> Methods { get; } = new ();
+            public Dictionary<Type, HashSet<MethodInfo>> Methods { get; } = [];
 
             /// <summary>
             /// Gets or sets a value indicating whether a serializer is available for this type.

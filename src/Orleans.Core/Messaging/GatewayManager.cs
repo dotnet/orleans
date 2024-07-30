@@ -23,8 +23,8 @@ namespace Orleans.Messaging
     internal class GatewayManager : IDisposable
     {
         private readonly object lockable = new object();
-        private readonly Dictionary<SiloAddress, DateTime> knownDead = new Dictionary<SiloAddress, DateTime>();
-        private readonly Dictionary<SiloAddress, DateTime> knownMasked = new Dictionary<SiloAddress, DateTime>();
+        private readonly Dictionary<SiloAddress, DateTime> knownDead = [];
+        private readonly Dictionary<SiloAddress, DateTime> knownMasked = [];
         private readonly IGatewayListProvider gatewayListProvider;
         private readonly ILogger logger;
         private readonly ConnectionManager connectionManager;

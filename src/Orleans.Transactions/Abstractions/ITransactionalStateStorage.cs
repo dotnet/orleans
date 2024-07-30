@@ -120,7 +120,7 @@ namespace Orleans.Transactions.Abstractions
         public DateTime TimeStamp { get; set; } = default;
 
         [Id(1)]
-        public Dictionary<Guid, CommitRecord> CommitRecords { get; set; } = new Dictionary<Guid, CommitRecord>();
+        public Dictionary<Guid, CommitRecord> CommitRecords { get; set; } = [];
     }
 
     [Serializable, GenerateSerializer, Immutable]

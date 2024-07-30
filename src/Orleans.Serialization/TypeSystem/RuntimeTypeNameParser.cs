@@ -23,10 +23,10 @@ public static class RuntimeTypeNameParser
     internal const char GenericTypeIndicator = '`';
     internal const char NestedTypeIndicator = '+';
     internal const char AssemblyIndicator = ',';
-    internal static ReadOnlySpan<char> LiteralDelimiters => new[] { LiteralDelimiter };
-    internal static ReadOnlySpan<char> TupleDelimiters => new[] { CompoundAliasElementSeparator, CompoundAliasEndIndicator };
-    internal static ReadOnlySpan<char> AssemblyDelimiters => new[] { ArrayEndIndicator, CompoundAliasElementSeparator, CompoundAliasEndIndicator };
-    internal static ReadOnlySpan<char> TypeNameDelimiters => new[] { ArrayStartIndicator, ArrayEndIndicator, PointerIndicator, ReferenceIndicator, AssemblyIndicator, GenericTypeIndicator, NestedTypeIndicator };
+    internal static ReadOnlySpan<char> LiteralDelimiters => [LiteralDelimiter];
+    internal static ReadOnlySpan<char> TupleDelimiters => [CompoundAliasElementSeparator, CompoundAliasEndIndicator];
+    internal static ReadOnlySpan<char> AssemblyDelimiters => [ArrayEndIndicator, CompoundAliasElementSeparator, CompoundAliasEndIndicator];
+    internal static ReadOnlySpan<char> TypeNameDelimiters => [ArrayStartIndicator, ArrayEndIndicator, PointerIndicator, ReferenceIndicator, AssemblyIndicator, GenericTypeIndicator, NestedTypeIndicator];
 
     /// <summary>
     /// Parse the provided value as a type name.

@@ -57,7 +57,7 @@ namespace Orleans.Runtime
             _loadSheddingOptions = loadSheddingOptions;
             _statisticsRefreshTime = options.Value.DeploymentLoadPublisherRefreshTime;
             _periodicStats = new ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>();
-            _siloStatisticsChangeListeners = new List<ISiloStatisticsChangeListener>();
+            _siloStatisticsChangeListeners = [];
         }
 
         public async Task Start()

@@ -63,7 +63,7 @@ namespace Orleans.Networking.Shared
 
             if (_bufferList == null)
             {
-                _bufferList = new List<ArraySegment<byte>>();
+                _bufferList = [];
             }
             else
             {

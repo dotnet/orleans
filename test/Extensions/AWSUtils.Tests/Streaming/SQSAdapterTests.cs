@@ -102,7 +102,7 @@ namespace AWSUtils.Tests.Streaming
                         foreach (var message in messages.Cast<SQSBatchContainer>())
                         {
                             streamsPerQueue.AddOrUpdate(queueId,
-                                id => new HashSet<StreamId> { message.StreamId },
+                                id => [message.StreamId],
                                 (id, set) =>
                                 {
                                     set.Add(message.StreamId);

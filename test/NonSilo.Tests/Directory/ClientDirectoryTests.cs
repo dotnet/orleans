@@ -38,7 +38,7 @@ namespace NonSilo.Tests.Directory
         public ClientDirectoryTests()
         {
             _connectedClientCollection = Substitute.For<IConnectedClientCollection>();
-            _connectedClientCollection.GetConnectedClientIds().ReturnsForAnyArgs(_ => new List<GrainId>());
+            _connectedClientCollection.GetConnectedClientIds().ReturnsForAnyArgs(_ => []);
 
             _localSiloDetails = Substitute.For<ILocalSiloDetails>();
             _localSilo = Silo("127.0.0.1:100@100");
@@ -49,7 +49,7 @@ namespace NonSilo.Tests.Directory
             _messagingOptions = Options.Create(new SiloMessagingOptions());
             _loggerFactory = NullLoggerFactory.Instance;
             _lifecycle = new SiloLifecycleSubject(_loggerFactory.CreateLogger<SiloLifecycleSubject>());
-            _timers = new List<DelegateAsyncTimer>();
+            _timers = [];
             _timerCalls = Channel.CreateUnbounded<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)>();
             _timerFactory = new DelegateAsyncTimerFactory(
                 (period, name) =>
@@ -104,7 +104,7 @@ namespace NonSilo.Tests.Directory
             Assert.Equal(Gateway.GetClientActivationAddress(hostedClientId, _localSilo), singleResult);
 
             // Add the client and check that it's added successfully.
-            var clientsVersion = SetLocalClients(new List<GrainId> { fakeClientId });
+            var clientsVersion = SetLocalClients([fakeClientId]);
             Assert.True(_directory.TryLocalLookup(fakeClientId, out lookupResult));
             Assert.NotNull(lookupResult);
             singleResult = Assert.Single(lookupResult);
@@ -112,7 +112,7 @@ namespace NonSilo.Tests.Directory
             Assert.Equal(clientsVersion, _testAccessor.ObservedConnectedClientsVersion);
 
             // Remove the client and check that it's no longer found.
-            clientsVersion = SetLocalClients(new List<GrainId>(0));
+            clientsVersion = SetLocalClients([]);
             Assert.False(_directory.TryLocalLookup(fakeClientId, out lookupResult));
             Assert.Null(lookupResult);
             Assert.Equal(clientsVersion, _testAccessor.ObservedConnectedClientsVersion);
@@ -144,7 +144,7 @@ namespace NonSilo.Tests.Directory
             Assert.Equal(Gateway.GetClientActivationAddress(hostedClientId, _localSilo), singleResult);
 
             // Add the client and check that it's added successfully
-            var clientsVersion = SetLocalClients(new List<GrainId> { fakeClientId });
+            var clientsVersion = SetLocalClients([fakeClientId]);
             lookupResult = await _directory.Lookup(fakeClientId);
             Assert.NotNull(lookupResult);
             singleResult = Assert.Single(lookupResult);
@@ -152,7 +152,7 @@ namespace NonSilo.Tests.Directory
             Assert.Equal(clientsVersion, _testAccessor.ObservedConnectedClientsVersion);
 
             // Remove the client and check that it's no longer found
-            clientsVersion = SetLocalClients(new List<GrainId>(0));
+            clientsVersion = SetLocalClients([]);
             lookupResult = await _directory.Lookup(fakeClientId);
             Assert.Empty(lookupResult);
             Assert.Equal(clientsVersion, _testAccessor.ObservedConnectedClientsVersion);
@@ -334,7 +334,7 @@ namespace NonSilo.Tests.Directory
             totalUpdateCalls[0] = 0;
 
             // Add clients locally and see that they are propagated to the new successor.
-            SetLocalClients(new List<GrainId> { remoteClientId, remoteClientId2 });
+            SetLocalClients([remoteClientId, remoteClientId2]);
             builder = ImmutableDictionary.CreateBuilder<SiloAddress, (ImmutableHashSet<GrainId>, long)>();
             builder[oldSuccessor] = (ImmutableHashSet.CreateRange(new[] { remoteClientId2 }), 4);
             await _directory.OnUpdateClientRoutes(builder.ToImmutable());

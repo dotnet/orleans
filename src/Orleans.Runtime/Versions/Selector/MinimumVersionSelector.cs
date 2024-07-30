@@ -8,10 +8,10 @@ namespace Orleans.Runtime.Versions.Selector
     {
         public ushort[] GetSuitableVersion(ushort requestedVersion, ushort[] availableVersions, ICompatibilityDirector compatibilityDirector)
         {
-            return new[]
-            {
+            return
+            [
                 availableVersions.Where(v => compatibilityDirector.IsCompatible(requestedVersion, v)).Min()
-            };
+            ];
         }
     }
 }

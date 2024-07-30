@@ -20,7 +20,7 @@ namespace Orleans.Runtime.Messaging
         // Scan for entries which are expired every minute
         private const long GarbageCollectionIntervalMilliseconds = 60 * 1000;
 
-        private readonly Dictionary<int, (byte[] Value, long LastSeen)> _cache = new();
+        private readonly Dictionary<int, (byte[] Value, long LastSeen)> _cache = [];
         private long _lastGarbageCollectionTimestamp;
 
         public CachingIdSpanCodec()

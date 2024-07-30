@@ -427,9 +427,9 @@ namespace Tester
 
         private class TestOptionsWithListAndDictionary
         {
-            public List<int> SomeList { get; set; } = new List<int>();
+            public List<int> SomeList { get; set; } = [];
 
-            public Dictionary<string, string> SomeDictionary { get; set; } = new Dictionary<string, string>();
+            public Dictionary<string, string> SomeDictionary { get; set; } = [];
 
             public List<int> NullList { get; set; } = null;
 
@@ -545,7 +545,7 @@ namespace Tester
 
             private class Logger : ILogger
             {
-                private readonly List<string> entries = new List<string>();
+                private readonly List<string> entries = [];
 
                 public IDisposable BeginScope<TState>(TState state)
                 {

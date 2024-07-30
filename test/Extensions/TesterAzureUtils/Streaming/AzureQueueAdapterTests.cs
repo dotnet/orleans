@@ -105,7 +105,7 @@ namespace Tester.AzureUtils.Streaming
                         foreach (IBatchContainer message in messages)
                         {
                             streamsPerQueue.AddOrUpdate(queueId,
-                                id => new HashSet<StreamId> { message.StreamId },
+                                id => [message.StreamId],
                                 (id, set) =>
                                 {
                                     set.Add(message.StreamId);

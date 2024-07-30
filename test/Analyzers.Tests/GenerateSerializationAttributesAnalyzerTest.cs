@@ -9,7 +9,7 @@ public class GenerateSerializationAttributesAnalyzerTest : DiagnosticAnalyzerTes
 {
     private async Task VerifyGeneratedDiagnostic(string code)
     {
-        var (diagnostics, _) = await GetDiagnosticsAsync(code, new string[0]);
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, []);
 
         Assert.NotEmpty(diagnostics);
         Assert.Single(diagnostics);

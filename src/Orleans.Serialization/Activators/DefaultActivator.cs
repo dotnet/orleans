@@ -16,7 +16,7 @@ namespace Orleans.Serialization.Activators
             if (ctor is null)
                 return null;
 
-            var method = new DynamicMethod(nameof(DefaultActivator<T>), typeof(T), new[] { typeof(object) });
+            var method = new DynamicMethod(nameof(DefaultActivator<T>), typeof(T), [typeof(object)]);
             var il = method.GetILGenerator();
             il.Emit(OpCodes.Newobj, ctor);
             il.Emit(OpCodes.Ret);

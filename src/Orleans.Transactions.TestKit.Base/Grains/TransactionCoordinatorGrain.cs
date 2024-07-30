@@ -51,9 +51,7 @@ namespace Orleans.Transactions.TestKit
 
         public Task MultiGrainAdd(ITransactionCommitterTestGrain committer, ITransactionCommitOperation<IRemoteCommitService> operation, List<ITransactionTestGrain> grains, int numberToAdd)
         {
-            List<Task> tasks = new List<Task>();
-            tasks.AddRange(grains.Select(g => g.Add(numberToAdd)));
-            tasks.Add(committer.Commit(operation));
+            List<Task> tasks = [.. grains.Select(g => g.Add(numberToAdd)), committer.Commit(operation)];
             return Task.WhenAll(tasks);
         }
 

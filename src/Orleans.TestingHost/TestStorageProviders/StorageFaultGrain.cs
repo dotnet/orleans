@@ -24,9 +24,9 @@ namespace Orleans.TestingHost
         {
             await base.OnActivateAsync(cancellationToken);
             logger = this.ServiceProvider.GetService<ILoggerFactory>().CreateLogger($"{typeof (StorageFaultGrain).FullName}-{IdentityString}-{RuntimeIdentity}");
-            readFaults = new();
-            writeFaults = new();
-            clearfaults = new();
+            readFaults = [];
+            writeFaults = [];
+            clearfaults = [];
             logger.LogInformation("Activate.");
         }
 

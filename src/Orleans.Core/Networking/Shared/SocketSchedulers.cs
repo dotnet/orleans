@@ -5,7 +5,7 @@ namespace Orleans.Networking.Shared
 {
     internal class SocketSchedulers
     {
-        private static readonly PipeScheduler[] ThreadPoolSchedulerArray = new PipeScheduler[] { PipeScheduler.ThreadPool };
+        private static readonly PipeScheduler[] ThreadPoolSchedulerArray = [PipeScheduler.ThreadPool];
         private readonly int _numSchedulers;
         private readonly PipeScheduler[] _schedulers;
         private int nextScheduler;

@@ -181,7 +181,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Represents an empty range.
         /// </summary>
-        private static readonly GeneralMultiRange EmptyRange = new(new());
+        private static readonly GeneralMultiRange EmptyRange = new([]);
         /// <summary>
         /// Represents a full range.
         /// </summary>

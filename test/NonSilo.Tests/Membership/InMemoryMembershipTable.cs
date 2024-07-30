@@ -10,7 +10,7 @@ namespace NonSilo.Tests.Membership
     public class InMemoryMembershipTable : IMembershipTable
     {
         private readonly object tableLock = new object();
-        private readonly List<(string, object)> calls = new List<(string, object)>();
+        private readonly List<(string, object)> calls = [];
         private ImmutableList<(MembershipEntry, string)> entries = ImmutableList<(MembershipEntry, string)>.Empty;
         private TableVersion version = new TableVersion(0, "0");
 

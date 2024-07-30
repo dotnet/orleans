@@ -500,7 +500,7 @@ namespace UnitTests.SchedulerTests
                 Task<int> task2 = Task<int>.Factory.StartNew(() => { this.output.WriteLine("===> 2a"); Thread.Sleep(OneSecond); n = n + 3; this.output.WriteLine("===> 2b"); return 2; });
                 Task<int> task3 = Task<int>.Factory.StartNew(() => { this.output.WriteLine("===> 3a"); Thread.Sleep(OneSecond); n = n + 3; this.output.WriteLine("===> 3b"); return 3; });
                 Task<int> task4 = Task<int>.Factory.StartNew(() => { this.output.WriteLine("===> 4a"); Thread.Sleep(OneSecond); n = n + 3; this.output.WriteLine("===> 4b"); return 4; });
-                tasks = new Task<int>[] { task1, task2, task3, task4 };
+                tasks = [task1, task2, task3, task4];
                 result.SetResult(true);
             });
 
@@ -508,7 +508,7 @@ namespace UnitTests.SchedulerTests
 
             var promise = Task<int[]>.Factory.ContinueWhenAll(tasks, (res) => 
             {
-                List<int> output = new List<int>();
+                List<int> output = [];
                 int taskNum = 1;
                 foreach (var t in tasks)
                 {

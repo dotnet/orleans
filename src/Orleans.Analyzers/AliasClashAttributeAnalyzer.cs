@@ -42,7 +42,7 @@ public partial class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        List<AttributeArgumentBag<string>> bags = new();
+        List<AttributeArgumentBag<string>> bags = [];
         foreach (var methodDeclaration in interfaceDeclaration.Members.OfType<MethodDeclarationSyntax>())
         {
             var attributes = methodDeclaration.AttributeLists.GetAttributeSyntaxes(Constants.AliasAttributeName);

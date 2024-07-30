@@ -145,7 +145,7 @@ public class NumericsWideningAndNarrowingTests
         var values = W.Sign(W.MinValue) switch
         {
             -1 => new[] { W.MinValue, W.MaxValue },
-            _ => new[] { W.MaxValue }
+            _ => [W.MaxValue]
         };
 
         foreach (var value in values)
@@ -387,7 +387,7 @@ public class NumericsWideningAndNarrowingTests
         var values = w.Sign(w.MinValue) switch
         {
             -1 => new[] { w.MinValue, w.MaxValue },
-            _ => new[] { w.MaxValue }
+            _ => [w.MaxValue]
         };
 
         foreach (var value in values)

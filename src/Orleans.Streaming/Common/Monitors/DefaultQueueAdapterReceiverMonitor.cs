@@ -52,7 +52,7 @@ namespace Orleans.Providers.Streams.Common
         /// Initializes a new instance of the <see cref="DefaultQueueAdapterReceiverMonitor"/> class.
         /// </summary>
         /// <param name="dimensions">The dimensions.</param>
-        public DefaultQueueAdapterReceiverMonitor(ReceiverMonitorDimensions dimensions) : this(new KeyValuePair<string,object>[] { new("QueueId", dimensions.QueueId) })
+        public DefaultQueueAdapterReceiverMonitor(ReceiverMonitorDimensions dimensions) : this([new("QueueId", dimensions.QueueId)])
         {
         }
 

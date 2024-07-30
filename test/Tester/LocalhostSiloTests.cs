@@ -73,7 +73,7 @@ namespace Tester
 
             var clientHost = new HostBuilder().UseOrleansClient((ctx, clientBuilder) =>
             {
-                clientBuilder.UseLocalhostClustering(new[] {baseGatewayPort, baseGatewayPort + 1});
+                clientBuilder.UseLocalhostClustering([baseGatewayPort, baseGatewayPort + 1]);
             }).Build();
 
             var client = clientHost.Services.GetRequiredService<IClusterClient>();

@@ -30,7 +30,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
         /// <param name="minAllocationSize">Minimum size of the allocation.</param>
         public PooledBufferStream(int minAllocationSize = 0)
         {
-            _segments = new();
+            _segments = [];
             _length = 0;
             _minAllocationSize = minAllocationSize > 0 ? minAllocationSize : 4096;
         }

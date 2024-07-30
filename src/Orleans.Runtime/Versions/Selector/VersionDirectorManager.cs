@@ -20,7 +20,7 @@ namespace Orleans.Runtime.Versions.Selector
             this.serviceProvider = serviceProvider;
             this.strategyFromConfig = serviceProvider.GetRequiredKeyedService<VersionSelectorStrategy>(options.Value.DefaultVersionSelectorStrategy);
             Default = ResolveVersionSelector(serviceProvider, this.strategyFromConfig);
-            versionSelectors = new Dictionary<GrainInterfaceType, IVersionSelector>();
+            versionSelectors = [];
         }
 
         public IVersionSelector GetSelector(GrainInterfaceType interfaceType)

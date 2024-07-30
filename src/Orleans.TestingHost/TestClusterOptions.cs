@@ -82,13 +82,13 @@ namespace Orleans.TestingHost
         /// Gets the silo builder configurator types.
         /// </summary>
         /// <value>The silo builder configurator types.</value>
-        public List<string> SiloBuilderConfiguratorTypes { get; } = new List<string>();
+        public List<string> SiloBuilderConfiguratorTypes { get; } = [];
 
         /// <summary>
         /// Gets the client builder configurator types.
         /// </summary>
         /// <value>The client builder configurator types.</value>
-        public List<string> ClientBuilderConfiguratorTypes { get; } = new List<string>();
+        public List<string> ClientBuilderConfiguratorTypes { get; } = [];
 
         /// <summary>
         /// Gets or sets a value indicating what transport to use for connecting silos and clients.

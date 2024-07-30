@@ -19,7 +19,7 @@ namespace Tester.Cosmos.Persistence;
 public class PersistenceProviderTests_Cosmos
 {
     private readonly IProviderRuntime providerRuntime;
-    private readonly Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
+    private readonly Dictionary<string, string> providerCfgProps = [];
     private readonly ITestOutputHelper output;
     private readonly TestEnvironmentFixture fixture;
     private readonly string _clusterId;

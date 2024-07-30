@@ -11,9 +11,9 @@ namespace UnitTests.Grains
         public const int MaxLocalWorkers = 1;
 
         private Guid activationGuid;
-        private readonly List<Tuple<DateTime, DateTime>> calls = new List<Tuple<DateTime, DateTime>>();
+        private readonly List<Tuple<DateTime, DateTime>> calls = [];
         private readonly ILogger logger;
-        private static readonly HashSet<Guid> allActivationIds = new HashSet<Guid>();
+        private static readonly HashSet<Guid> allActivationIds = [];
 
         public StatelessWorkerGrain(ILoggerFactory loggerFactory)
         {

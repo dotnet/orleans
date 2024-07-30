@@ -34,7 +34,7 @@ namespace Orleans.Providers.Streams.Common
         private readonly PeriodicAction periodicMonitoring;
         private readonly PeriodicAction periodicMetadaPurging;
 
-        private readonly Dictionary<StreamId, (DateTime TimeStamp, StreamSequenceToken Token)> lastPurgedToken = new Dictionary<StreamId, (DateTime TimeStamp, StreamSequenceToken Token)>();
+        private readonly Dictionary<StreamId, (DateTime TimeStamp, StreamSequenceToken Token)> lastPurgedToken = [];
 
         /// <summary>
         /// Gets the cached message most recently added.

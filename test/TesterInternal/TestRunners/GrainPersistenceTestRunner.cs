@@ -199,17 +199,17 @@ namespace TestExtensions.Runners
 
             Assert.Null(val);  // "Initial value"
 
-            await grain.DoWrite(new List<int> { 1 });
+            await grain.DoWrite([1]);
             val = await grain.GetValue();
-            Assert.Equal(new List<int> { 1 }, val);  // "Value after Write-1"
+            Assert.Equal([1], val);  // "Value after Write-1"
 
-            await grain.DoWrite(new List<int> { 1, 2 });
+            await grain.DoWrite([1, 2]);
             val = await grain.GetValue();
-            Assert.Equal(new List<int> { 1, 2 }, val);  // "Value after Write-2"
+            Assert.Equal([1, 2], val);  // "Value after Write-2"
 
             val = await grain.DoRead();
 
-            Assert.Equal(new List<int> { 1, 2 }, val);  // "Value after Re-Read"
+            Assert.Equal([1, 2], val);  // "Value after Re-Read"
         }
 
         [SkippableFact]
