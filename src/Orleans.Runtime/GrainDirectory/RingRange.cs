@@ -96,9 +96,9 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
     public static RingRange FromPoint(uint point) => new (unchecked(point - 1), point);
 
     /// <summary>
-    /// Gets the length of the range.
+    /// Gets the size of the range.
     /// </summary>
-    public uint Length
+    public uint Size
     {
         get
         {
@@ -180,7 +180,7 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
         return num > Start || num <= End;
     }
 
-    public float SizePercent => Length * (100.0f / uint.MaxValue);
+    public float SizePercent => Size * (100.0f / uint.MaxValue);
 
     public bool Equals(RingRange other) => _start == other._start && _end == other._end;
 
@@ -188,9 +188,7 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
 
     public override int GetHashCode() => HashCode.Combine(_start, _end);
 
-    public override string ToString() => IsFull
-        ? $"(0, 0], Size=0x{Length:X8} (100.0%)"
-        : $"(0x{Start:X8}, 0x{End:X8}], Size=0x{Length:X8} ({SizePercent:0.0}%)";
+    public override string ToString() => $"{this}";
 
     string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
@@ -200,10 +198,10 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
             ? destination.TryWrite($"(0 0), Size=0x0 (0%)", out charsWritten)
             : IsFull
                 ? destination.TryWrite($"(0, 0], Size=0x{uint.MaxValue:X8} (100%)", out charsWritten)
-                : destination.TryWrite($"(0x{Start:X8}, 0x{End:X8}], Size=0x{Length:X8} ({SizePercent:0.0}%)", out charsWritten);
+                : destination.TryWrite($"(0x{Start:X8}, 0x{End:X8}], Size=0x{Size:X8} ({SizePercent:0.0}%)", out charsWritten);
     }
 
-    internal bool Overlaps(RingRange other) => !IsEmpty && !other.IsEmpty && (Equals(other) || Contains(other.End) || other.Contains(End));
+    public bool Overlaps(RingRange other) => !IsEmpty && !other.IsEmpty && (Equals(other) || Contains(other.End) || other.Contains(End));
 
     internal RingRange Inverse()
     {
@@ -291,6 +289,7 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
             yield return removal;
         }
     }
+
     public static bool operator ==(RingRange left, RingRange right) => left.Equals(right);
 
     public static bool operator !=(RingRange left, RingRange right) => !(left == right);

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -493,7 +494,7 @@ namespace Orleans.Runtime
             }
         }
 
-        Task<Immutable<List<GrainAddress>>> ICatalog.GetRegisteredActivations(RingRange range)
+        Task<Immutable<List<GrainAddress>>> ICatalog.GetRegisteredActivations(RingRangeCollection ranges)
         {
             var result = new List<GrainAddress>();
             foreach (var (grainId, activation) in activations)
@@ -501,7 +502,7 @@ namespace Orleans.Runtime
                 var directory = GetGrainDirectory(activation, grainDirectoryResolver);
                 if (directory is not null && directory.GetType() == typeof(ReplicatedGrainDirectory))
                 {
-                    if (range.Contains(activation.GrainId.GetUniformHashCode()))
+                    if (ranges.Contains(activation.GrainId.GetUniformHashCode()))
                     {
                         result.Add(activation.Address);
                     }

@@ -19,6 +19,6 @@ namespace Orleans.Runtime
         /// <returns></returns>
         Task DeleteActivations(List<GrainAddress> activationAddresses, DeactivationReasonCode reasonCode, string reasonText);
 
-        Task<Immutable<List<GrainAddress>>> GetRegisteredActivations(RingRange range);
+        Task<Immutable<List<GrainAddress>>> GetRegisteredActivations(RingRangeCollection ranges);
     }
 }

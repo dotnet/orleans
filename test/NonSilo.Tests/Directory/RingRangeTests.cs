@@ -81,7 +81,7 @@ public sealed class RingRangeTests
         {
             var range = RingRange.CreateEquallyDividedRange(count, i);
             Assert.False(previous.Overlaps(range));
-            sum += range.Length;
+            sum += range.Size;
             previous = range;
         }
 

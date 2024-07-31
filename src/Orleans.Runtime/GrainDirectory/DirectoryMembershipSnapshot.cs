@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -8,14 +9,17 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Orleans.Configuration;
+using Orleans.Runtime.Utilities;
 
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed class DirectoryMembershipSnapshot
 {
-    private const int HashesPerEntry = 30;
+    private const int HashesPerEntry = ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS;
     private readonly ClusterMembershipSnapshot _snapshot;
+    private readonly ImmutableArray<(uint Start, int MemberIndex)> _ringBoundaries;
+    private readonly RingRangeCollection[] _virtualBucketsByMember;
 
     public DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot)
     {
@@ -42,11 +46,12 @@ internal sealed class DirectoryMembershipSnapshot
         }
 
         hashIndexPairs.Sort(static (left, right) => left.Hash.CompareTo(right.Hash));
-        RawRanges = hashIndexPairs.ToImmutable();
+        _ringBoundaries = hashIndexPairs.ToImmutable();
 
         Members = sortedActiveMembers.ToImmutable();
-        Debug.Assert(Members.Length * HashesPerEntry == RawRanges.Length);
+        Debug.Assert(Members.Length * HashesPerEntry == _ringBoundaries.Length);
 
+        _virtualBucketsByMember = new RingRangeCollection[Members.Length];
         _snapshot = snapshot;
     }
 
@@ -57,54 +62,66 @@ internal sealed class DirectoryMembershipSnapshot
 
     public ImmutableArray<SiloAddress> Members { get; }
 
-    public RangeCollection RangeOwners => new(this);
-
-    private (RingRange Range, SiloAddress Owner) GetRangeOwner(int index)
-    {
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, RawRanges.Length);
-        ArgumentOutOfRangeException.ThrowIfLessThan(index, 0);
-
-        var entry = RawRanges[index];
-        var next = RawRanges[(index + 1) % RawRanges.Length];
-        var range = RingRange.Create(entry.Start, next.Start);
-        return (range, Members[entry.MemberIndex]);
-    }
-
-    private RingRange GetRangeCore(int index)
-    {
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, RawRanges.Length);
-        ArgumentOutOfRangeException.ThrowIfLessThan(index, 0);
-
-        var entry = RawRanges[index];
-        var next = RawRanges[(index + 1) % RawRanges.Length];
-        var range = RingRange.Create(entry.Start, next.Start);
-        return range;
-    }
-
-    //public ImmutableArray<RingRange> Ranges { get; }
-    private ImmutableArray<(uint Start, int MemberIndex)> RawRanges { get; }
-
-    public bool Contains(SiloAddress? address) => TryGetMemberIndex(address) >= 0;
-
-    public ImmutableArray<RingRange> GetRingRanges(SiloAddress address)
+    public RingRangeCollection GetRanges(SiloAddress address)
     {
         var index = TryGetMemberIndex(address);
 
         if (index < 0)
         {
-            return [];
+            return RingRangeCollection.Empty;
         }
 
-        var result = ImmutableArray.CreateBuilder<RingRange>(HashesPerEntry);
-        for (var i = 0; i < RawRanges.Length; i++)
+        return GetRanges(index);
+    }
+
+    private RingRangeCollection GetRanges(int memberIndex)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(memberIndex, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(memberIndex, _virtualBucketsByMember.Length);
+
+        var range = _virtualBucketsByMember[memberIndex];
+        if (range.IsDefault)
         {
-            if (RawRanges[i].MemberIndex == index)
+            var result = ImmutableArray.CreateBuilder<RingRange>(HashesPerEntry);
+            for (var i = 0; i < _ringBoundaries.Length; i++)
             {
-                result.Add(GetRangeCore(i));
+                if (_ringBoundaries[i].MemberIndex == memberIndex)
+                {
+                    result.Add(GetRangeCore(i));
+                }
             }
+
+            range = _virtualBucketsByMember[memberIndex] = new(result.ToImmutable());
         }
 
-        return result.ToImmutable();
+        return range;
+    }
+
+    public RangeCollection RangeOwners => new(this);
+
+    private (RingRange Range, int OwnerIndex) GetRangeOwner(int index)
+    {
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, _ringBoundaries.Length);
+        ArgumentOutOfRangeException.ThrowIfLessThan(index, 0);
+
+        var range = GetRangeCore(index);
+        return (range, _ringBoundaries[index].MemberIndex);
+    }
+
+    private RingRange GetRangeCore(int index)
+    {
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, _ringBoundaries.Length);
+        ArgumentOutOfRangeException.ThrowIfLessThan(index, 0);
+
+        var entry = _ringBoundaries[index];
+        var next = _ringBoundaries[(index + 1) % _ringBoundaries.Length];
+        if (entry.Start == next.Start)
+        {
+            // Handle hash collisions by making adjacent ranges empty.
+            return _ringBoundaries.Length == 1 ? RingRange.Full : RingRange.Empty;
+        }
+
+        return RingRange.Create(entry.Start, next.Start);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -115,11 +132,12 @@ internal sealed class DirectoryMembershipSnapshot
             return -1;
         }
 
-        return BinarySearch(
+        return SearchAlgorithms.BinarySearch(
             Members.Length,
-            address,
-            static (snapshot, index, address) =>
+            (this, address),
+            static (index, state) =>
             {
+                var (snapshot, address) = state;
                 var candidate = snapshot.Members[index];
                 var comparison = candidate.GetConsistentHashCode().CompareTo(address.GetConsistentHashCode());
                 if (comparison != 0)
@@ -136,6 +154,7 @@ internal sealed class DirectoryMembershipSnapshot
             });
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGetOwnerIndex(GrainId grainId, [NotNullWhen(true)] out SiloAddress? owner) => TryGetOwnerIndex(grainId.GetUniformHashCode(), out owner);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -143,82 +162,58 @@ internal sealed class DirectoryMembershipSnapshot
     {
         // Binary search with wrap-around to include the last element to handle the case
         // where it wraps around the boundary of the ring.
-        var index = BinarySearch(
-            RawRanges.Length + 1,
-            hashCode,
-            static (snapshot, index, hashCode) =>
+        if (_ringBoundaries.Length > 0)
+        {
+            var index = SearchAlgorithms.BinarySearch(
+                _ringBoundaries.Length + 1,
+                (this, hashCode),
+                static (index, state) =>
+                {
+                    var (snapshot, hashCode) = state;
+                    if (index == 0)
+                    {
+                        index = snapshot._ringBoundaries.Length;
+                    }
+
+                    return snapshot.GetRangeCore(index - 1).CompareTo(hashCode);
+                });
+            if (index >= 0)
             {
                 if (index == 0)
                 {
-                    index = snapshot.RawRanges.Length;
+                    index = _ringBoundaries.Length;
                 }
 
-                return snapshot.GetRangeCore(index - 1).CompareTo(hashCode);
-            });
-        if (index >= 0)
-        {
-            if (index == 0)
-            {
-                index = RawRanges.Length;
+                owner = Members[_ringBoundaries[index - 1].MemberIndex];
+                return true;
             }
-
-            owner = Members[RawRanges[index - 1].MemberIndex];
-            return true;
         }
 
         owner = null;
         return false;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private int BinarySearch<TState>(int length, TState state, Func<DirectoryMembershipSnapshot, int, TState, int> comparer)
+    public readonly struct RangeCollection(DirectoryMembershipSnapshot snapshot) : IReadOnlyList<(RingRange Range, int OwnerIndex)>
     {
-        var left = 0;
-        var right = length - 1;
+        public int Count => snapshot._ringBoundaries.Length;
 
-        while (left <= right)
-        {
-            var mid = left + (right - left) / 2;
-            var comparison = comparer(this, mid, state);
-
-            if (comparison == 0)
-            {
-                return mid;
-            }
-            else if (comparison < 0)
-            {
-                left = mid + 1;
-            }
-            else
-            {
-                right = mid - 1;
-            }
-        }
-
-        return -1;
-    }
-
-    public readonly struct RangeCollection(DirectoryMembershipSnapshot snapshot) : IEnumerable<(RingRange Range, SiloAddress Owner)>, IReadOnlyCollection<(RingRange Range, SiloAddress Owner)>, IReadOnlyList<(RingRange Range, SiloAddress Owner)>
-    {
-        public int Count => snapshot.RawRanges.Length;
-
-        public (RingRange Range, SiloAddress Owner) this[int index] => snapshot.GetRangeOwner(index);
+        public (RingRange Range, int OwnerIndex) this[int index] => snapshot.GetRangeOwner(index);
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-        IEnumerator<(RingRange Range, SiloAddress Owner)> IEnumerable<(RingRange Range, SiloAddress Owner)>.GetEnumerator() => GetEnumerator();
+        IEnumerator<(RingRange Range, int OwnerIndex)> IEnumerable<(RingRange Range, int OwnerIndex)>.GetEnumerator() => GetEnumerator();
         public RangeCollectionEnumerator GetEnumerator() => new(snapshot);
 
-        public struct RangeCollectionEnumerator(DirectoryMembershipSnapshot snapshot) : IEnumerator<(RingRange Range, SiloAddress Owner)>
+        public struct RangeCollectionEnumerator(DirectoryMembershipSnapshot snapshot) : IEnumerator<(RingRange Range, int OwnerIndex)>
         {
             private int _index = 0;
-            public readonly (RingRange Range, SiloAddress Owner) Current => snapshot.GetRangeOwner(_index - 1);
-            readonly (RingRange Range, SiloAddress Owner) IEnumerator<(RingRange Range, SiloAddress Owner)>.Current => Current;
+            public readonly (RingRange Range, int OwnerIndex) Current => snapshot.GetRangeOwner(_index - 1);
+            readonly (RingRange Range, int OwnerIndex) IEnumerator<(RingRange Range, int OwnerIndex)>.Current => Current;
             readonly object IEnumerator.Current => Current;
 
             public void Dispose() => _index = int.MaxValue;
             public bool MoveNext()
             {
-                if (_index >= 0 && _index++ < snapshot.RawRanges.Length)
+                if (_index >= 0 && _index++ < snapshot._ringBoundaries.Length)
                 {
                     return true;
                 }
