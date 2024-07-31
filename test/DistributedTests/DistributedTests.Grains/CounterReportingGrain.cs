@@ -6,7 +6,7 @@ namespace DistributedTests.Grains
     public class CounterGrain : Grain, ICounterGrain
     {
         private readonly ReportingOptions _options;
-        private readonly List<IGrainWithCounter> _trackedGrains = new();
+        private readonly List<IGrainWithCounter> _trackedGrains = [];
 
         public CounterGrain(IOptions<ReportingOptions> options)
         {

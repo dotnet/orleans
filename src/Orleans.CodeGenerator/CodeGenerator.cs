@@ -17,11 +17,11 @@ namespace Orleans.CodeGenerator
 {
     public class CodeGeneratorOptions
     {
-        public List<string> GenerateSerializerAttributes { get; } = new() { "Orleans.GenerateSerializerAttribute" };
-        public List<string> IdAttributes { get; } = new() { "Orleans.IdAttribute" };
-        public List<string> AliasAttributes { get; } = new() { "Orleans.AliasAttribute" };
-        public List<string> ImmutableAttributes { get; } = new() { "Orleans.ImmutableAttribute" };
-        public List<string> ConstructorAttributes { get; } = new() { "Orleans.OrleansConstructorAttribute", "Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute" };
+        public List<string> GenerateSerializerAttributes { get; } = ["Orleans.GenerateSerializerAttribute"];
+        public List<string> IdAttributes { get; } = ["Orleans.IdAttribute"];
+        public List<string> AliasAttributes { get; } = ["Orleans.AliasAttribute"];
+        public List<string> ImmutableAttributes { get; } = ["Orleans.ImmutableAttribute"];
+        public List<string> ConstructorAttributes { get; } = ["Orleans.OrleansConstructorAttribute", "Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute"];
         public GenerateFieldIds GenerateFieldIds { get; set; }
         public bool GenerateCompatibilityInvokers { get; set; }
     }
@@ -29,10 +29,10 @@ namespace Orleans.CodeGenerator
     public class CodeGenerator
     {
         internal const string CodeGeneratorName = "OrleansCodeGen";
-        private readonly Dictionary<string, List<MemberDeclarationSyntax>> _namespacedMembers = new();
-        private readonly Dictionary<InvokableMethodId, InvokableMethodDescription> _invokableMethodDescriptions = new();
+        private readonly Dictionary<string, List<MemberDeclarationSyntax>> _namespacedMembers = [];
+        private readonly Dictionary<InvokableMethodId, InvokableMethodDescription> _invokableMethodDescriptions = [];
         private readonly HashSet<INamedTypeSymbol> _visitedInterfaces = new(SymbolEqualityComparer.Default);
-        private readonly List<string> DisabledWarnings = new() { "CS1591" };
+        private readonly List<string> DisabledWarnings = ["CS1591"];
 
         public CodeGenerator(Compilation compilation, CodeGeneratorOptions options)
         {
@@ -340,7 +340,7 @@ namespace Orleans.CodeGenerator
                             }));
             }
 
-            var usings = List(new[] { UsingDirective(ParseName("global::Orleans.Serialization.Codecs")), UsingDirective(ParseName("global::Orleans.Serialization.GeneratedCodeHelpers")) });
+            var usings = List([UsingDirective(ParseName("global::Orleans.Serialization.Codecs")), UsingDirective(ParseName("global::Orleans.Serialization.GeneratedCodeHelpers"))]);
             var namespaces = new List<MemberDeclarationSyntax>(_namespacedMembers.Count);
             foreach (var pair in _namespacedMembers)
             {
@@ -389,7 +389,7 @@ namespace Orleans.CodeGenerator
         {
             if (!_namespacedMembers.TryGetValue(ns, out var existing))
             {
-                existing = _namespacedMembers[ns] = new List<MemberDeclarationSyntax>();
+                existing = _namespacedMembers[ns] = [];
             }
 
             existing.Add(member);
@@ -626,7 +626,7 @@ namespace Orleans.CodeGenerator
                 return result;
             }
 
-            result = new List<InvokableMethodProxyBase>();
+            result = [];
             if (interfaceType.GetAttributes(LibraryTypes.GenerateMethodSerializersAttribute, out var attributes, inherited: true))
             {
                 foreach (var attribute in attributes)

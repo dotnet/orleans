@@ -62,7 +62,7 @@ namespace Orleans.Transactions.State
                                    AccessCounter counter, bool isRead, Func<TResult> task)
         {
             bool rollbacksOccurred = false;
-            List<Task> cleanup = new List<Task>();
+            List<Task> cleanup = [];
 
             await this.queue.Ready();
 
@@ -154,7 +154,7 @@ namespace Orleans.Transactions.State
                 // task will be executed once its group acquires the lock
 
                 if (group.Tasks == null)
-                    group.Tasks = new List<Action>();
+                    group.Tasks = [];
 
                 group.Tasks.Add(completion);
             }
@@ -522,7 +522,7 @@ namespace Orleans.Transactions.State
                         {
                             if (multiple == null)
                             {
-                                multiple = new List<TransactionRecord<TState>>();
+                                multiple = [];
                             }
                             multiple.Add(kvp.Value);
                         }

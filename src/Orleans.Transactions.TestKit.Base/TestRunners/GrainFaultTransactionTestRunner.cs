@@ -19,7 +19,7 @@ namespace Orleans.Transactions.TestKit
             ITransactionTestGrain grain = RandomTestGrain(grainStates);
             ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
-            await coordinator.MultiGrainSet(new List<ITransactionTestGrain> { grain }, expected);
+            await coordinator.MultiGrainSet([grain], expected);
             Func<Task> task = () => coordinator.AddAndThrow(grain, expected);
             await task.Should().ThrowAsync<OrleansTransactionAbortedException>();
 
@@ -47,10 +47,10 @@ namespace Orleans.Transactions.TestKit
 
             await throwGrain.Set(expected);
             await coordinator.MultiGrainSet(grains, expected);
-            Func<Task> task = () => coordinator.MultiGrainAddAndThrow(new List<ITransactionTestGrain>()
-            {
+            Func<Task> task = () => coordinator.MultiGrainAddAndThrow(
+            [
                 throwGrain
-            }, grains, expected);
+            ], grains, expected);
             await task.Should().ThrowAsync<OrleansTransactionAbortedException>();
             grains.Add(throwGrain);
 

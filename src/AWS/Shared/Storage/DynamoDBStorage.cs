@@ -324,8 +324,8 @@ namespace Orleans.Transactions.DynamoDB
             await _ddbClient.UpdateTableAsync(new UpdateTableRequest
             {
                 TableName = tableName,
-                GlobalSecondaryIndexUpdates = new List<GlobalSecondaryIndexUpdate>
-                {
+                GlobalSecondaryIndexUpdates =
+                [
                     new GlobalSecondaryIndexUpdate
                     {
                         Create = new CreateGlobalSecondaryIndexAction()
@@ -336,7 +336,7 @@ namespace Orleans.Transactions.DynamoDB
                             KeySchema = secondaryIndex.KeySchema
                         }
                     }
-                },
+                ],
                 AttributeDefinitions = attributes
             });
 
@@ -651,7 +651,7 @@ namespace Orleans.Transactions.DynamoDB
             try
             {
                 var request = new BatchWriteItemRequest();
-                request.RequestItems = new Dictionary<string, List<WriteRequest>>();
+                request.RequestItems = [];
                 var batch = new List<WriteRequest>();
 
                 foreach (var keys in toDelete)
@@ -876,7 +876,7 @@ namespace Orleans.Transactions.DynamoDB
             try
             {
                 var request = new BatchWriteItemRequest();
-                request.RequestItems = new Dictionary<string, List<WriteRequest>>();
+                request.RequestItems = [];
                 var batch = new List<WriteRequest>();
 
                 foreach (var item in toCreate)

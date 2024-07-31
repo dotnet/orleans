@@ -69,9 +69,9 @@ namespace Orleans.Transactions
             this.confirmUpTo = confirmUpTo;
             this.cancelAbove = cancelAbove;
             this.cancelAboveStart = cancelAbove;
-            this.followUpActions = new List<Action>();
-            this.storeConditions = new List<Func<Task<bool>>>();
-            this.prepares = new SortedDictionary<long, PendingTransactionState<TState>>();
+            this.followUpActions = [];
+            this.storeConditions = [];
+            this.prepares = [];
         }
 
         public StorageBatch(StorageBatch<TState> previous)

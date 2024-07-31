@@ -88,11 +88,11 @@ namespace Orleans.Serialization
             Type[] callbackParameterTypes;
             if (owner.IsValueType)
             {
-                callbackParameterTypes = new[] { typeof(object), owner.MakeByRefType(), typeof(StreamingContext) };
+                callbackParameterTypes = [typeof(object), owner.MakeByRefType(), typeof(StreamingContext)];
             }
             else
             {
-                callbackParameterTypes = new[] { typeof(object), typeof(object), typeof(StreamingContext) };
+                callbackParameterTypes = [typeof(object), typeof(object), typeof(StreamingContext)];
             }
 
             var method = new DynamicMethod($"{callbackMethod.Name}_Trampoline", null, callbackParameterTypes, type, skipVisibility: true);

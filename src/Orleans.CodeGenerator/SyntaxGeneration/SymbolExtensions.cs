@@ -358,7 +358,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
 
                 if (result is null)
                 {
-                    result = new List<AttributeData>();
+                    result = [];
                 }
 
                 result.Add(attr);
@@ -404,7 +404,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
 
                     if (result is null)
                     {
-                        result = new List<AttributeData>();
+                        result = [];
                     }
 
                     result.Add(attr);

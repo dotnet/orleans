@@ -76,7 +76,7 @@ public class RecordSerializationTests
         {
             var original = new FooWithListOfObject
             {
-                Items = new List<object> { new FruitRecord("Banana"), new FruitRecord("Mango") },
+                Items = [new FruitRecord("Banana"), new FruitRecord("Mango")],
                 Bar = new FooRecord(Guid.NewGuid())
             };
 
@@ -112,7 +112,7 @@ public class RecordSerializationTests
         {
             var original = new FooWithListOfObject
             {
-                Items = new List<object> { new AppleRecord("Golden Delicious"), new AppleRecord("Granny Smith") },
+                Items = [new AppleRecord("Golden Delicious"), new AppleRecord("Granny Smith")],
                 Bar = new FooRecord(Guid.NewGuid())
             };
 
@@ -134,7 +134,7 @@ public class RecordSerializationTests
         {
             var original = new FooWithListOfFruit()
             {
-                Items = new List<FruitRecord> { new FruitRecord("Banana"), new FruitRecord("Mango") },
+                Items = [new FruitRecord("Banana"), new FruitRecord("Mango")],
                 Bar = new FooRecord(Guid.NewGuid())
             };
 
@@ -151,7 +151,7 @@ public class RecordSerializationTests
         {
             var original = new FooWithListOfFruit()
             {
-                Items = new List<FruitRecord> { new AppleRecord("Golden Delicious"), new AppleRecord("Granny Smith") },
+                Items = [new AppleRecord("Golden Delicious"), new AppleRecord("Granny Smith")],
                 Bar = new FooRecord(Guid.NewGuid())
             };
 
@@ -168,7 +168,7 @@ public class RecordSerializationTests
         {
             var original = new FooWithListOfApple()
             {
-                Items = new List<AppleRecord> { new AppleRecord("Golden Delicious"), new AppleRecord("Granny Smith") },
+                Items = [new AppleRecord("Golden Delicious"), new AppleRecord("Granny Smith")],
                 Bar = new FooRecord(Guid.NewGuid())
             };
 

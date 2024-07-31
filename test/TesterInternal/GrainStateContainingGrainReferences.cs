@@ -15,8 +15,8 @@ namespace TesterInternal
 
         public GrainStateContainingGrainReferences()
         {
-            GrainList = new List<IAddressable>();
-            GrainDict = new Dictionary<string, IAddressable>();
+            GrainList = [];
+            GrainDict = [];
         }
     }
 }

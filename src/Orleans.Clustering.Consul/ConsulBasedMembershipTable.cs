@@ -99,7 +99,7 @@ namespace Orleans.Runtime.Membership
                 var rowInsert = new KVTxnOp(insertKV.Key, KVTxnVerb.CAS) { Index = siloRegistration.LastIndex, Value = insertKV.Value };
                 var versionUpdate = this.GetVersionRowUpdate(tableVersion);
 
-                var responses = await _consulClient.KV.Txn(new List<KVTxnOp> { rowInsert, versionUpdate });
+                var responses = await _consulClient.KV.Txn([rowInsert, versionUpdate]);
                 if (!responses.Response.Success)
                 {
                     _logger.LogDebug("ConsulMembershipProvider failed to insert the row {SiloAddress}.", entry.SiloAddress);
@@ -126,7 +126,7 @@ namespace Orleans.Runtime.Membership
                 var rowUpdate = new KVTxnOp(updateKV.Key, KVTxnVerb.CAS) { Index = siloRegistration.LastIndex, Value = updateKV.Value };
                 var versionUpdate = this.GetVersionRowUpdate(tableVersion);
 
-                var responses = await _consulClient.KV.Txn(new List<KVTxnOp> { rowUpdate, versionUpdate });
+                var responses = await _consulClient.KV.Txn([rowUpdate, versionUpdate]);
                 if (!responses.Response.Success)
                 {
                     _logger.LogDebug("ConsulMembershipProvider failed the CAS check when updating the registration for silo {SiloAddress}.", entry.SiloAddress);

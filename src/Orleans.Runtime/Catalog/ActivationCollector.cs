@@ -21,7 +21,7 @@ namespace Orleans.Runtime
         private readonly TimeSpan shortestAgeLimit;
         private readonly ConcurrentDictionary<DateTime, Bucket> buckets = new();
         private DateTime nextTicket;
-        private static readonly List<ICollectibleGrainContext> nothing = new(0);
+        private static readonly List<ICollectibleGrainContext> nothing = [];
         private readonly ILogger logger;
         private readonly PeriodicTimer _collectionTimer;
         private Task _collectionLoopTask;
@@ -568,7 +568,7 @@ namespace Orleans.Runtime
                         item.CollectionTicket = default;
                     }
 
-                    result ??= new List<ICollectibleGrainContext>();
+                    result ??= [];
                     result.Add(pair.Value);
                 }
 

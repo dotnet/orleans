@@ -236,7 +236,7 @@ namespace Orleans.CodeGenerator
             var invocationExpression =
                          InvocationExpression(
                              baseInvokeExpression,
-                             ArgumentList(SeparatedList(new[] { Argument(requestVar) })));
+                             ArgumentList(SeparatedList([Argument(requestVar)])));
 
             var rt = namedMethodReturnType.ConstructedFrom;
             bool isAsync;
@@ -333,11 +333,11 @@ namespace Orleans.CodeGenerator
                 {
                     case Accessibility.Public:
                     case Accessibility.Protected:
-                        return new[] { Token(SyntaxKind.PublicKeyword) };
+                        return [Token(SyntaxKind.PublicKeyword)];
                     case Accessibility.Internal:
                     case Accessibility.ProtectedOrInternal:
                     case Accessibility.ProtectedAndInternal:
-                        return new[] { Token(SyntaxKind.InternalKeyword) };
+                        return [Token(SyntaxKind.InternalKeyword)];
                     default:
                         return Array.Empty<SyntaxToken>();
                 }
@@ -395,14 +395,14 @@ namespace Orleans.CodeGenerator
                 {
                     return InvocationExpression(
                         MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), IdentifierName("UnwrapService")),
-                        ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(expr) })));
+                        ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(expr)])));
                 }
 
                 static ExpressionSyntax GetService(TypeSyntax type)
                 {
                     return InvocationExpression(
                         MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), GenericName(Identifier("GetService"), TypeArgumentList(SingletonSeparatedList(type)))),
-                        ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(IdentifierName(CodecProviderMemberName)) })));
+                        ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(IdentifierName(CodecProviderMemberName))])));
                 }
             }
         }

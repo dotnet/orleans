@@ -42,7 +42,7 @@ namespace Orleans.Runtime
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
         private readonly IMembershipService membershipService;
-        private readonly List<GrainService> grainServices = new List<GrainService>();
+        private readonly List<GrainService> grainServices = [];
         private readonly ILoggerFactory loggerFactory;
 
         internal ILocalGrainDirectory LocalGrainDirectory { get { return localGrainDirectory; } }

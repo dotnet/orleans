@@ -63,11 +63,11 @@ namespace UnitTests.Grains
         public Task ThrowsMultipleExceptionsAggregatedInFaultedTask()
         {
             var tcs = new TaskCompletionSource<object>();
-            tcs.SetException(new[]
-            {
+            tcs.SetException(
+            [
                 new InvalidOperationException("Test exception 1"),
                 new InvalidOperationException("Test exception 2"),
-            });
+            ]);
 
             return tcs.Task;
         }

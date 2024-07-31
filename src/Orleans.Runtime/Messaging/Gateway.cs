@@ -21,7 +21,7 @@ namespace Orleans.Runtime.Messaging
         // In addition, we use clientConnections collection for fast retrival of ClientState.
         // Anything that appears in those 2 collections should also appear in the main clients collection.
         private readonly ConcurrentDictionary<ClientGrainId, ClientState> clients = new();
-        private readonly Dictionary<GatewayInboundConnection, ClientState> clientConnections = new();
+        private readonly Dictionary<GatewayInboundConnection, ClientState> clientConnections = [];
         private readonly SiloAddress gatewayAddress;
         private readonly IAsyncTimer gatewayMaintenanceTimer;
         private readonly Task gatewayMaintenanceTask;

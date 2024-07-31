@@ -28,15 +28,15 @@ namespace DistributedTests.Server.Configurator
 
         public string Name => nameof(EventGeneratorStreamingSilo);
 
-        public List<Option> Options => new()
-        {
+        public List<Option> Options =>
+        [
             OptionHelper.CreateOption<StreamPubSubType>("--type", defaultValue: StreamPubSubType.ExplicitGrainBasedAndImplicit),
             OptionHelper.CreateOption<int>("--streamsPerQueue", defaultValue: 1000),
             OptionHelper.CreateOption<int>("--queueCount", defaultValue: 8),
             OptionHelper.CreateOption<int>("--batchSize", defaultValue: 5),
             OptionHelper.CreateOption<int>("--wait", "initial wait, in seconds, before starting generating events", defaultValue: 30),
             OptionHelper.CreateOption<int>("--duration", "duration, in seconds, of the run", defaultValue: 120),
-        };
+        ];
 
         public void Configure(ISiloBuilder siloBuilder, Parameter parameters)
         {
@@ -91,7 +91,7 @@ namespace DistributedTests.Server.Configurator
     {
         private DateTime _startTime;
         private DateTime _endTime;
-        private readonly List<StreamId> _streamIds = new List<StreamId>();
+        private readonly List<StreamId> _streamIds = [];
         private int _sequenceId = 0;
         private object _payload;
 

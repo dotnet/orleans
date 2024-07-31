@@ -103,7 +103,7 @@ namespace Orleans.Storage
         /// that is either <see cref="Type.AssemblyQualifiedName"/> or <see cref="Type.FullName"/>.
         /// <see cref="ExtractBaseClass(string)"/>.
         /// </summary>
-        private static char[] BaseClassExtractionSplitDelimeters { get; } = new[] { '[', ']' };
+        private static char[] BaseClassExtractionSplitDelimeters { get; } = ['[', ']'];
 
         /// <summary>
         /// The default query to initialize this structure from the Orleans database.
@@ -118,7 +118,7 @@ namespace Orleans.Storage
         /// <summary>
         /// The hash generator used to hash natural keys, grain ID and grain type to a more narrow index.
         /// </summary>
-        public IStorageHasherPicker HashPicker { get; set; } = new StorageHasherPicker(new[] { new OrleansDefaultHasher() });
+        public IStorageHasherPicker HashPicker { get; set; } = new StorageHasherPicker([new OrleansDefaultHasher()]);
 
         private readonly AdoNetGrainStorageOptions options;
         private readonly IProviderRuntime providerRuntime;

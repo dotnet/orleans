@@ -141,7 +141,7 @@ namespace Orleans.Metadata
                         {
                             if (!bindings.TryGetValue(binding.Index, out var properties))
                             {
-                                bindings[binding.Index] = properties = new Dictionary<string, string>();
+                                bindings[binding.Index] = properties = [];
                             }
 
                             properties.Add(binding.Key, binding.Value);

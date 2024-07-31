@@ -109,12 +109,12 @@ namespace Orleans.Hosting.Kubernetes
         private static class IPAddressSelector
         {
             // IANA private IPv4 addresses
-            private static readonly (IPAddress Address, IPAddress SubnetMask)[] PreferredRanges = new []
-            {
+            private static readonly (IPAddress Address, IPAddress SubnetMask)[] PreferredRanges =
+            [
                 (IPAddress.Parse("192.168.0.0"), IPAddress.Parse("255.255.0.0")),
                 (IPAddress.Parse("10.0.0.0"), IPAddress.Parse("255.0.0.0")),
                 (IPAddress.Parse("172.16.0.0"), IPAddress.Parse("255.240.0.0")),
-            };
+            ];
 
             public static IPAddress? PickIPAddress(IReadOnlyList<IPAddress> candidates)
             {

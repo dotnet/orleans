@@ -17,7 +17,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             Assert.Equal(resources.Distinct().Count(), resources.Count);
             resources.Sort();
-            List<string> selected = resourceSelector.NextSelection(resources.Count, new List<string>());
+            List<string> selected = resourceSelector.NextSelection(resources.Count, []);
             Assert.Equal(resources.Count, selected.Count);
             selected = selected.Distinct().ToList();
             selected.Sort();
@@ -32,7 +32,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             Assert.Equal(resources.Distinct().Count(), resources.Count);
             resources.Sort();
-            List<string> selected = resourceSelector.NextSelection(int.MaxValue, new List<string>());
+            List<string> selected = resourceSelector.NextSelection(int.MaxValue, []);
             Assert.Equal(resources.Count, selected.Count);
             selected = selected.Distinct().ToList();
             selected.Sort();
@@ -50,7 +50,7 @@ namespace UnitTests.OrleansRuntime.Streams
             {
                 for (int excludeCount = 0; excludeCount < resources.Count; excludeCount++)
                 {
-                    List<string> excluded = resourceSelector.NextSelection(excludeCount, new List<string>());
+                    List<string> excluded = resourceSelector.NextSelection(excludeCount, []);
                     Assert.Equal(excludeCount, excluded.Count);
                     excluded = excluded.Distinct().ToList();
                     Assert.Equal(excludeCount, excluded.Count);

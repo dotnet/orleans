@@ -13,7 +13,7 @@ namespace Orleans.Streaming.EventHubs.StatisticMonitors
         /// </summary>
         /// <param name="dimensions"></param>
         public DefaultEventHubCacheMonitor(EventHubCacheMonitorDimensions dimensions)
-            : base(new KeyValuePair<string, object>[] { new("Path", dimensions.EventHubPath), new("Partition", dimensions.EventHubPartition) })
+            : base([new("Path", dimensions.EventHubPath), new("Partition", dimensions.EventHubPartition)])
         {
         }
     }

@@ -41,7 +41,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             this.queue = queue?? throw new ArgumentNullException(nameof(queue));
             this.dataAdapter = dataAdapter?? throw new ArgumentNullException(nameof(dataAdapter));
             this.logger = loggerFactory.CreateLogger<AzureQueueAdapterReceiver>();
-            this.pending = new List<PendingDelivery>();
+            this.pending = [];
         }
 
         public Task Initialize(TimeSpan timeout)
@@ -84,7 +84,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 outstandingTask = task;
                 IEnumerable<QueueMessage> messages = await task;
 
-                List<IBatchContainer> azureQueueMessages = new List<IBatchContainer>();
+                List<IBatchContainer> azureQueueMessages = [];
                 foreach (var message in messages)
                 {
                     IBatchContainer container = this.dataAdapter.FromQueueMessage(message.MessageText, lastReadMessage++);

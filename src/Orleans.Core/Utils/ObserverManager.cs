@@ -42,7 +42,7 @@ namespace Orleans.Utilities
         /// <summary>
         /// The observers.
         /// </summary>
-        private readonly Dictionary<TIdentity, ObserverEntry> _observers = new();
+        private readonly Dictionary<TIdentity, ObserverEntry> _observers = [];
 
         /// <summary>
         /// The log.
@@ -158,7 +158,7 @@ namespace Orleans.Utilities
                 if (observer.Value.LastSeen + ExpirationDuration < now)
                 {
                     // Expired observers will be removed.
-                    defunct ??= new List<TIdentity>();
+                    defunct ??= [];
                     defunct.Add(observer.Key);
                     continue;
                 }
@@ -176,7 +176,7 @@ namespace Orleans.Utilities
                 catch (Exception)
                 {
                     // Failing observers are considered defunct and will be removed..
-                    defunct ??= new List<TIdentity>();
+                    defunct ??= [];
                     defunct.Add(observer.Key);
                 }
             }
@@ -213,7 +213,7 @@ namespace Orleans.Utilities
                 if (observer.Value.LastSeen + ExpirationDuration < now)
                 {
                     // Expired observers will be removed.
-                    defunct ??= new List<TIdentity>();
+                    defunct ??= [];
                     defunct.Add(observer.Key);
                     continue;
                 }
@@ -231,7 +231,7 @@ namespace Orleans.Utilities
                 catch (Exception)
                 {
                     // Failing observers are considered defunct and will be removed..
-                    defunct ??= new List<TIdentity>();
+                    defunct ??= [];
                     defunct.Add(observer.Key);
                 }
             }
@@ -262,7 +262,7 @@ namespace Orleans.Utilities
                 if (observer.Value.LastSeen + ExpirationDuration < now)
                 {
                     // Expired observers will be removed.
-                    defunct ??= new List<TIdentity>();
+                    defunct ??= [];
                     defunct.Add(observer.Key);
                 }
             }

@@ -23,7 +23,7 @@ namespace UnitTests.Directory
         public void Reset()
         {
             this.UnregistrationCounter = 0;
-            this.UnregistrationReceived = new List<(GrainAddress activationAddress, UnregistrationCause cause)>();
+            this.UnregistrationReceived = [];
         }
 
         public async Task UnregisterAsync(GrainAddress address, UnregistrationCause cause, int hopCount = 0)

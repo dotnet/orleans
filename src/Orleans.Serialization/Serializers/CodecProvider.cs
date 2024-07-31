@@ -31,19 +31,19 @@ namespace Orleans.Serialization.Serializers
         private readonly ConcurrentDictionary<Type, object> _instantiatedBaseCopiers = new();
         private readonly ConcurrentDictionary<Type, object> _instantiatedValueSerializers = new();
         private readonly ConcurrentDictionary<Type, object> _instantiatedActivators = new();
-        private readonly Dictionary<Type, Type> _baseCodecs = new();
-        private readonly Dictionary<Type, Type> _valueSerializers = new();
-        private readonly Dictionary<Type, Type> _fieldCodecs = new();
-        private readonly Dictionary<Type, Type> _copiers = new();
-        private readonly Dictionary<Type, Type> _converters = new();
-        private readonly Dictionary<Type, Type> _baseCopiers = new();
-        private readonly Dictionary<Type, Type> _activators = new();
-        private readonly List<IGeneralizedCodec> _generalizedCodecs = new();
-        private readonly List<ISpecializableCodec> _specializableCodecs = new();
-        private readonly List<IGeneralizedBaseCodec> _generalizedBaseCodecs = new();
-        private readonly List<ISpecializableBaseCodec> _specializableBaseCodecs = new();
-        private readonly List<IGeneralizedCopier> _generalizedCopiers = new();
-        private readonly List<ISpecializableCopier> _specializableCopiers = new();
+        private readonly Dictionary<Type, Type> _baseCodecs = [];
+        private readonly Dictionary<Type, Type> _valueSerializers = [];
+        private readonly Dictionary<Type, Type> _fieldCodecs = [];
+        private readonly Dictionary<Type, Type> _copiers = [];
+        private readonly Dictionary<Type, Type> _converters = [];
+        private readonly Dictionary<Type, Type> _baseCopiers = [];
+        private readonly Dictionary<Type, Type> _activators = [];
+        private readonly List<IGeneralizedCodec> _generalizedCodecs = [];
+        private readonly List<ISpecializableCodec> _specializableCodecs = [];
+        private readonly List<IGeneralizedBaseCodec> _generalizedBaseCodecs = [];
+        private readonly List<ISpecializableBaseCodec> _specializableBaseCodecs = [];
+        private readonly List<IGeneralizedCopier> _generalizedCopiers = [];
+        private readonly List<ISpecializableCopier> _specializableCopiers = [];
         private readonly ObjectCodec _objectCodec = new();
         private readonly VoidCodec _voidCodec = new();
         private readonly ObjectCopier _objectCopier = new();
@@ -514,7 +514,7 @@ namespace Orleans.Serialization.Serializers
 
                 // If there is a base type serializer for this type, create a codec which will then accept that base type serializer.
                 codecType = typeof(ConcreteTypeSerializer<,>).MakeGenericType(fieldType, baseCodecType);
-                constructorArguments = new[] { GetServiceOrCreateInstance(baseCodecType) };
+                constructorArguments = [GetServiceOrCreateInstance(baseCodecType)];
             }
             else if (_valueSerializers.TryGetValue(searchType, out var valueSerializerType))
             {
@@ -525,7 +525,7 @@ namespace Orleans.Serialization.Serializers
 
                 // If there is a value serializer for this type, create a codec which will then accept that value serializer.
                 codecType = typeof(ValueSerializer<,>).MakeGenericType(fieldType, valueSerializerType);
-                constructorArguments = new[] { GetServiceOrCreateInstance(valueSerializerType) };
+                constructorArguments = [GetServiceOrCreateInstance(valueSerializerType)];
             }
             else if (fieldType.IsArray)
             {
@@ -583,7 +583,7 @@ namespace Orleans.Serialization.Serializers
                 }
 
                 var typeArgs = new Type[3] { converterInterfaceArgs[0], converterInterfaceArgs[1], converterType };
-                constructorArguments = new object[] { GetServiceOrCreateInstance(converterType) };
+                constructorArguments = [GetServiceOrCreateInstance(converterType)];
                 if (typeArgs[0].IsValueType)
                 {
                     surrogateCodecType = typeof(ValueTypeSurrogateCodec<,,>).MakeGenericType(typeArgs);

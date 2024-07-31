@@ -20,7 +20,7 @@ namespace Orleans.Streams
 
         public StreamConsumerCollection(DateTime now)
         {
-            queueData = new Dictionary<GuidId, StreamConsumerData>();
+            queueData = [];
             lastActivityTime = now;
         }
 

@@ -8,7 +8,7 @@ namespace Orleans.Runtime.Utilities
     /// </summary>
     internal static class FactoryUtility
     {
-        private static readonly object[] EmptyArguments = new object[0];
+        private static readonly object[] EmptyArguments = [];
 
         /// <summary>
         /// Creates a factory returning a new <typeparamref name="TInstance"/>.
@@ -31,8 +31,8 @@ namespace Orleans.Runtime.Utilities
         /// <returns>A new factory.</returns>
         public static Factory<TParam1, TInstance> Create<TParam1, TInstance>(IServiceProvider serviceProvider)
         {
-            var factory = ActivatorUtilities.CreateFactory(typeof(TInstance), new[] { typeof(TParam1) });
-            return arg1 => (TInstance)factory(serviceProvider, new object[] { arg1 });
+            var factory = ActivatorUtilities.CreateFactory(typeof(TInstance), [typeof(TParam1)]);
+            return arg1 => (TInstance)factory(serviceProvider, [arg1]);
         }
 
         /// <summary>
@@ -45,8 +45,8 @@ namespace Orleans.Runtime.Utilities
         /// <returns>A new factory.</returns>
         public static Factory<TParam1, TParam2, TInstance> Create<TParam1, TParam2, TInstance>(IServiceProvider serviceProvider)
         {
-            var factory = ActivatorUtilities.CreateFactory(typeof(TInstance), new[] { typeof(TParam1), typeof(TParam2) });
-            return (arg1, arg2) => (TInstance)factory(serviceProvider, new object[] { arg1, arg2 });
+            var factory = ActivatorUtilities.CreateFactory(typeof(TInstance), [typeof(TParam1), typeof(TParam2)]);
+            return (arg1, arg2) => (TInstance)factory(serviceProvider, [arg1, arg2]);
         }
         /// <summary>
         /// Creates a factory returning a new <typeparamref name="TInstance"/> given arguments of the specified types.
@@ -59,8 +59,8 @@ namespace Orleans.Runtime.Utilities
         /// <returns>A new factory.</returns>
         public static Factory<TParam1, TParam2, TParam3, TInstance> Create<TParam1, TParam2, TParam3, TInstance>(IServiceProvider serviceProvider)
         {
-            var factory = ActivatorUtilities.CreateFactory(typeof(TInstance), new[] { typeof(TParam1), typeof(TParam2), typeof(TParam3) });
-            return (arg1, arg2, arg3) => (TInstance)factory(serviceProvider, new object[] { arg1, arg2, arg3 });
+            var factory = ActivatorUtilities.CreateFactory(typeof(TInstance), [typeof(TParam1), typeof(TParam2), typeof(TParam3)]);
+            return (arg1, arg2, arg3) => (TInstance)factory(serviceProvider, [arg1, arg2, arg3]);
         }
     }
 }

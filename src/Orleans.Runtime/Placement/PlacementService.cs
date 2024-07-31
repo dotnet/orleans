@@ -140,7 +140,7 @@ namespace Orleans.Runtime.Placement
                 if (result.Length > 0) return result;
 
                 _logger.LogWarning((int)ErrorCode.Catalog_GetApproximateSiloStatuses, "AllActiveSilos SiloStatusOracle.GetApproximateSiloStatuses empty");
-                return new SiloAddress[] { LocalSilo };
+                return [LocalSilo];
             }
         }
 
@@ -215,7 +215,7 @@ namespace Orleans.Runtime.Placement
 
         private class PlacementWorker
         {
-            private readonly Dictionary<GrainId, GrainPlacementWorkItem> _inProgress = new();
+            private readonly Dictionary<GrainId, GrainPlacementWorkItem> _inProgress = [];
             private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
             private readonly ILogger _logger;
 #pragma warning disable IDE0052 // Remove unread private members. Justification: retained for debugging purposes
@@ -223,7 +223,7 @@ namespace Orleans.Runtime.Placement
 #pragma warning restore IDE0052 // Remove unread private members
             private readonly object _lockObj = new();
             private readonly PlacementService _placementService;
-            private List<(Message Message, TaskCompletionSource<bool> Completion)> _messages = new();
+            private List<(Message Message, TaskCompletionSource<bool> Completion)> _messages = [];
 
             public PlacementWorker(PlacementService placementService)
             {
@@ -240,7 +240,7 @@ namespace Orleans.Runtime.Placement
 
                 lock (_lockObj)
                 {
-                    _messages ??= new();
+                    _messages ??= [];
                     _messages.Add((message, completion));
                 }
 
@@ -388,7 +388,7 @@ namespace Orleans.Runtime.Placement
 
             private class GrainPlacementWorkItem
             {
-                public List<(Message Message, TaskCompletionSource<bool> Completion)> Messages { get; } = new();
+                public List<(Message Message, TaskCompletionSource<bool> Completion)> Messages { get; } = [];
 
                 public Task<SiloAddress> Result { get; set; }
             }

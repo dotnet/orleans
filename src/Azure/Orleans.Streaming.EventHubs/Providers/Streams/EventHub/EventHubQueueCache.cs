@@ -113,8 +113,8 @@ namespace Orleans.Streaming.EventHubs
         /// <returns></returns>
         public List<StreamPosition> Add(List<EventData> messages, DateTime dequeueTimeUtc)
         {
-            List<StreamPosition> positions = new List<StreamPosition>();
-            List<CachedMessage> cachedMessages = new List<CachedMessage>();
+            List<StreamPosition> positions = [];
+            List<CachedMessage> cachedMessages = [];
             foreach (EventData message in messages)
             {
                 StreamPosition position = this.dataAdapter.GetStreamPosition(this.Partition, message);

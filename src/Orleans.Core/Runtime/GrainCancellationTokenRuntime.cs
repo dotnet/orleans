@@ -43,7 +43,7 @@ namespace Orleans.Runtime
             {
                 if (tasks is null)
                 {
-                    tasks = new();
+                    tasks = [];
                     if (localTask != null) tasks.Add(localTask);
                 }
                 tasks.Add(CancelTokenWithRetries(id, grainReferences, reference.Key, reference.Value.AsReference<ICancellationSourcesExtension>()));

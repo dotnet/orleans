@@ -17,7 +17,7 @@ internal class HistogramAggregator
     {
         if (buckets[^1] != long.MaxValue)
         {
-            buckets = buckets.Concat(new[] { long.MaxValue }).ToArray();
+            buckets = buckets.Concat([long.MaxValue]).ToArray();
         }
 
         _tags = tags;

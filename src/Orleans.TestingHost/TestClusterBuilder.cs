@@ -15,8 +15,8 @@ namespace Orleans.TestingHost
     /// <summary>Configuration builder for starting a <see cref="TestCluster"/>.</summary>
     public class TestClusterBuilder
     {
-        private readonly List<Action<IConfigurationBuilder>> configureHostConfigActions = new List<Action<IConfigurationBuilder>>();
-        private readonly List<Action> configureBuilderActions = new List<Action>();
+        private readonly List<Action<IConfigurationBuilder>> configureHostConfigActions = [];
+        private readonly List<Action> configureBuilderActions = [];
         private Func<string, IConfiguration, Task<SiloHandle>> _createSiloAsync;
 
         /// <summary>
@@ -56,7 +56,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Configuration values which will be provided to the silos and clients created by this builder.
         /// </summary>
-        public Dictionary<string, string> Properties { get; } = new Dictionary<string, string>();
+        public Dictionary<string, string> Properties { get; } = [];
 
         /// <summary>
         /// Gets the options.

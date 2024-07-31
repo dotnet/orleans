@@ -140,7 +140,7 @@ namespace Orleans.Runtime.Host
             {
                 dynamic ep = instanceEndpoints.GetType()
                     .GetProperty("Item")
-                    .GetMethod.Invoke(instanceEndpoints, new object[] {endpointName});
+                    .GetMethod.Invoke(instanceEndpoints, new[] { endpointName });
                 return ep.IPEndpoint;
             }
             catch (Exception exc)
@@ -162,20 +162,20 @@ namespace Orleans.Runtime.Host
 
         public string GetConfigurationSettingValue(string configurationSettingName)
         {
-            return (string) roleEnvironmentType.GetMethod("GetConfigurationSettingValue").Invoke(null, new object[] {configurationSettingName});
+            return (string) roleEnvironmentType.GetMethod("GetConfigurationSettingValue").Invoke(null, [configurationSettingName]);
         }
 
         public void SubscribeForStoppingNotification(object handlerObject, EventHandler<object> handler)
         {
             var handlerDelegate = handler.GetMethodInfo().CreateDelegate(stoppingEvent.EventHandlerType, handlerObject);
-            stoppingEventAdd.Invoke(null, new object[] { handlerDelegate });
+            stoppingEventAdd.Invoke(null, [handlerDelegate]);
             
         }
 
         public void UnsubscribeFromStoppingNotification(object handlerObject, EventHandler<object> handler)
         {
             var handlerDelegate = handler.GetMethodInfo().CreateDelegate(stoppingEvent.EventHandlerType, handlerObject);
-            stoppingEventRemove.Invoke(null, new[] { handlerDelegate });
+            stoppingEventRemove.Invoke(null, [handlerDelegate]);
         }
 
 

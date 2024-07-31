@@ -18,7 +18,7 @@ namespace UnitTests.General
         public IEnumerable<string> SplitScript(string setupScript)
         {
             return setupScript.Replace("END$$", "END;")
-                .Split(new[] { "DELIMITER $$", "DELIMITER ;" }, StringSplitOptions.RemoveEmptyEntries);
+                .Split(["DELIMITER $$", "DELIMITER ;"], StringSplitOptions.RemoveEmptyEntries);
         }
 
         protected override string CreateDatabaseTemplate
@@ -38,7 +38,7 @@ namespace UnitTests.General
 
         protected override IEnumerable<string> ConvertToExecutableBatches(string setupScript, string databaseName)
         {
-            var batches = setupScript.Replace("END$$", "END;").Split(new[] { "DELIMITER $$", "DELIMITER ;" }, StringSplitOptions.RemoveEmptyEntries).ToList();
+            var batches = setupScript.Replace("END$$", "END;").Split(["DELIMITER $$", "DELIMITER ;"], StringSplitOptions.RemoveEmptyEntries).ToList();
             batches.Add(CreateStreamTestTable);
 
             return batches;

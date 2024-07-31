@@ -26,7 +26,7 @@ namespace UnitTests.ConcurrencyTests
             IConcurrentGrain first = this.fixture.GrainFactory.GetGrain<IConcurrentGrain>(GetRandomGrainId());
             await first.Initialize(0);
 
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             for (int i = 0; i < 5; i++)
             {
                 Task p = first.A();

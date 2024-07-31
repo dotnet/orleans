@@ -46,7 +46,7 @@ namespace DefaultCluster.Tests.TimerTests
         public async Task TimerOrleansTest_Parallel()
         {
             TimeSpan period = TimeSpan.Zero;
-            List<ITimerGrain> grains = new List<ITimerGrain>();
+            List<ITimerGrain> grains = [];
             for (int i = 0; i < 10; i++)
             {
                 ITimerGrain grain = GrainFactory.GetGrain<ITimerGrain>(GetRandomGrainId());
@@ -333,7 +333,7 @@ namespace DefaultCluster.Tests.TimerTests
         public async Task TimerOrleansTest_Parallel_Poco()
         {
             TimeSpan period = TimeSpan.Zero;
-            List<IPocoTimerGrain> grains = new List<IPocoTimerGrain>();
+            List<IPocoTimerGrain> grains = [];
             for (int i = 0; i < 10; i++)
             {
                 IPocoTimerGrain grain = GrainFactory.GetGrain<IPocoTimerGrain>(GetRandomGrainId());

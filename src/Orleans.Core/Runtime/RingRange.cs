@@ -181,7 +181,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Represents an empty range.
         /// </summary>
-        private static readonly GeneralMultiRange EmptyRange = new(new());
+        private static readonly GeneralMultiRange EmptyRange = new([]);
         /// <summary>
         /// Represents a full range.
         /// </summary>
@@ -230,7 +230,7 @@ namespace Orleans.Runtime
         /// <returns>The contiguous sub-ranges represented by the provided range.</returns>
         public static IEnumerable<ISingleRange> GetSubRanges(IRingRange range) => range switch
         {
-            ISingleRange single => new[] { single },
+            ISingleRange single => [single],
             GeneralMultiRange m => m.Ranges,
             _ => throw new NotSupportedException(),
         };

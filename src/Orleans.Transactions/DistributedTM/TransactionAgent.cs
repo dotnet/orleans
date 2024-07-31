@@ -258,14 +258,14 @@ namespace Orleans.Transactions
                 {
                     if(resources == null)
                     {
-                        resources = new List<KeyValuePair<ParticipantId, AccessCounter>>();
+                        resources = [];
                     }
                     resources.Add(participant);
                     if(participant.Value.Writes > 0)
                     {
                         if (writers == null)
                         {
-                            writers = new List<ParticipantId>();
+                            writers = [];
                         }
                         writers.Add(id);
                     }

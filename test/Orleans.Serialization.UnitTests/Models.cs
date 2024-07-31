@@ -502,7 +502,7 @@ namespace Orleans.Serialization.UnitTests
                 throw new ArgumentException($"Type '{stronglyTypedIdType}' is not a strongly-typed id type", nameof(stronglyTypedIdType));
             }
 
-            var ctor = stronglyTypedIdType.GetConstructor(new[] { typeof(TValue) });
+            var ctor = stronglyTypedIdType.GetConstructor([typeof(TValue)]);
             if (ctor is null)
             {
                 throw new ArgumentException($"Type '{stronglyTypedIdType}' doesn't have a constructor with one parameter of type '{typeof(TValue)}'", nameof(stronglyTypedIdType));

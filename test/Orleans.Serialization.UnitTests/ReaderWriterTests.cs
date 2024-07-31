@@ -216,8 +216,8 @@ namespace Orleans.Serialization.UnitTests
         [Fact]
         public void SkipBufferEdge_ReadOnlySequence()
         {
-            byte[] b = new byte[] { 25, 84, 101, 115, 116, 32, 97, 99, 99, 111, 117, 110 };
-            byte[] b2 = new byte[] { 116, 64, 0, 0, 0 };
+            byte[] b = [25, 84, 101, 115, 116, 32, 97, 99, 99, 111, 117, 110];
+            byte[] b2 = [116, 64, 0, 0, 0];
 
             var seq = ReadOnlySequenceHelper.CreateReadOnlySequence(b, b2);
             using SerializerSession session = this.GetSession();
@@ -230,8 +230,8 @@ namespace Orleans.Serialization.UnitTests
         [Fact]
         public void SkipBufferEdge_BufferSlice()
         {
-            byte[] b = new byte[] { 25, 84, 101, 115, 116, 32, 97, 99, 99, 111, 117, 110 };
-            byte[] b2 = new byte[] { 116, 64, 0, 0, 0 };
+            byte[] b = [25, 84, 101, 115, 116, 32, 97, 99, 99, 111, 117, 110];
+            byte[] b2 = [116, 64, 0, 0, 0];
 
             var buffer = new PooledBuffer();
 

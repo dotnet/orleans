@@ -49,8 +49,10 @@ namespace UnitTests.StorageTests
                 Tuple.Create(KeyName1, key1.ToString(CultureInfo.InvariantCulture))
             }.ToList();
 
-            var data = new Dictionary<string, object>();
-            data.Add(ValueName1, testName);
+            var data = new Dictionary<string, object>
+            {
+                { ValueName1, testName }
+            };
 
             var store = new HierarchicalKeyStore(1);
             _ = store.WriteRow(keys, data, null);
@@ -78,8 +80,10 @@ namespace UnitTests.StorageTests
                 Tuple.Create(KeyName2, key2.ToString(CultureInfo.InvariantCulture))
             }.ToList();
 
-            var data = new Dictionary<string, object>();
-            data.Add(ValueName1, testName);
+            var data = new Dictionary<string, object>
+            {
+                { ValueName1, testName }
+            };
 
             var store = new HierarchicalKeyStore(2);
             _ = store.WriteRow(keys, data, null);
@@ -109,10 +113,12 @@ namespace UnitTests.StorageTests
                 Tuple.Create(KeyName3, key3.ToString(CultureInfo.InvariantCulture))
             }.ToList();
 
-            var data = new Dictionary<string, object>();
-            data[ValueName1] = testName + 1;
-            data[ValueName2] = testName + 2;
-            data[ValueName3] = testName + 3;
+            var data = new Dictionary<string, object>
+            {
+                [ValueName1] = testName + 1,
+                [ValueName2] = testName + 2,
+                [ValueName3] = testName + 3
+            };
 
             var store = new HierarchicalKeyStore(3);
             _ = store.WriteRow(keys, data, null);
@@ -136,8 +142,10 @@ namespace UnitTests.StorageTests
 
             List<Tuple<string, string>> keys = MakeKeys(key1, key2);
 
-            var data = new Dictionary<string, object>();
-            data[ValueName1] = testName;
+            var data = new Dictionary<string, object>
+            {
+                [ValueName1] = testName
+            };
 
             var store = new HierarchicalKeyStore(keys.Count);
 
@@ -173,8 +181,10 @@ namespace UnitTests.StorageTests
             List<Tuple<string, string>> keys1 = MakeKeys(key1, key2);
             List<Tuple<string, string>> keys2 = MakeKeys(key3, key4);
 
-            var data = new Dictionary<string, object>();
-            data[ValueName1] = testName;
+            var data = new Dictionary<string, object>
+            {
+                [ValueName1] = testName
+            };
 
             var store = new HierarchicalKeyStore(keys1.Count);
 
@@ -214,16 +224,20 @@ namespace UnitTests.StorageTests
 
             List<Tuple<string, string>> keys = MakeKeys(key1, key2);
 
-            var data = new Dictionary<string, object>();
-            data[ValueName1] = testName + 1;
-            data[ValueName2] = testName + 2;
-            data[ValueName3] = testName + 3;
+            var data = new Dictionary<string, object>
+            {
+                [ValueName1] = testName + 1,
+                [ValueName2] = testName + 2,
+                [ValueName3] = testName + 3
+            };
 
             var store = new HierarchicalKeyStore(keys.Count);
             _ = store.WriteRow(keys, data, null);
 
-            var readKeys = new List<Tuple<string, string>>();
-            readKeys.Add(keys.First());
+            var readKeys = new List<Tuple<string, string>>
+            {
+                keys.First()
+            };
 
             var results = store.ReadMultiRow(readKeys);
 

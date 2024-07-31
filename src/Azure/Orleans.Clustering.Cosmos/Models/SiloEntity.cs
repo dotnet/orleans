@@ -36,11 +36,11 @@ internal class SiloEntity : BaseClusterEntity
 
     [JsonProperty(nameof(SuspectingSilos))]
     [JsonPropertyName(nameof(SuspectingSilos))]
-    public List<string> SuspectingSilos { get; set; } = new();
+    public List<string> SuspectingSilos { get; set; } = [];
 
     [JsonProperty(nameof(SuspectingTimes))]
     [JsonPropertyName(nameof(SuspectingTimes))]
-    public List<string> SuspectingTimes { get; set; } = new();
+    public List<string> SuspectingTimes { get; set; } = [];
 
     [JsonProperty(nameof(StartTime))]
     [JsonPropertyName(nameof(StartTime))]

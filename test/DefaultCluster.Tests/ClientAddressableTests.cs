@@ -14,7 +14,7 @@ namespace DefaultCluster.Tests
         private class MyPseudoGrain : IClientAddressableTestClientObject
         {
             private int counter = 0;
-            private readonly List<int> numbers = new List<int>();
+            private readonly List<int> numbers = [];
 
             public Task<string> OnHappyPath(string message)
             {

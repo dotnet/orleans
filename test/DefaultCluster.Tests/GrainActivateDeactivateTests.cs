@@ -72,7 +72,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             string activation2 = await grain.DoSomething();
 
             Assert.NotEqual(activation, activation2); // New activation created after re-activate
-            await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
+            await CheckNumActivateDeactivateCalls(2, 1, [activation, activation2], "After reactivation");
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
@@ -120,7 +120,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             string activation2 = await grain.DoSomething();
 
             Assert.NotEqual(activation, activation2); // New activation created after re-activate
-            await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
+            await CheckNumActivateDeactivateCalls(2, 1, [activation, activation2], "After reactivation");
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("Reentrancy")]
@@ -145,7 +145,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 
             Assert.NotEqual(activation, activation2); // New activation created after re-activate;
 
-            await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
+            await CheckNumActivateDeactivateCalls(2, 1, [activation, activation2], "After reactivation");
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
@@ -280,7 +280,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(
                 expectedActivateCalls,
                 expectedDeactivateCalls,
-                new string[] { forActivation },
+                [forActivation],
                 when )
             ;
         }

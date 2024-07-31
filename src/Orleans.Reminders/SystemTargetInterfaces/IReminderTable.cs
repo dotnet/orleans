@@ -124,7 +124,7 @@ namespace Orleans
         /// <param name="entry">The entry.</param>
         public ReminderTableData(ReminderEntry entry)
         {
-            Reminders = new[] { entry };
+            Reminders = [entry];
         }
 
         /// <summary>

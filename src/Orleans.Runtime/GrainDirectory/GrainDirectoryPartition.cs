@@ -120,7 +120,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public GrainDirectoryPartition(ISiloStatusOracle siloStatusOracle, IOptions<GrainDirectoryOptions> grainDirectoryOptions, ILoggerFactory loggerFactory)
         {
-            partitionData = new Dictionary<GrainId, GrainInfo>();
+            partitionData = [];
             lockable = new object();
             log = loggerFactory.CreateLogger<GrainDirectoryPartition>();
             this.siloStatusOracle = siloStatusOracle;
@@ -277,7 +277,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                         var activationToDrop = existing.Merge(pair.Value);
                         if (activationToDrop == null) continue;
-                        (CollectionsMarshal.GetValueRefOrAddDefault(activationsToRemove ??= new(), activationToDrop.SiloAddress!, out _) ??= new()).Add(activationToDrop);
+                        (CollectionsMarshal.GetValueRefOrAddDefault(activationsToRemove ??= [], activationToDrop.SiloAddress!, out _) ??= []).Add(activationToDrop);
                     }
                     else
                     {

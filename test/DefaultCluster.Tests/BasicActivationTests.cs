@@ -210,7 +210,7 @@ namespace DefaultCluster.Tests.General
          TestCategory("Reentrancy")]
         public async Task BasicActivation_Reentrant_RecoveryAfterExpiredMessage()
         {
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             TimeSpan prevTimeout = this.GetResponseTimeout();
             try
             {

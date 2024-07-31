@@ -33,7 +33,7 @@ namespace Orleans.SqlUtils.StorageProvider.GrainClasses
                 throw new ArgumentNullException(nameof(device));
 
             if (null == State.Devices)
-                State.Devices = new List<IDeviceGrain>();
+                State.Devices = [];
 
             if (!State.Devices.Contains(device))
             {
@@ -62,7 +62,7 @@ namespace Orleans.SqlUtils.StorageProvider.GrainClasses
             State.KudoPoints = _random.Next();
             State.Status = _random.Next();
             State.LastLogin = now;
-            State.Devices = new List<IDeviceGrain>();
+            State.Devices = [];
 
             await WriteStateAsync();
         }

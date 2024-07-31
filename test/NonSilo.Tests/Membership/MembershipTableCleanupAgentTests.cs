@@ -21,7 +21,7 @@ namespace NonSilo.Tests.Membership
         public MembershipTableCleanupAgentTests(ITestOutputHelper output)
         {
             this.output = output;
-            this.loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(this.output) });
+            this.loggerFactory = new LoggerFactory([new XunitLoggerProvider(this.output)]);
         }
 
         [Fact]

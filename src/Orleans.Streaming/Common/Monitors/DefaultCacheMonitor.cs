@@ -64,7 +64,7 @@ namespace Orleans.Providers.Streams.Common
         /// Initializes a new instance of the <see cref="DefaultCacheMonitor"/> class.
         /// </summary>
         /// <param name="dimensions">The dimensions.</param>
-        public DefaultCacheMonitor(CacheMonitorDimensions dimensions) : this(new KeyValuePair<string, object>[] { new("QueueId", dimensions.QueueId) })
+        public DefaultCacheMonitor(CacheMonitorDimensions dimensions) : this([new("QueueId", dimensions.QueueId)])
         {
         }
 

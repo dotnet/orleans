@@ -45,8 +45,10 @@ namespace Orleans.Transactions
             this.copier = copier;
             this.grainRuntime = grainRuntime;
             this.logger = logger;
-            this.copiers = new Dictionary<Type, object>();
-            this.copiers.Add(typeof(TState), copier);
+            this.copiers = new Dictionary<Type, object>
+            {
+                { typeof(TState), copier }
+            };
             this.activationLifetime = new ActivationLifetime(this.context);
         }
 

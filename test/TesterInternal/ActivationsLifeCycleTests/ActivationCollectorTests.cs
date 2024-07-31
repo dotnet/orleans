@@ -92,7 +92,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             const int grainCount = 1000;
             var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain1));
 
-            List<Task> tasks = new List<Task>();
+            List<Task> tasks = [];
             logger.LogInformation("ActivationCollectorForceCollection: activating {Count} grains.", grainCount);
             for (var i = 0; i < grainCount; ++i)
             {
@@ -121,7 +121,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             const int grainCount = 1000;
             var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain1));
 
-            List<Task> tasks = new List<Task>();
+            List<Task> tasks = [];
             logger.LogInformation("IdleActivationCollectorShouldCollectIdleActivations: activating {Count} grains.", grainCount);
             for (var i = 0; i < grainCount; ++i)
             {
@@ -153,8 +153,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             var idleGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain1));
             var busyGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(BusyActivationGcTestGrain1));
 
-            List<Task> tasks0 = new List<Task>();
-            List<IBusyActivationGcTestGrain1> busyGrains = new List<IBusyActivationGcTestGrain1>();
+            List<Task> tasks0 = [];
+            List<IBusyActivationGcTestGrain1> busyGrains = [];
             logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivations: activating {Count} busy grains.", busyGrainCount);
             for (var i = 0; i < busyGrainCount; ++i)
             {
@@ -163,11 +163,11 @@ namespace UnitTests.ActivationsLifeCycleTests
                 tasks0.Add(g.Nop());
             }
             await Task.WhenAll(tasks0);
-            bool[] quit = new bool[]{ false };
+            bool[] quit = [false];
             async Task busyWorker()
             {
                 logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivations: busyWorker started");
-                List<Task> tasks1 = new List<Task>();
+                List<Task> tasks1 = [];
                 while (!quit[0])
                 {
                     foreach (var g in busyGrains)
@@ -215,8 +215,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             var idleGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain1));
             var busyGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(BusyActivationGcTestGrain1));
 
-            List<Task> tasks0 = new List<Task>();
-            List<IBusyActivationGcTestGrain1> busyGrains = new List<IBusyActivationGcTestGrain1>();
+            List<Task> tasks0 = [];
+            List<IBusyActivationGcTestGrain1> busyGrains = [];
             logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: activating {Count} busy grains.", busyGrainCount);
             for (var i = 0; i < busyGrainCount; ++i)
             {
@@ -225,11 +225,11 @@ namespace UnitTests.ActivationsLifeCycleTests
                 tasks0.Add(g.Nop());
             }
             await Task.WhenAll(tasks0);
-            bool[] quit = new bool[]{ false };
+            bool[] quit = [false];
             async Task busyWorker()
             {
                 logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: busyWorker started");
-                List<Task> tasks1 = new List<Task>();
+                List<Task> tasks1 = [];
                 while (!quit[0])
                 {
                     foreach (var g in busyGrains)
@@ -288,7 +288,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             const int grainCount = 1000;
             var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain2));
 
-            List<Task> tasks = new List<Task>();
+            List<Task> tasks = [];
             logger.LogInformation("ActivationCollectorShouldCollectIdleActivationsSpecifiedInPerTypeConfiguration: activating {Count} grains.", grainCount);
             for (var i = 0; i < grainCount; ++i)
             {
@@ -322,8 +322,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             var idleGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain2));
             var busyGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(BusyActivationGcTestGrain2));
 
-            List<Task> tasks0 = new List<Task>();
-            List<IBusyActivationGcTestGrain2> busyGrains = new List<IBusyActivationGcTestGrain2>();
+            List<Task> tasks0 = [];
+            List<IBusyActivationGcTestGrain2> busyGrains = [];
             logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration: activating {Count} busy grains.", busyGrainCount);
             for (var i = 0; i < busyGrainCount; ++i)
             {
@@ -332,11 +332,11 @@ namespace UnitTests.ActivationsLifeCycleTests
                 tasks0.Add(g.Nop());
             }
             await Task.WhenAll(tasks0);
-            bool[] quit = new bool[]{ false };
+            bool[] quit = [false];
             async Task busyWorker()
             {
                 logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration: busyWorker started");
-                List<Task> tasks1 = new List<Task>();
+                List<Task> tasks1 = [];
                 while (!quit[0])
                 {
                     foreach (var g in busyGrains)
@@ -393,8 +393,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             var grainTypeName = RuntimeTypeNameFormatter.Format(typeof(StatelessWorkerActivationCollectorTestGrain1));
             const int burstLength = 1000;
 
-            List<Task> tasks0 = new List<Task>();
-            List<IStatelessWorkerActivationCollectorTestGrain1> grains = new List<IStatelessWorkerActivationCollectorTestGrain1>();
+            List<Task> tasks0 = [];
+            List<IStatelessWorkerActivationCollectorTestGrain1> grains = [];
             for (var i = 0; i < grainCount; ++i)
             {
                 IStatelessWorkerActivationCollectorTestGrain1 g = this.testCluster.GrainFactory.GetGrain<IStatelessWorkerActivationCollectorTestGrain1>(Guid.NewGuid());
@@ -402,7 +402,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
 
 
-            bool[] quit = new bool[] { false };
+            bool[] quit = [false];
             bool[] matched = new bool[grainCount];
             string[] activationIds = new string[grainCount];
             async Task workFunc(int index)
@@ -423,7 +423,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 // (part of) 4. periodically send a message to each grain...
                 logger.LogInformation("ActivationCollectorShouldNotCollectBusyStatelessWorkers: busyWorker started");
 
-                List<Task> tasks1 = new List<Task>();
+                List<Task> tasks1 = [];
                 while (!quit[0])
                 {
                     for (int index = 0; index < grains.Count; ++index)
@@ -502,7 +502,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             // CollectionAgeLimit = 12 seconds
             var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain));
 
-            List<Task> tasks = new List<Task>();
+            List<Task> tasks = [];
             logger.LogInformation("ActivationCollectorShouldCollectByCollectionSpecificAgeLimit: activating {GrainCount} grains.", grainCount);
             for (var i = 0; i < grainCount; ++i)
             {

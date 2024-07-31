@@ -14,8 +14,8 @@ namespace NonSilo.Tests
         public interface IMyBaseType<T> { }
         public interface IMyArrayType<T> : IMyBaseType <T[]> { }
         private readonly ITestOutputHelper _output;
-        private readonly List<Type> _types = new()
-            {
+        private readonly List<Type> _types =
+            [
                 typeof(NameValueCollection),
                 typeof(int),
                 typeof(int[]),
@@ -35,7 +35,7 @@ namespace NonSilo.Tests
                     .MakeArrayType(10)
                     .MakeByRefType(),
                 typeof(NameValueCollection)
-            };
+            ];
 
         public RuntimeTypeNameFormatterTests(ITestOutputHelper output)
         {

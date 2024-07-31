@@ -67,7 +67,7 @@ namespace Orleans.Transactions.State
             this.storageWorker = new BatchWorkerFromDelegate(StorageWork, this.activationLifetime.OnDeactivating);
             this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger, activationLifetime);
             this.confirmationWorker = new ConfirmationWorker<TState>(options, this.resource, this.storageWorker, () => this.storageBatch, this.logger, timerManager, activationLifetime);
-            this.unprocessedPreparedMessages = new Dictionary<DateTime, PreparedMessages>();
+            this.unprocessedPreparedMessages = [];
             this.commitQueue = new CommitQueue<TState>();
             this.readyTask = Task.CompletedTask;
         }
@@ -646,8 +646,7 @@ namespace Orleans.Transactions.State
 
         private async Task Bail(TransactionalStatus status, Exception exception, bool force = false)
         {
-            List<Task> pending = new List<Task>();
-            pending.Add(RWLock.AbortExecutingTransactions(exception));
+            List<Task> pending = [RWLock.AbortExecutingTransactions(exception)];
             this.RWLock.AbortQueuedTransactions();
 
             // abort all entries in the commit queue
@@ -858,7 +857,7 @@ namespace Orleans.Transactions.State
 
         private async Task AbortCommits(TransactionalStatus status, int from = 0)
         {
-            List<Task> pending = new List<Task>();
+            List<Task> pending = [];
             // emtpy the back of the commit queue, starting at specified position
             for (int i = from; i < commitQueue.Count; i++)
             {

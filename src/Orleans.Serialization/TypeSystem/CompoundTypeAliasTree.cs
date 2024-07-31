@@ -87,7 +87,7 @@ public class CompoundTypeAliasTree
 #else
         if (key is null) throw new ArgumentNullException(nameof(key));
 #endif
-        _children ??= new();
+        _children ??= [];
 
         if (_children.TryGetValue(key, out var existing))
         {

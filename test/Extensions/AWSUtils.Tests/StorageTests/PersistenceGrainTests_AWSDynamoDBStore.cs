@@ -146,12 +146,13 @@ namespace AWSUtils.Tests.StorageTests
         public async Task AWSDynamoDBStore_ConvertToFromStorageFormat_GrainReference_List()
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
-            Guid[] ids = { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
-            IUser[] grains = new IUser[3];
-            grains[0] = this.HostedCluster.GrainFactory.GetGrain<IUser>(ids[0]);
-            grains[1] = this.HostedCluster.GrainFactory.GetGrain<IUser>(ids[1]);
-            grains[2] = this.HostedCluster.GrainFactory.GetGrain<IUser>(ids[2]);
-
+            Guid[] ids = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()];
+            IUser[] grains =
+            [
+                this.HostedCluster.GrainFactory.GetGrain<IUser>(ids[0]),
+                this.HostedCluster.GrainFactory.GetGrain<IUser>(ids[1]),
+                this.HostedCluster.GrainFactory.GetGrain<IUser>(ids[2]),
+            ];
             var initialState = new GrainStateContainingGrainReferences();
             foreach (var g in grains)
             {

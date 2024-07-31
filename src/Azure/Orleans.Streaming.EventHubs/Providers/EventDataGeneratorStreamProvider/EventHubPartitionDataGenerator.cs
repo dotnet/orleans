@@ -45,7 +45,7 @@ namespace Orleans.Streaming.EventHubs.Testing
                 return false;
             }
             int count = maxCount;
-            List<EventData> eventDataList = new List<EventData>();
+            List<EventData> eventDataList = [];
             while (count-- > 0)
             {
                 this.SequenceNumberCounter.Increment();
@@ -75,8 +75,10 @@ namespace Orleans.Streaming.EventHubs.Testing
 
         private IEnumerable<int> GenerateEvent(int sequenceNumber)
         {
-            var events = new List<int>();
-            events.Add(sequenceNumber);
+            var events = new List<int>
+            {
+                sequenceNumber
+            };
             return events;
         }
         
@@ -116,7 +118,7 @@ namespace Orleans.Streaming.EventHubs.Testing
         {
             this.options = options;
             this.generatorFactory = generatorFactory;
-            this.generators = new List<IStreamDataGenerator<EventData>>();
+            this.generators = [];
             this.logger = logger;
         }
         /// <inheritdoc />

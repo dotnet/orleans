@@ -132,13 +132,13 @@ namespace Tester.AzureUtils.TimerTests
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
             Task<bool>[] tasks =
-            {
+            [
                 Task.Run(() => PerGrainMultiReminderTestChurn(g1)),
                 Task.Run(() => PerGrainMultiReminderTestChurn(g2)),
                 Task.Run(() => PerGrainMultiReminderTestChurn(g3)),
                 Task.Run(() => PerGrainMultiReminderTestChurn(g4)),
                 Task.Run(() => PerGrainMultiReminderTestChurn(g5)),
-            };
+            ];
 
             await Task.Delay(period.Multiply(5));
 
@@ -162,13 +162,13 @@ namespace Tester.AzureUtils.TimerTests
             IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
             Task<bool>[] tasks =
-            {
+            [
                 Task.Run(() => PerGrainMultiReminderTest(g1)),
                 Task.Run(() => PerGrainMultiReminderTest(g2)),
                 Task.Run(() => PerGrainMultiReminderTest(g3)),
                 Task.Run(() => PerGrainMultiReminderTest(g4)),
                 Task.Run(() => PerGrainMultiReminderTest(g5)),
-            };
+            ];
 
             //Block until all tasks complete.
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT);
@@ -205,13 +205,13 @@ namespace Tester.AzureUtils.TimerTests
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
             Task[] tasks =
-            {
+            [
                 Task.Run(() => PerGrainFailureTest(g1)),
                 Task.Run(() => PerGrainFailureTest(g2)),
                 Task.Run(() => PerGrainFailureTest(g3)),
                 Task.Run(() => PerGrainFailureTest(g4)),
                 Task.Run(() => PerGrainFailureTest(g5)),
-            };
+            ];
 
             Thread.Sleep(period.Multiply(failAfter));
 
@@ -240,13 +240,13 @@ namespace Tester.AzureUtils.TimerTests
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
             Task[] tasks =
-            {
+            [
                 Task.Run(() => PerGrainFailureTest(g1)),
                 Task.Run(() => PerGrainFailureTest(g2)),
                 Task.Run(() => PerGrainFailureTest(g3)),
                 Task.Run(() => PerGrainFailureTest(g4)),
                 Task.Run(() => PerGrainFailureTest(g5)),
-            };
+            ];
 
             Thread.Sleep(period.Multiply(failAfter));
 
@@ -258,7 +258,7 @@ namespace Tester.AzureUtils.TimerTests
             {
                 t.GetAwaiter().GetResult();
             });
-            await Task.WhenAll(new[] { t1, t2 }).WithTimeout(ENDWAIT);
+            await Task.WhenAll([t1, t2]).WithTimeout(ENDWAIT);
 
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT); // Block until all tasks complete.
             log.LogInformation("\n\n\nReminderTest_1F1J_MultiGrain passed OK.\n\n\n");
@@ -270,7 +270,7 @@ namespace Tester.AzureUtils.TimerTests
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             Task<IGrainReminder> promise1 = grain.StartReminder(DR);
             Task<IGrainReminder> promise2 = grain.StartReminder(DR);
-            Task<IGrainReminder>[] tasks = { promise1, promise2 };
+            Task<IGrainReminder>[] tasks = [promise1, promise2];
             await Task.WhenAll(tasks).WithTimeout(TimeSpan.FromSeconds(15));
             //Assert.NotEqual(promise1.Result, promise2.Result);
             // TODO: write tests where period of a reminder is changed
@@ -315,12 +315,12 @@ namespace Tester.AzureUtils.TimerTests
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
             Task[] tasks =
-            {
+            [
                 Task.Run(() => PerGrainFailureTest(g1)),
                 Task.Run(() => PerGrainFailureTest(g2)),
                 Task.Run(() => PerCopyGrainFailureTest(g3)),
                 Task.Run(() => PerCopyGrainFailureTest(g4)),
-            };
+            ];
 
             Thread.Sleep(period.Multiply(failAfter));
 
@@ -329,7 +329,7 @@ namespace Tester.AzureUtils.TimerTests
             log.LogInformation("Stopping a silo and joining a silo");
             Task t1 = Task.Run(async () => await this.HostedCluster.StopSiloAsync(siloToKill));
             Task t2 = Task.Run(async () => await this.HostedCluster.StartAdditionalSilosAsync(1));
-            await Task.WhenAll(new[] { t1, t2 }).WithTimeout(ENDWAIT);
+            await Task.WhenAll([t1, t2]).WithTimeout(ENDWAIT);
 
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT); // Block until all tasks complete.
         }

@@ -67,7 +67,7 @@ namespace Orleans.Transactions.TestKit
         {
             TransactionInfo ti = TransactionContext.GetTransactionInfo();
             List<string>[] results = new List<string>[tier + 1 + tiers.Length];
-            results[tier] = new List<string>(new[] { ti?.Id });
+            results[tier] = new List<string>([ti?.Id]);
 
             if (tiers.Length == 0)
             {

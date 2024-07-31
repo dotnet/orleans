@@ -69,38 +69,36 @@ namespace Orleans.Reminders.DynamoDB
             {
                 IndexName = SERVICE_ID_GRAIN_HASH_INDEX,
                 Projection = new Projection { ProjectionType = ProjectionType.ALL },
-                KeySchema = new List<KeySchemaElement>
-                {
+                KeySchema =
+                [
                     new KeySchemaElement { AttributeName = SERVICE_ID_PROPERTY_NAME, KeyType = KeyType.HASH},
                     new KeySchemaElement { AttributeName = GRAIN_HASH_PROPERTY_NAME, KeyType = KeyType.RANGE }
-                }
+                ]
             };
 
             var serviceIdGrainReferenceGlobalSecondaryIndex = new GlobalSecondaryIndex
             {
                 IndexName = SERVICE_ID_GRAIN_REFERENCE_INDEX,
                 Projection = new Projection { ProjectionType = ProjectionType.ALL },
-                KeySchema = new List<KeySchemaElement>
-                {
+                KeySchema =
+                [
                     new KeySchemaElement { AttributeName = SERVICE_ID_PROPERTY_NAME, KeyType = KeyType.HASH},
                     new KeySchemaElement { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, KeyType = KeyType.RANGE }
-                }
+                ]
             };
 
             return this.storage.InitializeTable(this.options.TableName,
-                new List<KeySchemaElement>
-                {
+                [
                     new KeySchemaElement { AttributeName = REMINDER_ID_PROPERTY_NAME, KeyType = KeyType.HASH },
                     new KeySchemaElement { AttributeName = GRAIN_HASH_PROPERTY_NAME, KeyType = KeyType.RANGE }
-                },
-                new List<AttributeDefinition>
-                {
+                ],
+                [
                     new AttributeDefinition { AttributeName = REMINDER_ID_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
                     new AttributeDefinition { AttributeName = GRAIN_HASH_PROPERTY_NAME, AttributeType = ScalarAttributeType.N },
                     new AttributeDefinition { AttributeName = SERVICE_ID_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
                     new AttributeDefinition { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
-                },
-                new List<GlobalSecondaryIndex> { serviceIdGrainHashGlobalSecondaryIndex, serviceIdGrainReferenceGlobalSecondaryIndex });
+                ],
+                [serviceIdGrainHashGlobalSecondaryIndex, serviceIdGrainReferenceGlobalSecondaryIndex]);
         }
 
         /// <summary>
@@ -298,7 +296,7 @@ namespace Orleans.Reminders.DynamoDB
                 }
                 else
                 {
-                    List<Task> tasks = new List<Task>();
+                    List<Task> tasks = [];
                     foreach (var batch in records.BatchIEnumerable(25))
                     {
                         tasks.Add(this.storage.DeleteEntriesAsync(this.options.TableName, batch));

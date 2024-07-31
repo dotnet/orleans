@@ -23,7 +23,7 @@ namespace Orleans.Transactions
             TransactionalStateConfiguration config = AttributeToConfig(attribute);
             // use generic type args to define collection type.
             MethodInfo genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
-            object[] args = new object[] { config };
+            object[] args = [config];
             return context => Create(context, genericCreate, args);
         }
 

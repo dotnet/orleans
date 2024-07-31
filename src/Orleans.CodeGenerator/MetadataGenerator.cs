@@ -99,14 +99,14 @@ namespace Orleans.CodeGenerator
             foreach (var type in MetadataModel.WellKnownTypeIds)
             {
                 body.Add(ExpressionStatement(InvocationExpression(addWellKnownTypeIdMethod,
-                    ArgumentList(SeparatedList(new[] { Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(type.Id))), Argument(TypeOfExpression(type.Type)) })))));
+                    ArgumentList(SeparatedList([Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(type.Id))), Argument(TypeOfExpression(type.Type))])))));
             }
 
             var addTypeAliasMethod = configParam.Member("WellKnownTypeAliases").Member("Add");
             foreach (var type in MetadataModel.TypeAliases)
             {
                 body.Add(ExpressionStatement(InvocationExpression(addTypeAliasMethod,
-                    ArgumentList(SeparatedList(new[] { Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(type.Alias))), Argument(TypeOfExpression(type.Type)) })))));
+                    ArgumentList(SeparatedList([Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(type.Alias))), Argument(TypeOfExpression(type.Type))])))));
             }
 
             AddCompoundTypeAliases(configParam, body);
@@ -161,15 +161,15 @@ namespace Orleans.CodeGenerator
                             { } argument => new[] { Argument(TypeOfExpression(typeKey.TypeValue.ToOpenTypeSyntax())), argument },
 
                             // Call the one-argument Add overload to add only a key.
-                            _ => new[] { Argument(TypeOfExpression(typeKey.TypeValue.ToOpenTypeSyntax())) },
+                            _ => [Argument(TypeOfExpression(typeKey.TypeValue.ToOpenTypeSyntax()))],
                         },
                         { IsString: true } stringKey => valueExpression switch
                         {
                             // Call the two-argument Add overload to add a key and value.
-                            { } argument => new[] { Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(stringKey.StringValue))), argument },
+                            { } argument => [Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(stringKey.StringValue))), argument],
 
                             // Call the one-argument Add overload to add only a key.
-                            _ => new[] { Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(stringKey.StringValue))) },
+                            _ => [Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(stringKey.StringValue)))],
                         },
                         _ => throw new InvalidOperationException("Unexpected alias key")
                     };

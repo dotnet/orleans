@@ -32,7 +32,7 @@ namespace UnitTests.Directory
 
         public CachedGrainLocatorTests(ITestOutputHelper output)
         {
-            this.loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(output) });
+            this.loggerFactory = new LoggerFactory([new XunitLoggerProvider(output)]);
             this.lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
 
             this.grainDirectory = Substitute.For<IGrainDirectory>();

@@ -105,7 +105,7 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>
 
         if (result is null)
         {
-            result = new();
+            result = [];
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
         }
 

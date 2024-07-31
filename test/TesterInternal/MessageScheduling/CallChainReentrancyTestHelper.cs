@@ -194,7 +194,7 @@ namespace UnitTests.General
 
             public async Task WaitForOperationAsync(CallChainOperation operationType, string grain, int callIndex)
             {
-                List<(CallChainOperation Operation, string Grain, int CallIndex)> ops = new();
+                List<(CallChainOperation Operation, string Grain, int CallIndex)> ops = [];
                 var operations = Operations.Reader;
                 while (await operations.WaitToReadAsync())
                 {

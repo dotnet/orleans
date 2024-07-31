@@ -44,7 +44,7 @@ namespace Tester.StreamingTests
             getDeliveryFailureCount = getDeliveryFailureCount ?? DefaultDeliveryFailureCount;
 
             Guid streamGuid = Guid.NewGuid();
-            int[] eventCount = {0};
+            int[] eventCount = [0];
 
             // become stream consumers
             await SubscribeToStream(streamProviderName, streamGuid, streamNamespace,

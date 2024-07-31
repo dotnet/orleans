@@ -82,7 +82,7 @@ namespace Tester.AzureUtils
             Assert.True(msgs == null || !msgs.Any());
 
             int numMsgs = 10;
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             for (int i = 0; i < numMsgs; i++)
             {
                 promises.Add(manager.AddQueueMessage(i.ToString()));
@@ -94,7 +94,7 @@ namespace Tester.AzureUtils
             Assert.Equal(numMsgs, msgs.Count());
             Assert.Equal(numMsgs, await manager.GetApproximateMessageCount());
 
-            promises = new List<Task>();
+            promises = [];
             foreach (var msg in msgs)
             {
                 promises.Add(manager.DeleteQueueMessage(msg));

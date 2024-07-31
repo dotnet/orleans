@@ -61,7 +61,7 @@ namespace Orleans.Streams
             streamProviderName = strProviderName;
             pubSub = streamPubSub;
             this.streamFilter = streamFilter;
-            pubSubCache = new Dictionary<QualifiedStreamId, StreamConsumerCollection>();
+            pubSubCache = [];
             this.options = options;
             this.queueAdapter = queueAdapter ?? throw new ArgumentNullException(nameof(queueAdapter));
             this.streamFailureHandler = streamFailureHandler ?? throw new ArgumentNullException(nameof(streamFailureHandler));

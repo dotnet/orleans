@@ -33,8 +33,8 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     private readonly GrainTypeSharedContext _shared;
     private readonly IServiceScope _serviceScope;
     private readonly WorkItemGroup _workItemGroup;
-    private readonly List<(Message Message, CoarseStopwatch QueuedTime)> _waitingRequests = new();
-    private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = new();
+    private readonly List<(Message Message, CoarseStopwatch QueuedTime)> _waitingRequests = [];
+    private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = [];
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private GrainLifecycle? _lifecycle;
     private List<object>? _pendingOperations;
@@ -434,7 +434,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     {
         lock (this)
         {
-            _pendingOperations ??= new();
+            _pendingOperations ??= [];
             _pendingOperations.Add(operation);
         }
 
@@ -553,7 +553,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     {
         lock (this)
         {
-            Timers ??= new HashSet<IGrainTimer>();
+            Timers ??= [];
             Timers.Add(timer);
         }
     }
@@ -680,11 +680,11 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         {
             if (diagnostics is not null) return;
 
-            diagnostics = new List<string>
-            {
+            diagnostics =
+            [
                 ToDetailedString(),
                 $"TaskScheduler status: {_workItemGroup.DumpStatus()}"
-            };
+            ];
         }
     }
 
@@ -914,7 +914,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                             if (!compatibilityDirector.IsCompatible(message.InterfaceVersion, currentVersion))
                             {
                                 // Add this activation to cache invalidation headers.
-                                message.CacheInvalidationHeader ??= new List<GrainAddressCacheUpdate>();
+                                message.CacheInvalidationHeader ??= [];
                                 message.CacheInvalidationHeader.Add(new GrainAddressCacheUpdate(Address, validAddress: null));
 
                                 var reason = new DeactivationReason(
@@ -1861,7 +1861,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         var tracker = GetComponent<ReentrantRequestTracker>();
         if (tracker is null)
         {
-            tracker = new ReentrantRequestTracker();
+            tracker = [];
             SetComponent(tracker);
         }
 

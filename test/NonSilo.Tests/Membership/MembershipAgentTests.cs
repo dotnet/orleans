@@ -40,7 +40,7 @@ namespace NonSilo.Tests.Membership
         public MembershipAgentTests(ITestOutputHelper output)
         {
             this.output = output;
-            this.loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(this.output) });
+            this.loggerFactory = new LoggerFactory([new XunitLoggerProvider(this.output)]);
 
             this.localSiloDetails = Substitute.For<ILocalSiloDetails>();
             this.localSilo = SiloAddress.FromParsableString("127.0.0.1:100@100");
@@ -52,7 +52,7 @@ namespace NonSilo.Tests.Membership
             this.fatalErrorHandler.IsUnexpected(default).ReturnsForAnyArgs(true);
             this.membershipGossiper = Substitute.For<IMembershipGossiper>();
             this.lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
-            this.timers = new List<DelegateAsyncTimer>();
+            this.timers = [];
             this.timerCalls = new ConcurrentDictionary<string, ConcurrentQueue<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)>>();
             this.timerFactory = new DelegateAsyncTimerFactory(
                 (period, name) =>

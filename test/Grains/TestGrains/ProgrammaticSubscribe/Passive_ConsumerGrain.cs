@@ -21,8 +21,8 @@ namespace UnitTests.Grains
         {
             logger.LogInformation("OnActivateAsync");
             onAddCalledCount = 0;
-            consumerObservers = new List<ICounterObserver>();
-            consumerHandles = new List<StreamSubscriptionHandle<IFruit>>();
+            consumerObservers = [];
+            consumerHandles = [];
             return Task.CompletedTask;
         }
 

@@ -26,7 +26,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Period of inactivity necessary for a grain to be available for collection and deactivation by grain type.
         /// </summary>
-        public Dictionary<string, TimeSpan> ClassSpecificCollectionAge { get; set; } = new Dictionary<string, TimeSpan>();
+        public Dictionary<string, TimeSpan> ClassSpecificCollectionAge { get; set; } = [];
 
         /// <summary>
         /// Timeout value before giving up when trying to activate a grain.

@@ -30,7 +30,7 @@ namespace UnitTestGrains
             ThrowIfDeactivating();
             context = RuntimeContext.Current;
             defaultTimer = this.RegisterGrainTimer(Tick, DefaultTimerName, period, period);
-            allTimers = new Dictionary<string, IDisposable>();
+            allTimers = [];
             return Task.CompletedTask;
         }
 
@@ -681,7 +681,7 @@ namespace UnitTestGrains
             ThrowIfDeactivating();
             context = RuntimeContext.Current;
             defaultTimer = this.RegisterGrainTimer(Tick, DefaultTimerName, period, period);
-            allTimers = new Dictionary<string, IDisposable>();
+            allTimers = [];
             return Task.CompletedTask;
         }
 

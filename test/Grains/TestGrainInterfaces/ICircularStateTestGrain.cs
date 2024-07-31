@@ -27,7 +27,7 @@
     {
         public CircularTest2()
         {
-            CircularTest1List = new List<CircularTest1>();
+            CircularTest1List = [];
         }
 
         [Id(0)]

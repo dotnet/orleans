@@ -32,7 +32,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         private readonly FileInfo assemblyGrainsV1;
         private readonly FileInfo assemblyGrainsV2;
 
-        private readonly List<SiloHandle> deployedSilos = new List<SiloHandle>();
+        private readonly List<SiloHandle> deployedSilos = [];
         private int siloIdx = 0;
         private TestClusterBuilder builder;
         private TestCluster cluster;

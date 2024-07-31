@@ -26,8 +26,8 @@ namespace Orleans.Transactions.TestKit.Consistency
         private readonly bool tolerateUnknownExceptions;
         private readonly IGrainFactory grainFactory;
 
-        private readonly Dictionary<string, HashSet<string>> orderEdges = new Dictionary<string, HashSet<string>>();
-        private readonly Dictionary<string, bool> marks = new Dictionary<string, bool>();
+        private readonly Dictionary<string, HashSet<string>> orderEdges = [];
+        private readonly Dictionary<string, bool> marks = [];
 
 
         public ConsistencyTestHarness(
@@ -53,10 +53,10 @@ namespace Orleans.Transactions.TestKit.Consistency
                 GrainOffset = (DateTime.UtcNow.Ticks & 0xFFFFFFFF) * ConsistencyTestOptions.MaxGrains,
             };
 
-            this.tuples = new Dictionary<int, SortedDictionary<int, Dictionary<string, HashSet<string>>>>();
-            this.succeeded = new HashSet<string>();
-            this.aborted = new HashSet<string>();
-            this.indoubt = new Dictionary<string, string>();
+            this.tuples = [];
+            this.succeeded = [];
+            this.aborted = [];
+            this.indoubt = [];
 
             // determine what to check for in the end
             this.tolerateUnknownExceptions = tolerateUnknownExceptions;
@@ -98,15 +98,15 @@ namespace Orleans.Transactions.TestKit.Consistency
                             {
                                 if (!tuples.TryGetValue(tuple.Grain, out var versions))
                                 {
-                                    tuples.Add(tuple.Grain, versions = new SortedDictionary<int, Dictionary<string, HashSet<string>>>());
+                                    tuples.Add(tuple.Grain, versions = []);
                                 }
                                 if (!versions.TryGetValue(tuple.SeqNo, out var writers))
                                 {
-                                    versions.Add(tuple.SeqNo, writers = new Dictionary<string, HashSet<string>>());
+                                    versions.Add(tuple.SeqNo, writers = []);
                                 }
                                 if (!writers.TryGetValue(tuple.WriterTx, out var readers))
                                 {
-                                    writers.Add(tuple.WriterTx, readers = new HashSet<string>());
+                                    writers.Add(tuple.WriterTx, readers = []);
                                 }
                                 readers.Add(tuple.ExecutingTx);
                             }
@@ -155,7 +155,7 @@ namespace Orleans.Transactions.TestKit.Consistency
                     true.Should().BeFalse(msg);
                 }
 
-                HashSet<string> readersOfPreviousVersion = new HashSet<string>();
+                HashSet<string> readersOfPreviousVersion = [];
                 
                 foreach (var seqnoKvp in grainKvp.Value)
                 {
@@ -191,12 +191,12 @@ namespace Orleans.Transactions.TestKit.Consistency
                         if (r != writer)
                         {
                             if (!orderEdges.TryGetValue(r, out var readedges))
-                                orderEdges[r] = readedges = new HashSet<string>();
+                                orderEdges[r] = readedges = [];
                             readedges.Add(writer);
                         }
 
                     if (!orderEdges.TryGetValue(writer, out var writeedges))
-                        orderEdges[writer] = writeedges = new HashSet<string>();
+                        orderEdges[writer] = writeedges = [];
 
                     foreach (var r in readers)
                         if (r != writer)

@@ -9,34 +9,34 @@ namespace UnitTests.StorageTests.Relational
         /// <summary>
         /// Latin-1 with characters only (no punctuation, numbers etc.).
         /// </summary>
-        public static IList<Range<int>> Latin1 { get; } = new List<Range<int>>(new[]
-        {
+        public static IList<Range<int>> Latin1 { get; } = new List<Range<int>>(
+        [
             new Range<int>(0x0041, 0x005A),
             new Range<int>(0x0061, 0x007A),
             new Range<int>(0x00C0, 0x00D6),
             new Range<int>(0x00D8, 0x00F6),
             new Range<int>(0x00F8, 0x00FF),
-        });
+        ]);
 
         /// <summary>
         /// Cyrillic character set.
         /// </summary>
-        public static IList<Range<int>> Cyrillic { get; } = new List<Range<int>>(new[] { new Range<int>(0x0400, 0x04FF) });
+        public static IList<Range<int>> Cyrillic { get; } = new List<Range<int>>([new Range<int>(0x0400, 0x04FF)]);
 
         /// <summary>
         /// Hebrew character set.
         /// </summary>
-        public static IList<Range<int>> Hebrew { get; } = new List<Range<int>>(new[] { new Range<int>(0x05D0, 0x05EA) });
+        public static IList<Range<int>> Hebrew { get; } = new List<Range<int>>([new Range<int>(0x05D0, 0x05EA)]);
 
         /// <summary>
         /// Unicode emoticons.
         /// </summary>
-        public static IList<Range<int>> Emoticons { get; } = new List<Range<int>>(new[] { new Range<int>(0x1F600, 0x1F64F) });
+        public static IList<Range<int>> Emoticons { get; } = new List<Range<int>>([new Range<int>(0x1F600, 0x1F64F)]);
 
         /// <summary>
         /// Dingbats characters.
         /// </summary>
-        public static IList<Range<int>> Dingbats { get; } = new List<Range<int>>(new[] { new Range<int>(0x2700, 0x27BF) });
+        public static IList<Range<int>> Dingbats { get; } = new List<Range<int>>([new Range<int>(0x2700, 0x27BF)]);
 
         /// <summary>
         /// The set of symbols as defined by this set.

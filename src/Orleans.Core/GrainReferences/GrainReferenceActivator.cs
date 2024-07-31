@@ -26,7 +26,7 @@ namespace Orleans.GrainReferences
         private readonly object _lockObj = new object();
         private readonly IServiceProvider _serviceProvider;
         private readonly IGrainReferenceActivatorProvider[] _providers;
-        private Dictionary<(GrainType, GrainInterfaceType), IGrainReferenceActivator> _activators = new();
+        private Dictionary<(GrainType, GrainInterfaceType), IGrainReferenceActivator> _activators = [];
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainReferenceActivator"/> class.
@@ -194,7 +194,7 @@ namespace Orleans.GrainReferences
         {
             _typeConverter = typeConverter;
             var proxyTypes = config.Value.InterfaceProxies;
-            _mapping = new Dictionary<GrainInterfaceType, Type>();
+            _mapping = [];
             foreach (var proxyType in proxyTypes)
             {
                 if (!typeof(IAddressable).IsAssignableFrom(proxyType))
@@ -364,10 +364,10 @@ namespace Orleans.GrainReferences
             {
                 _shared = shared;
 
-                var ctor = referenceType.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, new[] { typeof(GrainReferenceShared), typeof(IdSpan) })
+                var ctor = referenceType.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, [typeof(GrainReferenceShared), typeof(IdSpan)])
                     ?? throw new SerializerException("Invalid proxy type: " + referenceType);
 
-                var method = new DynamicMethod(referenceType.Name, typeof(GrainReference), new[] { typeof(object), typeof(GrainReferenceShared), typeof(IdSpan) });
+                var method = new DynamicMethod(referenceType.Name, typeof(GrainReference), [typeof(object), typeof(GrainReferenceShared), typeof(IdSpan)]);
                 var il = method.GetILGenerator();
                 // arg0 is unused for better delegate performance (avoids argument shuffling thunk)
                 il.Emit(OpCodes.Ldarg_1);

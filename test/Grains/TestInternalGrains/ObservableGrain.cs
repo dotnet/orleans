@@ -5,7 +5,7 @@ namespace UnitTests.Grains
 {
     public class ObservableGrain : Grain, IObservableGrain, IIncomingGrainCallFilter
     {
-        private readonly List<(string InterfaceName, string MethodName)> _localCalls = new();
+        private readonly List<(string InterfaceName, string MethodName)> _localCalls = [];
         private readonly Channel<string> _updates = Channel.CreateUnbounded<string>();
 
         public IAsyncEnumerable<string> GetValues() => _updates.Reader.ReadAllAsync();

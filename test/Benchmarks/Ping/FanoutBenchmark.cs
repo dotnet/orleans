@@ -14,7 +14,7 @@ namespace Benchmarks.Ping
     public class FanoutBenchmark : IDisposable
     {
         private readonly ConsoleCancelEventHandler _onCancelEvent;
-        private readonly List<IHost> hosts = new();
+        private readonly List<IHost> hosts = [];
         private readonly ITreeGrain grain;
         private readonly IClusterClient client;
         private readonly IHost clientHost;

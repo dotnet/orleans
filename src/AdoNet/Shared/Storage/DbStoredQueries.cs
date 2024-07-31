@@ -202,13 +202,15 @@ namespace Orleans.Tests.SqlUtils
                     string suspectingSilos = record.GetValueOrDefault<string>(nameof(Columns.SuspectTimes));
                     if (!string.IsNullOrWhiteSpace(suspectingSilos))
                     {
-                        entry.SuspectTimes = new List<Tuple<SiloAddress, DateTime>>();
-                        entry.SuspectTimes.AddRange(suspectingSilos.Split('|').Select(s =>
-                        {
-                            var split = s.Split(',');
-                            return new Tuple<SiloAddress, DateTime>(SiloAddress.FromParsableString(split[0]),
-                                LogFormatter.ParseDate(split[1]));
-                        }));
+                        entry.SuspectTimes =
+                        [
+                            .. suspectingSilos.Split('|').Select(s =>
+                            {
+                                var split = s.Split(',');
+                                return new Tuple<SiloAddress, DateTime>(SiloAddress.FromParsableString(split[0]),
+                                    LogFormatter.ParseDate(split[1]));
+                            }),
+                        ];
                     }
                 }
 

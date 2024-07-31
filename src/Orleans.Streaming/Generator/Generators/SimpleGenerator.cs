@@ -36,7 +36,7 @@ namespace Orleans.Providers.Streams.Generator
         /// </summary>
         public bool TryReadEvents(DateTime utcNow, int maxCount, out List<IBatchContainer> events)
         {
-            events = new List<IBatchContainer>();
+            events = [];
             if (sequenceId >= this.options.EventsInStream)
             {
                 return false;

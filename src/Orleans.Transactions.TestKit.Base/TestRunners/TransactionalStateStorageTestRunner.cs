@@ -49,7 +49,7 @@ namespace Orleans.Transactions.TestKit
             response.PendingStates.Should().BeEmpty();
         }
 
-        private static readonly List<PendingTransactionState<TState>> emptyPendingStates = new List<PendingTransactionState<TState>>();
+        private static readonly List<PendingTransactionState<TState>> emptyPendingStates = [];
   
         public virtual async Task StoreWithoutChanges()
         {
@@ -178,7 +178,7 @@ namespace Orleans.Transactions.TestKit
                 var r = new CommitRecord()
                 {
                     Timestamp = DateTime.UtcNow,
-                    WriteParticipants = new List<ParticipantId>(),
+                    WriteParticipants = [],
                 };
                 for (int i = 0; i < size; i++)
                 {
@@ -199,7 +199,7 @@ namespace Orleans.Transactions.TestKit
 
             var expectedState = this.stateFactory(123);
             var pendingstate = MakePendingState(1, expectedState, false);
-            _ = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate }, null, null);
+            _ = await stateStorage.Store(etag, metadata, [pendingstate], null, null);
 
             loadresponse = await stateStorage.Load();
             _ = loadresponse.ETag;
@@ -229,12 +229,12 @@ namespace Orleans.Transactions.TestKit
 
             if (useTwoSteps)
             {
-                etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate }, null, null);
+                etag = await stateStorage.Store(etag, metadata, [pendingstate], null, null);
                 _ = await stateStorage.Store(etag, metadata, emptyPendingStates, 1, null);
             }
             else
             {
-                _ = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate }, 1, null);
+                _ = await stateStorage.Store(etag, metadata, [pendingstate], 1, null);
             }
 
             loadresponse = await stateStorage.Load();
@@ -260,7 +260,7 @@ namespace Orleans.Transactions.TestKit
             
             var pendingstate = MakePendingState(1, this.stateFactory(123), false);
 
-            etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate }, null, null);
+            etag = await stateStorage.Store(etag, metadata, [pendingstate], null, null);
             _ = await stateStorage.Store(etag, metadata, emptyPendingStates, null, 0);
 
             loadresponse = await stateStorage.Load();
@@ -289,8 +289,8 @@ namespace Orleans.Transactions.TestKit
             var pendingstate1 = MakePendingState(1, expectedState1, false);
             var pendingstate2 = MakePendingState(1, expectedState2, false);
 
-            etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate1 }, null, null);
-            _ = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate2 }, null, null);
+            etag = await stateStorage.Store(etag, metadata, [pendingstate1], null, null);
+            _ = await stateStorage.Store(etag, metadata, [pendingstate2], null, null);
       
             loadresponse = await stateStorage.Load();
             _ = loadresponse.ETag;
@@ -320,7 +320,7 @@ namespace Orleans.Transactions.TestKit
             var pendingstate1 = MakePendingState(1, expectedState, false);
             var pendingstate2 = MakePendingState(2, this.stateFactory(456), false);
 
-            etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate1, pendingstate2 }, null, null);
+            etag = await stateStorage.Store(etag, metadata, [pendingstate1, pendingstate2], null, null);
 
             if (useTwoSteps)
             {
@@ -550,10 +550,10 @@ namespace Orleans.Transactions.TestKit
            
 
             // prepare 1,2,3a,4a
-            etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate1, pendingstate2, pendingstate3a, pendingstate4a}, null, null);
+            etag = await stateStorage.Store(etag, metadata, [pendingstate1, pendingstate2, pendingstate3a, pendingstate4a], null, null);
 
             // replace 3b,4b, prepare 5, 6, 7, 8 confirm 1, 2, 3b, 4b, 5, 6
-            _ = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate3b, pendingstate4b, pendingstate5, pendingstate6, pendingstate7, pendingstate8 }, 6, null);
+            _ = await stateStorage.Store(etag, metadata, [pendingstate3b, pendingstate4b, pendingstate5, pendingstate6, pendingstate7, pendingstate8], 6, null);
 
             loadresponse = await stateStorage.Load();
             _ = loadresponse.ETag;
@@ -601,10 +601,10 @@ namespace Orleans.Transactions.TestKit
 
 
             // prepare 1,2,3a,4a, 5, 6, 7, 8
-            etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate1, pendingstate2, pendingstate3a, pendingstate4a, pendingstate5, pendingstate6, pendingstate7, pendingstate8 }, null, null);
+            etag = await stateStorage.Store(etag, metadata, [pendingstate1, pendingstate2, pendingstate3a, pendingstate4a, pendingstate5, pendingstate6, pendingstate7, pendingstate8], null, null);
 
             // replace 3b,4b, confirm 1, 2, 3b, cancel 5, 6, 7, 8
-            _ = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate3b, pendingstate4b }, 3, 4);
+            _ = await stateStorage.Store(etag, metadata, [pendingstate3b, pendingstate4b], 3, 4);
 
             loadresponse = await stateStorage.Load();
             _ = loadresponse.ETag;

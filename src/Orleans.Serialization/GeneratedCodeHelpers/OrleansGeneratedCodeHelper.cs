@@ -25,7 +25,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         {
             private int _depth;
 
-            public List<object> Callers { get; } = new List<object>();
+            public List<object> Callers { get; } = [];
 
             public void Enter(object caller)
             {

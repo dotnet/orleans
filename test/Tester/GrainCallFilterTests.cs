@@ -316,7 +316,7 @@ namespace UnitTests.General
         {
             var grain = this.fixture.GrainFactory.GetGrain<IGrainCallFilterTestGrain>(0);
 
-            var result = await grain.SumSet(new HashSet<int> { 1, 2, 3 });
+            var result = await grain.SumSet([1, 2, 3]);
             Assert.Equal(6, result);
         }
 
@@ -559,7 +559,7 @@ namespace UnitTests.General
             var observer = new GrainCallFilterTestGrainObserver();
             var grain = this.fixture.GrainFactory.CreateObjectReference<IGrainCallFilterTestGrainObserver>(observer);
 
-            var result = await grain.SumSet(new HashSet<int> { 1, 2, 3 });
+            var result = await grain.SumSet([1, 2, 3]);
             Assert.Equal(6, result);
         }
 

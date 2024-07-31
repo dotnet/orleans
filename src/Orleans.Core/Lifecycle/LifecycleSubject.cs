@@ -31,7 +31,7 @@ namespace Orleans
         {
             if (logger == null) throw new ArgumentNullException(nameof(logger));
             this.logger = logger;
-            this.subscribers = new List<OrderedObserver>();
+            this.subscribers = [];
         }
 
         /// <summary>

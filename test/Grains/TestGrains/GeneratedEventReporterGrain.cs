@@ -19,7 +19,7 @@ namespace TestGrains
         {
             logger.LogInformation("OnActivateAsync");
 
-            reports = new Dictionary<Tuple<string, string>, Dictionary<Guid, int>>();
+            reports = [];
             return base.OnActivateAsync(cancellationToken);
         }
 
@@ -29,7 +29,7 @@ namespace TestGrains
             Tuple<string, string> key = Tuple.Create(streamProvider, streamNamespace);
             if (!reports.TryGetValue(key, out counts))
             {
-                counts = new Dictionary<Guid, int>();
+                counts = [];
                 reports[key] = counts;
             }
 
@@ -56,7 +56,7 @@ namespace TestGrains
 
         public Task Reset()
         {
-            reports = new Dictionary<Tuple<string, string>, Dictionary<Guid, int>>();
+            reports = [];
             return Task.CompletedTask;
         }
 

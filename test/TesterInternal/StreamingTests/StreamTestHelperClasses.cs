@@ -294,7 +294,7 @@ namespace UnitTests.StreamingTests
 
         private async Task BecomeConsumer(Guid streamId, string providerToUse)
         {
-            List<Task> tasks = new List<Task>();
+            List<Task> tasks = [];
             foreach (var target in _targets)
             {
                 Task t = target.BecomeConsumer(streamId, providerToUse, null);
@@ -554,7 +554,7 @@ namespace UnitTests.StreamingTests
             }
             await Task.WhenAll(tasks);
 
-            tasks = new List<Task>();
+            tasks = [];
             foreach (var i in _targets.Distinct())
             {
                 tasks.Add(i.VerifyFinished());

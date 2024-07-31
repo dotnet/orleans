@@ -74,7 +74,7 @@ namespace Orleans.AzureUtils
         {
             entry.Status = INSTANCE_STATUS_CREATED;
             logger.LogInformation((int)ErrorCode.Runtime_Error_100270, "Registering silo instance: {Data}", entry.ToString());
-            Task.WaitAll(new Task[] { storage.UpsertTableEntryAsync(entry) });
+            Task.WaitAll([storage.UpsertTableEntryAsync(entry)]);
         }
 
         public Task<string> UnregisterSiloInstance(SiloInstanceTableEntry entry)

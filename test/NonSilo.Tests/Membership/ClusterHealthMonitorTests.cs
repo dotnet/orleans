@@ -33,7 +33,7 @@ namespace NonSilo.Tests.Membership
         public ClusterHealthMonitorTests(ITestOutputHelper output)
         {
             this.output = output;
-            this.loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(this.output) });
+            this.loggerFactory = new LoggerFactory([new XunitLoggerProvider(this.output)]);
 
             this.localSiloDetails = Substitute.For<ILocalSiloDetails>();
             this.localSilo = Silo("127.0.0.1:100@100");
@@ -44,7 +44,7 @@ namespace NonSilo.Tests.Membership
             this.fatalErrorHandler = Substitute.For<IFatalErrorHandler>();
             this.membershipGossiper = Substitute.For<IMembershipGossiper>();
             this.lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
-            this.timers = new List<DelegateAsyncTimer>();
+            this.timers = [];
             this.timerCalls = new ConcurrentQueue<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)>();
             this.timerFactory = new DelegateAsyncTimerFactory(
                 (period, name) =>

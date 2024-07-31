@@ -41,7 +41,7 @@ namespace UnitTests.Grains
     {
         public PersistenceTestGrainState()
         {
-            SortedDict = new SortedDictionary<int, int>();
+            SortedDict = [];
         }
 
         [Id(0)]
@@ -584,7 +584,7 @@ namespace UnitTests.Grains
     {
         public UserState()
         {
-            Friends = new List<IUser>();
+            Friends = [];
         }
 
         [Id(0)]
@@ -675,8 +675,8 @@ namespace UnitTests.Grains
     {
         public StateForIReentrentGrain()
         {
-            DictOne = new Dictionary<string, int>();
-            DictTwo = new Dictionary<string, int>();
+            DictOne = [];
+            DictTwo = [];
         }
 
         [Id(0)]

@@ -25,7 +25,7 @@ namespace UnitTests.StorageTests.Relational
         /// The value will be <em>null</em> if environment invariants have failed to hold upon
         /// storage provider creation.
         /// </summary>
-        private Dictionary<string, IGrainStorage> StorageProviders { get; set; } = new Dictionary<string, IGrainStorage>();
+        private Dictionary<string, IGrainStorage> StorageProviders { get; set; } = [];
 
         /// <summary>
         /// This is used to lock the storage providers dictionary.

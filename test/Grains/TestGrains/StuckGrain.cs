@@ -8,9 +8,9 @@ namespace UnitTests.Grains
     public class StuckGrain : Grain, IStuckGrain
     {
         private static readonly ConcurrentDictionary<GrainId, bool> ActivationCalls = new();
-        private static readonly Dictionary<Guid, TaskCompletionSource<bool>> tcss = new Dictionary<Guid, TaskCompletionSource<bool>>();
-        private static readonly Dictionary<Guid, int> counters = new Dictionary<Guid, int>();
-        private static readonly HashSet<Guid> grains = new HashSet<Guid>();
+        private static readonly Dictionary<Guid, TaskCompletionSource<bool>> tcss = [];
+        private static readonly Dictionary<Guid, int> counters = [];
+        private static readonly HashSet<Guid> grains = [];
         private readonly ILogger<StuckGrain> _log;
         private bool isDeactivatingBlocking = false;
 

@@ -23,7 +23,7 @@ namespace Orleans.CodeGenerator
             GeneratedMethodId = CodeGenerator.CreateHashedMethodId(Method);
             MethodId = CodeGenerator.GetId(Method)?.ToString(CultureInfo.InvariantCulture) ?? CodeGenerator.GetAlias(Method) ?? GeneratedMethodId;
 
-            MethodTypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
+            MethodTypeParameters = [];
 
             // Set defaults from the interface type.
             var invokableBaseTypes = new Dictionary<INamedTypeSymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
@@ -95,8 +95,8 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            AllTypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
-            MethodTypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
+            AllTypeParameters = [];
+            MethodTypeParameters = [];
 
             var names = new HashSet<string>(StringComparer.Ordinal);
             foreach (var typeParameter in ContainingInterface.GetAllTypeParameters())
@@ -180,7 +180,7 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// Gets the list of custom initializer method names and their corresponding argument.
         /// </summary>
-        public List<(string MethodName, TypedConstant MethodArgument)> CustomInitializerMethods { get; } = new();
+        public List<(string MethodName, TypedConstant MethodArgument)> CustomInitializerMethods { get; } = [];
 
         /// <summary>
         /// Gets the generated method identifier.

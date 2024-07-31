@@ -170,7 +170,7 @@ namespace Orleans
 
         public MembershipTableData(Tuple<MembershipEntry, string> tuple, TableVersion version)
         {
-            Members = new[] { tuple };
+            Members = [tuple];
             Version = version;
         }
 
@@ -308,7 +308,7 @@ namespace Orleans
 
         public void AddOrUpdateSuspector(SiloAddress localSilo, DateTime voteTime, int maxVotes)
         {
-            var allVotes = SuspectTimes ??= new List<Tuple<SiloAddress, DateTime>>();
+            var allVotes = SuspectTimes ??= [];
 
             // Find voting place:
             //      update my vote, if I voted previously
@@ -343,7 +343,7 @@ namespace Orleans
         }
 
         public void AddSuspector(SiloAddress suspectingSilo, DateTime suspectingTime)
-            => (SuspectTimes ??= new()).Add(Tuple.Create(suspectingSilo, suspectingTime));
+            => (SuspectTimes ??= []).Add(Tuple.Create(suspectingSilo, suspectingTime));
 
         internal MembershipEntry Copy()
         {

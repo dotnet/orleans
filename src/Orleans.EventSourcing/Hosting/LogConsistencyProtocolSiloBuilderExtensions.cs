@@ -13,8 +13,8 @@ namespace Orleans.Hosting
         {
             services.TryAddSingleton<Factory<IGrainContext, ILogConsistencyProtocolServices>>(serviceProvider =>
             {
-                var factory = ActivatorUtilities.CreateFactory(typeof(ProtocolServices), new[] { typeof(IGrainContext) });
-                return arg1 => (ILogConsistencyProtocolServices)factory(serviceProvider, new object[] { arg1 });
+                var factory = ActivatorUtilities.CreateFactory(typeof(ProtocolServices), [typeof(IGrainContext)]);
+                return arg1 => (ILogConsistencyProtocolServices)factory(serviceProvider, [arg1]);
             });
 
             return services;

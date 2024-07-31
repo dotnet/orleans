@@ -20,7 +20,7 @@ namespace UnitTests.OrleansRuntime
         public async Task AsyncSerialExecutorTests_Small()
         {
             AsyncSerialExecutor executor = new AsyncSerialExecutor();
-            List<Task> tasks = new List<Task>();
+            List<Task> tasks = [];
             operationsInProgress = 0;
 
             tasks.Add(executor.AddNext(() => Operation(1)));
@@ -34,7 +34,7 @@ namespace UnitTests.OrleansRuntime
         public async Task AsyncSerialExecutorTests_SerialSubmit()
         {
             AsyncSerialExecutor executor = new AsyncSerialExecutor();
-            List<Task> tasks = new List<Task>();
+            List<Task> tasks = [];
             for (int i = 0; i < 10; i++)
             {
                 int capture = i;
@@ -49,7 +49,7 @@ namespace UnitTests.OrleansRuntime
         {
             AsyncSerialExecutor executor = new AsyncSerialExecutor();
             ConcurrentStack<Task> tasks = new ConcurrentStack<Task>();
-            List<Task> enqueueTasks = new List<Task>();
+            List<Task> enqueueTasks = [];
             for (int i = 0; i < 10; i++)
             {
                 int capture = i;

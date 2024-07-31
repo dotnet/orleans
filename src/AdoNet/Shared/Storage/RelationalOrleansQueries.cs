@@ -37,11 +37,11 @@ namespace Orleans.Tests.SqlUtils
         /// When inserting statistics and generating a batch insert clause, these are the columns in the statistics
         /// table that will be updated with multiple values. The other ones are updated with one value only.
         /// </summary>
-        private static readonly string[] InsertStatisticsMultiupdateColumns = {
+        private static readonly string[] InsertStatisticsMultiupdateColumns = [
             DbStoredQueries.Columns.IsValueDelta,
             DbStoredQueries.Columns.StatValue,
             DbStoredQueries.Columns.Statistic
-        };
+        ];
 
         /// <summary>
         /// the orleans functional queries

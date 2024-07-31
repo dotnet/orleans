@@ -30,8 +30,8 @@ namespace Orleans.CodeGenerator
             Method = method;
             ProxyInterface = proxyInterface;
 
-            TypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
-            MethodTypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
+            TypeParameters = [];
+            MethodTypeParameters = [];
 
             TypeParametersWithArguments = Method.ContainingType.GetAllTypeParameters().Zip(method.ContainingType.GetAllTypeArguments(), (a, b) => (a, b)).ToImmutableArray();
             var names = new HashSet<string>(StringComparer.Ordinal);

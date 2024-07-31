@@ -15,8 +15,8 @@ namespace Orleans.GrainDirectory.Cosmos;
 internal static class CosmosIdSanitizer
 {
     private const char EscapeChar = '~';
-    private static ReadOnlySpan<char> SanitizedCharacters => new[] { '/', '\\', '?', '#', SeparatorChar, EscapeChar };
-    private static ReadOnlySpan<char> ReplacementCharacters => new[] { '0', '1', '2', '3', '4', '5' };
+    private static ReadOnlySpan<char> SanitizedCharacters => ['/', '\\', '?', '#', SeparatorChar, EscapeChar];
+    private static ReadOnlySpan<char> ReplacementCharacters => ['0', '1', '2', '3', '4', '5'];
 
     public const char SeparatorChar = '_';
 

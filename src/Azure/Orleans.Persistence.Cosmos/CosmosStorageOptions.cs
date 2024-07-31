@@ -26,7 +26,7 @@ public class CosmosGrainStorageOptions : CosmosOptions
     /// Each entry on this list represents a property in the State Object that will be included in the document index.
     /// The default is to not add any property in the State object.
     /// </summary>
-    public List<string> StateFieldsToIndex { get; set; } = new();
+    public List<string> StateFieldsToIndex { get; set; } = [];
 
     public string PartitionKeyPath { get; set; } = DEFAULT_PARTITION_KEY_PATH;
 

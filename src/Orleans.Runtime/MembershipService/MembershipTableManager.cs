@@ -474,7 +474,7 @@ namespace Orleans.Runtime.MembershipService
 
                 RoleName = RoleName,
 
-                SuspectTimes = new List<Tuple<SiloAddress, DateTime>>(),
+                SuspectTimes = [],
                 StartTime = this.siloStartTime,
                 IAmAliveTime = GetDateTimeUtcNow()
             };
@@ -772,7 +772,7 @@ namespace Orleans.Runtime.MembershipService
             }
 
             // Try to add our vote to the list and tally the fresh votes again.
-            var prevList = entry.SuspectTimes?.ToList() ?? new List<Tuple<SiloAddress, DateTime>>();
+            var prevList = entry.SuspectTimes?.ToList() ?? [];
             entry.AddOrUpdateSuspector(myAddress, now, clusterMembershipOptions.NumVotesForDeathDeclaration);
             freshVotes = entry.GetFreshVotes(now, this.clusterMembershipOptions.DeathVoteExpirationTimeout);
 

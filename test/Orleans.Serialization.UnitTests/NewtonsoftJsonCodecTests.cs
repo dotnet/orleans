@@ -24,15 +24,15 @@ namespace Orleans.Serialization.UnitTests
 
         protected override MyNewtonsoftJsonClass CreateValue() => new MyNewtonsoftJsonClass { IntProperty = 30, SubTypeProperty = "hello" };
 
-        protected override int[] MaxSegmentSizes => new[] { 840 };
+        protected override int[] MaxSegmentSizes => [840];
 
-        protected override MyNewtonsoftJsonClass[] TestValues => new MyNewtonsoftJsonClass[]
-        {
+        protected override MyNewtonsoftJsonClass[] TestValues =>
+        [
             null,
             new MyNewtonsoftJsonClass(),
             new MyNewtonsoftJsonClass() { IntProperty = 150, SubTypeProperty = new string('c', 20) },
             new MyNewtonsoftJsonClass() { IntProperty = -150_000, SubTypeProperty = new string('c', 4097) },
-        };
+        ];
 
         [Fact]
         public void NewtonsoftJsonDeepCopyTyped()
@@ -108,13 +108,13 @@ namespace Orleans.Serialization.UnitTests
 
         protected override MyNewtonsoftJsonClass CreateValue() => new MyNewtonsoftJsonClass { IntProperty = 30, SubTypeProperty = "hello" };
 
-        protected override MyNewtonsoftJsonClass[] TestValues => new MyNewtonsoftJsonClass[]
-        {
+        protected override MyNewtonsoftJsonClass[] TestValues =>
+        [
             null,
             new MyNewtonsoftJsonClass(),
             new MyNewtonsoftJsonClass() { IntProperty = 150, SubTypeProperty = new string('c', 20) },
             new MyNewtonsoftJsonClass() { IntProperty = -150_000, SubTypeProperty = new string('c', 4097) },
-        };
+        ];
 
         [Fact]
         public void CanCopyNativeJsonTypes()

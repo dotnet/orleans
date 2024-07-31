@@ -17,7 +17,7 @@ namespace UnitTests.StorageTests.Relational
         {
             //This way of using the hasher is like ADO.NET Storage provider would use it. This tests
             //the hasher is thread safe.
-            var adonetDefaultHasher = new StorageHasherPicker(new[] { new OrleansDefaultHasher() });
+            var adonetDefaultHasher = new StorageHasherPicker([new OrleansDefaultHasher()]);
             const int TestGrainHash = -201809205;
             var grainType = "Grains.PersonGrain";
             Parallel.For(0, 1000000, i =>
@@ -58,7 +58,7 @@ namespace UnitTests.StorageTests.Relational
 
             //AdoGrainKey helper class splits the grain key and extension key using character '#'.
             //The key and its extension are the two distinct elements.
-            var grainKeys = longGrainIdWitExtensionAsString.Split(new[] { "#" }, StringSplitOptions.RemoveEmptyEntries);
+            var grainKeys = longGrainIdWitExtensionAsString.Split(["#"], StringSplitOptions.RemoveEmptyEntries);
             Assert.Equal(2, grainKeys.Length);
 
             Assert.Equal(grainKeys[0], LongGrainId.ToString(CultureInfo.InvariantCulture));

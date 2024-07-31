@@ -553,9 +553,9 @@ namespace Orleans.Runtime.GrainDirectory
 
                 if (forwardAddress != null)
                 {
-                    forward ??= new();
+                    forward ??= [];
                     if (!forward.TryGetValue(forwardAddress, out var list))
-                        forward[forwardAddress] = list = new();
+                        forward[forwardAddress] = list = [];
                     list.Add(address);
                 }
                 else

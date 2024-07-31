@@ -221,7 +221,7 @@ namespace Orleans
                         // Try to work out the best primary implementation
                         result.TryGetValue(implemented, out var entry);
 
-                        var implementations = entry.Implementations ?? new List<(string Prefix, GrainType GrainType)>();
+                        var implementations = entry.Implementations ?? [];
                         if (!implementations.Contains((fullTypeName, id))) implementations.Add((fullTypeName, id));
 
                         GrainType primaryImplementation;

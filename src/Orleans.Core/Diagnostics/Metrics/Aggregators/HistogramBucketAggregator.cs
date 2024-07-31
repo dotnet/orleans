@@ -14,7 +14,7 @@ internal class HistogramBucketAggregator
 
     public HistogramBucketAggregator(KeyValuePair<string, object>[] tags, long bound, KeyValuePair<string, object> label)
     {
-        _tags = tags.Concat(new[] { label }).ToArray();
+        _tags = tags.Concat([label]).ToArray();
         Bound = bound;
     }
 

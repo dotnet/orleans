@@ -23,7 +23,7 @@ namespace UnitTests.Directory
         public DhtGrainLocatorTests(ITestOutputHelper output)
         {
             this.output = output;
-            this.loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(output) });
+            this.loggerFactory = new LoggerFactory([new XunitLoggerProvider(output)]);
             this.rootContext = UnitTestSchedulingContext.Create(loggerFactory);
             this.localGrainDirectory = new MockLocalGrainDirectory(
                 TimeSpan.FromMilliseconds(100),

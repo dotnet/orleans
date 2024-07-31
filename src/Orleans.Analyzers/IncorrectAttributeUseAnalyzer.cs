@@ -51,7 +51,7 @@ public class IncorrectAttributeUseAnalyzer : DiagnosticAnalyzer
             context.ReportDiagnostic(Diagnostic.Create(
                 descriptor: Rule,
                 location: attribute.GetLocation(),
-                messageArgs: new object[] { attributeTypeName }));
+                messageArgs: [attributeTypeName]));
         }
     }
 }

@@ -375,7 +375,7 @@ namespace UnitTests.Grains
             IReentrantTaskGrain[] fanOutGrains = await InitTaskGrains_Reentrant(offset, num);
 
             logger.LogInformation("Starting fan-out calls to {Count} grains", num);
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             for (int i = 0; i < num; i++)
             {
                 //Task promise = fanOutGrains[i].Ping(OneSecond);
@@ -392,7 +392,7 @@ namespace UnitTests.Grains
             INonReentrantTaskGrain[] fanOutGrains = await InitTaskGrains_NonReentrant(offset, num);
 
             logger.LogInformation("Starting fan-out calls to {Count} grains", num);
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             for (int i = 0; i < num; i++)
             {
                 //Task promise = fanOutGrains[i].Ping(OneSecond);
@@ -409,7 +409,7 @@ namespace UnitTests.Grains
             IReentrantTaskGrain[] fanOutGrains = await InitTaskGrains_Reentrant(offset, num);
 
             logger.LogInformation("Starting fan-out chain calls to {Count} grains", num);
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             for (int i = 0; i < num; i++)
             {
                 Task promise = fanOutGrains[i].Ping(OneSecond);
@@ -425,7 +425,7 @@ namespace UnitTests.Grains
             INonReentrantTaskGrain[] fanOutGrains = await InitTaskGrains_NonReentrant(offset, num);
 
             logger.LogInformation("Starting fan-out chain calls to {Count} grains", num);
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             for (int i = 0; i < num; i++)
             {
                 Task promise = fanOutGrains[i].Ping(OneSecond);
@@ -441,7 +441,7 @@ namespace UnitTests.Grains
             IReentrantTaskGrain[] fanOutGrains = new IReentrantTaskGrain[num];
 
             logger.LogInformation("Creating {Count} fan-out reentrant worker grains", num);
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             for (int i = 0; i < num; i++)
             {
                 int idx = offset + i;
@@ -459,7 +459,7 @@ namespace UnitTests.Grains
             INonReentrantTaskGrain[] fanOutGrains = new INonReentrantTaskGrain[num];
 
             logger.LogInformation("Creating {Count} fan-out non-reentrant worker grains", num);
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             for (int i = 0; i < num; i++)
             {
                 int idx = offset + i;
@@ -495,7 +495,7 @@ namespace UnitTests.Grains
             IReentrantSelfManagedGrain[] fanOutGrains = await InitACGrains_Reentrant(offset, num);
 
             logger.LogInformation("Starting fan-out calls to {Count} grains", num);
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             for (int i = 0; i < num; i++)
             {
                 Task promise = fanOutGrains[i].GetCounter();
@@ -511,7 +511,7 @@ namespace UnitTests.Grains
             INonReentrantSelfManagedGrain[] fanOutGrains = await InitACGrains_NonReentrant(offset, num);
 
             logger.LogInformation("Starting fan-out calls to {Count} grains", num);
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             for (int i = 0; i < num; i++)
             {
                 Task promise = fanOutGrains[i].GetCounter();
@@ -527,7 +527,7 @@ namespace UnitTests.Grains
             IReentrantSelfManagedGrain[] fanOutGrains = await InitACGrains_Reentrant(offset, num);
 
             logger.LogInformation("Starting fan-out calls to {Count} grains", num);
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             for (int i = 0; i < num; i++)
             {
                 Task promise = fanOutGrains[i].Ping(OneSecond.Seconds);
@@ -543,7 +543,7 @@ namespace UnitTests.Grains
             INonReentrantSelfManagedGrain[] fanOutGrains = await InitACGrains_NonReentrant(offset, num);
 
             logger.LogInformation("Starting fan-out calls to {Count} grains", num);
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             for (int i = 0; i < num; i++)
             {
                 Task promise = fanOutGrains[i].Ping(OneSecond.Seconds);
@@ -557,7 +557,7 @@ namespace UnitTests.Grains
         private async Task<IReentrantSelfManagedGrain[]> InitACGrains_Reentrant(int offset, int num)
         {
             var fanOutGrains = new IReentrantSelfManagedGrain[num];
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             logger.LogInformation("Creating {Count} fan-out reentrant worker grains with offset={Offset}", num, offset);
             for (int i = 0; i < num; i++)
             {
@@ -575,7 +575,7 @@ namespace UnitTests.Grains
         private async Task<INonReentrantSelfManagedGrain[]> InitACGrains_NonReentrant(int offset, int num)
         {
             var fanOutGrains = new INonReentrantSelfManagedGrain[num];
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             logger.LogInformation("Creating {Count} fan-out non-reentrant worker grains with offset={offset}", num, offset);
             for (int i = 0; i < num; i++)
             {

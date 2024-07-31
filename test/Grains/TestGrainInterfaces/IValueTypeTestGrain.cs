@@ -75,7 +75,7 @@ namespace UnitTests.GrainInterfaces
         public LargeTestData()
         {
             boolArray = new bool[20];
-            stringIntDict = new Dictionary<string, int>();
+            stringIntDict = [];
             classArray = new ClassWithEnumTestData[50];
             for (var i = 0; i < 50; i++)
             {

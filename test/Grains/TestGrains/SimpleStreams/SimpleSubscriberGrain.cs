@@ -19,8 +19,8 @@ namespace UnitTests.Grains.BroadcastChannel
 
     public abstract class SubscriberGrainBase : Grain, ISubscriberGrain, IOnBroadcastChannelSubscribed
     {
-        private readonly Dictionary<ChannelId, List<int>> _values = new();
-        private readonly Dictionary<ChannelId, List<Exception>> _errors = new();
+        private readonly Dictionary<ChannelId, List<int>> _values = [];
+        private readonly Dictionary<ChannelId, List<Exception>> _errors = [];
         private int _onPublishedCounter = 0;
         private bool _throwsOnReceive = false;
 
@@ -42,7 +42,7 @@ namespace UnitTests.Grains.BroadcastChannel
                 }
                 if (!_values.TryGetValue(id, out var values))
                 {
-                    _values[id] = values = new List<int>();
+                    _values[id] = values = [];
                 }
                 values.Add(item);
                 return Task.CompletedTask;
@@ -52,7 +52,7 @@ namespace UnitTests.Grains.BroadcastChannel
             {
                 if (!_errors.TryGetValue(id, out var errors))
                 {
-                    _errors[id] = errors = new List<Exception>();
+                    _errors[id] = errors = [];
                 }
                 errors.Add(ex);
                 return Task.CompletedTask;

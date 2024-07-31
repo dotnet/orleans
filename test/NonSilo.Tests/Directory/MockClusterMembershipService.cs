@@ -21,7 +21,7 @@ namespace UnitTests.Directory
 
         public MockClusterMembershipService(Dictionary<SiloAddress, (SiloStatus Status, string Name)> initialStatuses = null)
         {
-            this.statuses = initialStatuses ?? new Dictionary<SiloAddress, (SiloStatus Status, string Name)>();
+            this.statuses = initialStatuses ?? [];
             this.snapshot = ToSnapshot(this.statuses, ++version);
             this.updates = new AsyncEnumerable<ClusterMembershipSnapshot>(
                 initialValue: this.snapshot,

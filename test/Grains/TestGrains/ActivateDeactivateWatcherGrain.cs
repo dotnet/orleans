@@ -7,8 +7,8 @@ namespace UnitTests.Grains
     {
         private readonly ILogger logger;
 
-        private readonly List<string> activationCalls = new List<string>();
-        private readonly List<string> deactivationCalls = new List<string>();
+        private readonly List<string> activationCalls = [];
+        private readonly List<string> deactivationCalls = [];
 
         public ActivateDeactivateWatcherGrain(ILogger<ActivateDeactivateWatcherGrain> logger)
         {

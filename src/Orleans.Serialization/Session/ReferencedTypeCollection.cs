@@ -10,8 +10,8 @@ namespace Orleans.Serialization.Session
     /// </summary>
     public sealed class ReferencedTypeCollection
     {
-        private readonly Dictionary<uint, Type> _referencedTypes = new();
-        private readonly Dictionary<Type, uint> _referencedTypeToIdMap = new();
+        private readonly Dictionary<uint, Type> _referencedTypes = [];
+        private readonly Dictionary<Type, uint> _referencedTypeToIdMap = [];
 
         private uint _currentReferenceId;
 

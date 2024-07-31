@@ -33,7 +33,7 @@ namespace UnitTests.Grains
 
         public StreamLifecycleTestGrainState()
         {
-            ConsumerSubscriptionHandles = new HashSet<StreamSubscriptionHandle<int>>();
+            ConsumerSubscriptionHandles = [];
         }
     }
 

@@ -187,7 +187,7 @@ namespace Orleans.Runtime.MembershipService
 
             async Task<List<SiloAddress>> CheckClusterConnectivity(SiloAddress[] members)
             {
-                if (members.Length == 0) return new List<SiloAddress>();
+                if (members.Length == 0) return [];
 
                 var tasks = new List<Task<bool>>(members.Length);
 

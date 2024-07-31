@@ -12,7 +12,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         private IDisposable producerTimer;
         internal ILogger logger;
         private static readonly TimeSpan defaultFirePeriod = TimeSpan.FromMilliseconds(10);
-        private readonly List<Exception> producerExceptions = new();
+        private readonly List<Exception> producerExceptions = [];
 
         public TypedProducerGrain(ILoggerFactory loggerFactory)
         {

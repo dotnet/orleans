@@ -19,7 +19,7 @@ namespace Orleans.Runtime;
 internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExtension, IAsyncDisposable, IDisposable
 {
     private const long EnumeratorExpirationMilliseconds = 10_000; 
-    private readonly Dictionary<Guid, EnumeratorState> _enumerators = new();
+    private readonly Dictionary<Guid, EnumeratorState> _enumerators = [];
     private readonly IGrainContext _grainContext;
     private readonly MessagingOptions _messagingOptions;
     private readonly IDisposable _timer;
@@ -65,7 +65,7 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
             if (state.LastSeenTimer.ElapsedMilliseconds > EnumeratorExpirationMilliseconds
                 && state.MoveNextTask is null or { IsCompleted: true })
             {
-                toRemove ??= new List<Guid>();
+                toRemove ??= [];
                 toRemove.Add(requestId);
             }
         }
@@ -80,7 +80,7 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
                 var disposeTask = state.Enumerator.DisposeAsync();
                 if (!disposeTask.IsCompletedSuccessfully)
                 {
-                    tasks ??= new List<Task>();
+                    tasks ??= [];
                     tasks.Add(disposeTask.AsTask());
                 }
             }

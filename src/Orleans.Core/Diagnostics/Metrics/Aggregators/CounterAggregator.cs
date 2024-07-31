@@ -22,34 +22,34 @@ internal sealed class CounterAggregator
         }
         else if (tagList.Name2 == null)
         {
-            _tags = new[] { new KeyValuePair<string, object>(tagList.Name1, tagList.Value1) };
+            _tags = [new KeyValuePair<string, object>(tagList.Name1, tagList.Value1)];
         }
         else if (tagList.Name3 == null)
         {
-            _tags = new[]
-            {
+            _tags =
+            [
                 new KeyValuePair<string, object>(tagList.Name1, tagList.Value1),
                 new KeyValuePair<string, object>(tagList.Name2, tagList.Value2)
-            };
+            ];
         }
         else if (tagList.Name4 == null)
         {
-            _tags = new[]
-            {
+            _tags =
+            [
                 new KeyValuePair<string, object>(tagList.Name1, tagList.Value1),
                 new KeyValuePair<string, object>(tagList.Name2, tagList.Value2),
                 new KeyValuePair<string, object>(tagList.Name3, tagList.Value3)
-            };
+            ];
         }
         else
         {
-            _tags = new[]
-            {
+            _tags =
+            [
                 new KeyValuePair<string, object>(tagList.Name1, tagList.Value1),
                 new KeyValuePair<string, object>(tagList.Name2, tagList.Value2),
                 new KeyValuePair<string, object>(tagList.Name3, tagList.Value3),
                 new KeyValuePair<string, object>(tagList.Name4, tagList.Value4)
-            };
+            ];
         }
     }
 

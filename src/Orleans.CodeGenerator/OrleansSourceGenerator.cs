@@ -38,22 +38,22 @@ namespace Orleans.CodeGenerator
                 var options = new CodeGeneratorOptions();
                 if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_immutableattributes", out var immutableAttributes) && immutableAttributes is { Length: > 0 })
                 {
-                    options.ImmutableAttributes.AddRange(immutableAttributes.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).ToList());
+                    options.ImmutableAttributes.AddRange([.. immutableAttributes.Split([ ';' ], StringSplitOptions.RemoveEmptyEntries)]);
                 }
 
                 if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_aliasattributes", out var aliasAttributes) && aliasAttributes is { Length: > 0 })
                 {
-                    options.AliasAttributes.AddRange(aliasAttributes.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).ToList());
+                    options.AliasAttributes.AddRange([.. aliasAttributes.Split([ ';' ], StringSplitOptions.RemoveEmptyEntries)]);
                 }
 
                 if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_idattributes", out var idAttributes) && idAttributes is { Length: > 0 })
                 {
-                    options.IdAttributes.AddRange(idAttributes.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).ToList());
+                    options.IdAttributes.AddRange([.. idAttributes.Split([ ';' ], StringSplitOptions.RemoveEmptyEntries)]);
                 }
 
                 if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_generateserializerattributes", out var generateSerializerAttributes) && generateSerializerAttributes is { Length: > 0 })
                 {
-                    options.GenerateSerializerAttributes.AddRange(generateSerializerAttributes.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).ToList());
+                    options.GenerateSerializerAttributes.AddRange([.. generateSerializerAttributes.Split([ ';' ], StringSplitOptions.RemoveEmptyEntries)]);
                 }
 
                 if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_generatefieldids", out var generateFieldIds) && generateFieldIds is { Length: > 0 })

@@ -9,7 +9,7 @@ public class HistogramAggregatorTests
     public void CollectBuckets()
     {
         var bounds = new long[] { 1, 3, 5, 8, 13 };
-        var aggregator = new HistogramAggregator(bounds, new[] { new KeyValuePair<string, object>("foo", "bar") }, bound => new("le", bound));
+        var aggregator = new HistogramAggregator(bounds, [new KeyValuePair<string, object>("foo", "bar")], bound => new("le", bound));
         aggregator.Record(0);
         aggregator.Record(2);
         aggregator.Record(5);

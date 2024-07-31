@@ -11,10 +11,10 @@ namespace Orleans.Connections.Security
     {
         internal SslClientAuthenticationOptions Value { get; } = new SslClientAuthenticationOptions
         {
-            ApplicationProtocols = new List<SslApplicationProtocol>
-            {
+            ApplicationProtocols =
+            [
                 OrleansApplicationProtocol.Orleans1
-            }
+            ]
         };
 
         public ClientCertificateSelectionCallback LocalCertificateSelectionCallback

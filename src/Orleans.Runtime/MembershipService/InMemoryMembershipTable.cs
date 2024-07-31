@@ -18,7 +18,7 @@ namespace Orleans.Runtime.MembershipService
         public InMemoryMembershipTable(DeepCopier deepCopier)
         {
             this.deepCopier = deepCopier;
-            siloTable = new Dictionary<SiloAddress, Tuple<MembershipEntry, string>>();
+            siloTable = [];
             lastETagCounter = 0;
             tableVersion = new TableVersion(0, NewETag());
         }

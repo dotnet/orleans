@@ -6,7 +6,7 @@ namespace BenchmarkGrains.MapReduce
     [Orleans.GenerateSerializer]
     public class MapProcessor : ITransformProcessor<string, List<string>>
     {
-        private static readonly char[] _delimiters = { '.', '?', '!', ' ', ';', ':', ',' };
+        private static readonly char[] _delimiters = ['.', '?', '!', ' ', ';', ':', ','];
 
         public List<string> Process(string input)
         {

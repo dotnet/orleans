@@ -62,7 +62,7 @@ namespace Orleans.CodeGenerator
 
             var isExceptionType = type.IsExceptionType && type.SerializationHooks.Count == 0;
 
-            var baseType = isExceptionType ? QualifiedName(AliasQualifiedName("global", IdentifierName("Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper")), GenericName(Identifier("ExceptionCopier"), TypeArgumentList(SeparatedList(new[] { type.TypeSyntax, type.BaseType.ToTypeSyntax() }))))
+            var baseType = isExceptionType ? QualifiedName(AliasQualifiedName("global", IdentifierName("Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper")), GenericName(Identifier("ExceptionCopier"), TypeArgumentList(SeparatedList([type.TypeSyntax, type.BaseType.ToTypeSyntax()]))))
                 : (isShallowCopyable ? LibraryTypes.ShallowCopier : LibraryTypes.DeepCopier_1).ToTypeSyntax(type.TypeSyntax);
 
             var classDeclaration = ClassDeclaration(simpleClassName)
@@ -162,7 +162,7 @@ namespace Orleans.CodeGenerator
 
                         var copier = InvocationExpression(
                             IdentifierName("OrleansGeneratedCodeHelper").Member(GenericName(Identifier("GetService"), TypeArgumentList(SingletonSeparatedList(field.FieldType)))),
-                            ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(IdentifierName("codecProvider")) })));
+                            ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(IdentifierName("codecProvider"))])));
 
                         statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), copier)));
                         break;
@@ -179,7 +179,7 @@ namespace Orleans.CodeGenerator
             {
                 return InvocationExpression(
                     IdentifierName("OrleansGeneratedCodeHelper").Member("UnwrapService"),
-                    ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(expr) })));
+                    ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(expr)])));
             }
         }
 
@@ -397,7 +397,7 @@ skip:;
                 {
                     // C#: DeepCopy(original, result, context);
                     body.Add(ExpressionStatement(InvocationExpression(IdentifierName("DeepCopy"),
-                        ArgumentList(SeparatedList(new[] { Argument(originalParam), Argument(resultVar), Argument(contextParam) })))));
+                        ArgumentList(SeparatedList([Argument(originalParam), Argument(resultVar), Argument(contextParam)])))));
                     body.Add(ReturnStatement(resultVar));
                     membersCopied = true;
                 }
@@ -576,7 +576,7 @@ skip:;
             {
                 getValueExpression = InvocationExpression(
                     copyContextVar.Member(DeepCopyMethodName),
-                    ArgumentList(SeparatedList(new[] { Argument(inputValue) })));
+                    ArgumentList(SeparatedList([Argument(inputValue)])));
             }
             else
             {
@@ -594,7 +594,7 @@ skip:;
 
                 getValueExpression = InvocationExpression(
                     copierExpression.Member(DeepCopyMethodName),
-                    ArgumentList(SeparatedList(new[] { Argument(inputValue), Argument(copyContextVar) })));
+                    ArgumentList(SeparatedList([Argument(inputValue), Argument(copyContextVar)])));
                 if (!SymbolEqualityComparer.Default.Equals(copier.UnderlyingType, member.Member.Type))
                 {
                     // If the member type type differs from the copier type (eg because the member is an array), cast the result.
@@ -631,7 +631,7 @@ skip:;
 
                 body.Add(ExpressionStatement(InvocationExpression(
                     IdentifierName($"_hook{hookIndex}").Member(callbackMethodName),
-                    ArgumentList(SeparatedList(new[] { originalArgument, resultArgument })))));
+                    ArgumentList(SeparatedList([originalArgument, resultArgument])))));
             }
         }
 

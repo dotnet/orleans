@@ -33,8 +33,8 @@ namespace Orleans.Serialization.TypeSystem
         private readonly Dictionary<QualifiedType, QualifiedType> _wellKnownTypeToAlias;
         private readonly ConcurrentDictionary<QualifiedType, bool> _allowedTypes;
         private readonly HashSet<string> _allowedTypesConfiguration;
-        private static readonly List<(string DisplayName, string RuntimeName)> WellKnownTypeAliases = new()
-        {
+        private static readonly List<(string DisplayName, string RuntimeName)> WellKnownTypeAliases =
+        [
             ("object", "System.Object"),
             ("string", "System.String"),
             ("char", "System.Char"),
@@ -55,7 +55,7 @@ namespace Orleans.Serialization.TypeSystem
             ("DateTime", "System.DateTime"),
             ("DateTimeOffset", "System.DateTimeOffset"),
             ("Type", "System.Type"),
-        };
+        ];
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TypeConverter"/> class.
@@ -82,8 +82,8 @@ namespace Orleans.Serialization.TypeSystem
             _convertFromDisplayName = ConvertFromDisplayName;
             _compoundAliasResolver = ResolveCompoundAliasType;
 
-            _wellKnownAliasToType = new Dictionary<QualifiedType, QualifiedType>();
-            _wellKnownTypeToAlias = new Dictionary<QualifiedType, QualifiedType>();
+            _wellKnownAliasToType = [];
+            _wellKnownTypeToAlias = [];
 
             _allowedTypes = new ConcurrentDictionary<QualifiedType, bool>(QualifiedType.EqualityComparer);
             _allowedTypesConfiguration = new(StringComparer.Ordinal);
@@ -429,7 +429,7 @@ namespace Orleans.Serialization.TypeSystem
             if (IsNameTypeAllowed(input) is bool allowed)
             {
                 var newAllowed = allowed && (state.IsTypeNameAllowed ?? true);
-                var newErrorList = state.ErrorTypes ?? new List<QualifiedType>();
+                var newErrorList = state.ErrorTypes ?? [];
                 if (!allowed)
                 {
                     newErrorList.Add(input);

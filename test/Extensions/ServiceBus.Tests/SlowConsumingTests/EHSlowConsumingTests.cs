@@ -99,8 +99,8 @@ namespace ServiceBus.Tests.SlowConsumingTests
 
         public static async Task<List<ISampleStreaming_ConsumerGrain>> SetUpHealthyConsumerGrain(IGrainFactory GrainFactory, Guid streamId, string streamNameSpace, string streamProvider, int grainCount)
         {
-            List<ISampleStreaming_ConsumerGrain> grains = new List<ISampleStreaming_ConsumerGrain>();
-            List<Task> tasks = new List<Task>();
+            List<ISampleStreaming_ConsumerGrain> grains = [];
+            List<Task> tasks = [];
             while (grainCount > 0)
             {
                 var consumer = GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
@@ -114,7 +114,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
 
         private async Task StopHealthyConsumerGrainComing(List<ISampleStreaming_ConsumerGrain> grains)
         {
-            List<Task> tasks = new List<Task>();
+            List<Task> tasks = [];
             foreach (var grain in grains)
             {
                 tasks.Add(grain.StopConsuming());

@@ -69,7 +69,7 @@ namespace Orleans.Providers.Streams.Common
             maxCacheSize = cacheSize;
             
             this.logger = logger;
-            cacheCursorHistogram = new List<CacheBucket>();
+            cacheCursorHistogram = [];
             CACHE_HISTOGRAM_MAX_BUCKET_SIZE = Math.Max(cacheSize / NUM_CACHE_HISTOGRAM_BUCKETS, 1); // we have 10 buckets
         }
 

@@ -215,13 +215,13 @@ namespace Orleans.Runtime.Configuration
         public static string RedactConnectionStringInfo(string connectionString)
         {
             string[] secretKeys =
-            {
+            [
                 "AccountKey=",                              // Azure Storage
                 "SharedAccessSignature=",                   // Many Azure services
                 "SharedAccessKey=", "SharedSecretValue=",   // ServiceBus
                 "Password=",                                // SQL
                 "SecretKey=", "SessionToken=",              // DynamoDb
-            };
+            ];
             var mark = "<--SNIP-->";
             if (string.IsNullOrEmpty(connectionString)) return "null";
             //if connection string format doesn't contain any secretKey, then return just <--SNIP-->

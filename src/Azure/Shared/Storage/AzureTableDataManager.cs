@@ -617,11 +617,11 @@ namespace Orleans.GrainDirectory.AzureStorage
                 try
                 {
                     data2.ETag = new ETag(data2Etag);
-                    var opResults = await Table.SubmitTransactionAsync(new TableTransactionAction[]
-                    {
+                    var opResults = await Table.SubmitTransactionAsync(
+                    [
                         new TableTransactionAction(TableTransactionActionType.Add, data1),
                         new TableTransactionAction(TableTransactionActionType.UpdateReplace, data2, data2.ETag)
-                    });
+                    ]);
 
                     //The batch results are returned in order of execution,
                     //see reference at https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.table.cloudtable.executebatch.aspx.
@@ -654,8 +654,10 @@ namespace Orleans.GrainDirectory.AzureStorage
                 try
                 {
                     data1.ETag = new ETag(data1Etag);
-                    var entityBatch = new List<TableTransactionAction>(2);
-                    entityBatch.Add(new TableTransactionAction(TableTransactionActionType.UpdateReplace, data1, data1.ETag));
+                    var entityBatch = new List<TableTransactionAction>(2)
+                    {
+                        new TableTransactionAction(TableTransactionActionType.UpdateReplace, data1, data1.ETag)
+                    };
 
                     if (data2 != null && data2Etag != null)
                     {

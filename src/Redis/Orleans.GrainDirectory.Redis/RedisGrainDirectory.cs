@@ -96,8 +96,8 @@ namespace Orleans.GrainDirectory.Redis
                 var key = GetKey(address.GrainId);
                 var entryString = (string?)await _database.ScriptEvaluateAsync(
                     RegisterScript,
-                    keys: new RedisKey[] { key },
-                    values: new RedisValue[] { value, previousActivationId, _ttl })!;
+                    keys: [key],
+                    values: [value, previousActivationId, _ttl])!;
 
                 if (entryString is null)
                 {
@@ -150,8 +150,8 @@ namespace Orleans.GrainDirectory.Redis
                 var value = JsonSerializer.Serialize(address);
                 var result = (int) await _database.ScriptEvaluateAsync(
                     DeleteScript,
-                    keys: new RedisKey[] { GetKey(address.GrainId) },
-                    values: new RedisValue[] { address.ActivationId.ToString() });
+                    keys: [GetKey(address.GrainId)],
+                    values: [address.ActivationId.ToString()]);
 
                 if (_logger.IsEnabled(LogLevel.Debug))
                 {

@@ -20,7 +20,7 @@ namespace Orleans.Runtime.Versions.Compatibility
         {
             this.serviceProvider = serviceProvider;
             this.strategyFromConfig = serviceProvider.GetRequiredKeyedService<CompatibilityStrategy>(options.Value.DefaultCompatibilityStrategy);
-            this.compatibilityDirectors = new Dictionary<GrainInterfaceType, ICompatibilityDirector>();
+            this.compatibilityDirectors = [];
             Default = ResolveVersionDirector(serviceProvider, this.strategyFromConfig);
         }
 

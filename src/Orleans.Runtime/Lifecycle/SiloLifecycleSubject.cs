@@ -30,7 +30,7 @@ namespace Orleans.Runtime
         /// <param name="logger">The logger.</param>
         public SiloLifecycleSubject(ILogger<SiloLifecycleSubject> logger) : base(logger)
         {
-            this.observers = new List<MonitoredObserver>();
+            this.observers = [];
             this.highestCompletedStage = int.MinValue;
             this.lowestStoppedStage = int.MaxValue;
         }

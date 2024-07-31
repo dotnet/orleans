@@ -228,7 +228,7 @@ namespace UnitTests.OrleansRuntime.Streams
                     StreamId = StreamId.Create(TestStreamNamespace, streamId),
                     SequenceNumber = seqNumber,
                 };
-                cache.Add(new List<CachedMessage>() { converter.ToCachedMessage(msg, now) }, now);
+                cache.Add([converter.ToCachedMessage(msg, now)], now);
                 seqNumber++;
                 return msg.SequenceNumber;
             }
@@ -286,7 +286,7 @@ namespace UnitTests.OrleansRuntime.Streams
                     StreamId = streamId,
                     SequenceNumber = seqNumber,
                 };
-                cache.Add(new List<CachedMessage>() { converter.ToCachedMessage(msg, now) }, now);
+                cache.Add([converter.ToCachedMessage(msg, now)], now);
                 seqNumber++;
                 return msg.SequenceNumber;
             }
@@ -342,7 +342,7 @@ namespace UnitTests.OrleansRuntime.Streams
                     StreamId = StreamId.Create(TestStreamNamespace, streamId),
                     SequenceNumber = seqNumber,
                 };
-                cache.Add(new List<CachedMessage>() { converter.ToCachedMessage(msg, now) }, now);
+                cache.Add([converter.ToCachedMessage(msg, now)], now);
                 seqNumber++;
                 return msg.SequenceNumber;
             }

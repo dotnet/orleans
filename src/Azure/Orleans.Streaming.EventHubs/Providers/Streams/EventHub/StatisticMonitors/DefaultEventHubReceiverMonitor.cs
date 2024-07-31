@@ -13,7 +13,7 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <param name="dimensions">Aggregation Dimension bag for EventhubReceiverMonitor</param>
         public DefaultEventHubReceiverMonitor(EventHubReceiverMonitorDimensions dimensions)
-            : base(new KeyValuePair<string, object>[] { new("Path", dimensions.EventHubPath), new("Partition", dimensions.EventHubPartition) })
+            : base([new("Path", dimensions.EventHubPath), new("Partition", dimensions.EventHubPartition)])
         {
         }
     }

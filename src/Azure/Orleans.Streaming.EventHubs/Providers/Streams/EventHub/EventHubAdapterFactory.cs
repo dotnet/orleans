@@ -218,7 +218,7 @@ namespace Orleans.Streaming.EventHubs
         {
             EventData eventData = this.dataAdapter.ToQueueMessage(streamId, events, token, requestContext);
             string partitionKey = this.dataAdapter.GetPartitionKey(streamId);
-            return this.client.SendAsync(new[] { eventData }, new SendEventOptions { PartitionKey = partitionKey });
+            return this.client.SendAsync([eventData], new SendEventOptions { PartitionKey = partitionKey });
         }
 
         /// <summary>

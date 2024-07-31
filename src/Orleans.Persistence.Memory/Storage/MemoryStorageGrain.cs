@@ -13,7 +13,7 @@ namespace Orleans.Storage
     [KeepAlive]
     internal class MemoryStorageGrain : Grain, IMemoryStorageGrain
     {
-        private readonly Dictionary<string, object> _store = new(); 
+        private readonly Dictionary<string, object> _store = []; 
         private readonly ILogger _logger;
 
         public MemoryStorageGrain(ILogger<MemoryStorageGrain> logger)

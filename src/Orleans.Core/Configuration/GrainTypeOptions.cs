@@ -14,12 +14,12 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets a collection of metadata about grain classes.
         /// </summary>
-        public HashSet<Type> Classes { get; } = new ();
+        public HashSet<Type> Classes { get; } = [];
 
         /// <summary>
         /// Gets a collection of metadata about grain interfaces.
         /// </summary>
-        public HashSet<Type> Interfaces { get; } = new ();
+        public HashSet<Type> Interfaces { get; } = [];
     }
 
     /// <summary>

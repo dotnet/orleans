@@ -10,7 +10,7 @@ namespace Orleans.Serialization.TestKit
     [ExcludeFromCodeCoverage]
     public class TestMultiSegmentBufferWriter : IBufferWriter<byte>, IOutputBuffer
     {
-        private readonly List<byte[]> _committed = new();
+        private readonly List<byte[]> _committed = [];
         private readonly int _maxAllocationSize;
         private byte[] _current = Array.Empty<byte>();
 
@@ -69,6 +69,6 @@ namespace Orleans.Serialization.TestKit
         [Pure]
         public ReadOnlySequence<byte> GetReadOnlySequence(int maxSegmentSize) => _committed.SelectMany(b => b).Batch(maxSegmentSize).ToReadOnlySequence();
 
-        public ReadOnlySequence<byte> PeekAllBuffers() => _committed.Concat(new[] { _current }).ToReadOnlySequence();
+        public ReadOnlySequence<byte> PeekAllBuffers() => _committed.Concat([_current]).ToReadOnlySequence();
     }
 }

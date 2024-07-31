@@ -259,7 +259,7 @@ namespace UnitTests.Serialization
                     return list;
                 }
 
-                return new List<GrainAddress>();
+                return [];
             }
 
             internal void WriteCacheInvalidationHeaders<TBufferWriter>(ref Writer<TBufferWriter> writer, List<GrainAddress> value) where TBufferWriter : IBufferWriter<byte>

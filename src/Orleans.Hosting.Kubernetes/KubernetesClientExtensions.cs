@@ -22,7 +22,7 @@ namespace Orleans.Hosting.Kubernetes
                 });
 
             var reader = channel.Reader;
-            Watcher<TValue>[] watcher = new Watcher<TValue>[] { default };
+            Watcher<TValue>[] watcher = [default];
             var cancellationRegistration = cancellation.Register(() =>
             {
                 _ = channel.Writer.TryComplete();

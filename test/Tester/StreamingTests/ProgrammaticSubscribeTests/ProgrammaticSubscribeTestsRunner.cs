@@ -60,7 +60,7 @@ namespace Tester.StreamingTests
             var tasks = new List<Task>();
             foreach (var consumer in consumers)
             {
-                tasks.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters(new List<ITypedProducerGrain> { producer }, 
+                tasks.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters([producer], 
                     consumer, lastTry, this.fixture.Logger), _timeout));
             }
             await Task.WhenAll(tasks);
@@ -103,7 +103,7 @@ namespace Tester.StreamingTests
 
             //assert normal consumer consumed equal to produced
             await TestingUtils.WaitUntilAsync(
-            lastTry =>CheckCounters(new List<ITypedProducerGrain> { producer }, consumerNormal, lastTry, this.fixture.Logger), _timeout);
+            lastTry =>CheckCounters([producer], consumerNormal, lastTry, this.fixture.Logger), _timeout);
 
             //asert unsubscribed consumer consumed less than produced
             numProduced = await producer.GetNumberProduced();
@@ -198,7 +198,7 @@ namespace Tester.StreamingTests
             var tasks2 = new List<Task>();
             foreach (var consumer in consumers)
             {
-                tasks2.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },
+                tasks2.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters([producer, producer2],
                     consumer, lastTry, this.fixture.Logger), _timeout));
             }
             await Task.WhenAll(tasks);
@@ -242,7 +242,7 @@ namespace Tester.StreamingTests
             var tasks2 = new List<Task>();
             foreach (var consumer in consumers)
             {
-                tasks2.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },
+                tasks2.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters([producer, producer2],
                     consumer, lastTry, this.fixture.Logger), _timeout));
             }
             await Task.WhenAll(tasks);

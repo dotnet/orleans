@@ -107,7 +107,7 @@ namespace UnitTests.AsyncPrimitivesTests
             var pipeline = new AsyncPipeline(pipelineCapacity);
             int tasksCompleted = 0;
             // the following value is wrapped within an array to avoid a modified closure warning from ReSharper.
-            int[] pipelineSize = { 0 };
+            int[] pipelineSize = [0];
             var capacityReached = new InterlockedFlag();
 
             void workFunc()

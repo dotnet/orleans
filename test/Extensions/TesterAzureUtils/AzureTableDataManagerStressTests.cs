@@ -100,7 +100,7 @@ namespace Tester.AzureUtils
         private void WriteAlot_Async(string testName, int numPartitions, int iterations, int batchSize)
         {
             output.WriteLine("Iterations={0}, Batch={1}, Partitions={2}", iterations, batchSize, numPartitions);
-            List<Task> promises = new List<Task>();
+            List<Task> promises = [];
             Stopwatch sw = Stopwatch.StartNew();
             for (int i = 0; i < iterations; i++)
             {

@@ -86,7 +86,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             Task t1 = Task.Run(async () =>
             {
-                List<Task> tasks = new List<Task>();
+                List<Task> tasks = [];
                 for (int i = 0; i < 100; i++)
                 {
                     tasks.Add(a.IncrCounter());
@@ -108,7 +108,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             Task t1 = Task.Run(async () =>
             {
-                List<Task> tasks = new List<Task>();
+                List<Task> tasks = [];
                 for (int i = 0; i < 100; i++)
                 {
                     tasks.Add(a.IncrCounter());
@@ -143,7 +143,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             Task t1 = Task.Run(async () =>
             {
-                List<Task> tasks = new List<Task>();
+                List<Task> tasks = [];
                 for (int i = 0; i < 100; i++)
                 {
                     tasks.Add(a.IncrCounter());
@@ -152,7 +152,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             });
             Task t2 = Task.Run(async () =>
             {
-                List<Task> tasks = new List<Task>();
+                List<Task> tasks = [];
                 for (int i = 0; i < 1; i++)
                 {
                     await Task.Delay(1);
@@ -168,7 +168,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         {
             Initialize();
             var a = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(1);
-            List<Task> tasks = new List<Task>();
+            List<Task> tasks = [];
             for (int i = 0; i < 100; i++)
             {
                 tasks.Add(a.IncrCounter());

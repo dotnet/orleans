@@ -20,12 +20,12 @@ namespace Orleans.Clustering.DynamoDB
         /// <param name="options"></param>
         internal static void ParseDataConnectionString(string dataConnectionString, DynamoDBGatewayOptions options)
         {
-            var parameters = dataConnectionString.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+            var parameters = dataConnectionString.Split([ ';' ], StringSplitOptions.RemoveEmptyEntries);
 
             var serviceConfig = parameters.Where(p => p.Contains(ServicePropertyName)).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(serviceConfig))
             {
-                var value = serviceConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                var value = serviceConfig.Split([ '=' ], StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     options.Service = value[1];
             }
@@ -33,7 +33,7 @@ namespace Orleans.Clustering.DynamoDB
             var secretKeyConfig = parameters.Where(p => p.Contains(SecretKeyPropertyName)).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(secretKeyConfig))
             {
-                var value = secretKeyConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                var value = secretKeyConfig.Split([ '=' ], StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     options.SecretKey = value[1];
             }
@@ -41,7 +41,7 @@ namespace Orleans.Clustering.DynamoDB
             var accessKeyConfig = parameters.Where(p => p.Contains(AccessKeyPropertyName)).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(accessKeyConfig))
             {
-                var value = accessKeyConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                var value = accessKeyConfig.Split([ '=' ], StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     options.AccessKey = value[1];
             }
@@ -49,7 +49,7 @@ namespace Orleans.Clustering.DynamoDB
             var readCapacityUnitsConfig = parameters.Where(p => p.Contains(ReadCapacityUnitsPropertyName)).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(readCapacityUnitsConfig))
             {
-                var value = readCapacityUnitsConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                var value = readCapacityUnitsConfig.Split([ '=' ], StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     options.ReadCapacityUnits = int.Parse(value[1]);
             }
@@ -57,7 +57,7 @@ namespace Orleans.Clustering.DynamoDB
             var writeCapacityUnitsConfig = parameters.Where(p => p.Contains(WriteCapacityUnitsPropertyName)).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(writeCapacityUnitsConfig))
             {
-                var value = writeCapacityUnitsConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                var value = writeCapacityUnitsConfig.Split([ '=' ], StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     options.WriteCapacityUnits = int.Parse(value[1]);
             }

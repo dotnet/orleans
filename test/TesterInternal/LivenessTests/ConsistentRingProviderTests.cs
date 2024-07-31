@@ -78,7 +78,7 @@ namespace UnitTests.LivenessTests
             var allAgentRanges = new List<(SiloAddress, List<IRingRangeInternal>)>();
             foreach (var siloRange in siloRanges)
             {
-                List<IRingRangeInternal> agentRanges = new List<IRingRangeInternal>();
+                List<IRingRangeInternal> agentRanges = [];
                 for(int i=0; i < NUM_AGENTS; i++)
                 {
                     IRingRangeInternal agentRange = (IRingRangeInternal)RangeFactory.GetEquallyDividedSubRange(siloRange.Value, NUM_AGENTS, i);
@@ -111,10 +111,10 @@ namespace UnitTests.LivenessTests
             HashRingBasedStreamQueueMapper queueMapper = new HashRingBasedStreamQueueMapper(options, "AzureQueues");
             _ = queueMapper.GetAllQueues();
 
-            Dictionary<SiloAddress, List<int>> queueHistogram = new Dictionary<SiloAddress, List<int>>();
+            Dictionary<SiloAddress, List<int>> queueHistogram = [];
             foreach (var siloRange in siloRanges)
             {
-                List<int> agentRanges = new List<int>();
+                List<int> agentRanges = [];
                 foreach (IRingRangeInternal agentRange in siloRange.Value)
                 {
                     int numQueues = queueMapper.GetQueuesForRange(agentRange).Count();
