@@ -1,6 +1,4 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
@@ -11,7 +9,7 @@ namespace Orleans.Runtime.GrainDirectory;
 
 // Read-only, sorted collection of non-overlapping ranges.
 [GenerateSerializer, Alias(nameof(RingRangeCollection))]
-internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, IEnumerable<RingRange>, ISpanFormattable
+internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, ISpanFormattable
 {
     public RingRangeCollection(ImmutableArray<RingRange> ranges)
     {
@@ -251,12 +249,10 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
     }
 
     public ImmutableArray<RingRange>.Enumerator GetEnumerator() => Ranges.GetEnumerator();
-    IEnumerator<RingRange> IEnumerable<RingRange>.GetEnumerator() => ((IEnumerable<RingRange>)Ranges).GetEnumerator();
-    IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable<RingRange>)Ranges).GetEnumerator();
 
     public override string ToString() => $"{this}";
     string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
     bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
-        => destination.TryWrite($"Subranges: {Ranges.Length}, Size: {SizePercent:0.00}%", out charsWritten);
+        => destination.TryWrite($"({Ranges.Length} subranges), {SizePercent:0.00}%", out charsWritten);
 }

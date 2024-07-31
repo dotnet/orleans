@@ -27,6 +27,7 @@ namespace Orleans.Runtime
         public static readonly GrainType ActivationMigratorType = SystemTargetGrainId.CreateGrainType("migrator");
         public static readonly GrainType ActivationRepartitionerType = SystemTargetGrainId.CreateGrainType("repartitioner");
         public static readonly GrainType DirectoryReplicaType = SystemTargetGrainId.CreateGrainType("dir.replica");
+        public static readonly GrainType DirectoryReplicaClientType = SystemTargetGrainId.CreateGrainType("dir.replica.client");
 
         public static readonly GrainId SiloDirectConnectionId = GrainId.Create(
             GrainType.Create(GrainTypePrefix.SystemPrefix + "silo"),
@@ -55,6 +56,7 @@ namespace Orleans.Runtime
             {ActivationMigratorType, "ActivationMigrator"},
             {ActivationRepartitionerType, "ActivationRepartitioner"},
             {DirectoryReplicaType, "DirectoryReplica"},
+            {DirectoryReplicaClientType, "DirectoryClient"},
         }.ToFrozenDictionary();
 
         public static string SystemTargetName(GrainType id) => SingletonSystemTargetNames.TryGetValue(id, out var name) ? name : id.ToString();

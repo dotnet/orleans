@@ -1,24 +1,23 @@
-using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.GrainDirectory;
-using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.TestingHost;
 using TestExtensions;
-using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Tester.Directories;
 
-internal interface IMyDirectoryTestGrain : IGrainWithGuidKey
+internal interface IMyDirectoryTestGrain : IGrainWithIntegerKey
 {
-    ValueTask<string> Echo(string data);
+    ValueTask Ping();
 }
 
 internal class MyDirectoryTestGrain : Grain, IMyDirectoryTestGrain
 {
-    public ValueTask<string> Echo(string data) => new(data);
+    public ValueTask Ping() => default;
 }
 
 public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
@@ -27,68 +26,111 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
     public async Task DynamicClusterTest()
     {
         var testClusterBuilder = new TestClusterBuilder(1);
+        testClusterBuilder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();   
         var testCluster = testClusterBuilder.Build();
         await testCluster.DeployAsync();
 
         var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
         var reconfigurationTimer = CoarseStopwatch.StartNew();
-        var target = 10;
-        var upperLimit = 10;
+        var upperLimit = 5;
         var lowerLimit = 1;
+        var target = upperLimit;
+        Task clusterOperation = Task.CompletedTask;
+        var idBase = 0L;
+        const int CallsPerIteration = 100;
         try
         {
-            while (!cts.IsCancellationRequested)
+            var loadTask = Task.Run(async () =>
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(5));
-                try
+                while (!cts.IsCancellationRequested)
                 {
-                    for (var i = 0; i < 100; i++)
+                    try
                     {
-                        await testCluster.GrainFactory.GetGrain<IMyDirectoryTestGrain>(Guid.NewGuid()).Echo("hello");
+                        await Task.Delay(TimeSpan.FromMilliseconds(5));
+                        await Parallel.ForAsync(0, CallsPerIteration, (i, ct) => testCluster.GrainFactory.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping());
+
+                        idBase += CallsPerIteration;
+
                     }
-
-                    if (reconfigurationTimer.Elapsed > TimeSpan.FromSeconds(5))
+                    catch (Exception ex)
                     {
-                        reconfigurationTimer.Restart();
-                        var currentCount = testCluster.Silos.Count;
-
-                        if (currentCount > target)
-                        {
-                            var victim = testCluster.Silos.Last();
-                            if (currentCount % 2 == 0)
-                            {
-                                await testCluster.StopSiloAsync(victim);
-                            }
-                            else
-                            {
-                                await testCluster.KillSiloAsync(victim);
-                            }
-                        }
-                        else if (currentCount < target)
-                        {
-                            await testCluster.StartAdditionalSiloAsync();
-                        }
-
-                        if (currentCount <= lowerLimit)
-                        {
-                            target = upperLimit;
-                        }
-                        else if (currentCount >= upperLimit)
-                        {
-                            target = lowerLimit;
-                        }
+                        output.WriteLine($"Ignoring load exception: {ex}");
                     }
                 }
-                catch (Exception exception)
+            });
+
+            var chaosTask = Task.Run(async () =>
+            {
+                while (!cts.IsCancellationRequested)
                 {
-                    output.WriteLine($"Exception: {exception}");
+                    try
+                    {
+                        if (reconfigurationTimer.Elapsed > TimeSpan.FromSeconds(2))
+                        {
+                            reconfigurationTimer.Restart();
+                            await clusterOperation;
+                            clusterOperation = Task.Run(async () =>
+                            {
+                                var currentCount = testCluster.Silos.Count;
+
+                                if (currentCount > target)
+                                {
+                                    // Stop or kill a random silo, but not the primary (since that hosts cluster membership)
+                                    var victim = testCluster.SecondarySilos[Random.Shared.Next(testCluster.SecondarySilos.Count)];
+                                    if (currentCount % 2 == 0)
+                                    {
+                                        await testCluster.StopSiloAsync(victim);
+                                    }
+                                    else
+                                    {
+                                        TESTLATCH.LATCH = true;
+                                        await testCluster.KillSiloAsync(victim);
+                                        TESTLATCH.LATCH = false;
+                                    }
+                                }
+                                else if (currentCount < target)
+                                {
+                                    await testCluster.StartAdditionalSiloAsync();
+                                }
+
+                                if (currentCount <= lowerLimit)
+                                {
+                                    target = upperLimit;
+                                }
+                                else if (currentCount >= upperLimit)
+                                {
+                                    target = lowerLimit;
+                                }
+                            });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        output.WriteLine($"Ignoring chaos exception: {ex}");
+                    }
                 }
-            }
+            });
+
+            await Task.WhenAll(loadTask, chaosTask);
         }
         finally
         {
             await testCluster.StopAllSilosAsync();
             await testCluster.DisposeAsync();
+        }
+    }
+
+    private class SiloBuilderConfigurator : ISiloConfigurator
+    {
+        public void Configure(ISiloBuilder siloBuilder) => siloBuilder.Services.AddSingleton<IFatalErrorHandler, FakeFatalErrorHandler>();
+    }
+
+    private class FakeFatalErrorHandler : IFatalErrorHandler
+    {
+        bool IFatalErrorHandler.IsUnexpected(Exception exception) => false;
+        void IFatalErrorHandler.OnFatalException(object sender, string context, Exception exception)
+        {
+            // no-op
         }
     }
 }

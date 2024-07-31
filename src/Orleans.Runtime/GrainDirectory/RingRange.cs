@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory;
@@ -195,10 +194,10 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
     bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
     {
         return IsEmpty
-            ? destination.TryWrite($"(0 0), Size=0x0 (0%)", out charsWritten)
+            ? destination.TryWrite($"(0, 0) 0.00%", out charsWritten)
             : IsFull
-                ? destination.TryWrite($"(0, 0], Size=0x{uint.MaxValue:X8} (100%)", out charsWritten)
-                : destination.TryWrite($"(0x{Start:X8}, 0x{End:X8}], Size=0x{Size:X8} ({SizePercent:0.0}%)", out charsWritten);
+                ? destination.TryWrite($"(0, 0] (100.00%)", out charsWritten)
+                : destination.TryWrite($"(0x{Start:X8}, 0x{End:X8}] ({SizePercent:0.00}%)", out charsWritten);
     }
 
     public bool Overlaps(RingRange other) => !IsEmpty && !other.IsEmpty && (Equals(other) || Contains(other.End) || other.Contains(End));

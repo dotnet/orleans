@@ -40,9 +40,9 @@ namespace Orleans.Runtime
         {
             foreach(var stage in this.observers.GroupBy(o => o.Stage).OrderBy(s => s.Key))
             {
-                if (this.logger.IsEnabled(LogLevel.Debug))
+                if (this.Logger.IsEnabled(LogLevel.Debug))
                 {
-                    this.logger.LogDebug(
+                    this.Logger.LogDebug(
                         (int)ErrorCode.LifecycleStagesReport,
                         "Stage {Stage}: {Observers}",
                         this.GetStageName(stage.Key),
@@ -77,9 +77,9 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         protected override void PerfMeasureOnStop(int stage, TimeSpan elapsed)
         {
-            if (this.logger.IsEnabled(LogLevel.Debug))
+            if (this.Logger.IsEnabled(LogLevel.Debug))
             {
-                this.logger.LogDebug(
+                this.Logger.LogDebug(
                     (int)ErrorCode.SiloStartPerfMeasure,
                     "Stopping lifecycle stage {Stage} took {Elapsed} Milliseconds",
                     this.GetStageName(stage),
@@ -90,9 +90,9 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         protected override void PerfMeasureOnStart(int stage, TimeSpan elapsed)
         {
-            if (this.logger.IsEnabled(LogLevel.Debug))
+            if (this.Logger.IsEnabled(LogLevel.Debug))
             {
-                this.logger.LogDebug(
+                this.Logger.LogDebug(
                     (int)ErrorCode.SiloStartPerfMeasure,
                     "Starting lifecycle stage {Stage} took {Elapsed} Milliseconds",
                     this.GetStageName(stage),
@@ -103,7 +103,7 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer)
         {
-            var monitoredObserver = new MonitoredObserver(observerName, stage, this.GetStageName(stage), observer, this.logger);
+            var monitoredObserver = new MonitoredObserver(observerName, stage, this.GetStageName(stage), observer, this.Logger);
             this.observers.Add(monitoredObserver);
             return base.Subscribe(observerName, stage, monitoredObserver);
         }

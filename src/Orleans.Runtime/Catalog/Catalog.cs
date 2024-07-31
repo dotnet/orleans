@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Metadata;
@@ -33,7 +32,6 @@ namespace Orleans.Runtime
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
         private readonly GrainContextActivator grainActivator;
         private readonly GrainPropertiesResolver grainPropertiesResolver;
-        private readonly ClusterMembershipService _clusterMembershipService;
 
         public Catalog(
             ILocalSiloDetails localSiloDetails,
@@ -46,8 +44,7 @@ namespace Orleans.Runtime
             ILoggerFactory loggerFactory,
             IOptions<GrainCollectionOptions> collectionOptions,
             GrainContextActivator grainActivator,
-            GrainPropertiesResolver grainPropertiesResolver,
-            ClusterMembershipService clusterMembershipService)
+            GrainPropertiesResolver grainPropertiesResolver)
             : base(Constants.CatalogType, localSiloDetails.SiloAddress, loggerFactory)
         {
             this.LocalSilo = localSiloDetails.SiloAddress;
@@ -60,7 +57,6 @@ namespace Orleans.Runtime
             this.collectionOptions = collectionOptions;
             this.grainActivator = grainActivator;
             this.grainPropertiesResolver = grainPropertiesResolver;
-            _clusterMembershipService = clusterMembershipService;
             this.logger = loggerFactory.CreateLogger<Catalog>();
             this.activationCollector = activationCollector;
             this.RuntimeClient = serviceProvider.GetRequiredService<InsideRuntimeClient>();
@@ -273,7 +269,7 @@ namespace Orleans.Runtime
                         SiloAddress = Silo,
                         GrainId = grainId,
                         ActivationId = ActivationId.NewId(),
-                        MembershipVersion = _clusterMembershipService.CurrentSnapshot.Version,
+                        MembershipVersion = MembershipVersion.MinValue,
                     };
                     result = this.grainActivator.CreateInstance(address);
                     activations.RecordNewTarget(result);
@@ -491,42 +487,6 @@ namespace Orleans.Runtime
                     var reason = new DeactivationReason(DeactivationReasonCode.InternalFailure, reasonText);
                     StartDeactivatingActivations(reason, activationsToShutdown);
                 }
-            }
-        }
-
-        Task<Immutable<List<GrainAddress>>> ICatalog.GetRegisteredActivations(RingRangeCollection ranges)
-        {
-            var result = new List<GrainAddress>();
-            foreach (var (grainId, activation) in activations)
-            {
-                var directory = GetGrainDirectory(activation, grainDirectoryResolver);
-                if (directory is not null && directory.GetType() == typeof(ReplicatedGrainDirectory))
-                {
-                    if (ranges.Contains(activation.GrainId.GetUniformHashCode()))
-                    {
-                        result.Add(activation.Address);
-                    }
-                }
-            }
-
-            return Task.FromResult(result.AsImmutable());
-
-            static IGrainDirectory GetGrainDirectory(IGrainContext grainContext, GrainDirectoryResolver grainDirectoryResolver)
-            {
-                if (grainContext is ActivationData activationData)
-                {
-                    return activationData.Shared.GrainDirectory;
-                }
-                else if (grainContext is SystemTarget systemTarget)
-                {
-                    return null;
-                }
-                else if (grainContext.GetComponent<PlacementStrategy>() is { IsUsingGrainDirectory: true })
-                {
-                    return grainDirectoryResolver.Resolve(grainContext.GrainId.Type);
-                }
-
-                return null;
             }
         }
     }

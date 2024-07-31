@@ -142,8 +142,8 @@ namespace Orleans.Hosting
             services.TryAddSingleton<GrainDirectoryReplica>();    
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainDirectoryReplica>();
             services.TryAddSingleton<ReplicatedGrainDirectory>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ReplicatedGrainDirectory>();
             services.AddFromExisting<IGrainDirectory, ReplicatedGrainDirectory>();
-            //services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ReplicatedGrainDirectory>();
             services.AddGrainDirectory<ReplicatedGrainDirectory>(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (sp, name) => sp.GetRequiredService<ReplicatedGrainDirectory>());
 
             services.TryAddSingleton<MessageCenter>();
