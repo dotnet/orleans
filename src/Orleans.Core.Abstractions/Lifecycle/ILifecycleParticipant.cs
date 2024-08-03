@@ -14,9 +14,9 @@ namespace Orleans
         /// <summary>
         /// Adds the provided observer as a participant in the lifecycle.
         /// </summary>
-        /// <param name="observer">
+        /// <param name="lifecycle">
         /// The observer.
         /// </param>
-        void Participate(TLifecycleObservable observer);
+        void Participate(TLifecycleObservable lifecycle);
     }
 }

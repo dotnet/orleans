@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -12,7 +14,7 @@ using Orleans.Runtime.Scheduler;
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal sealed class LocalGrainDirectory : ILocalGrainDirectory, ISiloStatusListener
+    internal sealed class LocalGrainDirectory : ILocalGrainDirectory, ISiloStatusListener, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly AdaptiveDirectoryCacheMaintainer maintainer;
         private readonly ILogger log;
@@ -20,13 +22,13 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IInternalGrainFactory grainFactory;
         private readonly object writeLock = new object();
+        private readonly IServiceProvider _serviceProvider;
         private Action<SiloAddress, SiloStatus>? catalogOnSiloRemoved;
         private DirectoryMembership directoryMembership = DirectoryMembership.Default;
 
-        // Consider: move these constants into an apropriate place
+        // Consider: move these constants into an appropriate place
         internal const int HOP_LIMIT = 6; // forward a remote request no more than 5 times
         public static readonly TimeSpan RETRY_DELAY = TimeSpan.FromMilliseconds(200); // Pause 200ms between forwards to let the membership directory settle down
-
         internal bool Running;
 
         internal SiloAddress MyAddress { get; }
@@ -88,6 +90,7 @@ namespace Orleans.Runtime.GrainDirectory
                 return ring.Count == 0 ? 0 : ((float)100 / (float)ring.Count);
             });
             DirectoryInstruments.RegisterRingSizeObserve(() => this.directoryMembership.MembershipRingList.Count);
+            _serviceProvider = serviceProvider;
         }
 
         public void Start()
@@ -830,6 +833,14 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void AddOrUpdateCacheEntry(GrainId grainId, SiloAddress siloAddress) => this.DirectoryCache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
         public bool TryCachedLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address) => (address = GetLocalCacheData(grainId)) is not null;
+        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+        {
+            var catalog = _serviceProvider.GetRequiredService<Catalog>();
+            catalog.RegisterSystemTarget(RemoteGrainDirectory);
+            catalog.RegisterSystemTarget(CacheValidator);
+            siloStatusOracle.SubscribeToSiloStatusEvents(this);
+            lifecycle.Subscribe<LocalGrainDirectory>(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => Start()), (ct) => Task.Run(() => StopAsync()));
+        }
 
         private class DirectoryMembership
         {

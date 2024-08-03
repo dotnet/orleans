@@ -83,9 +83,7 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
                                     }
                                     else
                                     {
-                                        TESTLATCH.LATCH = true;
                                         await testCluster.KillSiloAsync(victim);
-                                        TESTLATCH.LATCH = false;
                                     }
                                 }
                                 else if (currentCount < target)

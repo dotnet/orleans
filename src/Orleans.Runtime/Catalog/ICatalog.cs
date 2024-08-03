@@ -1,7 +1,5 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.Concurrency;
-using Orleans.Runtime.GrainDirectory;
 
 namespace Orleans.Runtime
 {

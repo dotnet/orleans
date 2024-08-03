@@ -27,7 +27,6 @@ namespace Orleans.Runtime
         public const string PrimarySiloName = "Primary";
         private readonly ILocalSiloDetails siloDetails;
         private readonly MessageCenter messageCenter;
-        private readonly LocalGrainDirectory localGrainDirectory;
         private readonly ILogger logger;
         private readonly TaskCompletionSource<int> siloTerminatedTask = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly InsideRuntimeClient runtimeClient;
@@ -36,16 +35,13 @@ namespace Orleans.Runtime
         private readonly Watchdog platformWatchdog;
         private readonly TimeSpan waitForMessageToBeQueuedForOutbound;
         private readonly TimeSpan initTimeout;
-        private readonly TimeSpan stopTimeout = TimeSpan.FromMinutes(1);
         private readonly Catalog catalog;
         private readonly object lockable = new object();
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
-        private readonly IMembershipService membershipService;
         private readonly List<GrainService> grainServices = new List<GrainService>();
         private readonly ILoggerFactory loggerFactory;
 
-        internal ILocalGrainDirectory LocalGrainDirectory { get { return localGrainDirectory; } }
         internal IConsistentRingProvider RingProvider { get; }
 
         internal SystemStatus SystemStatus { get; set; }
@@ -59,8 +55,6 @@ namespace Orleans.Runtime
         /// Gets a <see cref="Task"/> which completes once the silo has terminated.
         /// </summary>
         public Task SiloTerminated { get { return this.siloTerminatedTask.Task; } } // one event for all types of termination (shutdown, stop and fast kill).
-
-        private bool isFastKilledNeeded = false; // Set to true if something goes wrong in the shutdown/stop phase
 
         private LifecycleSchedulingSystemTarget lifecycleSchedulingSystemTarget;
 
@@ -86,7 +80,6 @@ namespace Orleans.Runtime
             if (Debugger.IsAttached)
             {
                 initTimeout = StandardExtensions.Max(TimeSpan.FromMinutes(10), clusterMembershipOptions.Value.MaxJoinAttemptTime);
-                stopTimeout = initTimeout;
             }
 
             var localEndpoint = this.siloDetails.SiloAddress.Endpoint;
@@ -147,14 +140,9 @@ namespace Orleans.Runtime
             messageCenter = Services.GetRequiredService<MessageCenter>();
             messageCenter.SniffIncomingMessage = runtimeClient.SniffIncomingMessage;
 
-            // Now the router/directory service
-            // This has to come after the message center //; note that it then gets injected back into the message center.;
-            localGrainDirectory = Services.GetRequiredService<LocalGrainDirectory>();
-
             catalog = Services.GetRequiredService<Catalog>();
 
             siloStatusOracle = Services.GetRequiredService<ISiloStatusOracle>();
-            this.membershipService = Services.GetRequiredService<IMembershipService>();
 
             this.SystemStatus = SystemStatus.Created;
 
@@ -185,7 +173,7 @@ namespace Orleans.Runtime
         {
             // SystemTarget for provider init calls
             this.lifecycleSchedulingSystemTarget = Services.GetRequiredService<LifecycleSchedulingSystemTarget>();
-            RegisterSystemTarget(lifecycleSchedulingSystemTarget);
+            catalog.RegisterSystemTarget(lifecycleSchedulingSystemTarget);
 
             try
             {
@@ -201,29 +189,16 @@ namespace Orleans.Runtime
         private void CreateSystemTargets()
         {
             var siloControl = ActivatorUtilities.CreateInstance<SiloControl>(Services);
-            RegisterSystemTarget(siloControl);
+            catalog.RegisterSystemTarget(siloControl);
 
-            RegisterSystemTarget(Services.GetRequiredService<DeploymentLoadPublisher>());
-            RegisterSystemTarget(LocalGrainDirectory.RemoteGrainDirectory);
-            RegisterSystemTarget(LocalGrainDirectory.CacheValidator);
-
-            this.RegisterSystemTarget(this.Services.GetRequiredService<ClientDirectory>());
-
-            if (this.membershipService is SystemTarget)
-            {
-                RegisterSystemTarget((SystemTarget)this.membershipService);
-            }
         }
 
         private void InjectDependencies()
         {
             catalog.SiloStatusOracle = this.siloStatusOracle;
-            this.siloStatusOracle.SubscribeToSiloStatusEvents(localGrainDirectory);
-
-            this.siloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<DeploymentLoadPublisher>());
 
             // SystemTarget for provider init calls
-            RegisterSystemTarget(fallbackScheduler);
+            catalog.RegisterSystemTarget(fallbackScheduler);
         }
 
         private Task OnRuntimeInitializeStart(CancellationToken ct)
@@ -266,14 +241,12 @@ namespace Orleans.Runtime
 
         private Task OnRuntimeServicesStart(CancellationToken ct)
         {
-            //TODO: Setup all (or as many as possible) of the class started in this call to work directly with lifecyce
+            //TODO: Setup all (or as many as possible) of the class started in this call to work directly with lifecycle
             var stopWatch = Stopwatch.StartNew();
 
             // This has to follow the above steps that start the runtime components
             CreateSystemTargets();
             InjectDependencies();
-
-            StartTaskWithPerfAnalysis("Start local grain directory", LocalGrainDirectory.Start, stopWatch);
 
             return Task.CompletedTask;
         }
@@ -288,16 +261,6 @@ namespace Orleans.Runtime
 
             try
             {
-                // Finally, initialize the deployment load collector, for grains with load-based placement
-                await StartAsyncTaskWithPerfAnalysis("Start deployment load collector", StartDeploymentLoadCollector, stopWatch);
-                async Task StartDeploymentLoadCollector()
-                {
-                    var deploymentLoadPublisher = Services.GetRequiredService<DeploymentLoadPublisher>();
-                    await deploymentLoadPublisher.WorkItemGroup.QueueTask(deploymentLoadPublisher.Start, deploymentLoadPublisher)
-                        .WithTimeout(this.initTimeout, $"Starting DeploymentLoadPublisher failed due to timeout {initTimeout}");
-                    logger.LogDebug("Silo deployment load publisher started successfully.");
-                }
-
                 // Start background timer tick to watch for platform execution stalls, such as when GC kicks in
                 this.platformWatchdog.Start();
             }
@@ -343,7 +306,7 @@ namespace Orleans.Runtime
         private async Task RegisterGrainService(IGrainService service)
         {
             var grainService = (GrainService)service;
-            RegisterSystemTarget(grainService);
+            catalog.RegisterSystemTarget(grainService);
             grainServices.Add(grainService);
 
             await grainService.QueueTask(() => grainService.Init(Services)).WithTimeout(this.initTimeout, $"GrainService Initializing failed due to timeout {initTimeout}");
@@ -367,20 +330,6 @@ namespace Orleans.Runtime
         /// </summary>
         public void Stop()
         {
-            var cancellationSource = new CancellationTokenSource();
-            cancellationSource.Cancel();
-            StopAsync(cancellationSource.Token).GetAwaiter().GetResult();
-        }
-
-        /// <summary>
-        /// Gracefully stop the run time system and the application.
-        /// All grains will be properly deactivated.
-        /// All in-flight applications requests would be awaited and finished gracefully.
-        /// </summary>
-        public void Shutdown()
-        {
-            var cancellationSource = new CancellationTokenSource(this.stopTimeout);
-            StopAsync(cancellationSource.Token).GetAwaiter().GetResult();
         }
 
         /// <summary>
@@ -482,9 +431,6 @@ namespace Orleans.Runtime
 
         private Task OnRuntimeServicesStop(CancellationToken ct)
         {
-            if (this.isFastKilledNeeded || ct.IsCancellationRequested) // No time for this
-                return Task.CompletedTask;
-
             // Start rejecting all silo to silo application messages
             messageCenter.BlockApplicationMessages();
 
@@ -493,9 +439,6 @@ namespace Orleans.Runtime
 
         private async Task OnRuntimeInitializeStop(CancellationToken ct)
         {
-            // Silo may be dying before platformWatchdog was set up
-            platformWatchdog.Stop(); 
-
             try
             {
                 await messageCenter.StopAsync();
@@ -510,17 +453,11 @@ namespace Orleans.Runtime
 
         private async Task OnBecomeActiveStop(CancellationToken ct)
         {
-            if (this.isFastKilledNeeded)
-                return;
-
-            bool gracefully = !ct.IsCancellationRequested;
             try
             {
+                bool gracefully = !ct.IsCancellationRequested;
                 if (gracefully)
                 {
-                    // Stop LocalGrainDirectory
-                    await localGrainDirectory.CacheValidator.RunOrQueueTask(localGrainDirectory.StopAsync);
-
                     try
                     {
                         await catalog.DeactivateAllActivations().WaitAsync(ct);
@@ -547,7 +484,6 @@ namespace Orleans.Runtime
                     (int)ErrorCode.SiloFailedToStopMembership,
                     exc,
                     "Failed to shutdown gracefully. About to terminate ungracefully");
-                this.isFastKilledNeeded = true;
             }
 
             // Stop the gateway
@@ -556,7 +492,7 @@ namespace Orleans.Runtime
 
         private async Task OnActiveStop(CancellationToken ct)
         {
-            if (this.isFastKilledNeeded || ct.IsCancellationRequested)
+            if (ct.IsCancellationRequested)
                 return;
 
             if (this.messageCenter.Gateway != null)
@@ -582,18 +518,8 @@ namespace Orleans.Runtime
             }
         }
 
-        private void SafeExecute(Action action)
-        {
-            Utils.SafeExecute(action, logger, "Silo.Stop");
-        }
-
-        internal void RegisterSystemTarget(SystemTarget target) => this.catalog.RegisterSystemTarget(target);
-
         /// <inheritdoc/>
-        public override string ToString()
-        {
-            return localGrainDirectory.ToString();
-        }
+        public override string ToString() => $"Silo: {SiloAddress}";
 
         private void Participate(ISiloLifecycle lifecycle)
         {
@@ -615,7 +541,9 @@ namespace Orleans.Runtime
         {
             try
             {
-                Stop();
+                using var cts = new CancellationTokenSource();
+                cts.Cancel();
+                StopAsync(cts.Token).Wait();
             }
             catch
             {

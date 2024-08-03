@@ -79,7 +79,8 @@ namespace NonSilo.Tests.Directory
                 loggerFactory: _loggerFactory,
                 clusterMembershipService: _clusterMembershipService,
                 timerFactory: _timerFactory,
-                connectedClients: _connectedClientCollection);
+                connectedClients: _connectedClientCollection,
+                catalog: null);
             _testAccessor = new ClientDirectory.TestAccessor(_directory);
 
             // Disable automatic publishing to simplify testing.

@@ -198,13 +198,6 @@ namespace Orleans.Runtime.Messaging
                 }
                 else
                 {
-                    if (stopped)
-                    {
-                        log.LogInformation((int)ErrorCode.Runtime_Error_100115, "Message was queued for sending after outbound queue was stopped: {Message}", msg);
-                        SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message was queued for sending after outbound queue was stopped");
-                        return;
-                    }
-
                     if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection))
                     {
                         existingConnection.Send(msg);

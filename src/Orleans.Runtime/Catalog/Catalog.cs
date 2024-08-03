@@ -17,7 +17,7 @@ using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Runtime
 {
-    internal class Catalog : SystemTarget, ICatalog
+    internal sealed class Catalog : SystemTarget, ICatalog
     {
         public SiloAddress LocalSilo { get; private set; }
         internal ISiloStatusOracle SiloStatusOracle { get; set; }
