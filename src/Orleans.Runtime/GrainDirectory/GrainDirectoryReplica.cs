@@ -530,7 +530,15 @@ internal sealed partial class GrainDirectoryReplica(
         }
         catch (Exception exception)
         {
-            _logger.LogWarning(exception, "Error transferring ownership of range '{Range}'. Recovery will be performed.", addedRanges);
+            if (exception is SiloUnavailableException)
+            {
+                _logger.LogWarning("Remote host became unavailable while transferring ownership of range '{Range}'. Recovery will be performed.", addedRanges);
+            }
+            else
+            {
+                _logger.LogWarning(exception, "Error transferring ownership of range '{Range}'. Recovery will be performed.", addedRanges);
+            }
+
             return false;
         }
     }
