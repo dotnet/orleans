@@ -113,15 +113,13 @@ namespace Orleans.CodeGenerator
 
             private static IEnumerable<IMemberDescription> GetUnionCaseDataMembers(LibraryTypes libraryTypes, INamedTypeSymbol symbol)
             {
-                List<IPropertySymbol> dataMembers = new();
-                foreach (var property in symbol.GetDeclaredInstanceMembers<IPropertySymbol>())
+                List<IFieldSymbol> dataMembers = new();
+                foreach (var field in symbol.GetDeclaredInstanceMembers<IFieldSymbol>())
                 {
-                    if (!property.Name.StartsWith("Item", System.StringComparison.Ordinal))
+                    if (field.Name.StartsWith("item", System.StringComparison.Ordinal) || field.Name.Equals("_tag", System.StringComparison.Ordinal))
                     {
-                        continue;
+                        dataMembers.Add(field);
                     }
-
-                    dataMembers.Add(property);
                 }
 
                 dataMembers.Sort(FSharpUnionCasePropertyNameComparer.Default);
@@ -134,11 +132,11 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            private class FSharpUnionCasePropertyNameComparer : IComparer<IPropertySymbol>
+            private class FSharpUnionCasePropertyNameComparer : IComparer<IFieldSymbol>
             {
                 public static FSharpUnionCasePropertyNameComparer Default { get; } = new FSharpUnionCasePropertyNameComparer();
 
-                public int Compare(IPropertySymbol x, IPropertySymbol y)
+                public int Compare(IFieldSymbol x, IFieldSymbol y)
                 {
                     var xName = x.Name;
                     var yName = y.Name;
@@ -159,30 +157,28 @@ namespace Orleans.CodeGenerator
             private class FSharpUnionCaseFieldDescription : IMemberDescription, ISerializableMember
             {
                 private readonly LibraryTypes _libraryTypes;
-                private readonly IPropertySymbol _property;
+                private readonly IFieldSymbol _field;
 
-                public FSharpUnionCaseFieldDescription(LibraryTypes libraryTypes, IPropertySymbol property, uint ordinal)
+                public FSharpUnionCaseFieldDescription(LibraryTypes libraryTypes, IFieldSymbol field, uint ordinal)
                 {
                     _libraryTypes = libraryTypes;
                     FieldId = ordinal;
-                    _property = property;
+                    _field = field;
                 }
 
                 public uint FieldId { get; }
 
-                public bool IsShallowCopyable => _libraryTypes.IsShallowCopyable(Type) || _property.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
+                public bool IsShallowCopyable => _libraryTypes.IsShallowCopyable(Type) || _field.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
 
                 public bool IsValueType => Type.IsValueType;
 
                 public IMemberDescription Member => this;
 
-                public ITypeSymbol Type => _property.Type;
+                public ITypeSymbol Type => _field.Type;
 
-                public INamedTypeSymbol ContainingType => _property.ContainingType;
+                public INamedTypeSymbol ContainingType => _field.ContainingType;
 
-                public ISymbol Symbol => _property;
-
-                public string FieldName => _property.Name.ToLowerInvariant(); 
+                public ISymbol Symbol => _field;
 
                 /// <summary>
                 /// Gets the name of the setter field.
@@ -193,14 +189,8 @@ namespace Orleans.CodeGenerator
                 /// Gets syntax representing the type of this field.
                 /// </summary>
                 public TypeSyntax TypeSyntax => Type.TypeKind == TypeKind.Dynamic
-                    ? PredefinedType(Token(SyntaxKind.ObjectKeyword)) 
+                    ? PredefinedType(Token(SyntaxKind.ObjectKeyword))
                     : GetTypeSyntax(Type);
-
-                /// <summary>
-                /// Gets the <see cref="Property"/> which this field is the backing property for, or
-                /// <see langword="null" /> if this is not the backing field of an auto-property.
-                /// </summary>
-                private IPropertySymbol Property => _property;
 
                 public string AssemblyName => Type.ContainingAssembly.ToDisplayName();
                 public string TypeName => Type.ToDisplayName();
@@ -215,7 +205,7 @@ namespace Orleans.CodeGenerator
                 /// </summary>
                 /// <param name="instance">The instance of the containing type.</param>
                 /// <returns>Syntax for retrieving the value of this field.</returns>
-                public ExpressionSyntax GetGetter(ExpressionSyntax instance) => instance.Member(Property.Name);
+                public ExpressionSyntax GetGetter(ExpressionSyntax instance) => instance.Member(_field.Name);
 
                 /// <summary>
                 /// Returns syntax for setting the value of this field.
@@ -239,7 +229,7 @@ namespace Orleans.CodeGenerator
                 public FieldAccessorDescription GetGetterFieldDescription() => null;
 
                 public FieldAccessorDescription GetSetterFieldDescription()
-                    => SerializableMember.GetFieldAccessor(ContainingType, TypeSyntax, FieldName, SetterFieldName, _libraryTypes, true);
+                    => SerializableMember.GetFieldAccessor(ContainingType, TypeSyntax, _field.Name, SetterFieldName, _libraryTypes, true);
             }
         }
 
