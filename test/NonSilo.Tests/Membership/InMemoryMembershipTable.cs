@@ -102,7 +102,7 @@ namespace NonSilo.Tests.Membership
                 this.calls.Add((nameof(InsertRow), (entry, tableVersion)));
                 this.ValidateVersion(tableVersion);
 
-                if (this.entries.Any(e => e.Item1.SiloAddress.Equals(entry.SiloAddress)))
+                if (this.entries.Exists(e => e.Item1.SiloAddress.Equals(entry.SiloAddress)))
                 {
                     return Task.FromResult(false);
                 }
@@ -158,7 +158,7 @@ namespace NonSilo.Tests.Membership
             {
                 this.calls.Add((nameof(UpdateRow), (entry, etag, tableVersion)));
                 this.ValidateVersion(tableVersion);
-                var existingEntry = this.entries.FirstOrDefault(e => e.Item1.SiloAddress.Equals(entry.SiloAddress));
+                var existingEntry = this.entries.Find(e => e.Item1.SiloAddress.Equals(entry.SiloAddress));
                 if (existingEntry.Item1 is null) return Task.FromResult(false);
 
                 if (!etag.Equals(existingEntry.Item2))

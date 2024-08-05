@@ -223,7 +223,7 @@ namespace Orleans.Hosting.Kubernetes
                             .Take(_options.CurrentValue.MaxAgents)
                             .ToList();
 
-                        if (!_enableMonitoring && chosenSilos.Any(s => s.SiloAddress.Equals(_localSiloDetails.SiloAddress)))
+                        if (!_enableMonitoring && chosenSilos.Exists(s => s.SiloAddress.Equals(_localSiloDetails.SiloAddress)))
                         {
                             _enableMonitoring = true;
                             _pauseMonitoringSemaphore.Release(1);

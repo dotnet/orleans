@@ -37,7 +37,7 @@ internal class FieldIdAssignmentHelper
 
     public bool TryGetSymbolKey(ISymbol symbol, out (uint, bool) key) => _symbols.TryGetValue(symbol, out key);
 
-    private bool HasMemberWithIdAnnotation() => _memberSymbols.Any(member => member.HasAnyAttribute(_libraryTypes.IdAttributeTypes));
+    private bool HasMemberWithIdAnnotation() => Array.Exists(_memberSymbols, member => member.HasAnyAttribute(_libraryTypes.IdAttributeTypes));
 
     private IEnumerable<ISymbol> GetMembers(INamedTypeSymbol symbol)
     {

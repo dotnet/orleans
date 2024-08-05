@@ -347,7 +347,7 @@ namespace Orleans.Runtime.MembershipService
 
                     var gossipTask = this.GossipToOthers(this.myAddress, status);
                     gossipTask.Ignore();
-                    var cancellation = new CancellationTokenSource();
+                    using var cancellation = new CancellationTokenSource();
                     var timeoutTask = Task.Delay(GossipTimeout, cancellation.Token);
                     var task = await Task.WhenAny(gossipTask, timeoutTask);
                     if (ReferenceEquals(task, timeoutTask))

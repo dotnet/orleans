@@ -46,7 +46,7 @@ namespace Orleans.Serialization.TestKit
                 list.Add(buffer);
             }
 
-            return ToReadOnlySequence(list.ToArray());
+            return ToReadOnlySequence(list);
         }
 
         private class ReadOnlyBufferSegment : ReadOnlySequenceSegment<byte>

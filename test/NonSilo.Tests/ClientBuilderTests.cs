@@ -194,8 +194,8 @@ namespace NonSilo.Tests
 
             // Both services should be registered.
             Assert.Equal(2, services.Count);
-            Assert.NotNull(services.FirstOrDefault(svc => svc.Id == 1));
-            Assert.NotNull(services.FirstOrDefault(svc => svc.Id == 2));
+            Assert.NotNull(services.Find(svc => svc.Id == 1));
+            Assert.NotNull(services.Find(svc => svc.Id == 2));
 
             // Service 1 should have been registered first - the pipeline order should be preserved.
             Assert.Equal(1, registeredFirst[0]);

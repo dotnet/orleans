@@ -1,14 +1,14 @@
-using Amazon.Runtime;
-using Amazon.SQS;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Amazon.Runtime;
+using Amazon.SQS;
 using Amazon.SQS.Model;
 using Microsoft.Extensions.Logging;
+using Orleans;
 using Orleans.Streaming.SQS;
 using SQSMessage = Amazon.SQS.Model.Message;
-using Orleans;
 
 namespace OrleansAWSUtils.Storage
 {
@@ -55,7 +55,7 @@ namespace OrleansAWSUtils.Storage
         {
             var parameters = dataConnectionString.Split(';', StringSplitOptions.RemoveEmptyEntries);
 
-            var serviceConfig = parameters.FirstOrDefault(p => p.Contains(ServicePropertyName));
+            var serviceConfig = Array.Find(parameters, p => p.Contains(ServicePropertyName));
             if (!string.IsNullOrWhiteSpace(serviceConfig))
             {
                 var value = serviceConfig.Split('=', StringSplitOptions.RemoveEmptyEntries);
@@ -63,7 +63,7 @@ namespace OrleansAWSUtils.Storage
                     service = value[1];
             }
 
-            var secretKeyConfig = parameters.FirstOrDefault(p => p.Contains(SecretKeyPropertyName));
+            var secretKeyConfig = Array.Find(parameters, p => p.Contains(SecretKeyPropertyName));
             if (!string.IsNullOrWhiteSpace(secretKeyConfig))
             {
                 var value = secretKeyConfig.Split('=', StringSplitOptions.RemoveEmptyEntries);
@@ -71,7 +71,7 @@ namespace OrleansAWSUtils.Storage
                     secretKey = value[1];
             }
 
-            var accessKeyConfig = parameters.FirstOrDefault(p => p.Contains(AccessKeyPropertyName));
+            var accessKeyConfig = Array.Find(parameters, p => p.Contains(AccessKeyPropertyName));
             if (!string.IsNullOrWhiteSpace(accessKeyConfig))
             {
                 var value = accessKeyConfig.Split('=', StringSplitOptions.RemoveEmptyEntries);

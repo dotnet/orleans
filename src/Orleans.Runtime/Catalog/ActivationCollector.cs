@@ -505,7 +505,7 @@ namespace Orleans.Runtime
 
         private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list)
         {
-            var cts = new CancellationTokenSource(_options.Value.DeactivationTimeout);
+            using var cts = new CancellationTokenSource(_options.Value.DeactivationTimeout);
             var mtcs = new MultiTaskCompletionSource(list.Count);
 
             logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {Count} to promptly Destroy.", list.Count);

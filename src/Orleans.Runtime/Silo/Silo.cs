@@ -161,7 +161,7 @@ namespace Orleans.Runtime
             this.siloLifecycle = this.Services.GetRequiredService<ISiloLifecycleSubject>();
             // register all lifecycle participants
             IEnumerable<ILifecycleParticipant<ISiloLifecycle>> lifecycleParticipants = this.Services.GetServices<ILifecycleParticipant<ISiloLifecycle>>();
-            foreach(ILifecycleParticipant<ISiloLifecycle> participant in lifecycleParticipants)
+            foreach (ILifecycleParticipant<ISiloLifecycle> participant in lifecycleParticipants)
             {
                 participant?.Participate(this.siloLifecycle);
             }
@@ -357,7 +357,7 @@ namespace Orleans.Runtime
             var grainService = (GrainService)service;
 
             await grainService.QueueTask(grainService.Start).WithTimeout(this.initTimeout, $"Starting GrainService failed due to timeout {initTimeout}");
-            logger.LogInformation("Grain Service {GrainServiceType} started successfully.",service.GetType().FullName);
+            logger.LogInformation("Grain Service {GrainServiceType} started successfully.", service.GetType().FullName);
         }
 
         /// <summary>
@@ -423,10 +423,10 @@ namespace Orleans.Runtime
                 {
                     logger.LogDebug((int)ErrorCode.SiloStopInProgress, "Silo shutdown in progress. Waiting for shutdown to be completed.");
                 }
-                var pause = TimeSpan.FromSeconds(1);                
+                var pause = TimeSpan.FromSeconds(1);
 
                 while (!this.SystemStatus.Equals(SystemStatus.Terminated))
-                {                    
+                {
                     if (logger.IsEnabled(LogLevel.Debug))
                     {
                         logger.LogDebug((int)ErrorCode.WaitingForSiloStop, "Silo shutdown still in progress...");
@@ -494,7 +494,7 @@ namespace Orleans.Runtime
         private async Task OnRuntimeInitializeStop(CancellationToken ct)
         {
             // Silo may be dying before platformWatchdog was set up
-            platformWatchdog.Stop(); 
+            platformWatchdog.Stop();
 
             try
             {
@@ -641,4 +641,3 @@ namespace Orleans.Runtime
         }
     }
 }
-
