@@ -1448,10 +1448,27 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             try
             {
                 RequestContextExtensions.Import(requestContextData);
-                await Lifecycle.OnStart(cancellationToken).WithCancellation("Timed out waiting for grain lifecycle to complete activation", cancellationToken);
+                try
+                {
+                    await Lifecycle.OnStart(cancellationToken).WaitAsync(cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    _shared.Logger.LogError(exception, "Error starting lifecycle for activation '{Activation}'.", this);
+                    throw;
+                }
+
                 if (GrainInstance is IGrainBase grainBase)
                 {
-                    await grainBase.OnActivateAsync(cancellationToken).WithCancellation($"Timed out waiting for {nameof(IGrainBase.OnActivateAsync)} to complete", cancellationToken);
+                    try
+                    {
+                        await grainBase.OnActivateAsync(cancellationToken).WaitAsync(cancellationToken);
+                    }
+                    catch (Exception exception)
+                    {
+                        _shared.Logger.LogError(exception, $"Error thrown from {nameof(IGrainBase.OnActivateAsync)} for activation '{{Activation}}'.", this);
+                        throw;
+                    }
                 }
 
                 lock (this)
@@ -1676,45 +1693,79 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         {
             if (_shared.Logger.IsEnabled(LogLevel.Trace))
             {
-                _shared.Logger.LogTrace("FinishDeactivating activation {Activation}", this.ToDetailedString());
+                _shared.Logger.LogTrace("Completing deactivation of '{Activation}'", ToDetailedString());
             }
 
             // Stop timers from firing.
             DisposeTimers();
 
-            // Call OnDeactivateAsync(reason, cancellationToken)
-            await CallGrainDeactivate(cancellationToken);
+            // Note: This call is being made from within Scheduler.Queue wrapper, so we are already executing on worker thread
+            if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                _shared.Logger.LogDebug(
+                    (int)ErrorCode.Catalog_BeforeCallingDeactivate,
+                    "About to call OnDeactivateAsync for '{Activation}'",
+                    this);
 
-            if (DehydrationContext is { } context
-                && ForwardingAddress is { } forwardingAddress
-                && _shared.MigrationManager is { } migrationManager)
+            // just check in case this activation data is already Invalid or not here at all.
+            if (State == ActivationState.Deactivating)
             {
+                if (GrainInstance is IGrainBase grainBase)
+                {
+                    try
+                    {
+                        await grainBase.OnDeactivateAsync(DeactivationReason, cancellationToken).WaitAsync(cancellationToken);
+                    }
+                    catch (Exception exception)
+                    {
+                        _shared.Logger.LogError(exception, $"Error thrown from {nameof(IGrainBase.OnDeactivateAsync)} for activation '{{Activation}}'.", this);
+                        throw;
+                    }
+                }
+
                 try
                 {
-                    // Populate the dehydration context.
-                    if (context.RequestContext is { } requestContext)
-                    {
-                        RequestContextExtensions.Import(requestContext);
-                    }
-                    else
-                    {
-                        RequestContext.Clear();
-                    }
-
-                    OnDehydrate(context.MigrationContext);
-
-                    // Send the dehydration context to the target host.
-                    await migrationManager.MigrateAsync(forwardingAddress, GrainId, context.MigrationContext);
-                    _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, forwardingAddress);
-                    migrated = true;
+                    await Lifecycle.OnStop(cancellationToken).WaitAsync(cancellationToken);
                 }
                 catch (Exception exception)
                 {
-                    _shared.Logger.LogWarning(exception, "Failed to migrate grain {GrainId} to {SiloAddress}", GrainId, forwardingAddress);
+                    _shared.Logger.LogError(exception, $"Error stopping lifecycle for activation '{{Activation}}'.", this);
+                    throw;
                 }
-                finally
+
+                if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                    _shared.Logger.LogDebug(
+                        (int)ErrorCode.Catalog_AfterCallingDeactivate,
+                        "Returned from calling '{Activation}' OnDeactivateAsync method",
+                        this);
+
+                if (DehydrationContext is { } context
+                    && ForwardingAddress is { } forwardingAddress
+                    && _shared.MigrationManager is { } migrationManager
+                    && !cancellationToken.IsCancellationRequested)
                 {
-                    RequestContext.Clear();
+                    try
+                    {
+                        // Populate the dehydration context.
+                        if (context.RequestContext is { } requestContext)
+                        {
+                            RequestContextExtensions.Import(requestContext);
+                        }
+
+                        OnDehydrate(context.MigrationContext);
+
+                        // Send the dehydration context to the target host.
+                        await migrationManager.MigrateAsync(forwardingAddress, GrainId, context.MigrationContext);
+                        _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, forwardingAddress);
+                        migrated = true;
+                    }
+                    catch (Exception exception)
+                    {
+                        _shared.Logger.LogWarning(exception, "Failed to migrate grain {GrainId} to {SiloAddress}", GrainId, forwardingAddress);
+                    }
+                    finally
+                    {
+                        RequestContext.Clear();
+                    }
                 }
             }
 
@@ -1723,15 +1774,10 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 // Unregister from directory
                 await _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force);
             }
-
-            if (_shared.Logger.IsEnabled(LogLevel.Trace))
-            {
-                _shared.Logger.LogTrace("Completed async portion of FinishDeactivating for activation {Activation}", this.ToDetailedString());
-            }
         }
         catch (Exception ex)
         {
-            _shared.Logger.LogWarning((int)ErrorCode.Catalog_DeactivateActivation_Exception, ex, "Exception when trying to deactivate {Activation}", this);
+            _shared.Logger.LogWarning((int)ErrorCode.Catalog_DeactivateActivation_Exception, ex, "Error deactivating '{Activation}'", this);
         }
 
         lock (this)
@@ -1772,65 +1818,6 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         // Signal deactivation
         GetDeactivationCompletionSource().TrySetResult(true);
         _workSignal.Signal();
-
-        if (_shared.Logger.IsEnabled(LogLevel.Trace))
-        {
-            _shared.Logger.LogTrace("Completed final portion of FinishDeactivating for activation {Activation}", this.ToDetailedString());
-        }
-
-        async Task CallGrainDeactivate(CancellationToken ct)
-        {
-            try
-            {
-                // Note: This call is being made from within Scheduler.Queue wrapper, so we are already executing on worker thread
-                if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                    _shared.Logger.LogDebug(
-                        (int)ErrorCode.Catalog_BeforeCallingDeactivate,
-                        "About to call {Activation} grain's OnDeactivateAsync(...) method {GrainInstanceType}",
-                        this,
-                        GrainInstance?.GetType().FullName);
-
-                // Call OnDeactivateAsync inline, but within try-catch wrapper to safely capture any exceptions thrown from called function
-                try
-                {
-                    // just check in case this activation data is already Invalid or not here at all.
-                    if (State == ActivationState.Deactivating)
-                    {
-                        RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake.
-                        if (GrainInstance is IGrainBase grainBase)
-                        {
-                            await grainBase.OnDeactivateAsync(DeactivationReason, ct).WithCancellation($"Timed out waiting for {nameof(IGrainBase.OnDeactivateAsync)} to complete", ct);
-                        }
-
-                        await Lifecycle.OnStop(ct).WithCancellation("Timed out waiting for grain lifecycle to complete deactivation", ct);
-                    }
-
-                    if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                        _shared.Logger.LogDebug(
-                            (int)ErrorCode.Catalog_AfterCallingDeactivate,
-                            "Returned from calling {Activation} grain's OnDeactivateAsync(...) method {GrainInstanceType}",
-                            this,
-                            GrainInstance?.GetType().FullName);
-                }
-                catch (Exception exc)
-                {
-                    _shared.Logger.LogError(
-                        (int)ErrorCode.Catalog_ErrorCallingDeactivate,
-                        exc,
-                        "Error calling grain's OnDeactivateAsync(...) method - Grain type = {GrainType} Activation = {Activation}",
-                        GrainInstance?.GetType().FullName,
-                        this);
-                }
-            }
-            catch (Exception exc)
-            {
-                _shared.Logger.LogError(
-                    (int)ErrorCode.Catalog_FinishGrainDeactivateAndCleanupStreams_Exception,
-                    exc,
-                    "CallGrainDeactivateAndCleanupStreams Activation = {Activation} failed.",
-                    this);
-            }
-        }
     }
 
     private TaskCompletionSource<bool> GetDeactivationCompletionSource()
