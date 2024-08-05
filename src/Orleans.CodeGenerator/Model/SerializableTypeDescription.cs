@@ -173,7 +173,7 @@ namespace Orleans.CodeGenerator
                     t = t.BaseType;
                 }
 
-                foreach (var ctor in Type.Constructors)
+                foreach (var ctor in Type.Constructors.Where(x => x.IsImplicitlyDeclared))
                 {
                     if (ctor.Parameters.Length != 0)
                     {
