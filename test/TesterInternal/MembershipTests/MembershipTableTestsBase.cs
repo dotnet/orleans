@@ -60,11 +60,11 @@ namespace UnitTests.MembershipTests
             var adoVariant = GetAdoInvariant();
 
             membershipTable = CreateMembershipTable(logger);
-            membershipTable.InitializeMembershipTable(true).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
+            membershipTable.InitializeMembershipTable(true).WaitAsync(TimeSpan.FromMinutes(1)).Wait();
 
             this._gatewayOptions = Options.Create(new GatewayOptions());
             gatewayListProvider = CreateGatewayListProvider(logger);
-            gatewayListProvider.InitializeGatewayListProvider().WithTimeout(TimeSpan.FromMinutes(1)).Wait();
+            gatewayListProvider.InitializeGatewayListProvider().WaitAsync(TimeSpan.FromMinutes(1)).Wait();
         }
 
         public IGrainFactory GrainFactory => this.environment.GrainFactory;
@@ -381,7 +381,7 @@ namespace UnitTests.MembershipTests
                         done = false;
                     }
                 } while (!done);
-            })).WithTimeout(TimeSpan.FromSeconds(30));
+            })).WaitAsync(TimeSpan.FromSeconds(30));
 
 
             tableData = await membershipTable.ReadAll();

@@ -229,8 +229,8 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
         if (_log.IsEnabled(LogLevel.Trace))
         {
             _log.LogTrace(
-            "About to execute task {Task} in GrainContext={GrainContext}",
-            OrleansTaskExtentions.ToString(task),
+            "About to execute task '{Task}' in GrainContext={GrainContext}",
+            task,
             GrainContext);
         }
     }
@@ -253,7 +253,7 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
             (int)ErrorCode.SchedulerExceptionFromExecute,
             ex,
             "Worker thread caught an exception thrown from Execute by task {Task}",
-            OrleansTaskExtentions.ToString(task));
+            task);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -263,7 +263,7 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
         _log.LogWarning(
             (int)ErrorCode.SchedulerTurnTooLong3,
             "Task {Task} in WorkGroup {GrainContext} took elapsed time {Duration} for execution, which is longer than {TurnWarningLengthThreshold}. Running on thread {Thread}",
-            OrleansTaskExtentions.ToString(task),
+            task,
             GrainContext.ToString(),
             taskDuration.ToString("g"),
             _schedulingOptions.TurnWarningLengthThreshold,

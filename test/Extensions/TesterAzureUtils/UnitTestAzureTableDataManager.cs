@@ -58,7 +58,7 @@ namespace Tester.AzureUtils
             : base(new AzureStorageOperationOptions { TableName = INSTANCE_TABLE_NAME }.ConfigureTestDefaults(),
                   NullLoggerFactory.Instance.CreateLogger<UnitTestAzureTableDataManager>())
         {
-            InitTableAsync().WithTimeout(new AzureStoragePolicyOptions().CreationTimeout).Wait();
+            InitTableAsync().WaitAsync(new AzureStoragePolicyOptions().CreationTimeout).Wait();
         }
     }
 }

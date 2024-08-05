@@ -109,7 +109,7 @@ public class ReminderTests_Cosmos_Standalone
                 _log.LogInformation("Started {Capture}", capture);
             }
             _log.LogInformation("Started all, now waiting...");
-            await Task.WhenAll(promises).WithTimeout(TimeSpan.FromSeconds(500));
+            await Task.WhenAll(promises).WaitAsync(TimeSpan.FromSeconds(500));
         }
         catch (Exception exc)
         {

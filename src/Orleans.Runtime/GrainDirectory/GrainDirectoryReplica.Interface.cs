@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -19,7 +20,7 @@ internal sealed partial class GrainDirectoryReplica
         }
 
         // Ensure that the current membership version is new enough.
-        await WaitForRange(address.GrainId, version);
+        await WaitForRange(address.GrainId, version, CancellationToken.None);
         if (!IsExpectedView(version))
         {
             return new DirectoryResult<GrainAddress>(null!, _view.Version);
@@ -41,7 +42,7 @@ internal sealed partial class GrainDirectoryReplica
         foreach (var address in addresses)
         {
             // Ensure we can serve the request.
-            await WaitForRange(address.GrainId, version);
+            await WaitForRange(address.GrainId, version, CancellationToken.None);
             if (!IsExpectedView(version))
             {
                 return new DirectoryResult<List<GrainAddress>>(null!, _view.Version);
@@ -62,7 +63,7 @@ internal sealed partial class GrainDirectoryReplica
         }
 
         // Ensure we can serve the request.
-        await WaitForRange(grainId, version);
+        await WaitForRange(grainId, version, CancellationToken.None);
         if (!IsExpectedView(version))
         {
             return new DirectoryResult<GrainAddress?>(null, _view.Version);
@@ -83,7 +84,7 @@ internal sealed partial class GrainDirectoryReplica
         var results = new List<GrainAddress?>(grainIds.Count);
         foreach (var grainId in grainIds)
         {
-            await WaitForRange(grainId, version);
+            await WaitForRange(grainId, version, CancellationToken.None);
             if (!IsExpectedView(version))
             {
                 return new DirectoryResult<List<GrainAddress?>>(null!, _view.Version);
@@ -104,7 +105,7 @@ internal sealed partial class GrainDirectoryReplica
             _logger.LogTrace("UnregisterAsync('{Version}', '{Address}')", version, address);
         }
 
-        await WaitForRange(address.GrainId, version);
+        await WaitForRange(address.GrainId, version, CancellationToken.None);
         if (!IsExpectedView(version))
         {
             return new DirectoryResult<bool>(false, _view.Version);
@@ -126,7 +127,7 @@ internal sealed partial class GrainDirectoryReplica
         foreach (var address in addresses)
         {
             // Ensure we can serve the request.
-            await WaitForRange(address.GrainId, version);
+            await WaitForRange(address.GrainId, version, CancellationToken.None);
             if (!IsExpectedView(version))
             {
                 return new DirectoryResult<bool>(false, _view.Version);

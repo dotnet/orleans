@@ -55,10 +55,10 @@ internal sealed partial class GrainDirectoryReplica(
 
     public IAsyncEnumerable<DirectoryMembershipSnapshot> ViewUpdates => _viewUpdates;
 
-    public async ValueTask<DirectoryMembershipSnapshot> RefreshViewAsync(MembershipVersion version = default)
+    public async ValueTask<DirectoryMembershipSnapshot> RefreshViewAsync(MembershipVersion version, CancellationToken cancellationToken)
     {
-        _ = _clusterMembershipService.Refresh(version);
-        await foreach (var view in _viewUpdates)
+        _ = _clusterMembershipService.Refresh(version, cancellationToken);
+        await foreach (var view in _viewUpdates.WithCancellation(cancellationToken))
         {
             if (view.Version >= version)
             {
@@ -77,10 +77,10 @@ internal sealed partial class GrainDirectoryReplica(
         }
 
         // Wait for the range to be un-wedged.
-        await RefreshViewAsync(version);
+        await RefreshViewAsync(version, CancellationToken.None);
         foreach (var range in ranges)
         {
-            await WaitForRange(range, rangeVersion);
+            await WaitForRange(range, rangeVersion, CancellationToken.None);
         }
 
         List<GrainAddress> partitionAddresses = [];
@@ -160,18 +160,18 @@ internal sealed partial class GrainDirectoryReplica(
         Debug.Assert(_id.Equals(owner));
     }
 
-    private ValueTask WaitForRange(GrainId grainId, MembershipVersion version) => WaitForRange(RingRange.FromPoint(grainId.GetUniformHashCode()), version);
+    private ValueTask WaitForRange(GrainId grainId, MembershipVersion version, CancellationToken cancellationToken) => WaitForRange(RingRange.FromPoint(grainId.GetUniformHashCode()), version, cancellationToken);
 
-    private async ValueTask WaitForRange(RingRange ranges, MembershipVersion version)
+    private async ValueTask WaitForRange(RingRange ranges, MembershipVersion version, CancellationToken cancellationToken)
     {
         if (_view.Version < version)
         {
-            await RefreshViewAsync(version);
+            await RefreshViewAsync(version, cancellationToken);
         }
 
         while (TryGetOverlappingWedge(ranges, version, out var completion))
         {
-            await completion;
+            await completion.WaitAsync(cancellationToken);
         }
 
         bool TryGetOverlappingWedge(RingRange ranges, MembershipVersion version, [NotNullWhen(true)] out Task? completion)
@@ -503,7 +503,7 @@ internal sealed partial class GrainDirectoryReplica(
             // Wait for previous versions to be un-wedged before proceeding.
             foreach (var range in addedRanges)
             {
-                await WaitForRange(range, previousVersion);
+                await WaitForRange(range, previousVersion, CancellationToken.None);
             }
 
             // Incorporate the values into the grain directory.
@@ -613,7 +613,7 @@ internal sealed partial class GrainDirectoryReplica(
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error invoking operation '{Operation}' on silo '{SiloAddress}'.", operationName, siloAddress);
-                await _clusterMembershipService.Refresh(default);
+                await _clusterMembershipService.Refresh(default, CancellationToken.None);
                 if (_clusterMembershipService.CurrentSnapshot.Version == clusterMembershipSnapshot.Version)
                 {
                     await Task.Delay(TimeSpan.FromMilliseconds(100));

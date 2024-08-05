@@ -33,34 +33,39 @@ internal sealed partial class ReplicatedGrainDirectory(
 
     public async Task<GrainAddress?> Lookup(GrainId grainId) => await InvokeAsync(
         grainId,
-        static (replica, version, grainId) => replica.LookupAsync(version, grainId),
+        static (replica, version, grainId, cancellationToken) => replica.LookupAsync(version, grainId),
         grainId,
+        CancellationToken.None,
         strict: false);
 
     public async Task<GrainAddress?> Register(GrainAddress address) => await InvokeAsync(
         address.GrainId,
-        static (replica, version, address) => replica.RegisterAsync(version, address, null),
+        static (replica, version, address, cancellationToken) => replica.RegisterAsync(version, address, null),
         address,
+        CancellationToken.None,
         strict: true);
 
     public async Task Unregister(GrainAddress address) => await InvokeAsync(
         address.GrainId,
-        static (replica, version, address) => replica.UnregisterAsync(version, address),
+        static (replica, version, address, cancellationToken) => replica.UnregisterAsync(version, address),
         address,
+        CancellationToken.None,
         strict: false);
 
     public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress) => await InvokeAsync(
         address.GrainId,
-        static (replica, version, state) => replica.RegisterAsync(version, state.Address, state.PreviousAddress),
+        static (replica, version, state, cancellationToken) => replica.RegisterAsync(version, state.Address, state.PreviousAddress),
         (Address: address, PreviousAddress: previousAddress),
+        CancellationToken.None,
         strict: true);
 
     public Task UnregisterSilos(List<SiloAddress> siloAddresses) => Task.CompletedTask;
 
     private async Task<TResult> InvokeAsync<TState, TResult>(
         GrainId grainId,
-        Func<IGrainDirectoryReplica, MembershipVersion, TState, ValueTask<DirectoryResult<TResult>>> func,
+        Func<IGrainDirectoryReplica, MembershipVersion, TState, CancellationToken, ValueTask<DirectoryResult<TResult>>> func,
         TState state,
+        CancellationToken cancellationToken,
         bool strict = true,
         [CallerMemberName] string operation = "")
     {
@@ -71,7 +76,7 @@ internal sealed partial class ReplicatedGrainDirectory(
         var delay = TimeSpan.FromMilliseconds(10);
         while (true)
         {
-
+            cancellationToken.ThrowIfCancellationRequested();
             var initialVersion = _recoveryMembershipVersionValue;
             if (view.Version.Value < _recoveryMembershipVersionValue || !view.TryGetOwnerIndex(grainId, out var owner))
             {
@@ -80,7 +85,7 @@ internal sealed partial class ReplicatedGrainDirectory(
                     return default!;
                 }
 
-                view = await localReplica.RefreshViewAsync(new(view.Version.Value + 1));
+                view = await localReplica.RefreshViewAsync(new(view.Version.Value + 1), cancellationToken);
                 continue;
             }
 
@@ -93,9 +98,9 @@ internal sealed partial class ReplicatedGrainDirectory(
 
             try
             {
-                invokeResult = await func(replica, view.Version, state);
+                invokeResult = await func(replica, view.Version, state, cancellationToken);
             }
-            catch (OrleansMessageRejectionException) when (attempts < MaxAttempts)
+            catch (OrleansMessageRejectionException) when (attempts < MaxAttempts && !cancellationToken.IsCancellationRequested)
             {
                 // This likely indicates that the target silo has been declared dead.
                 ++attempts;
@@ -123,7 +128,7 @@ internal sealed partial class ReplicatedGrainDirectory(
             else
             {
                 // Sync with the remote replica.
-                view = await localReplica.RefreshViewAsync(invokeResult.Version);
+                view = await localReplica.RefreshViewAsync(invokeResult.Version, cancellationToken);
             }
         }
     }

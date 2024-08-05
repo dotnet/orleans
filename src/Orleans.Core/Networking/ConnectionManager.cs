@@ -201,7 +201,7 @@ namespace Orleans.Runtime.Messaging
 
                 this.StartConnection(address, connection);
 
-                await connection.Initialized.WithCancellation(openConnectionCancellation.Token);
+                await connection.Initialized.WaitAsync(openConnectionCancellation.Token);
                 this.OnConnected(address, connection, entry);
 
                 return connection;

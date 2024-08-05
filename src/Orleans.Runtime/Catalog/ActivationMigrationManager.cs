@@ -316,7 +316,7 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
             workerTasks.Add(value.PumpTask);
         }
 
-        await Task.WhenAll(workerTasks).WithCancellation(cancellationToken);
+        await Task.WhenAll(workerTasks).WaitAsync(cancellationToken);
     }
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)

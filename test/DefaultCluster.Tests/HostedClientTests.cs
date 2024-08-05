@@ -108,7 +108,7 @@ namespace DefaultCluster.Tests.General
                             var grain = client.GetGrain<IStuckGrain>(Guid.NewGuid());
                             await grain.RunForever();
                         })
-                    .WithTimeout(maxTimeout);
+                    .WaitAsync(maxTimeout);
 
                 Assert.Equal(expected: 1, actual: runtimeClient.GetRunningRequestsCount(stuckGrainType));
 

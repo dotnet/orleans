@@ -430,7 +430,7 @@ namespace Orleans.Runtime
 
             if (_collectionLoopTask is Task task)
             {
-                await task.WithCancellation(cancellationToken);
+                await task.WaitAsync(cancellationToken);
             }
         }
 
