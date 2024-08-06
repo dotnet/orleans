@@ -146,6 +146,9 @@ internal sealed partial class ReplicatedGrainDirectory(
         var grainDirectoryResolver = serviceProvider.GetRequiredService<GrainDirectoryResolver>();
         List<GrainAddress> result = [];
         List<Task> deactivationTasks = [];
+        var stopwatch = CoarseStopwatch.StartNew();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
         foreach (var (grainId, activation) in localActivations)
         {
             var directory = GetGrainDirectory(activation, grainDirectoryResolver);
@@ -158,9 +161,10 @@ internal sealed partial class ReplicatedGrainDirectory(
                     try
                     {
                         // This activation has not completed registration or is not currently active.
+                        // Abort the activation with a pre-canceled cancellation token so that it skips directory unregistration.
                         // TODO: Expand validity check to non-ActivationData activations.
                         logger.LogWarning("Deactivating activation '{Activation}' due to failure of a directory range owner.", activation);
-                        activation.Deactivate(new DeactivationReason(DeactivationReasonCode.InternalFailure, "Cluster membership changed before activation completed."));
+                        activation.Deactivate(new DeactivationReason(DeactivationReasonCode.DirectoryFailure, "This activation's directory partition was salvaged while registration status was in-doubt."), cts.Token);
                         deactivationTasks.Add(activation.Deactivated);
                     }
                     catch(Exception exception)
@@ -181,11 +185,12 @@ internal sealed partial class ReplicatedGrainDirectory(
         await Task.WhenAll(deactivationTasks);
 
         logger.LogInformation(
-            "Submitting {Count} registered activations for ranges {Ranges} at version {MembershipVersion}. Deactivated {DeactivationCount} in-doubt registrations.",
+            "Submitting {Count} registered activations for ranges {Ranges} at version {MembershipVersion}. Deactivated {DeactivationCount} in-doubt registrations. Took {ElapsedMilliseconds}ms",
             result.Count,
             ranges,
             membershipVersion,
-            deactivationTasks.Count);
+            deactivationTasks.Count,
+            stopwatch.ElapsedMilliseconds);
         return result.AsImmutable();
 
         static IGrainDirectory? GetGrainDirectory(IGrainContext grainContext, GrainDirectoryResolver grainDirectoryResolver)

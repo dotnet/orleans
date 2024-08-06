@@ -57,12 +57,21 @@ internal sealed partial class GrainDirectoryReplica(
 
     public async ValueTask<DirectoryMembershipSnapshot> RefreshViewAsync(MembershipVersion version, CancellationToken cancellationToken)
     {
+        var stopwatch = ValueStopwatch.StartNew();
         _ = _clusterMembershipService.Refresh(version, cancellationToken);
-        await foreach (var view in _viewUpdates.WithCancellation(cancellationToken))
+        if (_view.Version <= version)
         {
-            if (view.Version >= version)
+            await foreach (var view in _viewUpdates.WithCancellation(cancellationToken))
             {
-                return view;
+                if (view.Version >= version)
+                {
+                    break;
+                }
+            }
+
+            if (_logger.IsEnabled(LogLevel.Information) && stopwatch.Elapsed.TotalMilliseconds > 50)
+            {
+                _logger.LogInformation("Refreshed view to version '{Version}' in {Elapsed}ms.", version, stopwatch.Elapsed.TotalMilliseconds);
             }
         }
 
@@ -80,7 +89,12 @@ internal sealed partial class GrainDirectoryReplica(
         await RefreshViewAsync(version, CancellationToken.None);
         foreach (var range in ranges)
         {
+            var stopwatch = CoarseStopwatch.StartNew();
             await WaitForRange(range, rangeVersion, CancellationToken.None);
+            if (stopwatch.Elapsed.TotalMilliseconds > 500)
+            {
+                _logger.LogInformation("Waited for range '{Range}' at version '{Version}' for {Elapsed}ms.", range, rangeVersion, stopwatch.ElapsedMilliseconds);
+            }
         }
 
         List<GrainAddress> partitionAddresses = [];
@@ -588,21 +602,23 @@ internal sealed partial class GrainDirectoryReplica(
                 AssertOwnership(current, entry.GrainId);
                 _directory[entry.GrainId] = entry;
             }
-
-            if (_logger.IsEnabled(LogLevel.Information))
-            {
-                _logger.LogInformation("Recovered '{Count}' entries from silo '{SiloAddress}' for ranges '{Range}' at version '{Version}'.", activations.Count, members[i], addedRanges, current.Version);
-            }
         }
 
-        async Task<List<GrainAddress>> GetRegisteredActivations(MembershipVersion viewNumber, RingRangeCollection ranges, SiloAddress siloAddress)
+        async Task<List<GrainAddress>> GetRegisteredActivations(MembershipVersion version, RingRangeCollection ranges, SiloAddress siloAddress)
         {
+            var stopwatch = ValueStopwatch.StartNew();
             var client = _grainFactory.GetSystemTarget<IGrainDirectoryReplicaClient>(Constants.DirectoryReplicaClientType, siloAddress);
             var result = await InvokeOnClusterMember(
                 siloAddress,
-                async () => await client.GetRegisteredActivations(viewNumber, ranges),
+                async () => await client.GetRegisteredActivations(version, ranges),
                 new Immutable<List<GrainAddress>>([]),
                 nameof(GetRegisteredActivations));
+
+            if (_logger.IsEnabled(LogLevel.Information) && stopwatch.Elapsed.TotalMilliseconds > 50)
+            {
+                _logger.LogInformation("Recovered '{Count}' entries from silo '{SiloAddress}' for ranges '{Range}' at version '{Version}' in {ElapsedMilliseconds}ms.", result.Value.Count, siloAddress, ranges, version, stopwatch.Elapsed.TotalMilliseconds);
+            }
+
             return result.Value;
         }
     }

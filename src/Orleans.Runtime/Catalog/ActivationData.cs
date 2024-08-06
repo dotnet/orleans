@@ -37,7 +37,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = new();
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private GrainLifecycle? _lifecycle;
-    private List<object>? _pendingOperations;
+    private Queue<object>? _pendingOperations;
     private Message? _blockingRequest;
     private bool _isInWorkingSet = true;
     private CoarseStopwatch _busyDuration;
@@ -438,7 +438,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         lock (this)
         {
             _pendingOperations ??= new();
-            _pendingOperations.Add(operation);
+            _pendingOperations.Enqueue(operation);
         }
 
         _workSignal.Signal();
@@ -548,7 +548,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             }
 
             if (state is ActivationState.Creating or ActivationState.Activating or ActivationState.Valid)
-            {
+            {   
                 SetState(ActivationState.Deactivating);
                 _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
                 ScheduleOperation(new Command.Deactivate(cts, state));
@@ -561,7 +561,15 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 {
                     if (op is Command.Activate activate)
                     {
-                        activate.Cts.Cancel();
+                        try
+                        {
+                            _shared.Logger.LogInformation("Cancelling activation of {Activation} due to '{Reason}'", this, reason);
+                            activate.Cts.Cancel();
+                        }
+                        catch (Exception exception)
+                        {
+                            _shared.Logger.LogError(exception, "Error cancelling activation.");
+                        }
                     }
                 }
             }
@@ -864,13 +872,12 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             {
                 if (!IsCurrentlyExecuting)
                 {
-                    List<object>? operations = null;
+                    Queue<object>? operations = null;
                     lock (this)
                     {
                         if (_pendingOperations is { Count: > 0 })
                         {
                             operations = _pendingOperations;
-                            _pendingOperations = null;
                         }
                     }
 
@@ -1090,10 +1097,28 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             return false;
         }
 
-        async Task ProcessOperationsAsync(List<object> operations)
+        async Task ProcessOperationsAsync(Queue<object> operations)
         {
-            foreach (var op in operations)
+            object? op = null;
+            while (true)
             {
+                lock (this)
+                {
+                    // Remove the previous operation.
+                    // Operations are not removed until they are completed, allowing for them to see each other.
+                    // Eg, a deactivation request can see any on-going activation request and cancel it.
+                    if (op is not null)
+                    {
+                        operations.Dequeue();
+                    }
+
+                    // Try to get the next operation.
+                    if (!operations.TryPeek(out op))
+                    {
+                        return;
+                    }
+                }
+
                 try
                 {
                     switch (op)
@@ -1436,6 +1461,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     {
         // A chain of promises that will have to complete in order to complete the activation
         // Register with the grain directory and call the Activate method on the new activation.
+        var stopwatch = ValueStopwatch.StartNew();
         try
         {
             // Currently, the only grain type that is not registered in the Grain Directory is StatelessWorker.
@@ -1516,7 +1542,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
                 if (!success)
                 {
-                    Deactivate(new(DeactivationReasonCode.InternalFailure, registrationException, "Failed to register activation in grain directory."));
+                    Deactivate(new(DeactivationReasonCode.DirectoryFailure, registrationException, "Failed to register activation in grain directory."));
 
                     // Activation failed.
                     return;
@@ -1610,6 +1636,11 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
         finally
         {
+            if (cancellationToken.IsCancellationRequested && stopwatch.Elapsed.TotalMilliseconds > 50)
+            {
+                _shared.Logger.LogInformation("Cancellation requested for activation {Activation} took {ElapsedMilliseconds:0.0}ms.", this, stopwatch.Elapsed.TotalMilliseconds);
+            }
+
             _workSignal.Signal();
         }
     }
@@ -1623,6 +1654,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     /// <param name="cancellationToken">A cancellation which terminates graceful deactivation when cancelled.</param>
     private async Task FinishDeactivating(CancellationToken cancellationToken, ActivationState previousState)
     {
+        var stopwatch = ValueStopwatch.StartNew();
         var migrated = false;
         var encounteredError = false;
         try
@@ -1716,8 +1748,9 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             }
 
             // There is no need to unregister grains during shutdown since dead silos are ignored.
-            var isShuttingDown = DeactivationReason.ReasonCode == DeactivationReasonCode.ShuttingDown;
-            if (!migrated && IsUsingGrainDirectory && !cancellationToken.IsCancellationRequested && !isShuttingDown)
+            // Additionally, if the instance is being deactivated due to an internal failure, the directory does not need to be contacted.
+            var isAborting = DeactivationReason.ReasonCode is (DeactivationReasonCode.ShuttingDown or DeactivationReasonCode.DirectoryFailure);
+            if (!migrated && IsUsingGrainDirectory && !cancellationToken.IsCancellationRequested && !isAborting)
             {
                 // Unregister from directory.
                 // If the grain was migrated, the new activation will perform a check-and-set on the registration itself.
@@ -1774,6 +1807,10 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         // Signal deactivation
         GetDeactivationCompletionSource().TrySetResult(true);
         _workSignal.Signal();
+        if (cancellationToken.IsCancellationRequested && stopwatch.Elapsed.TotalMilliseconds > 50)
+        {
+            _shared.Logger.LogInformation("Cancellation requested for deactivation {Activation} took {ElapsedMilliseconds:0.0}ms.", this, stopwatch.Elapsed.TotalMilliseconds);
+        }
     }
 
     private TaskCompletionSource<bool> GetDeactivationCompletionSource()

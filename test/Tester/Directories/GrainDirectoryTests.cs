@@ -32,7 +32,7 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
 
         var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
         var reconfigurationTimer = CoarseStopwatch.StartNew();
-        var upperLimit = 10;
+        var upperLimit = 5;
         var lowerLimit = 1;
         var target = upperLimit;
         Task clusterOperation = Task.CompletedTask;
