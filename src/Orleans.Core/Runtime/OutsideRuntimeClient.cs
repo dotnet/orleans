@@ -408,7 +408,7 @@ namespace Orleans
             disposed = true;
         }
 
-        public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
+        public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
         {
             foreach (var callback in callbacks)
             {

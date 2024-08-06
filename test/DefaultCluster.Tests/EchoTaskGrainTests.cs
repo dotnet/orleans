@@ -62,7 +62,7 @@ namespace DefaultCluster.Tests.General
                 while (exc is AggregateException) exc = exc.InnerException;
                 string received = exc.Message;
                 Assert.Equal(expectedEchoError, received);
-            }).WithTimeout(timeout);
+            }).WaitAsync(timeout);
         }
 
         [Fact, TestCategory("SlowBVT"), TestCategory("Echo"), TestCategory("Timeout")]
@@ -84,7 +84,7 @@ namespace DefaultCluster.Tests.General
                     Exception exc = t.Exception;
                     while (exc is AggregateException) exc = exc.InnerException;
                     Assert.IsAssignableFrom<TimeoutException>(exc);
-                }).WithTimeout(delay45);
+                }).WaitAsync(delay45);
             sw.Stop();
             Assert.True(TimeIsLonger(sw.Elapsed, delay5), $"Elapsed time out of range: {sw.Elapsed}");
             Assert.True(TimeIsShorter(sw.Elapsed, delay60), $"Elapsed time out of range: {sw.Elapsed}");
@@ -176,7 +176,7 @@ namespace DefaultCluster.Tests.General
                 while (exc is AggregateException) exc = exc.InnerException;
                 string received = exc.Message;
                 Assert.Equal(expectedEchoError, received);
-            }).WithTimeout(timeout);
+            }).WaitAsync(timeout);
 
             clock.Restart();
             received = await grain.GetLastEchoAsync();
@@ -198,7 +198,7 @@ namespace DefaultCluster.Tests.General
             what = "EchoGrain.Ping";
             clock.Restart();
             
-            await grain.PingAsync().WithTimeout(timeout);
+            await grain.PingAsync().WaitAsync(timeout);
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
         }
 
@@ -214,7 +214,7 @@ namespace DefaultCluster.Tests.General
 
             what = "EchoGrain.PingLocalSilo";
             clock.Restart();
-            await grain.PingLocalSiloAsync().WithTimeout(timeout);
+            await grain.PingLocalSiloAsync().WaitAsync(timeout);
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
         }
 
@@ -233,12 +233,12 @@ namespace DefaultCluster.Tests.General
 
             what = "EchoGrain.PingRemoteSilo[1]";
             clock.Restart();
-            await grain.PingRemoteSiloAsync(silo1).WithTimeout(timeout);
+            await grain.PingRemoteSiloAsync(silo1).WaitAsync(timeout);
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
 
             what = "EchoGrain.PingRemoteSilo[2]";
             clock.Restart();
-            await grain.PingRemoteSiloAsync(silo2).WithTimeout(timeout);
+            await grain.PingRemoteSiloAsync(silo2).WaitAsync(timeout);
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
         }
 
@@ -254,7 +254,7 @@ namespace DefaultCluster.Tests.General
 
             what = "EchoGrain.PingOtherSilo";
             clock.Restart();
-            await grain.PingOtherSiloAsync().WithTimeout(timeout);
+            await grain.PingOtherSiloAsync().WaitAsync(timeout);
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
         }
 
@@ -270,7 +270,7 @@ namespace DefaultCluster.Tests.General
 
             what = "EchoGrain.PingOtherSiloMembership";
             clock.Restart();
-            await grain.PingClusterMemberAsync().WithTimeout(timeout);
+            await grain.PingClusterMemberAsync().WaitAsync(timeout);
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
         }
 

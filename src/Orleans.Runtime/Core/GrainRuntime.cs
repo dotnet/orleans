@@ -95,8 +95,7 @@ internal class GrainRuntime : IGrainRuntime
             void ThrowMissingContext() => throw new InvalidOperationException("Activation access violation. A non-activation thread attempted to access activation services.");
         }
 
-        if (context is ActivationData activation
-            && (activation.State == ActivationState.Invalid || activation.State == ActivationState.FailedToActivate))
+        if (context is ActivationData activation && activation.State == ActivationState.Invalid)
         {
             // Move exceptions into local functions to help inlining this method.
             ThrowInvalidActivation(activation);

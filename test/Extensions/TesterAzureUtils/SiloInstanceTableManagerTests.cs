@@ -52,19 +52,19 @@ namespace Tester.AzureUtils
                 this.clusterId,
                 fixture.LoggerFactory,
                 new AzureStorageClusteringOptions { TableName = new AzureStorageClusteringOptions().TableName }.ConfigureTestDefaults())
-                .WaitForResultWithThrow(SiloInstanceTableTestConstants.Timeout);
+                .WaitAsync(SiloInstanceTableTestConstants.Timeout).Result;
         }
 
         // Use TestCleanup to run code after each test has run
         public void Dispose()
         {
-            if(manager != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
+            if (manager != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
             {
                 TimeSpan timeout = SiloInstanceTableTestConstants.Timeout;
 
                 output.WriteLine("TestCleanup Timeout={0}", timeout);
 
-                manager.DeleteTableEntries(this.clusterId).WaitWithThrow(timeout);
+                manager.DeleteTableEntries(this.clusterId).WaitAsync(timeout).Wait();
 
                 output.WriteLine("TestCleanup -  Finished");
                 manager = null;
@@ -126,7 +126,7 @@ namespace Tester.AzureUtils
         public async Task SiloInstanceTable_Op_CreateSiloEntryConditionally()
         {
             bool didInsert = await manager.TryCreateTableVersionEntryAsync()
-                .WithTimeout(new AzureStoragePolicyOptions().OperationTimeout);
+                .WaitAsync(new AzureStoragePolicyOptions().OperationTimeout);
 
             Assert.True(didInsert, "Did insert");
         }

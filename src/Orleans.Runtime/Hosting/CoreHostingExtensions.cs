@@ -121,6 +121,9 @@ namespace Orleans.Hosting
                     services
                         .AddSingleton<SystemTargetBasedMembershipTable>()
                         .AddFromExisting<IMembershipTable, SystemTargetBasedMembershipTable>();
+                    services
+                        .AddSingleton<MembershipTableSystemTarget>()
+                        .AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableSystemTarget>();
                 });
         }
 

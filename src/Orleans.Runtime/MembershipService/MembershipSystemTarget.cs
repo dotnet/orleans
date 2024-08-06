@@ -8,7 +8,7 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.MembershipService
 {
-    internal class MembershipSystemTarget : SystemTarget, IMembershipService
+    internal sealed class MembershipSystemTarget : SystemTarget, IMembershipService, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly MembershipTableManager membershipTableManager;
         private readonly ILogger<MembershipSystemTarget> log;
@@ -19,12 +19,14 @@ namespace Orleans.Runtime.MembershipService
             ILocalSiloDetails localSiloDetails,
             ILoggerFactory loggerFactory,
             ILogger<MembershipSystemTarget> log,
-            IInternalGrainFactory grainFactory)
+            IInternalGrainFactory grainFactory,
+            Catalog catalog)
             : base(Constants.MembershipServiceType, localSiloDetails.SiloAddress, loggerFactory)
         {
             this.membershipTableManager = membershipTableManager;
             this.log = log;
             this.grainFactory = grainFactory;
+            catalog.RegisterSystemTarget(this);
         }
 
         public Task Ping(int pingNumber) => Task.CompletedTask;
@@ -83,7 +85,15 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 var probeTask = this.ProbeInternal(target, probeNumber);
-                await probeTask.WithTimeout(probeTimeout, exceptionMessage: $"Requested probe timeout {probeTimeout} exceeded");
+                try
+                {
+                    await probeTask.WaitAsync(probeTimeout);
+                }
+                catch (TimeoutException exception)
+                {
+                    log.LogWarning(exception, "Requested probe timeout {ProbeTimeout} exceeded", probeTimeout);
+                    throw;
+                }
 
                 result = new IndirectProbeResponse
                 {
@@ -189,6 +199,11 @@ namespace Orleans.Runtime.MembershipService
             }
 
             return task;
+        }
+
+        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle observer)
+        {
+            // No-op, just ensure this instance is created at start-up.
         }
     }
 }

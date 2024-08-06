@@ -36,7 +36,7 @@ namespace AWSUtils.Tests.StorageTests
                     new List<AttributeDefinition> {
                         new AttributeDefinition { AttributeName = "PartitionKey", AttributeType = ScalarAttributeType.S }
                     })
-                .WithTimeout(TimeSpan.FromSeconds(2)).Wait();
+                .WaitAsync(TimeSpan.FromSeconds(2)).Wait();
                 return true;
             }
             catch (Exception exc)

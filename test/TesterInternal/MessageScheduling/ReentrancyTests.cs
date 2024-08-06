@@ -105,7 +105,7 @@ namespace UnitTests
             await grain.SetSelf(grain);
             try
             {
-                await grain.Exceptional().WithTimeout(TimeSpan.FromSeconds(2));
+                await grain.Exceptional().WaitAsync(TimeSpan.FromSeconds(2));
             }
             catch (Exception ex)
             {
@@ -214,39 +214,39 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Stress"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void FanOut_Task_Stress_Reentrant()
+        public async Task FanOut_Task_Stress_Reentrant()
         {
             const int numLoops = 5;
             const int blockSize = 10;
             TimeSpan timeout = TimeSpan.FromSeconds(40);
-            Do_FanOut_Stress(numLoops, blockSize, timeout, false, false);
+            await Do_FanOut_Stress(numLoops, blockSize, timeout, false, false);
         }
 
         [Fact, TestCategory("Stress"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void FanOut_Task_Stress_NonReentrant()
+        public async Task FanOut_Task_Stress_NonReentrant()
         {
             const int numLoops = 5;
             const int blockSize = 10;
             TimeSpan timeout = TimeSpan.FromSeconds(40);
-            Do_FanOut_Stress(numLoops, blockSize, timeout, true, false);
+            await Do_FanOut_Stress(numLoops, blockSize, timeout, true, false);
         }
 
         [Fact, TestCategory("Stress"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void FanOut_AC_Stress_Reentrant()
+        public async Task FanOut_AC_Stress_Reentrant()
         {
             const int numLoops = 5;
             const int blockSize = 10;
             TimeSpan timeout = TimeSpan.FromSeconds(40);
-            Do_FanOut_Stress(numLoops, blockSize, timeout, false, true);
+            await Do_FanOut_Stress(numLoops, blockSize, timeout, false, true);
         }
 
         [Fact, TestCategory("Stress"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void FanOut_AC_Stress_NonReentrant()
+        public async Task FanOut_AC_Stress_NonReentrant()
         {
             const int numLoops = 5;
             const int blockSize = 10;
             TimeSpan timeout = TimeSpan.FromSeconds(40);
-            Do_FanOut_Stress(numLoops, blockSize, timeout, true, true);
+            await Do_FanOut_Stress(numLoops, blockSize, timeout, true, true);
         }
 
         // ---------- Utility methods ----------
@@ -313,7 +313,7 @@ namespace UnitTests
 
         private readonly TimeSpan MaxStressExecutionTime = TimeSpan.FromMinutes(2);
 
-        private void Do_FanOut_Stress(int numLoops, int blockSize, TimeSpan timeout,
+        private async Task Do_FanOut_Stress(int numLoops, int blockSize, TimeSpan timeout,
             bool doNonReentrant, bool doAC)
         {
             Stopwatch totalTime = Stopwatch.StartNew();
@@ -334,8 +334,7 @@ namespace UnitTests
                     });
                     promises.Add(promise);
                     output.WriteLine("Inner loop {0} - Created Tasks. Elapsed={1}", j, innerClock.Elapsed);
-                    bool ok = Task.WhenAll(promises).Wait(timeout);
-                    if (!ok) throw new TimeoutException();
+                    await Task.WhenAll(promises).WaitAsync(timeout);
                     output.WriteLine("Inner loop {0} - Finished Join. Elapsed={1}", j, innerClock.Elapsed);
                     promises.Clear();
                 }

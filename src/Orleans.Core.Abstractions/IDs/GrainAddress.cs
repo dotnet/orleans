@@ -56,7 +56,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="other"> The other <see cref="GrainAddress"/> to compare this one with.</param>
         /// <returns> Returns <c>true</c> if the two <see cref="GrainAddress"/> are considered to match.</returns>
-        public bool Matches(GrainAddress other)
+        public bool Matches(GrainAddress? other)
         {
             return other is not null && _grainId.Equals(other._grainId) && (SiloAddress?.Equals(other.SiloAddress) ?? other.SiloAddress is null)
                 && (_activationId.IsDefault || other._activationId.IsDefault || _activationId.Equals(other._activationId));

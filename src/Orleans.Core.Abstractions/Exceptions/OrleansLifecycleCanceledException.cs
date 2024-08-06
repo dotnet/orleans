@@ -30,8 +30,8 @@ namespace Orleans.Runtime
         /// <param name="innerException">
         /// The inner exception.
         /// </param>
-        internal OrleansLifecycleCanceledException(string message,
-                                                   Exception innerException) : base(message, innerException)
+        internal OrleansLifecycleCanceledException(string message, Exception innerException)
+            : base(message, innerException)
         {
         }
 

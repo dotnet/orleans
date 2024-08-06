@@ -315,9 +315,14 @@ namespace Orleans.Streams
             var agentGrainRef = agent.AsReference<IPersistentStreamPullingAgent>();
 
             // Need to call it as a grain reference.
-            var task = agentGrainRef.Initialize();
-            await task.LogException(logger, ErrorCode.PersistentStreamPullingManager_09,
-                $"PersistentStreamPullingAgent {agent.QueueId} failed to Initialize.");
+            try
+            {
+                await agentGrainRef.Initialize();
+            }
+            catch (Exception exc)
+            {
+                logger.LogError((int)ErrorCode.PersistentStreamPullingManager_09, exc, "PersistentStreamPullingAgent {QueueId} failed to Initialize.", agent.QueueId);
+            }
         }
 
         private async Task RemoveQueues(List<QueueId> queuesToRemove)

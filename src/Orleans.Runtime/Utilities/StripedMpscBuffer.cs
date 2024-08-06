@@ -425,4 +425,3 @@ internal class Padding
     internal const int CACHE_LINE_SIZE = 64;
 #endif
 }
-

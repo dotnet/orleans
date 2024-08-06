@@ -59,7 +59,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             await a.GetOtherAge(); // prime a's routing cache
             await b.DeactivateSelf();
             Thread.Sleep(5000);
-            var age = a.GetOtherAge().WaitForResultWithThrow(TimeSpan.FromMilliseconds(2000));
+            var age = await a.GetOtherAge().WaitAsync(TimeSpan.FromMilliseconds(2000));
             Assert.True(age.TotalMilliseconds < 2000, "Should be newly activated grain");
         }
 

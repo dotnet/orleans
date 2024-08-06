@@ -138,7 +138,7 @@ namespace UnitTests.SchedulerTests
             rootContext.Scheduler.QueueTask(task1);
             rootContext.Scheduler.QueueTask(task2);
 
-            await Task.WhenAll(task1, task2).WithTimeout(TimeSpan.FromSeconds(5));
+            await Task.WhenAll(task1, task2).WaitAsync(TimeSpan.FromSeconds(5));
 
             // N should be 15, because the two tasks should execute in order
             Assert.True(n != 0, "Work items did not get executed");
@@ -227,14 +227,14 @@ namespace UnitTests.SchedulerTests
                 }
             });
 
-            await result0.Task.WithTimeout(TimeSpan.FromMinutes(1));
+            await result0.Task.WaitAsync(TimeSpan.FromMinutes(1));
             Assert.True(result0.Task.Exception == null, "Task-0 should not throw exception: " + result0.Task.Exception);
             Assert.True(await result0.Task, "Task-0 completed");
 
             Assert.NotNull(t1); // Task-1 started
-            await result1.Task.WithTimeout(TimeSpan.FromMinutes(1));
+            await result1.Task.WaitAsync(TimeSpan.FromMinutes(1));
             // give a minimum extra chance to yield after result0 has been set, as it might not have finished the t1 task
-            await t1.WithTimeout(TimeSpan.FromMilliseconds(1));
+            await t1.WaitAsync(TimeSpan.FromMilliseconds(1));
 
             Assert.True(t1.IsCompleted, "Task-1 completed");
             Assert.False(t1.IsFaulted, "Task-1 faulted: " + t1.Exception);
@@ -307,7 +307,7 @@ namespace UnitTests.SchedulerTests
 
             Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get Initial"
 
-            Task t0 = Task.Factory.StartNew(() =>
+            Task t0 = Task.Factory.StartNew(async () =>
             {
                 this.output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                     SynchronizationContext.Current, TaskScheduler.Current);
@@ -326,10 +326,8 @@ namespace UnitTests.SchedulerTests
                         SynchronizationContext.Current, TaskScheduler.Current);
                     Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get #2"
                 });
-#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
-                t2.Wait(TimeSpan.FromSeconds(5));
-#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
-            });
+                await t2.WaitAsync(TimeSpan.FromSeconds(5));
+            }).Unwrap();
             await t0.WaitAsync(TimeSpan.FromSeconds(10));
             Assert.True(t0.IsCompleted, "Task #0 FAULTED=" + t0.Exception);
         }

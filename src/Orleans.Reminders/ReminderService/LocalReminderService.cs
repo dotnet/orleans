@@ -69,12 +69,27 @@ namespace Orleans.Runtime.ReminderService
                 ServiceLifecycleStage.BecomeActive,
                 async ct =>
                 {
-                    await this.QueueTask(() => Initialize(ct));
+                    try
+                    {
+                        await this.QueueTask(() => Initialize(ct));
+                    }
+                    catch (Exception exception)
+                    {
+                        logger.LogError(exception, "Error activating reminder service.");
+                        throw;
+                    }
                 },
                 async ct =>
                 {
-                    await this.QueueTask(Stop)
-                        .WithCancellation("Stopping ReminderService failed because the task was cancelled.", ct);
+                    try
+                    {
+                        await this.QueueTask(Stop).WaitAsync(ct);
+                    }
+                    catch (Exception exception)
+                    {
+                        logger.LogError(exception, "Error stopping reminder service.");
+                        throw;
+                    }
                 });
             observer.Subscribe(
                 nameof(LocalReminderService),
@@ -84,8 +99,15 @@ namespace Orleans.Runtime.ReminderService
                     using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                     cts.CancelAfter(this.reminderOptions.InitializationTimeout);
 
-                    await this.QueueTask(Start)
-                        .WithCancellation($"Starting ReminderService failed because the task was canceled.", cts.Token);
+                    try
+                    {
+                        await this.QueueTask(Start).WaitAsync(cts.Token);
+                    }
+                    catch (Exception exception)
+                    {
+                        logger.LogError(exception, "Error starting reminder service.");
+                        throw;
+                    }
                 },
                 ct => Task.CompletedTask);
         }
@@ -517,7 +539,7 @@ namespace Orleans.Runtime.ReminderService
                             try
                             {
                                 // wait for the initial load task to complete (with a timeout)
-                                await task.WithTimeout(InitialReadMaxWaitTimeForUpdates);
+                                await task.WaitAsync(InitialReadMaxWaitTimeForUpdates);
                             }
                             catch (TimeoutException ex)
                             {

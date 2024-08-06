@@ -47,7 +47,7 @@ namespace UnitTests.General
         {
             await this.HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-            VerificationScenario(0);
+            await VerificationScenario(0);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
@@ -94,7 +94,7 @@ namespace UnitTests.General
             List<SiloHandle> failures = await getSilosToFail(failCode, numOfFailures);
             foreach (SiloHandle fail in failures) // verify before failure
             {
-                VerificationScenario(PickKey(fail.SiloAddress)); // fail.SiloAddress.GetConsistentHashCode());
+                await VerificationScenario(PickKey(fail.SiloAddress)); // fail.SiloAddress.GetConsistentHashCode());
             }
 
             logger.LogInformation(
@@ -110,11 +110,11 @@ namespace UnitTests.General
             }
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
-            AssertEventually(() =>
+            await AssertEventually(async () =>
             {
                 foreach (var key in keysToTest) // verify after failure
                 {
-                    VerificationScenario(key);
+                    await VerificationScenario(key);
                 }
             }, failureTimeout);
         }
@@ -141,7 +141,7 @@ namespace UnitTests.General
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             foreach (SiloHandle sh in silos)
             {
-                VerificationScenario(PickKey(sh.SiloAddress));
+                await VerificationScenario(PickKey(sh.SiloAddress));
             }
             Thread.Sleep(TimeSpan.FromSeconds(15));
         }
@@ -167,10 +167,10 @@ namespace UnitTests.General
 
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
-            AssertEventually(() =>
+            await AssertEventually(async () =>
             {
-                VerificationScenario(keyToCheck); // verify failed silo's key
-                VerificationScenario(PickKey(joins[0].SiloAddress)); // verify newly joined silo's key
+                await VerificationScenario(keyToCheck); // verify failed silo's key
+                await VerificationScenario(PickKey(joins[0].SiloAddress)); // verify newly joined silo's key
             }, failureTimeout);
         }
 
@@ -196,10 +196,10 @@ namespace UnitTests.General
 
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
-            AssertEventually(() =>
+            await AssertEventually(async () =>
             {
-                VerificationScenario(keyToCheck); // verify failed silo's key
-                VerificationScenario(PickKey(joins[0].SiloAddress));
+                await VerificationScenario(keyToCheck); // verify failed silo's key
+                await VerificationScenario(PickKey(joins[0].SiloAddress));
             }, failureTimeout);
         }
 
@@ -219,7 +219,7 @@ namespace UnitTests.General
                 responsibleSilo, testHooks.GetConsistentRingProviderDiagnosticInfo().Result));
         }
 
-        private void VerificationScenario(uint testKey)
+        private async Task VerificationScenario(uint testKey)
         {
             // setup
             List<SiloAddress> silos = new List<SiloAddress>();
@@ -232,22 +232,22 @@ namespace UnitTests.General
             }
 
             // verify parameter key
-            VerifyKey(testKey, silos);
+            await VerifyKey(testKey, silos);
             // verify some other keys as well, apart from the parameter key            
             // some random keys
             for (int i = 0; i < 3; i++)
             {
-                VerifyKey((uint)Random.Shared.Next(), silos);
+                await VerifyKey((uint)Random.Shared.Next(), silos);
             }
             // lowest key
             uint lowest = (uint)(silos.First().GetConsistentHashCode() - 1);
-            VerifyKey(lowest, silos);
+            await VerifyKey(lowest, silos);
             // highest key
             uint highest = (uint)(silos.Last().GetConsistentHashCode() + 1);
-            VerifyKey(lowest, silos);
+            await VerifyKey(lowest, silos);
         }
 
-        private void VerifyKey(uint key, List<SiloAddress> silos)
+        private async Task VerifyKey(uint key, List<SiloAddress> silos)
         {
             var testHooks = this.Client.GetTestHooks(this.HostedCluster.Primary);
             SiloAddress truth = testHooks.GetConsistentRingPrimaryTargetSilo(key).Result; //expected;
@@ -264,7 +264,7 @@ namespace UnitTests.General
             foreach (var siloHandle in this.HostedCluster.GetActiveSilos()) // do this for each silo
             {
                 testHooks = this.Client.GetTestHooks(siloHandle);
-                SiloAddress s = testHooks.GetConsistentRingPrimaryTargetSilo((uint)key).Result;
+                SiloAddress s = await testHooks.GetConsistentRingPrimaryTargetSilo((uint)key);
                 Assert.Equal(truth, s);
             }
         }
@@ -360,12 +360,12 @@ namespace UnitTests.General
             }
         }
 
-        private static void AssertEventually(Action assertion, TimeSpan timeout)
+        private static async Task AssertEventually(Func<Task> assertion, TimeSpan timeout)
         {
-            AssertEventually(assertion, timeout, TimeSpan.FromMilliseconds(500));
+            await AssertEventually(assertion, timeout, TimeSpan.FromMilliseconds(500));
         }
 
-        private static void AssertEventually(Action assertion, TimeSpan timeout, TimeSpan delayBetweenIterations)
+        private static async Task AssertEventually(Func<Task> assertion, TimeSpan timeout, TimeSpan delayBetweenIterations)
         {
             var sw = Stopwatch.StartNew();
 
@@ -373,7 +373,7 @@ namespace UnitTests.General
             {
                 try
                 {
-                    assertion();
+                    await assertion();
                     return;
                 }
                 catch (XunitException)

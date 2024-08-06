@@ -114,7 +114,7 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
             {
                 lock (activation)
                 {
-                    if (activation.State is not (ActivationState.Valid or ActivationState.Invalid or ActivationState.FailedToActivate))
+                    if (activation.State is not (ActivationState.Valid or ActivationState.Invalid))
                     {
                         allActiveOrTerminal = false;
                         break;
@@ -316,7 +316,7 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
             workerTasks.Add(value.PumpTask);
         }
 
-        await Task.WhenAll(workerTasks).WithCancellation(cancellationToken);
+        await Task.WhenAll(workerTasks).WaitAsync(cancellationToken);
     }
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)

@@ -198,13 +198,6 @@ namespace Orleans.Runtime.Messaging
                 }
                 else
                 {
-                    if (stopped)
-                    {
-                        log.LogInformation((int)ErrorCode.Runtime_Error_100115, "Message was queued for sending after outbound queue was stopped: {Message}", msg);
-                        SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message was queued for sending after outbound queue was stopped");
-                        return;
-                    }
-
                     if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection))
                     {
                         existingConnection.Send(msg);
@@ -593,13 +586,16 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 // Activation does not exists and is not a new placement.
-                log.LogInformation(
-                    (int)ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
-                    "Intermediate NonExistentActivation for message {Message}",
-                    msg);
+                if (log.IsEnabled(LogLevel.Debug))
+                {
+                    log.LogDebug(
+                        (int)ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
+                        "Unable to create local activation for message {Message}.",
+                        msg);
+                }
 
-                var nonExistentActivation = new GrainAddress { SiloAddress = msg.TargetSilo, GrainId = msg.TargetGrain };
-                ProcessRequestToInvalidActivation(msg, nonExistentActivation, null, "Non-existent activation");
+                var partialAddress = new GrainAddress { SiloAddress = msg.TargetSilo, GrainId = msg.TargetGrain };
+                ProcessRequestToInvalidActivation(msg, partialAddress, null, "Unable to create local activation");
             }
         }
 
