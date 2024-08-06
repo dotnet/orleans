@@ -872,18 +872,15 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             {
                 if (!IsCurrentlyExecuting)
                 {
-                    Queue<object>? operations = null;
+                    bool hasPendingOperations;
                     lock (this)
                     {
-                        if (_pendingOperations is { Count: > 0 })
-                        {
-                            operations = _pendingOperations;
-                        }
+                        hasPendingOperations = _pendingOperations is { Count: > 0 };
                     }
 
-                    if (operations is not null)
+                    if (hasPendingOperations)
                     {
-                        await ProcessOperationsAsync(operations);
+                        await ProcessOperationsAsync();
                     }
                 }
 
@@ -1097,24 +1094,27 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             return false;
         }
 
-        async Task ProcessOperationsAsync(Queue<object> operations)
+        async Task ProcessOperationsAsync()
         {
             object? op = null;
             while (true)
             {
                 lock (this)
                 {
+                    Debug.Assert(_pendingOperations is not null);
+
                     // Remove the previous operation.
                     // Operations are not removed until they are completed, allowing for them to see each other.
                     // Eg, a deactivation request can see any on-going activation request and cancel it.
                     if (op is not null)
                     {
-                        operations.Dequeue();
+                        _pendingOperations.Dequeue();
                     }
 
                     // Try to get the next operation.
-                    if (!operations.TryPeek(out op))
+                    if (!_pendingOperations.TryPeek(out op))
                     {
+                        _pendingOperations = null;
                         return;
                     }
                 }
