@@ -153,11 +153,22 @@ internal sealed partial class GrainDirectoryReplica(
     }
 
     [Conditional("DEBUG")]
-    private void AssertOwnership(GrainId grainId)
+    private void AssertOwnership(GrainId grainId) => AssertOwnership(_view, grainId);
+
+    [Conditional("DEBUG")]
+    private void AssertOwnership(DirectoryMembershipSnapshot view, GrainId grainId)
     {
-        var view = _view;
-        Debug.Assert(view.TryGetOwnerIndex(grainId, out var owner));
-        Debug.Assert(_id.Equals(owner));
+        if (!view.TryGetOwnerIndex(grainId, out var owner))
+        {
+            Debugger.Launch();
+            Debug.Fail($"Could not find owner for grain grain '{grainId}' in view '{view}'.");
+        }
+
+        if (!_id.Equals(owner))
+        {
+            Debugger.Launch();
+            Debug.Fail($"'{_id}' expected to be the owner of grain '{grainId}', but the owner is '{owner}'.");
+        }
     }
 
     private ValueTask WaitForRange(GrainId grainId, MembershipVersion version, CancellationToken cancellationToken) => WaitForRange(RingRange.FromPoint(grainId.GetUniformHashCode()), version, cancellationToken);
@@ -372,17 +383,17 @@ internal sealed partial class GrainDirectoryReplica(
         var addedRanges = currentRanges.GetAdditions(previousRanges);
         if (!addedRanges.IsEmpty)
         {
-            tasks.Add(TransferOwnershipAsync(previous, current.Version, addedRanges));
+            tasks.Add(TransferOwnershipAsync(previous, current, addedRanges));
         }
     }
 
-    private async Task TransferOwnershipAsync(DirectoryMembershipSnapshot previous, MembershipVersion currentVersion, RingRangeCollection addedRanges)
+    private async Task TransferOwnershipAsync(DirectoryMembershipSnapshot previous, DirectoryMembershipSnapshot current, RingRangeCollection addedRanges)
     {
         var stopwatch = CoarseStopwatch.StartNew();
 
         // The view change is contiguous if the new version is exactly one greater than the previous version.
         // If not, we have missed some updates, so we must declare a potential data loss event.
-        var isContiguous = currentVersion.Value == previous.Version.Value + 1;
+        var isContiguous = current.Version.Value == previous.Version.Value + 1;
         bool success;
         if (isContiguous)
         {
@@ -393,7 +404,7 @@ internal sealed partial class GrainDirectoryReplica(
                 var previousOwnerRanges = previous.GetRanges(previousOwner);
                 if (addedRanges.Overlaps(previousOwnerRanges))
                 {
-                    tasks.Add(TransferRangeAsync(currentVersion, addedRanges, previousOwner, previous.Version));
+                    tasks.Add(TransferRangeAsync(current, addedRanges, previousOwner, previous.Version));
                 }
             }
 
@@ -414,7 +425,7 @@ internal sealed partial class GrainDirectoryReplica(
                 _logger.LogInformation(
                     "Non-contiguous view change detected: '{PreviousVersion}' to '{CurrentVersion}'. Performing recovery.",
                     previous.Version,
-                    currentVersion);
+                    current.Version);
             }
 
             // Suspend all ranges.
@@ -426,7 +437,7 @@ internal sealed partial class GrainDirectoryReplica(
                     _logger.LogTrace("Accepting ownership of range '{Range}'.", addedRange);
                 }
 
-                _pendingRanges.Add((addedRange, currentVersion, tcs));
+                _pendingRanges.Add((addedRange, current.Version, tcs));
             }
 
             success = false;
@@ -435,14 +446,14 @@ internal sealed partial class GrainDirectoryReplica(
         var recovered = false;
         if (!success)
         {
-            await RecoverPartitionRange(currentVersion, addedRanges);
-            ResumeAllRanges(currentVersion);
+            await RecoverPartitionRange(current, addedRanges);
+            ResumeAllRanges(current.Version);
             recovered = true;
         }
 
         if (_logger.IsEnabled(LogLevel.Information))
         {
-            _logger.LogInformation("Completed transferring entries for range '{Range}' at version '{Version}' took {Elapsed}ms.{Recovered}", addedRanges, currentVersion, stopwatch.ElapsedMilliseconds, recovered ? " Recovered" : "");
+            _logger.LogInformation("Completed transferring entries for range '{Range}' at version '{Version}' took {Elapsed}ms.{Recovered}", addedRanges, current.Version, stopwatch.ElapsedMilliseconds, recovered ? " Recovered" : "");
         }
 
         void ResumeAllRanges(MembershipVersion currentVersion)
@@ -460,7 +471,7 @@ internal sealed partial class GrainDirectoryReplica(
         }
     }
 
-    private async Task<bool> TransferRangeAsync(MembershipVersion currentVersion, RingRangeCollection addedRanges, SiloAddress previousOwner, MembershipVersion previousVersion)
+    private async Task<bool> TransferRangeAsync(DirectoryMembershipSnapshot current, RingRangeCollection addedRanges, SiloAddress previousOwner, MembershipVersion previousVersion)
     {
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         foreach (var addedRange in addedRanges.Ranges)
@@ -472,7 +483,7 @@ internal sealed partial class GrainDirectoryReplica(
 
             // Suspend this range and transfer state from the previous owner.
             // If the predecessor becomes unavailable or membership advances quickly, we will declare data loss and un-wedge the range.
-            _pendingRanges.Add((addedRange, currentVersion, tcs));
+            _pendingRanges.Add((addedRange, current.Version, tcs));
         }
 
         try
@@ -485,7 +496,7 @@ internal sealed partial class GrainDirectoryReplica(
             var replica = GetReplica(previousOwner);
 
             // Alternatively, the previous owner could push the snapshot. The pull-based approach is used here because it is simpler.
-            var snapshot = await replica.GetPartitionSnapshotAsync(currentVersion, previousVersion, addedRanges).AsTask().WaitAsync(_shutdownCts.Token);
+            var snapshot = await replica.GetPartitionSnapshotAsync(current.Version, previousVersion, addedRanges).AsTask().WaitAsync(_shutdownCts.Token);
 
             if (snapshot is null)
             {
@@ -509,7 +520,7 @@ internal sealed partial class GrainDirectoryReplica(
             // Incorporate the values into the grain directory.
             foreach (var entry in snapshot.GrainAddresses)
             {
-                AssertOwnership(entry.GrainId);
+                AssertOwnership(current, entry.GrainId);
                 _directory[entry.GrainId] = entry;
             }
 
@@ -522,7 +533,7 @@ internal sealed partial class GrainDirectoryReplica(
             tcs.SetResult();
             foreach (var addedRange in addedRanges.Ranges)
             {
-                _pendingRanges.Remove((addedRange, currentVersion, tcs));
+                _pendingRanges.Remove((addedRange, current.Version, tcs));
             }
 
             await ackTask;
@@ -543,14 +554,14 @@ internal sealed partial class GrainDirectoryReplica(
         }
     }
 
-    private async Task RecoverPartitionRange(MembershipVersion viewNumber, RingRangeCollection addedRanges)
+    private async Task RecoverPartitionRange(DirectoryMembershipSnapshot current, RingRangeCollection addedRanges)
     {
-        _logger.LogInformation("Recovering activations from ranges '{Range}' at version '{Version}'.", addedRanges, viewNumber);
+        _logger.LogInformation("Recovering activations from ranges '{Range}' at version '{Version}'.", addedRanges, current.Version);
         var tasks = new List<Task<List<GrainAddress>>>();
 
         // Membership is guaranteed to be newer than the current view.
         var clusterMembershipSnapshot = _clusterMembershipService.CurrentSnapshot;
-        Debug.Assert(clusterMembershipSnapshot.Version >= viewNumber);
+        Debug.Assert(clusterMembershipSnapshot.Version >= current.Version);
         var members = new List<ClusterMember>();
         foreach (var member in clusterMembershipSnapshot.Members.Values)
         {
@@ -560,7 +571,7 @@ internal sealed partial class GrainDirectoryReplica(
             }
 
             members.Add(member);
-            tasks.Add(GetRegisteredActivations(viewNumber, addedRanges, member.SiloAddress));
+            tasks.Add(GetRegisteredActivations(current.Version, addedRanges, member.SiloAddress));
         }
 
         await Task.WhenAll(tasks).WaitAsync(_shutdownCts.Token).SuppressThrowing();
@@ -574,13 +585,13 @@ internal sealed partial class GrainDirectoryReplica(
             var activations = await tasks[i];
             foreach (var entry in activations)
             {
-                AssertOwnership(entry.GrainId);
+                AssertOwnership(current, entry.GrainId);
                 _directory[entry.GrainId] = entry;
             }
 
             if (_logger.IsEnabled(LogLevel.Information))
             {
-                _logger.LogInformation("Recovered '{Count}' entries from silo '{SiloAddress}' for ranges '{Range}' at version '{Version}'.", activations.Count, members[i], addedRanges, viewNumber);
+                _logger.LogInformation("Recovered '{Count}' entries from silo '{SiloAddress}' for ranges '{Range}' at version '{Version}'.", activations.Count, members[i], addedRanges, current.Version);
             }
         }
 

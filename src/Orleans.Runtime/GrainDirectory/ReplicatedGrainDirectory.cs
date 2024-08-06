@@ -133,7 +133,7 @@ internal sealed partial class ReplicatedGrainDirectory(
         }
     }
 
-    public ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRangeCollection ranges)
+    public async ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRangeCollection ranges)
     {
         if (_recoveryMembershipVersionValue < membershipVersion.Value)
         {
@@ -144,6 +144,7 @@ internal sealed partial class ReplicatedGrainDirectory(
         var localActivations = serviceProvider.GetRequiredService<ActivationDirectory>();
         var grainDirectoryResolver = serviceProvider.GetRequiredService<GrainDirectoryResolver>();
         var result = new List<GrainAddress>();
+        List<Task> deactivationTasks = [];
         foreach (var (grainId, activation) in localActivations)
         {
             var directory = GetGrainDirectory(activation, grainDirectoryResolver);
@@ -157,7 +158,9 @@ internal sealed partial class ReplicatedGrainDirectory(
                     {
                         // This activation has not completed registration or is not currently active.
                         // TODO: Expand validity check to non-ActivationData activations.
-                        activation.Deactivate(new DeactivationReason(DeactivationReasonCode.InternalFailure, "Cluster membership changed during directory registration."));
+                        logger.LogWarning("Deactivating activation '{Activation}' due to failure of a directory range owner.", activation);
+                        activation.Deactivate(new DeactivationReason(DeactivationReasonCode.InternalFailure, "Cluster membership changed before activation completed."));
+                        deactivationTasks.Add(activation.Deactivated);
                     }
                     catch(Exception exception)
                     {
@@ -174,7 +177,8 @@ internal sealed partial class ReplicatedGrainDirectory(
             }
         }
 
-        return new(result.AsImmutable());
+        await Task.WhenAll(deactivationTasks);
+        return result.AsImmutable();
 
         static IGrainDirectory? GetGrainDirectory(IGrainContext grainContext, GrainDirectoryResolver grainDirectoryResolver)
         {

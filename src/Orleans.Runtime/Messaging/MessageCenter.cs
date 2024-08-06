@@ -586,13 +586,16 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 // Activation does not exists and is not a new placement.
-                log.LogInformation(
-                    (int)ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
-                    "Intermediate NonExistentActivation for message {Message}",
-                    msg);
+                if (log.IsEnabled(LogLevel.Debug))
+                {
+                    log.LogDebug(
+                        (int)ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
+                        "Unable to create local activation for message {Message}.",
+                        msg);
+                }
 
-                var nonExistentActivation = new GrainAddress { SiloAddress = msg.TargetSilo, GrainId = msg.TargetGrain };
-                ProcessRequestToInvalidActivation(msg, nonExistentActivation, null, "Non-existent activation");
+                var partialAddress = new GrainAddress { SiloAddress = msg.TargetSilo, GrainId = msg.TargetGrain };
+                ProcessRequestToInvalidActivation(msg, partialAddress, null, "Unable to create local activation");
             }
         }
 

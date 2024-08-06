@@ -356,30 +356,28 @@ namespace Orleans.Runtime
         /// complete and commit outstanding transactions before deleting it.
         /// To be called not from within Activation context, so can be awaited.
         /// </summary>
-        internal async Task DeactivateActivations(DeactivationReason reason, List<IGrainContext> list)
+        internal async Task DeactivateActivations(DeactivationReason reason, List<IGrainContext> list, CancellationToken cancellationToken)
         {
             if (list == null || list.Count == 0) return;
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("DeactivateActivations: {Count} activations.", list.Count);
 
-            var timeoutTokenSource = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
-            await Task.WhenAll(list.Select(activation => activation.DeactivateAsync(reason, timeoutTokenSource.Token)));
+            await Task.WhenAll(list.Select(activation => activation.DeactivateAsync(reason, cancellationToken)));
         }
 
-        internal void StartDeactivatingActivations(DeactivationReason reason, List<IGrainContext> list)
+        internal void StartDeactivatingActivations(DeactivationReason reason, List<IGrainContext> list, CancellationToken cancellationToken)
         {
             if (list == null || list.Count == 0) return;
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("DeactivateActivations: {Count} activations.", list.Count);
 
-            var timeoutTokenSource = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
             foreach (var activation in list)
             {
-                activation.DeactivateAsync(reason, timeoutTokenSource.Token);
+                activation.Deactivate(reason, cancellationToken);
             }
         }
 
-        public Task DeactivateAllActivations()
+        public Task DeactivateAllActivations(CancellationToken cancellationToken)
         {
             if (logger.IsEnabled(LogLevel.Debug))
             {
@@ -398,7 +396,7 @@ namespace Orleans.Runtime
             }
 
             var reason = new DeactivationReason(DeactivationReasonCode.ShuttingDown, "This process is terminating");
-            return DeactivateActivations(reason, activationsToShutdown);
+            return DeactivateActivations(reason, activationsToShutdown, cancellationToken);
         }
 
         public SiloStatus LocalSiloStatus
@@ -485,7 +483,7 @@ namespace Orleans.Runtime
                 {
                     var reasonText = $"This activation is being deactivated due to a failure of server {updatedSilo}, since it was responsible for this activation's grain directory registration.";
                     var reason = new DeactivationReason(DeactivationReasonCode.InternalFailure, reasonText);
-                    StartDeactivatingActivations(reason, activationsToShutdown);
+                    StartDeactivatingActivations(reason, activationsToShutdown, CancellationToken.None);
                 }
             }
         }
