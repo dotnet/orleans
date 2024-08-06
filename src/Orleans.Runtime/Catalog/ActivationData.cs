@@ -39,7 +39,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     private GrainLifecycle? _lifecycle;
     private List<object>? _pendingOperations;
     private Message? _blockingRequest;
-    private bool _isInWorkingSet;
+    private bool _isInWorkingSet = true;
     private CoarseStopwatch _busyDuration;
     private CoarseStopwatch _idleDuration;
     private GrainReference? _selfReference;
@@ -56,16 +56,18 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 #pragma warning restore IDE0052 // Remove unread private members
 
     public ActivationData(
-        GrainAddress addr,
+        GrainAddress grainAddress,
         Func<IGrainContext, WorkItemGroup> createWorkItemGroup,
         IServiceProvider applicationServices,
         GrainTypeSharedContext shared)
     {
+        ArgumentNullException.ThrowIfNull(grainAddress);
+        ArgumentNullException.ThrowIfNull(createWorkItemGroup);
+        ArgumentNullException.ThrowIfNull(applicationServices);
+        ArgumentNullException.ThrowIfNull(shared);
         _shared = shared;
-        Address = addr ?? throw new ArgumentNullException(nameof(addr));
-        State = ActivationState.Create;
+        Address = grainAddress;
         _serviceScope = applicationServices.CreateScope();
-        _isInWorkingSet = true;
         _workItemGroup = createWorkItemGroup(this);
         _messageLoopTask = this.RunOrQueueTask(RunMessageLoop);
     }
@@ -74,13 +76,12 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     public object? GrainInstance { get; private set; }
     public GrainAddress Address { get; private set; }
     public GrainReference GrainReference => _selfReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
-    public ActivationState State { get; private set; }
+    public ActivationState State { get; private set; } = ActivationState.Creating;
     public PlacementStrategy PlacementStrategy => _shared.PlacementStrategy;
     public DateTime CollectionTicket { get; set; }
     public IServiceProvider ActivationServices => _serviceScope.ServiceProvider;
     public ActivationId ActivationId => Address.ActivationId;
-    public IGrainLifecycle ObservableLifecycle => Lifecycle;
-    internal GrainLifecycle Lifecycle
+    public IGrainLifecycle ObservableLifecycle
     {
         get
         {
@@ -456,8 +457,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     {
         lock (this)
         {
-            // Avoid the cost of selecting a new location if the activation is not currently valid.
-            if (State is not ActivationState.Valid)
+            if (State is not (ActivationState.Activating or ActivationState.Valid or ActivationState.Deactivating))
             {
                 return;
             }
@@ -492,9 +492,9 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
             lock (this)
             {
-                if (!StartDeactivating(new DeactivationReason(DeactivationReasonCode.Migrating, "Migrating to a new location")))
+                if (!DeactivateCore(new DeactivationReason(DeactivationReasonCode.Migrating, "Migrating to a new location"), cts.Token))
                 {
-                    // Grain is already deactivating, ignore the migration request.
+                    // Grain is not able to start deactivating or has already completed.
                     return;
                 }
 
@@ -514,9 +514,6 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             {
                 _shared.Logger.LogDebug("Migrating {GrainId} to {SiloAddress}", GrainId, newLocation);
             }
-
-            // Start deactivation to prevent any other.
-            ScheduleOperation(new Command.Deactivate(cts));
         }
         catch (Exception exception)
         {
@@ -525,13 +522,40 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
     }
 
-    public void Deactivate(DeactivationReason reason, CancellationToken cancellationToken)
+    public void Deactivate(DeactivationReason reason, CancellationToken cancellationToken = default) => DeactivateCore(reason, cancellationToken);
+
+    public bool DeactivateCore(DeactivationReason reason, CancellationToken cancellationToken)
     {
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
 
-        StartDeactivating(reason);
-        ScheduleOperation(new Command.Deactivate(cts));
+        lock (this)
+        {
+            var state = State;
+            if (state is ActivationState.Invalid)
+            {
+                return false;
+            }
+
+            if (DeactivationReason.ReasonCode == DeactivationReasonCode.None)
+            {
+                DeactivationReason = reason;
+            }
+
+            if (!DeactivationStartTime.HasValue)
+            {
+                DeactivationStartTime = GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime;
+            }
+
+            if (state is ActivationState.Creating or ActivationState.Activating or ActivationState.Valid)
+            {
+                SetState(ActivationState.Deactivating);
+                _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
+                ScheduleOperation(new Command.Deactivate(cts, state));
+            }
+        }
+
+        return true;
     }
 
     private void DeactivateStuckActivation()
@@ -560,7 +584,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
     }
 
-    void IGrainTimerRegistry.OnTimerDisposed(IGrainTimer orleansTimerInsideGrain)
+    void IGrainTimerRegistry.OnTimerDisposed(IGrainTimer timer)
     {
         lock (this) // need to lock since dispose can be called on finalizer thread, outside grain context (not single threaded).
         {
@@ -569,7 +593,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 return;
             }
 
-            Timers.Remove(orleansTimerInsideGrain);
+            Timers.Remove(timer);
         }
     }
 
@@ -967,7 +991,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
         void ProcessRequestsToInvalidActivation()
         {
-            if (State is ActivationState.Create or ActivationState.Activating)
+            if (State is ActivationState.Creating or ActivationState.Activating)
             {
                 // Do nothing until the activation becomes either valid or invalid
                 return;
@@ -1068,7 +1092,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                         case Command.Activate command:
                             try
                             {
-                                await ActivateAsync(command.RequestContext, command.Cts.Token);
+                                await ActivateAsync(command.RequestContext, command.Cts.Token).SuppressThrowing();
                             }
                             finally
                             {
@@ -1078,7 +1102,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                         case Command.Deactivate command:
                             try
                             {
-                                await FinishDeactivating(command.Cts.Token);
+                                await FinishDeactivating(command.Cts.Token, command.PreviousState).SuppressThrowing();
                             }
                             finally
                             {
@@ -1115,7 +1139,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
             lock (this)
             {
-                if (State != ActivationState.Create)
+                if (State != ActivationState.Creating)
                 {
                     throw new InvalidOperationException($"Attempted to rehydrate a grain in the {State} state");
                 }
@@ -1296,7 +1320,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     {
         lock (this)
         {
-            if (State == ActivationState.Invalid || State == ActivationState.FailedToActivate)
+            if (State == ActivationState.Invalid)
             {
                 _shared.InternalRuntime.MessagingTrace.OnDispatcherReceiveInvalidActivation(message, State);
 
@@ -1383,7 +1407,6 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     }
 
     #region Activation
-
     public void Rehydrate(IRehydrationContext context)
     {
         ScheduleOperation(new Command.Rehydrate(context));
@@ -1400,14 +1423,92 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     private async Task ActivateAsync(Dictionary<string, object>? requestContextData, CancellationToken cancellationToken)
     {
         // A chain of promises that will have to complete in order to complete the activation
-        // Register with the grain directory, register with the store if necessary and call the Activate method on the new activation.
+        // Register with the grain directory and call the Activate method on the new activation.
         try
         {
-            var success = await RegisterActivationInGrainDirectoryAndValidate();
-            if (!success)
+            // Currently, the only grain type that is not registered in the Grain Directory is StatelessWorker.
+            // Among those that are registered in the directory, we currently do not have any multi activations.
+            if (IsUsingGrainDirectory)
             {
-                // If registration failed, bail out.
-                return;
+                Exception? registrationException;
+                var previousRegistration = PreviousRegistration;
+                bool success;
+                try
+                {
+                    while (true)
+                    {
+                        var result = await _shared.InternalRuntime.GrainLocator.Register(Address, previousRegistration);
+                        if (Address.Matches(result))
+                        {
+                            Address = result;
+                            success = true;
+                        }
+                        else if (result?.SiloAddress is { } registeredSilo && registeredSilo.Equals(Address.SiloAddress))
+                        {
+                            if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                            {
+                                _shared.Logger.LogDebug(
+                                    "The grain directory has an existing entry pointing to a different activation of this grain on this silo, {PreviousRegistration}."
+                                    + " This may indicate that the previous activation was deactivated but the directory was not successfully updated."
+                                    + " The directory will be updated to point to this activation.",
+                                    previousRegistration);
+                            }
+
+                            // Attempt to register this activation again, using the registration of the previous instance of this grain,
+                            // which is registered to this silo. That activation must be a defunct predecessor of this activation,
+                            // since the catalog only allows one activation of a given grain at a time.
+                            // This could occur if the previous activation failed to unregister itself from the grain directory.
+                            previousRegistration = result;
+                            continue;
+                        }
+                        else
+                        {
+                            // Set the forwarding address so that messages enqueued on this activation can be forwarded to
+                            // the existing activation.
+                            ForwardingAddress = result?.SiloAddress;
+                            if (ForwardingAddress is { } address)
+                            {
+                                DeactivationReason = new(DeactivationReasonCode.DuplicateActivation, $"This grain is active on another host ({address}).");
+                            }
+
+                            success = false;
+                            CatalogInstruments.ActivationConcurrentRegistrationAttempts.Add(1);
+                            if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                            {
+                                // If this was a duplicate, it's not an error, just a race.
+                                // Forward on all of the pending messages, and then forget about this activation.
+                                _shared.Logger.LogDebug(
+                                    (int)ErrorCode.Catalog_DuplicateActivation,
+                                    "Tried to create a duplicate activation {Address}, but we'll use {ForwardingAddress} instead. "
+                                    + "GrainInstance type is {GrainInstanceType}."
+                                    + "Full activation address is {Address}. We have {WaitingCount} messages to forward.",
+                                    Address,
+                                    ForwardingAddress,
+                                    GrainInstance?.GetType(),
+                                    Address.ToFullString(),
+                                    WaitingCount);
+                            }
+                        }
+
+                        break;
+                    }
+
+                    registrationException = null;
+                }
+                catch (Exception exception)
+                {
+                    registrationException = exception;
+                    _shared.Logger.LogWarning((int)ErrorCode.Runtime_Error_100064, registrationException, "Failed to register grain {Grain} in grain directory", ToString());
+                    success = false;
+                }
+
+                if (!success)
+                {
+                    Deactivate(new(DeactivationReasonCode.InternalFailure, registrationException, "Failed to register activation in grain directory."));
+
+                    // Activation failed.
+                    return;
+                }
             }
 
             lock (this)
@@ -1415,30 +1516,6 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 SetState(ActivationState.Activating);
             }
 
-            success = await CallActivateAsync(requestContextData, cancellationToken);
-            if (!success)
-            {
-                // If activation failed, bail out.
-                return;
-            }
-
-            _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
-            if (_shared.Logger.IsEnabled(LogLevel.Debug))
-            {
-                _shared.Logger.LogDebug("InitActivation is done: {Address}", Address);
-            }
-        }
-        catch (Exception exception)
-        {
-            _shared.Logger.LogError(exception, "Activation of grain {Grain} failed", this);
-        }
-        finally
-        {
-            _workSignal.Signal();
-        }
-
-        async Task<bool> CallActivateAsync(Dictionary<string, object>? requestContextData, CancellationToken cancellationToken)
-        {
             if (_shared.Logger.IsEnabled(LogLevel.Debug))
             {
                 _shared.Logger.LogDebug((int)ErrorCode.Catalog_BeforeCallingActivate, "Activating grain {Grain}", this);
@@ -1450,7 +1527,10 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 RequestContextExtensions.Import(requestContextData);
                 try
                 {
-                    await Lifecycle.OnStart(cancellationToken).WaitAsync(cancellationToken);
+                    if (_lifecycle is { } lifecycle)
+                    {
+                        await lifecycle.OnStart(cancellationToken).WaitAsync(cancellationToken);
+                    }
                 }
                 catch (Exception exception)
                 {
@@ -1479,12 +1559,12 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                     }
                 }
 
+               _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
+ 
                 if (_shared.Logger.IsEnabled(LogLevel.Debug))
                 {
                     _shared.Logger.LogDebug((int)ErrorCode.Catalog_AfterCallingActivate, "Finished activating grain {Grain}", this);
                 }
-
-                return true;
             }
             catch (Exception exception)
             {
@@ -1493,31 +1573,6 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 // Capture the exception so that it can be propagated to rejection messages
                 var sourceException = (exception as OrleansLifecycleCanceledException)?.InnerException ?? exception;
                 _shared.Logger.LogError((int)ErrorCode.Catalog_ErrorCallingActivate, sourceException, "Error activating grain {Grain}", this);
-
-                // Unregister the activation from the directory so other silo don't keep sending message to it
-                lock (this)
-                {
-                    SetState(ActivationState.FailedToActivate);
-                    DeactivationReason = new(DeactivationReasonCode.ActivationFailed, sourceException, "Failed to activate grain.");
-                }
-
-                GetDeactivationCompletionSource().TrySetResult(true);
-
-                if (IsUsingGrainDirectory && ForwardingAddress is null)
-                {
-                    try
-                    {
-                        await _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force);
-                    }
-                    catch (Exception ex)
-                    {
-                        _shared.Logger.LogWarning(
-                            (int)ErrorCode.Catalog_UnregisterAsync,
-                            ex,
-                            "Failed to unregister grain activation {Grain} after activation failed",
-                            this);
-                    }
-                }
 
                 // Unregister this as a message target after some period of time.
                 // This is delayed so that consistently failing activation, perhaps due to an application bug or network
@@ -1529,166 +1584,35 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                     ScheduleOperation(new Command.Delay(TimeSpan.FromSeconds(5)));
                 }
 
-                ScheduleOperation(Command.UnregisterFromCatalog.Instance);
+                // Perform the required deactivation steps.
+                Deactivate(new(DeactivationReasonCode.ActivationFailed, sourceException, "Failed to activate grain."));
 
-                lock (this)
-                {
-                    SetState(ActivationState.Invalid);
-                }
-
-                return false;
+                // Activation failed.
+                return;
             }
         }
-    }
-
-    private async ValueTask<bool> RegisterActivationInGrainDirectoryAndValidate()
-    {
-        bool success;
-
-        // Currently, the only grain type that is not registered in the Grain Directory is StatelessWorker.
-        // Among those that are registered in the directory, we currently do not have any multi activations.
-        if (!IsUsingGrainDirectory)
+        catch (Exception exception)
         {
-            // Grains which do not use the grain directory do not need to do anything here
-            success = true;
+            _shared.Logger.LogError(exception, "Activation of grain {Grain} failed", this);
+            Deactivate(new(DeactivationReasonCode.ApplicationError, exception, "Failed to activate grain."));
         }
-        else
+        finally
         {
-            Exception? registrationException;
-            var previousRegistration = PreviousRegistration;
-            try
-            {
-                while (true)
-                {
-                    var result = await _shared.InternalRuntime.GrainLocator.Register(Address, previousRegistration);
-                    if (Address.Matches(result))
-                    {
-                        Address = result;
-                        success = true;
-                    }
-                    else if (result?.SiloAddress is { } registeredSilo && registeredSilo.Equals(Address.SiloAddress))
-                    {
-                        if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                        {
-                            _shared.Logger.LogDebug(
-                                "The grain directory has an existing entry pointing to a different activation of this grain on this silo, {PreviousRegistration}."
-                                + " This may indicate that the previous activation was deactivated but the directory was not successfully updated."
-                                + " The directory will be updated to point to this activation.",
-                                previousRegistration);
-                        }
-
-                        // Attempt to register this activation again, using the registration of the previous instance of this grain,
-                        // which is registered to this silo. That activation must be a defunct predecessor of this activation,
-                        // since the catalog only allows one activation of a given grain at a time.
-                        // This could occur if the previous activation failed to unregister itself from the grain directory.
-                        previousRegistration = result;
-                        continue;
-                    }
-                    else
-                    {
-                        // Set the forwarding address so that messages enqueued on this activation can be forwarded to
-                        // the existing activation.
-                        ForwardingAddress = result?.SiloAddress;
-                        if (ForwardingAddress is { } address)
-                        {
-                            DeactivationReason = new(DeactivationReasonCode.DuplicateActivation, $"This grain is active on another host ({address}).");
-                        }
-
-                        success = false;
-                        CatalogInstruments.ActivationConcurrentRegistrationAttempts.Add(1);
-                        if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                        {
-                            // If this was a duplicate, it's not an error, just a race.
-                            // Forward on all of the pending messages, and then forget about this activation.
-                            var primary = _shared.InternalRuntime.LocalGrainDirectory.GetPrimaryForGrain(GrainId);
-                            _shared.Logger.LogDebug(
-                                (int)ErrorCode.Catalog_DuplicateActivation,
-                                "Tried to create a duplicate activation {Address}, but we'll use {ForwardingAddress} instead. "
-                                + "GrainInstance type is {GrainInstanceType}. {PrimaryMessage}"
-                                + "Full activation address is {Address}. We have {WaitingCount} messages to forward.",
-                                Address,
-                                ForwardingAddress,
-                                GrainInstance?.GetType(),
-                                primary != null ? "Primary Directory partition for this grain is " + primary + ". " : string.Empty,
-                                Address.ToFullString(),
-                                WaitingCount);
-                        }
-                    }
-
-                    break;
-                }
-
-                registrationException = null;
-            }
-            catch (Exception exception)
-            {
-                registrationException = exception;
-                _shared.Logger.LogWarning((int)ErrorCode.Runtime_Error_100064, registrationException, "Failed to register grain {Grain} in grain directory", ToString());
-                success = false;
-            }
-
-            if (!success)
-            {
-                if (DeactivationReason.ReasonCode == DeactivationReasonCode.None)
-                {
-                    DeactivationReason = new(DeactivationReasonCode.InternalFailure, registrationException, "Failed to register activation in grain directory.");
-                }
-
-                lock (this)
-                {
-                    SetState(ActivationState.Invalid);
-                }
-
-                UnregisterMessageTarget();
-            }
+            _workSignal.Signal();
         }
-
-        return success;
     }
     #endregion
 
     #region Deactivation
 
     /// <summary>
-    /// Starts the deactivation process.
-    /// </summary>
-    public bool StartDeactivating(DeactivationReason reason)
-    {
-        lock (this)
-        {
-            if (State is ActivationState.Deactivating or ActivationState.Invalid or ActivationState.FailedToActivate)
-            {
-                return false;
-            }
-
-            if (State is ActivationState.Activating or ActivationState.Create)
-            {
-                throw new InvalidOperationException("Calling DeactivateOnIdle from within OnActivateAsync is not supported");
-            }
-
-            // If State is Valid, then begin deactivation.
-
-            if (DeactivationReason.ReasonCode == DeactivationReasonCode.None)
-            {
-                DeactivationReason = reason;
-            }
-
-            DeactivationStartTime = GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime;
-            SetState(ActivationState.Deactivating);
-
-            _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
-        }
-
-        return true;
-    }
-
-    /// <summary>
     /// Completes the deactivation process.
     /// </summary>
     /// <param name="cancellationToken">A cancellation which terminates graceful deactivation when cancelled.</param>
-    private async Task FinishDeactivating(CancellationToken cancellationToken)
+    private async Task FinishDeactivating(CancellationToken cancellationToken, ActivationState previousState)
     {
         var migrated = false;
+        var encounteredError = false;
         try
         {
             if (_shared.Logger.IsEnabled(LogLevel.Trace))
@@ -1706,78 +1630,98 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                     "About to call OnDeactivateAsync for '{Activation}'",
                     this);
 
-            // just check in case this activation data is already Invalid or not here at all.
-            if (State == ActivationState.Deactivating)
+            // If the grain was valid when deactivation started, call OnDeactivateAsync.
+            if (previousState == ActivationState.Valid)
             {
                 if (GrainInstance is IGrainBase grainBase)
                 {
                     try
                     {
-                        await grainBase.OnDeactivateAsync(DeactivationReason, cancellationToken).WaitAsync(cancellationToken);
+                        await grainBase.OnDeactivateAsync(DeactivationReason, cancellationToken);
+
+                        if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                            _shared.Logger.LogDebug(
+                                (int)ErrorCode.Catalog_AfterCallingDeactivate,
+                                "Returned from calling '{Activation}' OnDeactivateAsync method",
+                                this);
                     }
                     catch (Exception exception)
                     {
                         _shared.Logger.LogError(exception, $"Error thrown from {nameof(IGrainBase.OnDeactivateAsync)} for activation '{{Activation}}'.", this);
-                        throw;
-                    }
-                }
 
-                try
-                {
-                    await Lifecycle.OnStop(cancellationToken).WaitAsync(cancellationToken);
-                }
-                catch (Exception exception)
-                {
-                    _shared.Logger.LogError(exception, $"Error stopping lifecycle for activation '{{Activation}}'.", this);
-                    throw;
-                }
-
-                if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                    _shared.Logger.LogDebug(
-                        (int)ErrorCode.Catalog_AfterCallingDeactivate,
-                        "Returned from calling '{Activation}' OnDeactivateAsync method",
-                        this);
-
-                if (DehydrationContext is { } context
-                    && ForwardingAddress is { } forwardingAddress
-                    && _shared.MigrationManager is { } migrationManager
-                    && !cancellationToken.IsCancellationRequested)
-                {
-                    try
-                    {
-                        // Populate the dehydration context.
-                        if (context.RequestContext is { } requestContext)
-                        {
-                            RequestContextExtensions.Import(requestContext);
-                        }
-
-                        OnDehydrate(context.MigrationContext);
-
-                        // Send the dehydration context to the target host.
-                        await migrationManager.MigrateAsync(forwardingAddress, GrainId, context.MigrationContext);
-                        _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, forwardingAddress);
-                        migrated = true;
-                    }
-                    catch (Exception exception)
-                    {
-                        _shared.Logger.LogWarning(exception, "Failed to migrate grain {GrainId} to {SiloAddress}", GrainId, forwardingAddress);
-                    }
-                    finally
-                    {
-                        RequestContext.Clear();
+                        // Swallow the exception and continue with deactivation.
+                        encounteredError = true;
                     }
                 }
             }
 
-            if (!migrated)
+            try
             {
-                // Unregister from directory
-                await _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force);
+                if (_lifecycle is { } lifecycle)
+                {
+                    // Stops the lifecycle stages which were previously started.
+                    // Stages which were never started are ignored.
+                    await lifecycle.OnStop(cancellationToken);
+                }
+            }
+            catch (Exception exception)
+            {
+                _shared.Logger.LogError(exception, "Error stopping lifecycle for activation '{Activation}'.", this);
+
+                // Swallow the exception and continue with deactivation.
+                encounteredError = true;
+            }
+
+            if (!encounteredError
+                && DehydrationContext is { } context
+                && ForwardingAddress is { } forwardingAddress
+                && _shared.MigrationManager is { } migrationManager
+                && !cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    // Populate the dehydration context.
+                    if (context.RequestContext is { } requestContext)
+                    {
+                        RequestContextExtensions.Import(requestContext);
+                    }
+
+                    OnDehydrate(context.MigrationContext);
+
+                    // Send the dehydration context to the target host.
+                    await migrationManager.MigrateAsync(forwardingAddress, GrainId, context.MigrationContext);
+                    _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, forwardingAddress);
+                    migrated = true;
+                }
+                catch (Exception exception)
+                {
+                    _shared.Logger.LogWarning(exception, "Failed to migrate activation '{Activation}' to '{SiloAddress}'.", this, forwardingAddress);
+                }
+                finally
+                {
+                    RequestContext.Clear();
+                }
+            }
+
+            // There is no need to unregister grains during shutdown since dead silos are ignored.
+            var isShuttingDown = DeactivationReason.ReasonCode == DeactivationReasonCode.Shutdown;
+            if (!migrated && IsUsingGrainDirectory && !cancellationToken.IsCancellationRequested && !isShuttingDown)
+            {
+                // Unregister from directory.
+                // If the grain was migrated, the new activation will perform a check-and-set on the registration itself.
+                try
+                {
+                    await _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force);
+                }
+                catch (Exception exception)
+                {
+                    _shared.Logger.LogError(exception, "Failed to unregister activation '{Activation}' from directory.", this);
+                }
             }
         }
         catch (Exception ex)
         {
-            _shared.Logger.LogWarning((int)ErrorCode.Catalog_DeactivateActivation_Exception, ex, "Error deactivating '{Activation}'", this);
+            _shared.Logger.LogWarning((int)ErrorCode.Catalog_DeactivateActivation_Exception, ex, "Error deactivating '{Activation}'.", this);
         }
 
         lock (this)
@@ -1810,7 +1754,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
         catch (Exception exception)
         {
-            _shared.Logger.LogWarning(exception, "Exception disposing activation {Activation}", this);
+            _shared.Logger.LogWarning(exception, "Exception disposing activation '{Activation}'.", this);
         }
 
         UnregisterMessageTarget();
@@ -1978,9 +1922,10 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     {
         protected Command() { }
 
-        public sealed class Deactivate(CancellationTokenSource cts) : Command
+        public sealed class Deactivate(CancellationTokenSource cts, ActivationState previousState) : Command
         {
             public CancellationTokenSource Cts { get; } = cts;
+            public ActivationState PreviousState { get; } = previousState;
         }
 
         public sealed class Activate(Dictionary<string, object>? requestContext, CancellationTokenSource cts) : Command

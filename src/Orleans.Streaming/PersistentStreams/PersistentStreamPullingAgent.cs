@@ -129,7 +129,9 @@ namespace Orleans.Streams
 
             try
             {
-                receiverInitTask = await receiver.Initialize(this.options.InitQueueTimeout);
+                receiverInitTask = OrleansTaskExtentions.SafeExecute(() => receiver.Initialize(this.options.InitQueueTimeout))
+                    .LogException(logger, ErrorCode.PersistentStreamPullingAgent_03, $"QueueAdapterReceiver {QueueId:H} failed to Initialize.");
+                receiverInitTask.Ignore();
             }
             catch (Exception exception)
             {
