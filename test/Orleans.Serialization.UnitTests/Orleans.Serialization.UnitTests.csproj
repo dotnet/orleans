@@ -29,6 +29,7 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.NewtonsoftJson\Orleans.Serialization.NewtonsoftJson.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.MessagePack\Orleans.Serialization.MessagePack.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Serializers\Orleans.Serialization.Protobuf\Orleans.Serialization.Protobuf.csproj" />
+    <ProjectReference Include="..\Misc\TestSerializerExternalModels\TestSerializerExternalModels.csproj" />
   </ItemGroup>
 
   <ItemGroup>

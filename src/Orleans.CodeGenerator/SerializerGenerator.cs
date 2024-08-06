@@ -137,11 +137,39 @@ namespace Orleans.CodeGenerator
                                     SingletonSeparatedList(VariableDeclarator(type.FieldName)
                                         .WithInitializer(EqualsValueClause(TypeOfExpression(type.CodecFieldType))))))
                             .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
-                    case FieldAccessorDescription accessor:
+                    case FieldAccessorDescription accessor when accessor.InitializationSyntax != null:
                         return
                             FieldDeclaration(VariableDeclaration(accessor.FieldType,
                                 SingletonSeparatedList(VariableDeclarator(accessor.FieldName).WithInitializer(EqualsValueClause(accessor.InitializationSyntax)))))
                                 .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+                    case FieldAccessorDescription accessor when accessor.InitializationSyntax == null:
+                        //[UnsafeAccessor(UnsafeAccessorKind.Method, Name = "set_Amount")]
+                        //extern static void SetAmount(External instance, int value);
+                        return
+                            MethodDeclaration(
+                                PredefinedType(Token(SyntaxKind.VoidKeyword)),
+                                accessor.AccessorName)
+                                .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ExternKeyword), Token(SyntaxKind.StaticKeyword))
+                                .AddAttributeLists(AttributeList(SingletonSeparatedList(
+                                    Attribute(IdentifierName("System.Runtime.CompilerServices.UnsafeAccessor"))
+                                        .AddArgumentListArguments(
+                                            AttributeArgument(
+                                                MemberAccessExpression(
+                                                        SyntaxKind.SimpleMemberAccessExpression,
+                                                        IdentifierName("System.Runtime.CompilerServices.UnsafeAccessorKind"),
+                                                        IdentifierName("Method"))),
+                                            AttributeArgument(
+                                                    LiteralExpression(
+                                                        SyntaxKind.StringLiteralExpression,
+                                                        Literal($"set_{accessor.FieldName}")))
+                                            .WithNameEquals(NameEquals("Name"))))))
+                                .WithParameterList(
+                                    ParameterList(SeparatedList(new[]
+                                        {
+                                            Parameter(Identifier("instance")).WithType(accessor.ContainingType),
+                                            Parameter(Identifier("value")).WithType(description.FieldType)
+                                        })))
+                                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
                     default:
                         return FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
                             .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
@@ -1069,11 +1097,16 @@ namespace Orleans.CodeGenerator
 
         internal sealed class FieldAccessorDescription : GeneratedFieldDescription
         {
-            public FieldAccessorDescription(TypeSyntax fieldType, string fieldName, ExpressionSyntax initializationSyntax) : base(fieldType, fieldName)
-                => InitializationSyntax = initializationSyntax;
+            public FieldAccessorDescription(TypeSyntax containingType, TypeSyntax fieldType, string fieldName, string accessorName, ExpressionSyntax initializationSyntax = null) : base(fieldType, fieldName)
+            {
+                ContainingType = containingType;
+                AccessorName = accessorName;
+                InitializationSyntax = initializationSyntax;
+            }
 
             public override bool IsInjected => false;
-
+            public readonly string AccessorName;
+            public readonly TypeSyntax ContainingType;
             public readonly ExpressionSyntax InitializationSyntax;
         }
 
@@ -1325,7 +1358,6 @@ namespace Orleans.CodeGenerator
                     return AssignmentExpression(
                         SyntaxKind.SimpleAssignmentExpression,
                         instance.Member(Field.Name),
-
                         value);
                 }
 
@@ -1357,19 +1389,25 @@ namespace Orleans.CodeGenerator
             public FieldAccessorDescription GetGetterFieldDescription()
             {
                 if (IsGettableField || IsGettableProperty) return null;
-                return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, GetterFieldName, LibraryTypes, false);
+                return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, GetterFieldName, LibraryTypes, false,
+                    IsPrimaryConstructorParameter && IsProperty);
             }
 
             public FieldAccessorDescription GetSetterFieldDescription()
             {
                 if (IsSettableField || IsSettableProperty) return null;
-                return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, SetterFieldName, LibraryTypes, true);
+                return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, SetterFieldName, LibraryTypes, true,
+                    IsPrimaryConstructorParameter && IsProperty);
             }
 
-            public static FieldAccessorDescription GetFieldAccessor(INamedTypeSymbol containingType, TypeSyntax fieldType, string fieldName, string accessorName, LibraryTypes library, bool setter)
+            public static FieldAccessorDescription GetFieldAccessor(INamedTypeSymbol containingType, TypeSyntax fieldType, string fieldName, string accessorName, LibraryTypes library, bool setter, bool useUnsafeAccessor = false)
             {
-                var valueType = containingType.IsValueType;
                 var containingTypeSyntax = containingType.ToTypeSyntax();
+
+                if (useUnsafeAccessor)
+                    return new(containingTypeSyntax, fieldType, fieldName, accessorName);
+
+                var valueType = containingType.IsValueType;
 
                 var delegateType = (setter ? (valueType ? library.ValueTypeSetter_2 : library.Action_2) : (valueType ? library.ValueTypeGetter_2 : library.Func_2))
                     .ToTypeSyntax(containingTypeSyntax, fieldType);
@@ -1381,7 +1419,8 @@ namespace Orleans.CodeGenerator
                     InvocationExpression(fieldAccessorUtility.Member(accessorMethod))
                         .AddArgumentListArguments(Argument(TypeOfExpression(containingTypeSyntax)), Argument(fieldName.GetLiteralExpression())));
 
-                return new(delegateType, accessorName, accessorInvoke);
+                // Existing case, accessor is the field in both cases
+                return new(containingTypeSyntax, delegateType, accessorName, accessorName, accessorInvoke);
             }
         }
     }

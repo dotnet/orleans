@@ -18,6 +18,22 @@ namespace Orleans.CodeGenerator
             return GetMatchingProperty(field, field.ContainingType.GetMembers());
         }
 
+        public static bool IsCompilerGenerated(this ISymbol? symbol)
+            => symbol?.GetAttributes().Any(a => a.AttributeClass?.Name == "CompilerGeneratedAttribute") == true;
+
+        public static bool IsCompilerGenerated(this IPropertySymbol? property)
+            => property?.GetMethod.IsCompilerGenerated() == true && property.SetMethod.IsCompilerGenerated();
+
+        public static IParameterSymbol? GetMatchingPrimaryConstructorParameter(IPropertySymbol property, IEnumerable<IParameterSymbol> constructorParameters)
+        {
+            if (!property.IsCompilerGenerated())
+                return null;
+
+            return constructorParameters.FirstOrDefault(p =>
+                string.Equals(p.Name, property.Name, StringComparison.Ordinal) &&
+                SymbolEqualityComparer.Default.Equals(p.Type, property.Type));
+        }
+
         public static IPropertySymbol? GetMatchingProperty(IFieldSymbol field, IEnumerable<ISymbol> memberSymbols)
         {
             var propertyName = PropertyMatchRegex.Match(field.Name);

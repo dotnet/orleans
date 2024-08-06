@@ -242,6 +242,8 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Orleans.Serialization.FShar
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.MessagePack", "src\Orleans.Serialization.MessagePack\Orleans.Serialization.MessagePack.csproj", "{F50F81B6-E9B5-4143-B66B-A1AD913F6E9C}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestSerializerExternalModels", "test\Misc\TestSerializerExternalModels\TestSerializerExternalModels.csproj", "{5D587DDE-036D-4694-A314-8DDF270AC031}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -632,6 +634,10 @@ Global
 		{F50F81B6-E9B5-4143-B66B-A1AD913F6E9C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F50F81B6-E9B5-4143-B66B-A1AD913F6E9C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F50F81B6-E9B5-4143-B66B-A1AD913F6E9C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D587DDE-036D-4694-A314-8DDF270AC031}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D587DDE-036D-4694-A314-8DDF270AC031}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D587DDE-036D-4694-A314-8DDF270AC031}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D587DDE-036D-4694-A314-8DDF270AC031}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -748,6 +754,7 @@ Global
 		{84B44F1D-B7FE-40E3-82F0-730A55AC8613} = {316CDCC7-323F-4264-9FC9-667662BB1F80}
 		{B2D53D3C-E44A-4C9B-AAEE-28FB8C1BDF62} = {A6573187-FD0D-4DF7-91D1-03E07E470C0A}
 		{F50F81B6-E9B5-4143-B66B-A1AD913F6E9C} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
+		{5D587DDE-036D-4694-A314-8DDF270AC031} = {70BCC54E-1618-4742-A079-07588065E361}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}

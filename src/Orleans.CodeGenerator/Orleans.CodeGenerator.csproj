@@ -10,6 +10,7 @@
     <DevelopmentDependency>true</DevelopmentDependency>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IsRoslynComponent>true</IsRoslynComponent>
   </PropertyGroup>
 
   <ItemGroup>
