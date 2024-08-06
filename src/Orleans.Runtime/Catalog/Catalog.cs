@@ -291,8 +291,7 @@ namespace Orleans.Runtime
             }
 
             // Initialize the new activation asynchronously.
-            var cancellation = new CancellationTokenSource(collectionOptions.Value.ActivationTimeout);
-            result.Activate(requestContextData, cancellation.Token);
+            result.Activate(requestContextData);
             return result;
 
             [MethodImpl(MethodImplOptions.NoInlining)]
@@ -413,14 +412,13 @@ namespace Orleans.Runtime
 
         public Task DeleteActivations(List<GrainAddress> addresses, DeactivationReasonCode reasonCode, string reasonText)
         {
-            var timeoutTokenSource = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
             var tasks = new List<Task>(addresses.Count);
             var deactivationReason = new DeactivationReason(reasonCode, reasonText);
             foreach (var activationAddress in addresses)
             {
                 if (TryGetGrainContext(activationAddress.GrainId, out var grainContext))
                 {
-                    tasks.Add(grainContext.DeactivateAsync(deactivationReason, timeoutTokenSource.Token));
+                    tasks.Add(grainContext.DeactivateAsync(deactivationReason));
                 }
             }
 

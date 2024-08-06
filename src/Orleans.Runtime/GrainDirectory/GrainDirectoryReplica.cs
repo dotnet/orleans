@@ -167,10 +167,10 @@ internal sealed partial class GrainDirectoryReplica(
     }
 
     [Conditional("DEBUG")]
-    private void AssertOwnership(GrainId grainId) => AssertOwnership(_view, grainId);
+    private void AssertOwnership(GrainId grainId) => DebugAssertOwnership(_view, grainId);
 
     [Conditional("DEBUG")]
-    private void AssertOwnership(DirectoryMembershipSnapshot view, GrainId grainId)
+    private void DebugAssertOwnership(DirectoryMembershipSnapshot view, GrainId grainId)
     {
         if (!view.TryGetOwnerIndex(grainId, out var owner))
         {
@@ -534,7 +534,7 @@ internal sealed partial class GrainDirectoryReplica(
             // Incorporate the values into the grain directory.
             foreach (var entry in snapshot.GrainAddresses)
             {
-                AssertOwnership(current, entry.GrainId);
+                DebugAssertOwnership(current, entry.GrainId);
                 _directory[entry.GrainId] = entry;
             }
 
@@ -599,7 +599,7 @@ internal sealed partial class GrainDirectoryReplica(
             var activations = await tasks[i];
             foreach (var entry in activations)
             {
-                AssertOwnership(current, entry.GrainId);
+                DebugAssertOwnership(current, entry.GrainId);
                 _directory[entry.GrainId] = entry;
             }
         }

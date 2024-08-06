@@ -1747,10 +1747,10 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 }
             }
 
-            // There is no need to unregister grains during shutdown since dead silos are ignored.
-            // Additionally, if the instance is being deactivated due to an internal failure, the directory does not need to be contacted.
-            var isAborting = DeactivationReason.ReasonCode is (DeactivationReasonCode.ShuttingDown or DeactivationReasonCode.DirectoryFailure);
-            if (!migrated && IsUsingGrainDirectory && !cancellationToken.IsCancellationRequested && !isAborting)
+            // If the instance is being deactivated due to a directory failure, we should not unregister it.
+            var isDirectoryFailure = DeactivationReason.ReasonCode is DeactivationReasonCode.DirectoryFailure;
+
+            if (!migrated && IsUsingGrainDirectory && !cancellationToken.IsCancellationRequested && !isDirectoryFailure)
             {
                 // Unregister from directory.
                 // If the grain was migrated, the new activation will perform a check-and-set on the registration itself.

@@ -12,7 +12,6 @@ using Orleans.GrainDirectory;
 namespace Orleans.Runtime.GrainDirectory;
 
 // TODO: Automatically batch registrations & unregistrations
-// TODO: Fix potential lost registration issue either by deactivating activations or by one of the below options.
 
 internal sealed partial class ReplicatedGrainDirectory(
     GrainDirectoryReplica localReplica,
@@ -120,7 +119,7 @@ internal sealed partial class ReplicatedGrainDirectory(
             {
                 if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.LogInformation("Invoked '{Operation}' on '{Owner}' for grain '{GrainId}' and received result '{Result}'.", operation, owner, grainId, result);
+                    logger.LogTrace("Invoked '{Operation}' on '{Owner}' for grain '{GrainId}' and received result '{Result}'.", operation, owner, grainId, result);
                 }
 
                 return result;
