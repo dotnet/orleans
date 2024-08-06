@@ -23,7 +23,8 @@ namespace Orleans.CodeGenerator
                     return;
                 }
 
-                if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_designtimebuild", out var isDesignTimeBuild)
+                if (!Debugger.IsAttached &&
+                    context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_designtimebuild", out var isDesignTimeBuild)
                     && string.Equals("true", isDesignTimeBuild, StringComparison.OrdinalIgnoreCase))
                 {
                     return;

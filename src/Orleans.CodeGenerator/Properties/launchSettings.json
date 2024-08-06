@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Roslyn": {
+      "commandName": "DebugRoslynComponent",
+      "targetProject": "..\\..\\test\\Orleans.Serialization.UnitTests\\Orleans.Serialization.UnitTests.csproj"
+    }
+  }
+}
