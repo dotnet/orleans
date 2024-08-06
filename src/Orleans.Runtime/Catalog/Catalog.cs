@@ -380,12 +380,13 @@ namespace Orleans.Runtime
             }
         }
 
-        public Task DeactivateAllActivations(CancellationToken cancellationToken)
+        public async Task DeactivateAllActivations(CancellationToken cancellationToken)
         {
             if (logger.IsEnabled(LogLevel.Debug))
             {
                 logger.LogDebug((int)ErrorCode.Catalog_DeactivateAllActivations, "DeactivateAllActivations.");
             }
+
             var activationsToShutdown = new List<IGrainContext>();
             foreach (var pair in activations)
             {
@@ -399,7 +400,7 @@ namespace Orleans.Runtime
             }
 
             var reason = new DeactivationReason(DeactivationReasonCode.ShuttingDown, "This process is terminating");
-            return DeactivateActivations(reason, activationsToShutdown, cancellationToken);
+            await DeactivateActivations(reason, activationsToShutdown, cancellationToken).WaitAsync(cancellationToken);
         }
 
         public SiloStatus LocalSiloStatus
