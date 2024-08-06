@@ -553,6 +553,18 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
                 ScheduleOperation(new Command.Deactivate(cts, state));
             }
+
+            // If the grain is currently activating, cancel that operation.
+            if (_pendingOperations is { } operations)
+            {
+                foreach (var op in operations)
+                {
+                    if (op is Command.Activate activate)
+                    {
+                        activate.Cts.Cancel();
+                    }
+                }
+            }
         }
 
         return true;
@@ -1437,7 +1449,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 {
                     while (true)
                     {
-                        var result = await _shared.InternalRuntime.GrainLocator.Register(Address, previousRegistration);
+                        var result = await _shared.InternalRuntime.GrainLocator.Register(Address, previousRegistration).WaitAsync(cancellationToken);
                         if (Address.Matches(result))
                         {
                             Address = result;
@@ -1704,7 +1716,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             }
 
             // There is no need to unregister grains during shutdown since dead silos are ignored.
-            var isShuttingDown = DeactivationReason.ReasonCode == DeactivationReasonCode.Shutdown;
+            var isShuttingDown = DeactivationReason.ReasonCode == DeactivationReasonCode.ShuttingDown;
             if (!migrated && IsUsingGrainDirectory && !cancellationToken.IsCancellationRequested && !isShuttingDown)
             {
                 // Unregister from directory.

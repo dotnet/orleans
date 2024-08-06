@@ -299,9 +299,10 @@ namespace Orleans.Runtime
             static IGrainContext UnableToCreateActivation(Catalog self, GrainId grainId)
             {
                 // Did not find and did not start placing new
+                var isTerminating = self.SiloStatusOracle.CurrentStatus.IsTerminating();
                 if (self.logger.IsEnabled(LogLevel.Debug))
                 {
-                    if (self.SiloStatusOracle.CurrentStatus.IsTerminating())
+                    if (isTerminating)
                     {
                         self.logger.LogDebug((int)ErrorCode.CatalogNonExistingActivation2, "Unable to create activation for grain {GrainId} because this silo is terminating", grainId);
                     }
@@ -314,14 +315,17 @@ namespace Orleans.Runtime
                 CatalogInstruments.NonExistentActivations.Add(1);
 
                 self.grainLocator.InvalidateCache(grainId);
+                if (!isTerminating)
+                {
+                    // Unregister the target activation so we don't keep getting spurious messages.
+                    // The time delay (one minute, as of this writing) is to handle the unlikely but possible race where
+                    // this request snuck ahead of another request, with new placement requested, for the same activation.
+                    // If the activation registration request from the new placement somehow sneaks ahead of this deregistration,
+                    // we want to make sure that we don't unregister the activation we just created.
+                    var address = new GrainAddress { SiloAddress = self.Silo, GrainId = grainId };
+                    _ = self.UnregisterNonExistentActivation(address);
+                }
 
-                // Unregister the target activation so we don't keep getting spurious messages.
-                // The time delay (one minute, as of this writing) is to handle the unlikely but possible race where
-                // this request snuck ahead of another request, with new placement requested, for the same activation.
-                // If the activation registration request from the new placement somehow sneaks ahead of this deregistration,
-                // we want to make sure that we don't unregister the activation we just created.
-                var address = new GrainAddress { SiloAddress = self.Silo, GrainId = grainId };
-                _ = self.UnregisterNonExistentActivation(address);
                 return null;
             }
         }

@@ -135,6 +135,7 @@ internal sealed partial class ReplicatedGrainDirectory(
 
     public async ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRangeCollection ranges)
     {
+        logger.LogInformation("Collecting registered activations for ranges {Ranges} at version {MembershipVersion}.", ranges, membershipVersion);
         if (_recoveryMembershipVersionValue < membershipVersion.Value)
         {
             // Interlocked.Exchange is used to ensure that the value is immediately visible to any thread registering an activation.
@@ -143,7 +144,7 @@ internal sealed partial class ReplicatedGrainDirectory(
 
         var localActivations = serviceProvider.GetRequiredService<ActivationDirectory>();
         var grainDirectoryResolver = serviceProvider.GetRequiredService<GrainDirectoryResolver>();
-        var result = new List<GrainAddress>();
+        List<GrainAddress> result = [];
         List<Task> deactivationTasks = [];
         foreach (var (grainId, activation) in localActivations)
         {
@@ -178,6 +179,13 @@ internal sealed partial class ReplicatedGrainDirectory(
         }
 
         await Task.WhenAll(deactivationTasks);
+
+        logger.LogInformation(
+            "Submitting {Count} registered activations for ranges {Ranges} at version {MembershipVersion}. Deactivated {DeactivationCount} in-doubt registrations.",
+            result.Count,
+            ranges,
+            membershipVersion,
+            deactivationTasks.Count);
         return result.AsImmutable();
 
         static IGrainDirectory? GetGrainDirectory(IGrainContext grainContext, GrainDirectoryResolver grainDirectoryResolver)
