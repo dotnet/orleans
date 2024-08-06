@@ -11,6 +11,13 @@ using System.Collections.Generic;
 using System.IO.Pipelines;
 using Xunit;
 using System.Linq;
+using UnitTests.SerializerExternalModels;
+using Orleans;
+
+[assembly: GenerateCodeForDeclaringAssembly(typeof(Person2ExternalStruct))]
+#if NET6_0_OR_GREATER
+[assembly: GenerateCodeForDeclaringAssembly(typeof(Person2External))]
+#endif
 
 namespace Orleans.Serialization.UnitTests;
 
@@ -125,6 +132,44 @@ public class GeneratedSerializerTests : IDisposable
         Assert.Equal(original.FavouriteColor, result.FavouriteColor);
         Assert.Equal(original.StarSign, result.StarSign);
     }
+
+    [Fact]
+    public void GeneratedLibExternalRecordStructWithPCtorSerializersRoundTripThroughCodec()
+    {
+        var original = new Person2ExternalStruct(2, "harry")
+        {
+            FavouriteColor = "redborine",
+            StarSign = "Aquaricorn"
+        };
+
+        var result = RoundTripThroughCodec(original);
+
+        Assert.Equal(original.Age, result.Age);
+        Assert.Equal(original.Name, result.Name);
+        Assert.Equal(original.FavouriteColor, result.FavouriteColor);
+        Assert.Equal(original.StarSign, result.StarSign);
+    }
+
+#if NET6_0_OR_GREATER
+
+    [Fact]
+    public void GeneratedLibExternalRecordWithPCtorSerializersRoundTripThroughCodec()
+    {
+        var original = new Person2External(2, "harry")
+        {
+            FavouriteColor = "redborine",
+            StarSign = "Aquaricorn"
+        };
+
+        var result = RoundTripThroughCodec(original);
+
+        Assert.Equal(original.Age, result.Age);
+        Assert.Equal(original.Name, result.Name);
+        Assert.Equal(original.FavouriteColor, result.FavouriteColor);
+        Assert.Equal(original.StarSign, result.StarSign);
+    }
+
+#endif
 
 #if NET6_0_OR_GREATER
     [Fact]

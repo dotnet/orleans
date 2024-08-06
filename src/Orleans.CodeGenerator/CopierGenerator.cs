@@ -117,11 +117,39 @@ namespace Orleans.CodeGenerator
             {
                 switch (description)
                 {
-                    case FieldAccessorDescription accessor:
+                    case FieldAccessorDescription accessor when accessor.InitializationSyntax != null:
                         return
                             FieldDeclaration(VariableDeclaration(accessor.FieldType,
                                 SingletonSeparatedList(VariableDeclarator(accessor.FieldName).WithInitializer(EqualsValueClause(accessor.InitializationSyntax)))))
                                 .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+                    case FieldAccessorDescription accessor when accessor.InitializationSyntax == null:
+                        //[UnsafeAccessor(UnsafeAccessorKind.Method, Name = "set_Amount")]
+                        //extern static void SetAmount(External instance, int value);
+                        return
+                            MethodDeclaration(
+                                PredefinedType(Token(SyntaxKind.VoidKeyword)),
+                                accessor.AccessorName)
+                                .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ExternKeyword), Token(SyntaxKind.StaticKeyword))
+                                .AddAttributeLists(AttributeList(SingletonSeparatedList(
+                                    Attribute(IdentifierName("System.Runtime.CompilerServices.UnsafeAccessor"))
+                                        .AddArgumentListArguments(
+                                            AttributeArgument(
+                                                MemberAccessExpression(
+                                                        SyntaxKind.SimpleMemberAccessExpression,
+                                                        IdentifierName("System.Runtime.CompilerServices.UnsafeAccessorKind"),
+                                                        IdentifierName("Method"))),
+                                            AttributeArgument(
+                                                    LiteralExpression(
+                                                        SyntaxKind.StringLiteralExpression,
+                                                        Literal($"set_{accessor.FieldName}")))
+                                            .WithNameEquals(NameEquals("Name"))))))
+                                .WithParameterList(
+                                    ParameterList(SeparatedList(new[]
+                                        {
+                                            Parameter(Identifier("instance")).WithType(accessor.ContainingType),
+                                            Parameter(Identifier("value")).WithType(description.FieldType)
+                                        })))
+                                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
                     default:
                         return FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
                             .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
