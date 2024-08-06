@@ -200,9 +200,9 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
                 : destination.TryWrite($"(0x{Start:X8}, 0x{End:X8}] ({SizePercent:0.00}%)", out charsWritten);
     }
 
-    public bool Overlaps(RingRange other) => !IsEmpty && !other.IsEmpty && (Equals(other) || Contains(other.End) || other.Contains(End));
+    public bool Intersects(RingRange other) => !IsEmpty && !other.IsEmpty && (Equals(other) || Contains(other.End) || other.Contains(End));
 
-    internal RingRange Inverse()
+    internal RingRange Complement()
     {
         if (IsEmpty)
         {
@@ -219,7 +219,7 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
 
     internal IEnumerable<RingRange> Intersections(RingRange other)
     {
-        if (!Overlaps(other))
+        if (!Intersects(other))
         {
             // No intersections.
             yield break;
@@ -265,27 +265,15 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
         }
     }
 
-    // Gets the sub-ranges which are in this range but are not in the 'previous' range.
-    internal IEnumerable<RingRange> GetAdditions(RingRange previous)
+    // Gets the set difference: the sub-ranges which are in this range but are not in the 'previous' range.
+    internal IEnumerable<RingRange> Difference(RingRange previous)
     {
         // Additions are the intersections between this range and the inverse of the previous range.
-        foreach (var addition in Intersections(previous.Inverse()))
+        foreach (var addition in Intersections(previous.Complement()))
         {
-            Debug.Assert(!addition.Overlaps(previous));
-            Debug.Assert(addition.Overlaps(this));
+            Debug.Assert(!addition.Intersects(previous));
+            Debug.Assert(addition.Intersects(this));
             yield return addition;
-        }
-    }
-
-    // Gets the sub-ranges which are not in this range but are in the 'previous' range.
-    internal IEnumerable<RingRange> GetRemovals(RingRange previous)
-    {
-        // Removals are the intersections between the inverse of this range and the previous range.
-        foreach (var removal in Inverse().Intersections(previous))
-        {
-            Debug.Assert(removal.Overlaps(previous));
-            Debug.Assert(!removal.Overlaps(this));
-            yield return removal;
         }
     }
 

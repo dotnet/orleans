@@ -21,13 +21,13 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
         {
             var prev = ranges[i - 1];
             var curr = ranges[i];
-            Debug.Assert(!prev.Overlaps(curr));
+            Debug.Assert(!prev.Intersects(curr));
             Debug.Assert(curr.Start >= prev.Start);
         }
 
         if (ranges.Length > 1)
         {
-            Debug.Assert(!ranges[0].Overlaps(ranges[^1]));
+            Debug.Assert(!ranges[0].Intersects(ranges[^1]));
         }
 #endif
 

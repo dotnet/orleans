@@ -203,7 +203,7 @@ internal sealed partial class GrainDirectoryReplica(
         {
             foreach (var wedge in _pendingRanges)
             {
-                if (wedge.Version <= version && ranges.Overlaps(wedge.Range))
+                if (wedge.Version <= version && ranges.Intersects(wedge.Range))
                 {
                     completion = wedge.Completion.Task;
                     return true;
@@ -365,7 +365,7 @@ internal sealed partial class GrainDirectoryReplica(
 
             foreach (var (range, ownerIndex) in current.RangeOwners)
             {
-                if (range.Overlaps(removedRange))
+                if (range.Intersects(removedRange))
                 {
                     var owner = current.Members[ownerIndex];
                     Debug.Assert(!_id.Equals(owner));

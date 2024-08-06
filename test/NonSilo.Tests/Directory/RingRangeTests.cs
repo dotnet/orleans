@@ -9,17 +9,16 @@ public sealed class RingRangeTests
     {
         var previous = RingRange.Empty;
         var current = RingRange.CreateEquallyDividedRange(2, 0);
-        Assert.Empty(current.GetAdditions(current));
-        Assert.Empty(current.GetRemovals(current));
+        Assert.Empty(current.Difference(current));
 
-        Assert.Equal(current, Assert.Single(current.GetAdditions(previous)));
-        Assert.Empty(current.GetRemovals(previous));
+        Assert.Equal(current, Assert.Single(current.Difference(previous)));
+        Assert.Empty(previous.Difference(current));
 
         var firstHalf = RingRange.CreateEquallyDividedRange(2, 0);
         var secondHalf = RingRange.CreateEquallyDividedRange(2, 1);
 
-        Assert.Equal(firstHalf, Assert.Single(firstHalf.GetAdditions(secondHalf)));
-        Assert.Equal(secondHalf, Assert.Single(firstHalf.GetRemovals(secondHalf)));
+        Assert.Equal(firstHalf, Assert.Single(firstHalf.Difference(secondHalf)));
+        Assert.Equal(secondHalf, Assert.Single(secondHalf.Difference(firstHalf)));
     }
 
     [Fact]
@@ -30,7 +29,7 @@ public sealed class RingRangeTests
         var third = RingRange.CreateEquallyDividedRange(8, 2);
         var fullRange = RingRange.Create(first.Start, third.End);
 
-        var midPunch = fullRange.GetAdditions(second);
+        var midPunch = fullRange.Difference(second);
         Assert.Equal(2, midPunch.Count());
         Assert.Equal(first, midPunch.First());
         Assert.Equal(third, midPunch.Last());
@@ -40,7 +39,7 @@ public sealed class RingRangeTests
     public void RingRangeAdditionsTest_End()
     {
         var current = RingRange.Create(0x33333334, 0x66666667);
-        var result = current.GetAdditions(RingRange.Empty);
+        var result = current.Difference(RingRange.Empty);
         Assert.Equal(current, Assert.Single(result));
     }
 
@@ -48,23 +47,23 @@ public sealed class RingRangeTests
     public void RingRangeAdditionsTest_End_Two()
     {
         var current = RingRange.Create(0x33333334, 0x66666667);
-        var result = current.GetAdditions(RingRange.Create(uint.MaxValue - 1, 1));
-        Assert.Equal(current, Assert.Single(result));
+        var previous = RingRange.Create(uint.MaxValue - 1, 1);
+        var result = Assert.Single(current.Difference(previous));
+        Assert.Equal(current, result);
+        Assert.Equal(previous, Assert.Single(previous.Difference(current)));
     }
 
     [Fact]
     public void RingRangeIntersection()
     {
-        Assert.Empty(RingRange.Empty.GetAdditions(RingRange.Empty));
-        Assert.Empty(RingRange.Empty.GetRemovals(RingRange.Empty));
+        Assert.Empty(RingRange.Empty.Difference(RingRange.Empty));
 
-        Assert.Empty(RingRange.Full.GetAdditions(RingRange.Full));
-        Assert.Empty(RingRange.Full.GetRemovals(RingRange.Full));
+        Assert.Empty(RingRange.Full.Difference(RingRange.Full));
 
-        Assert.Equal(RingRange.Full, Assert.Single(RingRange.Full.GetAdditions(RingRange.Empty)));
+        Assert.Equal(RingRange.Full, Assert.Single(RingRange.Full.Difference(RingRange.Empty)));
 
-        Assert.Empty(RingRange.Empty.GetAdditions(RingRange.Full));
-        Assert.Empty(RingRange.Full.GetRemovals(RingRange.Empty));
+        Assert.Empty(RingRange.Empty.Difference(RingRange.Full));
+        Assert.Empty(RingRange.Full.Difference(RingRange.Empty));
     }
 
     [InlineData(1)]
@@ -80,7 +79,7 @@ public sealed class RingRangeTests
         for (var i = 0; i < count; i++)
         {
             var range = RingRange.CreateEquallyDividedRange(count, i);
-            Assert.False(previous.Overlaps(range));
+            Assert.False(previous.Intersects(range));
             sum += range.Size;
             previous = range;
         }
