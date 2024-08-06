@@ -131,10 +131,10 @@ namespace Orleans.Runtime
                 new SimpleGrainStatistic { SiloAddress = this.localSiloDetails.SiloAddress, GrainType = p.Key, ActivationCount = (int)p.Value }).ToArray());
         }
 
-        public Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId)
+        public async Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId)
         {
             logger.LogInformation("DetailedGrainReport for grain id {GrainId}", grainId);
-            return Task.FromResult( this.catalog.GetDetailedGrainReport(grainId));
+            return await this.catalog.GetDetailedGrainReport(grainId);
         }
 
         public Task<int> GetActivationCount()

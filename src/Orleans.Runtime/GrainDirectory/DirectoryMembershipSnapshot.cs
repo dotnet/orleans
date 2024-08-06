@@ -155,10 +155,10 @@ internal sealed class DirectoryMembershipSnapshot
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryGetOwnerIndex(GrainId grainId, [NotNullWhen(true)] out SiloAddress? owner) => TryGetOwnerIndex(grainId.GetUniformHashCode(), out owner);
+    public bool TryGetOwner(GrainId grainId, [NotNullWhen(true)] out SiloAddress? owner) => TryGetOwner(grainId.GetUniformHashCode(), out owner);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryGetOwnerIndex(uint hashCode, [NotNullWhen(true)] out SiloAddress? owner)
+    public bool TryGetOwner(uint hashCode, [NotNullWhen(true)] out SiloAddress? owner)
     {
         // Binary search with wrap-around to include the last element to handle the case
         // where it wraps around the boundary of the ring.

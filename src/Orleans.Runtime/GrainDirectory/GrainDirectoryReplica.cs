@@ -172,7 +172,7 @@ internal sealed partial class GrainDirectoryReplica(
     [Conditional("DEBUG")]
     private void DebugAssertOwnership(DirectoryMembershipSnapshot view, GrainId grainId)
     {
-        if (!view.TryGetOwnerIndex(grainId, out var owner))
+        if (!view.TryGetOwner(grainId, out var owner))
         {
             Debugger.Launch();
             Debug.Fail($"Could not find owner for grain grain '{grainId}' in view '{view}'.");

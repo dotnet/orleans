@@ -19,7 +19,7 @@ internal sealed partial class ReplicatedGrainDirectory(
     ILocalSiloDetails localSiloDetails,
     ILoggerFactory loggerFactory,
     IServiceProvider serviceProvider)
-    : SystemTarget(Constants.DirectoryReplicaClientType, localSiloDetails.SiloAddress, loggerFactory), IGrainDirectory, IGrainDirectoryReplicaClient, ILifecycleParticipant<ISiloLifecycle>
+    : SystemTarget(Constants.DirectoryReplicaClientType, localSiloDetails.SiloAddress, loggerFactory), IGrainDirectory, IGrainDirectoryReplicaClient, ILifecycleParticipant<ISiloLifecycle>, ReplicatedGrainDirectory.ITestHooks
 {
     // The recovery membership value is used to avoid a race between concurrent registration & recovery operations which could lead to lost registrations.
     // This could occur when a new activation is created and begins registering itself with a host which crashes. Concurrently, the new owner initiates
@@ -77,7 +77,7 @@ internal sealed partial class ReplicatedGrainDirectory(
         {
             cancellationToken.ThrowIfCancellationRequested();
             var initialVersion = _recoveryMembershipVersionValue;
-            if (view.Version.Value < _recoveryMembershipVersionValue || !view.TryGetOwnerIndex(grainId, out var owner))
+            if (view.Version.Value < _recoveryMembershipVersionValue || !view.TryGetOwner(grainId, out var owner))
             {
                 if (view.Members.Length == 0 && view.Version.Value > 0)
                 {
@@ -221,5 +221,16 @@ internal sealed partial class ReplicatedGrainDirectory(
 
             return Task.CompletedTask;
         }
+    }
+
+    SiloAddress? ITestHooks.GetPrimaryForGrain(GrainId grainId)
+    {
+        localReplica.CurrentView.TryGetOwner(grainId, out var owner);
+        return owner;
+    }
+
+    internal interface ITestHooks
+    {
+        SiloAddress? GetPrimaryForGrain(GrainId grainId);
     }
 }

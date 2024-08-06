@@ -135,7 +135,7 @@ namespace Orleans.Runtime
             return stats;
         }
 
-        public DetailedGrainReport GetDetailedGrainReport(GrainId grain)
+        public async Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grain)
         {
             string grainClassName;
             try
@@ -153,15 +153,17 @@ namespace Orleans.Runtime
                 ActivationData data => data.ToDetailedString(),
                 var a => a?.ToString()
             };
-
+            grainLocator.TryLookupInCache(grain, out var cachedAddress);
+            var address = await grainLocator.Lookup(grain);
+            var primary = (serviceProvider.GetService<ReplicatedGrainDirectory>() as ReplicatedGrainDirectory.ITestHooks)?.GetPrimaryForGrain(grain);
             return new()
             {
                 Grain = grain,
                 SiloAddress = LocalSilo,
                 SiloName = localSiloName,
-                LocalCacheActivationAddress = directory.GetLocalCacheData(grain),
-                LocalDirectoryActivationAddress = directory.GetLocalDirectoryData(grain).Address,
-                PrimaryForGrain = directory.GetPrimaryForGrain(grain),
+                LocalCacheActivationAddress = cachedAddress,
+                LocalDirectoryActivationAddress = address,
+                PrimaryForGrain = primary,
                 GrainClassTypeName = grainClassName,
                 LocalActivation = activation,
             };
