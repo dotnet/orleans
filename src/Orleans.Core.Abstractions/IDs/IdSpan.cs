@@ -81,7 +81,12 @@ namespace Orleans.Runtime
         /// <returns>
         /// A new <see cref="IdSpan"/> corresponding to the provided id.
         /// </returns>
-        public static IdSpan Create(string? id) => id is string idString ? new IdSpan(Encoding.UTF8.GetBytes(idString)) : default;
+        /// <exception cref="ArgumentException"/>
+        public static IdSpan Create(string? id)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(id, nameof(id));
+            return new IdSpan(Encoding.UTF8.GetBytes(id!));
+        }
 
         /// <summary>
         /// Returns a span representation of this instance.
