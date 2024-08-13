@@ -56,13 +56,14 @@
     <PackageVersion Include="Aspire.Hosting.Redis" Version="8.1.0" />
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="8.1.0" />
     <!-- 3rd party packages -->
-    <PackageVersion Include="Google.Cloud.PubSub.V1" Version="1.0.0-beta13" />
+    <PackageVersion Include="Google.Cloud.PubSub.V1" Version="3.6.0" />
     <PackageVersion Include="AWSSDK.DynamoDBv2" Version="3.7.300.6" />
     <PackageVersion Include="AWSSDK.SQS" Version="3.7.300" />
     <PackageVersion Include="Consul" Version="1.6.10.9" />
     <PackageVersion Include="Google.Protobuf" Version="3.24.4" />
     <PackageVersion Include="protobuf-net" Version="3.2.26" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+
     <PackageVersion Include="ZooKeeperNetEx" Version="3.4.12.4" />
     <PackageVersion Include="StackExchange.Redis" Version="2.6.122" />
     <PackageVersion Include="KubernetesClient" Version="12.1.1" />
