@@ -372,7 +372,7 @@ public class LeaseBasedQueueBalancer(
         var results = await _leaseProvider.Renew(_options.LeaseCategory, _myQueues.Select(queue => queue.AcquiredLease).ToArray());
 
         // Update myQueues list with successfully renewed leases.
-        for (var i = 0; i < results.Length; i++)
+        for (var i = results.Length - 1; i >= 0; i--)
         {
             AcquireLeaseResult result = results[i];
             switch (result.StatusCode)
