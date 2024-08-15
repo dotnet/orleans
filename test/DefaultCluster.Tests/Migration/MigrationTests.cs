@@ -43,6 +43,38 @@ namespace DefaultCluster.Tests.General
         }
 
         /// <summary>
+        /// Tests that migration can be initiated from within the grain's <see cref="IGrainBase.OnDeactivateAsync(DeactivationReason, CancellationToken)"/> implementation.
+        /// </summary>
+        [Fact, TestCategory("BVT")]
+        public async Task InitiateMigrationFromOnDeactivateAsyncTest()
+        {
+            for (var i = 1; i < 100; ++i)
+            {
+                var grain = GrainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
+                var expectedState = Random.Shared.Next();
+                await grain.SetState(expectedState);
+                var originalAddress = await grain.GetGrainAddress();
+                var originalHost = originalAddress.SiloAddress;
+                var targetHost = Fixture.HostedCluster.GetActiveSilos().Select(s => s.SiloAddress).First(address => address != originalHost);
+
+                // Trigger deactivation and tell the grain that it should migrate to the target host on deactivation.
+                await grain.MigrateDuringDeactivation(targetHost);
+
+                GrainAddress newAddress;
+                do
+                {
+                    newAddress = await grain.GetGrainAddress();
+                } while (newAddress.ActivationId == originalAddress.ActivationId);
+
+                var newHost = newAddress.SiloAddress;
+                Assert.Equal(targetHost, newHost);
+
+                var newState = await grain.GetState();
+                Assert.Equal(expectedState, newState);
+            }
+        }
+
+        /// <summary>
         /// Tests that grain migration works for a simple grain which directly implements <see cref="IGrainMigrationParticipant"/>.
         /// The test specifies an alternative location for the grain to migrate to and asserts that it migrates to that location.
         /// </summary>
@@ -259,11 +291,13 @@ namespace DefaultCluster.Tests.General
         ValueTask<GrainAddress> GetGrainAddress();
         ValueTask SetState(int state);
         ValueTask<int> GetState();
+        ValueTask MigrateDuringDeactivation(SiloAddress targetHost);
     }
 
     public class MigrationTestGrain : Grain, IMigrationTestGrain, IGrainMigrationParticipant
     {
         private int _state;
+        private SiloAddress _migrateDuringDeactivationTargetHost;
         public ValueTask<int> GetState() => new(_state);
 
         public ValueTask SetState(int state)
@@ -302,6 +336,23 @@ namespace DefaultCluster.Tests.General
         }
 
         public ValueTask<GrainAddress> GetGrainAddress() => new(GrainContext.Address);
+        public ValueTask MigrateDuringDeactivation(SiloAddress targetHost)
+        {
+            _migrateDuringDeactivationTargetHost = targetHost;
+            this.DeactivateOnIdle();
+            return ValueTask.CompletedTask;
+        }
+
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+        {
+            if (reason.ReasonCode is DeactivationReasonCode.ApplicationRequested && _migrateDuringDeactivationTargetHost is not null)
+            {
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, _migrateDuringDeactivationTargetHost);
+                this.MigrateOnIdle();
+            }
+
+            return base.OnDeactivateAsync(reason, cancellationToken);
+        }
     }
 
     public interface IMigrationTestGrain_GrainOfT : IGrainWithIntegerKey
