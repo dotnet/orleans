@@ -37,7 +37,7 @@ namespace UnitTests.TimerTests
             // ReminderTable.Clear() cannot be called from a non-Orleans thread,
             // so we must proxy the call through a grain.
             var controlProxy = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            controlProxy.EraseReminderTable().WaitWithThrow(TestConstants.InitTimeout);
+            controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout).Wait();
         }
 
         // Basic tests

@@ -110,7 +110,7 @@ namespace Tester.AzureUtils.TimerTests
                     this.log.LogInformation("Started {Capture}", capture);
                 }
                 this.log.LogInformation("Started all, now waiting...");
-                await Task.WhenAll(promises).WithTimeout(TimeSpan.FromSeconds(500));
+                await Task.WhenAll(promises).WaitAsync(TimeSpan.FromSeconds(500));
             }
             catch (Exception exc)
             {

@@ -37,7 +37,7 @@ namespace UnitTests.MessageCenterTests
 
         protected async Task Test_GatewaySelection(IGatewayListProvider listProvider)
         {
-            IList<Uri> gatewayUris = listProvider.GetGateways().GetResult();
+            IList<Uri> gatewayUris = await listProvider.GetGateways();
             Assert.True(gatewayUris.Count > 0, $"Found some gateways. Data = {Utils.EnumerableToString(gatewayUris)}");
 
             var gatewayEndpoints = gatewayUris.Select(uri =>
