@@ -84,7 +84,7 @@ namespace Orleans.Serialization.UnitTests
                             { } t => t,
                         };
                         typesWithCopiers.Add(typeArg);
-                    }   
+                    }
                 }
             }
 
@@ -1045,6 +1045,36 @@ namespace Orleans.Serialization.UnitTests
         protected override bool IsImmutable => true;
     }
 
+    public class BitArrayCodecTests(ITestOutputHelper output) : FieldCodecTester<BitArray, BitArrayCodec>(output)
+    {
+        protected override BitArray CreateValue() => new BitArray(Guid.NewGuid().ToByteArray());
+
+        protected override bool Equals(BitArray left, BitArray right) => ReferenceEquals(left, right) || left.Length == right.Length && Enumerable.Range(0, left.Length).All(i => left[i] == right[i]);
+
+        protected override BitArray[] TestValues =>
+        [
+            null,
+            new BitArray(0, false),
+            new BitArray(Enumerable.Range(0, Random.Next(4097)).Select(b => unchecked((byte)b)).ToArray()),
+            CreateValue(),
+        ];
+    }
+
+    public class BitArrayCopierTests(ITestOutputHelper output) : CopierTester<BitArray, BitArrayCopier>(output)
+    {
+        protected override BitArray CreateValue() => new BitArray(Guid.NewGuid().ToByteArray());
+
+        protected override bool Equals(BitArray left, BitArray right) => ReferenceEquals(left, right) || left.Length == right.Length && Enumerable.Range(0, left.Length).All(i => left[i] == right[i]);
+
+        protected override BitArray[] TestValues =>
+        [
+            null,
+            new BitArray(0, false),
+            new BitArray(Enumerable.Range(0, Random.Next(4097)).Select(b => unchecked((byte)b)).ToArray()),
+            CreateValue(),
+        ];
+    }
+
     public class ByteArrayCodecTests(ITestOutputHelper output) : FieldCodecTester<byte[], ByteArrayCodec>(output)
     {
         protected override byte[] CreateValue() => Guid.NewGuid().ToByteArray();
@@ -1084,7 +1114,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(Memory<int> left, Memory<int> right) => left.Span.SequenceEqual(right.Span);
-        protected override Memory<int>[] TestValues => [null, new Memory<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
+        protected override Memory<int>[] TestValues => [default, new Memory<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class MemoryCopierTests(ITestOutputHelper output) : CopierTester<Memory<int>, MemoryCopier<int>>(output)
@@ -1098,7 +1128,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(Memory<int> left, Memory<int> right) => left.Span.SequenceEqual(right.Span);
-        protected override Memory<int>[] TestValues => [null, new Memory<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
+        protected override Memory<int>[] TestValues => [default, new Memory<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ReadOnlyMemoryCodecTests(ITestOutputHelper output) : FieldCodecTester<ReadOnlyMemory<int>, ReadOnlyMemoryCodec<int>>(output)
@@ -1112,7 +1142,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ReadOnlyMemory<int> left, ReadOnlyMemory<int> right) => left.Span.SequenceEqual(right.Span);
-        protected override ReadOnlyMemory<int>[] TestValues => [null, new ReadOnlyMemory<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
+        protected override ReadOnlyMemory<int>[] TestValues => [default, new ReadOnlyMemory<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ReadOnlyMemoryCopierTests(ITestOutputHelper output) : CopierTester<ReadOnlyMemory<int>, ReadOnlyMemoryCopier<int>>(output)
@@ -1126,7 +1156,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ReadOnlyMemory<int> left, ReadOnlyMemory<int> right) => left.Span.SequenceEqual(right.Span);
-        protected override ReadOnlyMemory<int>[] TestValues => [null, new ReadOnlyMemory<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
+        protected override ReadOnlyMemory<int>[] TestValues => [default, new ReadOnlyMemory<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ArraySegmentCodecTests(ITestOutputHelper output) : FieldCodecTester<ArraySegment<int>, ArraySegmentCodec<int>>(output)
@@ -1140,7 +1170,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ArraySegment<int> left, ArraySegment<int> right) => left.SequenceEqual(right);
-        protected override ArraySegment<int>[] TestValues => [null, new ArraySegment<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
+        protected override ArraySegment<int>[] TestValues => [default, new ArraySegment<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ArraySegmentCopierTests(ITestOutputHelper output) : CopierTester<ArraySegment<int>, ArraySegmentCopier<int>>(output)
@@ -1154,7 +1184,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ArraySegment<int> left, ArraySegment<int> right) => left.SequenceEqual(right);
-        protected override ArraySegment<int>[] TestValues => [null, new ArraySegment<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
+        protected override ArraySegment<int>[] TestValues => [default, new ArraySegment<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ArrayCodecTests(ITestOutputHelper output) : FieldCodecTester<int[], ArrayCodec<int>>(output)
