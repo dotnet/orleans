@@ -31,6 +31,7 @@ namespace Orleans.Streams
         [Id(6)]
         public string FilterData;
 
+        [NonSerialized]
         public bool IsRegistered = false;
 
         public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
