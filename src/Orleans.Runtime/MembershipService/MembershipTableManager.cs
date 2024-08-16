@@ -10,6 +10,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime.Utilities;
+using Orleans.Serialization;
 using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Runtime.MembershipService
@@ -119,15 +120,8 @@ namespace Orleans.Runtime.MembershipService
                         localSiloEntry.ToFullString());
                     this.KillMyselfLocally($"I should be Dead according to membership table (in RefreshFromSnapshot). Local entry: {(localSiloEntry.ToFullString())}.");
                 }
-
-                snapshot = MembershipTableSnapshot.Create(localSiloEntry.WithStatus(this.CurrentStatus), snapshot);
-            }
-            else
-            {
-                snapshot = MembershipTableSnapshot.Create(this.CreateLocalSiloEntry(this.CurrentStatus), snapshot);
             }
 
-            // If we are behind, let's take directly the snapshot in param
             this.updates.TryPublish(snapshot);
         }
 
@@ -485,10 +479,7 @@ namespace Orleans.Runtime.MembershipService
             if (table is null) throw new ArgumentNullException(nameof(table));
             if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug($"{nameof(ProcessTableUpdate)} (called from {{Caller}}) membership table {{Table}}", caller, table.ToString());
 
-            // Update the current membership snapshot.
-            var (localSiloEntry, _) = this.GetOrCreateLocalSiloEntry(table, this.CurrentStatus);
-            var updated = MembershipTableSnapshot.Create(localSiloEntry, table);
-
+            var updated = MembershipTableSnapshot.Create(table);
             if (this.updates.TryPublish(updated))
             {
                 this.LogMissedIAmAlives(table);
