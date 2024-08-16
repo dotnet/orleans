@@ -117,6 +117,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// A <see cref="Task"/> which will complete once the grain has deactivated.
         /// </returns>
+        [Obsolete("This method is error-prone: waiting deactivation to complete from within the grain being deactivated will usually result in a deadlock.")]
         public static Task DeactivateAsync(this IGrainContext grainContext, DeactivationReason deactivationReason, CancellationToken cancellationToken = default)
         {
             grainContext.Deactivate(deactivationReason, cancellationToken);

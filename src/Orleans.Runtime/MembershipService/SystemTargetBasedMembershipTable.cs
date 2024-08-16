@@ -112,7 +112,7 @@ namespace Orleans.Runtime.MembershipService
     }
 
     [Reentrant]
-    internal class MembershipTableSystemTarget : SystemTarget, IMembershipTableSystemTarget
+    internal sealed class MembershipTableSystemTarget : SystemTarget, IMembershipTableSystemTarget, ILifecycleParticipant<ISiloLifecycle>
     {
         private InMemoryMembershipTable table;
         private readonly ILogger logger;
@@ -120,12 +120,14 @@ namespace Orleans.Runtime.MembershipService
         public MembershipTableSystemTarget(
             ILocalSiloDetails localSiloDetails,
             ILoggerFactory loggerFactory,
-            DeepCopier deepCopier)
+            DeepCopier deepCopier,
+            Catalog catalog)
             : base(CreateId(localSiloDetails), localSiloDetails.SiloAddress, loggerFactory)
         {
             logger = loggerFactory.CreateLogger<MembershipTableSystemTarget>();
             table = new InMemoryMembershipTable(deepCopier);
             logger.LogInformation((int)ErrorCode.MembershipGrainBasedTable1, "GrainBasedMembershipTable Activated.");
+            catalog.RegisterSystemTarget(this);
         }
 
         private static SystemTargetGrainId CreateId(ILocalSiloDetails localSiloDetails)
@@ -198,6 +200,11 @@ namespace Orleans.Runtime.MembershipService
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
             throw new NotImplementedException();
+        }
+
+        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+        {
+            // Do nothing, just ensure that this instance is created so that it can register itself in the catalog.
         }
     }
 }

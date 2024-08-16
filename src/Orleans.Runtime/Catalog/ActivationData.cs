@@ -515,7 +515,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
             lock (this)
             {
-                if (!DeactivateCore(new DeactivationReason(DeactivationReasonCode.Migrating, "Migrating to a new location"), cts.Token))
+                if (!DeactivateCore(new DeactivationReason(DeactivationReasonCode.Migrating, "Migrating to a new location."), cts.Token))
                 {
                     // Grain is not able to start deactivating or has already completed.
                     return;
