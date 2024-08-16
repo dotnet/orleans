@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Metadata;
 using Orleans.Providers;
+using Orleans.Runtime.Placement;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
@@ -285,6 +286,26 @@ namespace Orleans.Runtime
                 }
             }
             return Task.FromResult(results);
+        }
+
+        public Task MigrateRandomActivations(SiloAddress target, int count)
+        {
+            var statistics = catalog.GetDetailedGrainStatistics();
+            var idsToMigrate = Random.Shared.GetItems(statistics.Select(x => x.GrainId).ToArray(), count);
+            var migrationContext = new Dictionary<string, object>()
+            {
+                [IPlacementDirector.PlacementHintKey] = target
+            };
+
+            foreach (var grainId in idsToMigrate)
+            {
+                if (activationDirectory.FindTarget(grainId) is { } activation)
+                {
+                    activation.Migrate(migrationContext);
+                }
+            }
+
+            return Task.CompletedTask;
         }
     }
 }
