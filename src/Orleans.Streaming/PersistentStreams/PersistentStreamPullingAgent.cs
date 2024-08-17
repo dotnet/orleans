@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -256,6 +257,7 @@ namespace Orleans.Streams
 
             if (await DoHandshakeWithConsumer(data, cacheToken))
             {
+                data.IsRegistered = true;
                 if (data.State == StreamConsumerDataState.Inactive)
                     RunConsumerCursor(data).Ignore(); // Start delivering events if not actively doing so
             }
@@ -485,18 +487,7 @@ namespace Orleans.Streams
                 if (pubSubCache.TryGetValue(streamId, out streamData))
                 {
                     streamData.RefreshActivity(now);
-                    if (streamData.StreamRegistered)
-                    {
-                        StartInactiveCursors(streamData,
-                            startToken); // if this is an existing stream, start any inactive cursors
-                    }
-                    else
-                    {
-                        if(this.logger.IsEnabled(LogLevel.Debug))
-                            this.logger.LogDebug(
-                                $"Pulled new messages in stream {streamId} from the queue, but pulling agent haven't succeeded in" +
-                                                              $"RegisterStream yet, will start deliver on this stream after RegisterStream succeeded");
-                    }
+                    StartInactiveCursors(streamData, startToken);
 
                 }
                 else
@@ -545,11 +536,22 @@ namespace Orleans.Streams
         {
             foreach (StreamConsumerData consumerData in streamData.AllConsumers())
             {
-                consumerData.Cursor?.Refresh(startToken);
-                if (consumerData.State == StreamConsumerDataState.Inactive)
+                // Some consumer might not be fully registered yet
+                if (consumerData.IsRegistered)
                 {
-                    // wake up inactive consumers
-                    RunConsumerCursor(consumerData).Ignore();
+                    consumerData.Cursor?.Refresh(startToken);
+                    if (consumerData.State == StreamConsumerDataState.Inactive)
+                    {
+                        // wake up inactive consumers
+                        RunConsumerCursor(consumerData).Ignore();
+                    }
+                }
+                else
+                {
+                    if (this.logger.IsEnabled(LogLevel.Debug))
+                        this.logger.LogDebug(
+                            $"Pulled new messages in stream {consumerData.StreamId} from the queue, but the subscriber isn't " +
+                            $"fully registered yet. The pulling agent will start deliver on this stream after registration is complete.");
                 }
             }
         }

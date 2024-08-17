@@ -10,4 +10,10 @@ namespace UnitTests.GrainInterfaces
 
         Task DeactivateOnEvent(bool deactivate);
     }
+
+    public interface IFastImplicitSubscriptionCounterGrain : IImplicitSubscriptionCounterGrain
+    { }
+
+    public interface ISlowImplicitSubscriptionCounterGrain : IImplicitSubscriptionCounterGrain
+    { }
 }

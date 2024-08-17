@@ -103,5 +103,24 @@ namespace Tester.StreamingTests
             Assert.Equal(0, await grain.GetErrorCounter());
             Assert.Equal(3, await grain.GetEventCounter());
         }
+
+        [SkippableFact]
+        public virtual async Task ResumeAfterSlowSubscriber()
+        {
+            var key = Guid.NewGuid();
+            var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
+            var stream = streamProvider.GetStream<byte[]>("FastSlowImplicitSubscriptionCounterGrain", key);
+
+            var fastGrain = this.Client.GetGrain<IFastImplicitSubscriptionCounterGrain>(key);
+            var slowGrain = this.Client.GetGrain<ISlowImplicitSubscriptionCounterGrain>(key);
+
+            await stream.OnNextAsync([1]);
+            await Task.Delay(500);
+            Assert.Equal(1, await fastGrain.GetEventCounter());
+
+            await stream.OnNextAsync([2]);
+            await Task.Delay(500);
+            Assert.Equal(2, await fastGrain.GetEventCounter());
+        }
     }
 }
