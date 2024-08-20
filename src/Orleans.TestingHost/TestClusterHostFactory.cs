@@ -55,7 +55,6 @@ namespace Orleans.TestingHost
                 services.AddFromExisting<IEnvironmentStatisticsProvider, TestHooksEnvironmentStatisticsProvider>();
                 services.AddSingleton<TestHooksSystemTarget>();
 
-                //TryConfigureClusterMembership(context.Configuration, services);
                 TryConfigureFileLogging(configuration, services, siloName);
 
                 if (Debugger.IsAttached)
@@ -172,53 +171,6 @@ namespace Orleans.TestingHost
                         hostBuilder.UseOrleansClient(clientBuilder => clientBuilderConfigurator.Configure(configuration, clientBuilder));
                     }
                 }
-            }
-        }
-
-        private static void TryConfigureClusterMembership(IConfiguration configuration, IServiceCollection services)
-        {
-            bool.TryParse(configuration[nameof(TestClusterOptions.UseTestClusterMembership)], out bool useTestClusterMembership);
-
-            // Configure test cluster membership if requested and if no membership table implementation has been registered.
-            // If the test involves a custom membership oracle and no membership table, special care will be required
-            if (useTestClusterMembership && services.All(svc => svc.ServiceType != typeof(IMembershipTable)))
-            {
-                var primarySiloEndPoint = new IPEndPoint(IPAddress.Loopback, int.Parse(configuration[nameof(TestSiloSpecificOptions.PrimarySiloEndPoint)]));
-
-                services.Configure<DevelopmentClusterMembershipOptions>(options => options.PrimarySiloEndpoint = primarySiloEndPoint);
-                services
-                    .AddSingleton<SystemTargetBasedMembershipTable>()
-                    .AddFromExisting<IMembershipTable, SystemTargetBasedMembershipTable>();
-            }
-        }
-
-        private static void TryConfigureClientMembership(IConfiguration configuration, IServiceCollection services)
-        {
-            bool.TryParse(configuration[nameof(TestClusterOptions.UseTestClusterMembership)], out bool useTestClusterMembership);
-            if (useTestClusterMembership && services.All(svc => svc.ServiceType != typeof(IGatewayListProvider)))
-            {
-                Action<StaticGatewayListProviderOptions> configureOptions = options =>
-                {
-                    int baseGatewayPort = int.Parse(configuration[nameof(TestClusterOptions.BaseGatewayPort)]);
-                    int initialSilosCount = int.Parse(configuration[nameof(TestClusterOptions.InitialSilosCount)]);
-                    bool gatewayPerSilo = bool.Parse(configuration[nameof(TestClusterOptions.GatewayPerSilo)]);
-
-                    if (gatewayPerSilo)
-                    {
-                        options.Gateways = Enumerable.Range(baseGatewayPort, initialSilosCount)
-                            .Select(port => new IPEndPoint(IPAddress.Loopback, port).ToGatewayUri())
-                            .ToList();
-                    }
-                    else
-                    {
-                        options.Gateways = new List<Uri> { new IPEndPoint(IPAddress.Loopback, baseGatewayPort).ToGatewayUri() };
-                    }
-                };
-
-                services.Configure(configureOptions);
-
-                services.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
-                    .ConfigureFormatter<StaticGatewayListProviderOptions>();
             }
         }
 

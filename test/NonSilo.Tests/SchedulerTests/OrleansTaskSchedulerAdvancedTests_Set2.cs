@@ -164,7 +164,7 @@ namespace UnitTests.SchedulerTests
             var timeoutLimit = TimeSpan.FromSeconds(2);
             try
             {
-                await result.Task.WithTimeout(timeoutLimit);
+                await result.Task.WaitAsync(timeoutLimit);
             }
             catch (TimeoutException)
             {
@@ -212,7 +212,7 @@ namespace UnitTests.SchedulerTests
             var timeoutLimit = TimeSpan.FromSeconds(1);
             try
             {
-                await finish.Task.WithTimeout(timeoutLimit);
+                await finish.Task.WaitAsync(timeoutLimit);
             }
             catch (TimeoutException)
             {
@@ -266,7 +266,7 @@ namespace UnitTests.SchedulerTests
             var timeoutLimit = TimeSpan.FromSeconds(1);
             try
             {
-                await finish.Task.WithTimeout(timeoutLimit);
+                await finish.Task.WaitAsync(timeoutLimit);
             }
             catch (TimeoutException)
             {
@@ -335,7 +335,7 @@ namespace UnitTests.SchedulerTests
             var timeoutLimit = TimeSpan.FromSeconds(1);
             try
             {
-                await finish.Task.WithTimeout(timeoutLimit);
+                await finish.Task.WaitAsync(timeoutLimit);
             }
             catch (TimeoutException)
             {
@@ -395,7 +395,7 @@ namespace UnitTests.SchedulerTests
             var timeoutLimit = TimeSpan.FromSeconds(1);
             try
             {
-                await finish.Task.WithTimeout(timeoutLimit);
+                await finish.Task.WaitAsync(timeoutLimit);
             }
             catch (TimeoutException)
             {
@@ -458,7 +458,7 @@ namespace UnitTests.SchedulerTests
             var timeoutLimit = TimeSpan.FromSeconds(1);
             try
             {
-                await finish.Task.WithTimeout(timeoutLimit);
+                await finish.Task.WaitAsync(timeoutLimit);
             }
             catch (TimeoutException)
             {
@@ -590,7 +590,7 @@ namespace UnitTests.SchedulerTests
 
                 try
                 {
-                    await resultHandles[i].Task.WithTimeout(waitCheckTime);
+                    await resultHandles[i].Task.WaitAsync(waitCheckTime);
                 }
                 catch (TimeoutException)
                 {
@@ -602,7 +602,7 @@ namespace UnitTests.SchedulerTests
                 try
                 {
                     // since resultHandle being complete doesn't directly imply that the final chain was completed (there's a chance for a race condition), give a small chance for it to complete.
-                    await taskChainEnds[i].WithTimeout(TimeSpan.FromMilliseconds(10));
+                    await taskChainEnds[i].WaitAsync(TimeSpan.FromMilliseconds(10));
                 }
                 catch (TimeoutException)
                 {
@@ -671,7 +671,7 @@ namespace UnitTests.SchedulerTests
             var timeoutLimit = TimeSpan.FromSeconds(1);
             try
             {
-                await wrapperDone.Task.WithTimeout(timeoutLimit);
+                await wrapperDone.Task.WaitAsync(timeoutLimit);
             }
             catch (TimeoutException)
             {
@@ -687,7 +687,7 @@ namespace UnitTests.SchedulerTests
             await wrapped;
             try
             {
-                await wrappedDone.Task.WithTimeout(timeoutLimit);
+                await wrappedDone.Task.WaitAsync(timeoutLimit);
             }
             catch (TimeoutException)
             {

@@ -111,7 +111,7 @@ namespace UnitTests.SchedulerTests
             var timeoutLimit = TimeSpan.FromMilliseconds(1500);
             try
             {
-                await result.Task.WithTimeout(timeoutLimit);
+                await result.Task.WaitAsync(timeoutLimit);
             }
             catch (TimeoutException)
             {
@@ -169,9 +169,9 @@ namespace UnitTests.SchedulerTests
                 this.mainDone = true;
             });
 
-            try { await result1.Task.WithTimeout(TimeSpan.FromSeconds(3)); }
+            try { await result1.Task.WaitAsync(TimeSpan.FromSeconds(3)); }
             catch (TimeoutException) { Assert.Fail("Timeout-1"); }
-            try { await result2.Task.WithTimeout(TimeSpan.FromSeconds(3)); }
+            try { await result2.Task.WaitAsync(TimeSpan.FromSeconds(3)); }
             catch (TimeoutException) { Assert.Fail("Timeout-2"); }
 
             Assert.NotEqual(0, this.stageNum1); // "Work items did not get executed-1"

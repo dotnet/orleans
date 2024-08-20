@@ -294,7 +294,7 @@ namespace Orleans.Runtime
                 {
                     var deploymentLoadPublisher = Services.GetRequiredService<DeploymentLoadPublisher>();
                     await deploymentLoadPublisher.WorkItemGroup.QueueTask(deploymentLoadPublisher.Start, deploymentLoadPublisher)
-                        .WithTimeout(this.initTimeout, $"Starting DeploymentLoadPublisher failed due to timeout {initTimeout}");
+                        .WaitAsync(this.initTimeout);
                     logger.LogDebug("Silo deployment load publisher started successfully.");
                 }
 
@@ -346,7 +346,15 @@ namespace Orleans.Runtime
             RegisterSystemTarget(grainService);
             grainServices.Add(grainService);
 
-            await grainService.QueueTask(() => grainService.Init(Services)).WithTimeout(this.initTimeout, $"GrainService Initializing failed due to timeout {initTimeout}");
+            try
+            {
+                await grainService.QueueTask(() => grainService.Init(Services)).WaitAsync(this.initTimeout);
+            }
+            catch (TimeoutException exception)
+            {
+                logger.LogError(exception, "GrainService initialization timed out after '{Timeout}'.", initTimeout);
+                throw;
+            }
             logger.LogInformation(
                 "Grain Service {GrainServiceType} registered successfully.",
                 service.GetType().FullName);
@@ -356,7 +364,16 @@ namespace Orleans.Runtime
         {
             var grainService = (GrainService)service;
 
-            await grainService.QueueTask(grainService.Start).WithTimeout(this.initTimeout, $"Starting GrainService failed due to timeout {initTimeout}");
+            try
+            {
+                await grainService.QueueTask(grainService.Start).WaitAsync(this.initTimeout);
+            }
+            catch (TimeoutException exception)
+            {
+                logger.LogError(exception, "GrainService startup timed out after '{Timeout}'.", initTimeout);
+                throw;
+            }
+
             logger.LogInformation("Grain Service {GrainServiceType} started successfully.",service.GetType().FullName);
         }
 
@@ -561,16 +578,37 @@ namespace Orleans.Runtime
 
             if (this.messageCenter.Gateway != null)
             {
-                await lifecycleSchedulingSystemTarget
-                    .QueueTask(() => this.messageCenter.Gateway.SendStopSendMessages(this.grainFactory))
-                    .WithCancellation("Sending gateway disconnection requests failed because the task was cancelled", ct);
+                try
+                {
+                    await lifecycleSchedulingSystemTarget
+                        .QueueTask(() => this.messageCenter.Gateway.SendStopSendMessages(this.grainFactory)).WaitAsync(ct);
+                }
+                catch (Exception exception)
+                {
+                    logger.LogError(exception, "Sending gateway disconnection requests to connected clients failed.");
+                    if (!ct.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                }
             }
 
             foreach (var grainService in grainServices)
             {
-                await grainService
-                    .QueueTask(grainService.Stop)
-                    .WithCancellation("Stopping GrainService failed because the task was cancelled", ct);
+                try
+                {
+                    await grainService
+                        .QueueTask(grainService.Stop)
+                        .WaitAsync(ct);
+                }
+                catch (Exception exception)
+                {
+                    logger.LogError(exception, "Stopping GrainService '{GrainService}' failed.", grainService);
+                    if (!ct.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                }
 
                 if (this.logger.IsEnabled(LogLevel.Debug))
                 {

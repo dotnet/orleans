@@ -1225,7 +1225,7 @@ namespace UnitTests.StorageTests
             TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(15);
             try
             {
-                await taskFunc().WithTimeout(timeout);
+                await taskFunc().WaitAsync(timeout);
 
                 if (ErrorInjectionStorageProvider.DoInjectErrors)
                 {
