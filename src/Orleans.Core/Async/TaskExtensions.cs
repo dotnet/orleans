@@ -76,7 +76,7 @@ namespace Orleans.Internal
                 return;
             }
 
-            var timeoutCancellationTokenSource = new CancellationTokenSource();
+            using var timeoutCancellationTokenSource = new CancellationTokenSource();
             var completedTask = await Task.WhenAny(taskToComplete, Task.Delay(timeout, timeoutCancellationTokenSource.Token));
 
             // We got done before the timeout, or were able to complete before this code ran, return the result
@@ -110,7 +110,7 @@ namespace Orleans.Internal
                 return await taskToComplete;
             }
 
-            var timeoutCancellationTokenSource = new CancellationTokenSource();
+            using var timeoutCancellationTokenSource = new CancellationTokenSource();
             var completedTask = await Task.WhenAny(taskToComplete, Task.Delay(timeSpan, timeoutCancellationTokenSource.Token));
 
             // We got done before the timeout, or were able to complete before this code ran, return the result

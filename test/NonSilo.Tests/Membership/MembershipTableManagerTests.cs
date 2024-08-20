@@ -172,7 +172,7 @@ namespace NonSilo.Tests.Membership
                 Assert.Contains(membershipTable.Calls, c => c.Method.Equals(nameof(IMembershipTable.ReadAll)));
             }
 
-            var cts = new CancellationTokenSource();
+            using var cts = new CancellationTokenSource();
             if (!gracefulShutdown) cts.Cancel();
             Assert.Equal(0, timers.First().DisposedCounter);
             var stopped = this.lifecycle.OnStop(cts.Token);
@@ -361,7 +361,7 @@ namespace NonSilo.Tests.Membership
 
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
-            var cts = new CancellationTokenSource();
+            using var cts = new CancellationTokenSource();
             cts.Cancel();
             await this.lifecycle.OnStop(cts.Token);
         }

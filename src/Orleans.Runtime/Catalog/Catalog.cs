@@ -354,7 +354,7 @@ namespace Orleans.Runtime
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("DeactivateActivations: {Count} activations.", list.Count);
 
-            var timeoutTokenSource = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
+            using var timeoutTokenSource = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
             await Task.WhenAll(list.Select(activation => activation.DeactivateAsync(reason, timeoutTokenSource.Token)));
         }
 
@@ -401,9 +401,9 @@ namespace Orleans.Runtime
             }
         }
 
-        public Task DeleteActivations(List<GrainAddress> addresses, DeactivationReasonCode reasonCode, string reasonText)
+        public async Task DeleteActivations(List<GrainAddress> addresses, DeactivationReasonCode reasonCode, string reasonText)
         {
-            var timeoutTokenSource = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
+            using var timeoutTokenSource = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
             var tasks = new List<Task>(addresses.Count);
             var deactivationReason = new DeactivationReason(reasonCode, reasonText);
             foreach (var activationAddress in addresses)
@@ -414,7 +414,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            return Task.WhenAll(tasks);
+            await Task.WhenAll(tasks);
         }
 
         // TODO move this logic in the LocalGrainDirectory

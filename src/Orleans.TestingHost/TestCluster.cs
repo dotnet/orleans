@@ -492,7 +492,7 @@ namespace Orleans.TestingHost
             var client = ClientHost;
             if (client != null)
             {
-                var cancelled = new CancellationTokenSource();
+                using var cancelled = new CancellationTokenSource();
                 cancelled.Cancel();
                 try
                 {

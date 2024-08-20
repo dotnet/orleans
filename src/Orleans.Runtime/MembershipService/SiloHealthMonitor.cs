@@ -175,7 +175,7 @@ namespace Orleans.Runtime.MembershipService
 
                     var isDirectProbe = !_clusterMembershipOptions.CurrentValue.EnableIndirectProbes || _failedProbes < _clusterMembershipOptions.CurrentValue.NumMissedProbesLimit - 1 || otherNodes.Length == 0;
                     var timeout = GetTimeout(isDirectProbe);
-                    var cancellation = new CancellationTokenSource(timeout);
+                    using var cancellation = new CancellationTokenSource(timeout);
 
                     if (isDirectProbe)
                     {
