@@ -68,7 +68,9 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         _shared = shared;
         Address = grainAddress;
         _serviceScope = applicationServices.CreateScope();
+        Debug.Assert(_serviceScope != null, "_serviceScope must not be null.");
         _workItemGroup = createWorkItemGroup(this);
+        Debug.Assert(_workItemGroup != null, "_workItemGroup must not be null.");
         _messageLoopTask = this.RunOrQueueTask(RunMessageLoop);
     }
 

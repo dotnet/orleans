@@ -77,6 +77,10 @@ namespace Orleans.Runtime.GrainDirectory
 
             RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceType, loggerFactory);
             CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorType, loggerFactory);
+            var catalog = serviceProvider.GetRequiredService<Catalog>();
+            catalog.RegisterSystemTarget(RemoteGrainDirectory);
+            catalog.RegisterSystemTarget(CacheValidator);
+            SetSiloRemovedCatalogCallback(catalog.OnSiloStatusChange);
 
             // add myself to the list of members
             AddServer(MyAddress);
@@ -105,6 +109,8 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 CacheValidator.WorkItemGroup.QueueAction(maintainer.Start);
             }
+
+            siloStatusOracle.SubscribeToSiloStatusEvents(this);
         }
 
         // Note that this implementation stops processing directory change requests (Register, Unregister, etc.) when the Stop event is raised.
@@ -835,10 +841,6 @@ namespace Orleans.Runtime.GrainDirectory
         public bool TryCachedLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address) => (address = GetLocalCacheData(grainId)) is not null;
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
-            var catalog = _serviceProvider.GetRequiredService<Catalog>();
-            catalog.RegisterSystemTarget(RemoteGrainDirectory);
-            catalog.RegisterSystemTarget(CacheValidator);
-            siloStatusOracle.SubscribeToSiloStatusEvents(this);
             lifecycle.Subscribe<LocalGrainDirectory>(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => Start()), (ct) => Task.Run(() => StopAsync()));
         }
 

@@ -6,10 +6,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Metadata;
 using Orleans.Providers;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
+using Orleans.Serialization.TypeSystem;
 using Orleans.Statistics;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
@@ -37,6 +40,7 @@ namespace Orleans.Runtime
 
         private readonly IOptions<LoadSheddingOptions> loadSheddingOptions;
         private readonly GrainCountStatistics _grainCountStatistics;
+        private readonly GrainPropertiesResolver grainPropertiesResolver;
 
         public SiloControl(
             ILocalSiloDetails localSiloDetails,
@@ -115,13 +119,60 @@ namespace Orleans.Runtime
         public Task<List<Tuple<GrainId, string, int>>> GetGrainStatistics()
         {
             logger.LogInformation("GetGrainStatistics");
-            return Task.FromResult(this.catalog.GetGrainStatistics());
+            var counts = new Dictionary<string, Dictionary<GrainId, int>>();
+            lock (activationDirectory)
+            {
+                foreach (var activation in activationDirectory)
+                {
+                    var data = activation.Value;
+                    if (data == null || data.GrainInstance == null) continue;
+
+                    // TODO: generic type expansion
+                    var grainTypeName = RuntimeTypeNameFormatter.Format(data.GrainInstance.GetType());
+
+                    Dictionary<GrainId, int> grains;
+                    int n;
+                    if (!counts.TryGetValue(grainTypeName, out grains))
+                    {
+                        counts.Add(grainTypeName, new Dictionary<GrainId, int> { { data.GrainId, 1 } });
+                    }
+                    else if (!grains.TryGetValue(data.GrainId, out n))
+                        grains[data.GrainId] = 1;
+                    else
+                        grains[data.GrainId] = n + 1;
+                }
+            }
+
+            return Task.FromResult(counts
+                .SelectMany(p => p.Value.Select(p2 => Tuple.Create(p2.Key, p.Key, p2.Value)))
+                .ToList());
         }
 
         public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[] types=null)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetDetailedGrainStatistics");
-            return Task.FromResult(this.catalog.GetDetailedGrainStatistics(types));
+            var stats = new List<DetailedGrainStatistic>();
+            lock (activationDirectory)
+            {
+                foreach (var activation in activationDirectory)
+                {
+                    var data = activation.Value;
+                    if (data == null || data.GrainInstance == null) continue;
+
+                    var grainType = RuntimeTypeNameFormatter.Format(data.GrainInstance.GetType());
+                    if (types == null || types.Contains(grainType))
+                    {
+                        stats.Add(new DetailedGrainStatistic()
+                        {
+                            GrainType = grainType,
+                            GrainId = data.GrainId,
+                            SiloAddress = Silo
+                        });
+                    }
+                }
+            }
+
+            return Task.FromResult(stats);
         }
 
         public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
@@ -134,7 +185,36 @@ namespace Orleans.Runtime
         public Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId)
         {
             logger.LogInformation("DetailedGrainReport for grain id {GrainId}", grainId);
-            return Task.FromResult( this.catalog.GetDetailedGrainReport(grainId));
+            string grainClassName;
+            try
+            {
+                var properties = this.grainPropertiesResolver.GetGrainProperties(grainId.Type);
+                properties.Properties.TryGetValue(WellKnownGrainTypeProperties.TypeName, out grainClassName);
+            }
+            catch (Exception exc)
+            {
+                grainClassName = exc.ToString();
+            }
+
+            var activation = activationDirectory.FindTarget(grainId) switch
+            {
+                ActivationData data => data.ToDetailedString(),
+                var a => a?.ToString()
+            };
+
+            var directory = services.GetRequiredService<ILocalGrainDirectory>();
+            var report = new DetailedGrainReport()
+            {
+                Grain = grainId,
+                SiloAddress = localSiloDetails.SiloAddress,
+                SiloName = localSiloDetails.Name,
+                LocalCacheActivationAddress = directory.GetLocalCacheData(grainId),
+                LocalDirectoryActivationAddress = directory.GetLocalDirectoryData(grainId).Address,
+                PrimaryForGrain = directory.GetPrimaryForGrain(grainId),
+                GrainClassTypeName = grainClassName,
+                LocalActivation = activation,
+            };
+            return Task.FromResult(report);
         }
 
         public Task<int> GetActivationCount()
