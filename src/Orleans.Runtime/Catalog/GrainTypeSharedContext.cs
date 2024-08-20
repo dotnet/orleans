@@ -6,8 +6,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.GrainDirectory;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
@@ -51,6 +53,8 @@ public class GrainTypeSharedContext
         MaxWarningRequestProcessingTime = messagingOptions.Value.ResponseTimeout.Multiply(5);
         MaxRequestProcessingTime = messagingOptions.Value.MaxRequestProcessingTime;
         PlacementStrategy = placementStrategyResolver.GetPlacementStrategy(grainType);
+        var grainDirectoryResolver = serviceProvider.GetRequiredService<GrainDirectoryResolver>();
+        GrainDirectory = PlacementStrategy.IsUsingGrainDirectory ? grainDirectoryResolver.Resolve(grainType) : null;
         SchedulingOptions = schedulingOptions.Value;
         Runtime = grainRuntime;
         MigrationManager = _serviceProvider.GetService<IActivationMigrationManager>();
@@ -161,6 +165,11 @@ public class GrainTypeSharedContext
     /// Gets the placement strategy used by grains of this type.
     /// </summary>
     public PlacementStrategy PlacementStrategy { get; }
+
+    /// <summary>
+    /// Gets the grain directory used by grains of this type, if this type uses a grain directory.
+    /// </summary>
+    public IGrainDirectory? GrainDirectory { get; }
 
     /// <summary>
     /// Gets the scheduling options.

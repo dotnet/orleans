@@ -262,11 +262,11 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
                 string activation = await grain.DoSomething();
                 Assert.Fail("Should have thrown.");
             }
-            catch(InvalidOperationException exc)
+            catch (OrleansMessageRejectionException exc)
             {
                 this.Logger.LogInformation(exc, "Thrown as expected");
                 Assert.True(
-                    exc.Message.Contains("DeactivateOnIdle from within OnActivateAsync"),
+                    exc.Message.Contains("Forwarding failed"),
                     "Did not get expected exception message returned: " + exc.Message);
             }  
         }
