@@ -1,3 +1,4 @@
+#nullable enable
 using System.Buffers;
 using System.IO.Pipelines;
 using System.Net;
@@ -46,25 +47,18 @@ internal class InMemoryTransportConnection : TransportConnection
         return new InMemoryTransportConnection(memoryPool, logger, pair, localEndPoint, remoteEndPoint);
     }
 
-    public PipeWriter Input => Application.Output;
-
-    public PipeReader Output => Application.Input;
-
     public override MemoryPool<byte> MemoryPool { get; }
-
-    public ConnectionAbortedException AbortReason { get; private set; }
 
     public Task WaitForCloseTask => _waitForCloseTcs.Task;
 
-    public override void Abort(ConnectionAbortedException abortReason)
+    public override void Abort(ConnectionAbortedException? abortReason)
     {
         _logger.LogDebug(@"Connection id ""{ConnectionId}"" closing because: ""{Message}""", ConnectionId, abortReason?.Message);
 
-        Input.Complete(abortReason);
+        Transport.Input.CancelPendingRead();
+        Transport.Output.CancelPendingFlush();
 
         OnClosed();
-
-        AbortReason = abortReason;
     }
 
     public void OnClosed()
@@ -88,9 +82,7 @@ internal class InMemoryTransportConnection : TransportConnection
 
     public override async ValueTask DisposeAsync()
     {
-        Transport.Input.Complete();
-        Transport.Output.Complete();
-
+        Abort(null);
         await _waitForCloseTcs.Task;
 
         _connectionClosedTokenSource.Dispose();
