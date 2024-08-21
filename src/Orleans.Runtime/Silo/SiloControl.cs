@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -57,7 +58,8 @@ namespace Orleans.Runtime
             IActivationWorkingSet activationWorkingSet,
             IEnvironmentStatisticsProvider environmentStatisticsProvider,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
-            GrainCountStatistics grainCountStatistics)
+            GrainCountStatistics grainCountStatistics,
+            GrainPropertiesResolver grainPropertiesResolver)
             : base(Constants.SiloControlType, localSiloDetails.SiloAddress, loggerFactory)
         {
             this.localSiloDetails = localSiloDetails;
@@ -75,6 +77,7 @@ namespace Orleans.Runtime
             this.environmentStatisticsProvider = environmentStatisticsProvider;
             this.loadSheddingOptions = loadSheddingOptions;
             _grainCountStatistics = grainCountStatistics;
+            this.grainPropertiesResolver = grainPropertiesResolver;
         }
 
         public Task Ping(string message)
@@ -130,7 +133,7 @@ namespace Orleans.Runtime
                     // TODO: generic type expansion
                     var grainTypeName = RuntimeTypeNameFormatter.Format(data.GrainInstance.GetType());
 
-                    Dictionary<GrainId, int> grains;
+                    Dictionary<GrainId, int>? grains;
                     int n;
                     if (!counts.TryGetValue(grainTypeName, out grains))
                     {
@@ -148,7 +151,7 @@ namespace Orleans.Runtime
                 .ToList());
         }
 
-        public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[] types=null)
+        public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[]? types = null)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetDetailedGrainStatistics");
             var stats = new List<DetailedGrainStatistic>();
@@ -178,14 +181,14 @@ namespace Orleans.Runtime
         public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
         {
             logger.LogInformation("GetSimpleGrainStatistics");
-            return Task.FromResult( _grainCountStatistics.GetSimpleGrainStatistics().Select(p =>
+            return Task.FromResult(_grainCountStatistics.GetSimpleGrainStatistics().Select(p =>
                 new SimpleGrainStatistic { SiloAddress = this.localSiloDetails.SiloAddress, GrainType = p.Key, ActivationCount = (int)p.Value }).ToArray());
         }
 
         public Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId)
         {
             logger.LogInformation("DetailedGrainReport for grain id {GrainId}", grainId);
-            string grainClassName;
+            string? grainClassName;
             try
             {
                 var properties = this.grainPropertiesResolver.GetGrainProperties(grainId.Type);
