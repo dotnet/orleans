@@ -505,20 +505,20 @@ namespace Orleans.Runtime
 
         private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list)
         {
-            var cts = new CancellationTokenSource(_options.Value.DeactivationTimeout);
             var mtcs = new MultiTaskCompletionSource(list.Count);
 
             logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {Count} to promptly Destroy.", list.Count);
             CatalogInstruments.ActivationShutdownViaCollection();
 
-            void signalCompletion(Task task) => mtcs.SetOneResult();
+            Action signalCompletion = mtcs.SetOneResult;
             var reason = GetDeactivationReason();
             for (var i = 0; i < list.Count; i++)
             {
                 var activationData = list[i];
 
-                // Continue deactivation when ready
-                _ = activationData.DeactivateAsync(reason, cts.Token).ContinueWith(signalCompletion);
+                // Continue deactivation when ready.
+                activationData.Deactivate(reason);
+                activationData.Deactivated.GetAwaiter().OnCompleted(signalCompletion);
             }
 
             await mtcs.Task;

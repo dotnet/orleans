@@ -62,7 +62,8 @@ namespace Orleans.Runtime.GrainDirectory
             ILoggerFactory loggerFactory,
             IClusterMembershipService clusterMembershipService,
             IAsyncTimerFactory timerFactory,
-            IConnectedClientCollection connectedClients)
+            IConnectedClientCollection connectedClients,
+            Catalog catalog)
             : base(Constants.ClientDirectoryType, siloDetails.SiloAddress, loggerFactory)
         {
             _consistentRing = new SimpleConsistentRingProvider(siloDetails, clusterMembershipService);
@@ -74,7 +75,8 @@ namespace Orleans.Runtime.GrainDirectory
             _refreshTimer = timerFactory.Create(_messagingOptions.ClientRegistrationRefresh, "ClientDirectory.RefreshTimer");
             _connectedClients = connectedClients;
             _localHostedClientId = HostedClient.CreateHostedClientGrainId(_localSilo).GrainId;
-            _schedulePublishUpdate = () => SchedulePublishUpdates();
+            _schedulePublishUpdate = SchedulePublishUpdates;
+            catalog?.RegisterSystemTarget(this);
         }
 
         public ValueTask<List<GrainAddress>> Lookup(GrainId grainId)
