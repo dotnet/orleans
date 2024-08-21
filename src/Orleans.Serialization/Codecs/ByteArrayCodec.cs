@@ -1,7 +1,9 @@
 using System;
 using System.Buffers;
+using System.Collections;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
@@ -9,6 +11,94 @@ using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs
 {
+    /// <summary>
+    /// Serializer for <see cref="BitArray"/> arrays.
+    /// </summary>
+    [RegisterSerializer]
+    public sealed partial class BitArrayCodec : IFieldCodec<BitArray>
+    {
+#if NET8_0_OR_GREATER
+        [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "m_array")]
+        extern static ref int[] GetSetArray(BitArray bitArray);
+#else
+        private static int[] GetSetArray(BitArray bitArray) => typeof(BitArray).GetField("m_array", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(bitArray) as int[];
+#endif
+
+        BitArray IFieldCodec<BitArray>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
+
+        /// <summary>
+        /// Reads a value.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field.</param>
+        /// <returns>The value.</returns>
+        public static BitArray ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        {
+            if (field.WireType == WireType.Reference)
+            {
+                return ReferenceCodec.ReadReference<BitArray, TInput>(ref reader, field);
+            }
+
+            field.EnsureWireType(WireType.LengthPrefixed);
+            var numBytes = reader.ReadVarUInt32();
+            var result = new BitArray((int)numBytes * 8, false);
+            var resultArray = GetSetArray(result);
+            reader.ReadBytes(MemoryMarshal.AsBytes(resultArray.AsSpan()).Slice(0, (int)numBytes));
+
+            ReferenceCodec.RecordObject(reader.Session, result);
+            return result;
+        }
+
+        void IFieldCodec<BitArray>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, BitArray value)
+        {
+            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
+            {
+                return;
+            }
+
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(BitArray), WireType.LengthPrefixed);
+            var numBytes = GetByteArrayLengthFromBitLength(value.Length);
+            writer.WriteVarUInt32((uint)numBytes);
+            writer.Write(MemoryMarshal.AsBytes(GetSetArray(value).AsSpan()).Slice(0, numBytes));
+
+            static int GetByteArrayLengthFromBitLength(int n)
+            {
+                const int BitShiftPerByte = 3;
+                Debug.Assert(n >= 0);
+                return (int)((uint)(n - 1 + (1 << BitShiftPerByte)) >> BitShiftPerByte);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Copier for <see cref="byte"/> arrays.
+    /// </summary>
+    [RegisterCopier]
+    public sealed class BitArrayCopier : IDeepCopier<BitArray>
+    {
+        /// <inheritdoc/>
+        BitArray IDeepCopier<BitArray>.DeepCopy(BitArray input, CopyContext context) => DeepCopy(input, context);
+
+        /// <summary>
+        /// Creates a deep copy of the provided input.
+        /// </summary>
+        /// <param name="input">The input.</param>
+        /// <param name="context">The context.</param>
+        /// <returns>A copy of <paramref name="input" />.</returns>
+        public static BitArray DeepCopy(BitArray input, CopyContext context)
+        {
+            if (context.TryGetCopy<BitArray>(input, out var result))
+            {
+                return result;
+            }
+
+            result = new(input);
+            context.RecordCopy(input, result);
+            return result;
+        }
+    }
+
     /// <summary>
     /// Serializer for <see cref="byte"/> arrays.
     /// </summary>
