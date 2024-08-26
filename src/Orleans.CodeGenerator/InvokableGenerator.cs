@@ -609,7 +609,12 @@ namespace Orleans.CodeGenerator
                     ),
                     TryStatement().WithBlock(
                         Block(
-                             ((INamedTypeSymbol)method.Method.ReturnType).ConstructedFrom is { IsGenericType: true }
+                            ExpressionStatement(
+                                InvocationExpression(
+                                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
+                                        IdentifierName("cancellationToken"),
+                                        IdentifierName("ThrowIfCancellationRequested")))),
+                            ((INamedTypeSymbol)method.Method.ReturnType).ConstructedFrom is { IsGenericType: true }
                                 ? ReturnStatement(
                                     AwaitExpression(
                                         InvocationExpression(methodCall, ArgumentList(args))
