@@ -16,8 +16,9 @@ public interface ICancellationRuntime
     /// Registers the token and returns a cancellation token linked to the token id
     /// </summary>
     /// <param name="tokenId">The token id to register</param>
+    /// <param name="default">The default cancellationToken to consider</param>
     /// <returns>A cancellationToken that will be cancelled once Cancel for the token has been called</returns>
-    CancellationToken RegisterCancellableToken(Guid tokenId);
+    CancellationToken RegisterCancellableToken(Guid tokenId, CancellationToken @default);
 
     /// <summary>
     /// Cancels the invokable with the specified token id

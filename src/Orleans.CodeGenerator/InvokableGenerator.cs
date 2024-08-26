@@ -553,6 +553,9 @@ namespace Orleans.CodeGenerator
             }
             else if (method.IsCancellable)
             {
+                var defaultCancellationTokenFieldName = fields.OfType<MethodParameterFieldDescription>()
+                    .First(p => SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, p.Parameter.Type)).FieldName;
+
                 body = Block(
                     LocalDeclarationStatement(
                         VariableDeclaration(
@@ -594,7 +597,9 @@ namespace Orleans.CodeGenerator
                                                         IdentifierName("RegisterCancellableToken")))
                                                 .AddArgumentListArguments(
                                                     Argument(
-                                                        IdentifierName("cancellableTokenId")))),
+                                                        IdentifierName("cancellableTokenId")),
+                                                    Argument(
+                                                        IdentifierName(defaultCancellationTokenFieldName)))),
                                             DefaultExpression(LibraryTypes.CancellationToken.ToTypeSyntax())
                                         )
                                     )

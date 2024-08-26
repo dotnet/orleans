@@ -57,12 +57,23 @@ internal class CancellationRuntime : ICancellationRuntime
                 // Dispose if we failed to reuse
                 entry.Source.Dispose();
             }
+
+            lock (_cancellationTokens)
+            {
+                _cancellationTokens.Remove(tokenId);
+            }
         }
     }
 
-    public CancellationToken RegisterCancellableToken(Guid tokenId)
+    public CancellationToken RegisterCancellableToken(Guid tokenId, CancellationToken @default)
     {
         var entry = GetOrCreateEntry(tokenId);
+
+        if (@default != CancellationToken.None)
+        {
+            return CancellationTokenSource.CreateLinkedTokenSource(@default, entry.Source.Token).Token;
+        }
+
         return entry.Source.Token;
     }
 
