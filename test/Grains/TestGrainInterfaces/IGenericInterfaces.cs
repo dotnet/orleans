@@ -193,15 +193,19 @@ namespace UnitTests.GrainInterfaces
         Task<string> GetRuntimeInstanceIdWithDelay(TimeSpan delay);
 
         Task LongWait(GrainCancellationToken tc, TimeSpan delay);
+        Task LongWait(CancellationToken tc, TimeSpan delay);
         Task<T> LongRunningTask(T t, TimeSpan delay);
         Task<T> CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay);
         Task<T> FanOutOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay, int degreeOfParallelism);
         Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, GrainCancellationToken tc, TimeSpan delay);
+        Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, CancellationToken tc, TimeSpan delay);
         Task CallOtherLongRunningTaskWithLocalToken(ILongRunningTaskGrain<T> target, TimeSpan delay,
             TimeSpan delayBeforeCancel);
         Task<bool> CancellationTokenCallbackResolve(GrainCancellationToken tc);
+        Task<bool> CancellationTokenCallbackResolve(CancellationToken tc);
         Task<bool> CallOtherCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target);
         Task CancellationTokenCallbackThrow(GrainCancellationToken tc);
+        Task CancellationTokenCallbackThrow(CancellationToken tc);
         Task<T> GetLastValue();
     }
 
