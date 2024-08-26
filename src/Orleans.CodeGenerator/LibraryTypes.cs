@@ -127,6 +127,7 @@ namespace Orleans.CodeGenerator
                     new(TypeOrDefault("System.Int128"), TypeOrDefault("Orleans.Serialization.Codecs.Int128Codec")),
                     new(TypeOrDefault("System.Half"), TypeOrDefault("Orleans.Serialization.Codecs.HalfCodec")),
                     new(Type("System.Uri"), Type("Orleans.Serialization.Codecs.UriCodec")),
+                    new(Type("System.Threading.CancellationToken"), Type("Orleans.Serialization.Codecs.CancellationTokenCodec")),
                 }.Where(desc => desc.UnderlyingType is { } && desc.CodecType is { }).ToArray();
             WellKnownCodecs = new WellKnownCodecDescription[]
             {
