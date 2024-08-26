@@ -504,13 +504,13 @@ namespace Orleans.CodeGenerator
         {
             var resultTask = IdentifierName("resultTask");
 
-
             // C# var resultTask = this.target.{Method}({params});
             var args = SeparatedList(
-                method.Method.Parameters
-                    .Select(p => SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, p.Type)
+                fields.OfType<MethodParameterFieldDescription>()
+                    .OrderBy(p => p.ParameterOrdinal)
+                    .Select(p => SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, p.Parameter.Type)
                         ? Argument(IdentifierName("cancellationToken"))
-                        : Argument(IdentifierName($"arg{p.Ordinal}"))));
+                        : Argument(IdentifierName(p.FieldName))));
 
             var isExtension = method.Key.ProxyBase.IsExtension;
             var getTarget = InvocationExpression(
@@ -691,19 +691,11 @@ namespace Orleans.CodeGenerator
         }
 
         private MemberDeclarationSyntax GenerateGetArgumentCount(InvokableMethodDescription methodDescription)
-        {
-            var count = methodDescription.Method.Parameters.Length;
-            if (methodDescription.IsCancellable)
-            {
-                count -= 1;
-            }
-
-            return count is not 0 ?
+            => methodDescription.Method.Parameters.Length is var count and not 0 ?
             MethodDeclaration(PredefinedType(Token(SyntaxKind.IntKeyword)), "GetArgumentCount")
                 .WithExpressionBody(ArrowExpressionClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(count))))
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)) : null;
-        }
 
         private MemberDeclarationSyntax GenerateGetActivityName(InvokableMethodDescription methodDescription)
         {
@@ -903,11 +895,6 @@ namespace Orleans.CodeGenerator
 
             foreach (var parameter in method.Method.Parameters)
             {
-                if (SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, parameter.Type))
-                {
-                    continue;
-                }
-
                 fields.Add(new MethodParameterFieldDescription(method.CodeGenerator, parameter, $"arg{fieldId}", fieldId, method.TypeParameterSubstitutions));
                 fieldId++;
             }
