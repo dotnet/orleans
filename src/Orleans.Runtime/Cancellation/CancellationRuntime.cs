@@ -14,8 +14,6 @@ internal class CancellationRuntime : ICancellationRuntime
 
     readonly Dictionary<Guid, TokenEntry> _cancellationTokens = new Dictionary<Guid, TokenEntry>();
 
-    CancellationTokenSource _reusableCancellationTokenSource;
-
     ref TokenEntry GetOrCreateEntry(Guid tokenId)
     {
         lock (_cancellationTokens)
@@ -24,16 +22,7 @@ internal class CancellationRuntime : ICancellationRuntime
 
             if (!exists)
             {
-                var cancellationTokenSource = _reusableCancellationTokenSource;
-                if (cancellationTokenSource is not null)
-                {
-                    _reusableCancellationTokenSource = null;
-                }
-                else
-                {
-                    cancellationTokenSource = new CancellationTokenSource();
-                }
-                entry.SetSource(cancellationTokenSource);
+                entry.SetSource(new CancellationTokenSource());
             }
 
             entry.Touch();
@@ -43,24 +32,20 @@ internal class CancellationRuntime : ICancellationRuntime
 
     public void Cancel(Guid tokenId, bool lastCall)
     {
-        var entry = GetOrCreateEntry(tokenId);
-        entry.Source.Cancel();
-
-        if (lastCall)
+        if (!lastCall)
         {
-            // Cancel the source on the last call
+            var entry = GetOrCreateEntry(tokenId);
             entry.Source.Cancel();
-
-            // Try and reuse the source
-            if (_reusableCancellationTokenSource is not null || entry.Source.TryReset() is false || Interlocked.CompareExchange(ref _reusableCancellationTokenSource, entry.Source, null) != entry.Source)
-            {
-                // Dispose if we failed to reuse
-                entry.Source.Dispose();
-            }
-
+        }
+        else
+        {
             lock (_cancellationTokens)
             {
-                _cancellationTokens.Remove(tokenId);
+                if (_cancellationTokens.Remove(tokenId, out var entry))
+                {
+                    entry.Source.Cancel();
+                    entry.Source.Dispose();
+                }
             }
         }
     }
