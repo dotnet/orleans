@@ -43,6 +43,8 @@ using Microsoft.Extensions.Configuration;
 using Orleans.Serialization.Internal;
 using Orleans.Core;
 using Orleans.Placement.Repartitioning;
+using Orleans.Runtime.Cancellation;
+using Orleans.Serialization.Invocation;
 using Orleans.Runtime.Placement.Filtering;
 
 namespace Orleans.Hosting
@@ -94,12 +96,15 @@ namespace Orleans.Hosting
             services.TryAddSingleton<LifecycleSchedulingSystemTarget>();
 
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
-            
+
             services.TryAddSingleton<GrainRuntime>();
             services.TryAddSingleton<IGrainRuntime, GrainRuntime>();
             services.TryAddSingleton<IGrainCancellationTokenRuntime, GrainCancellationTokenRuntime>();
             services.AddTransient<CancellationSourcesExtension>();
             services.AddKeyedTransient<IGrainExtension>(typeof(ICancellationSourcesExtension), (sp, _) => sp.GetRequiredService<CancellationSourcesExtension>());
+            services.TryAddTransient<ICancellationRuntime, CancellationRuntime>();
+            services.AddTransient<CancellableInvokableGrainExtension>();
+            services.AddKeyedTransient<IGrainExtension>(typeof(ICancellableInvokableGrainExtension), (sp, _) => sp.GetRequiredService<CancellableInvokableGrainExtension>());
             services.TryAddSingleton<GrainFactory>(sp => sp.GetRequiredService<InsideRuntimeClient>().ConcreteGrainFactory);
             services.TryAddSingleton<InterfaceToImplementationMappingCache>();
             services.TryAddSingleton<GrainInterfaceTypeToGrainTypeResolver>();

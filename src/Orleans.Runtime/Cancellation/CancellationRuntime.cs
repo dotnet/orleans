@@ -1,48 +1,104 @@
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Cancellation;
 
 internal class CancellationRuntime : ICancellationRuntime
 {
-    readonly ConcurrentDictionary<Guid, TokenEntry> _cancellationTokens = new ConcurrentDictionary<Guid, TokenEntry>();
+    private static readonly TimeSpan _cleanupFrequency = TimeSpan.FromMinutes(7);
 
-    TokenEntry GetOrCreateEntry(Guid tokenId)
+    readonly Dictionary<Guid, TokenEntry> _cancellationTokens = new Dictionary<Guid, TokenEntry>();
+
+    CancellationTokenSource _reusableCancellationTokenSource;
+
+    ref TokenEntry GetOrCreateEntry(Guid tokenId)
     {
-        return _cancellationTokens.GetOrAdd(tokenId, _ => new TokenEntry(new CancellationTokenSource()));
+        lock (_cancellationTokens)
+        {
+            ref var entry = ref CollectionsMarshal.GetValueRefOrAddDefault(_cancellationTokens, tokenId, out var exists);
+
+            if (!exists)
+            {
+                var cancellationTokenSource = _reusableCancellationTokenSource;
+                if (cancellationTokenSource is not null)
+                {
+                    _reusableCancellationTokenSource = null;
+                }
+                else
+                {
+                    cancellationTokenSource = new CancellationTokenSource();
+                }
+                entry.SetSource(cancellationTokenSource);
+            }
+
+            entry.Touch();
+            return ref entry;
+        }
     }
 
     public void Cancel(Guid tokenId, bool lastCall)
     {
+        var entry = GetOrCreateEntry(tokenId);
+        entry.Source.Cancel();
+
         if (lastCall)
         {
-            // On a last call, we can remove the token entry and dispose of it. If no entry exists then we can ignore the call.
-            if (_cancellationTokens.TryRemove(tokenId, out var entry))
+            // Cancel the source on the last call
+            entry.Source.Cancel();
+
+            // Try and reuse the source
+            if (_reusableCancellationTokenSource is not null || entry.Source.TryReset() is false || Interlocked.CompareExchange(ref _reusableCancellationTokenSource, entry.Source, null) != entry.Source)
             {
-                entry.CancellationTokenSource.Cancel();
-                entry.Dispose();
+                // Dispose if we failed to reuse
+                entry.Source.Dispose();
             }
-        }
-        else
-        {
-            // If our invokable has yet to complete, we can cancel the token and leave the entry in place.
-            var entry = GetOrCreateEntry(tokenId);
-            entry.CancellationTokenSource.Cancel();
         }
     }
 
     public CancellationToken RegisterCancellableToken(Guid tokenId)
     {
         var entry = GetOrCreateEntry(tokenId);
-        return entry.CancellationTokenSource.Token;
+        return entry.Source.Token;
     }
 
-    readonly record struct TokenEntry(CancellationTokenSource CancellationTokenSource) : IDisposable
+    public void ExpireTokens()
     {
-        // TODO: Expire the entry after a certain amount of time
+        var now = Stopwatch.GetTimestamp();
+        lock (_cancellationTokens)
+        {
+            foreach (var token in _cancellationTokens)
+            {
+                if (token.Value.IsExpired(_cleanupFrequency, now))
+                {
+                    _cancellationTokens.Remove(token.Key);
+                }
+            }
+        }
+    }
 
-        public void Dispose() => CancellationTokenSource.Dispose();
+    struct TokenEntry 
+    {
+        private long _createdTime;
+
+        public void Touch() => _createdTime = Stopwatch.GetTimestamp();
+
+        public void SetSource(CancellationTokenSource source)
+        {
+            Source = source;
+        }
+
+        public CancellationTokenSource Source { get; private set; }
+
+        public bool IsExpired(TimeSpan expiry, long nowTimestamp)
+        {
+            var untouchedTime = TimeSpan.FromSeconds((nowTimestamp - _createdTime) / (double)Stopwatch.Frequency);
+
+            return untouchedTime >= expiry;
+        }
     }
 }

@@ -25,4 +25,9 @@ public interface ICancellationRuntime
     /// <param name="tokenId">The token id to cancel</param>
     /// <param name="lastCall">Whether this is the last call associated with the token</param>
     void Cancel(Guid tokenId, bool lastCall);
+
+    /// <summary>
+    /// Expires any tokens that have not yet been cancelled and have been inactive for a period of time
+    /// </summary>
+    void ExpireTokens();
 }
