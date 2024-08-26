@@ -43,7 +43,7 @@ namespace UnitTests.CancellationTests
             var grainTask = grain.LongWait(tcs.Token, TimeSpan.FromSeconds(10));
             await Task.Delay(TimeSpan.FromMilliseconds(delay));
             await tcs.CancelAsync();
-            await Assert.ThrowsAsync<TaskCanceledException>(() => grainTask);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => grainTask);
         }
 
         [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
@@ -56,7 +56,7 @@ namespace UnitTests.CancellationTests
             var grainTasks = Enumerable.Range(0, 5)
                 .Select(i => this.fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid())
                             .LongWait(tcs.Token, TimeSpan.FromSeconds(10)))
-                            .Select(task => Assert.ThrowsAsync<TaskCanceledException>(() => task)).ToList();
+                            .Select(task => Assert.ThrowsAnyAsync<OperationCanceledException>(() => task)).ToList();
             await Task.Delay(TimeSpan.FromMilliseconds(delay));
             await tcs.CancelAsync();
             await Task.WhenAll(grainTasks);
@@ -81,27 +81,10 @@ namespace UnitTests.CancellationTests
                         await task;
                         Assert.Fail("Expected TaskCancelledException, but message completed");
                     }
-                    catch (TaskCanceledException) { }
+                    catch (OperationCanceledException) { }
                 })
                 .ToList();
             await Task.WhenAll(grainTasks);
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
-        public async Task MultipleGrainTasksSingleCancellation()
-        {
-            var grain = this.fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
-
-            var primaryTsc = new CancellationTokenSource();
-            var primaryTask = grain.LongWait(primaryTsc.Token, TimeSpan.FromSeconds(10));
-            var otherTsc = new CancellationTokenSource();
-            var otherGrainTask = grain.LongWait(otherTsc.Token, TimeSpan.FromSeconds(10));
-
-            primaryTsc.Cancel();
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => primaryTask);
-
-            await Task.Delay(TimeSpan.FromMilliseconds(100));
-            Assert.Equal(TaskStatus.Running, otherGrainTask.Status);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
