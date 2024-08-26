@@ -40,6 +40,7 @@ namespace Orleans.CodeGenerator
             ConstructorAttributeTypes = options.ConstructorAttributes.Select(Type).ToArray();
             AliasAttribute = Type("Orleans.AliasAttribute");
             IInvokable = Type("Orleans.Serialization.Invocation.IInvokable");
+            ICancellableInvokable = Type("Orleans.Serialization.Invocation.ICancellableInvokable");
             InvokeMethodNameAttribute = Type("Orleans.InvokeMethodNameAttribute");
             RuntimeHelpers = Type("System.Runtime.CompilerServices.RuntimeHelpers");
             InvokableCustomInitializerAttribute = Type("Orleans.InvokableCustomInitializerAttribute");
@@ -58,6 +59,8 @@ namespace Orleans.CodeGenerator
             SuppressReferenceTrackingAttribute = Type("Orleans.SuppressReferenceTrackingAttribute");
             OmitDefaultMemberValuesAttribute = Type("Orleans.OmitDefaultMemberValuesAttribute");
             ITargetHolder = Type("Orleans.Serialization.Invocation.ITargetHolder");
+            ICancellationRuntime = Type("Orleans.Serialization.Invocation.ICancellationRuntime");
+            ICancellableInvokableGrainExtension = TypeOrDefault("Orleans.Runtime.ICancellableInvokableGrainExtension");
             TypeManifestProviderAttribute = Type("Orleans.Serialization.Configuration.TypeManifestProviderAttribute");
             NonSerializedAttribute = Type("System.NonSerializedAttribute");
             ObsoleteAttribute = Type("System.ObsoleteAttribute");
@@ -77,11 +80,11 @@ namespace Orleans.CodeGenerator
             _dateOnly = TypeOrDefault("System.DateOnly");
             _dateTimeOffset = Type("System.DateTimeOffset");
             _bitVector32 = Type("System.Collections.Specialized.BitVector32");
-            _guid = Type("System.Guid");
             _compareInfo = Type("System.Globalization.CompareInfo");
             _cultureInfo = Type("System.Globalization.CultureInfo");
             _version = Type("System.Version");
             _timeOnly = TypeOrDefault("System.TimeOnly");
+            Guid = Type("System.Guid");
             ICodecProvider = Type("Orleans.Serialization.Serializers.ICodecProvider");
             ValueSerializer = Type("Orleans.Serialization.Serializers.IValueSerializer`1");
             ValueTask = Type("System.Threading.Tasks.ValueTask");
@@ -153,7 +156,7 @@ namespace Orleans.CodeGenerator
             TimeSpan = Type("System.TimeSpan");
             _ipAddress = Type("System.Net.IPAddress");
             _ipEndPoint = Type("System.Net.IPEndPoint");
-            _cancellationToken = Type("System.Threading.CancellationToken");
+            CancellationToken = Type("System.Threading.CancellationToken");
             _immutableContainerTypes = new[]
             {
                     compilation.GetSpecialType(SpecialType.System_Nullable_T),
@@ -218,7 +221,10 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol IActivator_1 { get; private set; }
         public INamedTypeSymbol IBufferWriter { get; private set; }
         public INamedTypeSymbol IInvokable { get; private set; }
+        public INamedTypeSymbol ICancellableInvokable { get; private set; }
         public INamedTypeSymbol ITargetHolder { get; private set; }
+        public INamedTypeSymbol ICancellationRuntime { get; private set; }
+        public INamedTypeSymbol? ICancellableInvokableGrainExtension { get; private set; }
         public INamedTypeSymbol TypeManifestProviderAttribute { get; private set; }
         public INamedTypeSymbol NonSerializedAttribute { get; private set; }
         public INamedTypeSymbol ObsoleteAttribute { get; private set; }
@@ -259,13 +265,13 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol SuppressReferenceTrackingAttribute { get; private set; }
         public INamedTypeSymbol OmitDefaultMemberValuesAttribute { get; private set; }
         public INamedTypeSymbol CopyContext { get; private set; }
+        public INamedTypeSymbol CancellationToken { get; private set; }
+        public INamedTypeSymbol Guid { get; private set; }
         public Compilation Compilation { get; private set; }
         public INamedTypeSymbol TimeSpan { get; private set; }
         private INamedTypeSymbol _ipAddress;
         private INamedTypeSymbol _ipEndPoint;
-        private INamedTypeSymbol _cancellationToken;
         private INamedTypeSymbol[] _immutableContainerTypes;
-        private INamedTypeSymbol _guid;
         private INamedTypeSymbol _bitVector32;
         private INamedTypeSymbol _compareInfo;
         private INamedTypeSymbol _cultureInfo;
@@ -280,14 +286,14 @@ namespace Orleans.CodeGenerator
             _dateOnly,
             _timeOnly,
             _dateTimeOffset,
-            _guid,
+            Guid,
             _bitVector32,
             _compareInfo,
             _cultureInfo,
             _version,
             _ipAddress,
             _ipEndPoint,
-            _cancellationToken,
+            CancellationToken,
             Type,
             _uri,
             _uInt128,
