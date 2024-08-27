@@ -323,6 +323,7 @@ namespace Orleans.CodeGenerator
             InvokableMethodDescription methodDescription,
             HolderFieldDescription holderField)
         {
+            var containingInterface = methodDescription.ContainingInterface;
             var isExtension = methodDescription.Key.ProxyBase.IsExtension;
             var body = ConditionalAccessExpression(
                     holderField.FieldName.ToIdentifierName(),
@@ -331,7 +332,7 @@ namespace Orleans.CodeGenerator
                         GenericName(isExtension ? "GetComponent" : "GetTarget")
                             .WithTypeArgumentList(
                                 TypeArgumentList(
-                                    SingletonSeparatedList(methodDescription.Method.ContainingType.ToTypeSyntax())))))
+                                    SingletonSeparatedList(containingInterface.ToTypeSyntax())))))
                 .WithArgumentList(ArgumentList()));
 
             return MethodDeclaration(PredefinedType(Token(SyntaxKind.ObjectKeyword)), "GetTarget")
@@ -512,17 +513,14 @@ namespace Orleans.CodeGenerator
                         ? Argument(IdentifierName("cancellationToken"))
                         : Argument(IdentifierName(p.FieldName))));
 
+            var containingInterface = method.ContainingInterface;
             var isExtension = method.Key.ProxyBase.IsExtension;
-            var getTarget = InvocationExpression(
-                    MemberAccessExpression(
-                        SyntaxKind.SimpleMemberAccessExpression,
-                        holder.FieldName.ToIdentifierName(),
-                        GenericName(isExtension ? "GetComponent" : "GetTarget")
-                            .WithTypeArgumentList(
-                                TypeArgumentList(
-                                    SingletonSeparatedList(method.Method.ContainingType.ToTypeSyntax())))))
-                .WithArgumentList(ArgumentList());
-
+            var getTarget = ParenthesizedExpression(
+                    CastExpression(
+                        method.Method.ContainingType.ToTypeSyntax(),
+                        InvocationExpression(IdentifierName("GetTarget"))
+                    )
+                );
 
             ExpressionSyntax methodCall;
             if (method.MethodTypeParameters.Count > 0)
