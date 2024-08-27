@@ -556,6 +556,47 @@ namespace Orleans.CodeGenerator
                 var defaultCancellationTokenFieldName = fields.OfType<MethodParameterFieldDescription>()
                     .First(p => SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, p.Parameter.Type)).FieldName;
 
+                var returnType = (INamedTypeSymbol)method.Method.ReturnType;
+                StatementSyntax innerBody = returnType switch
+                {
+                    // IAsyncEnumerable<T>
+                    { ConstructedFrom: { IsGenericType: true } } when SymbolEqualityComparer.Default.Equals(LibraryTypes.IAsyncEnumerable, returnType.ConstructedFrom) =>
+                        ForEachStatement(
+                            returnType.TypeArguments[0].ToTypeSyntax(method.TypeParameterSubstitutions),
+                            Identifier("item"),
+                            InvocationExpression(methodCall, ArgumentList(args)),
+                            Block(
+                                YieldStatement(
+                                    SyntaxKind.YieldReturnStatement,
+                                    IdentifierName("item")
+                                ),
+                                ExpressionStatement(
+                                    InvocationExpression(
+                                        MemberAccessExpression(
+                                            SyntaxKind.SimpleMemberAccessExpression,
+                                            IdentifierName("cancellationToken"),
+                                            IdentifierName("ThrowIfCancellationRequested")
+                                        )
+                                    )
+                                )
+                            )
+                        ).WithAwaitKeyword(Token(SyntaxKind.AwaitKeyword)),
+                    // Task<T> / ValueTask<T>
+                    { ConstructedFrom: { IsGenericType: true } } => 
+                        ReturnStatement(
+                            AwaitExpression(
+                                InvocationExpression(methodCall, ArgumentList(args))
+                            )
+                        ),
+                    // Task / ValueTask / Void
+                    _ => 
+                        ExpressionStatement(
+                            AwaitExpression(
+                                InvocationExpression(methodCall, ArgumentList(args))
+                            )
+                        )
+                };
+
                 body = Block(
                     LocalDeclarationStatement(
                         VariableDeclaration(
@@ -614,17 +655,7 @@ namespace Orleans.CodeGenerator
                                     MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
                                         IdentifierName("cancellationToken"),
                                         IdentifierName("ThrowIfCancellationRequested")))),
-                            ((INamedTypeSymbol)method.Method.ReturnType).ConstructedFrom is { IsGenericType: true }
-                                ? ReturnStatement(
-                                    AwaitExpression(
-                                        InvocationExpression(methodCall, ArgumentList(args))
-                                    )
-                                )
-                                : ExpressionStatement(
-                                    AwaitExpression(
-                                        InvocationExpression(methodCall, ArgumentList(args))
-                                    )
-                                )
+                            innerBody   
                         )
                     )
                     .WithFinally(

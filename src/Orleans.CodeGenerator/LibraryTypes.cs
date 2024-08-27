@@ -72,6 +72,7 @@ namespace Orleans.CodeGenerator
             TypeManifestOptions = Type("Orleans.Serialization.Configuration.TypeManifestOptions");
             Task = Type("System.Threading.Tasks.Task");
             Task_1 = Type("System.Threading.Tasks.Task`1");
+            IAsyncEnumerable = Type("System.Collections.Generic.IAsyncEnumerable`1");
             this.Type = Type("System.Type");
             _uri = Type("System.Uri");
             _int128 = TypeOrDefault("System.Int128");
@@ -237,6 +238,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol TypeManifestOptions { get; private set; }
         public INamedTypeSymbol Task { get; private set; }
         public INamedTypeSymbol Task_1 { get; private set; }
+        public INamedTypeSymbol IAsyncEnumerable { get; private set; }
         public INamedTypeSymbol Type { get; private set; }
         private INamedTypeSymbol _uri;
         private INamedTypeSymbol? _dateOnly;
