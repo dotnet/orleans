@@ -19,9 +19,9 @@ internal sealed partial class GrainDirectoryReplica
 
         // Ensure that the current membership version is new enough.
         await WaitForRange(address.GrainId, version);
-        if (!IsOwner(_view, address.GrainId))
+        if (!IsOwner(CurrentView, address.GrainId))
         {
-            return DirectoryResult.RefreshRequired<GrainAddress>(_view.Version);
+            return DirectoryResult.RefreshRequired<GrainAddress>(CurrentView.Version);
         }
 
         DebugAssertOwnership(address.GrainId);
@@ -37,9 +37,9 @@ internal sealed partial class GrainDirectoryReplica
 
         // Ensure we can serve the request.
         await WaitForRange(grainId, version);
-        if (!IsOwner(_view, grainId))
+        if (!IsOwner(CurrentView, grainId))
         {
-            return DirectoryResult.RefreshRequired<GrainAddress?>(_view.Version);
+            return DirectoryResult.RefreshRequired<GrainAddress?>(CurrentView.Version);
         }
 
         return DirectoryResult.FromResult(LookupCore(grainId), version);
@@ -54,9 +54,9 @@ internal sealed partial class GrainDirectoryReplica
         }
 
         await WaitForRange(address.GrainId, version);
-        if (!IsOwner(_view, address.GrainId))
+        if (!IsOwner(CurrentView, address.GrainId))
         {
-            return DirectoryResult.RefreshRequired<bool>(_view.Version);
+            return DirectoryResult.RefreshRequired<bool>(CurrentView.Version);
         }
 
         DebugAssertOwnership(address.GrainId);
@@ -89,7 +89,7 @@ internal sealed partial class GrainDirectoryReplica
 
         if (existing is null || existing.Matches(existingAddress) || IsSiloDead(existing))
         {
-            if (newAddress.MembershipVersion != _view.Version)
+            if (newAddress.MembershipVersion != CurrentView.Version)
             {
                 // Set the membership version to match the view number in which it was registered.
                 newAddress = new()
@@ -97,7 +97,7 @@ internal sealed partial class GrainDirectoryReplica
                     GrainId = newAddress.GrainId,
                     SiloAddress = newAddress.SiloAddress,
                     ActivationId = newAddress.ActivationId,
-                    MembershipVersion = _view.Version
+                    MembershipVersion = CurrentView.Version
                 };
             }
 

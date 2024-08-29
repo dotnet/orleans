@@ -1,5 +1,6 @@
 #nullable enable
 using System.Diagnostics;
+using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.GrainDirectory;
@@ -33,6 +34,8 @@ public sealed class DistributedGrainDirectoryResilienceTests(ITestOutputHelper o
         testClusterBuilder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         var testCluster = testClusterBuilder.Build();
         await testCluster.DeployAsync();
+        output.WriteLine($"ServiceId: {testCluster.Options.ServiceId}");
+        output.WriteLine($"ClusterId: {testCluster.Options.ClusterId}");
 
         var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
         var reconfigurationTimer = CoarseStopwatch.StartNew();
@@ -49,12 +52,16 @@ public sealed class DistributedGrainDirectoryResilienceTests(ITestOutputHelper o
             {
                 while (!cts.IsCancellationRequested)
                 {
-                    await Task.Delay(TimeSpan.FromMilliseconds(5));
                     var time = Stopwatch.StartNew();
                     var workTask = Parallel.ForAsync(0, CallsPerIteration, (i, ct) => client.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping());
                     using var delayCancellation = new CancellationTokenSource();
                     var delayTask = Task.Delay(TimeSpan.FromMilliseconds(15_000), delayCancellation.Token);
                     await Task.WhenAny(workTask, delayTask);
+                    if (delayTask.IsCompleted)
+                    {
+                        DumpCapture.CreateMiniDump("delayed");
+                    }
+
                     Assert.False(delayTask.IsCompleted);
 
                     try
@@ -64,6 +71,12 @@ public sealed class DistributedGrainDirectoryResilienceTests(ITestOutputHelper o
                     catch (SiloUnavailableException sue)
                     {
                         output.WriteLine($"Caught & swallowed transient exception: {sue}");
+                    }
+                    catch (Exception exception)
+                    {
+                        output.WriteLine($"Caught exception: {exception}");
+                        DumpCapture.CreateMiniDump("unexpected");
+                        throw;
                     }
 
                     idBase += CallsPerIteration;
@@ -155,5 +168,58 @@ public sealed class DistributedGrainDirectoryResilienceTests(ITestOutputHelper o
             siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.GrainDirectory.GrainDirectoryReplica", LogLevel.Trace));
             siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.GrainDirectory.DistributedGrainDirectory", LogLevel.Information));
         }
+    }
+}
+
+internal static partial class DumpCapture
+{
+    internal static FileInfo CreateMiniDump(string infix) => CreateMiniDump(Process.GetCurrentProcess(), infix);
+    internal static FileInfo CreateMiniDump(Process process, string infix, MiniDumpType dumpType = MiniDumpType.MiniDumpWithFullMemory)
+    {
+        var dumpFileName = $@"{process.ProcessName}-{infix}-{DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss-fffZ", CultureInfo.InvariantCulture)}.dmp";
+
+        using (var stream = File.Create(dumpFileName))
+        {
+            var result = MiniDumpWriteDump(
+                process.Handle,
+                process.Id,
+                stream.SafeFileHandle.DangerousGetHandle(),
+                dumpType,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                IntPtr.Zero);
+        }
+
+        return new FileInfo(dumpFileName);
+    }
+
+    [System.Runtime.InteropServices.DllImport("Dbghelp.dll")]
+    public static extern bool MiniDumpWriteDump(
+        IntPtr hProcess,
+        int processId,
+        IntPtr hFile,
+        MiniDumpType dumpType,
+        IntPtr exceptionParam,
+        IntPtr userStreamParam,
+        IntPtr callbackParam);
+
+    internal enum MiniDumpType
+    {
+        MiniDumpNormal = 0x00000000,
+        MiniDumpWithDataSegs = 0x00000001,
+        MiniDumpWithFullMemory = 0x00000002,
+        MiniDumpWithHandleData = 0x00000004,
+        MiniDumpFilterMemory = 0x00000008,
+        MiniDumpScanMemory = 0x00000010,
+        MiniDumpWithUnloadedModules = 0x00000020,
+        MiniDumpWithIndirectlyReferencedMemory = 0x00000040,
+        MiniDumpFilterModulePaths = 0x00000080,
+        MiniDumpWithProcessThreadData = 0x00000100,
+        MiniDumpWithPrivateReadWriteMemory = 0x00000200,
+        MiniDumpWithoutOptionalData = 0x00000400,
+        MiniDumpWithFullMemoryInfo = 0x00000800,
+        MiniDumpWithThreadInfo = 0x00001000,
+        MiniDumpWithCodeSegs = 0x00002000,
+        MiniDumpWithoutManagedState = 0x00004000,
     }
 }

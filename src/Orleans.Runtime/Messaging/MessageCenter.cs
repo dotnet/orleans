@@ -178,8 +178,8 @@ namespace Orleans.Runtime.Messaging
 
                 if (msg.TargetSilo is not { } targetSilo)
                 {
-                    log.LogError((int)ErrorCode.Runtime_Error_100113, "Message does not have a target silo: " + msg + " -- Call stack is: " + Utils.GetStackTrace());
-                    SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message to be sent does not have a target silo");
+                    log.LogError((int)ErrorCode.Runtime_Error_100113, "Message does not have a target silo: '{Message}'. Call stack: {StackTrace}", msg, Utils.GetStackTrace());
+                    SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message to be sent does not have a target silo.");
                     return;
                 }
 
@@ -209,7 +209,7 @@ namespace Orleans.Runtime.Messaging
                         if (msg.Direction is Message.Directions.Request or Message.Directions.OneWay)
                         {
                             this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
-                            this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead");
+                            this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead", new SiloUnavailableException());
                         }
 
                         return;
@@ -571,7 +571,7 @@ namespace Orleans.Runtime.Messaging
             {
                 MessagingInstruments.OnRejectedMessage(msg);
                 this.log.LogWarning(
-                    (int) ErrorCode.MessagingMessageFromUnknownActivation,
+                    (int)ErrorCode.MessagingMessageFromUnknownActivation,
                     "Received a message {Message} for an unknown SystemTarget: {Target}",
                      msg,
                      msg.TargetGrain);
@@ -603,7 +603,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason)
+        internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason, Exception? exception = null)
         {
             MessagingInstruments.OnRejectedMessage(msg);
 
@@ -616,7 +616,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 if (string.IsNullOrEmpty(reason)) reason = $"Rejection from silo {this._siloAddress} - Unknown reason.";
-                var error = this.messageFactory.CreateRejectionResponse(msg, rejectionType, reason);
+                var error = this.messageFactory.CreateRejectionResponse(msg, rejectionType, reason, exception);
                 // rejection msgs are always originated in the local silo, they are never remote.
                 this.ReceiveMessage(error);
             }

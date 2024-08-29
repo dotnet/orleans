@@ -97,7 +97,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 MessagingInstruments.OnRejectedMessage(msg);
-                var rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, "Silo stopping");
+                var rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, "Silo stopping", new SiloUnavailableException());
                 this.Send(rejection);
                 return;
             }
@@ -245,7 +245,7 @@ namespace Orleans.Runtime.Messaging
             // Don't send messages that have already timed out
             if (msg.IsExpired)
             {
-                this.MessagingTrace.OnDropExpiredMessage(msg,  MessagingInstruments.Phase.Send);
+                this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
 
                 if (msg.IsPing())
                 {
@@ -288,7 +288,11 @@ namespace Orleans.Runtime.Messaging
                 if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.LogDebug((int)ErrorCode.MessagingSendingRejection, "Silo {SiloAddress} is rejecting message: {Message}. Reason = {Reason}", this.LocalSiloAddress, msg, reason);
 
                 // Done retrying, send back an error instead
-                this.messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Silo {this.LocalSiloAddress} is rejecting message: {msg}. Reason = {reason}");
+                this.messageCenter.SendRejection(
+                    msg,
+                    Message.RejectionTypes.Transient,
+                    $"Silo {this.LocalSiloAddress} is rejecting message: {msg}. Reason = {reason}",
+                    new SiloUnavailableException());
             }
             else
             {
