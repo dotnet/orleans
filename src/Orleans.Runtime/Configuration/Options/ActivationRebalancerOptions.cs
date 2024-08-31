@@ -1,6 +1,5 @@
 using System;
 using Microsoft.Extensions.Options;
-using Orleans.Placement.Rebalancing;
 using Orleans.Runtime;
 
 namespace Orleans.Configuration;
@@ -79,7 +78,7 @@ public sealed class ActivationRebalancerOptions
     /// <summary>
     /// <para>Represents the weight that is given to the number of rebalancing cycles that have passed during a rebalancing session.</para>
     /// Changing this value has a far greater impact on the migration rate than <see cref="SiloNumberWeight"/>, and is suitable for controlling the session duration.
-    /// Pick lower values if you want a slower migration rate.
+    /// Pick higher values if you want a faster migration rate.
     /// </summary>
     /// <remarks>Allowed range: (0-1]</remarks>
     public float CycleNumberWeight { get; set; } = DEFAULT_CYCLE_NUMBER_WEIGHT;
@@ -90,9 +89,9 @@ public sealed class ActivationRebalancerOptions
     public const float DEFAULT_CYCLE_NUMBER_WEIGHT = 0.1f;
 
     /// <summary>
-    /// <para>Represents the weight that is given to the number of silo in the cluster during a rebalancing session.</para>
+    /// <para>Represents the weight that is given to the number of silos in the cluster during a rebalancing session.</para>
     /// Changing this value has a far lesser impact on the migration rate than <see cref="CycleNumberWeight"/>, and is suitable for fine-tuning.
-    /// Pick lower values if you want a slower migration rate.
+    /// Pick higher values if you want a faster migration rate.
     /// </summary>
     /// <remarks>Allowed range: (0-1]</remarks>
     public float SiloNumberWeight { get; set; } = DEFAULT_SILO_NUMBER_WEIGHT;
@@ -101,10 +100,6 @@ public sealed class ActivationRebalancerOptions
     /// The default value of <see cref="SiloNumberWeight"/>.
     /// </summary>
     public const float DEFAULT_SILO_NUMBER_WEIGHT = 0.1f;
-
-    public RebalancingParameters ToParameters() =>
-        new(SessionCyclePeriod, MaxStaleCycles, EntropyQuantum,
-            MaxEntropyDeviation, CycleNumberWeight, SiloNumberWeight);
 }
 
 internal sealed class ActivationRebalancerOptionsValidator(
@@ -114,41 +109,38 @@ internal sealed class ActivationRebalancerOptionsValidator(
     private readonly ActivationRebalancerOptions _options = options.Value;
     private readonly DeploymentLoadPublisherOptions _publisherOptions = publisherOptions.Value;
 
-    public void ValidateConfiguration() => ThrowIfInvalid(_options.ToParameters(),
-        _publisherOptions.DeploymentLoadPublisherRefreshTime);
-
-    public static void ThrowIfInvalid(RebalancingParameters parameters, TimeSpan deploymentLoadPublisherRefreshTime)
+    public void ValidateConfiguration()
     {
-        if (parameters.SessionCyclePeriod <= 2 * deploymentLoadPublisherRefreshTime)
+        if (_options.SessionCyclePeriod <= 2 * _publisherOptions.DeploymentLoadPublisherRefreshTime)
         {
             throw new OrleansConfigurationException(
-                $"{nameof(RebalancingParameters.SessionCyclePeriod)} must be greater than " +
+                $"{nameof(ActivationRebalancerOptions.SessionCyclePeriod)} must be greater than " +
                 $"{$"2 x {nameof(DeploymentLoadPublisherOptions.DeploymentLoadPublisherRefreshTime)}"}");
         }
 
-        if (parameters.MaxStaleCycles <= 0)
+        if (_options.MaxStaleCycles <= 0)
         {
-            throw new OrleansConfigurationException($"{nameof(RebalancingParameters.MaxStaleCycles)} must be greater than 0");
+            throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.MaxStaleCycles)} must be greater than 0");
         }
 
-        if (parameters.EntropyQuantum <= 0 || parameters.EntropyQuantum >= 1)
+        if (_options.EntropyQuantum <= 0 || _options.EntropyQuantum >= 1)
         {
-            throw new OrleansConfigurationException($"{nameof(RebalancingParameters.EntropyQuantum)} must be in greater than 0, and less 1");
+            throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.EntropyQuantum)} must be in greater than 0, and less 1");
         }
 
-        if (parameters.MaxEntropyDeviation <= 0 || parameters.MaxEntropyDeviation >= 1)
+        if (_options.MaxEntropyDeviation <= 0 || _options.MaxEntropyDeviation >= 1)
         {
-            throw new OrleansConfigurationException($"{nameof(RebalancingParameters.MaxEntropyDeviation)} must be in greater than 0, and less 1");
+            throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.MaxEntropyDeviation)} must be in greater than 0, and less 1");
         }
 
-        if (parameters.CycleNumberWeight <= 0 || parameters.CycleNumberWeight > 1)
+        if (_options.CycleNumberWeight <= 0 || _options.CycleNumberWeight > 1)
         {
-            throw new OrleansConfigurationException($"{nameof(RebalancingParameters.CycleNumberWeight)} must be in greater than 0, and less or equal to 1");
+            throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.CycleNumberWeight)} must be in greater than 0, and less or equal to 1");
         }
 
-        if (parameters.SiloNumberWeight <= 0 || parameters.SiloNumberWeight > 1)
+        if (_options.SiloNumberWeight <= 0 || _options.SiloNumberWeight > 1)
         {
-            throw new OrleansConfigurationException($"{nameof(RebalancingParameters.SiloNumberWeight)} must be in greater than 0, and less or equal to 1");
+            throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.SiloNumberWeight)} must be in greater than 0, and less or equal to 1");
         }
     }
 }
