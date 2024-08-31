@@ -29,7 +29,7 @@ internal sealed class ActivationRebalancerGrain(
     private record struct ResourceStatistics(long MemoryUsage, int ActivationCount);
 
     private int _rebalancingCycle;
-    private int _staleCycles;
+    private uint _staleCycles;
     private double _previousEntropy;
     private bool _hasDueTimeElapsed;
     private DateTime? _disabledUntil;
@@ -39,6 +39,7 @@ internal sealed class ActivationRebalancerGrain(
     private RebalancingParameters _parameters;
 
     private readonly TimeSpan _rebalancerDueTime = rebalancerOptions.Value.RebalancerDueTime;
+    private readonly TimeSpan _failedSessionDelay = rebalancerOptions.Value.FailedSessionDelay;
     private readonly TimeSpan _publisherRefreshTime = publisherOptions.Value.DeploymentLoadPublisherRefreshTime;
     private readonly Dictionary<SiloAddress, ResourceStatistics> _siloStatistics = [];
 
@@ -48,7 +49,7 @@ internal sealed class ActivationRebalancerGrain(
         get => _sessionTimer != null;
     }
 
-    private bool HasStopped
+    private bool IsSuspended
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _disabledUntil.HasValue && _disabledUntil.Value > DateTime.UtcNow;
@@ -85,18 +86,28 @@ internal sealed class ActivationRebalancerGrain(
 
     public Task ResumeRebalancing()
     {
+        if (IsSuspended)
+        {
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+                logger.LogTrace("I have been told to resume rebalancing, and will do so.");
+            };
+
+            StartSession();
+            return Task.CompletedTask;
+        }
+
         if (logger.IsEnabled(LogLevel.Trace))
         {
-            logger.LogTrace("I have been told to resume rebalancing.");
+            logger.LogTrace("I have been told to resume rebalancing, but I am already running.");
         };
 
-        StartSession(_parameters);
         return Task.CompletedTask;
     }
 
     public Task SuspendRebalancing(TimeSpan? duration)
     {
-        StopSession(duration);
+        StopSession(duration ?? Timeout.InfiniteTimeSpan);
 
         if (logger.IsEnabled(LogLevel.Trace))
         {
@@ -117,16 +128,17 @@ internal sealed class ActivationRebalancerGrain(
     {
         ActivationRebalancerOptionsValidator.ThrowIfInvalid(parameters, _publisherRefreshTime);
 
+        _parameters = parameters;
+
         if (_triggerTimer is null)
         {
-            _parameters = parameters;
             _firstTriggerTime = DateTime.UtcNow;
-            _triggerTimer = this.RegisterGrainTimer(() =>
-                PeriodicallyTriggerRebalancing(_parameters), new()
-                {
-                    DueTime = _rebalancerDueTime,
-                    Period = 2 * _parameters.SessionCyclePeriod // make trigger-period twice as long as the (session) cycle-period.
-                });
+            _triggerTimer = this.RegisterGrainTimer(PeriodicallyTriggerRebalancing, new()
+            {
+                Interleave = true,
+                DueTime = _rebalancerDueTime,
+                Period = 2 * _parameters.SessionCyclePeriod // make trigger-period twice as long as the session cycle-period.
+            });
 
             return Task.CompletedTask;
         }
@@ -150,11 +162,11 @@ internal sealed class ActivationRebalancerGrain(
                 "I will drop any on-going session, and will proceed with this one instead.");
         }
 
-        StartSession(parameters);
+        StartSession();
         return Task.CompletedTask;
     }
 
-    private Task PeriodicallyTriggerRebalancing(RebalancingParameters parameters)
+    private Task PeriodicallyTriggerRebalancing()
     {
         if (HasSession)
         {
@@ -168,7 +180,7 @@ internal sealed class ActivationRebalancerGrain(
             return Task.CompletedTask;
         }
 
-        if (HasStopped)
+        if (IsSuspended)
         {
             if (logger.IsEnabled(LogLevel.Trace))
             {
@@ -182,29 +194,11 @@ internal sealed class ActivationRebalancerGrain(
             }
         }
 
-        StartSession(parameters);
+        StartSession();
         return Task.CompletedTask;
     }
 
-    private void StartSession(RebalancingParameters parameters)
-    {
-        StopSession();
-
-        _sessionTimer = this.RegisterGrainTimer(() => RunRebalancingCycle(parameters), new()
-        {
-            DueTime = TimeSpan.Zero,
-            Period = parameters.SessionCyclePeriod
-        });
-
-        if (logger.IsEnabled(LogLevel.Trace))
-        {
-            logger.LogTrace(
-                "I have started a rebalancing session and will run according to {Parameters}",
-                parameters.ToString());
-        };
-    }
-
-    private async Task RunRebalancingCycle(RebalancingParameters parameters)
+    private async Task RunRebalancingCycle()
     {
         var siloCount = siloStatusOracle.GetActiveSilos().Length;
         if (siloCount < 2)
@@ -230,17 +224,17 @@ internal sealed class ActivationRebalancerGrain(
 
         _rebalancingCycle++;
 
-        if (_staleCycles > parameters.MaxStaleCycles)
+        if (_staleCycles > _parameters.MaxStaleCycles)
         {
             if (logger.IsEnabled(LogLevel.Trace))
             {
                 logger.LogTrace(
                     "The current rebalancing session has stopped due to {StaleCycles} stale " +
                     "cycles having passed, while the maximum allowed is {MaxStaleCycles}",
-                    _staleCycles, parameters.MaxStaleCycles);
+                    _staleCycles, _parameters.MaxStaleCycles);
             }
 
-            StopSession();
+            StopSession(_failedSessionDelay);
             return;
         }
 
@@ -250,7 +244,7 @@ internal sealed class ActivationRebalancerGrain(
         var currentEntropy = ComputeEntropy(snapshot.Select(x => x.Value), totalActivations, meanMemoryUsage);
         var entropyDeviation = (maximumEntropy - currentEntropy) / maximumEntropy;
 
-        if (entropyDeviation <= parameters.MaxEntropyDeviation)
+        if (entropyDeviation <= _parameters.MaxEntropyDeviation)
         {
             // The deviation from maximum is practically considered "0" i.e: we've reached maximum.
             if (logger.IsEnabled(LogLevel.Trace))
@@ -259,30 +253,40 @@ internal sealed class ActivationRebalancerGrain(
                     "The current rebalancing session has stopped due to a {EntropyDeviation} " +
                     "entropy deviation between the current {CurrentEntropy} and maximum possible {MaximumEntropy}. " +
                     "The difference is less than the required {MaxEntropyDeviation} deviation.",
-                    entropyDeviation, currentEntropy, maximumEntropy, parameters.MaxEntropyDeviation);
+                    entropyDeviation, currentEntropy, maximumEntropy, _parameters.MaxEntropyDeviation);
             }
 
-            StopSession();
+            StopSession(_failedSessionDelay);
             return;
         }
 
         var entropyDifference = currentEntropy - _previousEntropy;
-        if (entropyDifference < parameters.EntropyQuantum)
+        if (entropyDifference < _parameters.EntropyQuantum)
         {
             // Entropy difference is too low to be considered an improvement, chances are we are reaching the maximum, or the system
-            // is dynamically changing too fast i.e. new activations are being created at a high rate, we need to start "cooling-down".
-            // As a matter of fact, entropy could also become negative if the current entropy is less than the previous, due to many
-            // activation changes happening during this and the previous cycle.
+            // is dynamically changing too fast i.e. new activations are being created at a high rate with an imbalanced distribution,
+            // we need to start "cooling-down". As a matter of fact, entropy could also become negative if the current entropy is less
+            // than the previous, due to many activation changes happening during this and the previous cycle.
             if (logger.IsEnabled(LogLevel.Trace))
             {
                 logger.LogTrace(
                     "The change in entropy {EntropyDifference} is less than the quantum {EntropyQuantum}. " +
                     "This is practically not considered an improvement, therefor this cycle will be marked as stale.",
-                    entropyDifference, parameters.EntropyQuantum);
+                    entropyDifference, _parameters.EntropyQuantum);
             }
 
+            _previousEntropy = currentEntropy;
             _staleCycles++;
+
             return;
+        }
+
+        if (_staleCycles > 0)
+        {
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+                logger.LogTrace("Stale cycle count of {StaleCycles} has been reset to 0, as we are improving now.", _staleCycles);
+            }
         }
 
         var idealDistributions = snapshot.Select(x => new ValueTuple<SiloAddress, double>
@@ -291,7 +295,7 @@ internal sealed class ActivationRebalancerGrain(
             .ToDictionary();
 
         var alpha = currentEntropy / maximumEntropy;
-        var scalingFactor = ComputeAdaptiveScaling(ref parameters, siloCount, _rebalancingCycle);
+        var scalingFactor = ComputeAdaptiveScaling(ref _parameters, siloCount, _rebalancingCycle);
         var addressPairs = FormSiloPairs(snapshot);
         var migrationTasks = new List<Task>();
 
@@ -434,21 +438,49 @@ internal sealed class ActivationRebalancerGrain(
         return pairs;
     }
 
+    private void StartSession()
+    {
+        StopSession(TimeSpan.Zero);
+
+        _sessionTimer = this.RegisterGrainTimer(RunRebalancingCycle, new()
+        {
+            DueTime = TimeSpan.Zero,
+            Period = _parameters.SessionCyclePeriod
+        });
+
+        if (logger.IsEnabled(LogLevel.Trace))
+        {
+            logger.LogTrace(
+                "I have started a rebalancing session and will run according to {Parameters}",
+                _parameters.ToString());
+        };
+    }
+
+    private void StopSession(TimeSpan duration)
+    {
+        _previousEntropy = 0;
+        _rebalancingCycle = 0;
+        _staleCycles = 0;
+        _sessionTimer?.Dispose();
+        _sessionTimer = null;
+
+        if (duration == TimeSpan.Zero)
+        {
+            _disabledUntil = null;
+            return;
+        }
+
+        var disableFor = DateTime.UtcNow.Add(duration);
+
+        _disabledUntil = !_disabledUntil.HasValue ? disableFor :
+            (disableFor > _disabledUntil ? disableFor : _disabledUntil);
+    }
+
     public void RemoveSilo(SiloAddress address) => _siloStatistics.Remove(address);
 
     public void SiloStatisticsChangeNotification(SiloAddress address, SiloRuntimeStatistics statistics)
     {
         ref var stats = ref CollectionsMarshal.GetValueRefOrAddDefault(_siloStatistics, address, out _);
         stats = new(statistics.EnvironmentStatistics.MemoryUsageBytes, statistics.ActivationCount);
-    }
-
-    private void StopSession(TimeSpan? duration = null)
-    {
-        _previousEntropy = 0;
-        _rebalancingCycle = 0;
-        _staleCycles = 0;
-        _disabledUntil = duration.HasValue ? DateTime.UtcNow.Add(duration.Value) : DateTime.MaxValue;
-        _sessionTimer?.Dispose();
-        _sessionTimer = null;
     }
 }

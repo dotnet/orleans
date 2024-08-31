@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Options;
 using Orleans.Placement.Rebalancing;
 using Orleans.Runtime;
@@ -16,10 +15,10 @@ public sealed class ActivationRebalancerOptions
     /// <summary>
     /// The default value of <see cref="RebalancerDueTime"/>.
     /// </summary>
-    public static readonly TimeSpan DEFAULT_REBALANCER_DUE_TIME = TimeSpan.FromSeconds(60);
+    public static readonly TimeSpan DEFAULT_REBALANCER_DUE_TIME = TimeSpan.FromSeconds(30);
 
     /// <summary>
-    /// Determines the time between two consecutive rebalancing cycles within a session.
+    /// The time between two consecutive rebalancing cycles within a session.
     /// </summary>
     /// <remarks>It must be greater than 2 x <see cref="DeploymentLoadPublisherOptions.DeploymentLoadPublisherRefreshTime"/>.</remarks>
     public TimeSpan SessionCyclePeriod { get; set; } = DEFAULT_SESSION_CYCLE_PERIOD;
@@ -27,10 +26,22 @@ public sealed class ActivationRebalancerOptions
     /// <summary>
     /// The default value of <see cref="SessionCyclePeriod"/>.
     /// </summary>
-    public static readonly TimeSpan DEFAULT_SESSION_CYCLE_PERIOD = TimeSpan.FromSeconds(30);
+    public static readonly TimeSpan DEFAULT_SESSION_CYCLE_PERIOD = TimeSpan.FromSeconds(10);
 
     /// <summary>
-    /// The maximum consecutive number of cycles yielding no improvement to the cluster's entropy.
+    /// The time to wait for a new rebalancing session, after a previous session has failed on
+    /// yielding any significant improvement to the cluster's entropy.
+    /// </summary>
+    /// <remarks><see cref="TimeSpan.Zero"/> is valid.</remarks>
+    public TimeSpan FailedSessionDelay { get; set; }
+
+    /// <summary>
+    /// The default value of <see cref="FailedSessionDelay"/>.
+    /// </summary>
+    public static readonly TimeSpan DEFAULT_FAILED_SESSION_DELAY = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// The maximum, consecutive number of cycles, yielding no significant improvement to the cluster's entropy.
     /// </summary>
     /// <remarks>This value is inclusive, i.e. if this value is 'n', than the 'n+1' cycle will stop the current rebalancing session.</remarks>
     public int MaxStaleCycles { get; set; } = DEFAULT_MAX_STALE_CYCLES;
@@ -38,7 +49,7 @@ public sealed class ActivationRebalancerOptions
     /// <summary>
     /// The default value of <see cref="MaxStaleCycles"/>.
     /// </summary>
-    public const int DEFAULT_MAX_STALE_CYCLES = 10;
+    public const int DEFAULT_MAX_STALE_CYCLES = 3;
 
     /// <summary>
     /// The minumum change in the entropy of the cluster that is considered an "improvement".
@@ -106,7 +117,6 @@ internal sealed class ActivationRebalancerOptionsValidator(
     public void ValidateConfiguration() => ThrowIfInvalid(_options.ToParameters(),
         _publisherOptions.DeploymentLoadPublisherRefreshTime);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void ThrowIfInvalid(RebalancingParameters parameters, TimeSpan deploymentLoadPublisherRefreshTime)
     {
         if (parameters.SessionCyclePeriod <= 2 * deploymentLoadPublisherRefreshTime)
