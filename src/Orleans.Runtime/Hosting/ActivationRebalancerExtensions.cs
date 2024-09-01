@@ -25,6 +25,6 @@ public static class ActivationRebalancerExtensions
     {
         public Task Execute(CancellationToken cancellationToken) =>
             grainFactory.GetGrain<IInternalActivationRebalancerGrain>(
-                IActivationRebalancerGrain.Key).StartRebalancing();
+                IActivationRebalancerGrain.Key).StartRebalancer();
     }
 }

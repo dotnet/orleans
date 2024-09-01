@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Immutable;
 using System.Threading.Tasks;
+using Orleans.Concurrency;
+using Orleans.Runtime;
 
 namespace Orleans.Placement;
 
@@ -16,6 +19,9 @@ public interface IActivationRebalancerGrain : IGrainWithIntegerKey
     /// type will result in an <see cref="InvalidOperationException"/>.</strong></remarks>
     public const int Key = 0;
 
+    [AlwaysInterleave, Alias("GetStatistics")]
+    ValueTask<ImmutableArray<SiloRebalancingStatistics>> GetStatistics();
+
     /// <summary>
     /// Resumes the rebalancer if its suspended, otherwise its a no-op.
     /// </summary>
@@ -30,11 +36,23 @@ public interface IActivationRebalancerGrain : IGrainWithIntegerKey
     [Alias("SuspendRebalancing")] Task SuspendRebalancing(TimeSpan? duration);
 }
 
-[Alias("Orleans.Placement.Rebalancing.IInternalActivationRebalancerGrain")]
+[Alias("IInternalActivationRebalancerGrain")]
 internal interface IInternalActivationRebalancerGrain : IActivationRebalancerGrain
 {
     /// <summary>
     /// Starts the rebalancer if its not started yet, otherwise its a no-op.
     /// </summary>
-    [Alias("StartRebalancing")] Task StartRebalancing();
+    [Alias("StartRebalancer")] Task StartRebalancer();
 }
+
+/// <summary>
+/// Rebalancing statistics for the given <paramref name="SiloAddress"/>.
+/// </summary>
+/// <param name="SiloAddress">The silo address.</param>
+/// <param name="DispersedActivations">The number of activations that have been dispersed from this silo thus far.</param>
+/// <param name="AcquiredActivations">The number of activations that have been acquired by this silo thus far.</param>
+/// <remarks>Used for diagnostics / metrics purposes.</remarks>
+[GenerateSerializer]
+[Alias("SiloRebalancingStatistics")]
+public readonly record struct SiloRebalancingStatistics(
+    SiloAddress SiloAddress, ulong DispersedActivations, ulong AcquiredActivations);

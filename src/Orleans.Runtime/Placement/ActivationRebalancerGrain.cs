@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -10,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Placement;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime.Placement.Rebalancing;
 
@@ -27,6 +30,7 @@ internal sealed class ActivationRebalancerGrain(
     IOptions<ActivationRebalancerOptions> options)
         : Grain, IInternalActivationRebalancerGrain, ISiloStatisticsChangeListener
 {
+    private record struct RebalancingStatistics(ulong Dispersed, ulong Acquired);
     private record struct ResourceStatistics(long MemoryUsage, int ActivationCount);
 
     private int _rebalancingCycle;
@@ -38,6 +42,7 @@ internal sealed class ActivationRebalancerGrain(
 
     private readonly ActivationRebalancerOptions _options = options.Value;
     private readonly Dictionary<SiloAddress, ResourceStatistics> _siloStatistics = [];
+    private readonly Dictionary<SiloAddress, RebalancingStatistics> _rebalancingStatistics = [];
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
@@ -59,7 +64,12 @@ internal sealed class ActivationRebalancerGrain(
         stats = new(statistics.EnvironmentStatistics.MemoryUsageBytes, statistics.ActivationCount);
     }
 
-    public Task StartRebalancing()
+    public ValueTask<ImmutableArray<SiloRebalancingStatistics>> GetStatistics() =>
+        new(_rebalancingStatistics.Select(x =>
+            new SiloRebalancingStatistics(x.Key, x.Value.Dispersed, x.Value.Acquired))
+                .ToImmutableArray());
+
+    public Task StartRebalancer()
     {
         ThrowIfInvalidGrainKey();
 
@@ -147,6 +157,18 @@ internal sealed class ActivationRebalancerGrain(
             if (logger.IsEnabled(LogLevel.Trace))
             {
                 logger.LogTrace("Can not continue with rebalancing because I have statistics information for less than 2 silos.");
+            }
+
+            return;
+        }
+
+        if (snapshot.Any(x => x.Value.MemoryUsage == 0))
+        {
+            if (logger.IsEnabled(LogLevel.Warning))
+            {
+                logger.LogWarning(
+                    "Can not continue with rebalancing because at least one of the silos is reporting 0 memory usage. " +
+                    "This can indicated that there is no implementation of {ProviderName}", nameof(IEnvironmentStatisticsProvider));
             }
 
             return;
@@ -255,7 +277,9 @@ internal sealed class ActivationRebalancerGrain(
                 continue;
             }
 
+            var lowCount = snapshot[lowSilo].ActivationCount;
             var highCount = snapshot[highSilo].ActivationCount;
+
             if (delta > highCount)
             {
                 delta = highCount;
@@ -265,10 +289,10 @@ internal sealed class ActivationRebalancerGrain(
                 .GetSystemTarget<ISiloControl>(Constants.SiloControlType, highSilo)
                 .MigrateRandomActivations(lowSilo, delta));
 
+            UpdateStatistics(lowSilo, highSilo, (uint)delta);
+
             if (logger.IsEnabled(LogLevel.Trace))
             {
-                var lowCount = snapshot[lowSilo].ActivationCount;
-
                 logger.LogTrace(
                     "I have decided to migrate {Delta} activations.\n" +
                     "Adjusted activations for {LowSilo} will be [{LowSiloPreActivations} -> {LowSiloPostActivations}].\n" +
@@ -292,6 +316,16 @@ internal sealed class ActivationRebalancerGrain(
         }
 
         _previousEntropy = currentEntropy;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void UpdateStatistics(SiloAddress lowSilo, SiloAddress highSilo, uint delta)
+    {
+        ref var lowStats = ref CollectionsMarshal.GetValueRefOrAddDefault(_rebalancingStatistics, lowSilo, out _);
+        lowStats = new(lowStats.Dispersed, lowStats.Acquired + delta);
+
+        ref var highStats = ref CollectionsMarshal.GetValueRefOrAddDefault(_rebalancingStatistics, highSilo, out _);
+        highStats = new(highStats.Dispersed + delta, highStats.Acquired);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -330,6 +364,7 @@ internal sealed class ActivationRebalancerGrain(
 
         foreach (var value in memoryUsages)
         {
+            Debug.Assert(value > 0);
             result += 1.0 / value;
         }
 

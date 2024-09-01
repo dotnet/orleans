@@ -17,6 +17,9 @@ using Microsoft.Extensions.Hosting;
 using Orleans.TestingHost.InMemoryTransport;
 using Orleans.TestingHost.UnixSocketTransport;
 using System.Net;
+using Orleans.Hosting;
+using Orleans.Statistics;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Orleans.TestingHost
 {
@@ -676,10 +679,20 @@ namespace Orleans.TestingHost
                         default:
                             throw new ArgumentException($"Unsupported {nameof(ConnectionTransportType)}: {transport}");
                     }
+
+                    if (options.UseRealEnvironmentStatistics)
+                    {
+                        var descriptor = siloBuilder.Services.FirstOrDefault(descriptor => descriptor.ServiceType == typeof(IEnvironmentStatisticsProvider));
+                        if (descriptor != null)
+                        {
+                            siloBuilder.Services.Remove(descriptor);
+                            siloBuilder.Services.AddSingleton<IEnvironmentStatisticsProvider, EnvironmentStatisticsProvider>();
+                        }
+                    }
                 });
             });
         }
-        
+
         /// <summary>
         /// Start a new silo in the target cluster
         /// </summary>

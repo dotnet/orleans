@@ -43,6 +43,11 @@ namespace Orleans.TestingHost
         public bool UseTestClusterMembership { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether to use the real environment statistics.
+        /// </summary>
+        public bool UseRealEnvironmentStatistics { get; set; }
+
+        /// <summary>
         /// Gets or sets a value indicating whether to initialize the client immediately on deployment.
         /// </summary>
         /// <value><see langword="true" /> if the client should be initialized immediately on deployment; otherwise, <see langword="false" />.</value>
@@ -111,6 +116,7 @@ namespace Orleans.TestingHost
                 [nameof(BaseSiloPort)] = this.BaseSiloPort.ToString(),
                 [nameof(BaseGatewayPort)] = this.BaseGatewayPort.ToString(),
                 [nameof(UseTestClusterMembership)] = this.UseTestClusterMembership.ToString(),
+                [nameof(UseRealEnvironmentStatistics)] = this.UseRealEnvironmentStatistics.ToString(),
                 [nameof(InitializeClientOnDeploy)] = this.InitializeClientOnDeploy.ToString(),
                 [nameof(InitialSilosCount)] = this.InitialSilosCount.ToString(),
                 [nameof(ApplicationBaseDirectory)] = this.ApplicationBaseDirectory,
@@ -124,6 +130,8 @@ namespace Orleans.TestingHost
             {
                 result["Orleans:Clustering:ProviderType"] = "Development";
             }
+
+            result["UseRealEnvironmentStatistics"] = UseRealEnvironmentStatistics ? "True" : "False";
             
             if (this.SiloBuilderConfiguratorTypes != null)
             {

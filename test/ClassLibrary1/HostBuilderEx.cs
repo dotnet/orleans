@@ -8,8 +8,8 @@ namespace ClassLibrary1;
 
 public static class HostBuilderEx
 {
-    public const int RebalancerDueTimeSeconds = 10;
-    public const int SessionCyclePeriodSeconds = 5; 
+    public static readonly TimeSpan RebalancerDueTime = TimeSpan.FromSeconds(10);
+    public static readonly TimeSpan SessionCyclePeriod = TimeSpan.FromSeconds(5); 
 
     public static IHost CreateHost(this IHostBuilder hostBuilder, int siloNum)
     {
@@ -29,8 +29,8 @@ public static class HostBuilderEx
                 })
                 .Configure<ActivationRebalancerOptions>(o =>
                 {
-                    o.RebalancerDueTime = TimeSpan.FromSeconds(10);
-                    o.SessionCyclePeriod = TimeSpan.FromSeconds(SessionCyclePeriodSeconds);
+                    o.RebalancerDueTime = RebalancerDueTime;
+                    o.SessionCyclePeriod = SessionCyclePeriod;
                 })
                 .UseLocalhostClustering(
                     siloPort: EndpointOptions.DEFAULT_SILO_PORT + siloNum,
