@@ -66,7 +66,7 @@ while (true)
     await Task.Delay(1000 * (HostBuilderEx.SessionCyclePeriodSeconds + 3));
     var createMore = Random.Shared.Next(0, 4); // 25% chance
 
-    if (createMore == 1)
+    if (createMore == 10)
     {
         var randomGrainsPrimary = 100;   //Random.Shared.Next(10, 51);
         var randomGrainsSecondary = 5;   //Random.Shared.Next(10, 51);

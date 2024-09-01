@@ -183,26 +183,26 @@ internal sealed class ActivationRebalancerGrain(
             return;
         }
 
-        // We use the normalized, absolute entropy difference, because it is more useful for understanding how significant
+        // We use the normalized, absolute entropy change, because it is more useful for understanding how significant
         // the change is, relative to the maximum possible. Values closer to 1 reflect higher significance than those closer to 0.
         // Since max entropy is a function of the natural log of the cluster's size, this value is very robust against changes
         // in silo number within the cluster.
 
-        var entropyDifference = (float)Math.Abs((currentEntropy - _previousEntropy) / maximumEntropy);
-        Debug.Assert(entropyDifference >= 0 && entropyDifference <= 1);
+        var entropyChange = (float)Math.Abs((currentEntropy - _previousEntropy) / maximumEntropy);
+        Debug.Assert(entropyChange >= 0 && entropyChange <= 1);
 
-        if (entropyDifference < _options.EntropyQuantum)
+        if (entropyChange < _options.EntropyQuantum)
         {
-            // Entropy difference is too low to be considered an improvement, chances are we are reaching the maximum, or the system
+            // Entropy change is too low to be considered an improvement, chances are we are reaching the maximum, or the system
             // is dynamically changing too fast i.e. new activations are being created at a high rate with an imbalanced distribution,
             // we need to start "cooling-down". As a matter of fact, entropy could also become negative if the current entropy is less
             // than the previous, due to many activation changes happening during this and the previous cycle.
             if (logger.IsEnabled(LogLevel.Trace))
             {
                 logger.LogWarning(
-                    "The change in entropy {EntropyDifference} is less than the quantum {EntropyQuantum}. " +
+                    "The relative change in entropy {EntropyDifference} is less than the quantum {EntropyQuantum}. " +
                     "This is practically not considered an improvement, therefor this cycle will be marked as stale.",
-                    entropyDifference, _options.EntropyQuantum);
+                    entropyChange, _options.EntropyQuantum);
             }
 
             _staleCycles++;
