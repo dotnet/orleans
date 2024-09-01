@@ -56,6 +56,6 @@ public static class HostBuilderEx
             await Task.Delay(100);
         }
 
-        return silos.Keys.ToList();
+        return [.. silos.Keys];
     }
 }

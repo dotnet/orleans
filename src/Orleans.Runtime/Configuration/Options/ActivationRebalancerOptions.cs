@@ -53,15 +53,16 @@ public sealed class ActivationRebalancerOptions
     /// <summary>
     /// The minumum change in the entropy of the cluster that is considered an "improvement".
     /// When a total of n-consecutive stale cycles pass, during which the change in entropy is less than
-    /// the quantum, than the current rebalancing session will stop.
+    /// the quantum, than the current rebalancing session will stop. The "change" is a normalized value
+    /// being relative to the maximum possible entropy.
     /// </summary>
-    /// <remarks>Allowed range: (0-1)</remarks>
+    /// <remarks>Allowed range: (0-0.01)</remarks>
     public float EntropyQuantum { get; set; } = DEFAULT_ENTROPY_QUANTUM;
 
     /// <summary>
     /// The default value of <see cref="EntropyQuantum"/>.
     /// </summary>
-    public const float DEFAULT_ENTROPY_QUANTUM = 1e-4f;
+    public const float DEFAULT_ENTROPY_QUANTUM = 0.001f;
 
     /// <summary>
     /// Represents the allowed entropy deviation between the cluster's current entropy, againt the theoretical maximum.
@@ -123,7 +124,7 @@ internal sealed class ActivationRebalancerOptionsValidator(
             throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.MaxStaleCycles)} must be greater than 0");
         }
 
-        if (_options.EntropyQuantum <= 0 || _options.EntropyQuantum >= 1)
+        if (_options.EntropyQuantum <= 0 || _options.EntropyQuantum >= 0.01)
         {
             throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.EntropyQuantum)} must be in greater than 0, and less 1");
         }
