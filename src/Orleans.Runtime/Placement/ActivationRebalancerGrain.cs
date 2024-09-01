@@ -18,7 +18,7 @@ namespace Orleans.Runtime.Placement.Rebalancing;
 // See: https://www.ledjonbehluli.com/posts/orleans_adaptive_rebalancing/
 [KeepAlive]
 internal sealed class ActivationRebalancerGrain(
-    IOptions<ActivationRebalancerOptions> rebalancerOptions,
+    IOptions<ActivationRebalancerOptions> options,
     ILogger<ActivationRebalancerGrain> logger,
     ISiloStatusOracle siloStatusOracle,
     IInternalGrainFactory grainFactory,
@@ -35,7 +35,7 @@ internal sealed class ActivationRebalancerGrain(
     private IGrainTimer? _sessionTimer;
     private IGrainTimer? _triggerTimer;
 
-    private readonly ActivationRebalancerOptions _options = rebalancerOptions.Value;
+    private readonly ActivationRebalancerOptions _options = options.Value;
     private readonly Dictionary<SiloAddress, ResourceStatistics> _siloStatistics = [];
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
