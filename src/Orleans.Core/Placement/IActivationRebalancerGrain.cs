@@ -10,6 +10,13 @@ namespace Orleans.Placement;
 public interface IActivationRebalancerGrain : IGrainWithIntegerKey
 {
     /// <summary>
+    /// The key to the only activation of this grain type.
+    /// </summary>
+    /// <remarks><strong>Attempts to create another activation of this
+    /// type will result in an <see cref="InvalidOperationException"/>.</strong></remarks>
+    public const int Key = 0;
+
+    /// <summary>
     /// Resumes the rebalancer if its suspended, otherwise its a no-op.
     /// </summary>
     [Alias("ResumeRebalancing")] Task ResumeRebalancing();
@@ -26,5 +33,8 @@ public interface IActivationRebalancerGrain : IGrainWithIntegerKey
 [Alias("Orleans.Placement.Rebalancing.IInternalActivationRebalancerGrain")]
 internal interface IInternalActivationRebalancerGrain : IActivationRebalancerGrain
 {
+    /// <summary>
+    /// Starts the rebalancer if its not started yet, otherwise its a no-op.
+    /// </summary>
     [Alias("StartRebalancing")] Task StartRebalancing();
 }

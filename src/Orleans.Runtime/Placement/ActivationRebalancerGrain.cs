@@ -16,14 +16,15 @@ namespace Orleans.Runtime.Placement.Rebalancing;
 #nullable enable
 
 // See: https://www.ledjonbehluli.com/posts/orleans_adaptive_rebalancing/
-[KeepAlive]
+
+[KeepAlive, Immovable]
 internal sealed class ActivationRebalancerGrain(
-    IOptions<ActivationRebalancerOptions> options,
-    ILogger<ActivationRebalancerGrain> logger,
+    TimeProvider timeProvider,
+    DeploymentLoadPublisher loadPublisher,
     ISiloStatusOracle siloStatusOracle,
     IInternalGrainFactory grainFactory,
-    DeploymentLoadPublisher loadPublisher,
-    TimeProvider timeProvider)
+    ILogger<ActivationRebalancerGrain> logger,
+    IOptions<ActivationRebalancerOptions> options)
         : Grain, IInternalActivationRebalancerGrain, ISiloStatisticsChangeListener
 {
     private record struct ResourceStatistics(long MemoryUsage, int ActivationCount);
@@ -60,6 +61,8 @@ internal sealed class ActivationRebalancerGrain(
 
     public Task StartRebalancing()
     {
+        ThrowIfInvalidGrainKey();
+
         if (_triggerTimer is null)
         {
             var period = 2 * _options.SessionCyclePeriod; // make trigger-period twice as long as the session cycle-period.
@@ -83,12 +86,15 @@ internal sealed class ActivationRebalancerGrain(
 
     public Task ResumeRebalancing()
     {
+        ThrowIfInvalidGrainKey();
         StartSession();
+
         return Task.CompletedTask;
     }
 
     public Task SuspendRebalancing(TimeSpan? duration)
     {
+        ThrowIfInvalidGrainKey();
         StopSession(duration ?? Timeout.InfiniteTimeSpan);
 
         if (logger.IsEnabled(LogLevel.Trace))
@@ -365,6 +371,16 @@ internal sealed class ActivationRebalancerGrain(
         }
 
         return pairs;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ThrowIfInvalidGrainKey()
+    {
+        if (this.GetPrimaryKeyLong() != IActivationRebalancerGrain.Key)
+        {
+            throw new InvalidOperationException(
+                $"Creation of an activation with any key other than {IActivationRebalancerGrain.Key} is prohibited.");
+        }
     }
 
     private void StartSession()

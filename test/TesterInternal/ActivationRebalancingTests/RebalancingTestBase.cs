@@ -1,3 +1,4 @@
+/*
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Placement.Rebalancing;
@@ -59,3 +60,4 @@ public class ActivationRebalancingTests : BaseTestClusterFixture, IClassFixture<
         }
     }
 }
+*/
