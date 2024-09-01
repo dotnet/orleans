@@ -216,7 +216,7 @@ internal sealed class ActivationRebalancerGrain(
             _staleCycles = 0;
             if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.LogTrace("Stale cycle count of {StaleCycles} has been reset to 0, as we are improving now.", _staleCycles);
+                logger.LogTrace("Stale cycle count has been reset as we are improving now.");
             }
         }
 
