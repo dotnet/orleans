@@ -48,6 +48,7 @@ internal interface IInternalActivationRebalancerGrain : IActivationRebalancerGra
 /// <summary>
 /// Rebalancing statistics for the given <paramref name="SiloAddress"/>.
 /// </summary>
+/// <param name="TimeStamp">The time these statistics were assembled.</param>
 /// <param name="SiloAddress">The silo address.</param>
 /// <param name="DispersedActivations">The number of activations that have been dispersed from this silo thus far.</param>
 /// <param name="AcquiredActivations">The number of activations that have been acquired by this silo thus far.</param>
@@ -55,4 +56,4 @@ internal interface IInternalActivationRebalancerGrain : IActivationRebalancerGra
 [GenerateSerializer]
 [Alias("SiloRebalancingStatistics")]
 public readonly record struct SiloRebalancingStatistics(
-    SiloAddress SiloAddress, ulong DispersedActivations, ulong AcquiredActivations);
+    DateTime TimeStamp, SiloAddress SiloAddress, ulong DispersedActivations, ulong AcquiredActivations);

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
-using System.Net;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -15,6 +14,8 @@ using Orleans.Placement;
 using Orleans.Statistics;
 
 namespace Orleans.Runtime.Placement.Rebalancing;
+
+//TODO: Provide a way to delay the next cycle on finishes or even stale cycles
 
 #nullable enable
 
@@ -30,7 +31,6 @@ internal sealed class ActivationRebalancerGrain(
     IOptions<ActivationRebalancerOptions> options)
         : Grain, IInternalActivationRebalancerGrain, ISiloStatisticsChangeListener
 {
-    private record struct RebalancingStatistics(ulong Dispersed, ulong Acquired);
     private record struct ResourceStatistics(long MemoryUsage, int ActivationCount);
 
     private int _rebalancingCycle;
@@ -42,7 +42,7 @@ internal sealed class ActivationRebalancerGrain(
 
     private readonly ActivationRebalancerOptions _options = options.Value;
     private readonly Dictionary<SiloAddress, ResourceStatistics> _siloStatistics = [];
-    private readonly Dictionary<SiloAddress, RebalancingStatistics> _rebalancingStatistics = [];
+    private readonly Dictionary<SiloAddress, SiloRebalancingStatistics> _rebalancingStatistics = [];
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
@@ -65,9 +65,7 @@ internal sealed class ActivationRebalancerGrain(
     }
 
     public ValueTask<ImmutableArray<SiloRebalancingStatistics>> GetStatistics() =>
-        new(_rebalancingStatistics.Select(x =>
-            new SiloRebalancingStatistics(x.Key, x.Value.Dispersed, x.Value.Acquired))
-                .ToImmutableArray());
+        new(_rebalancingStatistics.Values.ToImmutableArray());
 
     public Task StartRebalancer()
     {
@@ -321,11 +319,13 @@ internal sealed class ActivationRebalancerGrain(
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void UpdateStatistics(SiloAddress lowSilo, SiloAddress highSilo, uint delta)
     {
+        var now = timeProvider.GetUtcNow().DateTime;
+
         ref var lowStats = ref CollectionsMarshal.GetValueRefOrAddDefault(_rebalancingStatistics, lowSilo, out _);
-        lowStats = new(lowStats.Dispersed, lowStats.Acquired + delta);
+        lowStats = new(now, lowSilo, lowStats.DispersedActivations, lowStats.AcquiredActivations + delta);
 
         ref var highStats = ref CollectionsMarshal.GetValueRefOrAddDefault(_rebalancingStatistics, highSilo, out _);
-        highStats = new(highStats.Dispersed + delta, highStats.Acquired);
+        highStats = new(now, highSilo, highStats.DispersedActivations + delta, highStats.AcquiredActivations);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
