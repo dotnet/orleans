@@ -39,7 +39,7 @@ namespace Orleans
 
         /// <summary>
         /// Returns all rows that have their <see cref="GrainId.GetUniformHashCode"/> in the range (begin, end].
-        /// If begin >= end, returns all entries with hash > begin or hash <= end.
+        /// If begin is greater or equal to end, returns all entries with hash greater begin or hash less or equal to end.
         /// </summary>
         /// <param name="begin">The exclusive lower bound.</param>
         /// <param name="end">The inclusive upper bound.</param>
