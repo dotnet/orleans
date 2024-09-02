@@ -13,7 +13,7 @@ internal class CancellableInvokableGrainExtension : ICancellableInvokableGrainEx
     public CancellableInvokableGrainExtension(IGrainContext grainContext)
     {
         _runtime = grainContext.GetComponent<ICancellationRuntime>();
-        _cleanupTimer = new Timer(obj => ((CancellableInvokableGrainExtension)obj)._runtime.ExpireTokens(), this, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        _cleanupTimer = new Timer(static obj => ((CancellableInvokableGrainExtension)obj)._runtime.ExpireTokens(), this, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
 
     public Task CancelRemoteToken(Guid tokenId)
