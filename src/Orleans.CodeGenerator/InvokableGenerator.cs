@@ -165,6 +165,7 @@ namespace Orleans.CodeGenerator
                     GenerateGetArgumentMethod(method, fieldDescriptions),
                     GenerateSetArgumentMethod(method, fieldDescriptions),
                     GenerateInvokeInnerMethod(method, fieldDescriptions, holderField),
+                    GenerateGetCancellationTokenMember(method, fieldDescriptions),
                     GenerateGetCancellableTokenIdMember(method));
 
             if (method.AllTypeParameters.Count > 0)
@@ -340,6 +341,25 @@ namespace Orleans.CodeGenerator
                 .WithExpressionBody(ArrowExpressionClause(body))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
+        }
+
+        private MemberDeclarationSyntax GenerateGetCancellationTokenMember(InvokableMethodDescription method, List<InvokerFieldDescription> fields)
+        {
+            if (!method.IsCancellable)
+            {
+                return null;
+            }
+
+            var cancellationTokenField = fields.First(f => SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, f.FieldType));
+
+            // Method to get the cancellationToken argument
+            var cancellableRequestIdMethod = MethodDeclaration(LibraryTypes.CancellationToken.ToTypeSyntax(), "GetCancellationToken")
+                .WithBody(Block(
+                    ReturnStatement(cancellationTokenField.FieldName.ToIdentifierName())
+                ))
+                .AddModifiers(Token(SyntaxKind.PublicKeyword));
+
+            return cancellableRequestIdMethod;
         }
 
         private MemberDeclarationSyntax GenerateGetCancellableTokenIdMember(InvokableMethodDescription method)
@@ -580,14 +600,14 @@ namespace Orleans.CodeGenerator
                             )
                         ).WithAwaitKeyword(Token(SyntaxKind.AwaitKeyword)),
                     // Task<T> / ValueTask<T>
-                    { ConstructedFrom: { IsGenericType: true } } => 
+                    { ConstructedFrom: { IsGenericType: true } } =>
                         ReturnStatement(
                             AwaitExpression(
                                 InvocationExpression(methodCall, ArgumentList(args))
                             )
                         ),
                     // Task / ValueTask / Void
-                    _ => 
+                    _ =>
                         ExpressionStatement(
                             AwaitExpression(
                                 InvocationExpression(methodCall, ArgumentList(args))
@@ -653,7 +673,7 @@ namespace Orleans.CodeGenerator
                                     MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
                                         IdentifierName("cancellationToken"),
                                         IdentifierName("ThrowIfCancellationRequested")))),
-                            innerBody   
+                            innerBody
                         )
                     )
                     .WithFinally(

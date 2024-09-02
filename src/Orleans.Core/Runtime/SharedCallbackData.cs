@@ -10,14 +10,17 @@ namespace Orleans.Runtime
         public readonly ILogger Logger;
         private TimeSpan responseTimeout;
         public long ResponseTimeoutStopwatchTicks;
+        public IGrainFactory GrainFactory;
 
         public SharedCallbackData(
             Action<Message> unregister,
             ILogger logger,
+            IGrainFactory grainFactory,
             TimeSpan responseTimeout)
         {
             this.Unregister = unregister;
             this.Logger = logger;
+            this.GrainFactory = grainFactory;
             this.ResponseTimeout = responseTimeout;
         }
 

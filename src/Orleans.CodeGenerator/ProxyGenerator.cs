@@ -151,51 +151,6 @@ namespace Orleans.CodeGenerator
                     .Concat(_codeGenerator.LibraryTypes.StaticCopiers)
                     .ToList();
 
-            // Ensure to hook up the cancellation token if the method has one
-            var cancellationTokenParameter = methodSymbol.Parameters.SingleOrDefault(parameter => SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, parameter.Type));
-            if (cancellationTokenParameter is not null)
-            {
-                // Throw aggressively if cancellation is already requested
-                statements.Add(
-                    ExpressionStatement(
-                        InvocationExpression(
-                            IdentifierName($"arg{cancellationTokenParameter.Ordinal}").Member("ThrowIfCancellationRequested"),
-                            ArgumentList()
-                        )
-                    )
-                );
-
-                // Register for cancellation
-                statements.Add(
-                    ExpressionStatement(
-                        InvocationExpression(
-                            IdentifierName($"arg{cancellationTokenParameter.Ordinal}").Member("Register"))
-                        .WithArgumentList(
-                            ArgumentList(SeparatedList(new[]
-                            {
-                                Argument(
-                                    SimpleLambdaExpression(
-                                        Parameter(Identifier("arg")),
-                                        InvocationExpression(
-                                            InvocationExpression(ThisExpression().Member("AsReference", LibraryTypes.ICancellableInvokableGrainExtension.ToTypeSyntax())).Member("CancelRemoteToken"),
-                                            ArgumentList(SeparatedList(new[]
-                                            {
-                                                Argument(
-                                                    CastExpression(
-                                                        ParseTypeName(_codeGenerator.LibraryTypes.Guid.ToDisplayName()),
-                                                        IdentifierName("arg")
-                                                    )
-                                                ),
-                                            }))
-                                        )
-                                    )
-                                ),
-                                Argument(
-                                    InvocationExpression(
-                                        IdentifierName("request").Member(IdentifierName("GetCancellableTokenId"))))
-                            })))));
-            }
-
             // Set request object fields from method parameters.
             var parameterIndex = 0;
             var parameters = invokable.Members.OfType<MethodParameterFieldDescription>().Select(member => new SerializableMethodMember(member));
