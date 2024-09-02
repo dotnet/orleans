@@ -66,9 +66,10 @@ namespace Orleans.Messaging
             var knownGateways = await this.gatewayListProvider.GetGateways();
             if (knownGateways.Count == 0)
             {
-                var err = $"Could not find any gateway in {this.gatewayListProvider.GetType().FullName}. Orleans client cannot initialize.";
-                this.logger.LogError((int)ErrorCode.GatewayManager_NoGateways, err);
-                throw new SiloUnavailableException(err);
+                // this situation can occur if the client starts faster than the silos.
+                var warning = $"Could not find any gateway in {this.gatewayListProvider.GetType().FullName}. Orleans client cannot initialize until at least one gateway becomes available.";
+                this.logger.LogWarning((int)ErrorCode.GatewayManager_NoGateways, warning);
+                throw new SiloUnavailableException(warning);
             }
 
             this.logger.LogInformation(
