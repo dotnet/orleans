@@ -19,6 +19,9 @@ public class RebalancingTests : BaseTestClusterFixture, IClassFixture<Rebalancin
 
     private readonly SiloAddress _silo1;
     private readonly SiloAddress _silo2;
+    private readonly SiloAddress _silo3;
+    private readonly SiloAddress _silo4;
+
     private readonly ITestOutputHelper _output;
     private readonly IGrainFactory _grainFactory;
     private readonly IManagementGrain _mgmtGrain;
@@ -30,13 +33,16 @@ public class RebalancingTests : BaseTestClusterFixture, IClassFixture<Rebalancin
 
         _silo1 = silos[0];
         _silo2 = silos[1];
+        _silo3 = silos[2];
+        _silo4 = silos[3];
+
         _output = output;
         _grainFactory = fixture.HostedCluster.GrainFactory;
         _mgmtGrain = _grainFactory.GetGrain<IManagementGrain>(0);
         _rebalancerGrain = _grainFactory.GetGrain<IInternalActivationRebalancerGrain>(IActivationRebalancerGrain.Key);
     }
 
-    private ulong GetActivationCount(DetailedGrainStatistic[] stats, SiloAddress silo) =>
+    private static ulong GetActivationCount(DetailedGrainStatistic[] stats, SiloAddress silo) =>
         (ulong)stats.Count(x => x.SiloAddress.Equals(silo));
 
     [Fact]
@@ -93,6 +99,100 @@ public class RebalancingTests : BaseTestClusterFixture, IClassFixture<Rebalancin
            $"{initialSilo1Activations - silo1Activations} activations being moved from Silo1 -> Silo2");
     }
 
+    [Fact]
+    public async Task Should_Move_Activations_From_Silo1_And_Silo3_To_Silo2_And_Silo4()
+    {
+        await _mgmtGrain.ForceActivationCollection(TimeSpan.Zero);
+
+        var tasks = new List<Task>();
+
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, _silo1);
+        for (var i = 0; i < 300; i++)
+        {
+            tasks.Add(_grainFactory.GetGrain<IRebalancingTestGrain>(Guid.NewGuid()).Ping());
+        }
+
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, _silo2);
+        for (var i = 0; i < 30; i++)
+        {
+            tasks.Add(_grainFactory.GetGrain<IRebalancingTestGrain>(Guid.NewGuid()).Ping());
+        }
+
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, _silo3);
+        for (var i = 0; i < 175; i++)
+        {
+            tasks.Add(_grainFactory.GetGrain<IRebalancingTestGrain>(Guid.NewGuid()).Ping());
+        }
+
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, _silo4);
+        for (var i = 0; i < 100; i++)
+        {
+            tasks.Add(_grainFactory.GetGrain<IRebalancingTestGrain>(Guid.NewGuid()).Ping());
+        }
+
+        await Task.WhenAll(tasks);
+
+        var stats = await _mgmtGrain.GetDetailedGrainStatistics();
+
+        var initialSilo1Activations = GetActivationCount(stats, _silo1);
+        var initialSilo2Activations = GetActivationCount(stats, _silo2);
+        var initialSilo3Activations = GetActivationCount(stats, _silo3);
+        var initialSilo4Activations = GetActivationCount(stats, _silo4);
+
+        _output.WriteLine(
+           $"Pre-rebalancing activations:\n" +
+           $"Silo1: {initialSilo1Activations}\n" +
+           $"Silo2: {initialSilo2Activations}\n" +
+           $"Silo3: {initialSilo3Activations}\n" +
+           $"Silo4: {initialSilo4Activations}\n");
+
+        var silo1Activations = initialSilo1Activations;
+        var silo2Activations = initialSilo2Activations;
+        var silo3Activations = initialSilo3Activations;
+        var silo4Activations = initialSilo4Activations;
+
+        var index = 0;
+        while (index < 6)
+        {
+            await Task.Delay(Fixture.SessionCyclePeriod);
+            stats = await _mgmtGrain.GetDetailedGrainStatistics();
+
+            silo1Activations = GetActivationCount(stats, _silo1);
+            silo2Activations = GetActivationCount(stats, _silo2);
+            silo3Activations = GetActivationCount(stats, _silo3);
+            silo4Activations = GetActivationCount(stats, _silo4);
+
+            index++;
+        }
+
+        Assert.True(silo1Activations < initialSilo1Activations,
+            $"Did not expect Silo1 to have more activations than what it started with: " +
+            $"[{initialSilo1Activations} -> {silo1Activations}]");
+
+        Assert.True(silo2Activations > initialSilo2Activations,
+            $"Did not expect Silo2 to have less activations than what it started with: " +
+            $"[{initialSilo2Activations} -> {silo2Activations}]");
+
+        Assert.True(silo3Activations < initialSilo3Activations,
+            $"Did not expect Silo3 to have more activations than what it started with: " +
+            $"[{initialSilo3Activations} -> {silo3Activations}]");
+
+        Assert.True(silo4Activations > initialSilo4Activations,
+            "Did not expect Silo4 to have less activations than what it started with: " +
+            $"[{initialSilo4Activations} -> {silo4Activations}]");
+
+        _output.WriteLine(
+            $"Post-rebalancing activations:\n" +
+            $"Silo1: {silo1Activations}\n" +
+            $"Silo2: {silo2Activations}\n" +
+            $"Silo3: {silo3Activations}\n" +
+            $"Silo4: {silo4Activations}\n");
+
+        //_output.WriteLine(
+        //    $"{initialSilo1Activations - silo1Activations} activations have been moved from Silo1 -> Silo2\n" +
+        //    $"{initialSilo3Activations - silo3Activations} activations have been moved from Silo3 -> Silo4");
+    }
+
     public interface IRebalancingTestGrain : IGrainWithGuidKey
     {
         Task Ping();
@@ -110,7 +210,7 @@ public class RebalancingTests : BaseTestClusterFixture, IClassFixture<Rebalancin
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.Options.InitialSilosCount = 2;
+            builder.Options.InitialSilosCount = 4;
             builder.Options.UseRealEnvironmentStatistics = true;
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
