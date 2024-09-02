@@ -151,8 +151,8 @@ public class RebalancingTests : BaseTestClusterFixture, IClassFixture<Rebalancin
         var silo3Activations = initialSilo3Activations;
         var silo4Activations = initialSilo4Activations;
 
-        var index = 0;
-        while (index < 6)
+        var index = 1;
+        while (index <= 6)
         {
             await Task.Delay(Fixture.SessionCyclePeriod);
             stats = await _mgmtGrain.GetDetailedGrainStatistics();
@@ -182,15 +182,11 @@ public class RebalancingTests : BaseTestClusterFixture, IClassFixture<Rebalancin
             $"[{initialSilo4Activations} -> {silo4Activations}]");
 
         _output.WriteLine(
-            $"Post-rebalancing activations:\n" +
+            $"Post-rebalancing activations ({index} cycles):\n" +
             $"Silo1: {silo1Activations}\n" +
             $"Silo2: {silo2Activations}\n" +
             $"Silo3: {silo3Activations}\n" +
             $"Silo4: {silo4Activations}\n");
-
-        //_output.WriteLine(
-        //    $"{initialSilo1Activations - silo1Activations} activations have been moved from Silo1 -> Silo2\n" +
-        //    $"{initialSilo3Activations - silo3Activations} activations have been moved from Silo3 -> Silo4");
     }
 
     public interface IRebalancingTestGrain : IGrainWithGuidKey
