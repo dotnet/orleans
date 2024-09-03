@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
+using Orleans.Internal;
 using Orleans.Runtime;
 
 namespace Orleans.Placement;
@@ -65,12 +65,8 @@ public readonly record struct SiloRebalancingStatistics(
 /// <summary>
 /// Determines how long to wait between successive rebalancing sessions, if an aprior session has failed.
 /// </summary>
-/// <remarks>A session is considered "failed" if it did not yield any significant improvement to the cluster's entropy.</remarks>
-public interface IFailedRebalancingSessionBackoffProvider
-{
-    /// <summary>
-    /// The minimum amount of time to wait before attempting a subsequent rebalancing sessions.
-    /// </summary>
-    /// <param name="attempt">The number of consecutive failed sessions which have been made.</param>
-    TimeSpan Next(uint attempt);
-}
+/// <remarks>
+/// A session is considered "failed" if n-consecutive number of cycles yielded no significant improvement
+/// to the cluster's entropy.
+/// </remarks>
+public interface IFailedRebalancingSessionBackoffProvider : IBackoffProvider { }

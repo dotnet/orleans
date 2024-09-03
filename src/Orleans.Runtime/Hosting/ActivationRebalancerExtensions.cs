@@ -8,6 +8,7 @@ using System.Threading;
 using Microsoft.Extensions.Options;
 using System;
 using Orleans.Configuration.Internal;
+using Orleans.Internal;
 
 namespace Orleans.Hosting;
 
@@ -25,7 +26,7 @@ public static class ActivationRebalancerExtensions
     /// </remarks>
     [Experimental("ORLEANSEXP002")]
     public static ISiloBuilder AddActivationRebalancer(this ISiloBuilder builder) =>
-        builder.AddActivationRebalancer<FixedFailedRebalancingSessionBackoffProvider>();
+        builder.AddActivationRebalancer<FixedBackoffProvider>();
 
     /// <inheritdoc cref="AddActivationRebalancer(ISiloBuilder)"/>.
     /// <typeparam name="TProvider">Custom backoff provider for determining next session after a failed attempt.</typeparam>
@@ -48,11 +49,6 @@ public static class ActivationRebalancerExtensions
                 IActivationRebalancerGrain.Key).StartRebalancer();
     }
 
-    private sealed class FixedFailedRebalancingSessionBackoffProvider(
-        IOptions<ActivationRebalancerOptions> options) :
-        IFailedRebalancingSessionBackoffProvider
-    {
-        private readonly TimeSpan _delay = options.Value.SessionCyclePeriod;
-        public TimeSpan Next(uint attempt) => _delay;
-    }
+    private sealed class FixedBackoffProvider(IOptions<ActivationRebalancerOptions> options) :
+        FixedBackoff(options.Value.SessionCyclePeriod), IFailedRebalancingSessionBackoffProvider;
 }

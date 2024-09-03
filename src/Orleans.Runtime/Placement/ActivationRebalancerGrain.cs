@@ -33,12 +33,31 @@ internal sealed class ActivationRebalancerGrain(
         : Grain, IInternalActivationRebalancerGrain, ISiloStatisticsChangeListener
 {
     private record struct ResourceStatistics(long MemoryUsage, int ActivationCount);
-    private enum StopReason { StartingSession, FailedSession, Suspend }
 
+    private enum StopReason
+    {
+        /// <summary>
+        /// A new session is about to start.
+        /// </summary>
+        SessionStarting,
+        /// <summary>
+        /// Current session has failed.
+        /// </summary>
+        SessionFailed,
+        /// <summary>
+        /// Current session has completed successfully till end
+        /// </summary>
+        SessionCompleted,
+        /// <summary>
+        /// Rebalancer was asked to suspend activity.
+        /// </summary>
+        RebalancerSuspended
+    }
+
+    private int _staleCycles;
+    private int _failedSessions;
     private int _rebalancingCycle;
-    private uint _staleCycles;
     private double _previousEntropy;
-    private uint _failedSessionCount; 
     private DateTime? _disabledUntil;
     private IGrainTimer? _sessionTimer;
     private IGrainTimer? _triggerTimer;
@@ -104,7 +123,7 @@ internal sealed class ActivationRebalancerGrain(
     public Task SuspendRebalancing(TimeSpan? duration)
     {
         ThrowIfInvalidGrainKey();
-        StopSession(StopReason.Suspend, duration);
+        StopSession(StopReason.RebalancerSuspended, duration);
 
         if (logger.IsEnabled(LogLevel.Trace))
         {
@@ -184,7 +203,7 @@ internal sealed class ActivationRebalancerGrain(
                     "cycles having passed, which is the maximum allowed.", _staleCycles);
             }
 
-            StopSession(StopReason.FailedSession);
+            StopSession(StopReason.SessionFailed);
             return;
         }
 
@@ -206,7 +225,7 @@ internal sealed class ActivationRebalancerGrain(
                     entropyDeviation, currentEntropy, maximumEntropy, _options.MaxEntropyDeviation);
             }
 
-            StopSession(StopReason.FailedSession);
+            StopSession(StopReason.SessionCompleted);
             return;
         }
 
@@ -247,9 +266,9 @@ internal sealed class ActivationRebalancerGrain(
             }
         }
 
-        if (_failedSessionCount > 0)
+        if (_failedSessions > 0)
         {
-            _failedSessionCount = 0;
+            _failedSessions = 0;
             if (logger.IsEnabled(LogLevel.Trace))
             {
                 logger.LogTrace("Failed session count has been reset as we are improving now.");
@@ -430,7 +449,7 @@ internal sealed class ActivationRebalancerGrain(
 
     private void StartSession()
     {
-        StopSession(StopReason.StartingSession);
+        StopSession(StopReason.SessionStarting);
 
         _sessionTimer = this.RegisterGrainTimer(RunRebalancingCycle, new()
         {
@@ -454,21 +473,27 @@ internal sealed class ActivationRebalancerGrain(
 
         switch (reason)
         {
-            case StopReason.StartingSession:
+            case StopReason.SessionStarting:
                 {
-                    _failedSessionCount = 0;
+                    _failedSessions = 0;
                     _disabledUntil = null;
                 }
                 break;
-            case StopReason.FailedSession:
+            case StopReason.SessionFailed:
                 {
-                    _failedSessionCount++;
-                    DisableFor(backoffProvider.Next(_failedSessionCount));
+                    _failedSessions++;
+                    DisableFor(backoffProvider.Next(_failedSessions));
                 }
                 break;
-            case StopReason.Suspend:
+            case StopReason.SessionCompleted:
                 {
-                    _failedSessionCount = 0;
+                    _failedSessions = 0;
+                    DisableFor(_options.SessionCyclePeriod);
+                }
+                break;
+            case StopReason.RebalancerSuspended:
+                {
+                    _failedSessions = 0;
                     DisableFor(duration ?? Timeout.InfiniteTimeSpan);
                 }
                 break;
