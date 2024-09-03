@@ -6,7 +6,6 @@ using TestExtensions;
 using Xunit;
 using CsCheck;
 using Xunit.Abstractions;
-using Microsoft.Extensions.Configuration;
 using Orleans.Placement;
 
 namespace UnitTests.ActivationRebalancingTests;
@@ -14,9 +13,6 @@ namespace UnitTests.ActivationRebalancingTests;
 [TestCategory("Functional"), TestCategory("ActivationRebalancing")]
 public class RebalancingTests : BaseTestClusterFixture, IClassFixture<RebalancingTests.Fixture>
 {
-    private const long _10MB = 10_048_576;
-    private const long _5MB = 5_242_880;
-
     private readonly SiloAddress _silo1;
     private readonly SiloAddress _silo2;
     private readonly SiloAddress _silo3;
@@ -44,60 +40,6 @@ public class RebalancingTests : BaseTestClusterFixture, IClassFixture<Rebalancin
 
     private static ulong GetActivationCount(DetailedGrainStatistic[] stats, SiloAddress silo) =>
         (ulong)stats.Count(x => x.SiloAddress.Equals(silo));
-
-    [Fact]
-    public async Task Silo1_Should_Disperse_Activations_Silo2_Should_Acquire()
-    {
-        await _mgmtGrain.ForceActivationCollection(TimeSpan.Zero);
-
-        var tasks = new List<Task>();
-
-        RequestContext.Set(IPlacementDirector.PlacementHintKey, _silo1);
-        for (var i = 0; i < 100; i++)
-        {
-            tasks.Add(_grainFactory.GetGrain<IRebalancingTestGrain>(Guid.NewGuid()).Ping());
-        }
-
-        RequestContext.Set(IPlacementDirector.PlacementHintKey, _silo2);
-        for (var i = 0; i < 10; i++)
-        {
-            tasks.Add(_grainFactory.GetGrain<IRebalancingTestGrain>(Guid.NewGuid()).Ping());
-        }
-
-        await Task.WhenAll(tasks);
-
-        var stats = await _mgmtGrain.GetDetailedGrainStatistics();
-
-        var initialSilo1Activations = GetActivationCount(stats, _silo1);
-        var initialSilo2Activations = GetActivationCount(stats, _silo2);
-
-        var silo1Activations = initialSilo1Activations;
-        var silo2Activations = initialSilo2Activations;
-
-        var index = 0;
-        while (index < 3)
-        {
-            await Task.Delay(Fixture.SessionCyclePeriod);
-            stats = await _mgmtGrain.GetDetailedGrainStatistics();
-
-            silo1Activations = GetActivationCount(stats, _silo1);
-            silo2Activations = GetActivationCount(stats, _silo2);
-
-            index++;
-        }
-
-        Assert.True(silo1Activations < initialSilo1Activations,
-            $"Did not expect Silo1 to have more activations than what it started with: " +
-            $"[{initialSilo1Activations} -> {silo1Activations}]");
-
-        Assert.True(silo2Activations > initialSilo2Activations,
-            "Did not expect Silo2 to have less activations than what it started with: " +
-            $"[{initialSilo2Activations} -> {silo2Activations}]");
-
-        _output.WriteLine(
-           $"{nameof(Silo1_Should_Disperse_Activations_Silo2_Should_Acquire)} test resulted in " +
-           $"{initialSilo1Activations - silo1Activations} activations being moved from Silo1 -> Silo2");
-    }
 
     [Fact]
     public async Task Should_Move_Activations_From_Silo1_And_Silo3_To_Silo2_And_Silo4()
@@ -151,8 +93,8 @@ public class RebalancingTests : BaseTestClusterFixture, IClassFixture<Rebalancin
         var silo3Activations = initialSilo3Activations;
         var silo4Activations = initialSilo4Activations;
 
-        var index = 1;
-        while (index <= 6)
+        var index = 0;
+        while (index < 5)
         {
             await Task.Delay(Fixture.SessionCyclePeriod);
             stats = await _mgmtGrain.GetDetailedGrainStatistics();

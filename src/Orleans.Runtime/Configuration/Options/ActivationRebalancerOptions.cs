@@ -92,9 +92,9 @@ public sealed class ActivationRebalancerOptions
     /// <summary>
     /// <para>Represents the weight that is given to the number of silos in the cluster during a rebalancing session.</para>
     /// Changing this value has a far lesser impact on the migration rate than <see cref="CycleNumberWeight"/>, and is suitable for fine-tuning.
-    /// Pick higher values if you want a faster migration rate.
+    /// Pick lower values if you want a faster migration rate.
     /// </summary>
-    /// <remarks>Allowed range: (0-1]</remarks>
+    /// <remarks>Allowed range: [0-1]</remarks>
     public float SiloNumberWeight { get; set; } = DEFAULT_SILO_NUMBER_WEIGHT;
 
     /// <summary>
@@ -112,10 +112,10 @@ internal sealed class ActivationRebalancerOptionsValidator(
 
     public void ValidateConfiguration()
     {
-        if (_options.SessionCyclePeriod <= 2 * _publisherOptions.DeploymentLoadPublisherRefreshTime)
+        if (_options.SessionCyclePeriod < 2 * _publisherOptions.DeploymentLoadPublisherRefreshTime)
         {
             throw new OrleansConfigurationException(
-                $"{nameof(ActivationRebalancerOptions.SessionCyclePeriod)} must be greater than " +
+                $"{nameof(ActivationRebalancerOptions.SessionCyclePeriod)} must be at least " +
                 $"{$"2 x {nameof(DeploymentLoadPublisherOptions.DeploymentLoadPublisherRefreshTime)}"}");
         }
 
@@ -139,9 +139,9 @@ internal sealed class ActivationRebalancerOptionsValidator(
             throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.CycleNumberWeight)} must be in greater than 0, and less or equal to 1");
         }
 
-        if (_options.SiloNumberWeight <= 0 || _options.SiloNumberWeight > 1)
+        if (_options.SiloNumberWeight < 0 || _options.SiloNumberWeight > 1)
         {
-            throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.SiloNumberWeight)} must be in greater than 0, and less or equal to 1");
+            throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.SiloNumberWeight)} must be in greater than or equal to 0, and less or equal to 1");
         }
     }
 }

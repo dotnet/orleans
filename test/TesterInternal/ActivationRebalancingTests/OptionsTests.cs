@@ -21,19 +21,19 @@ public class OptionsTests
     }
 
     [Theory]
-    [InlineData(4, 10, 0.1, 0.5, 0.5, 0.5, 2, 5)]
-    [InlineData(10, 10, 0.1, 0.5, 0.5, 0.5, 2, 1)]  
-    [InlineData(10, 10, 0, 0.5, 0.5, 0.5, 2, 1)]    
-    [InlineData(10, 10, 0.1, -0.001, 0.5, 0.5, 2, 1)] 
-    [InlineData(10, 10, 0.1, 0.011, 0.5, 0.5, 2, 1)]  
-    [InlineData(10, 10, 0.1, 0.001, -0.1, 0.5, 2, 1)] 
-    [InlineData(10, 10, 0.1, 0.001, 1.1, 0.5, 2, 1)]  
-    [InlineData(10, 10, 0.1, 0.001, 0.5, 0, 2, 1)]
-    [InlineData(10, 10, 0.1, 0.001, 0.5, 1.1, 2, 1)]  
-    [InlineData(10, 10, 0.1, 0.001, 0.5, 0.5, 0, 1)]  
-    [InlineData(10, 10, 0.1, 0.001, 0.5, 0.5, 1.1, 1)]
+    [InlineData(999, 1, 0.1, 0.5, 0.5, 0.5, 2, 5)]
+    [InlineData(1000, 1, 0.1, 0.5, 0.5, 0.5, 2, 1)]  
+    [InlineData(1000, 1, 0, 0.5, 0.5, 0.5, 2, 1)]    
+    [InlineData(1000, 1, 0.1, -0.001, 0.5, 0.5, 2, 1)] 
+    [InlineData(1000, 1, 0.1, 0.011, 0.5, 0.5, 2, 1)]  
+    [InlineData(1000, 1, 0.1, 0.001, -0.1, 0.5, 1.1, 1)] 
+    [InlineData(1000, 1, 0.1, 0.001, 1.1, 0.5, 2, 1)]  
+    [InlineData(1000, 1, 0.1, 0.001, 0.5, 0, 2, 1)]
+    [InlineData(1000, 1, 0.1, 0.001, 0.5, 1.1, 2, 1)]  
+    [InlineData(1000, 1, 0.1, 0.001, 0.5, 0.5, -0.1, 1)]  
+    [InlineData(1000, 1, 0.1, 0.001, 0.5, 0.5, 1.1, 1)]
     public void InvalidOptionsShouldThrow(
-        double sessionCyclePeriodSeconds,
+        double sessionCyclePeriodMilliseconds,
         double publisherRefreshTimeSeconds,
         int maxStaleCycles,
         double entropyQuantum,
@@ -49,7 +49,7 @@ public class OptionsTests
 
         var options = new ActivationRebalancerOptions
         {
-            SessionCyclePeriod = TimeSpan.FromSeconds(sessionCyclePeriodSeconds),
+            SessionCyclePeriod = TimeSpan.FromMilliseconds(sessionCyclePeriodMilliseconds),
             MaxStaleCycles = maxStaleCycles,
             EntropyQuantum = (float)entropyQuantum,
             MaxEntropyDeviation = (float)maxEntropyDeviation,
