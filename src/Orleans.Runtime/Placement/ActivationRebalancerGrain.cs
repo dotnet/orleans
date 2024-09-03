@@ -13,9 +13,9 @@ using Orleans.Configuration;
 using Orleans.Placement;
 using Orleans.Statistics;
 
+#pragma warning disable IDE0130 // For more granular log filtering
 namespace Orleans.Runtime.Placement.Rebalancing;
-
-//TODO: Provide a way to delay the next cycle on finishes or even stale cycles
+#pragma warning restore IDE0130
 
 #nullable enable
 
@@ -28,14 +28,17 @@ internal sealed class ActivationRebalancerGrain(
     ISiloStatusOracle siloStatusOracle,
     IInternalGrainFactory grainFactory,
     ILogger<ActivationRebalancerGrain> logger,
-    IOptions<ActivationRebalancerOptions> options)
+    IOptions<ActivationRebalancerOptions> options,
+    IFailedRebalancingSessionBackoffProvider backoffProvider)
         : Grain, IInternalActivationRebalancerGrain, ISiloStatisticsChangeListener
 {
     private record struct ResourceStatistics(long MemoryUsage, int ActivationCount);
+    private enum StopReason { StartingSession, FailedSession, Suspend }
 
     private int _rebalancingCycle;
     private uint _staleCycles;
     private double _previousEntropy;
+    private uint _failedSessionCount; 
     private DateTime? _disabledUntil;
     private IGrainTimer? _sessionTimer;
     private IGrainTimer? _triggerTimer;
@@ -64,8 +67,7 @@ internal sealed class ActivationRebalancerGrain(
         stats = new(statistics.EnvironmentStatistics.MemoryUsageBytes, statistics.ActivationCount);
     }
 
-    public ValueTask<ImmutableArray<SiloRebalancingStatistics>> GetStatistics() =>
-        new(_rebalancingStatistics.Values.ToImmutableArray());
+    public ValueTask<ImmutableArray<SiloRebalancingStatistics>> GetStatistics() => new([.. _rebalancingStatistics.Values]);
 
     public Task StartRebalancer()
     {
@@ -73,14 +75,13 @@ internal sealed class ActivationRebalancerGrain(
 
         if (_triggerTimer is null)
         {
-            var period = 2 * _options.SessionCyclePeriod; // make trigger-period twice as long as the session cycle-period.
+            var period = 0.5 * _options.SessionCyclePeriod; // make trigger-period twice as short as the session cycle-period.
 
             _triggerTimer = this.RegisterGrainTimer(PeriodicallyTriggerRebalancing, new()
             {
                 Interleave = true,
                 Period = period,
                 DueTime = _options.RebalancerDueTime
- 
             });
 
             if (logger.IsEnabled(LogLevel.Trace))
@@ -103,7 +104,7 @@ internal sealed class ActivationRebalancerGrain(
     public Task SuspendRebalancing(TimeSpan? duration)
     {
         ThrowIfInvalidGrainKey();
-        StopSession(duration ?? Timeout.InfiniteTimeSpan);
+        StopSession(StopReason.Suspend, duration);
 
         if (logger.IsEnabled(LogLevel.Trace))
         {
@@ -183,7 +184,7 @@ internal sealed class ActivationRebalancerGrain(
                     "cycles having passed, which is the maximum allowed.", _staleCycles);
             }
 
-            StopSession(_options.FailedSessionDelay);
+            StopSession(StopReason.FailedSession);
             return;
         }
 
@@ -205,7 +206,7 @@ internal sealed class ActivationRebalancerGrain(
                     entropyDeviation, currentEntropy, maximumEntropy, _options.MaxEntropyDeviation);
             }
 
-            StopSession(_options.FailedSessionDelay);
+            StopSession(StopReason.FailedSession);
             return;
         }
 
@@ -243,6 +244,15 @@ internal sealed class ActivationRebalancerGrain(
             if (logger.IsEnabled(LogLevel.Trace))
             {
                 logger.LogTrace("Stale cycle count has been reset as we are improving now.");
+            }
+        }
+
+        if (_failedSessionCount > 0)
+        {
+            _failedSessionCount = 0;
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+                logger.LogTrace("Failed session count has been reset as we are improving now.");
             }
         }
 
@@ -420,7 +430,7 @@ internal sealed class ActivationRebalancerGrain(
 
     private void StartSession()
     {
-        StopSession(TimeSpan.Zero);
+        StopSession(StopReason.StartingSession);
 
         _sessionTimer = this.RegisterGrainTimer(RunRebalancingCycle, new()
         {
@@ -434,7 +444,7 @@ internal sealed class ActivationRebalancerGrain(
         };
     }
 
-    private void StopSession(TimeSpan duration)
+    private void StopSession(StopReason reason, TimeSpan? duration = null)
     {
         _previousEntropy = 0;
         _rebalancingCycle = 0;
@@ -442,20 +452,39 @@ internal sealed class ActivationRebalancerGrain(
         _sessionTimer?.Dispose();
         _sessionTimer = null;
 
-        if (duration == TimeSpan.Zero)
+        switch (reason)
         {
-            _disabledUntil = null;
-            return;
+            case StopReason.StartingSession:
+                {
+                    _failedSessionCount = 0;
+                    _disabledUntil = null;
+                }
+                break;
+            case StopReason.FailedSession:
+                {
+                    _failedSessionCount++;
+                    DisableFor(backoffProvider.Next(_failedSessionCount));
+                }
+                break;
+            case StopReason.Suspend:
+                {
+                    _failedSessionCount = 0;
+                    DisableFor(duration ?? Timeout.InfiniteTimeSpan);
+                }
+                break;
         }
-
-        var disableFor = timeProvider.GetUtcNow().Add(duration).DateTime;
-
-        _disabledUntil = !_disabledUntil.HasValue ? disableFor :
-            (disableFor > _disabledUntil ? disableFor : _disabledUntil);
 
         if (logger.IsEnabled(LogLevel.Trace))
         {
             logger.LogTrace("I have stopped my current rebalancing session.");
         };
+
+        void DisableFor(TimeSpan duration)
+        {
+            var disableFor = timeProvider.GetUtcNow().Add(duration).DateTime;
+
+            _disabledUntil = !_disabledUntil.HasValue ? disableFor :
+                (disableFor > _disabledUntil ? disableFor : _disabledUntil);
+        }
     }
 }

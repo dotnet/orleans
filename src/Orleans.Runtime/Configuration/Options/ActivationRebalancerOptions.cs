@@ -14,7 +14,7 @@ public sealed class ActivationRebalancerOptions
     /// <summary>
     /// The default value of <see cref="RebalancerDueTime"/>.
     /// </summary>
-    public static readonly TimeSpan DEFAULT_REBALANCER_DUE_TIME = TimeSpan.FromSeconds(30);
+    public static readonly TimeSpan DEFAULT_REBALANCER_DUE_TIME = TimeSpan.FromSeconds(60);
 
     /// <summary>
     /// The time between two consecutive rebalancing cycles within a session.
@@ -26,18 +26,6 @@ public sealed class ActivationRebalancerOptions
     /// The default value of <see cref="SessionCyclePeriod"/>.
     /// </summary>
     public static readonly TimeSpan DEFAULT_SESSION_CYCLE_PERIOD = TimeSpan.FromSeconds(10);
-
-    /// <summary>
-    /// The time to wait for a new rebalancing session, after a previous session has failed on
-    /// yielding any significant improvement to the cluster's entropy.
-    /// </summary>
-    /// <remarks><see cref="TimeSpan.Zero"/> is valid.</remarks>
-    public TimeSpan FailedSessionDelay { get; set; }
-
-    /// <summary>
-    /// The default value of <see cref="FailedSessionDelay"/>.
-    /// </summary>
-    public static readonly TimeSpan DEFAULT_FAILED_SESSION_DELAY = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// The maximum, consecutive number of cycles, yielding no significant improvement to the cluster's entropy.

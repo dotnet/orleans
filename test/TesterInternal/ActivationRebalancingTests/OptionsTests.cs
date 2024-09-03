@@ -12,7 +12,6 @@ public class OptionsTests
     {
         Assert.Equal(TimeSpan.FromSeconds(30), ActivationRebalancerOptions.DEFAULT_REBALANCER_DUE_TIME);
         Assert.Equal(TimeSpan.FromSeconds(10), ActivationRebalancerOptions.DEFAULT_SESSION_CYCLE_PERIOD);
-        Assert.Equal(TimeSpan.FromSeconds(30), ActivationRebalancerOptions.DEFAULT_FAILED_SESSION_DELAY);
         Assert.Equal(3, ActivationRebalancerOptions.DEFAULT_MAX_STALE_CYCLES);
         Assert.Equal(0.001f, ActivationRebalancerOptions.DEFAULT_ENTROPY_QUANTUM);
         Assert.Equal(0.01f, ActivationRebalancerOptions.DEFAULT_MAX_ENTROPY_DEVIATION);
@@ -21,17 +20,17 @@ public class OptionsTests
     }
 
     [Theory]
-    [InlineData(999, 1, 0.1, 0.5, 0.5, 0.5, 2, 5)]
-    [InlineData(1000, 1, 0.1, 0.5, 0.5, 0.5, 2, 1)]  
-    [InlineData(1000, 1, 0, 0.5, 0.5, 0.5, 2, 1)]    
-    [InlineData(1000, 1, 0.1, -0.001, 0.5, 0.5, 2, 1)] 
-    [InlineData(1000, 1, 0.1, 0.011, 0.5, 0.5, 2, 1)]  
-    [InlineData(1000, 1, 0.1, 0.001, -0.1, 0.5, 1.1, 1)] 
-    [InlineData(1000, 1, 0.1, 0.001, 1.1, 0.5, 2, 1)]  
-    [InlineData(1000, 1, 0.1, 0.001, 0.5, 0, 2, 1)]
-    [InlineData(1000, 1, 0.1, 0.001, 0.5, 1.1, 2, 1)]  
-    [InlineData(1000, 1, 0.1, 0.001, 0.5, 0.5, -0.1, 1)]  
-    [InlineData(1000, 1, 0.1, 0.001, 0.5, 0.5, 1.1, 1)]
+    [InlineData(999, 1, 0.1, 0.5, 0.5, 0.5, 2)]
+    [InlineData(1000, 1, 0.1, 0.5, 0.5, 0.5, 2)]  
+    [InlineData(1000, 1, 0, 0.5, 0.5, 0.5, 2)]    
+    [InlineData(1000, 1, 0.1, -0.001, 0.5, 0.5, 2)] 
+    [InlineData(1000, 1, 0.1, 0.011, 0.5, 0.5, 2)]  
+    [InlineData(1000, 1, 0.1, 0.001, -0.1, 0.5, 1.1)] 
+    [InlineData(1000, 1, 0.1, 0.001, 1.1, 0.5, 2)]  
+    [InlineData(1000, 1, 0.1, 0.001, 0.5, 0, 2)]
+    [InlineData(1000, 1, 0.1, 0.001, 0.5, 1.1, 2)]  
+    [InlineData(1000, 1, 0.1, 0.001, 0.5, 0.5, -0.1)]  
+    [InlineData(1000, 1, 0.1, 0.001, 0.5, 0.5, 1.1)]
     public void InvalidOptionsShouldThrow(
         double sessionCyclePeriodMilliseconds,
         double publisherRefreshTimeSeconds,
@@ -39,8 +38,7 @@ public class OptionsTests
         double entropyQuantum,
         double maxEntropyDeviation,
         double cycleNumberWeight,
-        double siloNumberWeight,
-        double failedSessionDelaySeconds)
+        double siloNumberWeight)
     {
         var publisherOptions = new DeploymentLoadPublisherOptions
         {
@@ -54,8 +52,7 @@ public class OptionsTests
             EntropyQuantum = (float)entropyQuantum,
             MaxEntropyDeviation = (float)maxEntropyDeviation,
             CycleNumberWeight = (float)cycleNumberWeight,
-            SiloNumberWeight = (float)siloNumberWeight,
-            FailedSessionDelay = TimeSpan.FromSeconds(failedSessionDelaySeconds)
+            SiloNumberWeight = (float)siloNumberWeight
         };
 
         var validator = new ActivationRebalancerOptionsValidator(Options.Create(options), Options.Create(publisherOptions));
