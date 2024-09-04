@@ -3,7 +3,10 @@ using System.Diagnostics;
 using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Serialization;
+using Orleans.Storage;
 using Orleans.TestingHost;
 using Xunit;
 using Xunit.Abstractions;
@@ -15,6 +18,7 @@ internal interface IMyDirectoryTestGrain : IGrainWithIntegerKey
     ValueTask Ping();
 }
 
+[CollectionAgeLimit(Minutes = 1.01)]
 internal class MyDirectoryTestGrain : Grain, IMyDirectoryTestGrain
 {
     public ValueTask Ping() => default;
@@ -28,7 +32,7 @@ public sealed class GrainDirectoryResilienceTests(ITestOutputHelper output)
     /// </summary>
     /// <returns></returns>
     [Fact]
-    public async Task ElasticClusterWorkload()
+    public async Task ElasticChaos()
     {
         var testClusterBuilder = new TestClusterBuilder(1);
         testClusterBuilder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
@@ -37,12 +41,11 @@ public sealed class GrainDirectoryResilienceTests(ITestOutputHelper output)
         output.WriteLine($"ServiceId: {testCluster.Options.ServiceId}");
         output.WriteLine($"ClusterId: {testCluster.Options.ClusterId}");
 
-        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(15));
         var reconfigurationTimer = CoarseStopwatch.StartNew();
-        var upperLimit = 5;
-        var lowerLimit = 1;
+        var upperLimit = 10;
+        var lowerLimit = 1; // Membership is kept on the primary, so we can't go below 1
         var target = upperLimit;
-        var clusterOperation = Task.CompletedTask;
         var idBase = 0L;
         var client = ((InProcessSiloHandle)testCluster.Primary).SiloHost.Services.GetRequiredService<IGrainFactory>();
         const int CallsPerIteration = 100;
@@ -53,16 +56,17 @@ public sealed class GrainDirectoryResilienceTests(ITestOutputHelper output)
                 while (!cts.IsCancellationRequested)
                 {
                     var time = Stopwatch.StartNew();
-                    var workTask = Parallel.ForAsync(0, CallsPerIteration, (i, ct) => client.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping());
+                    var tasks = Enumerable.Range(0, CallsPerIteration).Select(i => client.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping().AsTask()).ToList();
+                    var workTask = Task.WhenAll(tasks);
                     using var delayCancellation = new CancellationTokenSource();
-                    var delayTask = Task.Delay(TimeSpan.FromMilliseconds(15_000), delayCancellation.Token);
+                    var delay = TimeSpan.FromMilliseconds(90_000);
+                    var delayTask = Task.Delay(delay, delayCancellation.Token);
                     await Task.WhenAny(workTask, delayTask);
                     if (delayTask.IsCompleted)
                     {
                         DumpCapture.CreateMiniDump("delayed");
+                        Assert.False(delayTask.IsCompleted, $"Request took longer than {delay.TotalSeconds}s to complete.");
                     }
-
-                    Assert.False(delayTask.IsCompleted);
 
                     try
                     {
@@ -70,7 +74,11 @@ public sealed class GrainDirectoryResilienceTests(ITestOutputHelper output)
                     }
                     catch (SiloUnavailableException sue)
                     {
-                        output.WriteLine($"Caught & swallowed transient exception: {sue}");
+                        output.WriteLine($"Swallowed transient exception: {sue}");
+                    }
+                    catch (OrleansMessageRejectionException omre)
+                    {
+                        output.WriteLine($"Swallowed rejection: {omre}");
                     }
                     catch (Exception exception)
                     {
@@ -79,17 +87,19 @@ public sealed class GrainDirectoryResilienceTests(ITestOutputHelper output)
                         throw;
                     }
 
+                    delayCancellation.Cancel();
                     idBase += CallsPerIteration;
                 }
             });
 
             var chaosTask = Task.Run(async () =>
             {
+                var clusterOperation = Task.CompletedTask;
                 while (!cts.IsCancellationRequested)
                 {
                     try
                     {
-                        var remaining = TimeSpan.FromSeconds(2) - reconfigurationTimer.Elapsed;
+                        var remaining = TimeSpan.FromSeconds(10) - reconfigurationTimer.Elapsed;
                         if (remaining <= TimeSpan.Zero)
                         {
                             reconfigurationTimer.Restart();
@@ -124,16 +134,22 @@ public sealed class GrainDirectoryResilienceTests(ITestOutputHelper output)
                                     var victim = testCluster.SecondarySilos[Random.Shared.Next(testCluster.SecondarySilos.Count)];
                                     if (currentCount % 2 == 0)
                                     {
+                                        output.WriteLine($"Stopping '{victim.SiloAddress}'.");
                                         await testCluster.StopSiloAsync(victim);
+                                        output.WriteLine($"Stopped '{victim.SiloAddress}'.");
                                     }
                                     else
                                     {
+                                        output.WriteLine($"Killing '{victim.SiloAddress}'.");
                                         await testCluster.KillSiloAsync(victim);
+                                        output.WriteLine($"Killed '{victim.SiloAddress}'.");
                                     }
                                 }
                                 else if (currentCount < target)
                                 {
-                                    await testCluster.StartAdditionalSiloAsync();
+                                    output.WriteLine("Starting new silo.");
+                                    var result = await testCluster.StartAdditionalSiloAsync();
+                                    output.WriteLine($"Started '{result.SiloAddress}'.");
                                 }
 
                                 if (currentCount <= lowerLimit)
@@ -173,12 +189,14 @@ public sealed class GrainDirectoryResilienceTests(ITestOutputHelper output)
     {
         public void Configure(ISiloBuilder siloBuilder)
         {
+            siloBuilder.Configure<SiloMessagingOptions>(o => o.ResponseTimeout = o.SystemResponseTimeout = TimeSpan.FromMinutes(2));
 #pragma warning disable ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-            //siloBuilder.AddDistributedGrainDirectory();
+            siloBuilder.AddDistributedGrainDirectory();
 #pragma warning restore ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-            siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.Messaging.MessageCenter", LogLevel.Debug));
+            //siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.Messaging.MessageCenter", LogLevel.Debug));
+            //siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Grain", LogLevel.Debug));
             //siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.GrainDirectory.GrainDirectoryReplica", LogLevel.Trace));
-            //siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.GrainDirectory.DistributedGrainDirectory", LogLevel.Information));
+            siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.GrainDirectory.DistributedGrainDirectory", LogLevel.Debug));
         }
     }
 }

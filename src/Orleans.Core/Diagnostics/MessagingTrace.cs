@@ -101,7 +101,6 @@ namespace Orleans.Runtime
 
         internal void OnDropExpiredMessage(Message message, MessagingInstruments.Phase phase)
         {
-            DumpCapture.CreateMiniDump(nameof(OnDropExpiredMessage));
             if (this.IsEnabled(DropExpiredMessageEventName))
             {
                 this.Write(DropExpiredMessageEventName, new { Message = message, Phase = phase });
@@ -123,7 +122,6 @@ namespace Orleans.Runtime
 
         internal void OnSiloDropSendingMessage(SiloAddress localSiloAddress, Message message, string reason)
         {
-            DumpCapture.CreateMiniDump(nameof(OnSiloDropSendingMessage));
             MessagingInstruments.OnDroppedSentMessage(message);
             LogSiloDropSendingMessage(this, localSiloAddress, message, reason, null);
         }

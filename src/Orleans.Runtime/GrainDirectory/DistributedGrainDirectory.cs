@@ -9,6 +9,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.GrainDirectory;
+using Orleans.Internal;
+using Orleans.Runtime.Internal;
+using Orleans.Runtime.Scheduler;
 
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory;
@@ -19,6 +22,10 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     private readonly ILogger<DistributedGrainDirectory> _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly ImmutableArray<GrainDirectoryReplica> _partitions;
+    private readonly CancellationTokenSource _stoppedCts = new();
+
+    internal CancellationToken OnStoppedToken => _stoppedCts.Token;
+    internal ClusterMembershipSnapshot ClusterMembershipSnapshot => _membershipService.CurrentView.ClusterMembershipSnapshot;
 
     // The recovery membership value is used to avoid a race between concurrent registration & recovery operations which could lead to lost registrations.
     // This could occur when a new activation is created and begins registering itself with a host which crashes. Concurrently, the new owner initiates
@@ -28,6 +35,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     // precise by also tracking the sets of ranges which need to be recovered, but that complicates things somewhat since it would require tracking the ranges
     // for each recovery version.
     private long _recoveryMembershipVersion;
+    private Task _runTask = Task.CompletedTask;
 
     public DistributedGrainDirectory(
         DirectoryMembershipService membershipService,
@@ -43,7 +51,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         var partitions = ImmutableArray.CreateBuilder<GrainDirectoryReplica>(DirectoryMembershipSnapshot.PartitionsPerSilo);
         for (var i = 0; i < DirectoryMembershipSnapshot.PartitionsPerSilo; i++)
         {
-            partitions.Add(new GrainDirectoryReplica(i, localSiloDetails, membershipService, loggerFactory, serviceProvider, grainFactory));
+            partitions.Add(new GrainDirectoryReplica(i, this, localSiloDetails, loggerFactory, serviceProvider, grainFactory));
         }
 
         _partitions = partitions.ToImmutable();
@@ -156,7 +164,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
     public async ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRange range, bool isValidation)
     {
-        if (_logger.IsEnabled(LogLevel.Debug))
+        if (!isValidation && _logger.IsEnabled(LogLevel.Debug))
         {
             _logger.LogDebug("Collecting registered activations for range {Range} at version {MembershipVersion}.", range, membershipVersion);
         }
@@ -189,6 +197,9 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                 if (address.MembershipVersion == MembershipVersion.MinValue
                     || activation is ActivationData activationData && !activationData.IsValid)
                 {
+                    // Validation does not require that the grain is deactivated, skip it instead.
+                    //if (isValidation) continue;
+
                     try
                     {
                         // This activation has not completed registration or is not currently active.
@@ -217,7 +228,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
         await Task.WhenAll(deactivationTasks);
 
-        if (_logger.IsEnabled(LogLevel.Debug))
+        if (!isValidation && _logger.IsEnabled(LogLevel.Debug))
         {
             _logger.LogDebug(
                 "Submitting {Count} registered activations for range {Range} at version {MembershipVersion}. Deactivated {DeactivationCount} in-doubt registrations. Took {ElapsedMilliseconds}ms",
@@ -249,23 +260,101 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         }
     }
 
+    internal ValueTask<DirectoryMembershipSnapshot> RefreshViewAsync(MembershipVersion version, CancellationToken cancellationToken) => _membershipService.RefreshViewAsync(version, cancellationToken);
+
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle observer)
     {
         observer.Subscribe(nameof(DistributedGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
-        foreach (var partition in _partitions)
-        {
-            partition.Participate(observer);
-        }
+
+        // Transition into 'ShuttingDown'/'Stopping' stage, removing ourselves from directory membership, but allow some time for hand-off before transitioning to 'Dead'.
+        observer.Subscribe(nameof(DistributedGrainDirectory), ServiceLifecycleStage.BecomeActive - 1, _ => Task.CompletedTask, OnShuttingDown);
 
         Task OnRuntimeInitializeStart(CancellationToken cancellationToken)
         {
             var catalog = _serviceProvider.GetRequiredService<Catalog>();
             catalog.RegisterSystemTarget(this);
+            foreach (var partition in _partitions)
+            {
+                catalog.RegisterSystemTarget(partition);
+            }
+
+            using var _ = new ExecutionContextSuppressor();
+            WorkItemGroup.QueueAction(() => _runTask = ProcessMembershipUpdates());
 
             return Task.CompletedTask;
         }
 
-        static Task OnRuntimeInitializeStop(CancellationToken cancellationToken) => Task.CompletedTask;
+        async Task OnRuntimeInitializeStop(CancellationToken cancellationToken)
+        {
+            _stoppedCts.Cancel();
+            if (_runTask is { } task)
+            {
+                // Try to wait for hand-off to complete.
+                await this.RunOrQueueTask(async () => await task.WaitAsync(cancellationToken).SuppressThrowing());
+            }
+        }
+
+        async Task OnShuttingDown(CancellationToken token)
+        {
+            var tasks = new List<Task>(_partitions.Length);
+            foreach (var partition in _partitions)
+            {
+                tasks.Add(partition.OnShuttingDown(token));
+            }
+            await Task.WhenAll(tasks).SuppressThrowing();
+        }
+    }
+
+    private async Task ProcessMembershipUpdates()
+    {
+        // Ensure all child tasks are completed before exiting, tracking them here.
+        List<Task> tasks = [];
+        var previousUpdate = ClusterMembershipSnapshot.Default;
+        while (!_stoppedCts.IsCancellationRequested)
+        {
+            try
+            {
+                await foreach (var update in _membershipService.ViewUpdates.WithCancellation(_stoppedCts.Token))
+                {
+                    tasks.RemoveAll(t => t.IsCompleted);
+                    var changes = update.ClusterMembershipSnapshot.CreateUpdate(previousUpdate);
+
+                    foreach (var change in changes.Changes)
+                    {
+                        if (change.Status == SiloStatus.Dead)
+                        {
+                            foreach (var partition in _partitions)
+                            {
+                                tasks.Add(partition.OnSiloRemovedFromClusterAsync(change));
+                            }
+                        }
+                    }
+
+                    var current = update;
+
+                    foreach (var partition in _partitions)
+                    {
+                        tasks.Add(partition.ProcessMembershipUpdateAsync(current));
+                    }
+
+                    if (_logger.IsEnabled(LogLevel.Debug))
+                    {
+                        _logger.LogDebug("Updated view from '{PreviousVersion}' to '{Version}'.", previousUpdate.Version, update.Version);
+                    }
+
+                    previousUpdate = update.ClusterMembershipSnapshot;
+                }
+            }
+            catch (Exception exception)
+            {
+                if (!_stoppedCts.IsCancellationRequested)
+                {
+                    _logger.LogError(exception, "Error processing membership updates.");
+                }
+            }
+        }
+
+        await Task.WhenAll(tasks).SuppressThrowing();
     }
 
     SiloAddress? ITestHooks.GetPrimaryForGrain(GrainId grainId)
