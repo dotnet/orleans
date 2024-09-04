@@ -123,5 +123,5 @@ internal sealed partial class GrainDirectoryReplica
         return existing;
     }
 
-    private bool IsSiloDead(GrainAddress existing) => _directoryMembershipService.CurrentView.ClusterMembershipSnapshot.GetSiloStatus(existing.SiloAddress) == SiloStatus.Dead;
+    private bool IsSiloDead(GrainAddress existing) => _owner.ClusterMembershipSnapshot.GetSiloStatus(existing.SiloAddress) == SiloStatus.Dead;
 }

@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Internal;
 using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime
@@ -372,9 +371,9 @@ namespace Orleans.Runtime
 
         void IActivationWorkingSetObserver.OnAdded(IActivationWorkingSetMember member)
         {
-            Interlocked.Increment(ref _activationCount);
             if (member is ICollectibleGrainContext activation)
             {
+                Interlocked.Increment(ref _activationCount);
                 if (activation.CollectionTicket == default)
                 {
                     ScheduleCollection(activation, activation.CollectionAgeLimit, DateTime.UtcNow);
@@ -410,10 +409,9 @@ namespace Orleans.Runtime
 
         void IActivationWorkingSetObserver.OnDeactivated(IActivationWorkingSetMember member)
         {
-            Interlocked.Decrement(ref _activationCount);
-            if (member is ICollectibleGrainContext activation)
+            if (member is ICollectibleGrainContext activation && TryCancelCollection(activation))
             {
-                TryCancelCollection(activation);
+                Interlocked.Decrement(ref _activationCount);
             }
         }
 

@@ -606,8 +606,9 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             if (state is ActivationState.Creating or ActivationState.Activating or ActivationState.Valid)
             {
                 CancelPendingOperations();
-                SetState(ActivationState.Deactivating);
+
                 _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
+                SetState(ActivationState.Deactivating);
                 var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
                 ScheduleOperation(new Command.Deactivate(cts, state));
@@ -804,8 +805,10 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         _extras.IsDisposing = true;
 
         CancelPendingOperations();
+
         lock (this)
         {
+            _shared.InternalRuntime.ActivationWorkingSet.OnDeactivated(this);
             SetState(ActivationState.Invalid);
         }
 
@@ -1642,13 +1645,12 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
                 lock (this)
                 {
-                    if (State == ActivationState.Activating)
+                    if (State is ActivationState.Activating)
                     {
                         SetState(ActivationState.Valid); // Activate calls on this activation are finished
+                        _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
                     }
                 }
-
-                _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
 
                 if (_shared.Logger.IsEnabled(LogLevel.Debug))
                 {
@@ -1840,8 +1842,6 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         {
             CatalogInstruments.ActivationShutdownViaCollection();
         }
-
-        _shared.InternalRuntime.ActivationWorkingSet.OnDeactivated(this);
 
         UnregisterMessageTarget();
 
