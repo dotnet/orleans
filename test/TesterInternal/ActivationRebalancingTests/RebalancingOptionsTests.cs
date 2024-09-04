@@ -5,7 +5,7 @@ using Xunit;
 namespace UnitTests.ActivationRebalancingTests;
 
 [TestCategory("Functional"), TestCategory("ActivationRebalancing")]
-public class OptionsTests
+public class RebalancingOptionsTests
 {
     [Fact]
     public void ConstantsShouldNotChange()
@@ -13,10 +13,10 @@ public class OptionsTests
         Assert.Equal(TimeSpan.FromSeconds(30), ActivationRebalancerOptions.DEFAULT_REBALANCER_DUE_TIME);
         Assert.Equal(TimeSpan.FromSeconds(10), ActivationRebalancerOptions.DEFAULT_SESSION_CYCLE_PERIOD);
         Assert.Equal(3, ActivationRebalancerOptions.DEFAULT_MAX_STALE_CYCLES);
-        Assert.Equal(0.001f, ActivationRebalancerOptions.DEFAULT_ENTROPY_QUANTUM);
-        Assert.Equal(0.01f, ActivationRebalancerOptions.DEFAULT_MAX_ENTROPY_DEVIATION);
-        Assert.Equal(0.1f, ActivationRebalancerOptions.DEFAULT_CYCLE_NUMBER_WEIGHT);
-        Assert.Equal(0.1f, ActivationRebalancerOptions.DEFAULT_SILO_NUMBER_WEIGHT);
+        Assert.Equal(0.001d, ActivationRebalancerOptions.DEFAULT_ENTROPY_QUANTUM);
+        Assert.Equal(0.01d, ActivationRebalancerOptions.DEFAULT_ALLOWED_ENTROPY_DEVIATION);
+        Assert.Equal(0.1d, ActivationRebalancerOptions.DEFAULT_CYCLE_NUMBER_WEIGHT);
+        Assert.Equal(0.1d, ActivationRebalancerOptions.DEFAULT_SILO_NUMBER_WEIGHT);
     }
 
     [Theory]
@@ -36,7 +36,7 @@ public class OptionsTests
         double publisherRefreshTimeSeconds,
         int maxStaleCycles,
         double entropyQuantum,
-        double maxEntropyDeviation,
+        double allowedEntropyDeviation,
         double cycleNumberWeight,
         double siloNumberWeight)
     {
@@ -49,10 +49,10 @@ public class OptionsTests
         {
             SessionCyclePeriod = TimeSpan.FromMilliseconds(sessionCyclePeriodMilliseconds),
             MaxStaleCycles = maxStaleCycles,
-            EntropyQuantum = (float)entropyQuantum,
-            MaxEntropyDeviation = (float)maxEntropyDeviation,
-            CycleNumberWeight = (float)cycleNumberWeight,
-            SiloNumberWeight = (float)siloNumberWeight
+            EntropyQuantum = entropyQuantum,
+            AllowedEntropyDeviation = allowedEntropyDeviation,
+            CycleNumberWeight = cycleNumberWeight,
+            SiloNumberWeight = siloNumberWeight
         };
 
         var validator = new ActivationRebalancerOptionsValidator(Options.Create(options), Options.Create(publisherOptions));

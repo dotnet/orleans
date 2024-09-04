@@ -45,24 +45,24 @@ public sealed class ActivationRebalancerOptions
     /// being relative to the maximum possible entropy.
     /// </summary>
     /// <remarks>Allowed range: (0-0.01)</remarks>
-    public float EntropyQuantum { get; set; } = DEFAULT_ENTROPY_QUANTUM;
+    public double EntropyQuantum { get; set; } = DEFAULT_ENTROPY_QUANTUM;
 
     /// <summary>
     /// The default value of <see cref="EntropyQuantum"/>.
     /// </summary>
-    public const float DEFAULT_ENTROPY_QUANTUM = 0.001f;
+    public const double DEFAULT_ENTROPY_QUANTUM = 0.001d;
 
     /// <summary>
     /// Represents the allowed entropy deviation between the cluster's current entropy, againt the theoretical maximum.
     /// Values lower than or equal to this are practically considered as "maximum", and the current rebalancing session will stop.
     /// </summary>
     /// <remarks>Allowed range is: (0-1)</remarks>
-    public float MaxEntropyDeviation { get; set; } = DEFAULT_MAX_ENTROPY_DEVIATION;
+    public double AllowedEntropyDeviation { get; set; } = DEFAULT_ALLOWED_ENTROPY_DEVIATION;
 
     /// <summary>
-    /// The default value of <see cref="MaxEntropyDeviation"/>.
+    /// The default value of <see cref="AllowedEntropyDeviation"/>.
     /// </summary>
-    public const float DEFAULT_MAX_ENTROPY_DEVIATION = 0.01f;
+    public const double DEFAULT_ALLOWED_ENTROPY_DEVIATION = 0.01d;
 
     /// <summary>
     /// <para>Represents the weight that is given to the number of rebalancing cycles that have passed during a rebalancing session.</para>
@@ -70,12 +70,12 @@ public sealed class ActivationRebalancerOptions
     /// <para>Pick higher values if you want a faster migration rate.</para>
     /// </summary>
     /// <remarks>Allowed range: (0-1]</remarks>
-    public float CycleNumberWeight { get; set; } = DEFAULT_CYCLE_NUMBER_WEIGHT;
+    public double CycleNumberWeight { get; set; } = DEFAULT_CYCLE_NUMBER_WEIGHT;
 
     /// <summary>
     /// The default value of <see cref="CycleNumberWeight"/>.
     /// </summary>
-    public const float DEFAULT_CYCLE_NUMBER_WEIGHT = 0.1f;
+    public const double DEFAULT_CYCLE_NUMBER_WEIGHT = 0.1d;
 
     /// <summary>
     /// <para>Represents the weight that is given to the number of silos in the cluster during a rebalancing session.</para>
@@ -83,12 +83,12 @@ public sealed class ActivationRebalancerOptions
     /// <para>Pick lower values if you want a faster migration rate.</para>
     /// </summary>
     /// <remarks>Allowed range: [0-1]</remarks>
-    public float SiloNumberWeight { get; set; } = DEFAULT_SILO_NUMBER_WEIGHT;
+    public double SiloNumberWeight { get; set; } = DEFAULT_SILO_NUMBER_WEIGHT;
 
     /// <summary>
     /// The default value of <see cref="SiloNumberWeight"/>.
     /// </summary>
-    public const float DEFAULT_SILO_NUMBER_WEIGHT = 0.1f;
+    public const double DEFAULT_SILO_NUMBER_WEIGHT = 0.1d;
 }
 
 internal sealed class ActivationRebalancerOptionsValidator(
@@ -112,22 +112,22 @@ internal sealed class ActivationRebalancerOptionsValidator(
             throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.MaxStaleCycles)} must be greater than 0");
         }
 
-        if (_options.EntropyQuantum <= 0 || _options.EntropyQuantum >= 0.01)
+        if (_options.EntropyQuantum <= 0d || _options.EntropyQuantum >= 0.01d)
         {
             throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.EntropyQuantum)} must be in greater than 0, and less 1");
         }
 
-        if (_options.MaxEntropyDeviation <= 0 || _options.MaxEntropyDeviation >= 1)
+        if (_options.AllowedEntropyDeviation <= 0d || _options.AllowedEntropyDeviation >= 1d)
         {
-            throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.MaxEntropyDeviation)} must be in greater than 0, and less 1");
+            throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.AllowedEntropyDeviation)} must be in greater than 0, and less 1");
         }
 
-        if (_options.CycleNumberWeight <= 0 || _options.CycleNumberWeight > 1)
+        if (_options.CycleNumberWeight <= 0d || _options.CycleNumberWeight > 1d)
         {
             throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.CycleNumberWeight)} must be in greater than 0, and less or equal to 1");
         }
 
-        if (_options.SiloNumberWeight < 0 || _options.SiloNumberWeight > 1)
+        if (_options.SiloNumberWeight < 0d || _options.SiloNumberWeight > 1d)
         {
             throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.SiloNumberWeight)} must be in greater than or equal to 0, and less or equal to 1");
         }
