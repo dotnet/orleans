@@ -294,24 +294,35 @@ namespace Orleans.Runtime
         public Task MigrateRandomActivations(SiloAddress target, int count)
         {
             var statistics = catalog.GetDetailedGrainStatistics();
-            var idsToMigrate = Random.Shared.GetItems(statistics.Select(x => x.GrainId).ToArray(), count);
+            var grainIds = statistics.Select(x => x.GrainId).ToList();
+            var idsToMigrate = new HashSet<GrainId>();
             var migrationContext = new Dictionary<string, object>()
             {
                 [IPlacementDirector.PlacementHintKey] = target
             };
 
-            foreach (var grainId in idsToMigrate)
-            {
-                if (_migratabilityChecker.IsMigratable(grainId.Type) &&
-                    activationDirectory.FindTarget(grainId) is { } activation)
+            // Loop until we've migrated the desired count of activations or run out of activations to try
+            while (idsToMigrate.Count < count && grainIds.Count > 0)
+            {   
+                var remainingCount = count - idsToMigrate.Count; // How many more we still need to migrate?
+                var candidates = Random.Shared.GetItems(grainIds.ToArray(), remainingCount); // Randomly select up to the remaining count
+
+                foreach (var grainId in candidates)
                 {
-                    activation.Migrate(migrationContext);
-                }
-                else
-                {
-                    Console.WriteLine("");
+                    grainIds.Remove(grainId); // Remove it from the list to avoid re-selection
+
+                    if (_migratabilityChecker.IsMigratable(grainId.Type) &&
+                        activationDirectory.FindTarget(grainId) is { } activation)
+                    {
+                        activation.Migrate(migrationContext);
+                        idsToMigrate.Add(grainId);
+
+                        if (idsToMigrate.Count >= count)
+                            break;
+                    }
                 }
             }
+
 
             return Task.CompletedTask;
         }
