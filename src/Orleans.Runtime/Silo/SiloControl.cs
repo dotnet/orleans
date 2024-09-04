@@ -43,12 +43,13 @@ namespace Orleans.Runtime
         private readonly IOptions<LoadSheddingOptions> loadSheddingOptions;
         private readonly GrainCountStatistics _grainCountStatistics;
         private readonly GrainPropertiesResolver grainPropertiesResolver;
+        private readonly GrainMigratabilityChecker _migratabilityChecker;
 
         public SiloControl(
             ILocalSiloDetails localSiloDetails,
             DeploymentLoadPublisher deploymentLoadPublisher,
             Catalog catalog,
-            CachedVersionSelectorManager cachedVersionSelectorManager, 
+            CachedVersionSelectorManager cachedVersionSelectorManager,
             CompatibilityDirectorManager compatibilityDirectorManager,
             VersionSelectorManager selectorManager,
             IServiceProvider services,
@@ -60,7 +61,8 @@ namespace Orleans.Runtime
             IEnvironmentStatisticsProvider environmentStatisticsProvider,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             GrainCountStatistics grainCountStatistics,
-            GrainPropertiesResolver grainPropertiesResolver)
+            GrainPropertiesResolver grainPropertiesResolver,
+            GrainMigratabilityChecker migratabilityChecker)
             : base(Constants.SiloControlType, localSiloDetails.SiloAddress, loggerFactory)
         {
             this.localSiloDetails = localSiloDetails;
@@ -79,6 +81,7 @@ namespace Orleans.Runtime
             this.loadSheddingOptions = loadSheddingOptions;
             _grainCountStatistics = grainCountStatistics;
             this.grainPropertiesResolver = grainPropertiesResolver;
+            _migratabilityChecker = migratabilityChecker;
         }
 
         public Task Ping(string message)
@@ -299,9 +302,14 @@ namespace Orleans.Runtime
 
             foreach (var grainId in idsToMigrate)
             {
-                if (activationDirectory.FindTarget(grainId) is { } activation)
+                if (_migratabilityChecker.IsMigratable(grainId.Type) &&
+                    activationDirectory.FindTarget(grainId) is { } activation)
                 {
                     activation.Migrate(migrationContext);
+                }
+                else
+                {
+                    Console.WriteLine("");
                 }
             }
 

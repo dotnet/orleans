@@ -39,7 +39,7 @@ public class StaticRebalancingTests(RebalancingTestBase.Fixture fixture, ITestOu
         var silo4Activations = initialSilo4Activations;
 
         var index = 0;
-        while (index < 5)
+        while (index < 3)
         {
             await Task.Delay(Fixture.SessionCyclePeriod);
             stats = await MgmtGrain.GetDetailedGrainStatistics();

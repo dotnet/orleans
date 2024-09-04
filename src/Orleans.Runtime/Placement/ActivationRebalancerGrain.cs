@@ -270,7 +270,7 @@ internal sealed partial class ActivationRebalancerGrain(
                 .GetSystemTarget<ISiloControl>(Constants.SiloControlType, highSilo)
                 .MigrateRandomActivations(lowSilo, delta));
 
-            UpdateStatistics(lowSilo, highSilo, (uint)delta);
+            UpdateStatistics(lowSilo, highSilo, delta);
             LogSiloMigrations(delta, lowSilo, lowCount, lowCount + delta, highSilo, highCount, highCount - delta);
         }
 
@@ -284,8 +284,9 @@ internal sealed partial class ActivationRebalancerGrain(
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void UpdateStatistics(SiloAddress lowSilo, SiloAddress highSilo, uint delta)
+    private void UpdateStatistics(SiloAddress lowSilo, SiloAddress highSilo, int delta)
     {
+        Debug.Assert(delta > 0);
         var now = timeProvider.GetUtcNow().DateTime;
 
         ref var lowStats = ref CollectionsMarshal.GetValueRefOrAddDefault(_rebalancingStatistics, lowSilo, out _);
@@ -294,7 +295,7 @@ internal sealed partial class ActivationRebalancerGrain(
             TimeStamp = now,
             SiloAddress = lowSilo,
             DispersedActivations = lowStats.DispersedActivations,
-            AcquiredActivations = lowStats.AcquiredActivations + delta
+            AcquiredActivations = lowStats.AcquiredActivations + (ulong)delta
         };
 
         ref var highStats = ref CollectionsMarshal.GetValueRefOrAddDefault(_rebalancingStatistics, highSilo, out _);
@@ -302,7 +303,7 @@ internal sealed partial class ActivationRebalancerGrain(
         {
             TimeStamp = now,
             SiloAddress = highSilo,
-            DispersedActivations = highStats.DispersedActivations + delta,
+            DispersedActivations = highStats.DispersedActivations + (ulong)delta,
             AcquiredActivations = highStats.AcquiredActivations
         };
     }
