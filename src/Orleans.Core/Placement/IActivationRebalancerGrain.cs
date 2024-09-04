@@ -21,7 +21,7 @@ public interface IActivationRebalancerGrain : IGrainWithIntegerKey
     public const int Key = 0;
 
     [AlwaysInterleave, Alias("GetStatistics")]
-    ValueTask<ImmutableArray<SiloRebalancingStatistics>> GetStatistics();
+    ValueTask<ImmutableArray<RebalancingStatistics>> GetStatistics();
 
     /// <summary>
     /// Resumes the rebalancer if its suspended, otherwise its a no-op.
@@ -47,20 +47,34 @@ internal interface IInternalActivationRebalancerGrain : IActivationRebalancerGra
 }
 
 /// <summary>
-/// Rebalancing statistics for the given <paramref name="SiloAddress"/>.
+/// Rebalancing statistics for the given <see cref="SiloAddress"/>.
 /// </summary>
-/// <param name="TimeStamp">The time these statistics were assembled.</param>
-/// <param name="SiloAddress">The silo address.</param>
-/// <param name="DispersedActivations">The number of activations that have been dispersed from this silo thus far.</param>
-/// <param name="AcquiredActivations">The number of activations that have been acquired by this silo thus far.</param>
-/// <remarks>Used for diagnostics / metrics purposes.</remarks>
+/// <remarks>
+/// Used for diagnostics / metrics purposes. Note that statistics are an approximation.</remarks>
 [GenerateSerializer]
-[Alias("SiloRebalancingStatistics")]
-public readonly record struct SiloRebalancingStatistics(
-    DateTime TimeStamp,
-    SiloAddress SiloAddress,
-    ulong DispersedActivations,
-    ulong AcquiredActivations);
+[Alias("RebalancingStatistics")]
+public readonly struct RebalancingStatistics
+{
+    /// <summary>
+    /// The time these statistics were assembled.
+    /// </summary>
+    [Id(0)] public required DateTime TimeStamp { get; init; }
+
+    /// <summary>
+    /// The silo address.
+    /// </summary>
+    [Id(1)] public required SiloAddress SiloAddress { get; init; }
+
+    /// <summary>
+    /// The number of activations that have been dispersed from this silo thus far.
+    /// </summary>
+    [Id(2)] public required ulong DispersedActivations { get; init; }
+
+    /// <summary>
+    /// The number of activations that have been acquired by this silo thus far.
+    /// </summary>
+    [Id(3)] public required ulong AcquiredActivations { get; init; }
+}
 
 /// <summary>
 /// Determines how long to wait between successive rebalancing sessions, if an aprior session has failed.

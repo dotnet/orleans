@@ -1,4 +1,3 @@
-using Orleans.Runtime.Placement;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -11,33 +10,12 @@ public class StaticRebalancingTests(RebalancingTestBase.Fixture fixture, ITestOu
     [Fact]
     public async Task Should_Move_Activations_From_Silo1_And_Silo3_To_Silo2_And_Silo4()
     {
-        await MgmtGrain.ForceActivationCollection(TimeSpan.Zero);
-
         var tasks = new List<Task>();
 
-        RequestContext.Set(IPlacementDirector.PlacementHintKey, Silo1);
-        for (var i = 0; i < 300; i++)
-        {
-            tasks.Add(GrainFactory.GetGrain<IRebalancingTestGrain>(Guid.NewGuid()).Ping());
-        }
-
-        RequestContext.Set(IPlacementDirector.PlacementHintKey, Silo2);
-        for (var i = 0; i < 30; i++)
-        {
-            tasks.Add(GrainFactory.GetGrain<IRebalancingTestGrain>(Guid.NewGuid()).Ping());
-        }
-
-        RequestContext.Set(IPlacementDirector.PlacementHintKey, Silo3);
-        for (var i = 0; i < 175; i++)
-        {
-            tasks.Add(GrainFactory.GetGrain<IRebalancingTestGrain>(Guid.NewGuid()).Ping());
-        }
-
-        RequestContext.Set(IPlacementDirector.PlacementHintKey, Silo4);
-        for (var i = 0; i < 100; i++)
-        {
-            tasks.Add(GrainFactory.GetGrain<IRebalancingTestGrain>(Guid.NewGuid()).Ping());
-        }
+        AddTestActivations(tasks, Silo1, 300);
+        AddTestActivations(tasks, Silo2, 30);
+        AddTestActivations(tasks, Silo3, 180);
+        AddTestActivations(tasks, Silo4, 100);
 
         await Task.WhenAll(tasks);
 
@@ -90,11 +68,15 @@ public class StaticRebalancingTests(RebalancingTestBase.Fixture fixture, ITestOu
             "Did not expect Silo4 to have less activations than what it started with: " +
             $"[{initialSilo4Activations} -> {silo4Activations}]");
 
+        var preVariance = CalculateVariance([initialSilo1Activations, initialSilo2Activations, initialSilo3Activations, initialSilo4Activations]);
+        var postVariance = CalculateVariance([silo1Activations, silo2Activations, silo3Activations, silo4Activations]);
+        
         OutputHelper.WriteLine(
             $"Post-rebalancing activations ({index} cycles):\n" +
             $"Silo1: {silo1Activations}\n" +
             $"Silo2: {silo2Activations}\n" +
             $"Silo3: {silo3Activations}\n" +
-            $"Silo4: {silo4Activations}\n");
+            $"Silo4: {silo4Activations}\n" +
+            $"Variance: {postVariance} | Expected without rebalancing: {preVariance}");
     }
 }

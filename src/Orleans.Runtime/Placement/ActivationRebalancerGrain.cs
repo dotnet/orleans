@@ -64,7 +64,7 @@ internal sealed class ActivationRebalancerGrain(
 
     private readonly ActivationRebalancerOptions _options = options.Value;
     private readonly Dictionary<SiloAddress, ResourceStatistics> _siloStatistics = [];
-    private readonly Dictionary<SiloAddress, SiloRebalancingStatistics> _rebalancingStatistics = [];
+    private readonly Dictionary<SiloAddress, RebalancingStatistics> _rebalancingStatistics = [];
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
@@ -86,7 +86,7 @@ internal sealed class ActivationRebalancerGrain(
         stats = new(statistics.EnvironmentStatistics.MemoryUsageBytes, statistics.ActivationCount);
     }
 
-    public ValueTask<ImmutableArray<SiloRebalancingStatistics>> GetStatistics() => new([.. _rebalancingStatistics.Values]);
+    public ValueTask<ImmutableArray<RebalancingStatistics>> GetStatistics() => new([.. _rebalancingStatistics.Values]);
 
     public Task StartRebalancer()
     {
@@ -351,10 +351,22 @@ internal sealed class ActivationRebalancerGrain(
         var now = timeProvider.GetUtcNow().DateTime;
 
         ref var lowStats = ref CollectionsMarshal.GetValueRefOrAddDefault(_rebalancingStatistics, lowSilo, out _);
-        lowStats = new(now, lowSilo, lowStats.DispersedActivations, lowStats.AcquiredActivations + delta);
+        lowStats = new()
+        {
+            TimeStamp = now,
+            SiloAddress = lowSilo,
+            DispersedActivations = lowStats.DispersedActivations,
+            AcquiredActivations = lowStats.AcquiredActivations + delta
+        };
 
         ref var highStats = ref CollectionsMarshal.GetValueRefOrAddDefault(_rebalancingStatistics, highSilo, out _);
-        highStats = new(now, highSilo, highStats.DispersedActivations + delta, highStats.AcquiredActivations);
+        highStats = new()
+        {
+            TimeStamp = now,
+            SiloAddress = highSilo,
+            DispersedActivations = highStats.DispersedActivations + delta,
+            AcquiredActivations = highStats.AcquiredActivations
+        };
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

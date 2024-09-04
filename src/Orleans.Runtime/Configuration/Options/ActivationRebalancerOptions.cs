@@ -67,7 +67,7 @@ public sealed class ActivationRebalancerOptions
     /// <summary>
     /// <para>Represents the weight that is given to the number of rebalancing cycles that have passed during a rebalancing session.</para>
     /// Changing this value has a far greater impact on the migration rate than <see cref="SiloNumberWeight"/>, and is suitable for controlling the session duration.
-    /// Pick higher values if you want a faster migration rate.
+    /// <para>Pick higher values if you want a faster migration rate.</para>
     /// </summary>
     /// <remarks>Allowed range: (0-1]</remarks>
     public float CycleNumberWeight { get; set; } = DEFAULT_CYCLE_NUMBER_WEIGHT;
@@ -80,7 +80,7 @@ public sealed class ActivationRebalancerOptions
     /// <summary>
     /// <para>Represents the weight that is given to the number of silos in the cluster during a rebalancing session.</para>
     /// Changing this value has a far lesser impact on the migration rate than <see cref="CycleNumberWeight"/>, and is suitable for fine-tuning.
-    /// Pick lower values if you want a faster migration rate.
+    /// <para>Pick lower values if you want a faster migration rate.</para>
     /// </summary>
     /// <remarks>Allowed range: [0-1]</remarks>
     public float SiloNumberWeight { get; set; } = DEFAULT_SILO_NUMBER_WEIGHT;

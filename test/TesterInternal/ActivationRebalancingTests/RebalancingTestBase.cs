@@ -1,9 +1,8 @@
 using TestExtensions;
-using Xunit;
-using CsCheck;
 using Xunit.Abstractions;
 using Orleans.Configuration;
 using Orleans.TestingHost;
+using Orleans.Runtime.Placement;
 
 namespace UnitTests.ActivationRebalancingTests;
 
@@ -32,8 +31,26 @@ public abstract class RebalancingTestBase : BaseTestClusterFixture
         MgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
     }
 
-    protected static ulong GetActivationCount(DetailedGrainStatistic[] stats, SiloAddress silo) =>
-        (ulong)stats.Count(x => x.SiloAddress.Equals(silo));
+    protected static int GetActivationCount(DetailedGrainStatistic[] stats, SiloAddress silo) =>
+        stats.Count(x => x.SiloAddress.Equals(silo));
+
+    protected void AddTestActivations(List<Task> tasks, SiloAddress silo, int count)
+    {
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, silo);
+        for (var i = 0; i < count; i++)
+        {
+            tasks.Add(GrainFactory.GetGrain<IRebalancingTestGrain>(Guid.NewGuid()).Ping());
+        }
+    }
+
+    protected static int CalculateVariance(int[] values)
+    {
+        var mean = values.Average();
+        var sumSqrtDiff = values.Select(x => (x - mean) * (x - mean)).Sum();
+        var variance = sumSqrtDiff / (values.Length - 1);
+
+        return (int)variance;
+    }
 
     public override async Task InitializeAsync()
     {
@@ -47,7 +64,7 @@ public abstract class RebalancingTestBase : BaseTestClusterFixture
     public class Fixture : BaseTestClusterFixture
     {
         public static readonly TimeSpan RebalancerDueTime = TimeSpan.FromSeconds(5);
-        public static readonly TimeSpan SessionCyclePeriod = TimeSpan.FromSeconds(5);
+        public static readonly TimeSpan SessionCyclePeriod = TimeSpan.FromSeconds(3);
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
