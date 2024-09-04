@@ -6,7 +6,7 @@ using Orleans.Concurrency;
 namespace Orleans.Runtime.GrainDirectory;
 
 [Alias("IGrainDirectoryReplica")]
-internal interface IGrainDirectoryReplica : ISystemTarget
+internal interface IGrainDirectoryPartition : ISystemTarget
 {
     [Alias("RegisterAsync")]
     ValueTask<DirectoryResult<GrainAddress>> RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration);
@@ -18,21 +18,21 @@ internal interface IGrainDirectoryReplica : ISystemTarget
     ValueTask<DirectoryResult<bool>> DeregisterAsync(MembershipVersion version, GrainAddress address);
 
     [Alias("GetSnapshotAsync")]
-    ValueTask<GrainDirectoryPartitionSnapshot?> GetSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRangeCollection ranges);
+    ValueTask<GrainDirectoryPartitionSnapshot?> GetSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range);
 
     [Alias("AcknowledgeSnapshotTransferAsync")]
-    ValueTask<bool> AcknowledgeSnapshotTransferAsync(SiloAddress owner, MembershipVersion version);
+    ValueTask<bool> AcknowledgeSnapshotTransferAsync(SiloAddress silo, int partitionIndex, MembershipVersion version);
 }
 
 [Alias("IGrainDirectoryReplicaClient")]
-internal interface IGrainDirectoryReplicaClient : ISystemTarget
+internal interface IGrainDirectoryClient : ISystemTarget
 {
     [Alias("GetRegisteredActivations")]
-    ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRangeCollection ranges, bool isValidation);
+    ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRange range, bool isValidation);
 }
 
 [Alias("IGrainDirectoryReplicaTestHooks")]
-internal interface IGrainDirectoryReplicaTestHooks : ISystemTarget
+internal interface IGrainDirectoryTestHooks : ISystemTarget
 {
     [Alias("CheckIntegrityAsync")]
     ValueTask CheckIntegrityAsync();

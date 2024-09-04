@@ -249,7 +249,7 @@ namespace Orleans.Runtime.Messaging
 
                 if (msg.IsPing())
                 {
-                    this.Log.LogWarning("Droppping expired ping message {Message}", msg);
+                    this.Log.LogWarning("Dropping expired ping message {Message}", msg);
                 }
 
                 return false;

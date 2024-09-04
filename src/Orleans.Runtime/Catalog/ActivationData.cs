@@ -1804,6 +1804,11 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                     _shared.Logger.LogError(exception, "Failed to unregister activation '{Activation}' from directory.", this);
                 }
             }
+            else if (isDirectoryFailure)
+            {
+                // Optimization: forward to the same host to restart activation without needing to invalidate caches.
+                ForwardingAddress ??= Address.SiloAddress;
+            }
         }
         catch (Exception ex)
         {

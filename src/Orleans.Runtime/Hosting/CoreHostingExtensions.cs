@@ -21,6 +21,8 @@ namespace Orleans.Hosting
     /// </summary>
     public static class CoreHostingExtensions
     {
+        private static readonly ServiceDescriptor DirectoryDescriptor = ServiceDescriptor.Singleton<DistributedGrainDirectory, DistributedGrainDirectory>();
+
         /// <summary>
         /// Add <see cref="Activity.Current"/> propagation through grain calls.
         /// Note: according to <see cref="ActivitySource.StartActivity(string, ActivityKind)"/> activity will be created only when any listener for activity exists <see cref="ActivitySource.HasListeners()"/> and <see cref="ActivityListener.Sample"/> returns <see cref="ActivitySamplingResult.PropagationData"/>.
@@ -161,11 +163,12 @@ namespace Orleans.Hosting
             }
 
             // Distributed Grain Directory
-            services.TryAddSingleton<GrainDirectoryReplica>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainDirectoryReplica>();
-            services.TryAddSingleton<DistributedGrainDirectory>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DistributedGrainDirectory>();
-            services.AddGrainDirectory<DistributedGrainDirectory>(name, (sp, name) => sp.GetRequiredService<DistributedGrainDirectory>());
+            services.TryAddSingleton<DirectoryMembershipService>();
+            if (!services.Contains(DirectoryDescriptor))
+            {
+                services.Add(DirectoryDescriptor);
+                services.AddGrainDirectory<DistributedGrainDirectory>(name, (sp, name) => sp.GetRequiredService<DistributedGrainDirectory>());
+            }
 
             return siloBuilder;
         }

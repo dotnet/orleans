@@ -370,6 +370,7 @@ namespace Orleans.Runtime.Messaging
                     message.AddToCacheInvalidationHeader(oldAddress, validAddress: destination);
                 }
 
+                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug(exc, "Forwarding {Message} to '{ForwardingAddress}' after '{FailedOperation}'", message, forwardingAddress, failedOperation);
                 forwardingSucceeded = this.TryForwardMessage(message, forwardingAddress);
             }
             catch (Exception exc2)
@@ -419,6 +420,7 @@ namespace Orleans.Runtime.Messaging
 
             message.ForwardCount = message.ForwardCount + 1;
             MessagingProcessingInstruments.OnDispatcherMessageForwared(message);
+
             ResendMessageImpl(message, forwardingAddress);
             return true;
         }

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -9,8 +10,13 @@ namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed partial class GrainDirectoryReplica
 {
-    async ValueTask<DirectoryResult<GrainAddress>> IGrainDirectoryReplica.RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration)
+    async ValueTask<DirectoryResult<GrainAddress>> IGrainDirectoryPartition.RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration)
     {
+        var gid = (GrainId)RequestContext.Get("gid");
+        if (!gid.Equals(GrainId))
+        {
+            Debug.Fail("1) what");
+        }
         ArgumentNullException.ThrowIfNull(address);
         if (_logger.IsEnabled(LogLevel.Trace))
         {
@@ -28,8 +34,13 @@ internal sealed partial class GrainDirectoryReplica
         return DirectoryResult.FromResult(RegisterCore(address, currentRegistration), version);
     }
 
-    async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryReplica.LookupAsync(MembershipVersion version, GrainId grainId)
+    async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryPartition.LookupAsync(MembershipVersion version, GrainId grainId)
     {
+        var gid = (GrainId)RequestContext.Get("gid");
+        if (!gid.Equals(GrainId))
+        {
+            Debug.Fail("1) what");
+        }
         if (_logger.IsEnabled(LogLevel.Trace))
         {
             _logger.LogTrace("LookupAsync('{Version}', '{GrainId}')", version, grainId);
@@ -45,8 +56,13 @@ internal sealed partial class GrainDirectoryReplica
         return DirectoryResult.FromResult(LookupCore(grainId), version);
     }
 
-    async ValueTask<DirectoryResult<bool>> IGrainDirectoryReplica.DeregisterAsync(MembershipVersion version, GrainAddress address)
+    async ValueTask<DirectoryResult<bool>> IGrainDirectoryPartition.DeregisterAsync(MembershipVersion version, GrainAddress address)
     {
+        var gid = (GrainId)RequestContext.Get("gid");
+        if (!gid.Equals(GrainId))
+        {
+            Debug.Fail("1) what");
+        }
         ArgumentNullException.ThrowIfNull(address);
         if (_logger.IsEnabled(LogLevel.Trace))
         {
@@ -107,5 +123,5 @@ internal sealed partial class GrainDirectoryReplica
         return existing;
     }
 
-    private bool IsSiloDead(GrainAddress existing) => _clusterMembershipService.CurrentSnapshot.GetSiloStatus(existing.SiloAddress) == SiloStatus.Dead;
+    private bool IsSiloDead(GrainAddress existing) => _directoryMembershipService.CurrentView.ClusterMembershipSnapshot.GetSiloStatus(existing.SiloAddress) == SiloStatus.Dead;
 }

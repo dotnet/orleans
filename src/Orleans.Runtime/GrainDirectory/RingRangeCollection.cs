@@ -15,9 +15,9 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
 {
     public RingRangeCollection(ImmutableArray<RingRange> ranges)
     {
+#if DEBUG
         Debug.Assert(!ranges.IsDefault);
 
-#if DEBUG
         // Ranges must be in sorted order and must not overlap with each other.
         for (var i = 1; i < ranges.Length; i++)
         {
@@ -33,7 +33,6 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
             Debug.Assert(!ranges[0].Intersects(ranges[^1]));
         }
 #endif
-
         Ranges = ranges;
     }
 

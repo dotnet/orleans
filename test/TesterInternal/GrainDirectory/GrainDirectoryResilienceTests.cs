@@ -21,7 +21,7 @@ internal class MyDirectoryTestGrain : Grain, IMyDirectoryTestGrain
 }
 
 [TestCategory("SlowBVT"), TestCategory("Directory")]
-public sealed class DistributedGrainDirectoryResilienceTests(ITestOutputHelper output)
+public sealed class GrainDirectoryResilienceTests(ITestOutputHelper output)
 {
     /// <summary>
     /// Cluster chaos test: tests directory functionality & integrity while starting/stopping/killing silos frequently.
@@ -96,11 +96,22 @@ public sealed class DistributedGrainDirectoryResilienceTests(ITestOutputHelper o
                             await clusterOperation;
 
                             // Check integrity
+                            var integrityChecks = new List<Task>();
                             foreach (var silo in testCluster.Silos)
                             {
                                 var address = silo.SiloAddress;
-                                var replica = ((IInternalGrainFactory)client).GetSystemTarget<IGrainDirectoryReplicaTestHooks>(Constants.DirectoryReplicaType, address);
-                                await replica.CheckIntegrityAsync();
+                                for (var partitionIndex = 0; partitionIndex < DirectoryMembershipSnapshot.PartitionsPerSilo; partitionIndex++)
+                                {
+                                    var replica = ((IInternalGrainFactory)client).GetSystemTarget<IGrainDirectoryTestHooks>(GrainDirectoryReplica.CreateGrainId(address, partitionIndex).GrainId);
+                                    RequestContext.Set("gid", replica.GetGrainId());
+                                    integrityChecks.Add(replica.CheckIntegrityAsync().AsTask());
+                                }
+                            }
+
+                            await Task.WhenAll(integrityChecks);
+                            foreach (var task in integrityChecks)
+                            {
+                                await task;
                             }
 
                             clusterOperation = Task.Run(async () =>
@@ -165,61 +176,10 @@ public sealed class DistributedGrainDirectoryResilienceTests(ITestOutputHelper o
 #pragma warning disable ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             //siloBuilder.AddDistributedGrainDirectory();
 #pragma warning restore ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-            siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.GrainDirectory.GrainDirectoryReplica", LogLevel.Trace));
-            siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.GrainDirectory.DistributedGrainDirectory", LogLevel.Information));
+            siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.Messaging.MessageCenter", LogLevel.Debug));
+            //siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.GrainDirectory.GrainDirectoryReplica", LogLevel.Trace));
+            //siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.GrainDirectory.DistributedGrainDirectory", LogLevel.Information));
         }
     }
 }
 
-internal static partial class DumpCapture
-{
-    internal static FileInfo CreateMiniDump(string infix) => CreateMiniDump(Process.GetCurrentProcess(), infix);
-    internal static FileInfo CreateMiniDump(Process process, string infix, MiniDumpType dumpType = MiniDumpType.MiniDumpWithFullMemory)
-    {
-        var dumpFileName = $@"{process.ProcessName}-{infix}-{DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss-fffZ", CultureInfo.InvariantCulture)}.dmp";
-
-        using (var stream = File.Create(dumpFileName))
-        {
-            var result = MiniDumpWriteDump(
-                process.Handle,
-                process.Id,
-                stream.SafeFileHandle.DangerousGetHandle(),
-                dumpType,
-                IntPtr.Zero,
-                IntPtr.Zero,
-                IntPtr.Zero);
-        }
-
-        return new FileInfo(dumpFileName);
-    }
-
-    [System.Runtime.InteropServices.DllImport("Dbghelp.dll")]
-    public static extern bool MiniDumpWriteDump(
-        IntPtr hProcess,
-        int processId,
-        IntPtr hFile,
-        MiniDumpType dumpType,
-        IntPtr exceptionParam,
-        IntPtr userStreamParam,
-        IntPtr callbackParam);
-
-    internal enum MiniDumpType
-    {
-        MiniDumpNormal = 0x00000000,
-        MiniDumpWithDataSegs = 0x00000001,
-        MiniDumpWithFullMemory = 0x00000002,
-        MiniDumpWithHandleData = 0x00000004,
-        MiniDumpFilterMemory = 0x00000008,
-        MiniDumpScanMemory = 0x00000010,
-        MiniDumpWithUnloadedModules = 0x00000020,
-        MiniDumpWithIndirectlyReferencedMemory = 0x00000040,
-        MiniDumpFilterModulePaths = 0x00000080,
-        MiniDumpWithProcessThreadData = 0x00000100,
-        MiniDumpWithPrivateReadWriteMemory = 0x00000200,
-        MiniDumpWithoutOptionalData = 0x00000400,
-        MiniDumpWithFullMemoryInfo = 0x00000800,
-        MiniDumpWithThreadInfo = 0x00001000,
-        MiniDumpWithCodeSegs = 0x00002000,
-        MiniDumpWithoutManagedState = 0x00004000,
-    }
-}

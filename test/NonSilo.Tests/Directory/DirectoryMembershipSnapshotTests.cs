@@ -28,7 +28,7 @@ public sealed class DirectoryMembershipSnapshotTests
         GenClusterMembershipSnapshot.SelectMany(snapshot => Gen.UInt.Array[ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS].Array[snapshot.Members.Count].Select(hashes => 
     {
         var i = 0;
-        return new DirectoryMembershipSnapshot(snapshot, (_, _) => hashes[i++]);
+        return new DirectoryMembershipSnapshot(snapshot, null!, (_, _) => hashes[i++]);
     }));
 
     [Fact]
@@ -36,7 +36,7 @@ public sealed class DirectoryMembershipSnapshotTests
     {
         // As long as the cluster has at least one member, we should be able to find an owner.
         Gen.Select(GenDirectoryMembershipSnapshot, Gen.UInt)
-            .Sample((snapshot, hash) => Assert.Equal(snapshot.Members.Length > 0, snapshot.TryGetOwner(hash, out var owner)));
+            .Sample((snapshot, hash) => Assert.Equal(snapshot.Members.Length > 0, snapshot.TryGetOwner(hash, out var owner, out _)));
     }
 
     [Fact]
@@ -72,7 +72,39 @@ public sealed class DirectoryMembershipSnapshotTests
                 var allRanges = new List<RingRange>();
                 foreach (var member in snapshot.Members)
                 {
-                    foreach (var range in snapshot.GetRanges(member))
+                    Assert.Equal(snapshot.GetMemberRanges(member).Sum(range => range.Size), snapshot.GetMemberRangesByPartition(member).Sum(range => range.Size));
+                    foreach (var range in snapshot.GetMemberRanges(member))
+                    {
+                        allRanges.Add(range);
+                        sum += range.Size;
+                    }
+                }
+
+
+                Assert.Equal(uint.MaxValue, sum);
+
+                var allRangesCollection = RingRangeCollection.Create(allRanges);
+
+                Assert.Equal(uint.MaxValue, allRangesCollection.Size);
+                Assert.Equal(100f, allRangesCollection.SizePercent);
+                Assert.False(allRangesCollection.IsEmpty);
+                Assert.False(allRangesCollection.IsDefault);
+                Assert.True(allRangesCollection.IsFull);
+            });
+    }
+
+    [Fact]
+    public void MemberRangesCoverRingTest()
+    {
+        // The union of all member ranges should cover the entire ring.
+        GenDirectoryMembershipSnapshot.Where(s => s.Members.Length > 0)
+            .Sample(snapshot =>
+            {
+                uint sum = 0;
+                var allRanges = new List<RingRange>();
+                foreach (var member in snapshot.Members)
+                {
+                    foreach (var range in snapshot.GetMemberRangesByPartition(member))
                     {
                         allRanges.Add(range);
                         sum += range.Size;

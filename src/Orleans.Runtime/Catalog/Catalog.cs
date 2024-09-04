@@ -67,20 +67,21 @@ namespace Orleans.Runtime
         /// <param name="activation"></param>
         public void UnregisterMessageTarget(IGrainContext activation)
         {
-            if (logger.IsEnabled(LogLevel.Trace))
+            if (activations.RemoveTarget(activation))
             {
-                logger.LogTrace("Unregistering activation {Activation}", activation.ToString());
+                if (logger.IsEnabled(LogLevel.Trace))
+                {
+                    logger.LogTrace("Unregistered activation {Activation}", activation);
+                }
+
+                // this should be removed once we've refactored the deactivation code path. For now safe to keep.
+                if (activation is ICollectibleGrainContext collectibleActivation)
+                {
+                    activationCollector.TryCancelCollection(collectibleActivation);
+                }
+
+                CatalogInstruments.ActivationsDestroyed.Add(1);
             }
-
-            activations.RemoveTarget(activation);
-
-            // this should be removed once we've refactored the deactivation code path. For now safe to keep.
-            if (activation is ICollectibleGrainContext collectibleActivation)
-            {
-                activationCollector.TryCancelCollection(collectibleActivation);
-            }
-
-            CatalogInstruments.ActivationsDestroyed.Add(1);
         }
 
         /// <summary>

@@ -10,11 +10,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Internal;
 
 namespace Orleans.Runtime.Scheduler;
 
-[DebuggerDisplay("WorkItemGroup Name={Name} State={state}")]
+[DebuggerDisplay("WorkItemGroup Context={GrainContext} State={state}")]
 internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
 {
     private enum WorkGroupStatus : byte
