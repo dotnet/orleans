@@ -1,14 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.Placement;
 using Orleans.Runtime;
 using System.Diagnostics.CodeAnalysis;
-using System.Threading.Tasks;
-using System.Threading;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
-using Orleans.Internal;
-using Orleans.Runtime.Placement;
+using Orleans.Placement.Rebalancing;
+using Orleans.Runtime.Placement.Rebalancing;
 
 namespace Orleans.Hosting;
 
@@ -26,29 +22,26 @@ public static class ActivationRebalancerExtensions
     /// </remarks>
     [Experimental("ORLEANSEXP002")]
     public static ISiloBuilder AddActivationRebalancer(this ISiloBuilder builder) =>
-        builder.AddActivationRebalancer<FixedBackoffProvider>();
+        builder.ConfigureServices(service => service.AddActivationRebalancer<FailedSessionBackoffProvider>());
 
     /// <inheritdoc cref="AddActivationRebalancer(ISiloBuilder)"/>.
     /// <typeparam name="TProvider">Custom backoff provider for determining next session after a failed attempt.</typeparam>
     [Experimental("ORLEANSEXP002")]
-    public static ISiloBuilder AddActivationRebalancer<TProvider>(this ISiloBuilder builder)
+    public static IServiceCollection AddActivationRebalancer<TProvider>(this IServiceCollection services)
         where TProvider : class, IFailedRebalancingSessionBackoffProvider
     {
-        builder.AddStartupTask<StartupTask>();
-        builder.Services.AddSingleton<TProvider>();
-        builder.Services.AddFromExisting<IFailedRebalancingSessionBackoffProvider, TProvider>();
-        builder.Services.AddTransient<IConfigurationValidator, ActivationRebalancerOptionsValidator>();
+        services.AddSingleton<ActivationRebalancerMonitor>();
+        services.AddFromExisting<IActivationRebalancer, ActivationRebalancerMonitor>();
+        services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationRebalancerMonitor>();
+        services.AddTransient<IConfigurationValidator, ActivationRebalancerOptionsValidator>();
         
-        return builder;
-    }
+        services.AddSingleton<TProvider>();
+        services.AddFromExisting<IFailedRebalancingSessionBackoffProvider, TProvider>();
+        if (typeof(TProvider).IsAssignableTo(typeof(ILifecycleParticipant<ISiloLifecycle>)))
+        {
+            services.AddFromExisting(typeof(ILifecycleParticipant<ISiloLifecycle>), typeof(TProvider));
+        }
 
-    private sealed class StartupTask(IGrainFactory grainFactory) : IStartupTask
-    {
-        public Task Execute(CancellationToken cancellationToken) =>
-            grainFactory.GetGrain<IInternalActivationRebalancerGrain>(
-                IActivationRebalancerGrain.Key).StartRebalancer();
+        return services;
     }
-
-    private sealed class FixedBackoffProvider(IOptions<ActivationRebalancerOptions> options) :
-        FixedBackoff(options.Value.SessionCyclePeriod), IFailedRebalancingSessionBackoffProvider;
 }

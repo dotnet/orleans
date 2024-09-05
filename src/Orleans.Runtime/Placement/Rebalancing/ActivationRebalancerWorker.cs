@@ -11,28 +11,34 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Placement;
+using Orleans.Placement.Rebalancing;
 using Orleans.Statistics;
 
-#pragma warning disable IDE0130 // For more granular log filtering
-namespace Orleans.Runtime.Placement.Rebalancing;
-#pragma warning restore IDE0130
-
 #nullable enable
+
+namespace Orleans.Runtime.Placement.Rebalancing;
 
 // See: https://www.ledjonbehluli.com/posts/orleans_adaptive_rebalancing/
 
 [KeepAlive, Immovable]
-internal sealed partial class ActivationRebalancerGrain(
+internal sealed partial class ActivationRebalancerWorker(
     TimeProvider timeProvider,
     DeploymentLoadPublisher loadPublisher,
     ILoggerFactory loggerFactory,
     ISiloStatusOracle siloStatusOracle,
     IInternalGrainFactory grainFactory,
+    ILocalSiloDetails localSiloDetails,
     IOptions<ActivationRebalancerOptions> options,
     IFailedRebalancingSessionBackoffProvider backoffProvider)
-        : Grain, IInternalActivationRebalancerGrain, ISiloStatisticsChangeListener
+        : Grain, IActivationRebalancerWorker, ISiloStatisticsChangeListener, IGrainMigrationParticipant
 {
     private record struct ResourceStatistics(long MemoryUsage, int ActivationCount);
+
+    [GenerateSerializer, Immutable, Alias("RebalancerState")]
+    internal record struct RebalancerState(
+        int StaleCycles, int FailedSessions,
+        int RebalancingCycle, double LatestEntropy,
+        DateTime? DisabledUntil, ImmutableArray<RebalancingStatistics> Statistics);
 
     private enum StopReason
     {
@@ -54,6 +60,8 @@ internal sealed partial class ActivationRebalancerGrain(
         RebalancerSuspended
     }
 
+    private const string StateKey = "REBALANCER_STATE";
+
     private int _staleCycles;
     private int _failedSessions;
     private int _rebalancingCycle;
@@ -61,15 +69,32 @@ internal sealed partial class ActivationRebalancerGrain(
     private DateTime? _disabledUntil;
     private IGrainTimer? _sessionTimer;
     private IGrainTimer? _triggerTimer;
+    private IGrainTimer? _monitorTimer;
 
     private readonly ActivationRebalancerOptions _options = options.Value;
     private readonly Dictionary<SiloAddress, ResourceStatistics> _siloStatistics = [];
     private readonly Dictionary<SiloAddress, RebalancingStatistics> _rebalancingStatistics = [];
-    private readonly ILogger<ActivationRebalancerGrain> _logger = loggerFactory.CreateLogger<ActivationRebalancerGrain>();
+    private readonly ILogger<ActivationRebalancerWorker> _logger = loggerFactory.CreateLogger<ActivationRebalancerWorker>();
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
+        _monitorTimer = this.RegisterGrainTimer(PeriodicallyReportToMonitor, new()
+        {
+            DueTime = TimeSpan.Zero,
+            Period = IActivationRebalancerMonitor.WorkerReportPeriod,
+        });
+
+        _triggerTimer = this.RegisterGrainTimer(PeriodicallyTriggerRebalancing, new()
+        {
+            Interleave = true,
+            Period = 0.5 * _options.SessionCyclePeriod, // make trigger-period twice as short as the session cycle-period.
+            DueTime = _options.RebalancerDueTime
+        });
+
+        LogScheduledToStart(_options.RebalancerDueTime);
+
         loadPublisher.SubscribeToStatisticsChangeEvents(this);
+
         return Task.CompletedTask;
     }
 
@@ -79,7 +104,38 @@ internal sealed partial class ActivationRebalancerGrain(
         return Task.CompletedTask;
     }
 
-    public void RemoveSilo(SiloAddress address) => _siloStatistics.Remove(address);
+    public void OnDehydrate(IDehydrationContext context)
+    {
+        _rebalancingStatistics.Remove(localSiloDetails.SiloAddress); // remove stats as we are shutting-down
+
+        context.TryAddValue<RebalancerState>(StateKey,
+            new(_staleCycles, _failedSessions, _rebalancingCycle,
+                _previousEntropy, _disabledUntil, [.. _rebalancingStatistics.Values]));
+    }
+    
+    public void OnRehydrate(IRehydrationContext context)
+    {
+        if (context.TryGetValue<RebalancerState?>(StateKey, out var rebalancerState) &&
+            rebalancerState is { } state)
+        {
+            _rebalancingCycle = state.RebalancingCycle;
+            _staleCycles = state.StaleCycles;
+            _failedSessions = state.FailedSessions;
+            _previousEntropy = state.LatestEntropy;
+            _disabledUntil = state.DisabledUntil;
+
+            foreach (var statistics in state.Statistics)
+            {
+                _rebalancingStatistics.TryAdd(statistics.SiloAddress, statistics);
+            }
+        }
+    }
+
+    public void RemoveSilo(SiloAddress address)
+    {
+        _siloStatistics.Remove(address);
+        _rebalancingStatistics.Remove(address);
+    }
 
     public void SiloStatisticsChangeNotification(SiloAddress address, SiloRuntimeStatistics statistics)
     {
@@ -89,46 +145,42 @@ internal sealed partial class ActivationRebalancerGrain(
 
     public ValueTask<ImmutableArray<RebalancingStatistics>> GetStatistics() => new([.. _rebalancingStatistics.Values]);
 
-    public Task StartRebalancer()
-    {
-        ThrowIfInvalidGrainKey();
-
-        if (_triggerTimer is null)
-        {
-            var period = 0.5 * _options.SessionCyclePeriod; // make trigger-period twice as short as the session cycle-period.
-
-            _triggerTimer = this.RegisterGrainTimer(PeriodicallyTriggerRebalancing, new()
-            {
-                Interleave = true,
-                Period = period,
-                DueTime = _options.RebalancerDueTime
-            });
-
-            LogScheduledToStart(_options.RebalancerDueTime);
-        }
-
-        return Task.CompletedTask;
-    }
+    public ValueTask<SiloAddress> StartRebalancer() => new(localSiloDetails.SiloAddress);
 
     public Task ResumeRebalancing()
     {
-        ThrowIfInvalidGrainKey();
         StartSession();
-
         return Task.CompletedTask;
     }
 
     public Task SuspendRebalancing(TimeSpan? duration)
     {
-        ThrowIfInvalidGrainKey();
         StopSession(StopReason.RebalancerSuspended, duration);
 
         if (duration.HasValue)
+        {
             LogSuspendedFor(duration.Value);
+        }
         else
+        {
             LogSuspended();
+        }
 
         return Task.CompletedTask;
+    }
+
+    private async Task PeriodicallyReportToMonitor()
+    {
+        var tasks = new List<Task>();
+
+        foreach (var silo in siloStatusOracle.GetActiveSilos())
+        {
+            tasks.Add(grainFactory.GetSystemTarget<IActivationRebalancerMonitor>
+                (Constants.ActivationRebalancerMonitorType, silo)
+                .Report(localSiloDetails.SiloAddress, [.. _rebalancingStatistics.Values]));
+        }
+
+        await Task.WhenAll(tasks);
     }
 
     private Task PeriodicallyTriggerRebalancing()
@@ -386,16 +438,6 @@ internal sealed partial class ActivationRebalancerGrain(
         }
 
         return pairs;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void ThrowIfInvalidGrainKey()
-    {
-        if (this.GetPrimaryKeyLong() != IActivationRebalancerGrain.Key)
-        {
-            throw new InvalidOperationException(
-                $"Creation of an activation with any key other than {IActivationRebalancerGrain.Key} is prohibited.");
-        }
     }
 
     private void StartSession()

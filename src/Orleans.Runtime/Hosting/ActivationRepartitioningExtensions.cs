@@ -5,7 +5,6 @@ using Orleans.Configuration;
 using Orleans.Runtime.Placement.Repartitioning;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Placement.Repartitioning;
-using Orleans.Runtime.Placement;
 
 namespace Orleans.Hosting;
 

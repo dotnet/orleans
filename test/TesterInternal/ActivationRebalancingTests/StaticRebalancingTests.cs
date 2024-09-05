@@ -4,8 +4,8 @@ using Xunit.Abstractions;
 namespace UnitTests.ActivationRebalancingTests;
 
 [TestCategory("Functional"), TestCategory("ActivationRebalancing")]
-public class StaticRebalancingTests(RebalancingTestBase.Fixture fixture, ITestOutputHelper output)
-    : RebalancingTestBase(fixture, output), IClassFixture<RebalancingTestBase.Fixture>
+public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper output)
+    : RebalancingTestBase<RebalancerFixture>(fixture, output), IClassFixture<RebalancerFixture>
 { 
     [Fact]
     public async Task Should_Move_Activations_From_Silo1_And_Silo3_To_Silo2_And_Silo4()
@@ -41,7 +41,7 @@ public class StaticRebalancingTests(RebalancingTestBase.Fixture fixture, ITestOu
         var index = 0;
         while (index < 3)
         {
-            await Task.Delay(Fixture.SessionCyclePeriod);
+            await Task.Delay(RebalancerFixture.SessionCyclePeriod);
             stats = await MgmtGrain.GetDetailedGrainStatistics();
 
             silo1Activations = GetActivationCount(stats, Silo1);

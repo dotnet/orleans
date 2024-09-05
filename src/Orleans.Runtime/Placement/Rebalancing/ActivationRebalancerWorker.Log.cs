@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Placement.Rebalancing;
 
-internal partial class ActivationRebalancerGrain
+internal partial class ActivationRebalancerWorker
 {
     [LoggerMessage(Level = LogLevel.Trace, Message = "Activation rebalancer has been scheduled to start after {DueTime}.")]
     private partial void LogScheduledToStart(TimeSpan dueTime);

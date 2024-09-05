@@ -4,8 +4,8 @@ using Xunit.Abstractions;
 namespace UnitTests.ActivationRebalancingTests;
 
 [TestCategory("Functional"), TestCategory("ActivationRebalancing")]
-public class DynamicRebalancingTests(RebalancingTestBase.Fixture fixture, ITestOutputHelper output)
-    : RebalancingTestBase(fixture, output), IClassFixture<RebalancingTestBase.Fixture>
+public class DynamicRebalancingTests(RebalancerFixture fixture, ITestOutputHelper output)
+    : RebalancingTestBase<RebalancerFixture>(fixture, output), IClassFixture<RebalancerFixture>
 {
     [Fact]
     public async Task Should_Move_Activations_From_Silo1_And_Silo3_To_Silo2_And_Silo4_While_New_Activations_Are_Created()
@@ -48,7 +48,7 @@ public class DynamicRebalancingTests(RebalancingTestBase.Fixture fixture, ITestO
 
         while (index < 5)
         {
-            await Task.Delay(Fixture.SessionCyclePeriod);
+            await Task.Delay(RebalancerFixture.SessionCyclePeriod);
 
             if (index % 2 == 0)
             {

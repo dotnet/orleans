@@ -3,21 +3,24 @@ using Xunit.Abstractions;
 using Orleans.Configuration;
 using Orleans.TestingHost;
 using Orleans.Runtime.Placement;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Placement.Rebalancing;
 
 namespace UnitTests.ActivationRebalancingTests;
 
-public abstract class RebalancingTestBase : BaseTestClusterFixture
+public abstract class RebalancingTestBase<TFixture> : BaseTestClusterFixture
+    where TFixture : BaseTestClusterFixture
 {
     protected SiloAddress Silo1 { get; }
     protected SiloAddress Silo2 { get; }
     protected SiloAddress Silo3 { get; }
     protected SiloAddress Silo4 { get; }
 
-    protected ITestOutputHelper OutputHelper { get; }
-    protected new IGrainFactory GrainFactory { get; }
-    protected IManagementGrain MgmtGrain { get; }
+    internal ITestOutputHelper OutputHelper { get; }
+    internal new IInternalGrainFactory GrainFactory { get; }
+    internal IManagementGrain MgmtGrain { get; }
 
-    protected RebalancingTestBase(Fixture fixture, ITestOutputHelper output)
+    protected RebalancingTestBase(TFixture fixture, ITestOutputHelper output)
     {
         var silos = fixture.HostedCluster.GetActiveSilos().Select(h => h.SiloAddress).OrderBy(s => s).ToArray();
 
@@ -27,7 +30,7 @@ public abstract class RebalancingTestBase : BaseTestClusterFixture
         Silo4 = silos[3];
 
         OutputHelper = output;
-        GrainFactory = fixture.HostedCluster.GrainFactory;
+        GrainFactory = fixture.HostedCluster.InternalGrainFactory;
         MgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
     }
 
@@ -60,37 +63,37 @@ public abstract class RebalancingTestBase : BaseTestClusterFixture
 
         await base.InitializeAsync();
     }
+}
 
-    public class Fixture : BaseTestClusterFixture
+public class RebalancerFixture : BaseTestClusterFixture
+{
+    public static readonly TimeSpan RebalancerDueTime = TimeSpan.FromSeconds(5);
+    public static readonly TimeSpan SessionCyclePeriod = TimeSpan.FromSeconds(3);
+
+    protected override void ConfigureTestCluster(TestClusterBuilder builder)
     {
-        public static readonly TimeSpan RebalancerDueTime = TimeSpan.FromSeconds(5);
-        public static readonly TimeSpan SessionCyclePeriod = TimeSpan.FromSeconds(3);
+        builder.Options.InitialSilosCount = 4;
+        builder.Options.UseRealEnvironmentStatistics = true;
+        builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+    }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
-        {
-            builder.Options.InitialSilosCount = 4;
-            builder.Options.UseRealEnvironmentStatistics = true;
-            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-        }
-
-        private class SiloConfigurator : ISiloConfigurator
-        {
-            public void Configure(ISiloBuilder hostBuilder)
+    private class SiloConfigurator : ISiloConfigurator
+    {
+        public void Configure(ISiloBuilder hostBuilder)
 #pragma warning disable ORLEANSEXP002
-                => hostBuilder
-                    .Configure<SiloMessagingOptions>(o =>
-                    {
-                        o.AssumeHomogenousSilosForTesting = true;
-                        o.ClientGatewayShutdownNotificationTimeout = default;
-                    })
-                    .Configure<ActivationRebalancerOptions>(o =>
-                    {
-                        o.RebalancerDueTime = RebalancerDueTime;
-                        o.SessionCyclePeriod = SessionCyclePeriod;
-                    })
-                    .AddActivationRebalancer();
+            => hostBuilder
+                .Configure<SiloMessagingOptions>(o =>
+                {
+                    o.AssumeHomogenousSilosForTesting = true;
+                    o.ClientGatewayShutdownNotificationTimeout = default;
+                })
+                .Configure<ActivationRebalancerOptions>(o =>
+                {
+                    o.RebalancerDueTime = RebalancerDueTime;
+                    o.SessionCyclePeriod = SessionCyclePeriod;
+                })
+                .AddActivationRebalancer();
 #pragma warning restore ORLEANSEXP002
-        }
     }
 }
 
