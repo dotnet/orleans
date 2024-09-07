@@ -146,6 +146,26 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>
+        /// Returns the <see cref="IServiceProvider"/> associated with the given <paramref name="silo"/>.
+        /// </summary>
+        /// <param name="silo">The silo process to the the service provider for.</param>
+        /// <remarks>If <paramref name="silo"/> is <see langword="null"/> one of the existing silos will be picked randomly.</remarks>
+        public IServiceProvider GetSiloServiceProvider(SiloAddress silo = null)
+        {
+            if (silo != null)
+            {
+                var handle = Silos.FirstOrDefault(x => x.SiloAddress.Equals(silo));
+                return handle != null ? ((InProcessSiloHandle)handle).SiloHost.Services :
+                    throw new ArgumentException($"The provided silo address '{silo}' is not a real silo process.");
+            }
+            else
+            {
+                var index = Random.Shared.Next(Silos.Count);
+                return ((InProcessSiloHandle)Silos[index]).SiloHost.Services;
+            }
+        }
+
+        /// <summary>
         /// Deploys the cluster using the specified configuration and starts the client in-process.
         /// It will start the number of silos defined in <see cref="TestClusterOptions.InitialSilosCount"/>.
         /// </summary>

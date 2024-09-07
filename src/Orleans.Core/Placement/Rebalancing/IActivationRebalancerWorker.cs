@@ -8,15 +8,9 @@ namespace Orleans.Placement.Rebalancing;
 internal interface IActivationRebalancerWorker : IGrainWithIntegerKey
 {
     /// <summary>
-    /// Returns latest report.
+    /// Returns the most recent rebalancing report.
     /// </summary>
     [AlwaysInterleave, Alias("GetReport")] ValueTask<RebalancingReport> GetReport();
-
-    /// <summary>
-    /// Wakes up the rebalancer and starts it if its not started yet.
-    /// </summary>
-    /// <returns>The most recent rebalancing report.</returns>
-    [Alias("StartRebalancer")] ValueTask<RebalancingReport> Ping();
 
     /// <summary>
     /// Resumes rebalancing if its suspended, otherwise its a no-op.

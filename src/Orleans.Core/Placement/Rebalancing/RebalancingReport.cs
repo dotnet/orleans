@@ -37,7 +37,7 @@ public readonly struct RebalancingReport
     [Id(1)] public required RebalancerStatus Status { get; init; }
 
     /// <summary>
-    /// If suspended, for how long (<see langword="null"/> means indefinitely).
+    /// The amount of time the rebalancer is suspended (if at all).
     /// </summary>
     /// <remarks>This will always be <see langword="null"/> if <see cref="Status"/> is <see cref="RebalancerStatus.Executing"/>.</remarks>
     [Id(2)] public TimeSpan? SuspensionDuration { get; init; }

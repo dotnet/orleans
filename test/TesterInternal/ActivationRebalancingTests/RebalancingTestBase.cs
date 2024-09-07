@@ -4,13 +4,14 @@ using Orleans.Configuration;
 using Orleans.TestingHost;
 using Orleans.Runtime.Placement;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Placement.Rebalancing;
 
 namespace UnitTests.ActivationRebalancingTests;
 
 public abstract class RebalancingTestBase<TFixture> : BaseTestClusterFixture
     where TFixture : BaseTestClusterFixture
 {
+    protected TestCluster Cluster { get; }
+
     protected SiloAddress Silo1 { get; }
     protected SiloAddress Silo2 { get; }
     protected SiloAddress Silo3 { get; }
@@ -29,6 +30,7 @@ public abstract class RebalancingTestBase<TFixture> : BaseTestClusterFixture
         Silo3 = silos[2];
         Silo4 = silos[3];
 
+        Cluster = fixture.HostedCluster;
         OutputHelper = output;
         GrainFactory = fixture.HostedCluster.InternalGrainFactory;
         MgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
@@ -79,9 +81,9 @@ public class RebalancerFixture : BaseTestClusterFixture
 
     private class SiloConfigurator : ISiloConfigurator
     {
-        public void Configure(ISiloBuilder hostBuilder)
+        public void Configure(ISiloBuilder siloBuilder)
 #pragma warning disable ORLEANSEXP002
-            => hostBuilder
+            => siloBuilder
                 .Configure<SiloMessagingOptions>(o =>
                 {
                     o.AssumeHomogenousSilosForTesting = true;

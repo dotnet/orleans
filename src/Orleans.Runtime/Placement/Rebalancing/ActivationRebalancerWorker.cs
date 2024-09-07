@@ -22,7 +22,6 @@ namespace Orleans.Runtime.Placement.Rebalancing;
 
 [KeepAlive, Immovable]
 internal sealed partial class ActivationRebalancerWorker(
-    TimeProvider timeProvider,
     DeploymentLoadPublisher loadPublisher,
     ILoggerFactory loggerFactory,
     ISiloStatusOracle siloStatusOracle,
@@ -32,10 +31,10 @@ internal sealed partial class ActivationRebalancerWorker(
     IFailedRebalancingSessionBackoffProvider backoffProvider)
         : Grain, IActivationRebalancerWorker, ISiloStatisticsChangeListener, IGrainMigrationParticipant
 {
-    private record struct ResourceStatistics(long MemoryUsage, int ActivationCount);
+    private readonly record struct ResourceStatistics(long MemoryUsage, int ActivationCount);
 
     [GenerateSerializer, Immutable, Alias("RebalancerState")]
-    internal record struct RebalancerState(
+    internal readonly record struct RebalancerState(
         int StaleCycles, int FailedSessions,
         int RebalancingCycle, double LatestEntropy,
         DateTime? DisabledUntil, ImmutableArray<RebalancingStatistics> Statistics);
@@ -76,6 +75,16 @@ internal sealed partial class ActivationRebalancerWorker(
     private readonly Dictionary<SiloAddress, RebalancingStatistics> _rebalancingStatistics = [];
     private readonly ILogger<ActivationRebalancerWorker> _logger = loggerFactory.CreateLogger<ActivationRebalancerWorker>();
 
+    private DateTime UtcNow
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Runtime.TimeProvider.GetUtcNow().UtcDateTime;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool IsSuspended(DateTime? suspendedUntil) =>
+        suspendedUntil.HasValue && suspendedUntil.Value > UtcNow;
+
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _monitorTimer = this.RegisterGrainTimer(ReportAllMonitors, new()
@@ -87,7 +96,7 @@ internal sealed partial class ActivationRebalancerWorker(
         _triggerTimer = this.RegisterGrainTimer(TriggerRebalancing, new()
         {
             Interleave = true,
-            Period = 0.5 * _options.SessionCyclePeriod, // make trigger-period half that of the session cycle-period.
+            Period = 0.5 * _options.SessionCyclePeriod, // Make trigger-period half that of the session cycle-period.
             DueTime = _options.RebalancerDueTime
         });
 
@@ -106,7 +115,7 @@ internal sealed partial class ActivationRebalancerWorker(
 
     public void OnDehydrate(IDehydrationContext context)
     {
-        _rebalancingStatistics.Remove(localSiloDetails.SiloAddress); // remove stats as we are shutting-down
+        _rebalancingStatistics.Remove(localSiloDetails.SiloAddress);   // Remove this silo's rebalancing stats, as we are shutting down.
 
         context.TryAddValue<RebalancerState>(StateKey,
             new(_staleCycles, _failedSessions, _rebalancingCycle,
@@ -131,10 +140,10 @@ internal sealed partial class ActivationRebalancerWorker(
         }
     }
 
-    public void RemoveSilo(SiloAddress address)
+    public void RemoveSilo(SiloAddress silo)
     {
-        _siloStatistics.Remove(address);
-        _rebalancingStatistics.Remove(address);
+        _siloStatistics.Remove(silo);
+        _rebalancingStatistics.Remove(silo); // Remove that silo's rebalancing stats, as it has been removed.
     }
 
     public void SiloStatisticsChangeNotification(SiloAddress address, SiloRuntimeStatistics statistics)
@@ -144,8 +153,6 @@ internal sealed partial class ActivationRebalancerWorker(
     }
 
     public ValueTask<RebalancingReport> GetReport() => new(BuildReport());
-
-    public ValueTask<RebalancingReport> Ping() => new(BuildReport());
 
     public async Task ResumeRebalancing()
     {
@@ -185,14 +192,14 @@ internal sealed partial class ActivationRebalancerWorker(
 
     private RebalancingReport BuildReport()
     {
-        var until = _suspendedUntil; // take copy since _triggerTimer interleaves
-        TimeSpan? duration = IsSuspended(until) ? until!.Value - timeProvider.GetUtcNow().DateTime : null;
+        var until = _suspendedUntil; // take a copy since _triggerTimer interleaves
+        var suspended = IsSuspended(until);
 
         return new RebalancingReport()
         {
             Silo = localSiloDetails.SiloAddress,
-            Status = RebalancerStatus.Executing,
-            SuspensionDuration = duration,
+            Status = suspended ? RebalancerStatus.Suspended : RebalancerStatus.Executing,
+            SuspensionDuration = suspended ? until!.Value - UtcNow : null,
             Statistics = [.. _rebalancingStatistics.Values]
         };
     }
@@ -231,7 +238,7 @@ internal sealed partial class ActivationRebalancerWorker(
 
         if (snapshot.Any(x => x.Value.MemoryUsage == 0))
         {
-            LogInvalidSiloMemoryUsage(nameof(IEnvironmentStatisticsProvider));
+            LogInvalidSiloMemory(nameof(IEnvironmentStatisticsProvider));
             return;
         }
 
@@ -353,7 +360,7 @@ internal sealed partial class ActivationRebalancerWorker(
     private void UpdateStatistics(SiloAddress lowSilo, SiloAddress highSilo, int delta)
     {
         Debug.Assert(delta > 0);
-        var now = timeProvider.GetUtcNow().DateTime;
+        var now = UtcNow;
 
         ref var lowStats = ref CollectionsMarshal.GetValueRefOrAddDefault(_rebalancingStatistics, lowSilo, out _);
         lowStats = new()
@@ -446,17 +453,13 @@ internal sealed partial class ActivationRebalancerWorker(
             right--;
         }
 
-        if (left == right) // odd number of silos
+        if (left == right) // Odd number of silos
         {
-            pairs.Add((sorted[left].Key, sorted[left].Key)); // pair this silo with itself 
+            pairs.Add((sorted[left].Key, sorted[left].Key)); // Pair this silo with itself 
         }
 
         return pairs;
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private bool IsSuspended(DateTime? suspendedUntil) =>
-        suspendedUntil.HasValue && suspendedUntil.Value > timeProvider.GetUtcNow();
 
     private void StartSession()
     {
@@ -502,7 +505,14 @@ internal sealed partial class ActivationRebalancerWorker(
             case StopReason.RebalancerSuspended:
                 {
                     _failedSessions = 0;
-                    SuspendFor(duration ?? Timeout.InfiniteTimeSpan);
+                    if (duration.HasValue)
+                    {
+                        SuspendFor(duration.Value);
+                    }
+                    else
+                    {
+                        _suspendedUntil = DateTime.MaxValue;
+                    }
                 }
                 break;
         }
@@ -511,10 +521,10 @@ internal sealed partial class ActivationRebalancerWorker(
 
         void SuspendFor(TimeSpan duration)
         {
-            var suspendFor = timeProvider.GetUtcNow().Add(duration).DateTime;
+            var suspendUntil = UtcNow.Add(duration);
 
-            _suspendedUntil = !_suspendedUntil.HasValue ? suspendFor :
-                (suspendFor > _suspendedUntil ? suspendFor : _suspendedUntil);
+            _suspendedUntil = !_suspendedUntil.HasValue ? suspendUntil :
+                (suspendUntil > _suspendedUntil ? suspendUntil : _suspendedUntil);
         }
     }
 }

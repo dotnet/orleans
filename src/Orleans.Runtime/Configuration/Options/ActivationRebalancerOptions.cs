@@ -25,7 +25,7 @@ public sealed class ActivationRebalancerOptions
     /// <summary>
     /// The default value of <see cref="SessionCyclePeriod"/>.
     /// </summary>
-    public static readonly TimeSpan DEFAULT_SESSION_CYCLE_PERIOD = TimeSpan.FromSeconds(10);
+    public static readonly TimeSpan DEFAULT_SESSION_CYCLE_PERIOD = TimeSpan.FromSeconds(15);
 
     /// <summary>
     /// The maximum, consecutive number of cycles, yielding no significant improvement to the cluster's entropy.

@@ -13,11 +13,11 @@ namespace Orleans.Hosting;
 public static class ActivationRebalancerExtensions
 {
     /// <summary>
-    /// Enables activation rebalancing for the cluster.
+    /// Enables activation rebalancing for the entire cluster.
     /// </summary>
     /// <remarks>
     /// Activation rebalancing attempts to distribute activations around the cluster in such a
-    /// way that it optimizes both activation count and memory usages across the cluster.
+    /// way that it optimizes both activation count and memory usages across the silos of the cluster.
     /// <para>You can read more on activation rebalancing <see href="https://www.ledjonbehluli.com/posts/orleans_adaptive_rebalancing/">here</see></para>
     /// </remarks>
     [Experimental("ORLEANSEXP002")]

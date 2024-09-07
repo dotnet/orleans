@@ -4,8 +4,9 @@ using System.Threading.Tasks;
 namespace Orleans.Placement.Rebalancing;
 
 /// <summary>
-/// Provides functionalities for interfacing with the activation rebalancer.
+/// A gateway to interface with the activation rebalancer.
 /// </summary>
+/// <remarks>This is available only on the silo.</remarks>
 public interface IActivationRebalancer
 {
     /// <summary>

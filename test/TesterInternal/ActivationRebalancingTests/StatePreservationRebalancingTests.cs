@@ -20,8 +20,6 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
         "Either you have added more silos and not updated this code, " +
         "or there is a bug in the rebalancer or monitor";
 
-    private readonly SPFixture _fixture = fixture;
-
     [Fact]
     public async Task Should_Migrate_And_Preserve_State_When_Hosting_Silo_Dies()
     {
@@ -64,9 +62,7 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
 
                 OutputHelper.WriteLine($"Cycle {index}: Now stopping Silo{rebalancerHostNum}, which is the host of the rebalancer\n");
 
-                await _fixture.HostedCluster.StopSiloAsync(
-                    _fixture.HostedCluster.SecondarySilos.First(
-                        x => x.SiloAddress.Equals(rebalancerHost)));
+                await Cluster.StopSiloAsync(Cluster.SecondarySilos.First(x => x.SiloAddress.Equals(rebalancerHost)));
             }
 
             await Task.Delay(SPFixture.SessionCyclePeriod);
@@ -189,9 +185,9 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
 
         private class Configurator : ISiloConfigurator, IClientBuilderConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
 #pragma warning disable ORLEANSEXP002
-                => hostBuilder
+                => siloBuilder
                     .Configure<SiloMessagingOptions>(o =>
                     {
                         o.ResponseTimeoutWithDebugger = TimeSpan.FromMinutes(1);

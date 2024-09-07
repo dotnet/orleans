@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Placement.Rebalancing;
 
 internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActivationRebalancerMonitor, ILifecycleParticipant<ISiloLifecycle>
 {
-    private IGrainTimer? _rebalancerTimer;
+    private IGrainTimer? _monitorTimer;
     private RebalancingReport _latestReport;
     private DateTime _lastHartbeat = DateTime.MinValue;
 
@@ -37,11 +37,12 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
         ISiloStatusOracle siloStatusOracle)
             : base(Constants.ActivationRebalancerMonitorType, localSiloDetails.SiloAddress, loggerFactory)
     {
-        _rebalancerGrain = grainFactory.GetGrain<IActivationRebalancerWorker>(0);
         _timeProvider = timeProvider;
         _activationDirectory = activationDirectory;
         _siloStatusOracle = siloStatusOracle;
         _logger = loggerFactory.CreateLogger<ActivationRebalancerMonitor>();
+        _rebalancerGrain = grainFactory.GetGrain<IActivationRebalancerWorker>(0);
+
         catalog.RegisterSystemTarget(this);
 
         _latestReport = new()
@@ -70,18 +71,18 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
 
     private async Task OnStart()
     {
-        _rebalancerTimer = RegisterTimer(async _ =>
+        _monitorTimer = RegisterTimer(async _ =>
         {
             var now = _timeProvider.GetUtcNow().DateTime;
             if (now > _lastHartbeat.Add(IActivationRebalancerMonitor.WorkerReportPeriod))
             {
                 LogStartingRebalancer(now - _lastHartbeat, IActivationRebalancerMonitor.WorkerReportPeriod);
-                _latestReport = await _rebalancerGrain.Ping();
+                _latestReport = await _rebalancerGrain.GetReport();
             }
 
         }, null, TimerPeriod, TimerPeriod);
 
-        _latestReport = await _rebalancerGrain.Ping();
+        _latestReport = await _rebalancerGrain.GetReport();
     }
 
     private Task OnStop()
@@ -95,7 +96,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
             }
         }
 
-        _rebalancerTimer?.Dispose();
+        _monitorTimer?.Dispose();
         return Task.CompletedTask;
     }
 

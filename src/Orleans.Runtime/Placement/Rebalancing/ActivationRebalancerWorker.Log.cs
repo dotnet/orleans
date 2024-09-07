@@ -29,7 +29,7 @@ internal partial class ActivationRebalancerWorker
     [LoggerMessage(Level = LogLevel.Warning, Message =
         "Can not continue with rebalancing because at least one of the silos is reporting 0 memory usage. " +
         "This can indicated that there is no implementation of {ProviderName}")]
-    private partial void LogInvalidSiloMemoryUsage(string providerName);
+    private partial void LogInvalidSiloMemory(string providerName);
 
     [LoggerMessage(Level = LogLevel.Trace, Message = "The current rebalancing session has stopped due to {StaleCycles} stale cycles having passed, which is the maximum allowed.")]
     private partial void LogMaxStaleCyclesReached(int staleCycles);
