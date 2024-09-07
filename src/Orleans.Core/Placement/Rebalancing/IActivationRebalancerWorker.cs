@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
-using Orleans.Runtime;
 
 namespace Orleans.Placement.Rebalancing;
 
@@ -11,14 +10,13 @@ internal interface IActivationRebalancerWorker : IGrainWithIntegerKey
     /// <summary>
     /// Returns latest report.
     /// </summary>
-    [AlwaysInterleave, Alias("GetReport")]
-    ValueTask<RebalancerReport> GetReport();
+    [AlwaysInterleave, Alias("GetReport")] ValueTask<RebalancingReport> GetReport();
 
     /// <summary>
-    /// Starts the rebalancer if its not started yet, otherwise its a no-op.
+    /// Wakes up the rebalancer and starts it if its not started yet.
     /// </summary>
-    /// <returns>The host address where the rebalancer is activated.</returns>
-    [Alias("StartRebalancer")] ValueTask<RebalancerReport> StartRebalancer();
+    /// <returns>The most recent rebalancing report.</returns>
+    [Alias("StartRebalancer")] ValueTask<RebalancingReport> Ping();
 
     /// <summary>
     /// Resumes rebalancing if its suspended, otherwise its a no-op.

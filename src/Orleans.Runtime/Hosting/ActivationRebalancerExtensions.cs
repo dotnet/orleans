@@ -22,12 +22,16 @@ public static class ActivationRebalancerExtensions
     /// </remarks>
     [Experimental("ORLEANSEXP002")]
     public static ISiloBuilder AddActivationRebalancer(this ISiloBuilder builder) =>
-        builder.ConfigureServices(service => service.AddActivationRebalancer<FailedSessionBackoffProvider>());
+        builder.AddActivationRebalancer<FailedSessionBackoffProvider>();
 
     /// <inheritdoc cref="AddActivationRebalancer(ISiloBuilder)"/>.
     /// <typeparam name="TProvider">Custom backoff provider for determining next session after a failed attempt.</typeparam>
     [Experimental("ORLEANSEXP002")]
-    public static IServiceCollection AddActivationRebalancer<TProvider>(this IServiceCollection services)
+    public static ISiloBuilder AddActivationRebalancer<TProvider>(this ISiloBuilder builder)
+        where TProvider : class, IFailedRebalancingSessionBackoffProvider =>
+        builder.ConfigureServices(service => service.AddActivationRebalancer<TProvider>());
+
+    private static IServiceCollection AddActivationRebalancer<TProvider>(this IServiceCollection services)
         where TProvider : class, IFailedRebalancingSessionBackoffProvider
     {
         services.AddSingleton<ActivationRebalancerMonitor>();

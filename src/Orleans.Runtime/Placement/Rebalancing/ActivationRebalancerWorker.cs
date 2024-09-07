@@ -78,13 +78,13 @@ internal sealed partial class ActivationRebalancerWorker(
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        _monitorTimer = this.RegisterGrainTimer(PeriodicallyReportToMonitor, new()
+        _monitorTimer = this.RegisterGrainTimer(ReportAllMonitors, new()
         {
             DueTime = TimeSpan.Zero,
             Period = IActivationRebalancerMonitor.WorkerReportPeriod,
         });
 
-        _triggerTimer = this.RegisterGrainTimer(PeriodicallyTriggerRebalancing, new()
+        _triggerTimer = this.RegisterGrainTimer(TriggerRebalancing, new()
         {
             Interleave = true,
             Period = 0.5 * _options.SessionCyclePeriod, // make trigger-period half that of the session cycle-period.
@@ -143,17 +143,17 @@ internal sealed partial class ActivationRebalancerWorker(
         stats = new(statistics.EnvironmentStatistics.MemoryUsageBytes, statistics.ActivationCount);
     }
 
-    public ValueTask<RebalancerReport> GetReport() => new(BuildReport());
+    public ValueTask<RebalancingReport> GetReport() => new(BuildReport());
 
-    public ValueTask<RebalancerReport> StartRebalancer() => new(BuildReport());
+    public ValueTask<RebalancingReport> Ping() => new(BuildReport());
 
-    public Task ResumeRebalancing()
+    public async Task ResumeRebalancing()
     {
         StartSession();
-        return Task.CompletedTask;
+        await ReportAllMonitors();
     }
 
-    public Task SuspendRebalancing(TimeSpan? duration)
+    public async Task SuspendRebalancing(TimeSpan? duration)
     {
         StopSession(StopReason.RebalancerSuspended, duration);
         
@@ -166,10 +166,10 @@ internal sealed partial class ActivationRebalancerWorker(
             LogSuspended();
         }
 
-        return Task.CompletedTask;
+        await ReportAllMonitors();
     }
 
-    private async Task PeriodicallyReportToMonitor()
+    private async Task ReportAllMonitors()
     {
         var tasks = new List<Task>();
         var report = BuildReport();
@@ -183,12 +183,12 @@ internal sealed partial class ActivationRebalancerWorker(
         await Task.WhenAll(tasks);
     }
 
-    private RebalancerReport BuildReport()
+    private RebalancingReport BuildReport()
     {
         var until = _suspendedUntil; // take copy since _triggerTimer interleaves
         TimeSpan? duration = IsSuspended(until) ? until!.Value - timeProvider.GetUtcNow().DateTime : null;
 
-        return new RebalancerReport()
+        return new RebalancingReport()
         {
             Silo = localSiloDetails.SiloAddress,
             Status = RebalancerStatus.Executing,
@@ -197,7 +197,7 @@ internal sealed partial class ActivationRebalancerWorker(
         };
     }
 
-    private Task PeriodicallyTriggerRebalancing()
+    private Task TriggerRebalancing()
     {
         if (_sessionTimer != null) 
         {

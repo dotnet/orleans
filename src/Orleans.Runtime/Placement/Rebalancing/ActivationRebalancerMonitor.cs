@@ -14,7 +14,7 @@ namespace Orleans.Runtime.Placement.Rebalancing;
 internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActivationRebalancerMonitor, ILifecycleParticipant<ISiloLifecycle>
 {
     private IGrainTimer? _rebalancerTimer;
-    private RebalancerReport _latestReport;
+    private RebalancingReport _latestReport;
     private DateTime _lastHartbeat = DateTime.MinValue;
 
     private readonly TimeProvider _timeProvider;
@@ -24,7 +24,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     private readonly ILogger<ActivationRebalancerMonitor> _logger;
     private readonly List<IActivationRebalancerReportListener> _statusListeners = [];
 
-    // Check on the worker with double the period the worker reports to me
+    // Check on the worker with double the period the worker reports to me.
     private readonly static TimeSpan TimerPeriod = 2 * IActivationRebalancerMonitor.WorkerReportPeriod;
 
     public ActivationRebalancerMonitor(
@@ -76,12 +76,12 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
             if (now > _lastHartbeat.Add(IActivationRebalancerMonitor.WorkerReportPeriod))
             {
                 LogStartingRebalancer(now - _lastHartbeat, IActivationRebalancerMonitor.WorkerReportPeriod);
-                _latestReport = await _rebalancerGrain.StartRebalancer();
+                _latestReport = await _rebalancerGrain.Ping();
             }
 
         }, null, TimerPeriod, TimerPeriod);
 
-        _latestReport = await _rebalancerGrain.StartRebalancer();
+        _latestReport = await _rebalancerGrain.Ping();
     }
 
     private Task OnStop()
@@ -102,7 +102,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     public Task ResumeRebalancing() => _rebalancerGrain.ResumeRebalancing();
     public Task SuspendRebalancing(TimeSpan? duration) => _rebalancerGrain.SuspendRebalancing(duration);
 
-    public async ValueTask<RebalancerReport> GetRebalancerReport(bool force = false)
+    public async ValueTask<RebalancingReport> GetRebalancingReport(bool force = false)
     {
         if (force)
         {
@@ -112,41 +112,27 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
         return _latestReport;
     }
 
-    public Task Report(RebalancerReport report)
+    public Task Report(RebalancingReport report)
     {
-        if (_latestReport.Silo == SiloAddress.Zero)
-        {
-            NotifyListeners(ref report);
-            return Task.CompletedTask;
-        }
-
-        if (_latestReport.Status != report.Status)
-        {
-            NotifyListeners(ref report);
-        }
-
         _latestReport = report;
         _lastHartbeat = _timeProvider.GetUtcNow().DateTime;
 
-        return Task.CompletedTask;
-
-        void NotifyListeners(ref readonly RebalancerReport report)
+        foreach (var listener in _statusListeners)
         {
-            foreach (var listener in _statusListeners)
+            try
             {
-                try
-                {
-                    listener.OnReport(report);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "An unexpected error occurred while notifying rebalancer listener.");
-                }
+                listener.OnReport(report);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An unexpected error occurred while notifying rebalancer listener.");
             }
         }
+
+        return Task.CompletedTask;
     }
 
-    public void SubscribeToStatusChanges(IActivationRebalancerReportListener listener)
+    public void SubscribeToReports(IActivationRebalancerReportListener listener)
     {
         if (!_statusListeners.Contains(listener))
         {
@@ -154,7 +140,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
         }
     }
 
-    public void UnsubscribeFromStatusChanges(IActivationRebalancerReportListener listener) =>
+    public void UnsubscribeFromReports(IActivationRebalancerReportListener listener) =>
         _statusListeners.Remove(listener);
 
     [LoggerMessage(Level = LogLevel.Trace, Message =

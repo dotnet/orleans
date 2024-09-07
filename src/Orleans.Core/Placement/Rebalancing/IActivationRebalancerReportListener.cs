@@ -6,8 +6,8 @@ namespace Orleans.Placement.Rebalancing;
 public interface IActivationRebalancerReportListener
 {
     /// <summary>
-    /// Triggered when rebalancer has provided a new <see cref="RebalancerReport"/>.
+    /// Triggered when rebalancer has provided a new <see cref="RebalancingReport"/>.
     /// </summary>
     /// <param name="report">Latest report from the rebalancer.</param>
-    void OnReport(RebalancerReport report);
+    void OnReport(RebalancingReport report);
 }

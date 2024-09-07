@@ -10,15 +10,21 @@ namespace Orleans.Placement.Rebalancing;
 [GenerateSerializer]
 public enum RebalancerStatus : byte
 {
+    /// <summary>
+    /// It is executing.
+    /// </summary>
     Executing = 0,
+    /// <summary>
+    /// It is suspended.
+    /// </summary>
     Suspended = 1
 }
 
 /// <summary>
 /// A report of the current state of the activation rebalancer.
 /// </summary>
-[GenerateSerializer, Immutable, Alias("RebalancerReport")]
-public readonly struct RebalancerReport
+[GenerateSerializer, Immutable, Alias("RebalancingReport")]
+public readonly struct RebalancingReport
 {
     /// <summary>
     /// The silo where the rebalancer is currently located.

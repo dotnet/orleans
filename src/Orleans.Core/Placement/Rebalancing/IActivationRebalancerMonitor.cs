@@ -16,5 +16,5 @@ internal interface IActivationRebalancerMonitor : ISystemTarget, IActivationReba
     /// <summary>
     /// Invoked periodically by the <see cref="IActivationRebalancerWorker"/>.
     /// </summary>
-    [Alias("Report")] Task Report(RebalancerReport report);
+    [Alias("Report")] Task Report(RebalancingReport report);
 }

@@ -9,28 +9,28 @@ namespace Orleans.Placement.Rebalancing;
 public interface IActivationRebalancer
 {
     /// <summary>
-    /// Returns the rebalancer report.
-    /// <para>Reports can lag behind if you choose a session cycle period less than <see cref="IActivationRebalancerMonitor.WorkerReportPeriod"/>.</para>
+    /// Returns the rebalancing report.
+    /// <para>The report can lag behind if you choose a session cycle period less than <see cref="IActivationRebalancerMonitor.WorkerReportPeriod"/>.</para>
     /// </summary>
     /// <param name="force">If set to <see langword="true"/> returns the most current report.</param>
     /// <remarks>Using <paramref name="force"/> incurs an asynchronous operation.</remarks>
-    ValueTask<RebalancerReport> GetRebalancerReport(bool force = false);
+    ValueTask<RebalancingReport> GetRebalancingReport(bool force = false);
 
     /// <inheritdoc cref="IActivationRebalancerWorker.ResumeRebalancing"/>
     Task ResumeRebalancing();
 
     /// <inheritdoc cref="IActivationRebalancerWorker.SuspendRebalancing(TimeSpan?)"/>
-    Task SuspendRebalancing(TimeSpan? duration);
+    Task SuspendRebalancing(TimeSpan? duration = null);
 
     /// <summary>
-    /// Subscribe to activation rebalancer status changes.
+    /// Subscribe to activation rebalancer reports.
     /// </summary>
     /// <param name="listener">The component that will be notified.</param>
-    void SubscribeToStatusChanges(IActivationRebalancerReportListener listener);
+    void SubscribeToReports(IActivationRebalancerReportListener listener);
 
     /// <summary>
-    /// Unsubscribe from activation rebalancer status changes.
+    /// Unsubscribe from activation rebalancer reports.
     /// </summary>
     /// <param name="listener">The already subscribed component.</param>
-    void UnsubscribeFromStatusChanges(IActivationRebalancerReportListener listener);
+    void UnsubscribeFromReports(IActivationRebalancerReportListener listener);
 }

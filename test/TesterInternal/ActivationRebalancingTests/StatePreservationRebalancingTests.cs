@@ -145,7 +145,7 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
         var host = (await GrainFactory
             .GetSystemTarget<IActivationRebalancerMonitor>(
              Constants.ActivationRebalancerMonitorType, target)
-            .GetRebalancerReport(true))
+            .GetRebalancingReport(true))
             .Silo;
 
         if (host.Equals(Silo1))
