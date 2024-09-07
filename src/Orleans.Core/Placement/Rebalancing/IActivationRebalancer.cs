@@ -22,4 +22,16 @@ public interface IActivationRebalancer
     /// <param name="force">If set to <see langword="true"/> returns the most current statistics.</param>
     /// <remarks>Using <paramref name="force"/> incurs an asynchronous operation.</remarks>
     ValueTask<ImmutableArray<RebalancingStatistics>> GetStatistics(bool force = false);
+
+    /// <summary>
+    /// Subscribe to activation rebalancer status changes.
+    /// </summary>
+    /// <param name="listener">The component that will be notified.</param>
+    void SubscribeToStatusChanges(IActivationRebalancerStatusListener listener);
+
+    /// <summary>
+    /// Unsubscribe from activation rebalancer status changes.
+    /// </summary>
+    /// <param name="listener">The already subscribed component.</param>
+    void UnsubscribeFromStatusChanges(IActivationRebalancerStatusListener listener);
 }

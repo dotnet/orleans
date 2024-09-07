@@ -8,7 +8,7 @@ using Orleans.Runtime;
 namespace Orleans.Placement.Rebalancing;
 
 [Alias("IActivationRebalancerMonitor")]
-internal interface IActivationRebalancerMonitor : ISystemTarget, IActivationRebalancer
+internal interface IActivationRebalancerMonitor : ISystemTarget
 {
     /// <summary>
     /// The period on which the <see cref="IActivationRebalancerWorker"/> must report back to the monitor.
@@ -24,7 +24,5 @@ internal interface IActivationRebalancerMonitor : ISystemTarget, IActivationReba
     /// <summary>
     /// Invoked periodically by the <see cref="IActivationRebalancerWorker"/>.
     /// </summary>
-    /// <param name="address">The silo where the rebalancer is currently located.</param>
-    /// <param name="statistics">Latest rebalancing statistics.</param>
-    [Alias("Report")] Task Report(SiloAddress address, ImmutableArray<RebalancingStatistics> statistics);
+    [Alias("Report")] Task Report(RebalancerReport report);
 }

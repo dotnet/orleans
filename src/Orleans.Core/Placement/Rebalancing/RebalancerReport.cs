@@ -1,7 +1,30 @@
 using System;
+using System.Collections.Immutable;
 using Orleans.Runtime;
 
 namespace Orleans.Placement.Rebalancing;
+
+/// <summary>
+/// Current state of the <see cref="IActivationRebalancerWorker"/>.
+/// </summary>
+/// <param name="Address">The silo where the rebalancer is currently located.</param>
+/// <param name="Status">The current status of the rebalancer.</param>
+/// <param name="Duration">If suspended, shows for how long (<see langword="null"/> means indefinitely).</param>
+/// <param name="Statistics">Latest rebalancing statistics.</param>
+[GenerateSerializer, Immutable, Alias("RebalancerReport")]
+internal readonly record struct RebalancerReport(
+    SiloAddress Address, RebalancerStatus Status, TimeSpan? Duration,
+    ImmutableArray<RebalancingStatistics> Statistics);
+
+/// <summary>
+/// The status of the <see cref="IActivationRebalancerWorker"/>.
+/// </summary>
+[GenerateSerializer]
+internal enum RebalancerStatus
+{
+    Executing,
+    Suspended
+}
 
 /// <summary>
 /// Rebalancing statistics for the given <see cref="SiloAddress"/>.

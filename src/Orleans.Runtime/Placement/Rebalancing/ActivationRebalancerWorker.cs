@@ -66,7 +66,7 @@ internal sealed partial class ActivationRebalancerWorker(
     private int _failedSessions;
     private int _rebalancingCycle;
     private double _previousEntropy;
-    private DateTime? _disabledUntil;
+    private DateTime? _suspendedUntil;
     private IGrainTimer? _sessionTimer;
     private IGrainTimer? _triggerTimer;
     private IGrainTimer? _monitorTimer;
@@ -87,7 +87,7 @@ internal sealed partial class ActivationRebalancerWorker(
         _triggerTimer = this.RegisterGrainTimer(PeriodicallyTriggerRebalancing, new()
         {
             Interleave = true,
-            Period = 0.5 * _options.SessionCyclePeriod, // make trigger-period twice as short as the session cycle-period.
+            Period = 0.5 * _options.SessionCyclePeriod, // make trigger-period half that of the session cycle-period.
             DueTime = _options.RebalancerDueTime
         });
 
@@ -110,7 +110,7 @@ internal sealed partial class ActivationRebalancerWorker(
 
         context.TryAddValue<RebalancerState>(StateKey,
             new(_staleCycles, _failedSessions, _rebalancingCycle,
-                _previousEntropy, _disabledUntil, [.. _rebalancingStatistics.Values]));
+                _previousEntropy, _suspendedUntil, [.. _rebalancingStatistics.Values]));
     }
     
     public void OnRehydrate(IRehydrationContext context)
@@ -122,7 +122,7 @@ internal sealed partial class ActivationRebalancerWorker(
             _staleCycles = state.StaleCycles;
             _failedSessions = state.FailedSessions;
             _previousEntropy = state.LatestEntropy;
-            _disabledUntil = state.DisabledUntil;
+            _suspendedUntil = state.DisabledUntil;
 
             foreach (var statistics in state.Statistics)
             {
@@ -156,7 +156,7 @@ internal sealed partial class ActivationRebalancerWorker(
     public Task SuspendRebalancing(TimeSpan? duration)
     {
         StopSession(StopReason.RebalancerSuspended, duration);
-
+        
         if (duration.HasValue)
         {
             LogSuspendedFor(duration.Value);
@@ -173,11 +173,15 @@ internal sealed partial class ActivationRebalancerWorker(
     {
         var tasks = new List<Task>();
 
+        var until = _suspendedUntil; // take copy since _triggerTimer interleaves
+        TimeSpan? duration = IsSuspended(until) ? until!.Value - timeProvider.GetUtcNow().DateTime : null;
+        RebalancerReport report = new(localSiloDetails.SiloAddress,
+            RebalancerStatus.Executing, duration, [.. _rebalancingStatistics.Values]);
+       
         foreach (var silo in siloStatusOracle.GetActiveSilos())
         {
             tasks.Add(grainFactory.GetSystemTarget<IActivationRebalancerMonitor>
-                (Constants.ActivationRebalancerMonitorType, silo)
-                .Report(localSiloDetails.SiloAddress, [.. _rebalancingStatistics.Values]));
+                (Constants.ActivationRebalancerMonitorType, silo).Report(report));
         }
 
         await Task.WhenAll(tasks);
@@ -187,12 +191,12 @@ internal sealed partial class ActivationRebalancerWorker(
     {
         if (_sessionTimer != null) 
         {
-            return Task.CompletedTask; // session exists
+            return Task.CompletedTask;
         }
 
-        if (_disabledUntil.HasValue && _disabledUntil.Value > timeProvider.GetUtcNow())
+        if (IsSuspended(_suspendedUntil))
         {
-            return Task.CompletedTask; // rebalancer is suspended
+            return Task.CompletedTask;
         }
 
         StartSession();
@@ -440,6 +444,10 @@ internal sealed partial class ActivationRebalancerWorker(
         return pairs;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool IsSuspended(DateTime? suspendedUntil) =>
+        suspendedUntil.HasValue && suspendedUntil.Value > timeProvider.GetUtcNow();
+
     private void StartSession()
     {
         StopSession(StopReason.SessionStarting);
@@ -466,37 +474,37 @@ internal sealed partial class ActivationRebalancerWorker(
             case StopReason.SessionStarting:
                 {
                     _failedSessions = 0;
-                    _disabledUntil = null;
+                    _suspendedUntil = null;
                 }
                 break;
             case StopReason.SessionFailed:
                 {
                     _failedSessions++;
-                    DisableFor(backoffProvider.Next(_failedSessions));
+                    SuspendFor(backoffProvider.Next(_failedSessions));
                 }
                 break;
             case StopReason.SessionCompleted:
                 {
                     _failedSessions = 0;
-                    DisableFor(_options.SessionCyclePeriod);
+                    SuspendFor(_options.SessionCyclePeriod);
                 }
                 break;
             case StopReason.RebalancerSuspended:
                 {
                     _failedSessions = 0;
-                    DisableFor(duration ?? Timeout.InfiniteTimeSpan);
+                    SuspendFor(duration ?? Timeout.InfiniteTimeSpan);
                 }
                 break;
         }
 
         LogSessionStopped();
 
-        void DisableFor(TimeSpan duration)
+        void SuspendFor(TimeSpan duration)
         {
-            var disableFor = timeProvider.GetUtcNow().Add(duration).DateTime;
+            var suspendFor = timeProvider.GetUtcNow().Add(duration).DateTime;
 
-            _disabledUntil = !_disabledUntil.HasValue ? disableFor :
-                (disableFor > _disabledUntil ? disableFor : _disabledUntil);
+            _suspendedUntil = !_suspendedUntil.HasValue ? suspendFor :
+                (suspendFor > _suspendedUntil ? suspendFor : _suspendedUntil);
         }
     }
 }

@@ -4,15 +4,18 @@ using System.Threading.Tasks;
 using Orleans.Placement.Rebalancing;
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
 
 #nullable enable
 
 namespace Orleans.Runtime.Placement.Rebalancing;
 
-internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActivationRebalancerMonitor, ILifecycleParticipant<ISiloLifecycle>
+internal sealed partial class ActivationRebalancerMonitor : SystemTarget,
+    IActivationRebalancer, IActivationRebalancerMonitor, ILifecycleParticipant<ISiloLifecycle>
 {
     private SiloAddress? _rebalancerAddress;
     private IGrainTimer? _rebalancerTimer;
+    private RebalancerStatus? _rebalancerStatus;
     private DateTime _lastHartbeat = DateTime.MinValue;
     private ImmutableArray<RebalancingStatistics> _lastStatistics;
 
@@ -21,6 +24,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     private readonly ISiloStatusOracle _siloStatusOracle;
     private readonly IActivationRebalancerWorker _rebalancerGrain;
     private readonly ILogger<ActivationRebalancerMonitor> _logger;
+    private readonly List<IActivationRebalancerStatusListener> _statusListeners = [];
 
     // Check on the worker with double the period the worker reports to me
     private readonly static TimeSpan TimerPeriod = 2 * IActivationRebalancerMonitor.WorkerReportPeriod;
@@ -102,13 +106,55 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
         return _lastStatistics;
     }
 
-    public Task Report(SiloAddress address, ImmutableArray<RebalancingStatistics> statistics)
+    public Task Report(RebalancerReport report)
     {
-        _rebalancerAddress = address;
-        _lastStatistics = statistics;
+        _rebalancerAddress = report.Address;
+        _lastStatistics = report.Statistics;
         _lastHartbeat = _timeProvider.GetUtcNow().DateTime;
 
+        if (_rebalancerStatus is null)
+        {
+            NotifyListeners(ref report);
+            return Task.CompletedTask;
+        }
+
+        if (_rebalancerStatus != report.Status)
+        {
+            NotifyListeners(ref report);
+        }
+
         return Task.CompletedTask;
+
+        void NotifyListeners(ref readonly RebalancerReport report)
+        {
+            foreach (var listener in _statusListeners)
+            {
+                if (report.Status == RebalancerStatus.Executing)
+                {
+                    listener.OnStarted();
+                }
+                else
+                {
+                    listener.OnStopped(report.Duration);
+                }
+            }
+        }
+    }
+
+    public void SubscribeToStatusChanges(IActivationRebalancerStatusListener listener)
+    {
+        if (!_statusListeners.Contains(listener))
+        {
+            _statusListeners.Add(listener);
+        }
+    }
+
+    public void UnsubscribeFromStatusChanges(IActivationRebalancerStatusListener listener)
+    {
+        if (!_statusListeners.Contains(listener))
+        {
+            _statusListeners.Add(listener);
+        }
     }
 
     public ValueTask<SiloAddress> GetRebalancerHost() => new(_rebalancerAddress ?? SiloAddress.Zero);
