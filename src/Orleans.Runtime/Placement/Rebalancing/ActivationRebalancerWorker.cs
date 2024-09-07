@@ -143,9 +143,9 @@ internal sealed partial class ActivationRebalancerWorker(
         stats = new(statistics.EnvironmentStatistics.MemoryUsageBytes, statistics.ActivationCount);
     }
 
-    public ValueTask<ImmutableArray<RebalancingStatistics>> GetStatistics() => new([.. _rebalancingStatistics.Values]);
+    public ValueTask<RebalancerReport> GetReport() => new(BuildReport());
 
-    public ValueTask<SiloAddress> StartRebalancer() => new(localSiloDetails.SiloAddress);
+    public ValueTask<RebalancerReport> StartRebalancer() => new(BuildReport());
 
     public Task ResumeRebalancing()
     {
@@ -172,11 +172,7 @@ internal sealed partial class ActivationRebalancerWorker(
     private async Task PeriodicallyReportToMonitor()
     {
         var tasks = new List<Task>();
-
-        var until = _suspendedUntil; // take copy since _triggerTimer interleaves
-        TimeSpan? duration = IsSuspended(until) ? until!.Value - timeProvider.GetUtcNow().DateTime : null;
-        RebalancerReport report = new(localSiloDetails.SiloAddress,
-            RebalancerStatus.Executing, duration, [.. _rebalancingStatistics.Values]);
+        var report = BuildReport();
        
         foreach (var silo in siloStatusOracle.GetActiveSilos())
         {
@@ -185,6 +181,20 @@ internal sealed partial class ActivationRebalancerWorker(
         }
 
         await Task.WhenAll(tasks);
+    }
+
+    private RebalancerReport BuildReport()
+    {
+        var until = _suspendedUntil; // take copy since _triggerTimer interleaves
+        TimeSpan? duration = IsSuspended(until) ? until!.Value - timeProvider.GetUtcNow().DateTime : null;
+
+        return new RebalancerReport()
+        {
+            Silo = localSiloDetails.SiloAddress,
+            Status = RebalancerStatus.Executing,
+            SuspensionDuration = duration,
+            Statistics = [.. _rebalancingStatistics.Values]
+        };
     }
 
     private Task PeriodicallyTriggerRebalancing()

@@ -5,26 +5,24 @@ using Orleans.Placement.Rebalancing;
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
+using System.Threading;
 
 #nullable enable
 
 namespace Orleans.Runtime.Placement.Rebalancing;
 
-internal sealed partial class ActivationRebalancerMonitor : SystemTarget,
-    IActivationRebalancer, IActivationRebalancerMonitor, ILifecycleParticipant<ISiloLifecycle>
+internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActivationRebalancerMonitor, ILifecycleParticipant<ISiloLifecycle>
 {
-    private SiloAddress? _rebalancerAddress;
     private IGrainTimer? _rebalancerTimer;
-    private RebalancerStatus? _rebalancerStatus;
+    private RebalancerReport _latestReport;
     private DateTime _lastHartbeat = DateTime.MinValue;
-    private ImmutableArray<RebalancingStatistics> _lastStatistics;
 
     private readonly TimeProvider _timeProvider;
     private readonly ActivationDirectory _activationDirectory;
     private readonly ISiloStatusOracle _siloStatusOracle;
     private readonly IActivationRebalancerWorker _rebalancerGrain;
     private readonly ILogger<ActivationRebalancerMonitor> _logger;
-    private readonly List<IActivationRebalancerStatusListener> _statusListeners = [];
+    private readonly List<IActivationRebalancerReportListener> _statusListeners = [];
 
     // Check on the worker with double the period the worker reports to me
     private readonly static TimeSpan TimerPeriod = 2 * IActivationRebalancerMonitor.WorkerReportPeriod;
@@ -45,6 +43,14 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget,
         _siloStatusOracle = siloStatusOracle;
         _logger = loggerFactory.CreateLogger<ActivationRebalancerMonitor>();
         catalog.RegisterSystemTarget(this);
+
+        _latestReport = new()
+        {
+            Silo = SiloAddress.Zero,
+            Status = RebalancerStatus.Suspended,
+            SuspensionDuration = Timeout.InfiniteTimeSpan,
+            Statistics = ImmutableArray<RebalancingStatistics>.Empty
+        };
     }
 
     public void Participate(ISiloLifecycle observer)
@@ -70,17 +76,17 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget,
             if (now > _lastHartbeat.Add(IActivationRebalancerMonitor.WorkerReportPeriod))
             {
                 LogStartingRebalancer(now - _lastHartbeat, IActivationRebalancerMonitor.WorkerReportPeriod);
-                _rebalancerAddress = await _rebalancerGrain.StartRebalancer();
+                _latestReport = await _rebalancerGrain.StartRebalancer();
             }
 
         }, null, TimerPeriod, TimerPeriod);
 
-        _rebalancerAddress = await _rebalancerGrain.StartRebalancer();
+        _latestReport = await _rebalancerGrain.StartRebalancer();
     }
 
     private Task OnStop()
     {
-        if (Silo.IsSameLogicalSilo(_rebalancerAddress))
+        if (_latestReport is { } report && Silo.IsSameLogicalSilo(report.Silo))
         {
             if (_activationDirectory.FindTarget(_rebalancerGrain.GetGrainId()) is { } activation)
             {
@@ -96,32 +102,31 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget,
     public Task ResumeRebalancing() => _rebalancerGrain.ResumeRebalancing();
     public Task SuspendRebalancing(TimeSpan? duration) => _rebalancerGrain.SuspendRebalancing(duration);
 
-    public async ValueTask<ImmutableArray<RebalancingStatistics>> GetStatistics(bool force)
+    public async ValueTask<RebalancerReport> GetRebalancerReport(bool force = false)
     {
         if (force)
         {
-            _lastStatistics = await _rebalancerGrain.GetStatistics();
+            _latestReport = await _rebalancerGrain.GetReport();
         }
 
-        return _lastStatistics;
+        return _latestReport;
     }
 
     public Task Report(RebalancerReport report)
     {
-        _rebalancerAddress = report.Address;
-        _lastStatistics = report.Statistics;
-        _lastHartbeat = _timeProvider.GetUtcNow().DateTime;
-
-        if (_rebalancerStatus is null)
+        if (_latestReport.Silo == SiloAddress.Zero)
         {
             NotifyListeners(ref report);
             return Task.CompletedTask;
         }
 
-        if (_rebalancerStatus != report.Status)
+        if (_latestReport.Status != report.Status)
         {
             NotifyListeners(ref report);
         }
+
+        _latestReport = report;
+        _lastHartbeat = _timeProvider.GetUtcNow().DateTime;
 
         return Task.CompletedTask;
 
@@ -129,19 +134,19 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget,
         {
             foreach (var listener in _statusListeners)
             {
-                if (report.Status == RebalancerStatus.Executing)
+                try
                 {
-                    listener.OnStarted();
+                    listener.OnReport(report);
                 }
-                else
+                catch (Exception ex)
                 {
-                    listener.OnStopped(report.Duration);
+                    _logger.LogError(ex, "An unexpected error occurred while notifying rebalancer listener.");
                 }
             }
         }
     }
 
-    public void SubscribeToStatusChanges(IActivationRebalancerStatusListener listener)
+    public void SubscribeToStatusChanges(IActivationRebalancerReportListener listener)
     {
         if (!_statusListeners.Contains(listener))
         {
@@ -149,15 +154,8 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget,
         }
     }
 
-    public void UnsubscribeFromStatusChanges(IActivationRebalancerStatusListener listener)
-    {
-        if (!_statusListeners.Contains(listener))
-        {
-            _statusListeners.Add(listener);
-        }
-    }
-
-    public ValueTask<SiloAddress> GetRebalancerHost() => new(_rebalancerAddress ?? SiloAddress.Zero);
+    public void UnsubscribeFromStatusChanges(IActivationRebalancerReportListener listener) =>
+        _statusListeners.Remove(listener);
 
     [LoggerMessage(Level = LogLevel.Trace, Message =
         "I have not received a report from the activation rebalancer for the last {Duration} which is more than the " +

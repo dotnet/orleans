@@ -5,25 +5,41 @@ using Orleans.Runtime;
 namespace Orleans.Placement.Rebalancing;
 
 /// <summary>
-/// Current state of the <see cref="IActivationRebalancerWorker"/>.
-/// </summary>
-/// <param name="Address">The silo where the rebalancer is currently located.</param>
-/// <param name="Status">The current status of the rebalancer.</param>
-/// <param name="Duration">If suspended, shows for how long (<see langword="null"/> means indefinitely).</param>
-/// <param name="Statistics">Latest rebalancing statistics.</param>
-[GenerateSerializer, Immutable, Alias("RebalancerReport")]
-internal readonly record struct RebalancerReport(
-    SiloAddress Address, RebalancerStatus Status, TimeSpan? Duration,
-    ImmutableArray<RebalancingStatistics> Statistics);
-
-/// <summary>
 /// The status of the <see cref="IActivationRebalancerWorker"/>.
 /// </summary>
 [GenerateSerializer]
-internal enum RebalancerStatus
+public enum RebalancerStatus : byte
 {
-    Executing,
-    Suspended
+    Executing = 0,
+    Suspended = 1
+}
+
+/// <summary>
+/// A report of the current state of the activation rebalancer.
+/// </summary>
+[GenerateSerializer, Immutable, Alias("RebalancerReport")]
+public readonly struct RebalancerReport
+{
+    /// <summary>
+    /// The silo where the rebalancer is currently located.
+    /// </summary>
+    [Id(0)] public required SiloAddress Silo { get; init; }
+
+    /// <summary>
+    /// The current status of the rebalancer.
+    /// </summary>
+    [Id(1)] public required RebalancerStatus Status { get; init; }
+
+    /// <summary>
+    /// If suspended, for how long (<see langword="null"/> means indefinitely).
+    /// </summary>
+    /// <remarks>This will always be <see langword="null"/> if <see cref="Status"/> is <see cref="RebalancerStatus.Executing"/>.</remarks>
+    [Id(2)] public TimeSpan? SuspensionDuration { get; init; }
+
+    /// <summary>
+    /// Latest rebalancing statistics.
+    /// </summary>
+    [Id(3)] public required ImmutableArray<RebalancingStatistics> Statistics { get; init; }
 }
 
 /// <summary>

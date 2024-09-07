@@ -140,31 +140,32 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
         OutputHelper.WriteLine($"The rebalancer is hosted by Silo{rebalancerHostNum} now");
     }
 
-    private async Task<(SiloAddress, int)> FindRebalancerHost(SiloAddress silo)
+    private async Task<(SiloAddress, int)> FindRebalancerHost(SiloAddress target)
     {
-        var rebalancerHost = await GrainFactory
+        var host = (await GrainFactory
             .GetSystemTarget<IActivationRebalancerMonitor>(
-             Constants.ActivationRebalancerMonitorType, silo)
-            .GetRebalancerHost();
+             Constants.ActivationRebalancerMonitorType, target)
+            .GetRebalancerReport(true))
+            .Silo;
 
-        if (rebalancerHost.Equals(Silo1))
+        if (host.Equals(Silo1))
         {
-            return new(rebalancerHost, 1);
+            return new(host, 1);
         }
 
-        if (rebalancerHost.Equals(Silo2))
+        if (host.Equals(Silo2))
         {
-            return new(rebalancerHost, 2);
+            return new(host, 2);
         }
 
-        if (rebalancerHost.Equals(Silo3))
+        if (host.Equals(Silo3))
         {
-            return new(rebalancerHost, 3);
+            return new(host, 3);
         }
 
-        if (rebalancerHost.Equals(Silo4))
+        if (host.Equals(Silo4))
         {
-            return new(rebalancerHost, 4);
+            return new(host, 4);
         }
 
         Assert.Fail(ErrorMessage);
