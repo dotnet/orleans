@@ -10,8 +10,8 @@ public class RebalancingOptionsTests
     [Fact]
     public void ConstantsShouldNotChange()
     {
-        Assert.Equal(TimeSpan.FromSeconds(30), ActivationRebalancerOptions.DEFAULT_REBALANCER_DUE_TIME);
-        Assert.Equal(TimeSpan.FromSeconds(10), ActivationRebalancerOptions.DEFAULT_SESSION_CYCLE_PERIOD);
+        Assert.Equal(TimeSpan.FromSeconds(60), ActivationRebalancerOptions.DEFAULT_REBALANCER_DUE_TIME);
+        Assert.Equal(TimeSpan.FromSeconds(15), ActivationRebalancerOptions.DEFAULT_SESSION_CYCLE_PERIOD);
         Assert.Equal(3, ActivationRebalancerOptions.DEFAULT_MAX_STALE_CYCLES);
         Assert.Equal(0.001d, ActivationRebalancerOptions.DEFAULT_ENTROPY_QUANTUM);
         Assert.Equal(0.01d, ActivationRebalancerOptions.DEFAULT_ALLOWED_ENTROPY_DEVIATION);

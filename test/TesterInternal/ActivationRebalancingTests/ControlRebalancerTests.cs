@@ -6,7 +6,7 @@ using Xunit.Abstractions;
 namespace UnitTests.ActivationRebalancingTests;
 
 [TestCategory("Functional"), TestCategory("ActivationRebalancing")]
-public class ControlRebalancingTests(RebalancerFixture fixture, ITestOutputHelper output)
+public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper output)
     : RebalancingTestBase<RebalancerFixture>(fixture, output), IClassFixture<RebalancerFixture>
 {
     [Fact]
