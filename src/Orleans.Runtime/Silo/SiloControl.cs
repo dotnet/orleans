@@ -158,12 +158,6 @@ namespace Orleans.Runtime
 
         public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[]? types = null)
         {
-            var stats = GetLocalDetailedGrainStatistics(types);
-            return Task.FromResult(stats);
-        }
-
-        private List<DetailedGrainStatistic> GetLocalDetailedGrainStatistics(string[]? types = null)
-        {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetDetailedGrainStatistics");
             var stats = new List<DetailedGrainStatistic>();
             lock (activationDirectory)
@@ -185,8 +179,7 @@ namespace Orleans.Runtime
                     }
                 }
             }
-
-            return stats;
+            return Task.FromResult(stats);
         }
 
         public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
@@ -300,7 +293,7 @@ namespace Orleans.Runtime
 
         public Task MigrateRandomActivations(SiloAddress target, int count)
         {
-            var statistics = GetLocalDetailedGrainStatistics();
+            var statistics = GetDetailedGrainStatistics().Result; // Task is always completed
             var grainIds = statistics.Select(x => x.GrainId).ToList();
             var idsToMigrate = new HashSet<GrainId>();
             var migrationContext = new Dictionary<string, object>()
