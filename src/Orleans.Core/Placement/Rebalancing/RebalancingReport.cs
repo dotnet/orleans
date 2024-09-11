@@ -62,7 +62,7 @@ public readonly struct RebalancingStatistics
     [Id(0)] public required DateTime TimeStamp { get; init; }
 
     /// <summary>
-    /// The silo address.
+    /// The silo to which these statistics belong to.
     /// </summary>
     [Id(1)] public required SiloAddress SiloAddress { get; init; }
 
