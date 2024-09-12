@@ -159,26 +159,7 @@ namespace Orleans.Runtime
         public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[]? types = null)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetDetailedGrainStatistics");
-            var stats = new List<DetailedGrainStatistic>();
-            lock (activationDirectory)
-            {
-                foreach (var activation in activationDirectory)
-                {
-                    var data = activation.Value;
-                    if (data == null || data.GrainInstance == null) continue;
-
-                    var grainType = RuntimeTypeNameFormatter.Format(data.GrainInstance.GetType());
-                    if (types == null || types.Contains(grainType))
-                    {
-                        stats.Add(new DetailedGrainStatistic()
-                        {
-                            GrainType = grainType,
-                            GrainId = data.GrainId,
-                            SiloAddress = Silo
-                        });
-                    }
-                }
-            }
+            var stats = GetDetailedGrainStatisticsCore();
             return Task.FromResult(stats);
         }
 
@@ -293,7 +274,7 @@ namespace Orleans.Runtime
 
         public Task MigrateRandomActivations(SiloAddress target, int count)
         {
-            var statistics = GetDetailedGrainStatistics().Result; // Task is always completed
+            var statistics = GetDetailedGrainStatisticsCore();
             var grainIds = statistics.Select(x => x.GrainId).ToList();
             var idsToMigrate = new HashSet<GrainId>();
             var migrationContext = new Dictionary<string, object>()
@@ -325,6 +306,31 @@ namespace Orleans.Runtime
 
 
             return Task.CompletedTask;
+        }
+
+        private List<DetailedGrainStatistic> GetDetailedGrainStatisticsCore(string[]? types = null)
+        {
+            var stats = new List<DetailedGrainStatistic>();
+            lock (activationDirectory)
+            {
+                foreach (var activation in activationDirectory)
+                {
+                    var data = activation.Value;
+                    if (data == null || data.GrainInstance == null) continue;
+
+                    var grainType = RuntimeTypeNameFormatter.Format(data.GrainInstance.GetType());
+                    if (types == null || types.Contains(grainType))
+                    {
+                        stats.Add(new DetailedGrainStatistic()
+                        {
+                            GrainType = grainType,
+                            GrainId = data.GrainId,
+                            SiloAddress = Silo
+                        });
+                    }
+                }
+            }
+            return stats;
         }
     }
 }
