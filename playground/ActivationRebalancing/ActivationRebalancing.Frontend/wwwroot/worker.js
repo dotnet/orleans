@@ -6,7 +6,7 @@ self.onmessage = function (e) {
 
     data.forEach((d, i) => {
       const numCells = Math.round(d.activations / totalActivations * 400);
-      const color = ['#ff0000', '#00ff00', '#0000ff', '#ffff00'][i % 4];
+      const color = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff'][i % 5];
 
       let cellsFilled = 0;
       const maxFillWhiteCellAttempts = 500;

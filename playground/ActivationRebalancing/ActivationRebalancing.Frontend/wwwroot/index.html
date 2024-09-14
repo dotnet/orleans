@@ -27,6 +27,10 @@
       font-size: 12px;
       fill: #000;
     }
+
+    .line-chart {
+      margin-top: 50px;
+    }
   </style>
 </head>
 <body>
@@ -35,11 +39,14 @@
     <div id="box"></div>
     <div id="bar-charts" class="bar-chart"></div>
   </div>
+  <div id="line-chart" class="line-chart"></div>
+
   <script>
     const width = 700;
     const height = 700;
-    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00'];
+    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff'];
     const numColors = colors.length;
+    const maxDataPoints = 100;
 
     const svgBox = d3.select("#box")
       .append("svg")
@@ -76,8 +83,52 @@
     svgBarCharts.append("text")
       .attr("class", "bar-label")
       .attr("x", 0)
-      .attr("y", barChartHeight + 20) 
-      .text(d => "0"); 
+      .attr("y", barChartHeight + 20)
+      .text(d => "0");
+
+    // Line chart setup
+    const lineChartWidth = 1400;
+    const lineChartHeight = 1000;
+
+    const svgLineChart = d3.select("#line-chart")
+      .append("svg")
+      .attr("width", lineChartWidth)
+      .attr("height", lineChartHeight)
+      .style("border", "1px solid black");
+
+    const xScale = d3.scaleLinear()
+      .domain([0, maxDataPoints - 1])
+      .range([0, lineChartWidth]);
+
+    const yScale = d3.scaleLinear()
+      .domain([0, 750])
+      .range([lineChartHeight, 0]);
+
+    const xAxis = d3.axisBottom(xScale).ticks(5);
+    const yAxis = d3.axisLeft(yScale).ticks(5);
+
+    svgLineChart.append("g")
+      .attr("transform", `translate(50, ${lineChartHeight - 30})`)
+      .call(xAxis);
+
+    svgLineChart.append("g")
+      .attr("transform", `translate(50, 0)`)
+      .call(yAxis);
+
+    const lineGenerators = colors.map(() => d3.line()
+      .x((d, i) => xScale(i))
+      .y(d => yScale(d)));
+
+    const linePaths = svgLineChart.selectAll(".line")
+      .data(colors)
+      .enter()
+      .append("path")
+      .attr("class", "line")
+      .attr("stroke", (d, i) => colors[i])
+      .attr("fill", "none")
+      .attr("stroke-width", 2);
+
+    const activationsHistory = colors.map(() => []);
 
     const worker = new Worker('worker.js');
 
@@ -118,7 +169,7 @@
             .attr("class", "bar")
             .merge(bars)
             .attr("x", -barChartWidth / 2)
-            .attr("y", d => barChartHeight - d) 
+            .attr("y", d => barChartHeight - d)
             .attr("width", barChartWidth - 10)
             .attr("height", d => d)
             .attr("fill", colors[i]);
@@ -128,11 +179,24 @@
           barChart.select(".bar-label")
             .text(data[i].activations);
         });
+
+        data.forEach((silo, i) => {
+          activationsHistory[i].push(silo.activations);
+          if (activationsHistory[i].length > maxDataPoints) {
+            activationsHistory[i].shift();
+          }
+        });
+
+        linePaths.each(function (d, i) {
+          d3.select(this)
+            .datum(activationsHistory[i])
+            .attr("d", lineGenerators[i]);
+        });
       };
     }
 
     function fetchData() {
-      fetch('http://localhost:5000/api/GrainStats/silo-stats')
+      fetch('http://localhost:5000/api/stats/silos')
         .then(response => response.json())
         .then(newData => {
           console.log('Fetched Data:', newData);
@@ -143,7 +207,7 @@
         });
     }
 
-    setInterval(fetchData, 3000);
+    setInterval(fetchData, 2500);
     fetchData();
   </script>
 </body>

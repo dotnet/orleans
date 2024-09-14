@@ -62,7 +62,7 @@ public sealed class ActivationRebalancerOptions
     /// <summary>
     /// The default value of <see cref="AllowedEntropyDeviation"/>.
     /// </summary>
-    public const double DEFAULT_ALLOWED_ENTROPY_DEVIATION = 0.01d;
+    public const double DEFAULT_ALLOWED_ENTROPY_DEVIATION = 0.001d;
 
     /// <summary>
     /// <para>Represents the weight that is given to the number of rebalancing cycles that have passed during a rebalancing session.</para>
