@@ -55,6 +55,7 @@ public sealed class ActivationRebalancerOptions
     /// <summary>
     /// Represents the allowed entropy deviation between the cluster's current entropy, againt the theoretical maximum.
     /// Values lower than this are practically considered as "maximum", and the current rebalancing session will stop.
+    /// This acts as a base rate if <see cref="ScaleAllowedEntropyDeviation"/> is set to <see langword="true"/>.
     /// </summary>
     /// <remarks>Allowed range is: (0-0.1]</remarks>
     public double AllowedEntropyDeviation { get; set; } = DEFAULT_ALLOWED_ENTROPY_DEVIATION;
