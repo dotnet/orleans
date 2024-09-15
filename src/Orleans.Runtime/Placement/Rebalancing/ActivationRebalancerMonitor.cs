@@ -6,6 +6,7 @@ using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Threading;
+using System.Runtime.CompilerServices;
 
 #nullable enable
 
@@ -27,6 +28,12 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     // Check on the worker with double the period the worker reports to me.
     private readonly static TimeSpan TimerPeriod = 2 * IActivationRebalancerMonitor.WorkerReportPeriod;
 
+    private DateTime UtcNow
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _timeProvider.GetUtcNow().UtcDateTime;
+    }
+
     public ActivationRebalancerMonitor(
         Catalog catalog,
         TimeProvider timeProvider,
@@ -47,6 +54,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
 
         _latestReport = new()
         {
+            ClusterImbalance = 1,
             Silo = SiloAddress.Zero,
             Status = RebalancerStatus.Suspended,
             SuspensionDuration = Timeout.InfiniteTimeSpan,
@@ -73,7 +81,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     {
         _monitorTimer = RegisterTimer(async _ =>
         {
-            var now = _timeProvider.GetUtcNow().DateTime;
+            var now = UtcNow;
             if (now > _lastHartbeat.Add(IActivationRebalancerMonitor.WorkerReportPeriod))
             {
                 LogStartingRebalancer(now - _lastHartbeat, IActivationRebalancerMonitor.WorkerReportPeriod);
@@ -116,7 +124,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     public Task Report(RebalancingReport report)
     {
         _latestReport = report;
-        _lastHartbeat = _timeProvider.GetUtcNow().DateTime;
+        _lastHartbeat = UtcNow;
 
         foreach (var listener in _statusListeners)
         {

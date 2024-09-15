@@ -13,8 +13,8 @@ public class RebalancingOptionsTests
         Assert.Equal(TimeSpan.FromSeconds(60), ActivationRebalancerOptions.DEFAULT_REBALANCER_DUE_TIME);
         Assert.Equal(TimeSpan.FromSeconds(15), ActivationRebalancerOptions.DEFAULT_SESSION_CYCLE_PERIOD);
         Assert.Equal(3, ActivationRebalancerOptions.DEFAULT_MAX_STALE_CYCLES);
-        Assert.Equal(0.001d, ActivationRebalancerOptions.DEFAULT_ENTROPY_QUANTUM);
-        Assert.Equal(0.001d, ActivationRebalancerOptions.DEFAULT_ALLOWED_ENTROPY_DEVIATION);
+        Assert.Equal(0.0001d, ActivationRebalancerOptions.DEFAULT_ENTROPY_QUANTUM);
+        Assert.Equal(0.0001d, ActivationRebalancerOptions.DEFAULT_ALLOWED_ENTROPY_DEVIATION);
         Assert.Equal(0.1d, ActivationRebalancerOptions.DEFAULT_CYCLE_NUMBER_WEIGHT);
         Assert.Equal(0.1d, ActivationRebalancerOptions.DEFAULT_SILO_NUMBER_WEIGHT);
     }

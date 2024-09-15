@@ -44,25 +44,25 @@ public sealed class ActivationRebalancerOptions
     /// the quantum, than the current rebalancing session will stop. The "change" is a normalized value
     /// being relative to the maximum possible entropy.
     /// </summary>
-    /// <remarks>Allowed range: (0-0.01)</remarks>
+    /// <remarks>Allowed range: (0-0.1]</remarks>
     public double EntropyQuantum { get; set; } = DEFAULT_ENTROPY_QUANTUM;
 
     /// <summary>
     /// The default value of <see cref="EntropyQuantum"/>.
     /// </summary>
-    public const double DEFAULT_ENTROPY_QUANTUM = 0.001d;
+    public const double DEFAULT_ENTROPY_QUANTUM = 0.0001d;
 
     /// <summary>
     /// Represents the allowed entropy deviation between the cluster's current entropy, againt the theoretical maximum.
     /// Values lower than or equal to this are practically considered as "maximum", and the current rebalancing session will stop.
     /// </summary>
-    /// <remarks>Allowed range is: (0-1)</remarks>
+    /// <remarks>Allowed range is: (0-0.1]</remarks>
     public double AllowedEntropyDeviation { get; set; } = DEFAULT_ALLOWED_ENTROPY_DEVIATION;
 
     /// <summary>
     /// The default value of <see cref="AllowedEntropyDeviation"/>.
     /// </summary>
-    public const double DEFAULT_ALLOWED_ENTROPY_DEVIATION = 0.001d;
+    public const double DEFAULT_ALLOWED_ENTROPY_DEVIATION = 0.0001d;
 
     /// <summary>
     /// <para>Represents the weight that is given to the number of rebalancing cycles that have passed during a rebalancing session.</para>
@@ -112,14 +112,14 @@ internal sealed class ActivationRebalancerOptionsValidator(
             throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.MaxStaleCycles)} must be greater than 0");
         }
 
-        if (_options.EntropyQuantum <= 0d || _options.EntropyQuantum >= 0.01d)
+        if (_options.EntropyQuantum <= 0d || _options.EntropyQuantum > 0.1d)
         {
-            throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.EntropyQuantum)} must be in greater than 0, and less 1");
+            throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.EntropyQuantum)} must be in greater than 0, and less or equal 0.1");
         }
 
-        if (_options.AllowedEntropyDeviation <= 0d || _options.AllowedEntropyDeviation >= 1d)
+        if (_options.AllowedEntropyDeviation <= 0d || _options.AllowedEntropyDeviation > 0.1d)
         {
-            throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.AllowedEntropyDeviation)} must be in greater than 0, and less 1");
+            throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.AllowedEntropyDeviation)} must be in greater than 0, and less or equal 0.1");
         }
 
         if (_options.CycleNumberWeight <= 0d || _options.CycleNumberWeight > 1d)

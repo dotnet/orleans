@@ -36,7 +36,7 @@ internal sealed partial class ActivationRebalancerWorker(
     [GenerateSerializer, Immutable, Alias("RebalancerState")]
     internal readonly record struct RebalancerState(
         int StaleCycles, int FailedSessions,
-        int RebalancingCycle, double LatestEntropy,
+        int RebalancingCycle, double LatestEntropy, double Imabalance,
         DateTime? DisabledUntil, ImmutableArray<RebalancingStatistics> Statistics);
 
     private enum StopReason
@@ -65,7 +65,7 @@ internal sealed partial class ActivationRebalancerWorker(
     private int _failedSessions;
     private int _rebalancingCycle;
     private double _previousEntropy;
-    private double _Imbalance;
+    private double _imbalance;
     private DateTime? _suspendedUntil;
     private IGrainTimer? _sessionTimer;
     private IGrainTimer? _triggerTimer;
@@ -120,7 +120,7 @@ internal sealed partial class ActivationRebalancerWorker(
 
         context.TryAddValue<RebalancerState>(StateKey,
             new(_staleCycles, _failedSessions, _rebalancingCycle,
-                _previousEntropy, _suspendedUntil, [.. _rebalancingStatistics.Values]));
+                _previousEntropy, _imbalance, _suspendedUntil, [.. _rebalancingStatistics.Values]));
     }
     
     public void OnRehydrate(IRehydrationContext context)
@@ -133,6 +133,7 @@ internal sealed partial class ActivationRebalancerWorker(
             _failedSessions = state.FailedSessions;
             _previousEntropy = state.LatestEntropy;
             _suspendedUntil = state.DisabledUntil;
+            _imbalance = state.Imabalance;
 
             foreach (var statistics in state.Statistics)
             {
@@ -198,10 +199,10 @@ internal sealed partial class ActivationRebalancerWorker(
 
         return new RebalancingReport()
         {
+            ClusterImbalance = _imbalance,
             Silo = localSiloDetails.SiloAddress,
             Status = suspended ? RebalancerStatus.Suspended : RebalancerStatus.Executing,
             SuspensionDuration = suspended ? until!.Value - UtcNow : null,
-            ClusterImbalance = _Imbalance,
             Statistics = [.. _rebalancingStatistics.Values]
         };
     }
@@ -260,7 +261,7 @@ internal sealed partial class ActivationRebalancerWorker(
         var currentEntropy = ComputeEntropy(snapshot.Select(x => x.Value), totalActivations, meanMemoryUsage);
         var entropyDeviation = (maximumEntropy - currentEntropy) / maximumEntropy;
 
-        _Imbalance = entropyDeviation;
+        _imbalance = entropyDeviation;
 
         if (entropyDeviation <= _options.AllowedEntropyDeviation)
         {
@@ -276,7 +277,7 @@ internal sealed partial class ActivationRebalancerWorker(
         // Since max entropy is a function of the natural log of the cluster's size, this value is very robust against changes
         // in silo number within the cluster.
 
-        var entropyChange = (float)Math.Abs((currentEntropy - _previousEntropy) / maximumEntropy);
+        var entropyChange = Math.Abs((currentEntropy - _previousEntropy) / maximumEntropy);
         Debug.Assert(entropyChange >= 0 && entropyChange <= 1);
 
         if (entropyChange < _options.EntropyQuantum)
