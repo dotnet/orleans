@@ -43,9 +43,15 @@ public readonly struct RebalancingReport
     [Id(2)] public TimeSpan? SuspensionDuration { get; init; }
 
     /// <summary>
+    /// The current view of the cluster's imbalance.
+    /// </summary>
+    /// <remarks>Range: [0 - 1]</remarks>
+    [Id(3)] public required double ClusterImbalance { get; init; }
+
+    /// <summary>
     /// Latest rebalancing statistics.
     /// </summary>
-    [Id(3)] public required ImmutableArray<RebalancingStatistics> Statistics { get; init; }
+    [Id(4)] public required ImmutableArray<RebalancingStatistics> Statistics { get; init; }
 }
 
 /// <summary>
