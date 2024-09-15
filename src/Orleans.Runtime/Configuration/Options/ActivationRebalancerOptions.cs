@@ -39,9 +39,9 @@ public sealed class ActivationRebalancerOptions
     public const int DEFAULT_MAX_STALE_CYCLES = 3;
 
     /// <summary>
-    /// The minumum change in the entropy of the cluster that is considered an "improvement".
+    /// The minumum change in the entropy of the cluster that is considered an improvement.
     /// When a total of n-consecutive stale cycles pass, during which the change in entropy is less than
-    /// the quantum, than the current rebalancing session will stop. The "change" is a normalized value
+    /// the quantum, than the current rebalancing session will stop. The change is a normalized value
     /// being relative to the maximum possible entropy.
     /// </summary>
     /// <remarks>Allowed range: (0-0.1]</remarks>
@@ -54,7 +54,7 @@ public sealed class ActivationRebalancerOptions
 
     /// <summary>
     /// Represents the allowed entropy deviation between the cluster's current entropy, againt the theoretical maximum.
-    /// Values lower than or equal to this are practically considered as "maximum", and the current rebalancing session will stop.
+    /// Values lower than this are practically considered as "maximum", and the current rebalancing session will stop.
     /// </summary>
     /// <remarks>Allowed range is: (0-0.1]</remarks>
     public double AllowedEntropyDeviation { get; set; } = DEFAULT_ALLOWED_ENTROPY_DEVIATION;
@@ -63,6 +63,21 @@ public sealed class ActivationRebalancerOptions
     /// The default value of <see cref="AllowedEntropyDeviation"/>.
     /// </summary>
     public const double DEFAULT_ALLOWED_ENTROPY_DEVIATION = 0.0001d;
+
+    /// <summary>
+    /// Determines whether <see cref="AllowedEntropyDeviation"/> should be scaled dynamically
+    /// based on the total number of activations. When set to <see langword="true"/>, the allowed entropy
+    /// deviation will increase logarithmically after reaching an activation threshold (10,000 activations),
+    /// and will cap at the maximum (0.1 deviation).
+    /// </summary>
+    /// <remarks>This is in place because a deviation of say 10 activations has far lesser
+    /// impact on a total of 100,000 activations, than it does for say 1,000 activations.</remarks>
+    public bool ScaleAllowedEntropyDeviation { get; set; } = DEFAULT_SCALE_DEFAULT_ALLOWED_ENTROPY_DEVIATION;
+
+    /// <summary>
+    /// The default value of <see cref="ScaleAllowedEntropyDeviation"/>.
+    /// </summary>
+    public const bool DEFAULT_SCALE_DEFAULT_ALLOWED_ENTROPY_DEVIATION = true;
 
     /// <summary>
     /// <para>Represents the weight that is given to the number of rebalancing cycles that have passed during a rebalancing session.</para>

@@ -28,7 +28,7 @@ internal sealed partial class ActivationRebalancerWorker(
     IInternalGrainFactory grainFactory,
     ILocalSiloDetails localSiloDetails,
     IOptions<ActivationRebalancerOptions> options,
-    IFailedRebalancingSessionBackoffProvider backoffProvider)
+    IFailedSessionBackoffProvider backoffProvider)
         : Grain, IActivationRebalancerWorker, ISiloStatisticsChangeListener, IGrainMigrationParticipant
 {
     private readonly record struct ResourceStatistics(long MemoryUsage, int ActivationCount);
@@ -36,7 +36,7 @@ internal sealed partial class ActivationRebalancerWorker(
     [GenerateSerializer, Immutable, Alias("RebalancerState")]
     internal readonly record struct RebalancerState(
         int StaleCycles, int FailedSessions,
-        int RebalancingCycle, double LatestEntropy, double Imabalance,
+        int RebalancingCycle, double LatestEntropy, double EntropyDeviation,
         DateTime? DisabledUntil, ImmutableArray<RebalancingStatistics> Statistics);
 
     private enum StopReason
@@ -65,7 +65,7 @@ internal sealed partial class ActivationRebalancerWorker(
     private int _failedSessions;
     private int _rebalancingCycle;
     private double _previousEntropy;
-    private double _imbalance;
+    private double _entropyDeviation;
     private DateTime? _suspendedUntil;
     private IGrainTimer? _sessionTimer;
     private IGrainTimer? _triggerTimer;
@@ -120,7 +120,7 @@ internal sealed partial class ActivationRebalancerWorker(
 
         context.TryAddValue<RebalancerState>(StateKey,
             new(_staleCycles, _failedSessions, _rebalancingCycle,
-                _previousEntropy, _imbalance, _suspendedUntil, [.. _rebalancingStatistics.Values]));
+                _previousEntropy, _entropyDeviation, _suspendedUntil, [.. _rebalancingStatistics.Values]));
     }
     
     public void OnRehydrate(IRehydrationContext context)
@@ -133,7 +133,7 @@ internal sealed partial class ActivationRebalancerWorker(
             _failedSessions = state.FailedSessions;
             _previousEntropy = state.LatestEntropy;
             _suspendedUntil = state.DisabledUntil;
-            _imbalance = state.Imabalance;
+            _entropyDeviation = state.EntropyDeviation;
 
             foreach (var statistics in state.Statistics)
             {
@@ -202,7 +202,7 @@ internal sealed partial class ActivationRebalancerWorker(
             Host = localSiloDetails.SiloAddress,
             Status = suspended ? RebalancerStatus.Suspended : RebalancerStatus.Executing,
             SuspensionDuration = suspended ? until!.Value - UtcNow : null,
-            ClusterImbalance = _imbalance,
+            ClusterImbalance = _entropyDeviation,
             Statistics = [.. _rebalancingStatistics.Values]
         };
     }
@@ -259,14 +259,15 @@ internal sealed partial class ActivationRebalancerWorker(
         var meanMemoryUsage = ComputeHarmonicMean(snapshot.Values);
         var maximumEntropy = Math.Log(siloCount);
         var currentEntropy = ComputeEntropy(snapshot.Values, totalActivations, meanMemoryUsage);
+        var allowedDeviation = ComputeAllowedEntropyDeviation(totalActivations);
         var entropyDeviation = (maximumEntropy - currentEntropy) / maximumEntropy;
 
-        _imbalance = entropyDeviation;
+        _entropyDeviation = entropyDeviation;
 
-        if (entropyDeviation <= _options.AllowedEntropyDeviation)
+        if (entropyDeviation < allowedDeviation)
         {
             // The deviation from maximum is practically considered "0" i.e: we've reached maximum.
-            LogMaxEntropyDeviationReached(entropyDeviation, currentEntropy, maximumEntropy, _options.AllowedEntropyDeviation);
+            LogMaxEntropyDeviationReached(entropyDeviation, currentEntropy, maximumEntropy, allowedDeviation);
             StopSession(StopReason.SessionCompleted);
 
             return;
@@ -427,6 +428,25 @@ internal sealed partial class ActivationRebalancerWorker(
         }
 
         return values.Count / result;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private double ComputeAllowedEntropyDeviation(int totalActivations)
+    {
+        const int ActivationThreshold = 10_000;
+        const double MaxAllowedEntropyDeviation = 0.1d;
+
+        Debug.Assert(totalActivations > 0);
+
+        if (totalActivations < ActivationThreshold)
+        {
+            return _options.AllowedEntropyDeviation;
+        }
+
+        var logFactor = (int)Math.Log10(totalActivations / ActivationThreshold);
+        var adjustedDeviation = _options.AllowedEntropyDeviation * Math.Pow(10, logFactor);
+
+        return Math.Min(adjustedDeviation, MaxAllowedEntropyDeviation);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

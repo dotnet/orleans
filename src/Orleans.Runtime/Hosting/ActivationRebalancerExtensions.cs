@@ -28,11 +28,11 @@ public static class ActivationRebalancerExtensions
     /// <typeparam name="TProvider">Custom backoff provider for determining next session after a failed attempt.</typeparam>
     [Experimental("ORLEANSEXP002")]
     public static ISiloBuilder AddActivationRebalancer<TProvider>(this ISiloBuilder builder)
-        where TProvider : class, IFailedRebalancingSessionBackoffProvider =>
+        where TProvider : class, IFailedSessionBackoffProvider =>
         builder.ConfigureServices(service => service.AddActivationRebalancer<TProvider>());
 
     private static IServiceCollection AddActivationRebalancer<TProvider>(this IServiceCollection services)
-        where TProvider : class, IFailedRebalancingSessionBackoffProvider
+        where TProvider : class, IFailedSessionBackoffProvider
     {
         services.AddSingleton<ActivationRebalancerMonitor>();
         services.AddFromExisting<IActivationRebalancer, ActivationRebalancerMonitor>();
@@ -40,7 +40,7 @@ public static class ActivationRebalancerExtensions
         services.AddTransient<IConfigurationValidator, ActivationRebalancerOptionsValidator>();
         
         services.AddSingleton<TProvider>();
-        services.AddFromExisting<IFailedRebalancingSessionBackoffProvider, TProvider>();
+        services.AddFromExisting<IFailedSessionBackoffProvider, TProvider>();
         if (typeof(TProvider).IsAssignableTo(typeof(ILifecycleParticipant<ISiloLifecycle>)))
         {
             services.AddFromExisting(typeof(ILifecycleParticipant<ISiloLifecycle>), typeof(TProvider));
