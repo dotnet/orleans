@@ -105,6 +105,17 @@ public sealed class ActivationRebalancerOptions
     /// The default value of <see cref="SiloNumberWeight"/>.
     /// </summary>
     public const double DEFAULT_SILO_NUMBER_WEIGHT = 0.1d;
+
+    /// <summary>
+    /// The maximum allowed number of activations that can be migrated at any given cycle.
+    /// </summary>
+    public int ActivationMigrationCountLimit { get; set; } = DEFAULT_ACTIVATION_MIGRATION_COUNT_LIMIT;
+
+    /// <summary>
+    /// The default value for <see cref="ActivationMigrationCountLimit"/>.
+    /// The default is practically no limit.
+    /// </summary>
+    public const int DEFAULT_ACTIVATION_MIGRATION_COUNT_LIMIT = int.MaxValue;
 }
 
 internal sealed class ActivationRebalancerOptionsValidator(
@@ -146,6 +157,11 @@ internal sealed class ActivationRebalancerOptionsValidator(
         if (_options.SiloNumberWeight < 0d || _options.SiloNumberWeight > 1d)
         {
             throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.SiloNumberWeight)} must be in greater than or equal to 0, and less or equal to 1");
+        }
+
+        if (_options.ActivationMigrationCountLimit < 1)
+        {
+            throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.ActivationMigrationCountLimit)} must be greater than 0");
         }
     }
 }

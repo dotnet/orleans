@@ -345,6 +345,11 @@ internal sealed partial class ActivationRebalancerWorker(
                 delta = highCount;
             }
 
+            if (delta > _options.ActivationMigrationCountLimit)
+            {
+                delta = _options.ActivationMigrationCountLimit;
+            }
+
             migrationTasks.Add(grainFactory
                 .GetSystemTarget<ISiloControl>(Constants.SiloControlType, highSilo)
                 .MigrateRandomActivations(lowSilo, delta));
@@ -436,12 +441,12 @@ internal sealed partial class ActivationRebalancerWorker(
         const int ActivationThreshold = 10_000;
         const double MaxAllowedEntropyDeviation = 0.1d;
 
-        Debug.Assert(totalActivations > 0);
-
-        if (totalActivations < ActivationThreshold)
+        if (!_options.ScaleAllowedEntropyDeviation || totalActivations < ActivationThreshold)
         {
             return _options.AllowedEntropyDeviation;
         }
+
+        Debug.Assert(totalActivations > 0);
 
         var logFactor = (int)Math.Log10(totalActivations / ActivationThreshold);
         var adjustedDeviation = _options.AllowedEntropyDeviation * Math.Pow(10, logFactor);
