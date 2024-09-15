@@ -29,7 +29,7 @@ public readonly struct RebalancingReport
     /// <summary>
     /// The silo where the rebalancer is currently located.
     /// </summary>
-    [Id(0)] public required SiloAddress Silo { get; init; }
+    [Id(0)] public required SiloAddress Host { get; init; }
 
     /// <summary>
     /// The current status of the rebalancer.

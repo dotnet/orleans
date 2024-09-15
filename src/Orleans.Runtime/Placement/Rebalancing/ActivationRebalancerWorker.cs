@@ -199,10 +199,10 @@ internal sealed partial class ActivationRebalancerWorker(
 
         return new RebalancingReport()
         {
-            ClusterImbalance = _imbalance,
-            Silo = localSiloDetails.SiloAddress,
+            Host = localSiloDetails.SiloAddress,
             Status = suspended ? RebalancerStatus.Suspended : RebalancerStatus.Executing,
             SuspensionDuration = suspended ? until!.Value - UtcNow : null,
+            ClusterImbalance = _imbalance,
             Statistics = [.. _rebalancingStatistics.Values]
         };
     }
@@ -256,9 +256,9 @@ internal sealed partial class ActivationRebalancerWorker(
         }
 
         var totalActivations = snapshot.Sum(x => x.Value.ActivationCount);
-        var meanMemoryUsage = ComputeHarmonicMean(snapshot.Select(x => x.Value.MemoryUsage).ToArray());
+        var meanMemoryUsage = ComputeHarmonicMean(snapshot.Values);
         var maximumEntropy = Math.Log(siloCount);
-        var currentEntropy = ComputeEntropy(snapshot.Select(x => x.Value), totalActivations, meanMemoryUsage);
+        var currentEntropy = ComputeEntropy(snapshot.Values, totalActivations, meanMemoryUsage);
         var entropyDeviation = (maximumEntropy - currentEntropy) / maximumEntropy;
 
         _imbalance = entropyDeviation;
@@ -388,45 +388,45 @@ internal sealed partial class ActivationRebalancerWorker(
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double ComputeEntropy(
-        IEnumerable<ResourceStatistics> statistics,
+        Dictionary<SiloAddress, ResourceStatistics>.ValueCollection values,
         int totalActivations, double meanMemoryUsage)
     {
         Debug.Assert(totalActivations > 0);
-        Debug.Assert(meanMemoryUsage > 0f);
+        Debug.Assert(meanMemoryUsage > 0);
 
-        var ratios = statistics.Select(x =>
+        var ratios = values.Select(x =>
             // p_i = (n_i / N) * (m_i / M_m)
-            ((double)x.ActivationCount / totalActivations) * (x.MemoryUsage / meanMemoryUsage))
-            .ToList();
+            ((double)x.ActivationCount / totalActivations) * (x.MemoryUsage / meanMemoryUsage));
 
         var ratiosSum = ratios.Sum();
-        var normalizedRatios = ratios.Select(r => r / ratiosSum).ToList();
+        var normalizedRatios = ratios.Select(r => r / ratiosSum);
 
         const double epsilon = 1e-10d;
 
         var entropy = -normalizedRatios.Sum(p =>
         {
-            var value = Math.Max(p, epsilon);  // to avoid log(0)
+            var value = Math.Max(p, epsilon);  // Avoid log(0)
             return value * Math.Log(value);    // - sum(p_i * log(p_i))
         });
 
-        Debug.Assert(entropy > 0f);
+        Debug.Assert(entropy > 0);
 
         return entropy;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double ComputeHarmonicMean(long[] memoryUsages)
+    private static double ComputeHarmonicMean(Dictionary<SiloAddress, ResourceStatistics>.ValueCollection values)
     {
         var result = 0d;
 
-        foreach (var value in memoryUsages)
+        foreach (var value in values)
         {
-            Debug.Assert(value > 0);
-            result += 1.0 / value;
+            var count = value.ActivationCount;
+            Debug.Assert(count > 0);
+            result += 1.0 / count;
         }
 
-        return memoryUsages.Length / result;
+        return values.Count / result;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

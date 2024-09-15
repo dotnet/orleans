@@ -142,7 +142,7 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
             .GetSystemTarget<IActivationRebalancerMonitor>(
              Constants.ActivationRebalancerMonitorType, target)
             .GetRebalancingReport(true))
-            .Silo;
+            .Host;
 
         if (host.Equals(Silo1))
         {

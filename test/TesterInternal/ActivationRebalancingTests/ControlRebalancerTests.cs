@@ -15,7 +15,7 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
         var serviceProvider = Cluster.GetSiloServiceProvider();
         var rebalancer = serviceProvider.GetRequiredService<IActivationRebalancer>();
         var report = await rebalancer.GetRebalancingReport();
-        var host = report.Silo;
+        var host = report.Host;
 
         Assert.Equal(RebalancerStatus.Executing, report.Status);
         Assert.Null(report.SuspensionDuration);
@@ -29,12 +29,12 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
         await rebalancer.ResumeRebalancing();
         Assert.True(listener.Report.HasValue);
         Assert.Equal(RebalancerStatus.Executing, listener.Report.Value.Status);
-        Assert.Equal(host, listener.Report.Value.Silo);
+        Assert.Equal(host, listener.Report.Value.Host);
 
         await rebalancer.SuspendRebalancing();
         Assert.Equal(RebalancerStatus.Suspended, listener.Report.Value.Status);
         Assert.True(listener.Report.Value.SuspensionDuration.HasValue);
-        Assert.Equal(host, listener.Report.Value.Silo);
+        Assert.Equal(host, listener.Report.Value.Host);
 
         rebalancer.UnsubscribeFromReports(listener);
         await rebalancer.ResumeRebalancing();
@@ -58,7 +58,7 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
         Assert.True(report.SuspensionDuration.HasValue);
         // Must be less than the time it was told to be suspended
         Assert.True(report.SuspensionDuration.Value < duration); 
-        Assert.Equal(host, report.Silo);
+        Assert.Equal(host, report.Host);
 
         while (report.Status == RebalancerStatus.Suspended)
         {
@@ -68,7 +68,7 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
 
         report = await rebalancer.GetRebalancingReport(true);
         Assert.False(report.SuspensionDuration.HasValue);
-        Assert.Equal(host, report.Silo);
+        Assert.Equal(host, report.Host);
 
         await rebalancer.SuspendRebalancing(); // Suspend indefinitely
         while (report.Status == RebalancerStatus.Executing)
@@ -78,7 +78,7 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
         }
         report = await rebalancer.GetRebalancingReport(true);
         Assert.True(report.SuspensionDuration.HasValue);
-        Assert.Equal(host, report.Silo);
+        Assert.Equal(host, report.Host);
     }
 
     private class Listener : IActivationRebalancerReportListener

@@ -55,7 +55,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
         _latestReport = new()
         {
             ClusterImbalance = 1,
-            Silo = SiloAddress.Zero,
+            Host = SiloAddress.Zero,
             Status = RebalancerStatus.Suspended,
             SuspensionDuration = Timeout.InfiniteTimeSpan,
             Statistics = ImmutableArray<RebalancingStatistics>.Empty
@@ -95,7 +95,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
 
     private Task OnStop()
     {
-        if (_latestReport is { } report && Silo.IsSameLogicalSilo(report.Silo))
+        if (_latestReport is { } report && Silo.IsSameLogicalSilo(report.Host))
         {
             if (_activationDirectory.FindTarget(_rebalancerGrain.GetGrainId()) is { } activation)
             {
