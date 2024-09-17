@@ -10,6 +10,7 @@ internal interface IActivationRebalancerWorker : IGrainWithIntegerKey
     /// <summary>
     /// Returns the most recent rebalancing report.
     /// </summary>
+    /// <remarks>Acts also as a way to wake up the rebalancer, if its deactivated.</remarks>
     [AlwaysInterleave, Alias("GetReport")] ValueTask<RebalancingReport> GetReport();
 
     /// <summary>
