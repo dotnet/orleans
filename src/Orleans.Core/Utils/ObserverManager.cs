@@ -155,8 +155,11 @@ namespace Orleans.Utilities
             var defunct = new List<TIdentity>();
             var tasks = new List<Task>();
 
-            foreach (var (observerKey, observerValue) in _observers)
+            foreach (var observer in _observers)
             {
+                var observerKey = observer.Key;
+                var observerValue = observer.Value;
+
                 if (observerValue.LastSeen + ExpirationDuration < now)
                 {
                     // Expired observers will be removed.
@@ -215,8 +218,11 @@ namespace Orleans.Utilities
             var defunct = new List<TIdentity>();
             var tasks = new List<Task>();
 
-            foreach (var (observerKey, observerValue) in _observers)
+            foreach (var observer in _observers)
             {
+                var observerKey = observer.Key;
+                var observerValue = observer.Value;
+
                 if (observerValue.LastSeen + ExpirationDuration < now)
                 {
                     // Expired observers will be removed.
