@@ -31,8 +31,8 @@ internal partial class ActivationRebalancerWorker
         "This can indicated that there is no implementation of {ProviderName}")]
     private partial void LogInvalidSiloMemory(string providerName);
 
-    [LoggerMessage(Level = LogLevel.Trace, Message = "The current rebalancing session has stopped due to {StaleCycles} stale cycles having passed, which is the maximum allowed.")]
-    private partial void LogMaxStaleCyclesReached(int staleCycles);
+    [LoggerMessage(Level = LogLevel.Trace, Message = "The current rebalancing session has stopped due to {StagnantCycles} stagnant cycles having passed, which is the maximum allowed.")]
+    private partial void LogMaxStagnantCyclesReached(int stagnantCycles);
 
     [LoggerMessage(Level = LogLevel.Trace, Message =
         "The current rebalancing session has stopped due to a {EntropyDeviation} " +
@@ -42,11 +42,11 @@ internal partial class ActivationRebalancerWorker
 
     [LoggerMessage(Level = LogLevel.Trace, Message =
         "The relative change in entropy {EntropyChange} is less than the quantum {EntropyQuantum}. " +
-        "This is practically not considered an improvement, therefor this cycle will be marked as stale.")]
+        "This is practically not considered an improvement, therefor this cycle will be marked as stagnant.")]
     private partial void LogInsufficientEntropyQuantum(double entropyChange, double entropyQuantum);
 
-    [LoggerMessage(Level = LogLevel.Trace, Message = "Stale cycle count has been reset as we are improving now.")]
-    private partial void LogStaleCyclesReset();
+    [LoggerMessage(Level = LogLevel.Trace, Message = "Stagnant cycle count has been reset as we are improving now.")]
+    private partial void LogStagnantCyclesReset();
 
     [LoggerMessage(Level = LogLevel.Trace, Message = "Failed session count has been reset as we are improving now.")]
     private partial void LogFailedSessionsReset();
@@ -61,9 +61,9 @@ internal partial class ActivationRebalancerWorker
 
     [LoggerMessage(Level = LogLevel.Trace, Message =
         "Rebalancing cycle {RebalancingCycle} has finished. " +
-        "[ Stale Cycles: {StaleCycles} | Previous Entropy: {PreviousEntropy} | " +
+        "[ Stagnant Cycles: {StagnantCycles} | Previous Entropy: {PreviousEntropy} | " +
         "Current Entropy: {CurrentEntropy} | Maximum Entropy: {MaximumEntropy} | Entropy Deviation: {EntropyDeviation} ]")]
     private partial void LogCycleOutcome(
-        int rebalancingCycle, int staleCycles, double previousEntropy,
+        int rebalancingCycle, int stagnantCycles, double previousEntropy,
         double currentEntropy, double maximumEntropy, double entropyDeviation);
 }

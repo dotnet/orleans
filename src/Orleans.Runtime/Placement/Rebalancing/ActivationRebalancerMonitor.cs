@@ -74,7 +74,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
            nameof(ActivationRepartitioner),
            ServiceLifecycleStage.ApplicationServices,
            _ => Task.CompletedTask,
-           _ => OnStop());
+           ct => OnStop(ct));
     }  
 
     private async Task OnStart()
@@ -93,14 +93,14 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
         _latestReport = await _rebalancerGrain.GetReport();
     }
 
-    private Task OnStop()
+    private Task OnStop(CancellationToken cancellationToken)
     {
         if (_latestReport is { } report && Silo.IsSameLogicalSilo(report.Host))
         {
             if (_activationDirectory.FindTarget(_rebalancerGrain.GetGrainId()) is { } activation)
             {
                 LogMigratingRebalancer(Silo);
-                activation.Migrate(null); // migrate it anywhere else
+                activation.Migrate(null, cancellationToken); // migrate it anywhere else
             }
         }
 

@@ -35,7 +35,7 @@ internal sealed partial class ActivationRebalancerWorker(
 
     [GenerateSerializer, Immutable, Alias("RebalancerState")]
     internal readonly record struct RebalancerState(
-        int StaleCycles, int FailedSessions,
+        int StagnantCycles, int FailedSessions,
         int RebalancingCycle, double LatestEntropy, double EntropyDeviation,
         DateTime? DisabledUntil, ImmutableArray<RebalancingStatistics> Statistics);
 
@@ -61,7 +61,7 @@ internal sealed partial class ActivationRebalancerWorker(
 
     private const string StateKey = "REBALANCER_STATE";
 
-    private int _staleCycles;
+    private int _stagnantCycles;
     private int _failedSessions;
     private int _rebalancingCycle;
     private double _previousEntropy;
@@ -119,7 +119,7 @@ internal sealed partial class ActivationRebalancerWorker(
         _rebalancingStatistics.Remove(localSiloDetails.SiloAddress);   // Remove this silo's rebalancing stats, as we are shutting down.
 
         context.TryAddValue<RebalancerState>(StateKey,
-            new(_staleCycles, _failedSessions, _rebalancingCycle,
+            new(_stagnantCycles, _failedSessions, _rebalancingCycle,
                 _previousEntropy, _entropyDeviation, _suspendedUntil, [.. _rebalancingStatistics.Values]));
     }
     
@@ -129,7 +129,7 @@ internal sealed partial class ActivationRebalancerWorker(
             rebalancerState is { } state)
         {
             _rebalancingCycle = state.RebalancingCycle;
-            _staleCycles = state.StaleCycles;
+            _stagnantCycles = state.StagnantCycles;
             _failedSessions = state.FailedSessions;
             _previousEntropy = state.LatestEntropy;
             _suspendedUntil = state.DisabledUntil;
@@ -247,9 +247,9 @@ internal sealed partial class ActivationRebalancerWorker(
 
         _rebalancingCycle++;
 
-        if (_staleCycles >= _options.MaxStaleCycles)
+        if (_stagnantCycles >= _options.MaxStagnantCycles)
         {
-            LogMaxStaleCyclesReached(_staleCycles);
+            LogMaxStagnantCyclesReached(_stagnantCycles);
             StopSession(StopReason.SessionFailed);
 
             return;
@@ -290,16 +290,16 @@ internal sealed partial class ActivationRebalancerWorker(
 
             LogInsufficientEntropyQuantum(entropyChange, _options.EntropyQuantum);
 
-            _staleCycles++;
+            _stagnantCycles++;
             _previousEntropy = currentEntropy;
 
             return;
         }
 
-        if (_staleCycles > 0)
+        if (_stagnantCycles > 0)
         {
-            _staleCycles = 0;
-            LogStaleCyclesReset();
+            _stagnantCycles = 0;
+            LogStagnantCyclesReset();
         }
 
         if (_failedSessions > 0)
@@ -363,7 +363,7 @@ internal sealed partial class ActivationRebalancerWorker(
             await Task.WhenAll(migrationTasks);
         }
 
-        LogCycleOutcome(_rebalancingCycle, _staleCycles, _previousEntropy, currentEntropy, maximumEntropy, entropyDeviation);
+        LogCycleOutcome(_rebalancingCycle, _stagnantCycles, _previousEntropy, currentEntropy, maximumEntropy, entropyDeviation);
         _previousEntropy = currentEntropy;
     }
 
@@ -508,7 +508,7 @@ internal sealed partial class ActivationRebalancerWorker(
     {
         _previousEntropy = 0;
         _rebalancingCycle = 0;
-        _staleCycles = 0;
+        _stagnantCycles = 0;
         _sessionTimer?.Dispose();
         _sessionTimer = null;
 

@@ -31,16 +31,16 @@ public sealed class ActivationRebalancerOptions
     /// The maximum, consecutive number of cycles, yielding no significant improvement to the cluster's entropy.
     /// </summary>
     /// <remarks>This value is inclusive, i.e. if this value is 'n', than the 'n+1' cycle will stop the current rebalancing session.</remarks>
-    public int MaxStaleCycles { get; set; } = DEFAULT_MAX_STALE_CYCLES;
+    public int MaxStagnantCycles { get; set; } = DEFAULT_MAX_STAGNANT_CYCLES;
 
     /// <summary>
-    /// The default value of <see cref="MaxStaleCycles"/>.
+    /// The default value of <see cref="MaxStagnantCycles"/>.
     /// </summary>
-    public const int DEFAULT_MAX_STALE_CYCLES = 3;
+    public const int DEFAULT_MAX_STAGNANT_CYCLES = 3;
 
     /// <summary>
     /// The minumum change in the entropy of the cluster that is considered an improvement.
-    /// When a total of n-consecutive stale cycles pass, during which the change in entropy is less than
+    /// When a total of n-consecutive stagnant cycles pass, during which the change in entropy is less than
     /// the quantum, than the current rebalancing session will stop. The change is a normalized value
     /// being relative to the maximum possible entropy.
     /// </summary>
@@ -134,9 +134,9 @@ internal sealed class ActivationRebalancerOptionsValidator(
                 $"{$"2 x {nameof(DeploymentLoadPublisherOptions.DeploymentLoadPublisherRefreshTime)}"}");
         }
 
-        if (_options.MaxStaleCycles <= 0)
+        if (_options.MaxStagnantCycles <= 0)
         {
-            throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.MaxStaleCycles)} must be greater than 0");
+            throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.MaxStagnantCycles)} must be greater than 0");
         }
 
         if (_options.EntropyQuantum <= 0d || _options.EntropyQuantum > 0.1d)

@@ -54,6 +54,7 @@ namespace Orleans.Runtime
             {ManifestProviderType, "ManifestProvider"},
             {ActivationMigratorType, "ActivationMigrator"},
             {ActivationRepartitionerType, "ActivationRepartitioner"},
+            {ActivationRebalancerMonitorType, "ActivationRebalancerMonitor"}
         }.ToFrozenDictionary();
 
         public static string SystemTargetName(GrainType id) => SingletonSystemTargetNames.TryGetValue(id, out var name) ? name : id.ToString();

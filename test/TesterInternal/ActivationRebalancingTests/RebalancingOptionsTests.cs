@@ -12,7 +12,7 @@ public class RebalancingOptionsTests
     {
         Assert.Equal(TimeSpan.FromSeconds(60), ActivationRebalancerOptions.DEFAULT_REBALANCER_DUE_TIME);
         Assert.Equal(TimeSpan.FromSeconds(15), ActivationRebalancerOptions.DEFAULT_SESSION_CYCLE_PERIOD);
-        Assert.Equal(3, ActivationRebalancerOptions.DEFAULT_MAX_STALE_CYCLES);
+        Assert.Equal(3, ActivationRebalancerOptions.DEFAULT_MAX_STAGNANT_CYCLES);
         Assert.Equal(0.0001d, ActivationRebalancerOptions.DEFAULT_ENTROPY_QUANTUM);
         Assert.Equal(0.0001d, ActivationRebalancerOptions.DEFAULT_ALLOWED_ENTROPY_DEVIATION);
         Assert.Equal(0.1d, ActivationRebalancerOptions.DEFAULT_CYCLE_NUMBER_WEIGHT);
@@ -37,7 +37,7 @@ public class RebalancingOptionsTests
     public void InvalidOptionsShouldThrow(
         double sessionCyclePeriodMilliseconds,
         double publisherRefreshTimeSeconds,
-        int maxStaleCycles,
+        int maxStagnantCycles,
         double entropyQuantum,
         double allowedEntropyDeviation,
         double cycleNumberWeight,
@@ -52,7 +52,7 @@ public class RebalancingOptionsTests
         var options = new ActivationRebalancerOptions
         {
             SessionCyclePeriod = TimeSpan.FromMilliseconds(sessionCyclePeriodMilliseconds),
-            MaxStaleCycles = maxStaleCycles,
+            MaxStagnantCycles = maxStagnantCycles,
             EntropyQuantum = entropyQuantum,
             AllowedEntropyDeviation = allowedEntropyDeviation,
             CycleNumberWeight = cycleNumberWeight,

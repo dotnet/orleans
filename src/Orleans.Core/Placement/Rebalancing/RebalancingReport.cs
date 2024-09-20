@@ -45,7 +45,7 @@ public readonly struct RebalancingReport
     /// <summary>
     /// The current view of the cluster's imbalance.
     /// </summary>
-    /// <remarks>Range: [0 - 1]</remarks>
+    /// <remarks>Range: [0-1]</remarks>
     [Id(3)] public required double ClusterImbalance { get; init; }
 
     /// <summary>
