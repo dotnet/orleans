@@ -150,8 +150,7 @@ internal sealed partial class ActivationRebalancerWorker(
 
     public void SiloStatisticsChangeNotification(SiloAddress address, SiloRuntimeStatistics statistics)
     {
-        ref var stats = ref CollectionsMarshal.GetValueRefOrAddDefault(_siloStatistics, address, out _);
-        stats = new(statistics.EnvironmentStatistics.MemoryUsageBytes, statistics.ActivationCount);
+        _siloStatistics[address] = new(statistics.EnvironmentStatistics.MemoryUsageBytes, statistics.ActivationCount);
     }
 
     public ValueTask<RebalancingReport> GetReport() => new(BuildReport());

@@ -274,36 +274,31 @@ namespace Orleans.Runtime
 
         public Task MigrateRandomActivations(SiloAddress target, int count)
         {
-            var statistics = GetDetailedGrainStatisticsCore();
-            var grainIds = statistics.Select(x => x.GrainId).ToList();
-            var idsToMigrate = new HashSet<GrainId>();
+            ArgumentNullException.ThrowIfNull(target);
+            ArgumentOutOfRangeException.ThrowIfNegative(count);
             var migrationContext = new Dictionary<string, object>()
             {
                 [IPlacementDirector.PlacementHintKey] = target
             };
 
-            // Loop until we've migrated the desired count of activations or run out of activations to try
-            while (idsToMigrate.Count < count && grainIds.Count > 0)
-            {   
-                var remainingCount = count - idsToMigrate.Count; // How many more we still need to migrate?
-                var candidates = Random.Shared.GetItems(grainIds.ToArray(), remainingCount); // Randomly select up to the remaining count
-
-                foreach (var grainId in candidates)
+            // Loop until we've migrated the desired count of activations or run out of activations to try.
+            // Note that we have a weak pseudorandom enumeration here, and lossy counting: this is not a precise
+            // or deterministic operation.
+            var remainingCount = count;
+            foreach (var (grainId, grainContext) in activationDirectory)
+            {
+                if (!_migratabilityChecker.IsMigratable(grainId.Type))
                 {
-                    grainIds.Remove(grainId); // Remove it from the list to avoid re-selection
-
-                    if (_migratabilityChecker.IsMigratable(grainId.Type) &&
-                        activationDirectory.FindTarget(grainId) is { } activation)
-                    {
-                        activation.Migrate(migrationContext);
-                        idsToMigrate.Add(grainId);
-
-                        if (idsToMigrate.Count >= count)
-                            break;
-                    }
+                    continue;
                 }
-            }
 
+                if (--remainingCount <= 0)
+                {
+                    break;
+                }
+
+                grainContext.Migrate(migrationContext);
+            }
 
             return Task.CompletedTask;
         }
