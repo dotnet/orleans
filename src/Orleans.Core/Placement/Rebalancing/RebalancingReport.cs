@@ -73,12 +73,12 @@ public readonly struct RebalancingStatistics
     [Id(1)] public required SiloAddress SiloAddress { get; init; }
 
     /// <summary>
-    /// The number of activations that have been dispersed from this silo thus far.
+    /// The approximate number of activations that have been dispersed from this silo thus far.
     /// </summary>
     [Id(2)] public required ulong DispersedActivations { get; init; }
 
     /// <summary>
-    /// The number of activations that have been acquired by this silo thus far.
+    /// The approximate number of activations that have been acquired by this silo thus far.
     /// </summary>
     [Id(3)] public required ulong AcquiredActivations { get; init; }
 }
