@@ -30,7 +30,7 @@ public sealed class ActivationRebalancerOptions
     /// <summary>
     /// The maximum, consecutive number of cycles, yielding no significant improvement to the cluster's entropy.
     /// </summary>
-    /// <remarks>This value is inclusive, i.e. if this value is 'n', than the 'n+1' cycle will stop the current rebalancing session.</remarks>
+    /// <remarks>This value is inclusive, i.e. if this value is 'n', then the 'n+1' cycle will stop the current rebalancing session.</remarks>
     public int MaxStagnantCycles { get; set; } = DEFAULT_MAX_STAGNANT_CYCLES;
 
     /// <summary>
@@ -39,9 +39,9 @@ public sealed class ActivationRebalancerOptions
     public const int DEFAULT_MAX_STAGNANT_CYCLES = 3;
 
     /// <summary>
-    /// The minumum change in the entropy of the cluster that is considered an improvement.
+    /// The minimum change in the entropy of the cluster that is considered an improvement.
     /// When a total of n-consecutive stagnant cycles pass, during which the change in entropy is less than
-    /// the quantum, than the current rebalancing session will stop. The change is a normalized value
+    /// the quantum, then the current rebalancing session will stop. The change is a normalized value
     /// being relative to the maximum possible entropy.
     /// </summary>
     /// <remarks>Allowed range: (0-0.1]</remarks>
@@ -53,7 +53,7 @@ public sealed class ActivationRebalancerOptions
     public const double DEFAULT_ENTROPY_QUANTUM = 0.0001d;
 
     /// <summary>
-    /// Represents the allowed entropy deviation between the cluster's current entropy, againt the theoretical maximum.
+    /// Represents the allowed entropy deviation between the cluster's current entropy, against the theoretical maximum.
     /// Values lower than this are practically considered as "maximum", and the current rebalancing session will stop.
     /// This acts as a base rate if <see cref="ScaleAllowedEntropyDeviation"/> is set to <see langword="true"/>.
     /// </summary>
@@ -72,7 +72,7 @@ public sealed class ActivationRebalancerOptions
     /// and will cap at the maximum (0.1 deviation).
     /// </summary>
     /// <remarks>This is in place because a deviation of say 10 activations has far lesser
-    /// impact on a total of 100,000 activations, than it does for say 1,000 activations.</remarks>
+    /// impact on a total of 100,000 activations than it does for say 1,000 activations.</remarks>
     public bool ScaleAllowedEntropyDeviation { get; set; } = DEFAULT_SCALE_DEFAULT_ALLOWED_ENTROPY_DEVIATION;
 
     /// <summary>

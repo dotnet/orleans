@@ -6,7 +6,6 @@ using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Threading;
-using System.Runtime.CompilerServices;
 
 #nullable enable
 
@@ -16,7 +15,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
 {
     private IGrainTimer? _monitorTimer;
     private RebalancingReport _latestReport;
-    private DateTime _lastHartbeat = DateTime.MinValue;
+    private long _lastHeartbeatTimestamp;
 
     private readonly TimeProvider _timeProvider;
     private readonly ActivationDirectory _activationDirectory;
@@ -27,12 +26,6 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
 
     // Check on the worker with double the period the worker reports to me.
     private readonly static TimeSpan TimerPeriod = 2 * IActivationRebalancerMonitor.WorkerReportPeriod;
-
-    private DateTime UtcNow
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => _timeProvider.GetUtcNow().UtcDateTime;
-    }
 
     public ActivationRebalancerMonitor(
         Catalog catalog,
@@ -49,6 +42,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
         _siloStatusOracle = siloStatusOracle;
         _logger = loggerFactory.CreateLogger<ActivationRebalancerMonitor>();
         _rebalancerGrain = grainFactory.GetGrain<IActivationRebalancerWorker>(0);
+        _lastHeartbeatTimestamp = _timeProvider.GetTimestamp();
 
         catalog.RegisterSystemTarget(this);
 
@@ -67,30 +61,30 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
         observer.Subscribe(
            nameof(ActivationRepartitioner),
            ServiceLifecycleStage.Active,
-           _ => OnStart(),
+           OnStart,
            _ => Task.CompletedTask);
 
         observer.Subscribe(
            nameof(ActivationRepartitioner),
            ServiceLifecycleStage.ApplicationServices,
            _ => Task.CompletedTask,
-           ct => OnStop(ct));
+           OnStop);
     }  
 
-    private async Task OnStart()
+    private async Task OnStart(CancellationToken cancellationToken)
     {
-        _monitorTimer = RegisterTimer(async _ =>
+        _monitorTimer = RegisterGrainTimer(async ct =>
         {
-            var now = UtcNow;
-            if (now > _lastHartbeat.Add(IActivationRebalancerMonitor.WorkerReportPeriod))
+            var elapsedSinceHeartbeat = _timeProvider.GetElapsedTime(_lastHeartbeatTimestamp);
+            if (elapsedSinceHeartbeat >= IActivationRebalancerMonitor.WorkerReportPeriod)
             {
-                LogStartingRebalancer(now - _lastHartbeat, IActivationRebalancerMonitor.WorkerReportPeriod);
-                _latestReport = await _rebalancerGrain.GetReport();
+                LogStartingRebalancer(elapsedSinceHeartbeat, IActivationRebalancerMonitor.WorkerReportPeriod);
+                _latestReport = await _rebalancerGrain.GetReport().AsTask().WaitAsync(ct);
             }
 
-        }, null, TimerPeriod, TimerPeriod);
+        }, TimerPeriod, TimerPeriod);
 
-        _latestReport = await _rebalancerGrain.GetReport();
+        _latestReport = await _rebalancerGrain.GetReport().AsTask().WaitAsync(cancellationToken);
     }
 
     private Task OnStop(CancellationToken cancellationToken)
@@ -124,7 +118,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     public Task Report(RebalancingReport report)
     {
         _latestReport = report;
-        _lastHartbeat = UtcNow;
+        _lastHeartbeatTimestamp = _timeProvider.GetTimestamp();
 
         foreach (var listener in _statusListeners)
         {

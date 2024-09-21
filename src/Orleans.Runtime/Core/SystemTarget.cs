@@ -157,8 +157,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Registers a timer to send regular callbacks to this grain.
-        /// This timer will keep the current grain from being deactivated.
+        /// Registers a timer to send regular callbacks to this system target.
         /// </summary>
         /// <param name="callback">The timer callback, which will fire whenever the timer becomes due.</param>
         /// <param name="state">The state object passed to the callback.</param>
@@ -176,10 +175,61 @@ namespace Orleans.Runtime
         /// </returns>
         public IGrainTimer RegisterTimer(Func<object, Task> callback, object state, TimeSpan dueTime, TimeSpan period)
         {
-            var ctxt = RuntimeContext.Current;
             ArgumentNullException.ThrowIfNull(callback);
             var timer = this.ActivationServices.GetRequiredService<ITimerRegistry>()
                 .RegisterGrainTimer(this, static (state, _) => state.Callback(state.State), (Callback: callback, State: state), new() { DueTime = dueTime, Period = period, Interleave = true });
+            return timer;
+        }
+
+        /// <summary>
+        /// Registers a timer to send regular callbacks to this system target.
+        /// </summary>
+        /// <param name="callback">The timer callback, which will fire whenever the timer becomes due.</param>
+        /// <param name="dueTime">
+        /// The amount of time to delay before the <paramref name="callback"/> is invoked.
+        /// Specify <see cref="Timeout.InfiniteTimeSpan"/> to prevent the timer from starting.
+        /// Specify <see cref="TimeSpan.Zero"/> to invoke the callback promptly.
+        /// </param>
+        /// <param name="period">
+        /// The time interval between invocations of <paramref name="callback"/>.
+        /// Specify <see cref="Timeout.InfiniteTimeSpan"/> to disable periodic signaling.
+        /// </param>
+        /// <returns>
+        /// An <see cref="IDisposable"/> object which will cancel the timer upon disposal.
+        /// </returns>
+        public IGrainTimer RegisterGrainTimer(Func<CancellationToken, Task> callback, TimeSpan dueTime, TimeSpan period)
+        {
+            CheckRuntimeContext();
+            ArgumentNullException.ThrowIfNull(callback);
+            var timer = this.ActivationServices.GetRequiredService<ITimerRegistry>()
+                .RegisterGrainTimer(this, (state, ct) => state(ct), callback, new() { DueTime = dueTime, Period = period, Interleave = true });
+            return timer;
+        }
+
+        /// <summary>
+        /// Registers a timer to send regular callbacks to this grain.
+        /// This timer will keep the current grain from being deactivated.
+        /// </summary>
+        /// <param name="callback">The timer callback, which will fire whenever the timer becomes due.</param>
+        /// <param name="state">The state object passed to the callback.</param>
+        /// <param name="dueTime">
+        /// The amount of time to delay before the <paramref name="callback"/> is invoked.
+        /// Specify <see cref="Timeout.InfiniteTimeSpan"/> to prevent the timer from starting.
+        /// Specify <see cref="TimeSpan.Zero"/> to invoke the callback promptly.
+        /// </param>
+        /// <param name="period">
+        /// The time interval between invocations of <paramref name="callback"/>.
+        /// Specify <see cref="Timeout.InfiniteTimeSpan"/> to disable periodic signaling.
+        /// </param>
+        /// <returns>
+        /// An <see cref="IDisposable"/> object which will cancel the timer upon disposal.
+        /// </returns>
+        public IGrainTimer RegisterGrainTimer<TState>(Func<TState, CancellationToken, Task> callback, TState state, TimeSpan dueTime, TimeSpan period)
+        {
+            CheckRuntimeContext();
+            ArgumentNullException.ThrowIfNull(callback);
+            var timer = this.ActivationServices.GetRequiredService<ITimerRegistry>()
+                .RegisterGrainTimer(this, callback, state, new() { DueTime = dueTime, Period = period, Interleave = true });
             return timer;
         }
 
@@ -330,6 +380,22 @@ namespace Orleans.Runtime
             foreach (var timer in timers)
             {
                 timer.Dispose();
+            }
+        }
+
+        internal void CheckRuntimeContext()
+        {
+            var context = RuntimeContext.Current;
+            if (context is null)
+            {
+                ThrowMissingContext();
+                void ThrowMissingContext() => throw new InvalidOperationException($"Access violation: attempted to access context '{this}' from null context.");
+            }
+
+            if (!ReferenceEquals(context, this))
+            {
+                ThrowAccessViolation(context);
+                void ThrowAccessViolation(IGrainContext currentContext) => throw new InvalidOperationException($"Access violation: attempt to access context '{this}' from different context, '{currentContext}'.");
             }
         }
     }

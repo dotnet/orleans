@@ -17,6 +17,7 @@ internal interface IActivationRebalancerWorker : IGrainWithIntegerKey
     /// Resumes rebalancing if its suspended, otherwise its a no-op.
     /// </summary>
     [Alias("ResumeRebalancing")] Task ResumeRebalancing();
+
     /// <summary>
     /// Suspends rebalancing if its running, otherwise its a no-op.
     /// </summary>
