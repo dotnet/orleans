@@ -17,9 +17,7 @@ using Microsoft.Extensions.Hosting;
 using Orleans.TestingHost.InMemoryTransport;
 using Orleans.TestingHost.UnixSocketTransport;
 using System.Net;
-using Orleans.Hosting;
 using Orleans.Statistics;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Orleans.TestingHost
 {
@@ -156,7 +154,7 @@ namespace Orleans.TestingHost
             {
                 var handle = Silos.FirstOrDefault(x => x.SiloAddress.Equals(silo));
                 return handle != null ? ((InProcessSiloHandle)handle).SiloHost.Services :
-                    throw new ArgumentException($"The provided silo address '{silo}' is not a real silo process.");
+                    throw new ArgumentException($"The provided silo address '{silo}' is unknown.");
             }
             else
             {
