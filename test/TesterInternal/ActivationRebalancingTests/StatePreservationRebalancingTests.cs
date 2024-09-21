@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Orleans.Configuration;
+using Orleans.Core.Internal;
 using Orleans.Placement.Rebalancing;
+using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
@@ -24,6 +26,12 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
     public async Task Should_Migrate_And_Preserve_State_When_Hosting_Silo_Dies()
     {
         var tasks = new List<Task>();
+
+        // Move the rebalancer to the first secondary silo, since we will stop it later and we cannot stop
+        // the primary in this test setup.
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, Cluster.SecondarySilos[0].SiloAddress);
+        await Cluster.Client.GetGrain<IActivationRebalancerWorker>(0).Cast<IGrainManagementExtension>().MigrateOnIdle();
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, null);
 
         AddTestActivations(tasks, Silo1, 300);
         AddTestActivations(tasks, Silo2, 30);
@@ -62,7 +70,8 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
 
                 OutputHelper.WriteLine($"Cycle {index}: Now stopping Silo{rebalancerHostNum}, which is the host of the rebalancer\n");
 
-                await Cluster.StopSiloAsync(Cluster.SecondarySilos.First(x => x.SiloAddress.Equals(rebalancerHost)));
+                Assert.NotEqual(rebalancerHost, Cluster.Primary.SiloAddress);
+                await Cluster.StopSiloAsync(Cluster.Silos.First(x => x.SiloAddress.Equals(rebalancerHost)));
             }
 
             await Task.Delay(SPFixture.SessionCyclePeriod);
@@ -175,15 +184,12 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            //TestUtils.CheckForAzureStorage();
-            builder.Options.UseTestClusterMembership = false;
             builder.Options.InitialSilosCount = 4;
             builder.Options.UseRealEnvironmentStatistics = true;
             builder.AddSiloBuilderConfigurator<Configurator>();
-            builder.AddClientBuilderConfigurator<Configurator>();
         }
 
-        private class Configurator : ISiloConfigurator, IClientBuilderConfigurator
+        private class Configurator : ISiloConfigurator
         {
             public void Configure(ISiloBuilder siloBuilder)
 #pragma warning disable ORLEANSEXP002
@@ -199,20 +205,8 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
                         o.RebalancerDueTime = RebalancerDueTime;
                         o.SessionCyclePeriod = SessionCyclePeriod;
                     })
-                    .UseAzureStorageClustering(o =>
-                    {
-                        o.TableServiceClient = new("UseDevelopmentStorage=true");
-                    })
                     .AddActivationRebalancer();
 #pragma warning restore ORLEANSEXP002
-
-            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-            {
-                clientBuilder.UseAzureStorageClustering(o =>
-                {
-                    o.TableServiceClient = new("UseDevelopmentStorage=true");
-                });
-            }
         }
     }
 }

@@ -112,8 +112,6 @@ internal sealed partial class ActivationRebalancerWorker(
 
     public void OnDehydrate(IDehydrationContext context)
     {
-        _rebalancingStatistics.Remove(localSiloDetails.SiloAddress);   // Remove this silo's rebalancing stats, as we are shutting down.
-
         context.TryAddValue<RebalancerState>(StateKey,
             new(_stagnantCycles, _failedSessions, _rebalancingCycle,
                 _previousEntropy, _entropyDeviation, RemainingSuspensionDuration, [.. _rebalancingStatistics.Values]));
@@ -121,7 +119,7 @@ internal sealed partial class ActivationRebalancerWorker(
     
     public void OnRehydrate(IRehydrationContext context)
     {
-        if (context.TryGetValue<RebalancerState?>(StateKey, out var rebalancerState) &&
+        if (context.TryGetValue<RebalancerState>(StateKey, out var rebalancerState) &&
             rebalancerState is { } state)
         {
             _rebalancingCycle = state.RebalancingCycle;
@@ -132,6 +130,11 @@ internal sealed partial class ActivationRebalancerWorker(
 
             foreach (var statistics in state.Statistics)
             {
+                if (siloStatusOracle.IsDeadSilo(statistics.SiloAddress))
+                {
+                    continue;
+                }
+
                 _rebalancingStatistics.TryAdd(statistics.SiloAddress, statistics);
             }
 
