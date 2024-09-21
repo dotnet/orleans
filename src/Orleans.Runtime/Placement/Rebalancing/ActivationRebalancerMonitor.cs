@@ -6,6 +6,7 @@ using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Threading;
+using Orleans.Runtime.Scheduler;
 
 #nullable enable
 
@@ -52,7 +53,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
             Host = SiloAddress.Zero,
             Status = RebalancerStatus.Suspended,
             SuspensionDuration = Timeout.InfiniteTimeSpan,
-            Statistics = ImmutableArray<RebalancingStatistics>.Empty
+            Statistics = []
         };
     }
 
@@ -73,33 +74,39 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
 
     private async Task OnStart(CancellationToken cancellationToken)
     {
-        _monitorTimer = RegisterGrainTimer(async ct =>
+        await this.RunOrQueueTask(async () =>
         {
-            var elapsedSinceHeartbeat = _timeProvider.GetElapsedTime(_lastHeartbeatTimestamp);
-            if (elapsedSinceHeartbeat >= IActivationRebalancerMonitor.WorkerReportPeriod)
+            _monitorTimer = RegisterGrainTimer(async ct =>
             {
-                LogStartingRebalancer(elapsedSinceHeartbeat, IActivationRebalancerMonitor.WorkerReportPeriod);
-                _latestReport = await _rebalancerGrain.GetReport().AsTask().WaitAsync(ct);
-            }
+                var elapsedSinceHeartbeat = _timeProvider.GetElapsedTime(_lastHeartbeatTimestamp);
+                if (elapsedSinceHeartbeat >= IActivationRebalancerMonitor.WorkerReportPeriod)
+                {
+                    LogStartingRebalancer(elapsedSinceHeartbeat, IActivationRebalancerMonitor.WorkerReportPeriod);
+                    _latestReport = await _rebalancerGrain.GetReport().AsTask().WaitAsync(ct);
+                }
 
-        }, TimerPeriod, TimerPeriod);
+            }, TimerPeriod, TimerPeriod);
 
-        _latestReport = await _rebalancerGrain.GetReport().AsTask().WaitAsync(cancellationToken);
+            _latestReport = await _rebalancerGrain.GetReport().AsTask().WaitAsync(cancellationToken);
+        });
     }
 
-    private Task OnStop(CancellationToken cancellationToken)
+    private async Task OnStop(CancellationToken cancellationToken)
     {
-        if (_latestReport is { } report && Silo.IsSameLogicalSilo(report.Host))
+        await this.RunOrQueueTask(() =>
         {
-            if (_activationDirectory.FindTarget(_rebalancerGrain.GetGrainId()) is { } activation)
+            if (_latestReport is { } report && Silo.IsSameLogicalSilo(report.Host))
             {
-                LogMigratingRebalancer(Silo);
-                activation.Migrate(null, cancellationToken); // migrate it anywhere else
+                if (_activationDirectory.FindTarget(_rebalancerGrain.GetGrainId()) is { } activation)
+                {
+                    LogMigratingRebalancer(Silo);
+                    activation.Migrate(null, cancellationToken); // migrate it anywhere else
+                }
             }
-        }
 
-        _monitorTimer?.Dispose();
-        return Task.CompletedTask;
+            _monitorTimer?.Dispose();
+            return Task.CompletedTask;
+        });
     }
 
     public Task ResumeRebalancing() => _rebalancerGrain.ResumeRebalancing();

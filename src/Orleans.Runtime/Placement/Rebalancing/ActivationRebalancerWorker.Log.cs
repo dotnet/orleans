@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.Logging;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime.Placement.Rebalancing;
 
@@ -28,8 +29,8 @@ internal partial class ActivationRebalancerWorker
 
     [LoggerMessage(Level = LogLevel.Warning, Message =
         "Can not continue with rebalancing because at least one of the silos is reporting 0 memory usage. " +
-        "This can indicated that there is no implementation of {ProviderName}")]
-    private partial void LogInvalidSiloMemory(string providerName);
+        $"This can indicate that there is no implementation of {nameof(IEnvironmentStatisticsProvider)}.")]
+    private partial void LogInvalidSiloMemory();
 
     [LoggerMessage(Level = LogLevel.Trace, Message = "The current rebalancing session has stopped due to {StagnantCycles} stagnant cycles having passed, which is the maximum allowed.")]
     private partial void LogMaxStagnantCyclesReached(int stagnantCycles);
@@ -42,7 +43,7 @@ internal partial class ActivationRebalancerWorker
 
     [LoggerMessage(Level = LogLevel.Trace, Message =
         "The relative change in entropy {EntropyChange} is less than the quantum {EntropyQuantum}. " +
-        "This is practically not considered an improvement, therefor this cycle will be marked as stagnant.")]
+        "This is practically not considered an improvement, therefore this cycle will be marked as stagnant.")]
     private partial void LogInsufficientEntropyQuantum(double entropyChange, double entropyQuantum);
 
     [LoggerMessage(Level = LogLevel.Trace, Message = "Stagnant cycle count has been reset as we are improving now.")]
