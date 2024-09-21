@@ -158,7 +158,7 @@ internal sealed partial class ActivationRebalancerWorker(
     public async Task ResumeRebalancing()
     {
         StartSession();
-        await ReportAllMonitors();
+        await ReportAllMonitors(CancellationToken.None);
     }
 
     public async Task SuspendRebalancing(TimeSpan? duration)
@@ -174,10 +174,10 @@ internal sealed partial class ActivationRebalancerWorker(
             LogSuspended();
         }
 
-        await ReportAllMonitors();
+        await ReportAllMonitors(CancellationToken.None);
     }
 
-    private async Task ReportAllMonitors()
+    private async Task ReportAllMonitors(CancellationToken cancellationToken)
     {
         var tasks = new List<Task>();
         var report = BuildReport();
@@ -188,7 +188,7 @@ internal sealed partial class ActivationRebalancerWorker(
                 (Constants.ActivationRebalancerMonitorType, silo).Report(report));
         }
 
-        await Task.WhenAll(tasks);
+        await Task.WhenAll(tasks).WaitAsync(cancellationToken);
     }
 
     private RebalancingReport BuildReport()
@@ -222,7 +222,7 @@ internal sealed partial class ActivationRebalancerWorker(
         return Task.CompletedTask;
     }
 
-    private async Task RunRebalancingCycle()
+    private async Task RunRebalancingCycle(CancellationToken cancellationToken)
     {
         var siloCount = siloStatusOracle.GetActiveSilos().Length;
         if (siloCount < 2)
@@ -359,7 +359,7 @@ internal sealed partial class ActivationRebalancerWorker(
 
         if (migrationTasks.Count > 0)
         {
-            await Task.WhenAll(migrationTasks);
+            await Task.WhenAll(migrationTasks).WaitAsync(cancellationToken);
         }
 
         LogCycleOutcome(_rebalancingCycle, _stagnantCycles, _previousEntropy, currentEntropy, maximumEntropy, entropyDeviation);
