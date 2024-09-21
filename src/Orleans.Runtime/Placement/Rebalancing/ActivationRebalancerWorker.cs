@@ -37,7 +37,7 @@ internal sealed partial class ActivationRebalancerWorker(
     internal readonly record struct RebalancerState(
         int StagnantCycles, int FailedSessions,
         int RebalancingCycle, double LatestEntropy, double EntropyDeviation,
-        DateTime? DisabledUntil, ImmutableArray<RebalancingStatistics> Statistics);
+        TimeSpan? SuspensionDuration, ImmutableArray<RebalancingStatistics> Statistics);
 
     private enum StopReason
     {
@@ -66,7 +66,7 @@ internal sealed partial class ActivationRebalancerWorker(
     private int _rebalancingCycle;
     private double _previousEntropy;
     private double _entropyDeviation;
-    private DateTime? _suspendedUntil;
+    private long _suspendedUntilTs;
     private IGrainTimer? _sessionTimer;
     private IGrainTimer? _triggerTimer;
     private IGrainTimer? _monitorTimer;
@@ -76,15 +76,11 @@ internal sealed partial class ActivationRebalancerWorker(
     private readonly Dictionary<SiloAddress, RebalancingStatistics> _rebalancingStatistics = [];
     private readonly ILogger<ActivationRebalancerWorker> _logger = loggerFactory.CreateLogger<ActivationRebalancerWorker>();
 
-    private DateTime UtcNow
+    private TimeSpan? RemainingSuspensionDuration => Runtime.TimeProvider.GetElapsedTime(Runtime.TimeProvider.GetTimestamp(), _suspendedUntilTs) switch
     {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => Runtime.TimeProvider.GetUtcNow().UtcDateTime;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private bool IsSuspended(DateTime? suspendedUntil) =>
-        suspendedUntil.HasValue && suspendedUntil.Value > UtcNow;
+        { } result when result > TimeSpan.Zero => result,
+        _ => null
+    };
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
@@ -120,7 +116,7 @@ internal sealed partial class ActivationRebalancerWorker(
 
         context.TryAddValue<RebalancerState>(StateKey,
             new(_stagnantCycles, _failedSessions, _rebalancingCycle,
-                _previousEntropy, _entropyDeviation, _suspendedUntil, [.. _rebalancingStatistics.Values]));
+                _previousEntropy, _entropyDeviation, RemainingSuspensionDuration, [.. _rebalancingStatistics.Values]));
     }
     
     public void OnRehydrate(IRehydrationContext context)
@@ -132,12 +128,16 @@ internal sealed partial class ActivationRebalancerWorker(
             _stagnantCycles = state.StagnantCycles;
             _failedSessions = state.FailedSessions;
             _previousEntropy = state.LatestEntropy;
-            _suspendedUntil = state.DisabledUntil;
             _entropyDeviation = state.EntropyDeviation;
 
             foreach (var statistics in state.Statistics)
             {
                 _rebalancingStatistics.TryAdd(statistics.SiloAddress, statistics);
+            }
+
+            if (state.SuspensionDuration is { } value)
+            {
+                SuspendFor(value);
             }
         }
     }
@@ -193,14 +193,13 @@ internal sealed partial class ActivationRebalancerWorker(
 
     private RebalancingReport BuildReport()
     {
-        var until = _suspendedUntil; // take a copy since _triggerTimer interleaves
-        var suspended = IsSuspended(until);
+        var suspensionRemaining = RemainingSuspensionDuration;
 
         return new RebalancingReport()
         {
             Host = localSiloDetails.SiloAddress,
-            Status = suspended ? RebalancerStatus.Suspended : RebalancerStatus.Executing,
-            SuspensionDuration = suspended ? until!.Value - UtcNow : null,
+            Status = suspensionRemaining is { } ? RebalancerStatus.Suspended : RebalancerStatus.Executing,
+            SuspensionDuration = suspensionRemaining,
             ClusterImbalance = _entropyDeviation,
             Statistics = [.. _rebalancingStatistics.Values]
         };
@@ -213,7 +212,7 @@ internal sealed partial class ActivationRebalancerWorker(
             return Task.CompletedTask;
         }
 
-        if (IsSuspended(_suspendedUntil))
+        if (RemainingSuspensionDuration.HasValue)
         {
             return Task.CompletedTask;
         }
@@ -240,7 +239,7 @@ internal sealed partial class ActivationRebalancerWorker(
 
         if (snapshot.Any(x => x.Value.MemoryUsage == 0))
         {
-            LogInvalidSiloMemory(nameof(IEnvironmentStatisticsProvider));
+            LogInvalidSiloMemory();
             return;
         }
 
@@ -278,7 +277,7 @@ internal sealed partial class ActivationRebalancerWorker(
         // in silo number within the cluster.
 
         var entropyChange = Math.Abs((currentEntropy - _previousEntropy) / maximumEntropy);
-        Debug.Assert(entropyChange >= 0 && entropyChange <= 1);
+        Debug.Assert(entropyChange is >= 0 and <= 1);
 
         if (entropyChange < _options.EntropyQuantum)
         {
@@ -366,11 +365,10 @@ internal sealed partial class ActivationRebalancerWorker(
         _previousEntropy = currentEntropy;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void UpdateStatistics(SiloAddress lowSilo, SiloAddress highSilo, int delta)
     {
         Debug.Assert(delta > 0);
-        var now = UtcNow;
+        var now = Runtime.TimeProvider.GetUtcNow().DateTime;
 
         ref var lowStats = ref CollectionsMarshal.GetValueRefOrAddDefault(_rebalancingStatistics, lowSilo, out _);
         lowStats = new()
@@ -391,7 +389,6 @@ internal sealed partial class ActivationRebalancerWorker(
         };
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double ComputeEntropy(
         Dictionary<SiloAddress, ResourceStatistics>.ValueCollection values,
         int totalActivations, double meanMemoryUsage)
@@ -419,7 +416,6 @@ internal sealed partial class ActivationRebalancerWorker(
         return entropy;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double ComputeHarmonicMean(Dictionary<SiloAddress, ResourceStatistics>.ValueCollection values)
     {
         var result = 0d;
@@ -434,7 +430,6 @@ internal sealed partial class ActivationRebalancerWorker(
         return values.Count / result;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private double ComputeAllowedEntropyDeviation(int totalActivations)
     {
         const int ActivationThreshold = 10_000;
@@ -453,7 +448,6 @@ internal sealed partial class ActivationRebalancerWorker(
         return Math.Min(adjustedDeviation, MaxAllowedEntropyDeviation);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private double ComputeAdaptiveScaling(int siloCount, int rebalancingCycle)
     {
         Debug.Assert(rebalancingCycle > 0);
@@ -464,7 +458,6 @@ internal sealed partial class ActivationRebalancerWorker(
         return (double)(cycleFactor * siloFactor);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static List<(SiloAddress, SiloAddress)> FormSiloPairs(
         Dictionary<SiloAddress, ResourceStatistics> statistics)
     {
@@ -516,7 +509,7 @@ internal sealed partial class ActivationRebalancerWorker(
             case StopReason.SessionStarting:
                 {
                     _failedSessions = 0;
-                    _suspendedUntil = null;
+                    _suspendedUntilTs = 0;
                 }
                 break;
             case StopReason.SessionFailed:
@@ -540,20 +533,26 @@ internal sealed partial class ActivationRebalancerWorker(
                     }
                     else
                     {
-                        _suspendedUntil = DateTime.MaxValue;
+                        _suspendedUntilTs = long.MaxValue;
                     }
                 }
                 break;
         }
 
         LogSessionStopped();
+    }
 
-        void SuspendFor(TimeSpan duration)
+    private void SuspendFor(TimeSpan duration)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(duration, TimeSpan.Zero);
+        var now = Runtime.TimeProvider.GetTimestamp();
+        var suspendUntil = now + (long)(Runtime.TimeProvider.TimestampFrequency * duration.TotalSeconds);
+        if (suspendUntil < now)
         {
-            var suspendUntil = UtcNow.Add(duration);
-
-            _suspendedUntil = !_suspendedUntil.HasValue ? suspendUntil :
-                (suspendUntil > _suspendedUntil ? suspendUntil : _suspendedUntil);
+            // Clamp overflow at max value.
+            suspendUntil = long.MaxValue;
         }
+
+        _suspendedUntilTs = Math.Max(_suspendedUntilTs, suspendUntil);
     }
 }
