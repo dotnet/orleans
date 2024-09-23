@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
@@ -225,7 +225,6 @@ namespace Orleans.Persistence
         {
             try
             {
-                RedisValue etag = grainState.ETag ?? "";
                 RedisResult response;
                 string newETag;
                 var key = _getKeyFunc(grainType, grainId);
@@ -241,7 +240,8 @@ namespace Orleans.Persistence
                           return -1
                         end
                         """;
-                    response = await _db.ScriptEvaluateAsync(DeleteScript, keys: new[] { key }, values: new[] { etag }).ConfigureAwait(false);
+                    RedisValue[] values = grainState.ETag is null ? [] : [grainState.ETag];
+                    response = await _db.ScriptEvaluateAsync(DeleteScript, keys: [key], values: values).ConfigureAwait(false);
                     newETag = null;
                 }
                 else
@@ -257,7 +257,8 @@ namespace Orleans.Persistence
                         end
                         """;
                     newETag = Guid.NewGuid().ToString("N");
-                    response = await _db.ScriptEvaluateAsync(ClearScript, keys: new[] { key }, values: new RedisValue[] { etag, newETag }).ConfigureAwait(false);
+                    RedisValue[] values = grainState.ETag is null ? [] : [grainState.ETag, newETag];
+                    response = await _db.ScriptEvaluateAsync(ClearScript, keys: [key], values: values).ConfigureAwait(false);
                 }
 
                 if (response is not null && (int)response == -1)
