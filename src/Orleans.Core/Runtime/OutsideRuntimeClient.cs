@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using Orleans.ClientObservers;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
+using Orleans.Core;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -272,7 +273,7 @@ namespace Orleans
             {
                 // don't set expiration for system target messages.
                 var ttl = request.GetDefaultResponseTimeout() ?? this.clientMessagingOptions.ResponseTimeout;
-                message.TimeToLive = ttl; 
+                message.TimeToLive = ttl;
             }
 
             if (!oneWay)
@@ -434,6 +435,18 @@ namespace Orleans
             try
             {
                 this.ClusterConnectionLost?.Invoke(this, EventArgs.Empty);
+
+                var statusObservers = this.ServiceProvider.GetServices<IClusterConnectionStatusObserver>().ToArray();
+
+                if (statusObservers.Length <= 0)
+                {
+                    return;
+                }
+
+                foreach (var observer in statusObservers)
+                {
+                    observer.NotifyClusterConnectionLost();
+                }
             }
             catch (Exception ex)
             {
@@ -447,6 +460,21 @@ namespace Orleans
             try
             {
                 this.GatewayCountChanged?.Invoke(this, new GatewayCountChangedEventArgs(currentNumberOfGateways, previousNumberOfGateways));
+
+                var statusObservers = this.ServiceProvider.GetServices<IClusterConnectionStatusObserver>().ToArray();
+
+                if (statusObservers.Length <= 0)
+                {
+                    return;
+                }
+
+                foreach (var observer in statusObservers)
+                {
+                    observer.NotifyGatewayCountChanged(
+                        currentNumberOfGateways,
+                        previousNumberOfGateways,
+                        currentNumberOfGateways > 0 && previousNumberOfGateways <= 0);
+                }
             }
             catch (Exception ex)
             {
