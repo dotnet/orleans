@@ -145,15 +145,19 @@ internal sealed partial class ActivationRebalancerWorker(
         }
     }
 
-    public void RemoveSilo(SiloAddress silo)
+    void ISiloStatisticsChangeListener.RemoveSilo(SiloAddress silo)
     {
-        _siloStatistics.Remove(silo);
-        _rebalancingStatistics.Remove(silo); // Remove that silo's rebalancing stats, as it has been removed.
+        GrainContext.Scheduler.QueueAction(() =>
+        {
+            _siloStatistics.Remove(silo);
+            _rebalancingStatistics.Remove(silo); // Remove that silo's rebalancing stats, as it has been removed.
+        });
     }
 
-    public void SiloStatisticsChangeNotification(SiloAddress address, SiloRuntimeStatistics statistics)
+    void ISiloStatisticsChangeListener.SiloStatisticsChangeNotification(SiloAddress address, SiloRuntimeStatistics statistics)
     {
-        _siloStatistics[address] = new(statistics.EnvironmentStatistics.MemoryUsageBytes, statistics.ActivationCount);
+        GrainContext.Scheduler.QueueAction(()
+            => _siloStatistics[address] = new(statistics.EnvironmentStatistics.MemoryUsageBytes, statistics.ActivationCount));
     }
 
     public ValueTask<RebalancingReport> GetReport() => new(BuildReport());
