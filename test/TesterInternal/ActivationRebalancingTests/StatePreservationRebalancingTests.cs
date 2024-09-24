@@ -29,7 +29,7 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
 
         // Move the rebalancer to the first secondary silo, since we will stop it later and we cannot stop
         // the primary in this test setup.
-        RequestContext.Set(IPlacementDirector.PlacementHintKey, Cluster.SecondarySilos[0].SiloAddress);
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, Cluster.Silos[1].SiloAddress);
         await Cluster.Client.GetGrain<IActivationRebalancerWorker>(0).Cast<IGrainManagementExtension>().MigrateOnIdle();
         RequestContext.Set(IPlacementDirector.PlacementHintKey, null);
 
@@ -70,7 +70,7 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
 
                 OutputHelper.WriteLine($"Cycle {index}: Now stopping Silo{rebalancerHostNum}, which is the host of the rebalancer\n");
 
-                Assert.NotEqual(rebalancerHost, Cluster.Primary.SiloAddress);
+                Assert.NotEqual(rebalancerHost, Cluster.Silos[0].SiloAddress);
                 await Cluster.StopSiloAsync(Cluster.Silos.First(x => x.SiloAddress.Equals(rebalancerHost)));
             }
 
@@ -177,21 +177,16 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
         return new(SiloAddress.Zero, 0);
     }
 
-    public class StatePreservationFixture : BaseTestClusterFixture
+    public class StatePreservationFixture : BaseInProcessTestClusterFixture
     {
         public static readonly TimeSpan RebalancerDueTime = TimeSpan.FromSeconds(5);
         public static readonly TimeSpan SessionCyclePeriod = TimeSpan.FromSeconds(3);
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             builder.Options.InitialSilosCount = 4;
             builder.Options.UseRealEnvironmentStatistics = true;
-            builder.AddSiloBuilderConfigurator<Configurator>();
-        }
-
-        private class Configurator : ISiloConfigurator
-        {
-            public void Configure(ISiloBuilder siloBuilder)
+            builder.ConfigureSilo((options, siloBuilder)
 #pragma warning disable ORLEANSEXP002
                 => siloBuilder
                     .Configure<SiloMessagingOptions>(o =>
@@ -205,7 +200,7 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
                         o.RebalancerDueTime = RebalancerDueTime;
                         o.SessionCyclePeriod = SessionCyclePeriod;
                     })
-                    .AddActivationRebalancer();
+                    .AddActivationRebalancer());
 #pragma warning restore ORLEANSEXP002
         }
     }

@@ -11,7 +11,6 @@ using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
-using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
@@ -19,7 +18,6 @@ using Orleans.Serialization.TypeSystem;
 using Orleans.Statistics;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
-
 
 namespace Orleans.Runtime
 {

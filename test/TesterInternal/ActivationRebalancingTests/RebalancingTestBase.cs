@@ -1,16 +1,14 @@
 using TestExtensions;
 using Xunit.Abstractions;
-using Orleans.Configuration;
 using Orleans.TestingHost;
 using Orleans.Runtime.Placement;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace UnitTests.ActivationRebalancingTests;
 
-public abstract class RebalancingTestBase<TFixture> : BaseTestClusterFixture
-    where TFixture : BaseTestClusterFixture
+public abstract class RebalancingTestBase<TFixture>
+    where TFixture : BaseInProcessTestClusterFixture
 {
-    protected TestCluster Cluster { get; }
+    protected InProcessTestCluster Cluster { get; }
 
     protected SiloAddress Silo1 { get; }
     protected SiloAddress Silo2 { get; }
@@ -18,7 +16,7 @@ public abstract class RebalancingTestBase<TFixture> : BaseTestClusterFixture
     protected SiloAddress Silo4 { get; }
 
     internal ITestOutputHelper OutputHelper { get; }
-    internal new IInternalGrainFactory GrainFactory { get; }
+    internal IInternalGrainFactory GrainFactory { get; }
     internal IManagementGrain MgmtGrain { get; }
 
     protected RebalancingTestBase(TFixture fixture, ITestOutputHelper output)
@@ -32,7 +30,7 @@ public abstract class RebalancingTestBase<TFixture> : BaseTestClusterFixture
 
         Cluster = fixture.HostedCluster;
         OutputHelper = output;
-        GrainFactory = fixture.HostedCluster.InternalGrainFactory;
+        GrainFactory = (IInternalGrainFactory)fixture.HostedCluster.Client;
         MgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
     }
 
@@ -57,45 +55,11 @@ public abstract class RebalancingTestBase<TFixture> : BaseTestClusterFixture
         return (int)variance;
     }
 
-    public override async Task InitializeAsync()
+    public async Task InitializeAsync()
     {
         await GrainFactory
             .GetGrain<IManagementGrain>(0)
             .ForceActivationCollection(TimeSpan.Zero);
-
-        await base.InitializeAsync();
-    }
-}
-
-public class RebalancerFixture : BaseTestClusterFixture
-{
-    public static readonly TimeSpan RebalancerDueTime = TimeSpan.FromSeconds(5);
-    public static readonly TimeSpan SessionCyclePeriod = TimeSpan.FromSeconds(3);
-
-    protected override void ConfigureTestCluster(TestClusterBuilder builder)
-    {
-        builder.Options.InitialSilosCount = 4;
-        builder.Options.UseRealEnvironmentStatistics = true;
-        builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-    }
-
-    private class SiloConfigurator : ISiloConfigurator
-    {
-        public void Configure(ISiloBuilder siloBuilder)
-#pragma warning disable ORLEANSEXP002
-            => siloBuilder
-                .Configure<SiloMessagingOptions>(o =>
-                {
-                    o.AssumeHomogenousSilosForTesting = true;
-                    o.ClientGatewayShutdownNotificationTimeout = default;
-                })
-                .Configure<ActivationRebalancerOptions>(o =>
-                {
-                    o.RebalancerDueTime = RebalancerDueTime;
-                    o.SessionCyclePeriod = SessionCyclePeriod;
-                })
-                .AddActivationRebalancer();
-#pragma warning restore ORLEANSEXP002
     }
 }
 
