@@ -91,7 +91,7 @@ public sealed class ActivationRebalancerOptions
     /// </summary>
     /// <remarks>
     /// <para>Allowed range: [1000-∞)</para>
-    /// <para><strong>Values lower than 5000 are highly discouraged.</strong></para>
+    /// <para><strong>Values lower than the default are discouraged.</strong></para>
     /// </remarks>
     public int ScaledEntropyDeviationActivationThreshold { get; set; }
 
