@@ -68,17 +68,37 @@ public sealed class ActivationRebalancerOptions
     /// <summary>
     /// Determines whether <see cref="AllowedEntropyDeviation"/> should be scaled dynamically
     /// based on the total number of activations. When set to <see langword="true"/>, the allowed entropy
-    /// deviation will increase logarithmically after reaching an activation threshold (10,000 activations),
-    /// and will cap at the maximum (0.1 deviation).
+    /// deviation will increase logarithmically after reaching <see cref="ScaledEntropyDeviationActivationThreshold"/>,
+    /// and will cap at <see cref="MAX_SCALED_ENTROPY_DEVIATION"/>.
     /// </summary>
     /// <remarks>This is in place because a deviation of say 10 activations has far lesser
     /// impact on a total of 100,000 activations than it does for say 1,000 activations.</remarks>
-    public bool ScaleAllowedEntropyDeviation { get; set; } = DEFAULT_SCALE_DEFAULT_ALLOWED_ENTROPY_DEVIATION;
+    public bool ScaleAllowedEntropyDeviation { get; set; } = DEFAULT_SCALE_ALLOWED_ENTROPY_DEVIATION;
 
     /// <summary>
     /// The default value of <see cref="ScaleAllowedEntropyDeviation"/>.
     /// </summary>
-    public const bool DEFAULT_SCALE_DEFAULT_ALLOWED_ENTROPY_DEVIATION = true;
+    public const bool DEFAULT_SCALE_ALLOWED_ENTROPY_DEVIATION = true;
+
+    /// <summary>
+    /// The maximum value allowed when <see cref="ScaleAllowedEntropyDeviation"/> is <see langword="true"/>.
+    /// </summary>
+    public const double MAX_SCALED_ENTROPY_DEVIATION = 0.1d;
+
+    /// <summary>
+    /// Determines the number of activations that must be active during any rebalancing cycle, in order for <see cref="ScaleAllowedEntropyDeviation"/>
+    /// (if, and only if, its <see langword="true"/>) to begin scaling the <see cref="AllowedEntropyDeviation"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>Allowed range: [1000-∞)</para>
+    /// <para><strong>Values lower than 5000 are highly discouraged.</strong></para>
+    /// </remarks>
+    public int ScaledEntropyDeviationActivationThreshold { get; set; }
+
+    /// <summary>
+    /// The default value of <see cref="ScaledEntropyDeviationActivationThreshold"/>.
+    /// </summary>
+    public const int DEFAULT_SCALED_ENTROPY_DEVIATION_ACTIVATION_THRESHOLD = 10_000;
 
     /// <summary>
     /// <para>Represents the weight that is given to the number of rebalancing cycles that have passed during a rebalancing session.</para>
@@ -162,6 +182,11 @@ internal sealed class ActivationRebalancerOptionsValidator(
         if (_options.ActivationMigrationCountLimit < 1)
         {
             throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.ActivationMigrationCountLimit)} must be greater than 0");
+        }
+
+        if (_options.ScaledEntropyDeviationActivationThreshold < 1_000)
+        {
+            throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.ScaledEntropyDeviationActivationThreshold)} must be greater than or equal to 1000");
         }
     }
 }

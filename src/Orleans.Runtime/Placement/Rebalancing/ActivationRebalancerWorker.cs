@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,7 +11,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Placement;
 using Orleans.Placement.Rebalancing;
-using Orleans.Statistics;
 
 #nullable enable
 
@@ -46,9 +44,9 @@ internal sealed partial class ActivationRebalancerWorker(
         /// </summary>
         SessionStarting,
         /// <summary>
-        /// Current session has failed.
+        /// Current session has stagnated.
         /// </summary>
-        SessionFailed,
+        SessionStagnated,
         /// <summary>
         /// Current session has completed successfully till end
         /// </summary>
@@ -255,7 +253,7 @@ internal sealed partial class ActivationRebalancerWorker(
         if (_stagnantCycles >= _options.MaxStagnantCycles)
         {
             LogMaxStagnantCyclesReached(_stagnantCycles);
-            StopSession(StopReason.SessionFailed);
+            StopSession(StopReason.SessionStagnated);
 
             return;
         }
@@ -323,14 +321,11 @@ internal sealed partial class ActivationRebalancerWorker(
         var addressPairs = FormSiloPairs(snapshot);
         var migrationTasks = new List<Task>();
 
+        Debug.Assert(addressPairs.Count % 2 == 0);
+
         for (var i = 0; i < addressPairs.Count; i++)
         {
             (var lowSilo, var highSilo) = addressPairs[i];
-
-            if (lowSilo.IsSameLogicalSilo(highSilo))
-            {
-                continue;
-            }
 
             var difference = Math.Abs(
                 (snapshot[lowSilo].ActivationCount - idealDistributions[lowSilo]) -
@@ -439,20 +434,17 @@ internal sealed partial class ActivationRebalancerWorker(
 
     private double ComputeAllowedEntropyDeviation(int totalActivations)
     {
-        const int ActivationThreshold = 10_000;
-        const double MaxAllowedEntropyDeviation = 0.1d;
-
-        if (!_options.ScaleAllowedEntropyDeviation || totalActivations < ActivationThreshold)
+        if (!_options.ScaleAllowedEntropyDeviation || totalActivations < _options.ScaledEntropyDeviationActivationThreshold)
         {
             return _options.AllowedEntropyDeviation;
         }
 
         Debug.Assert(totalActivations > 0);
 
-        var logFactor = (int)Math.Log10(totalActivations / ActivationThreshold);
+        var logFactor = (int)Math.Log10(totalActivations / _options.ScaledEntropyDeviationActivationThreshold);
         var adjustedDeviation = _options.AllowedEntropyDeviation * Math.Pow(10, logFactor);
 
-        return Math.Min(adjustedDeviation, MaxAllowedEntropyDeviation);
+        return Math.Min(adjustedDeviation, ActivationRebalancerOptions.MAX_SCALED_ENTROPY_DEVIATION);
     }
 
     private double ComputeAdaptiveScaling(int siloCount, int rebalancingCycle)
@@ -480,11 +472,6 @@ internal sealed partial class ActivationRebalancerWorker(
 
             left++;
             right--;
-        }
-
-        if (left == right) // Odd number of silos
-        {
-            pairs.Add((sorted[left].Key, sorted[left].Key)); // Pair this silo with itself 
         }
 
         return pairs;
@@ -519,7 +506,7 @@ internal sealed partial class ActivationRebalancerWorker(
                     _suspendedUntilTs = 0;
                 }
                 break;
-            case StopReason.SessionFailed:
+            case StopReason.SessionStagnated:
                 {
                     _failedSessions++;
                     SuspendFor(backoffProvider.Next(_failedSessions));
