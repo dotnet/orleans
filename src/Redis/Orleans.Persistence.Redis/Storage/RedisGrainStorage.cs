@@ -149,7 +149,7 @@ namespace Orleans.Persistence
             const string WriteScript =
                 """
                 local etag = redis.call('HGET', KEYS[1], 'etag')
-                if (not etag and (ARGV[1] == nil or ARGV[1] == '')) or etag == ARGV[1] then
+                if ((not etag or etag == '') and (not ARGV[1] or ARGV[1] == '')) or etag == ARGV[1] then
                   redis.call('HMSET', KEYS[1], 'etag', ARGV[2], 'data', ARGV[3])
                   if ARGV[4] ~= '-1' then
                     redis.call('EXPIRE', KEYS[1], ARGV[4])
@@ -225,6 +225,7 @@ namespace Orleans.Persistence
         {
             try
             {
+                RedisValue etag = grainState.ETag ?? "";
                 RedisResult response;
                 string newETag;
                 var key = _getKeyFunc(grainType, grainId);
@@ -233,15 +234,14 @@ namespace Orleans.Persistence
                     const string DeleteScript =
                         """
                         local etag = redis.call('HGET', KEYS[1], 'etag')
-                        if (not etag and not ARGV[1]) or etag == ARGV[1] then
+                        if ((not etag or etag == '') and (not ARGV[1] or ARGV[1] == '')) or etag == ARGV[1] then
                           redis.call('DEL', KEYS[1])
                           return 0
                         else
                           return -1
                         end
                         """;
-                    RedisValue[] values = grainState.ETag is null ? [] : [grainState.ETag];
-                    response = await _db.ScriptEvaluateAsync(DeleteScript, keys: [key], values: values).ConfigureAwait(false);
+                    response = await _db.ScriptEvaluateAsync(DeleteScript, keys: new[] { key }, values: new[] { etag }).ConfigureAwait(false);
                     newETag = null;
                 }
                 else
@@ -249,7 +249,7 @@ namespace Orleans.Persistence
                     const string ClearScript =
                         """
                         local etag = redis.call('HGET', KEYS[1], 'etag')
-                        if (not etag and not ARGV[1]) or etag == ARGV[1] then
+                        if ((not etag or etag == '') and (not ARGV[1] or ARGV[1] == '')) or etag == ARGV[1] then
                           redis.call('HMSET', KEYS[1], 'etag', ARGV[2], 'data', '')
                           return 0
                         else
@@ -257,8 +257,7 @@ namespace Orleans.Persistence
                         end
                         """;
                     newETag = Guid.NewGuid().ToString("N");
-                    RedisValue[] values = grainState.ETag is null ? [] : [grainState.ETag, newETag];
-                    response = await _db.ScriptEvaluateAsync(ClearScript, keys: [key], values: values).ConfigureAwait(false);
+                    response = await _db.ScriptEvaluateAsync(ClearScript, keys: new[] { key }, values: new RedisValue[] { etag, newETag }).ConfigureAwait(false);
                 }
 
                 if (response is not null && (int)response == -1)
