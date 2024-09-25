@@ -275,6 +275,11 @@ namespace Orleans.Runtime
         internal IGrainReferenceRuntime Runtime => Shared.Runtime;
 
         /// <summary>
+        /// Gets the flags for all calls made by this reference.
+        /// </summary>
+        internal InvokeMethodOptions InvokeMethodOptions => Shared.InvokeMethodOptions;
+
+        /// <summary>
         /// Gets the grain id.
         /// </summary>
         public GrainId GrainId => GrainId.Create(_shared.GrainType, _key);
@@ -377,7 +382,6 @@ namespace Orleans.Runtime
         {
             if (reference1 is null) return !(reference2 is null);
 
-
             return !reference1.Equals(reference2);
         }
 
@@ -409,7 +413,7 @@ namespace Orleans.Runtime
         /// <returns>The result of the invocation.</returns>
         protected ValueTask<T> InvokeAsync<T>(IRequest methodDescription)
         {
-            return this.Runtime.InvokeMethodAsync<T>(this, methodDescription, methodDescription.Options);
+            return this.Runtime.InvokeMethodAsync<T>(this, methodDescription, methodDescription.Options | InvokeMethodOptions);
         }
 
         /// <summary>
@@ -419,7 +423,7 @@ namespace Orleans.Runtime
         /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
         protected ValueTask InvokeAsync(IRequest methodDescription)
         {
-            return this.Runtime.InvokeMethodAsync(this, methodDescription, methodDescription.Options);
+            return this.Runtime.InvokeMethodAsync(this, methodDescription, methodDescription.Options | InvokeMethodOptions);
         }
 
         /// <summary>
@@ -428,7 +432,7 @@ namespace Orleans.Runtime
         /// <param name="methodDescription">The method description.</param>
         protected void Invoke(IRequest methodDescription)
         {
-            this.Runtime.InvokeMethod(this, methodDescription, methodDescription.Options);
+            this.Runtime.InvokeMethod(this, methodDescription, methodDescription.Options | InvokeMethodOptions);
         }
     }
 

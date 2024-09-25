@@ -43,6 +43,7 @@ namespace Orleans.Concurrency
     /// messages is not significant.
     /// </summary>
     [AttributeUsage(AttributeTargets.Interface)]
+    [Obsolete("This attribute has no effect and should be removed.")]
     public sealed class UnorderedAttribute : Attribute
     {
     }

@@ -42,7 +42,6 @@ namespace UnitTests.GrainInterfaces
         Task Do(Outsider o);
     }
 
-    [Unordered]
     public interface ISomeGrainWithInvocationOptions : IGrainWithIntegerKey
     {
         [AlwaysInterleave]
