@@ -7,11 +7,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Internal;
-using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Utilities;
 
@@ -29,7 +27,7 @@ internal sealed partial class GrainDirectoryReplica(
     ILoggerFactory loggerFactory,
     IServiceProvider serviceProvider,
     IInternalGrainFactory grainFactory)
-    : SystemTarget(CreateGrainId(localSiloDetails.SiloAddress, partitionIndex), localSiloDetails.SiloAddress, loggerFactory), IGrainDirectoryPartition, IGrainDirectoryTestHooks 
+    : SystemTarget(CreateGrainId(localSiloDetails.SiloAddress, partitionIndex), localSiloDetails.SiloAddress, loggerFactory), IGrainDirectoryPartition, IGrainDirectoryTestHooks
 {
     internal static SystemTargetGrainId CreateGrainId(SiloAddress siloAddress, int partitionIndex) => SystemTargetGrainId.Create(Constants.GrainDirectoryPartition, siloAddress, partitionIndex.ToString(CultureInfo.InvariantCulture));
     private readonly Dictionary<GrainId, GrainAddress> _directory = [];
@@ -362,7 +360,7 @@ internal sealed partial class GrainDirectoryReplica(
             // Wait for the range being removed to become valid.
             await WaitForRange(removedRange, previous.Version);
 
-        GrainRuntime.CheckRuntimeContext(this);
+            GrainRuntime.CheckRuntimeContext(this);
             if (_logger.IsEnabled(LogLevel.Trace))
             {
                 _logger.LogTrace("Relinquishing ownership of range '{Range}'.", removedRange);
@@ -542,11 +540,9 @@ internal sealed partial class GrainDirectoryReplica(
                 false,
                 nameof(IGrainDirectoryPartition.AcknowledgeSnapshotTransferAsync)).Ignore();
 
-        GrainRuntime.CheckRuntimeContext(this);
             // Wait for previous versions to be unlocked before proceeding.
             await WaitForRange(addedRange, previousVersion);
 
-        GrainRuntime.CheckRuntimeContext(this);
             // Incorporate the values into the grain directory.
             foreach (var entry in snapshot.GrainAddresses)
             {
@@ -588,7 +584,7 @@ internal sealed partial class GrainDirectoryReplica(
 
         await foreach (var activations in GetRegisteredActivations(current, addedRange, isValidation: false))
         {
-        GrainRuntime.CheckRuntimeContext(this);
+            GrainRuntime.CheckRuntimeContext(this);
             foreach (var entry in activations)
             {
                 DebugAssertOwnership(current, entry.GrainId);

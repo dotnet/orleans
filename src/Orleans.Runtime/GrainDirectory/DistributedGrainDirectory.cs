@@ -61,29 +61,25 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         grainId,
         static (replica, version, grainId, cancellationToken) => replica.LookupAsync(version, grainId),
         grainId,
-        CancellationToken.None,
-        strict: false);
+        CancellationToken.None);
 
     public async Task<GrainAddress?> Register(GrainAddress address) => await InvokeAsync(
         address.GrainId,
         static (replica, version, address, cancellationToken) => replica.RegisterAsync(version, address, null),
         address,
-        CancellationToken.None,
-        strict: true);
+        CancellationToken.None);
 
     public async Task Unregister(GrainAddress address) => await InvokeAsync(
         address.GrainId,
         static (replica, version, address, cancellationToken) => replica.DeregisterAsync(version, address),
         address,
-        CancellationToken.None,
-        strict: false);
+        CancellationToken.None);
 
     public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress) => await InvokeAsync(
         address.GrainId,
         static (replica, version, state, cancellationToken) => replica.RegisterAsync(version, state.Address, state.PreviousAddress),
         (Address: address, PreviousAddress: previousAddress),
-        CancellationToken.None,
-        strict: true);
+        CancellationToken.None);
 
     public Task UnregisterSilos(List<SiloAddress> siloAddresses) => Task.CompletedTask;
 
@@ -92,7 +88,6 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         Func<IGrainDirectoryPartition, MembershipVersion, TState, CancellationToken, ValueTask<DirectoryResult<TResult>>> func,
         TState state,
         CancellationToken cancellationToken,
-        bool strict = true,
         [CallerMemberName] string operation = "")
     {
         DirectoryResult<TResult> invokeResult;

@@ -25,7 +25,7 @@ internal class MyDirectoryTestGrain : Grain, IMyDirectoryTestGrain
 }
 
 [TestCategory("SlowBVT"), TestCategory("Directory")]
-public sealed class GrainDirectoryResilienceTests(ITestOutputHelper output)
+public sealed class GrainDirectoryResilienceTests
 {
     /// <summary>
     /// Cluster chaos test: tests directory functionality & integrity while starting/stopping/killing silos frequently.
@@ -38,8 +38,9 @@ public sealed class GrainDirectoryResilienceTests(ITestOutputHelper output)
         testClusterBuilder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         var testCluster = testClusterBuilder.Build();
         await testCluster.DeployAsync();
-        output.WriteLine($"ServiceId: {testCluster.Options.ServiceId}");
-        output.WriteLine($"ClusterId: {testCluster.Options.ClusterId}");
+        var log = testCluster.ServiceProvider.GetRequiredService<ILogger<GrainDirectoryResilienceTests>>();
+        log.LogInformation($"ServiceId: {testCluster.Options.ServiceId}");
+        log.LogInformation($"ClusterId: {testCluster.Options.ClusterId}");
 
         var cts = new CancellationTokenSource(TimeSpan.FromMinutes(15));
         var reconfigurationTimer = CoarseStopwatch.StartNew();
@@ -49,140 +50,135 @@ public sealed class GrainDirectoryResilienceTests(ITestOutputHelper output)
         var idBase = 0L;
         var client = ((InProcessSiloHandle)testCluster.Primary).SiloHost.Services.GetRequiredService<IGrainFactory>();
         const int CallsPerIteration = 100;
-        try
+        var loadTask = Task.Run(async () =>
         {
-            var loadTask = Task.Run(async () =>
+            while (!cts.IsCancellationRequested)
             {
-                while (!cts.IsCancellationRequested)
+                var time = Stopwatch.StartNew();
+                var tasks = Enumerable.Range(0, CallsPerIteration).Select(i => client.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping().AsTask()).ToList();
+                var workTask = Task.WhenAll(tasks);
+                using var delayCancellation = new CancellationTokenSource();
+                var delay = TimeSpan.FromMilliseconds(90_000);
+                var delayTask = Task.Delay(delay, delayCancellation.Token);
+                await Task.WhenAny(workTask, delayTask);
+                if (delayTask.IsCompleted)
                 {
-                    var time = Stopwatch.StartNew();
-                    var tasks = Enumerable.Range(0, CallsPerIteration).Select(i => client.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping().AsTask()).ToList();
-                    var workTask = Task.WhenAll(tasks);
-                    using var delayCancellation = new CancellationTokenSource();
-                    var delay = TimeSpan.FromMilliseconds(90_000);
-                    var delayTask = Task.Delay(delay, delayCancellation.Token);
-                    await Task.WhenAny(workTask, delayTask);
-                    if (delayTask.IsCompleted)
-                    {
-                        DumpCapture.CreateMiniDump("delayed");
-                        Assert.False(delayTask.IsCompleted, $"Request took longer than {delay.TotalSeconds}s to complete.");
-                    }
-
-                    try
-                    {
-                        await workTask;
-                    }
-                    catch (SiloUnavailableException sue)
-                    {
-                        output.WriteLine($"Swallowed transient exception: {sue}");
-                    }
-                    catch (OrleansMessageRejectionException omre)
-                    {
-                        output.WriteLine($"Swallowed rejection: {omre}");
-                    }
-                    catch (Exception exception)
-                    {
-                        output.WriteLine($"Caught exception: {exception}");
-                        DumpCapture.CreateMiniDump("unexpected");
-                        throw;
-                    }
-
-                    delayCancellation.Cancel();
-                    idBase += CallsPerIteration;
+                    log.LogError("SLOW CALL.");
+                    DumpCapture.CreateMiniDump("delayed");
+                    Assert.False(delayTask.IsCompleted, $"Request took longer than {delay.TotalSeconds}s to complete.");
                 }
-            });
 
-            var chaosTask = Task.Run(async () =>
-            {
-                var clusterOperation = Task.CompletedTask;
-                while (!cts.IsCancellationRequested)
+                try
                 {
-                    try
-                    {
-                        var remaining = TimeSpan.FromSeconds(10) - reconfigurationTimer.Elapsed;
-                        if (remaining <= TimeSpan.Zero)
-                        {
-                            reconfigurationTimer.Restart();
-                            await clusterOperation;
+                    await workTask;
+                }
+                catch (SiloUnavailableException sue)
+                {
+                    log.LogInformation(sue, "Swallowed transient exception.");
+                }
+                catch (OrleansMessageRejectionException omre)
+                {
+                   log.LogInformation(omre, "Swallowed rejection.");
+                }
+                catch (Exception exception)
+                {
+                    log.LogError(exception, "Unhandled exception.");
+                    DumpCapture.CreateMiniDump("unexpected");
+                    throw;
+                }
 
-                            // Check integrity
-                            var integrityChecks = new List<Task>();
-                            foreach (var silo in testCluster.Silos)
+                delayCancellation.Cancel();
+                idBase += CallsPerIteration;
+            }
+        });
+
+        var chaosTask = Task.Run(async () =>
+        {
+            var clusterOperation = Task.CompletedTask;
+            while (!cts.IsCancellationRequested)
+            {
+                try
+                {
+                    var remaining = TimeSpan.FromSeconds(10) - reconfigurationTimer.Elapsed;
+                    if (remaining <= TimeSpan.Zero)
+                    {
+                        reconfigurationTimer.Restart();
+                        await clusterOperation;
+
+                        // Check integrity
+                        var integrityChecks = new List<Task>();
+                        foreach (var silo in testCluster.Silos)
+                        {
+                            var address = silo.SiloAddress;
+                            for (var partitionIndex = 0; partitionIndex < DirectoryMembershipSnapshot.PartitionsPerSilo; partitionIndex++)
                             {
-                                var address = silo.SiloAddress;
-                                for (var partitionIndex = 0; partitionIndex < DirectoryMembershipSnapshot.PartitionsPerSilo; partitionIndex++)
+                                var replica = ((IInternalGrainFactory)client).GetSystemTarget<IGrainDirectoryTestHooks>(GrainDirectoryReplica.CreateGrainId(address, partitionIndex).GrainId);
+                                RequestContext.Set("gid", replica.GetGrainId());
+                                integrityChecks.Add(replica.CheckIntegrityAsync().AsTask());
+                            }
+                        }
+
+                        await Task.WhenAll(integrityChecks);
+                        foreach (var task in integrityChecks)
+                        {
+                            await task;
+                        }
+
+                        clusterOperation = Task.Run(async () =>
+                        {
+                            var currentCount = testCluster.Silos.Count;
+
+                            if (currentCount > target)
+                            {
+                                // Stop or kill a random silo, but not the primary (since that hosts cluster membership)
+                                var victim = testCluster.SecondarySilos[Random.Shared.Next(testCluster.SecondarySilos.Count)];
+                                if (currentCount % 2 == 0)
                                 {
-                                    var replica = ((IInternalGrainFactory)client).GetSystemTarget<IGrainDirectoryTestHooks>(GrainDirectoryReplica.CreateGrainId(address, partitionIndex).GrainId);
-                                    RequestContext.Set("gid", replica.GetGrainId());
-                                    integrityChecks.Add(replica.CheckIntegrityAsync().AsTask());
+                                    log.LogInformation($"Stopping '{victim.SiloAddress}'.");
+                                    await testCluster.StopSiloAsync(victim);
+                                    log.LogInformation($"Stopped '{victim.SiloAddress}'.");
+                                }
+                                else
+                                {
+                                    log.LogInformation($"Killing '{victim.SiloAddress}'.");
+                                    await testCluster.KillSiloAsync(victim);
+                                    log.LogInformation($"Killed '{victim.SiloAddress}'.");
                                 }
                             }
-
-                            await Task.WhenAll(integrityChecks);
-                            foreach (var task in integrityChecks)
+                            else if (currentCount < target)
                             {
-                                await task;
+                                log.LogInformation("Starting new silo.");
+                                var result = await testCluster.StartAdditionalSiloAsync();
+                                log.LogInformation($"Started '{result.SiloAddress}'.");
                             }
 
-                            clusterOperation = Task.Run(async () =>
+                            if (currentCount <= lowerLimit)
                             {
-                                var currentCount = testCluster.Silos.Count;
-
-                                if (currentCount > target)
-                                {
-                                    // Stop or kill a random silo, but not the primary (since that hosts cluster membership)
-                                    var victim = testCluster.SecondarySilos[Random.Shared.Next(testCluster.SecondarySilos.Count)];
-                                    if (currentCount % 2 == 0)
-                                    {
-                                        output.WriteLine($"Stopping '{victim.SiloAddress}'.");
-                                        await testCluster.StopSiloAsync(victim);
-                                        output.WriteLine($"Stopped '{victim.SiloAddress}'.");
-                                    }
-                                    else
-                                    {
-                                        output.WriteLine($"Killing '{victim.SiloAddress}'.");
-                                        await testCluster.KillSiloAsync(victim);
-                                        output.WriteLine($"Killed '{victim.SiloAddress}'.");
-                                    }
-                                }
-                                else if (currentCount < target)
-                                {
-                                    output.WriteLine("Starting new silo.");
-                                    var result = await testCluster.StartAdditionalSiloAsync();
-                                    output.WriteLine($"Started '{result.SiloAddress}'.");
-                                }
-
-                                if (currentCount <= lowerLimit)
-                                {
-                                    target = upperLimit;
-                                }
-                                else if (currentCount >= upperLimit)
-                                {
-                                    target = lowerLimit;
-                                }
-                            });
-                        }
-                        else
-                        {
-                            await Task.Delay(remaining);
-                        }
+                                target = upperLimit;
+                            }
+                            else if (currentCount >= upperLimit)
+                            {
+                                target = lowerLimit;
+                            }
+                        });
                     }
-                    catch (Exception exception)
+                    else
                     {
-                        output.WriteLine($"Ignoring chaos exception: {exception}");
+                        await Task.Delay(remaining);
                     }
                 }
-            });
+                catch (Exception exception)
+                {
+                    log.LogInformation(exception, "Ignoring chaos exception.");
+                }
+            }
+        });
 
-            await await Task.WhenAny(loadTask, chaosTask);
-            cts.Cancel();
-            await Task.WhenAll(loadTask, chaosTask);
-        }
-        finally
-        {
-            await testCluster.StopAllSilosAsync();
-            await testCluster.DisposeAsync();
-        }
+        await await Task.WhenAny(loadTask, chaosTask);
+        cts.Cancel();
+        await Task.WhenAll(loadTask, chaosTask);
+        await testCluster.StopAllSilosAsync();
+        await testCluster.DisposeAsync();
     }
 
     private class SiloBuilderConfigurator : ISiloConfigurator

@@ -224,15 +224,9 @@ namespace Orleans.Runtime
                         activation.CollectionTicket = default;
                         if (!activation.IsValid)
                         {
+                            // This is not an error scenario because the activation may have become invalid between the time
+                            // we captured a snapshot in 'DequeueQuantum' and now. We are not be able to observe such changes.
                             // Do nothing: don't collect, don't reschedule.
-                            // The activation can't be in Created or Activating, since we only ScheduleCollection after successfull activation.
-                            // If the activation is already in Deactivating or Invalid state, its already being collected or was collected
-                            // (both mean a bug, this activation should not be in the collector)
-                            // So in any state except for Valid we should just not collect and not reschedule.
-                            logger.LogWarning(
-                                (int)ErrorCode.Catalog_ActivationCollector_BadState_1,
-                                "ActivationCollector found an activation in a non Valid state. All activation inside the ActivationCollector should be in Valid state. Activation: {Activation}",
-                                activation);
                         }
                         else if (activation.KeepAliveUntil > now)
                         {
