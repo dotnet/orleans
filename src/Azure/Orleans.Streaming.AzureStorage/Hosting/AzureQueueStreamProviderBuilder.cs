@@ -63,14 +63,9 @@ public sealed class AzureQueueStreamProviderBuilder : IProviderBuilder<ISiloBuil
 
                     if (!string.IsNullOrEmpty(connectionString))
                     {
-                        if (Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
-                        {
-                            options.QueueServiceClient = new QueueServiceClient(uri);
-                        }
-                        else
-                        {
-                            options.QueueServiceClient = new QueueServiceClient(connectionString);
-                        }
+                        options.QueueServiceClient = Uri.TryCreate(connectionString, UriKind.Absolute, out var uri)
+                            ? new QueueServiceClient(uri)
+                            : new QueueServiceClient(connectionString);
                     }
                 }
             });
