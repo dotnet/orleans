@@ -93,7 +93,7 @@ public sealed class ActivationRebalancerOptions
     /// <para>Allowed range: [1000-∞)</para>
     /// <para><strong>Values lower than the default are discouraged.</strong></para>
     /// </remarks>
-    public int ScaledEntropyDeviationActivationThreshold { get; set; }
+    public int ScaledEntropyDeviationActivationThreshold { get; set; } = DEFAULT_SCALED_ENTROPY_DEVIATION_ACTIVATION_THRESHOLD;
 
     /// <summary>
     /// The default value of <see cref="ScaledEntropyDeviationActivationThreshold"/>.
