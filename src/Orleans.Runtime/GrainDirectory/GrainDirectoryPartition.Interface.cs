@@ -12,11 +12,6 @@ internal sealed partial class GrainDirectoryReplica
 {
     async ValueTask<DirectoryResult<GrainAddress>> IGrainDirectoryPartition.RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration)
     {
-        var gid = (GrainId)RequestContext.Get("gid");
-        if (!gid.Equals(GrainId))
-        {
-            Debug.Fail("1) what");
-        }
         ArgumentNullException.ThrowIfNull(address);
         if (_logger.IsEnabled(LogLevel.Trace))
         {
@@ -36,11 +31,6 @@ internal sealed partial class GrainDirectoryReplica
 
     async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryPartition.LookupAsync(MembershipVersion version, GrainId grainId)
     {
-        var gid = (GrainId)RequestContext.Get("gid");
-        if (!gid.Equals(GrainId))
-        {
-            Debug.Fail("1) what");
-        }
         if (_logger.IsEnabled(LogLevel.Trace))
         {
             _logger.LogTrace("LookupAsync('{Version}', '{GrainId}')", version, grainId);
@@ -58,11 +48,6 @@ internal sealed partial class GrainDirectoryReplica
 
     async ValueTask<DirectoryResult<bool>> IGrainDirectoryPartition.DeregisterAsync(MembershipVersion version, GrainAddress address)
     {
-        var gid = (GrainId)RequestContext.Get("gid");
-        if (!gid.Equals(GrainId))
-        {
-            Debug.Fail("1) what");
-        }
         ArgumentNullException.ThrowIfNull(address);
         if (_logger.IsEnabled(LogLevel.Trace))
         {

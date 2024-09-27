@@ -344,7 +344,7 @@ internal sealed partial class GrainDirectoryReplica(
     private async Task ReleaseRangeAsync(DirectoryMembershipSnapshot previous, DirectoryMembershipSnapshot current, RingRange removedRange)
     {
         GrainRuntime.CheckRuntimeContext(this);
-        var tcs = LockRange(removedRange, current.Version);
+        var (tcs, sw) = LockRange(removedRange, current.Version);
         if (_logger.IsEnabled(LogLevel.Debug))
         {
             _logger.LogDebug("Relinquishing ownership of range '{Range}'.", removedRange);
@@ -407,7 +407,7 @@ internal sealed partial class GrainDirectoryReplica(
         }
         finally
         {
-            UnlockRange(removedRange, current.Version, tcs);
+            UnlockRange(removedRange, current.Version, tcs, sw.Elapsed, "release");
         }
     }
 
@@ -416,7 +416,7 @@ internal sealed partial class GrainDirectoryReplica(
         GrainRuntime.CheckRuntimeContext(this);
         // Suspend the range and transfer state from the previous owners.
         // If the predecessor becomes unavailable or membership advances quickly, we will declare data loss and unlock the range.
-        var tcs = LockRange(addedRange, current.Version);
+        var (tcs, sw) = LockRange(addedRange, current.Version);
 
         try
         {
@@ -488,19 +488,20 @@ internal sealed partial class GrainDirectoryReplica(
         }
         finally
         {
-            UnlockRange(addedRange, current.Version, tcs);
+            UnlockRange(addedRange, current.Version, tcs, sw.Elapsed, "acquire");
         }
     }
 
-    private TaskCompletionSource LockRange(RingRange range, MembershipVersion version)
+    private (TaskCompletionSource Lock, ValueStopwatch Stopwatch) LockRange(RingRange range, MembershipVersion version)
     {
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _rangeLocks.Add((range, version, tcs));
-        return tcs;
+        return (tcs, ValueStopwatch.StartNew());
     }
 
-    private void UnlockRange(RingRange range, MembershipVersion version, TaskCompletionSource tcs)
+    private void UnlockRange(RingRange range, MembershipVersion version, TaskCompletionSource tcs, TimeSpan heldDuration, string operationName)
     {
+        DirectoryInstruments.RangeLockHeldDuration.Record((long)heldDuration.TotalMilliseconds);
         if (ShutdownToken.IsCancellationRequested)
         {
             // If the replica is stopped, the range is never unlocked and the task is cancelled instead.
@@ -517,6 +518,7 @@ internal sealed partial class GrainDirectoryReplica(
     {
         try
         {
+            var stopwatch = ValueStopwatch.StartNew();
             if (_logger.IsEnabled(LogLevel.Trace))
             {
                 _logger.LogTrace("Requesting entries for ranges '{Range}' from '{PreviousOwner}' at version '{PreviousVersion}'.", addedRange, previousOwner, previousVersion);
@@ -557,6 +559,8 @@ internal sealed partial class GrainDirectoryReplica(
                 _logger.LogDebug("Transferred '{Count}' entries for range '{Range}' from '{PreviousOwner}'.", snapshot.GrainAddresses.Count, addedRange, previousOwner);
             }
 
+            DirectoryInstruments.SnapshotTransferDuration.Record((long)stopwatch.Elapsed.TotalMilliseconds);
+
             return true;
         }
         catch (Exception exception)
@@ -576,6 +580,7 @@ internal sealed partial class GrainDirectoryReplica(
 
     private async Task RecoverPartitionRange(DirectoryMembershipSnapshot current, RingRange addedRange)
     {
+        var stopwatch = ValueStopwatch.StartNew();
         GrainRuntime.CheckRuntimeContext(this);
         if (_logger.IsEnabled(LogLevel.Debug))
         {
@@ -593,9 +598,10 @@ internal sealed partial class GrainDirectoryReplica(
             }
         }
 
+        DirectoryInstruments.RangeRecoveryDuration.Record((long)stopwatch.Elapsed.TotalMilliseconds);
         if (_logger.IsEnabled(LogLevel.Debug))
         {
-            _logger.LogDebug("Completed recovering activations from range '{Range}' at version '{Version}'.", addedRange, current.Version);
+            _logger.LogDebug("Completed recovering activations from range '{Range}' at version '{Version}' took '{Elapsed}'.", addedRange, current.Version, stopwatch.Elapsed);
         }
     }
 
