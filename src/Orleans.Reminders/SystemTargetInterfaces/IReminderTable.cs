@@ -38,7 +38,8 @@ namespace Orleans
         Task<ReminderTableData> ReadRows(GrainId grainId);
 
         /// <summary>
-        /// Return all rows that have their <see cref="GrainId.GetUniformHashCode"/> in the range (start, end]
+        /// Returns all rows that have their <see cref="GrainId.GetUniformHashCode"/> in the range (begin, end].
+        /// If begin is greater or equal to end, returns all entries with hash greater begin or hash less or equal to end.
         /// </summary>
         /// <param name="begin">The exclusive lower bound.</param>
         /// <param name="end">The inclusive upper bound.</param>
@@ -46,7 +47,7 @@ namespace Orleans
         Task<ReminderTableData> ReadRows(uint begin, uint end);
 
         /// <summary>
-        /// Reads a specifie entry.
+        /// Reads the specified entry.
         /// </summary>
         /// <param name="grainId">The grain ID.</param>
         /// <param name="reminderName">Name of the reminder.</param>
