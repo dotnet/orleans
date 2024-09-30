@@ -97,18 +97,6 @@ namespace Orleans
         {
             try
             {
-                var connectionLostHandlers = this.ServiceProvider.GetServices<ConnectionToClusterLostHandler>();
-                foreach (var handler in connectionLostHandlers)
-                {
-                    this.ClusterConnectionLost += handler;
-                }
-
-                var gatewayCountChangedHandlers = this.ServiceProvider.GetServices<GatewayCountChangedHandler>();
-                foreach (var handler in gatewayCountChangedHandlers)
-                {
-                    this.GatewayCountChanged += handler;
-                }
-
                 _statusObservers = this.ServiceProvider.GetServices<IClusterConnectionStatusObserver>().ToArray();
 
                 this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
@@ -405,9 +393,6 @@ namespace Orleans
 
             Utils.SafeExecute(() => MessageCenter?.Dispose());
 
-            this.ClusterConnectionLost = null;
-            this.GatewayCountChanged = null;
-
             GC.SuppressFinalize(this);
             disposed = true;
         }
@@ -425,12 +410,6 @@ namespace Orleans
 
         public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
             => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
-
-        /// <inheritdoc />
-        public event ConnectionToClusterLostHandler ClusterConnectionLost;
-
-        /// <inheritdoc />
-        public event GatewayCountChangedHandler GatewayCountChanged;
 
         /// <inheritdoc />
         public void NotifyClusterConnectionLost()
