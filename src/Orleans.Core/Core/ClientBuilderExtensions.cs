@@ -11,7 +11,6 @@ using Orleans.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans.Core;
 
 namespace Orleans.Hosting
 {
