@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
@@ -9,16 +10,15 @@ using Microsoft.Extensions.Options;
 using Orleans.ClientObservers;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
-using Orleans.Core;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
-using Orleans.Serialization.Serializers;
 using static Orleans.Internal.StandardExtensions;
 
 namespace Orleans
 {
+
     internal class OutsideRuntimeClient : IRuntimeClient, IDisposable, IClusterConnectionStatusListener
     {
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
@@ -33,6 +33,7 @@ namespace Orleans
 
         private readonly MessagingTrace messagingTrace;
         private readonly InterfaceToImplementationMappingCache _interfaceToImplementationMapping;
+        private IClusterConnectionStatusObserver[] _statusObservers;
 
         public IInternalGrainFactory InternalGrainFactory { get; private set; }
 
@@ -107,6 +108,8 @@ namespace Orleans
                 {
                     this.GatewayCountChanged += handler;
                 }
+
+                _statusObservers = this.ServiceProvider.GetServices<IClusterConnectionStatusObserver>().ToArray();
 
                 this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
                 this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
@@ -432,53 +435,35 @@ namespace Orleans
         /// <inheritdoc />
         public void NotifyClusterConnectionLost()
         {
-            try
+            foreach (var observer in _statusObservers)
             {
-                this.ClusterConnectionLost?.Invoke(this, EventArgs.Empty);
-
-                var statusObservers = this.ServiceProvider.GetServices<IClusterConnectionStatusObserver>().ToArray();
-
-                if (statusObservers.Length <= 0)
-                {
-                    return;
-                }
-
-                foreach (var observer in statusObservers)
+                try
                 {
                     observer.NotifyClusterConnectionLost();
                 }
-            }
-            catch (Exception ex)
-            {
-                this.logger.LogError((int)ErrorCode.ClientError, ex, "Error when sending cluster disconnection notification");
+                catch (Exception ex)
+                {
+                    this.logger.LogError((int)ErrorCode.ClientError, ex, "Error sending cluster disconnection notification.");
+                }
             }
         }
 
         /// <inheritdoc />
         public void NotifyGatewayCountChanged(int currentNumberOfGateways, int previousNumberOfGateways)
         {
-            try
+            foreach (var observer in _statusObservers)
             {
-                this.GatewayCountChanged?.Invoke(this, new GatewayCountChangedEventArgs(currentNumberOfGateways, previousNumberOfGateways));
-
-                var statusObservers = this.ServiceProvider.GetServices<IClusterConnectionStatusObserver>().ToArray();
-
-                if (statusObservers.Length <= 0)
-                {
-                    return;
-                }
-
-                foreach (var observer in statusObservers)
+                try
                 {
                     observer.NotifyGatewayCountChanged(
                         currentNumberOfGateways,
                         previousNumberOfGateways,
                         currentNumberOfGateways > 0 && previousNumberOfGateways <= 0);
                 }
-            }
-            catch (Exception ex)
-            {
-                this.logger.LogError((int)ErrorCode.ClientError, ex, "Error when sending gateway count changed notification");
+                catch (Exception ex)
+                {
+                    this.logger.LogError((int)ErrorCode.ClientError, ex, "Error sending gateway count changed notification.");
+                }
             }
         }
 

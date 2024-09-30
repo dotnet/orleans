@@ -115,7 +115,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Registers a <see cref="IClusterConnectionStatusObserver"/>.
+        /// Registers a cluster connection status observer.
         /// </summary>
         public static IClientBuilder AddClusterConnectionStatusObserver<TObserver>(this IClientBuilder builder, TObserver observer)
             where TObserver : IClusterConnectionStatusObserver
@@ -125,7 +125,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Registers a <see cref="IClusterConnectionStatusObserver"/>.
+        /// Registers a cluster connection status observer.
         /// </summary>
         public static IClientBuilder AddClusterConnectionStatusObserver<TObserver>(this IClientBuilder builder)
             where TObserver : class, IClusterConnectionStatusObserver
