@@ -75,7 +75,6 @@ namespace Orleans
             services.TryAddSingleton<OutsideRuntimeClient>();
             services.TryAddSingleton<InterfaceToImplementationMappingCache>();
             services.TryAddSingleton<ClientGrainContext>();
-            services.AddSingleton<IClusterConnectionStatusObserver, ClusterConnectionStatusObserverAdaptor>();
             services.AddFromExisting<IGrainContextAccessor, ClientGrainContext>();
             services.TryAddFromExisting<IRuntimeClient, OutsideRuntimeClient>();
             services.TryAddFromExisting<IClusterConnectionStatusListener, OutsideRuntimeClient>();
