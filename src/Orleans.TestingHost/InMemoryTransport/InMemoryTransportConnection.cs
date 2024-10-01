@@ -87,4 +87,6 @@ internal class InMemoryTransportConnection : TransportConnection
 
         _connectionClosedTokenSource.Dispose();
     }
+
+    public override string ToString() => $"InMem({LocalEndPoint}<->{RemoteEndPoint})";
 }

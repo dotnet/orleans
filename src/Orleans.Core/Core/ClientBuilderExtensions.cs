@@ -105,6 +105,35 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
+        /// Registers a <see cref="GatewayCountChangedHandler"/> event handler.
+        /// </summary>
+        public static IClientBuilder AddGatewayCountChangedHandler(this IClientBuilder builder, Func<IServiceProvider, GatewayCountChangedHandler> handlerFactory)
+        {
+            builder.ConfigureServices(services => services.AddSingleton(handlerFactory));
+            return builder;
+        }
+
+        /// <summary>
+        /// Registers a cluster connection status observer.
+        /// </summary>
+        public static IClientBuilder AddClusterConnectionStatusObserver<TObserver>(this IClientBuilder builder, TObserver observer)
+            where TObserver : IClusterConnectionStatusObserver
+        {
+            builder.Services.AddSingleton<IClusterConnectionStatusObserver>(observer);
+            return builder;
+        }
+
+        /// <summary>
+        /// Registers a cluster connection status observer.
+        /// </summary>
+        public static IClientBuilder AddClusterConnectionStatusObserver<TObserver>(this IClientBuilder builder)
+            where TObserver : class, IClusterConnectionStatusObserver
+        {
+            builder.Services.AddSingleton<IClusterConnectionStatusObserver, TObserver>();
+            return builder;
+        }
+
+        /// <summary>
         /// Registers a <see cref="ConnectionToClusterLostHandler"/> event handler.
         /// </summary>
         /// <param name="builder">The builder.</param>
@@ -113,6 +142,18 @@ namespace Orleans.Hosting
         public static IClientBuilder AddClusterConnectionLostHandler(this IClientBuilder builder, ConnectionToClusterLostHandler handler)
         {
             builder.ConfigureServices(services => services.AddSingleton(handler));
+            return builder;
+        }
+
+        /// <summary>
+        /// Registers a <see cref="ConnectionToClusterLostHandler"/> event handler.
+        /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="handlerFactory">The handler factory.</param>
+        /// <returns>The builder.</returns>
+        public static IClientBuilder AddClusterConnectionLostHandler(this IClientBuilder builder, Func<IServiceProvider, ConnectionToClusterLostHandler> handlerFactory)
+        {
+            builder.ConfigureServices(services => services.AddSingleton(handlerFactory));
             return builder;
         }
 
