@@ -75,7 +75,7 @@ public class MessagePackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilt
         {
 
             var msgPackWriter = new MessagePackWriter(bufferWriter);
-            MessagePackSerializer.Serialize(expectedType ?? value.GetType(), ref msgPackWriter, value, _options.SerializerOptions);
+            MessagePackSerializer.Serialize(value.GetType(), ref msgPackWriter, value, _options.SerializerOptions);
             msgPackWriter.Flush();
 
             ReferenceCodec.MarkValueField(writer.Session);
@@ -198,7 +198,7 @@ public class MessagePackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilt
             var sequence = bufferWriter.Value.AsReadOnlySequence();
             result = MessagePackSerializer.Deserialize(input.GetType(), sequence, _options.SerializerOptions);
         }
-        catch
+        finally
         {
             bufferWriter.Value.Dispose();
         }

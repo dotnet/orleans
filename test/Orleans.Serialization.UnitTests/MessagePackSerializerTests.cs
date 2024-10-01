@@ -30,6 +30,8 @@ public class MessagePackCodecTests : FieldCodecTester<MyMessagePackClass?, IFiel
         new() { SubClass = new() { Id = Guid.NewGuid() } },
         new() { IntProperty = 150, StringProperty = new string('c', 20), SubClass = new() { Id = Guid.NewGuid() } },
         new() { IntProperty = 150_000, StringProperty = new string('c', 6_000), SubClass = new() { Id = Guid.NewGuid() } },
+        new() { Union = new MyMessagePackUnionVariant1 { IntProperty = 1 } },
+        new() { Union = new MyMessagePackUnionVariant2 { StringProperty = "String" } },
     };
 
     [Fact]
@@ -59,7 +61,7 @@ public class MessagePackCodecTests : FieldCodecTester<MyMessagePackClass?, IFiel
     [Fact]
     public void MessagePackSerializerRoundTripThroughCodec()
     {
-        var original = new MyMessagePackClass { IntProperty = 30, StringProperty = "hi", SubClass = new(){ Id = Guid.NewGuid() } };
+        var original = new MyMessagePackClass { IntProperty = 30, StringProperty = "hi", SubClass = new() { Id = Guid.NewGuid() } };
         var result = RoundTripThroughCodec(original);
 
         Assert.Equal(original.IntProperty, result.IntProperty);
@@ -76,6 +78,29 @@ public class MessagePackCodecTests : FieldCodecTester<MyMessagePackClass?, IFiel
         Assert.Equal(original.IntProperty, result.IntProperty);
         Assert.Equal(original.StringProperty, result.StringProperty);
     }
+}
+
+
+[Trait("Category", "BVT")]
+public class MessagePackUnionCodecTests : FieldCodecTester<IMyMessagePackUnion?, IFieldCodec<IMyMessagePackUnion?>>
+{
+    public MessagePackUnionCodecTests(ITestOutputHelper output) : base(output)
+    {
+    }
+
+    protected override void Configure(ISerializerBuilder builder)
+    {
+        builder.AddMessagePackSerializer();
+    }
+
+    protected override IMyMessagePackUnion? CreateValue() => new MyMessagePackUnionVariant1() { IntProperty = 30 };
+
+    protected override IMyMessagePackUnion?[] TestValues => new IMyMessagePackUnion?[]
+    {
+        null,
+        new MyMessagePackUnionVariant1 { IntProperty = 1 },
+        new MyMessagePackUnionVariant2 { StringProperty = "String" },
+    };
 }
 
 

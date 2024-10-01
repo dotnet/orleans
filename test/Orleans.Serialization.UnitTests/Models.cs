@@ -5,7 +5,6 @@ using System.Linq.Expressions;
 using System.Runtime.Serialization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.Json.Serialization;
 using MessagePack;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -909,14 +908,14 @@ namespace Orleans.Serialization.UnitTests
         IConverter<MySecondForeignLibraryType, MySecondForeignLibraryTypeSurrogate>
     {
         public MyFirstForeignLibraryType ConvertFromSurrogate(in MyFirstForeignLibraryTypeSurrogate surrogate)
-            => new () { Num = surrogate.Num, String = surrogate.String, DateTimeOffset = surrogate.DateTimeOffset };
+            => new() { Num = surrogate.Num, String = surrogate.String, DateTimeOffset = surrogate.DateTimeOffset };
         public MyFirstForeignLibraryTypeSurrogate ConvertToSurrogate(in MyFirstForeignLibraryType value)
             => new() { Num = value.Num, String = value.String, DateTimeOffset = value.DateTimeOffset };
 
         public MySecondForeignLibraryType ConvertFromSurrogate(in MySecondForeignLibraryTypeSurrogate surrogate)
             => new() { Name = surrogate.Name, Value = surrogate.Value, Timestamp = surrogate.Timestamp };
         public MySecondForeignLibraryTypeSurrogate ConvertToSurrogate(in MySecondForeignLibraryType value)
-            => new () { Name = value.Name, Value = value.Value, Timestamp = value.Timestamp };
+            => new() { Name = value.Name, Value = value.Value, Timestamp = value.Timestamp };
     }
 
     [MessagePackObject]
@@ -930,6 +929,9 @@ namespace Orleans.Serialization.UnitTests
 
         [Key(2)]
         public MyMessagePackSubClass SubClass { get; init; }
+
+        [Key(3)]
+        public IMyMessagePackUnion Union { get; init; }
     }
 
     [MessagePackObject]
@@ -939,4 +941,23 @@ namespace Orleans.Serialization.UnitTests
         public Guid Id { get; init; }
     }
 
+    [Union(0, typeof(MyMessagePackUnionVariant1))]
+    [Union(1, typeof(MyMessagePackUnionVariant2))]
+    public interface IMyMessagePackUnion
+    {
+    }
+
+    [MessagePackObject]
+    public sealed record MyMessagePackUnionVariant1 : IMyMessagePackUnion
+    {
+        [Key(0)]
+        public int IntProperty { get; init; }
+    }
+
+    [MessagePackObject]
+    public sealed record MyMessagePackUnionVariant2 : IMyMessagePackUnion
+    {
+        [Key(0)]
+        public string StringProperty { get; init; }
+    }
 }
