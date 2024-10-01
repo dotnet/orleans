@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
@@ -14,11 +13,11 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Serializers;
 using static Orleans.Internal.StandardExtensions;
 
 namespace Orleans
 {
-
     internal class OutsideRuntimeClient : IRuntimeClient, IDisposable, IClusterConnectionStatusListener
     {
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
@@ -33,7 +32,6 @@ namespace Orleans
 
         private readonly MessagingTrace messagingTrace;
         private readonly InterfaceToImplementationMappingCache _interfaceToImplementationMapping;
-        private IClusterConnectionStatusObserver[] _statusObservers;
 
         public IInternalGrainFactory InternalGrainFactory { get; private set; }
 
@@ -97,7 +95,17 @@ namespace Orleans
         {
             try
             {
-                _statusObservers = this.ServiceProvider.GetServices<IClusterConnectionStatusObserver>().ToArray();
+                var connectionLostHandlers = this.ServiceProvider.GetServices<ConnectionToClusterLostHandler>();
+                foreach (var handler in connectionLostHandlers)
+                {
+                    this.ClusterConnectionLost += handler;
+                }
+
+                var gatewayCountChangedHandlers = this.ServiceProvider.GetServices<GatewayCountChangedHandler>();
+                foreach (var handler in gatewayCountChangedHandlers)
+                {
+                    this.GatewayCountChanged += handler;
+                }
 
                 this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
                 this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
@@ -264,7 +272,7 @@ namespace Orleans
             {
                 // don't set expiration for system target messages.
                 var ttl = request.GetDefaultResponseTimeout() ?? this.clientMessagingOptions.ResponseTimeout;
-                message.TimeToLive = ttl;
+                message.TimeToLive = ttl; 
             }
 
             if (!oneWay)
@@ -393,6 +401,9 @@ namespace Orleans
 
             Utils.SafeExecute(() => MessageCenter?.Dispose());
 
+            this.ClusterConnectionLost = null;
+            this.GatewayCountChanged = null;
+
             GC.SuppressFinalize(this);
             disposed = true;
         }
@@ -412,37 +423,34 @@ namespace Orleans
             => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
 
         /// <inheritdoc />
+        public event ConnectionToClusterLostHandler ClusterConnectionLost;
+
+        /// <inheritdoc />
+        public event GatewayCountChangedHandler GatewayCountChanged;
+
+        /// <inheritdoc />
         public void NotifyClusterConnectionLost()
         {
-            foreach (var observer in _statusObservers)
+            try
             {
-                try
-                {
-                    observer.NotifyClusterConnectionLost();
-                }
-                catch (Exception ex)
-                {
-                    this.logger.LogError((int)ErrorCode.ClientError, ex, "Error sending cluster disconnection notification.");
-                }
+                this.ClusterConnectionLost?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                this.logger.LogError((int)ErrorCode.ClientError, ex, "Error when sending cluster disconnection notification");
             }
         }
 
         /// <inheritdoc />
         public void NotifyGatewayCountChanged(int currentNumberOfGateways, int previousNumberOfGateways)
         {
-            foreach (var observer in _statusObservers)
+            try
             {
-                try
-                {
-                    observer.NotifyGatewayCountChanged(
-                        currentNumberOfGateways,
-                        previousNumberOfGateways,
-                        currentNumberOfGateways > 0 && previousNumberOfGateways <= 0);
-                }
-                catch (Exception ex)
-                {
-                    this.logger.LogError((int)ErrorCode.ClientError, ex, "Error sending gateway count changed notification.");
-                }
+                this.GatewayCountChanged?.Invoke(this, new GatewayCountChangedEventArgs(currentNumberOfGateways, previousNumberOfGateways));
+            }
+            catch (Exception ex)
+            {
+                this.logger.LogError((int)ErrorCode.ClientError, ex, "Error when sending gateway count changed notification");
             }
         }
 

@@ -16,12 +16,7 @@ namespace Orleans.TestingHost
         private bool isActive = true;
         
         /// <summary>Gets a reference to the silo host.</summary>
-        public IHost SiloHost { get; init; }
-
-        /// <summary>
-        /// Gets the silo's service provider.
-        /// </summary>
-        public IServiceProvider ServiceProvider => SiloHost.Services;
+        public IHost SiloHost { get; private set; }
 
         /// <inheritdoc />
         public override bool IsActive => isActive;
@@ -33,7 +28,7 @@ namespace Orleans.TestingHost
         /// <param name="configuration">The configuration.</param>
         /// <param name="postConfigureHostBuilder">An optional delegate which is invoked just prior to building the host builder.</param>
         /// <returns>The silo handle.</returns>
-        public static async Task<InProcessSiloHandle> CreateAsync(
+        public static async Task<SiloHandle> CreateAsync(
             string siloName,
             IConfiguration configuration,
             Action<IHostBuilder> postConfigureHostBuilder = null)
