@@ -145,10 +145,10 @@ namespace Orleans.CodeGenerator
                                 if (symbol.IsRecord)
                                 {
                                     // If there is a primary constructor then that will be declared before the copy constructor
-                                    // A record always generates a copy constructor and marks it as implicitly declared
+                                    // A record always generates a copy constructor and marks it as compiler generated
                                     // todo: find an alternative to this magic
                                     var potentialPrimaryConstructor = symbol.Constructors[0];
-                                    if (!potentialPrimaryConstructor.IsImplicitlyDeclared)
+                                    if (!potentialPrimaryConstructor.IsImplicitlyDeclared && !potentialPrimaryConstructor.IsCompilerGenerated())
                                     {
                                         constructorParameters = potentialPrimaryConstructor.Parameters;
                                     }
@@ -159,6 +159,23 @@ namespace Orleans.CodeGenerator
                                     if (annotatedConstructors.Count == 1)
                                     {
                                         constructorParameters = annotatedConstructors[0].Parameters;
+                                    }
+                                    else
+                                    {
+                                        // record structs from referenced assemblies do not return IsRecord=true
+                                        // above. See https://github.com/dotnet/roslyn/issues/69326
+                                        // So we implement the same heuristics from ShouldIncludePrimaryConstructorParameters
+                                        // to detect a primary constructor.
+                                        var properties = symbol.GetMembers().OfType<IPropertySymbol>().ToImmutableArray();
+                                        var primaryConstructor = symbol.GetMembers()
+                                            .OfType<IMethodSymbol>()
+                                            .Where(m => m.MethodKind == MethodKind.Constructor && m.Parameters.Length > 0)
+                                            // Check for a ctor where all parameters have a corresponding compiler-generated prop.
+                                            .FirstOrDefault(ctor => ctor.Parameters.All(prm =>
+                                                properties.Any(prop => prop.Name.Equals(prm.Name, StringComparison.Ordinal) && prop.IsCompilerGenerated())));
+
+                                        if (primaryConstructor != null)
+                                            constructorParameters = primaryConstructor.Parameters;
                                     }
                                 }
                             }
@@ -273,8 +290,18 @@ namespace Orleans.CodeGenerator
                             }
                         }
 
-                        // Default to true for records, false otherwise.
-                        return t.IsRecord;
+                        // Default to true for records.
+                        if (t.IsRecord)
+                            return true;
+
+                        var properties = t.GetMembers().OfType<IPropertySymbol>().ToImmutableArray();
+
+                        return t.GetMembers()
+                            .OfType<IMethodSymbol>()
+                            .Where(m => m.MethodKind == MethodKind.Constructor && m.Parameters.Length > 0)
+                            // Check for a ctor where all parameters have a corresponding compiler-generated prop.
+                            .Any(ctor => ctor.Parameters.All(prm =>
+                                properties.Any(prop => prop.Name.Equals(prm.Name, StringComparison.Ordinal) && prop.IsCompilerGenerated())));
                     }
                 }
             }
