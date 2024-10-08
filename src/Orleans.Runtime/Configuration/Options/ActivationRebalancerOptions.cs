@@ -4,6 +4,9 @@ using Orleans.Runtime;
 
 namespace Orleans.Configuration;
 
+/// <summary>
+/// Options for configuring activation rebalancing.
+/// </summary>
 public sealed class ActivationRebalancerOptions
 {
     /// <summary>
