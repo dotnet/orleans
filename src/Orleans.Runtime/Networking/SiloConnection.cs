@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
@@ -96,7 +97,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 MessagingInstruments.OnRejectedMessage(msg);
-                var rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, "Silo stopping");
+                var rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, "Silo stopping", new SiloUnavailableException());
                 this.Send(rejection);
                 return;
             }
@@ -197,7 +198,7 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                if (!(this.RemoteSiloAddress is null))
+                if (this.RemoteSiloAddress is not null)
                 {
                     this.connectionManager.OnConnectionTerminated(this.RemoteSiloAddress, this, error);
                 }
@@ -243,11 +244,11 @@ namespace Orleans.Runtime.Messaging
             // Don't send messages that have already timed out
             if (msg.IsExpired)
             {
-                this.MessagingTrace.OnDropExpiredMessage(msg,  MessagingInstruments.Phase.Send);
+                this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
 
                 if (msg.IsPing())
                 {
-                    this.Log.LogWarning("Droppping expired ping message {Message}", msg);
+                    this.Log.LogWarning("Dropping expired ping message {Message}", msg);
                 }
 
                 return false;
@@ -286,7 +287,11 @@ namespace Orleans.Runtime.Messaging
                 if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.LogDebug((int)ErrorCode.MessagingSendingRejection, "Silo {SiloAddress} is rejecting message: {Message}. Reason = {Reason}", this.LocalSiloAddress, msg, reason);
 
                 // Done retrying, send back an error instead
-                this.messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Silo {this.LocalSiloAddress} is rejecting message: {msg}. Reason = {reason}");
+                this.messageCenter.SendRejection(
+                    msg,
+                    Message.RejectionTypes.Transient,
+                    $"Silo {this.LocalSiloAddress} is rejecting message: {msg}. Reason = {reason}",
+                    new SiloUnavailableException());
             }
             else
             {

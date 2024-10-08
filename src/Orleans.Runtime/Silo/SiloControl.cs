@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.GrainDirectory;
 using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime.GrainDirectory;
@@ -47,7 +48,7 @@ namespace Orleans.Runtime
             ILocalSiloDetails localSiloDetails,
             DeploymentLoadPublisher deploymentLoadPublisher,
             Catalog catalog,
-            CachedVersionSelectorManager cachedVersionSelectorManager, 
+            CachedVersionSelectorManager cachedVersionSelectorManager,
             CompatibilityDirectorManager compatibilityDirectorManager,
             VersionSelectorManager selectorManager,
             IServiceProvider services,
@@ -185,7 +186,7 @@ namespace Orleans.Runtime
                 new SimpleGrainStatistic { SiloAddress = this.localSiloDetails.SiloAddress, GrainType = p.Key, ActivationCount = (int)p.Value }).ToArray());
         }
 
-        public Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId)
+        public async Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId)
         {
             logger.LogInformation("DetailedGrainReport for grain id {GrainId}", grainId);
             string? grainClassName;
@@ -205,19 +206,39 @@ namespace Orleans.Runtime
                 var a => a?.ToString()
             };
 
-            var directory = services.GetRequiredService<ILocalGrainDirectory>();
+            var resolver = services.GetRequiredService<GrainDirectoryResolver>();
+            var defaultDirectory = services.GetService<IGrainDirectory>();
+            var dir = resolver.Resolve(grainId.Type) ?? defaultDirectory;
+            GrainAddress? localCacheActivationAddress = null;
+            GrainAddress? localDirectoryActivationAddress = null;
+            SiloAddress? primaryForGrain = null;
+            if (dir is DistributedGrainDirectory distributedGrainDirectory)
+            {
+                var grainLocator = services.GetRequiredService<GrainLocator>();
+                grainLocator.TryLookupInCache(grainId, out localCacheActivationAddress);
+                localDirectoryActivationAddress = await ((DistributedGrainDirectory.ITestHooks)distributedGrainDirectory).GetLocalRecord(grainId);
+                primaryForGrain = ((DistributedGrainDirectory.ITestHooks)distributedGrainDirectory).GetPrimaryForGrain(grainId);
+            }
+            else if (dir is null && services.GetService<ILocalGrainDirectory>() is { } localGrainDirectory)
+            {
+                localCacheActivationAddress = localGrainDirectory.GetLocalCacheData(grainId);
+                localDirectoryActivationAddress = localGrainDirectory.GetLocalDirectoryData(grainId).Address;
+                primaryForGrain = localGrainDirectory.GetPrimaryForGrain(grainId);
+            }
+
             var report = new DetailedGrainReport()
             {
                 Grain = grainId,
                 SiloAddress = localSiloDetails.SiloAddress,
                 SiloName = localSiloDetails.Name,
-                LocalCacheActivationAddress = directory.GetLocalCacheData(grainId),
-                LocalDirectoryActivationAddress = directory.GetLocalDirectoryData(grainId).Address,
-                PrimaryForGrain = directory.GetPrimaryForGrain(grainId),
+                LocalCacheActivationAddress = localCacheActivationAddress,
+                LocalDirectoryActivationAddress = localDirectoryActivationAddress,
+                PrimaryForGrain = primaryForGrain,
                 GrainClassTypeName = grainClassName,
                 LocalActivation = activation,
             };
-            return Task.FromResult(report);
+
+            return report;
         }
 
         public Task<int> GetActivationCount()

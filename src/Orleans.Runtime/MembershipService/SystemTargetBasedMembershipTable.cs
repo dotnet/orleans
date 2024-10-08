@@ -4,12 +4,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Concurrency;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Internal;
-using Orleans.Providers;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime.MembershipService
@@ -105,10 +102,7 @@ namespace Orleans.Runtime.MembershipService
 
         public Task UpdateIAmAlive(MembershipEntry entry) => this.grain.UpdateIAmAlive(entry);
 
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
-        {
-            throw new NotImplementedException();
-        }
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => this.grain.CleanupDefunctSiloEntries(beforeDate);
     }
 
     [Reentrant]
@@ -199,7 +193,8 @@ namespace Orleans.Runtime.MembershipService
 
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
-            throw new NotImplementedException();
+            table.CleanupDefunctSiloEntries(beforeDate);
+            return Task.CompletedTask;
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)

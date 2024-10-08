@@ -102,7 +102,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
     }
 
-    internal sealed class GrainDirectoryPartition
+    internal sealed class LocalGrainDirectoryPartition
     {
         // Should we change this to SortedList<> or SortedDictionary so we can extract chunks better for shipping the full
         // partition to a follower, or should we leave it as a Dictionary to get O(1) lookups instead of O(log n), figuring we do
@@ -118,11 +118,11 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal int Count { get { return partitionData.Count; } }
 
-        public GrainDirectoryPartition(ISiloStatusOracle siloStatusOracle, IOptions<GrainDirectoryOptions> grainDirectoryOptions, ILoggerFactory loggerFactory)
+        public LocalGrainDirectoryPartition(ISiloStatusOracle siloStatusOracle, IOptions<GrainDirectoryOptions> grainDirectoryOptions, ILoggerFactory loggerFactory)
         {
             partitionData = new Dictionary<GrainId, GrainInfo>();
             lockable = new object();
-            log = loggerFactory.CreateLogger<GrainDirectoryPartition>();
+            log = loggerFactory.CreateLogger<LocalGrainDirectoryPartition>();
             this.siloStatusOracle = siloStatusOracle;
             this.grainDirectoryOptions = grainDirectoryOptions;
         }
@@ -260,7 +260,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="other"></param>
         /// <returns>Activations which must be deactivated.</returns>
-        internal Dictionary<SiloAddress, List<GrainAddress>>? Merge(GrainDirectoryPartition other)
+        internal Dictionary<SiloAddress, List<GrainAddress>>? Merge(LocalGrainDirectoryPartition other)
         {
             Dictionary<SiloAddress, List<GrainAddress>>? activationsToRemove = null;
             lock (lockable)

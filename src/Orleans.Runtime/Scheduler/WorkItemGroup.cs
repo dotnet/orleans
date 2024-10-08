@@ -10,11 +10,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Internal;
 
 namespace Orleans.Runtime.Scheduler;
 
-[DebuggerDisplay("WorkItemGroup Name={Name} State={state}")]
+[DebuggerDisplay("WorkItemGroup Context={GrainContext} State={state}")]
 internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
 {
     private enum WorkGroupStatus : byte
@@ -263,7 +262,7 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
         _log.LogWarning(
             (int)ErrorCode.SchedulerTurnTooLong3,
             "Task {Task} in WorkGroup {GrainContext} took elapsed time {Duration} for execution, which is longer than {TurnWarningLengthThreshold}. Running on thread {Thread}",
-            task,
+            task.AsyncState ?? task,
             GrainContext.ToString(),
             taskDuration.ToString("g"),
             _schedulingOptions.TurnWarningLengthThreshold,

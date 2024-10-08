@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -43,6 +44,7 @@ namespace Orleans.Runtime
 
         public void OnActivated(IActivationWorkingSetMember member)
         {
+            Debug.Assert(member is not ICollectibleGrainContext collectible || collectible.IsValid);
             if (_members.TryAdd(member, new MemberState()))
             {
                 Interlocked.Increment(ref _activeCount);

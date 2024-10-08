@@ -35,12 +35,15 @@ internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IG
         }
     }
 
-    public void RemoveTarget(IGrainContext target)
+    public bool RemoveTarget(IGrainContext target)
     {
         if (_activations.TryRemove(KeyValuePair.Create(target.GrainId, target)))
         {
             Interlocked.Decrement(ref _activationsCount);
+            return true;
         }
+
+        return false;
     }
 
     public IEnumerator<KeyValuePair<GrainId, IGrainContext>> GetEnumerator() => _activations.GetEnumerator();

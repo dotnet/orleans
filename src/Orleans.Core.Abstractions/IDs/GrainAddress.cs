@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 using Orleans.GrainDirectory;
 
@@ -46,8 +48,9 @@ namespace Orleans.Runtime
 
         public bool Equals(GrainAddress? other)
         {
-            return other != null && (SiloAddress?.Equals(other.SiloAddress) ?? other.SiloAddress is null)
-                && _grainId.Equals(other._grainId) && _activationId.Equals(other._activationId) && MembershipVersion == other.MembershipVersion;
+            if (ReferenceEquals(this, other)) return true;
+            return MatchesGrainIdAndSilo(this, other)
+                && _activationId.Equals(other._activationId);
         }
 
         /// <summary>
@@ -56,15 +59,21 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="other"> The other <see cref="GrainAddress"/> to compare this one with.</param>
         /// <returns> Returns <c>true</c> if the two <see cref="GrainAddress"/> are considered to match.</returns>
-        public bool Matches(GrainAddress other)
+        public bool Matches(GrainAddress? other)
         {
-            return other is not null && _grainId.Equals(other._grainId) && (SiloAddress?.Equals(other.SiloAddress) ?? other.SiloAddress is null)
+            if (ReferenceEquals(this, other)) return true;
+            return MatchesGrainIdAndSilo(this, other)
                 && (_activationId.IsDefault || other._activationId.IsDefault || _activationId.Equals(other._activationId));
         }
 
-        internal static bool MatchesGrainIdAndSilo(GrainAddress address, GrainAddress other)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static bool MatchesGrainIdAndSilo([NotNullWhen(true)] GrainAddress? address, [NotNullWhen(true)] GrainAddress? other)
         {
-            return other is not null && address.GrainId.Equals(other.GrainId) && (address.SiloAddress?.Equals(other.SiloAddress) ?? other.SiloAddress is null);
+            return other is not null
+                && address is not null
+                && address.GrainId.Equals(other.GrainId)
+                && !(address.SiloAddress is null ^ other.SiloAddress is null)
+                && (address.SiloAddress is null || address.SiloAddress.Equals(other.SiloAddress));
         }
 
         public override int GetHashCode() => HashCode.Combine(SiloAddress, _grainId, _activationId);

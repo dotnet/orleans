@@ -776,20 +776,20 @@ namespace Orleans.TestingHost
 
             await Task.Run(async () =>
             {
-                foreach (var handle in this.SecondarySilos)
+                foreach (var handle in SecondarySilos)
                 {
-                    await DisposeAsync(handle).ConfigureAwait(false);
+                    await DisposeAsync(handle).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
                 }
 
-                if (this.Primary is not null)
+                if (Primary is not null)
                 {
-                    await DisposeAsync(Primary).ConfigureAwait(false);
+                    await DisposeAsync(Primary).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
                 }
 
-                await DisposeAsync(ClientHost).ConfigureAwait(false);
+                await DisposeAsync(ClientHost).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
                 ClientHost = null;
 
-                this.PortAllocator?.Dispose();
+                PortAllocator?.Dispose();
             });
 
             _disposed = true;
