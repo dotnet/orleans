@@ -10,6 +10,7 @@ using Orleans.Configuration;
 using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Placement;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
@@ -17,7 +18,6 @@ using Orleans.Serialization.TypeSystem;
 using Orleans.Statistics;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
-
 
 namespace Orleans.Runtime
 {
@@ -42,12 +42,13 @@ namespace Orleans.Runtime
         private readonly IOptions<LoadSheddingOptions> loadSheddingOptions;
         private readonly GrainCountStatistics _grainCountStatistics;
         private readonly GrainPropertiesResolver grainPropertiesResolver;
+        private readonly GrainMigratabilityChecker _migratabilityChecker;
 
         public SiloControl(
             ILocalSiloDetails localSiloDetails,
             DeploymentLoadPublisher deploymentLoadPublisher,
             Catalog catalog,
-            CachedVersionSelectorManager cachedVersionSelectorManager, 
+            CachedVersionSelectorManager cachedVersionSelectorManager,
             CompatibilityDirectorManager compatibilityDirectorManager,
             VersionSelectorManager selectorManager,
             IServiceProvider services,
@@ -59,7 +60,8 @@ namespace Orleans.Runtime
             IEnvironmentStatisticsProvider environmentStatisticsProvider,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             GrainCountStatistics grainCountStatistics,
-            GrainPropertiesResolver grainPropertiesResolver)
+            GrainPropertiesResolver grainPropertiesResolver,
+            GrainMigratabilityChecker migratabilityChecker)
             : base(Constants.SiloControlType, localSiloDetails.SiloAddress, loggerFactory)
         {
             this.localSiloDetails = localSiloDetails;
@@ -78,6 +80,7 @@ namespace Orleans.Runtime
             this.loadSheddingOptions = loadSheddingOptions;
             _grainCountStatistics = grainCountStatistics;
             this.grainPropertiesResolver = grainPropertiesResolver;
+            _migratabilityChecker = migratabilityChecker;
         }
 
         public Task Ping(string message)
@@ -154,27 +157,7 @@ namespace Orleans.Runtime
         public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[]? types = null)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetDetailedGrainStatistics");
-            var stats = new List<DetailedGrainStatistic>();
-            lock (activationDirectory)
-            {
-                foreach (var activation in activationDirectory)
-                {
-                    var data = activation.Value;
-                    if (data == null || data.GrainInstance == null) continue;
-
-                    var grainType = RuntimeTypeNameFormatter.Format(data.GrainInstance.GetType());
-                    if (types == null || types.Contains(grainType))
-                    {
-                        stats.Add(new DetailedGrainStatistic()
-                        {
-                            GrainType = grainType,
-                            GrainId = data.GrainId,
-                            SiloAddress = Silo
-                        });
-                    }
-                }
-            }
-
+            var stats = GetDetailedGrainStatisticsCore();
             return Task.FromResult(stats);
         }
 
@@ -285,6 +268,62 @@ namespace Orleans.Runtime
                 }
             }
             return Task.FromResult(results);
+        }
+
+        public Task MigrateRandomActivations(SiloAddress target, int count)
+        {
+            ArgumentNullException.ThrowIfNull(target);
+            ArgumentOutOfRangeException.ThrowIfNegative(count);
+            var migrationContext = new Dictionary<string, object>()
+            {
+                [IPlacementDirector.PlacementHintKey] = target
+            };
+
+            // Loop until we've migrated the desired count of activations or run out of activations to try.
+            // Note that we have a weak pseudorandom enumeration here, and lossy counting: this is not a precise
+            // or deterministic operation.
+            var remainingCount = count;
+            foreach (var (grainId, grainContext) in activationDirectory)
+            {
+                if (!_migratabilityChecker.IsMigratable(grainId.Type))
+                {
+                    continue;
+                }
+
+                if (--remainingCount <= 0)
+                {
+                    break;
+                }
+
+                grainContext.Migrate(migrationContext);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private List<DetailedGrainStatistic> GetDetailedGrainStatisticsCore(string[]? types = null)
+        {
+            var stats = new List<DetailedGrainStatistic>();
+            lock (activationDirectory)
+            {
+                foreach (var activation in activationDirectory)
+                {
+                    var data = activation.Value;
+                    if (data == null || data.GrainInstance == null) continue;
+
+                    var grainType = RuntimeTypeNameFormatter.Format(data.GrainInstance.GetType());
+                    if (types == null || types.Contains(grainType))
+                    {
+                        stats.Add(new DetailedGrainStatistic()
+                        {
+                            GrainType = grainType,
+                            GrainId = data.GrainId,
+                            SiloAddress = Silo
+                        });
+                    }
+                }
+            }
+            return stats;
         }
     }
 }

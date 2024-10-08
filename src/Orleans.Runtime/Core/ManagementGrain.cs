@@ -384,8 +384,8 @@ namespace Orleans.Runtime.Management
             var results = new List<GrainCallFrequency>();
             foreach (var host in hostsIds)
             {
-                var siloBalancer = IActivationRepartitionerSystemTarget.GetReference(internalGrainFactory, host);
-                var frequencies = await siloBalancer.GetGrainCallFrequencies();
+                var siloPartitioner = IActivationRepartitionerSystemTarget.GetReference(internalGrainFactory, host);
+                var frequencies = await siloPartitioner.GetGrainCallFrequencies();
                 foreach (var frequency in frequencies)
                 {
                     results.Add(new GrainCallFrequency

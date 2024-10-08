@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orleans Activation Rebalancing</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    .bar {
+      fill-opacity: 0.7;
+    }
+
+    .axis-label {
+      font-size: 12px;
+    }
+
+    .bar-chart {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      height: 700px;
+      margin-left: 20px;
+    }
+
+    .bar-label {
+      text-anchor: middle;
+      font-size: 12px;
+      fill: #000;
+    }
+
+    .line-chart {
+      margin-top: 50px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Orleans Activation Rebalancing</h1>
+  <div id="chart" style="display: flex; align-items: flex-start;">
+    <div id="box"></div>
+    <div id="bar-charts" class="bar-chart"></div>
+  </div>
+  <div id="line-chart" class="line-chart"></div>
+
+  <script>
+    const width = 700;
+    const height = 700;
+    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff'];
+    const numColors = colors.length;
+    const maxDataPoints = 100;
+
+    const svgBox = d3.select("#box")
+      .append("svg")
+      .attr("width", width)
+      .attr("height", height);
+
+    const barChartWidth = 60;
+    const barChartHeight = 700;
+
+    const svgBarCharts = d3.select("#bar-charts")
+      .selectAll("svg")
+      .data(colors)
+      .enter()
+      .append("svg")
+      .attr("width", barChartWidth)
+      .attr("height", barChartHeight)
+      .append("g")
+      .attr("transform", `translate(${barChartWidth / 2}, 0)`);
+
+    svgBarCharts.append("line")
+      .attr("x1", 0)
+      .attr("y1", barChartHeight)
+      .attr("x2", 0)
+      .attr("y2", 0)
+      .attr("stroke", "#000");
+
+    svgBarCharts.append("line")
+      .attr("x1", -barChartWidth / 2)
+      .attr("y1", barChartHeight)
+      .attr("x2", barChartWidth / 2)
+      .attr("y2", barChartHeight)
+      .attr("stroke", "#000");
+
+    svgBarCharts.append("text")
+      .attr("class", "bar-label")
+      .attr("x", 0)
+      .attr("y", barChartHeight + 20)
+      .text(d => "0");
+
+    const lineChartWidth = 1400;
+    const lineChartHeight = 1000;
+
+    const svgLineChart = d3.select("#line-chart")
+      .append("svg")
+      .attr("width", lineChartWidth)
+      .attr("height", lineChartHeight)
+      .style("border", "1px solid black");
+
+    const xScale = d3.scaleLinear()
+      .domain([0, maxDataPoints - 1])
+      .range([0, lineChartWidth]);
+
+    const yScale = d3.scaleLinear()
+      .domain([0, 750])
+      .range([lineChartHeight, 0]);
+
+    const xAxis = d3.axisBottom(xScale).ticks(5);
+    const yAxis = d3.axisLeft(yScale).ticks(5);
+
+    svgLineChart.append("g")
+      .attr("transform", `translate(50, ${lineChartHeight - 30})`)
+      .call(xAxis);
+
+    svgLineChart.append("g")
+      .attr("transform", `translate(50, 0)`)
+      .call(yAxis);
+
+    const lineGenerators = colors.map(() => d3.line()
+      .x((d, i) => xScale(i))
+      .y(d => yScale(d)));
+
+    const linePaths = svgLineChart.selectAll(".line")
+      .data(colors)
+      .enter()
+      .append("path")
+      .attr("class", "line")
+      .attr("stroke", (d, i) => colors[i])
+      .attr("fill", "none")
+      .attr("stroke-width", 2);
+
+    const activationsHistory = colors.map(() => []);
+
+    const worker = new Worker('worker.js');
+
+    function updateChart(data) {
+      worker.postMessage(data);
+
+      worker.onmessage = function (event) {
+        const { densityMatrix, error } = event.data;
+
+        if (error) {
+          console.error('Error from worker:', error);
+          return;
+        }
+
+        const cells = svgBox.selectAll("rect")
+          .data(densityMatrix.flat());
+
+        cells.enter()
+          .append("rect")
+          .merge(cells)
+          .attr("x", (d, i) => (i % 20) * (width / 20))
+          .attr("y", (d, i) => Math.floor(i / 20) * (height / 20))
+          .attr("width", width / 20)
+          .attr("height", height / 20)
+          .attr("fill", d => d)
+          .attr("stroke", "#ccc");
+
+        cells.exit().remove();
+
+        svgBarCharts.each(function (d, i) {
+          const barChart = d3.select(this);
+
+          const bars = barChart.selectAll(".bar")
+            .data([data[i].activations]);
+
+          bars.enter()
+            .append("rect")
+            .attr("class", "bar")
+            .merge(bars)
+            .attr("x", -barChartWidth / 2)
+            .attr("y", d => barChartHeight - d)
+            .attr("width", barChartWidth - 10)
+            .attr("height", d => d)
+            .attr("fill", colors[i]);
+
+          bars.exit().remove();
+
+          barChart.select(".bar-label")
+            .text(data[i].activations);
+        });
+
+        data.forEach((silo, i) => {
+          activationsHistory[i].push(silo.activations);
+          if (activationsHistory[i].length > maxDataPoints) {
+            activationsHistory[i].shift();
+          }
+        });
+
+        linePaths.each(function (d, i) {
+          d3.select(this)
+            .datum(activationsHistory[i])
+            .attr("d", lineGenerators[i]);
+        });
+      };
+    }
+
+    function fetchData() {
+      fetch('http://localhost:5000/api/stats/silos')
+        .then(response => response.json())
+        .then(newData => {
+          console.log('Fetched Data:', newData);
+          updateChart(newData);
+        })
+        .catch(error => {
+          console.error('Error fetching grain stats:', error);
+        });
+    }
+
+    setInterval(fetchData, 2500);
+    fetchData();
+  </script>
+</body>
+</html>
