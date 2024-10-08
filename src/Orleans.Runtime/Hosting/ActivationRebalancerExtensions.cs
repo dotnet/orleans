@@ -10,6 +10,9 @@ namespace Orleans.Hosting;
 
 #nullable enable
 
+/// <summary>
+/// Extensions for configuring activation rebalancing.
+/// </summary>
 public static class ActivationRebalancerExtensions
 {
     /// <summary>
