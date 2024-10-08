@@ -1,9 +1,11 @@
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Storage;
 using TestExtensions;
 using UnitTests.Persistence;
@@ -54,21 +56,22 @@ namespace AWSUtils.Tests.StorageTests
         }
 
         [SkippableTheory, TestCategory("Functional")]
-        [InlineData(null, false)]
-        [InlineData(null, true)]
-        [InlineData(400_000, false)]
-        [InlineData(400_000, true)]
-        public async Task PersistenceProvider_DynamoDB_WriteClearRead(int? stringLength, bool useJson)
+        [InlineData(null, false, false)]
+        [InlineData(null, true, false)]
+        [InlineData(400_000, false, false)]
+        [InlineData(400_000, true, false)]
+        public async Task PersistenceProvider_DynamoDB_WriteClearRead(int? stringLength, bool useJson, bool useFallback)
         {
-            var testName = string.Format("{0}({1} = {2}, {3} = {4})",
+            var testName = string.Format("{0}({1} = {2}, {3} = {4}, {5} = {6})",
                 nameof(PersistenceProvider_DynamoDB_WriteClearRead),
                 nameof(stringLength), stringLength == null ? "default" : stringLength.ToString(),
-                nameof(useJson), useJson);
+                nameof(useJson), useJson,
+                nameof(useFallback), useFallback);
 
             var grainState = TestStoreGrainState.NewRandomState(stringLength);
             EnsureEnvironmentSupportsState(grainState);
 
-            var store = await InitDynamoDBGrainStorage(useJson);
+            var store = await InitDynamoDBGrainStorage(useJson, useFallback);
 
             await Test_PersistenceProvider_WriteClearRead(testName, store, grainState);
         }
@@ -161,7 +164,6 @@ namespace AWSUtils.Tests.StorageTests
 
         private async Task<DynamoDBGrainStorage> InitDynamoDBGrainStorage(DynamoDBStorageOptions options)
         {
-            options.GrainStorageSerializer = ActivatorUtilities.CreateInstance<JsonGrainStorageSerializer>(this.providerRuntime.ServiceProvider);
             DynamoDBGrainStorage store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(this.providerRuntime.ServiceProvider, "StorageProviderTests", options);
             ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this.providerRuntime.ServiceProvider, NullLogger<SiloLifecycleSubject>.Instance);
             store.Participate(lifecycle);
@@ -169,12 +171,24 @@ namespace AWSUtils.Tests.StorageTests
             return store;
         }
 
-        private Task<DynamoDBGrainStorage> InitDynamoDBGrainStorage(bool useJson = false)
+        private Task<DynamoDBGrainStorage> InitDynamoDBGrainStorage(bool useJson = false, bool useFallback = true)
         {
             var options = new DynamoDBStorageOptions
             {
                 Service = AWSTestConstants.DynamoDbService,
             };
+
+            var jsonOptions = this.providerRuntime.ServiceProvider.GetService<IOptions<OrleansJsonSerializerOptions>>();
+            var binarySerializer = new OrleansGrainStorageSerializer(this.providerRuntime.ServiceProvider.GetRequiredService<Serializer>());
+            var jsonSerializer = new JsonGrainStorageSerializer(new OrleansJsonSerializer(jsonOptions));
+
+            if (useFallback)
+                options.GrainStorageSerializer = useJson
+                    ? new GrainStorageSerializer(jsonSerializer, binarySerializer)
+                    : new GrainStorageSerializer(binarySerializer, jsonSerializer);
+            else
+                options.GrainStorageSerializer = useJson ? jsonSerializer : binarySerializer;
+
             return InitDynamoDBGrainStorage(options);
         }
 

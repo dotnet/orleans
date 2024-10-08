@@ -90,21 +90,22 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
-        [InlineData(null, false)]
-        [InlineData(null, true)]
-        [InlineData(15 * 64 * 1024 - 256, false)]
-        [InlineData(15 * 32 * 1024 - 256, true)]
-        public async Task PersistenceProvider_Azure_WriteClearRead(int? stringLength, bool useJson)
+        [InlineData(null, false, false)]
+        [InlineData(null, true, false)]
+        [InlineData(15 * 64 * 1024 - 256, false, false)]
+        [InlineData(15 * 32 * 1024 - 256, true, false)]
+        public async Task PersistenceProvider_Azure_WriteClearRead(int? stringLength, bool useJson, bool useFallback)
         {
-            var testName = string.Format("{0}({1} = {2}, {3} = {4})",
+            var testName = string.Format("{0}({1} = {2}, {3} = {4}, {5} = {6})",
                 nameof(PersistenceProvider_Azure_WriteClearRead),
                 nameof(stringLength), stringLength == null ? "default" : stringLength.ToString(),
-                nameof(useJson), useJson);
+                nameof(useJson), useJson,
+                nameof(useFallback), useFallback);
 
             var grainState = TestStoreGrainState.NewRandomState(stringLength);
             EnsureEnvironmentSupportsState(grainState);
 
-            var store = await InitAzureTableGrainStorage(useJson);
+            var store = await InitAzureTableGrainStorage(useJson, useFallback);
 
             await Test_PersistenceProvider_WriteClearRead(testName, store, grainState);
         }
@@ -300,7 +301,7 @@ namespace Tester.AzureUtils.Persistence
             return store;
         }
 
-        private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(bool useJson = false, bool useStringFormat = false, TypeNameHandling? typeNameHandling = null)
+        private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(bool useJson = false, bool useFallback = true, bool useStringFormat = false, TypeNameHandling? typeNameHandling = null)
         {
             if (useStringFormat && !useJson)
             {
@@ -320,9 +321,12 @@ namespace Tester.AzureUtils.Persistence
             // TODO change test to include more serializer?
             var binarySerializer = new OrleansGrainStorageSerializer(this.providerRuntime.ServiceProvider.GetRequiredService<Serializer>());
             var jsonSerializer = new JsonGrainStorageSerializer(new OrleansJsonSerializer(jsonOptions));
-            options.GrainStorageSerializer = useJson
-                ? new GrainStorageSerializer(jsonSerializer, binarySerializer)
-                : new GrainStorageSerializer(binarySerializer, jsonSerializer);
+            if (useFallback)
+                options.GrainStorageSerializer = useJson
+                    ? new GrainStorageSerializer(jsonSerializer, binarySerializer)
+                    : new GrainStorageSerializer(binarySerializer, jsonSerializer);
+            else
+                options.GrainStorageSerializer = useJson ? jsonSerializer : binarySerializer;
 
             AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(this.providerRuntime.ServiceProvider, options, "TestStorage");
             ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this.providerRuntime.ServiceProvider);
