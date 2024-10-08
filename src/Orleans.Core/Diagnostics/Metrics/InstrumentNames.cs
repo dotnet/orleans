@@ -83,7 +83,9 @@ internal static class InstrumentNames
     public const string DIRECTORY_UNREGISTRATIONS_MANY_REMOTE_SENT = "orleans-directory-unregistrations-many-remote-sent";
     public const string DIRECTORY_UNREGISTRATIONS_MANY_REMOTE_RECEIVED = "orleans-directory-unregistrations-many-remote-received";
 
+    public const string DIRECTORY_RANGE_SNAPSHOT_TRANSFER_COUNT = "orleans-directory-snapshot-transfer-count";
     public const string DIRECTORY_RANGE_SNAPSHOT_TRANSFER_DURATION = "orleans-directory-snapshot-transfer-duration";
+    public const string DIRECTORY_RANGE_RECOVERY_COUNT = "orleans-directory-recovery-count";
     public const string DIRECTORY_RANGE_RECOVERY_DURATION = "orleans-directory-recovery-duration";
     public const string DIRECTORY_RANGE_LOCK_HELD_DURATION = "orleans-directory-range-lock-held-duration";
 

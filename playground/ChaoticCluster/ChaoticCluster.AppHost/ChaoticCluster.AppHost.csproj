@@ -5,7 +5,10 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <IsAspireHost>true</IsAspireHost>
+
+    <!-- Uncomment this once Aspire no longer requires a 'dotnet workload install aspire' to build -->
+    <!--<IsAspireHost>true</IsAspireHost>-->
+
     <UserSecretsId>8cceaca4-1c1f-473f-ac3a-6f220c8791cf</UserSecretsId>
   </PropertyGroup>
 

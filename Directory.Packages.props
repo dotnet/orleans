@@ -55,6 +55,13 @@
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="8.2.0" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="8.2.0" />
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="8.2.0" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="8.8.0" />
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="8.2.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.9.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.9.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.9.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.9.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.9.0" />
     <!-- 3rd party packages -->
     <PackageVersion Include="Google.Cloud.PubSub.V1" Version="1.0.0-beta13" />
     <PackageVersion Include="AWSSDK.DynamoDBv2" Version="3.7.300.6" />

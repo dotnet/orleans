@@ -1798,8 +1798,9 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
             // If the instance is being deactivated due to a directory failure, we should not unregister it.
             var isDirectoryFailure = DeactivationReason.ReasonCode is DeactivationReasonCode.DirectoryFailure;
+            var isShuttingDown = DeactivationReason.ReasonCode is DeactivationReasonCode.ShuttingDown;
 
-            if (!migrated && IsUsingGrainDirectory && !cancellationToken.IsCancellationRequested && !isDirectoryFailure)
+            if (!migrated && IsUsingGrainDirectory && !cancellationToken.IsCancellationRequested && !isDirectoryFailure && !isShuttingDown)
             {
                 // Unregister from directory.
                 // If the grain was migrated, the new activation will perform a check-and-set on the registration itself.

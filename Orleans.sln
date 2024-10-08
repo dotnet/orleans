@@ -248,6 +248,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChaoticCluster.AppHost", "p
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChaoticCluster.Silo", "playground\ChaoticCluster\ChaoticCluster.Silo\ChaoticCluster.Silo.csproj", "{76A549FA-69F1-4967-82B6-161A8B52C86B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChaoticCluster.ServiceDefaults", "playground\ChaoticCluster\ChaoticCluster.ServiceDefaults\ChaoticCluster.ServiceDefaults.csproj", "{4004A79F-B6BB-4472-891B-AD1348AE3E93}"
+EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestSerializerExternalModels", "test\Misc\TestSerializerExternalModels\TestSerializerExternalModels.csproj", "{5D587DDE-036D-4694-A314-8DDF270AC031}"
 EndProject
 Global
@@ -648,6 +650,10 @@ Global
 		{76A549FA-69F1-4967-82B6-161A8B52C86B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{76A549FA-69F1-4967-82B6-161A8B52C86B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{76A549FA-69F1-4967-82B6-161A8B52C86B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4004A79F-B6BB-4472-891B-AD1348AE3E93}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4004A79F-B6BB-4472-891B-AD1348AE3E93}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4004A79F-B6BB-4472-891B-AD1348AE3E93}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4004A79F-B6BB-4472-891B-AD1348AE3E93}.Release|Any CPU.Build.0 = Release|Any CPU
 		{5D587DDE-036D-4694-A314-8DDF270AC031}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{5D587DDE-036D-4694-A314-8DDF270AC031}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5D587DDE-036D-4694-A314-8DDF270AC031}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -771,6 +777,7 @@ Global
 		{2579A7F6-EBE8-485A-BB20-A5D19DB5612B} = {A41DE3D1-F8AA-4234-BE6F-3C9646A1507A}
 		{4E79EC4B-2DC4-41E3-9AE6-17C1FFF17B02} = {2579A7F6-EBE8-485A-BB20-A5D19DB5612B}
 		{76A549FA-69F1-4967-82B6-161A8B52C86B} = {2579A7F6-EBE8-485A-BB20-A5D19DB5612B}
+		{4004A79F-B6BB-4472-891B-AD1348AE3E93} = {2579A7F6-EBE8-485A-BB20-A5D19DB5612B}
 		{5D587DDE-036D-4694-A314-8DDF270AC031} = {70BCC54E-1618-4742-A079-07588065E361}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution

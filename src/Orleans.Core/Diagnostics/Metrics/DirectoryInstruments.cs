@@ -21,8 +21,10 @@ internal static class DirectoryInstruments
     internal static readonly Counter<int> ValidationsCacheSent = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_VALIDATIONS_CACHE_SENT);
     internal static readonly Counter<int> ValidationsCacheReceived = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_VALIDATIONS_CACHE_RECEIVED);
 
+    internal static readonly Counter<int> SnapshotTransferCount = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_RANGE_SNAPSHOT_TRANSFER_COUNT);
     internal static readonly Histogram<long> SnapshotTransferDuration = Instruments.Meter.CreateHistogram<long>(InstrumentNames.DIRECTORY_RANGE_SNAPSHOT_TRANSFER_DURATION);
-    internal static readonly Histogram<long> RangeRecoveryDuration = Instruments.Meter.CreateHistogram<long>(InstrumentNames.DIRECTORY_RANGE_SNAPSHOT_TRANSFER_DURATION);
+    internal static readonly Counter<long> RangeRecoveryCount = Instruments.Meter.CreateCounter<long>(InstrumentNames.DIRECTORY_RANGE_RECOVERY_COUNT);
+    internal static readonly Histogram<long> RangeRecoveryDuration = Instruments.Meter.CreateHistogram<long>(InstrumentNames.DIRECTORY_RANGE_RECOVERY_DURATION);
     internal static readonly Histogram<long> RangeLockHeldDuration = Instruments.Meter.CreateHistogram<long>(InstrumentNames.DIRECTORY_RANGE_LOCK_HELD_DURATION);
 
     internal static ObservableGauge<int> DirectoryPartitionSize;

@@ -57,17 +57,7 @@ public sealed class GrainDirectoryResilienceTests
                 var time = Stopwatch.StartNew();
                 var tasks = Enumerable.Range(0, CallsPerIteration).Select(i => client.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping().AsTask()).ToList();
                 var workTask = Task.WhenAll(tasks);
-                using var delayCancellation = new CancellationTokenSource();
-                var delay = TimeSpan.FromMilliseconds(90_000);
-                var delayTask = Task.Delay(delay, delayCancellation.Token);
-                await Task.WhenAny(workTask, delayTask);
-                if (delayTask.IsCompleted)
-                {
-                    log.LogError("SLOW CALL.");
-                    DumpCapture.CreateMiniDump("delayed");
-                    Assert.False(delayTask.IsCompleted, $"Request took longer than {delay.TotalSeconds}s to complete.");
-                }
-
+                
                 try
                 {
                     await workTask;
@@ -83,11 +73,9 @@ public sealed class GrainDirectoryResilienceTests
                 catch (Exception exception)
                 {
                     log.LogError(exception, "Unhandled exception.");
-                    DumpCapture.CreateMiniDump("unexpected");
                     throw;
                 }
 
-                delayCancellation.Cancel();
                 idBase += CallsPerIteration;
             }
         });

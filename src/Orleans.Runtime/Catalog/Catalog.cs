@@ -261,26 +261,11 @@ namespace Orleans.Runtime
             if (list == null || list.Count == 0) return;
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("DeactivateActivations: {Count} activations.", list.Count);
-            var tasks = new List<Task>(list.Count);
-            foreach (var activation in list)
+            await Parallel.ForEachAsync(list, cancellationToken, (activation, ct) =>
             {
-                activation.Deactivate(reason, cancellationToken);
-                tasks.Add(activation.Deactivated);
-            }
-
-            await Task.WhenAll(tasks);
-        }
-
-        internal void StartDeactivatingActivations(DeactivationReason reason, List<IGrainContext> list, CancellationToken cancellationToken)
-        {
-            if (list == null || list.Count == 0) return;
-
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("DeactivateActivations: {Count} activations.", list.Count);
-
-            foreach (var activation in list)
-            {
-                activation.Deactivate(reason, cancellationToken);
-            }
+                activation.Deactivate(reason, ct);
+                return new (activation.Deactivated);
+            });
         }
 
         public async Task DeactivateAllActivations(CancellationToken cancellationToken)
@@ -290,14 +275,14 @@ namespace Orleans.Runtime
                 logger.LogDebug((int)ErrorCode.Catalog_DeactivateAllActivations, "DeactivateAllActivations.");
             }
 
-            var activationsToShutdown = new List<IGrainContext>();
-            foreach (var pair in activations)
-            {
-                activationsToShutdown.Add(pair.Value);
-            }
-
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("DeactivateActivations: {Count} activations.", activations.Count);
             var reason = new DeactivationReason(DeactivationReasonCode.ShuttingDown, "This process is terminating.");
-            await DeactivateActivations(reason, activationsToShutdown, cancellationToken).WaitAsync(cancellationToken);
+            await Parallel.ForEachAsync(activations, cancellationToken, (kv, ct) =>
+            {
+                var activation = kv.Value;
+                activation.Deactivate(reason, ct);
+                return new (activation.Deactivated);
+            });
         }
 
         public SiloStatus LocalSiloStatus
@@ -308,20 +293,20 @@ namespace Orleans.Runtime
             }
         }
 
-        public Task DeleteActivations(List<GrainAddress> addresses, DeactivationReasonCode reasonCode, string reasonText)
+        public async Task DeleteActivations(List<GrainAddress> addresses, DeactivationReasonCode reasonCode, string reasonText)
         {
             var tasks = new List<Task>(addresses.Count);
             var deactivationReason = new DeactivationReason(reasonCode, reasonText);
-            foreach (var activationAddress in addresses)
+            await Parallel.ForEachAsync(addresses, (activationAddress, cancellationToken) =>
             {
                 if (TryGetGrainContext(activationAddress.GrainId, out var grainContext))
                 {
                     grainContext.Deactivate(deactivationReason);
-                    tasks.Add(grainContext.Deactivated);
+                    return new ValueTask(grainContext.Deactivated);
                 }
-            }
 
-            return Task.WhenAll(tasks);
+                return ValueTask.CompletedTask;
+            });
         }
 
         // TODO move this logic in the LocalGrainDirectory
@@ -386,6 +371,18 @@ namespace Orleans.Runtime
                     var reasonText = $"This activation is being deactivated due to a failure of server {updatedSilo}, since it was responsible for this activation's grain directory registration.";
                     var reason = new DeactivationReason(DeactivationReasonCode.DirectoryFailure, reasonText);
                     StartDeactivatingActivations(reason, activationsToShutdown, CancellationToken.None);
+                }
+            }
+
+            void StartDeactivatingActivations(DeactivationReason reason, List<IGrainContext> list, CancellationToken cancellationToken)
+            {
+                if (list == null || list.Count == 0) return;
+
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("DeactivateActivations: {Count} activations.", list.Count);
+
+                foreach (var activation in list)
+                {
+                    activation.Deactivate(reason, cancellationToken);
                 }
             }
         }

@@ -559,6 +559,7 @@ internal sealed partial class GrainDirectoryReplica(
                 _logger.LogDebug("Transferred '{Count}' entries for range '{Range}' from '{PreviousOwner}'.", snapshot.GrainAddresses.Count, addedRange, previousOwner);
             }
 
+            DirectoryInstruments.SnapshotTransferCount.Add(1);
             DirectoryInstruments.SnapshotTransferDuration.Record((long)stopwatch.Elapsed.TotalMilliseconds);
 
             return true;
@@ -598,6 +599,7 @@ internal sealed partial class GrainDirectoryReplica(
             }
         }
 
+        DirectoryInstruments.RangeRecoveryCount.Add(1);
         DirectoryInstruments.RangeRecoveryDuration.Record((long)stopwatch.Elapsed.TotalMilliseconds);
         if (_logger.IsEnabled(LogLevel.Debug))
         {
