@@ -11,7 +11,7 @@ namespace Orleans.TestingHost.InProcess;
 /// <summary>
 /// An in-memory implementation of <see cref="IMembershipTable"/> for testing purposes.
 /// </summary>
-internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTableSystemTarget, IGatewayListProvider
+internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTable, IGatewayListProvider
 {
     private readonly Table _table = new();
     private readonly string _clusterId = clusterId;

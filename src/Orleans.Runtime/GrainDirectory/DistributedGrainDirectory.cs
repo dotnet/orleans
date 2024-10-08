@@ -358,11 +358,24 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         return owner;
     }
 
-    GrainAddress? ITestHooks.GetLocalRecord(GrainId grainId) => throw new NotImplementedException();// _localReplica.LookupCore(grainId);
+    async Task<GrainAddress?> ITestHooks.GetLocalRecord(GrainId grainId)
+    {
+        var view = _membershipService.CurrentView;
+        if (view.TryGetOwner(grainId, out var owner, out var partitionReference) && Silo.Equals(owner))
+        {
+            var result = await partitionReference.LookupAsync(view.Version, grainId);
+            if (result.TryGetResult(view.Version, out var address))
+            {
+                return address;
+            }
+        }
+
+        return null;
+    }
 
     internal interface ITestHooks
     {
         SiloAddress? GetPrimaryForGrain(GrainId grainId);
-        GrainAddress? GetLocalRecord(GrainId grainId);
+        Task<GrainAddress?> GetLocalRecord(GrainId grainId);
     }
 }

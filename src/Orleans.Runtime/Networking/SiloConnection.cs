@@ -200,7 +200,6 @@ namespace Orleans.Runtime.Messaging
             {
                 if (this.RemoteSiloAddress is not null)
                 {
-                    this.Shared.ServiceProvider.GetRequiredService<InsideRuntimeClient>().BreakOutstandingMessagesToSilo(this.RemoteSiloAddress);
                     this.connectionManager.OnConnectionTerminated(this.RemoteSiloAddress, this, error);
                 }
             }

@@ -39,8 +39,8 @@ public sealed class GrainDirectoryResilienceTests
         var testCluster = testClusterBuilder.Build();
         await testCluster.DeployAsync();
         var log = testCluster.ServiceProvider.GetRequiredService<ILogger<GrainDirectoryResilienceTests>>();
-        log.LogInformation($"ServiceId: {testCluster.Options.ServiceId}");
-        log.LogInformation($"ClusterId: {testCluster.Options.ClusterId}");
+        log.LogInformation("ServiceId: '{ServiceId}'", testCluster.Options.ServiceId);
+        log.LogInformation("ClusterId: '{ClusterId}'.", testCluster.Options.ClusterId);
 
         var cts = new CancellationTokenSource(TimeSpan.FromMinutes(15));
         var reconfigurationTimer = CoarseStopwatch.StartNew();
@@ -101,7 +101,6 @@ public sealed class GrainDirectoryResilienceTests
                             for (var partitionIndex = 0; partitionIndex < DirectoryMembershipSnapshot.PartitionsPerSilo; partitionIndex++)
                             {
                                 var replica = ((IInternalGrainFactory)client).GetSystemTarget<IGrainDirectoryTestHooks>(GrainDirectoryReplica.CreateGrainId(address, partitionIndex).GrainId);
-                                RequestContext.Set("gid", replica.GetGrainId());
                                 integrityChecks.Add(replica.CheckIntegrityAsync().AsTask());
                             }
                         }
@@ -122,22 +121,22 @@ public sealed class GrainDirectoryResilienceTests
                                 var victim = testCluster.SecondarySilos[Random.Shared.Next(testCluster.SecondarySilos.Count)];
                                 if (currentCount % 2 == 0)
                                 {
-                                    log.LogInformation($"Stopping '{victim.SiloAddress}'.");
+                                    log.LogInformation("Stopping '{Silo}'.", victim.SiloAddress);
                                     await testCluster.StopSiloAsync(victim);
-                                    log.LogInformation($"Stopped '{victim.SiloAddress}'.");
+                                    log.LogInformation("Stopped '{Silo}'.", victim.SiloAddress);
                                 }
                                 else
                                 {
-                                    log.LogInformation($"Killing '{victim.SiloAddress}'.");
+                                    log.LogInformation("Killing '{Silo}'.", victim.SiloAddress);
                                     await testCluster.KillSiloAsync(victim);
-                                    log.LogInformation($"Killed '{victim.SiloAddress}'.");
+                                    log.LogInformation("Killed '{Silo}'.", victim.SiloAddress);
                                 }
                             }
                             else if (currentCount < target)
                             {
                                 log.LogInformation("Starting new silo.");
                                 var result = await testCluster.StartAdditionalSiloAsync();
-                                log.LogInformation($"Started '{result.SiloAddress}'.");
+                                log.LogInformation("Started '{Silo}'.", result.SiloAddress);
                             }
 
                             if (currentCount <= lowerLimit)
@@ -177,10 +176,6 @@ public sealed class GrainDirectoryResilienceTests
 #pragma warning disable ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             siloBuilder.AddDistributedGrainDirectory();
 #pragma warning restore ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-            //siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.Messaging.MessageCenter", LogLevel.Debug));
-            //siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Grain", LogLevel.Debug));
-            //siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.GrainDirectory.GrainDirectoryReplica", LogLevel.Trace));
-            siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.GrainDirectory.DistributedGrainDirectory", LogLevel.Debug));
         }
     }
 }
