@@ -13,6 +13,7 @@ using Amazon.DynamoDBv2.Model;
 using Orleans.Configuration;
 using Orleans.Persistence.DynamoDB;
 using Orleans.Runtime;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Storage
 {
@@ -33,6 +34,7 @@ namespace Orleans.Storage
         private readonly DynamoDBStorageOptions options;
         private readonly ILogger logger;
         private readonly IServiceProvider serviceProvider;
+        private readonly IActivatorProvider activatorProvider;
         private readonly string name;
 
         private DynamoDBStorage storage;
@@ -50,6 +52,7 @@ namespace Orleans.Storage
             this.logger = logger;
             this.options = options;
             this.serviceProvider = serviceProvider;
+            this.activatorProvider = this.serviceProvider.GetRequiredService<IActivatorProvider>();
         }
 
         public void Participate(ISiloLifecycle lifecycle)
@@ -151,6 +154,10 @@ namespace Orleans.Storage
                 grainState.RecordExists = loadedState != null;
                 grainState.State = loadedState ?? Activator.CreateInstance<T>();
                 grainState.ETag = record.ETag.ToString();
+            }
+            else
+            {
+                grainState.State = this.activatorProvider.GetActivator<T>().Create();
             }
 
             // Else leave grainState in previous default condition
@@ -294,6 +301,7 @@ namespace Orleans.Storage
                 else
                 {
                     await WriteStateInternal(grainState, record, true);
+                    grainState.State = this.activatorProvider.GetActivator<T>().Create();
                 }
             }
             catch (Exception exc)
@@ -330,7 +338,8 @@ namespace Orleans.Storage
             T dataValue = default;
             try
             {
-                dataValue = this.options.GrainStorageSerializer.Deserialize<T>(entity.State);
+                if (entity.State is { Length: > 0 })
+                    dataValue = this.options.GrainStorageSerializer.Deserialize<T>(entity.State);
             }
             catch (Exception exc)
             {
