@@ -1,4 +1,6 @@
 #nullable enable
+using System;
+
 namespace Orleans.Serialization.Invocation;
 
 /// <summary>
@@ -7,16 +9,15 @@ namespace Orleans.Serialization.Invocation;
 public interface ITargetHolder
 {
     /// <summary>
-    /// Gets the target.
+    /// Gets the target instance.
     /// </summary>
-    /// <typeparam name="TTarget">The target type.</typeparam>
     /// <returns>The target.</returns>
-    TTarget? GetTarget<TTarget>() where TTarget : class;
+    object? GetTarget();
 
     /// <summary>
     /// Gets the component with the specified type.
     /// </summary>
-    /// <typeparam name="TComponent">The component type.</typeparam>
+    /// <param name="componentType">The component type.</param>
     /// <returns>The component with the specified type.</returns>
-    TComponent? GetComponent<TComponent>() where TComponent : class;
+    object? GetComponent(Type componentType);
 }

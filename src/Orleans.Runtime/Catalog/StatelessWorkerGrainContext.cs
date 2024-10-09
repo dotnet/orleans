@@ -118,11 +118,11 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     public bool Equals([AllowNull] IGrainContext other) => other is not null && ActivationId.Equals(other.ActivationId);
 
-    public TComponent? GetComponent<TComponent>() where TComponent : class => this switch
+    public object? GetComponent(Type componentType)
     {
-        TComponent contextResult => contextResult,
-        _ => _shared.GetComponent<TComponent>()
-    };
+        if (componentType.IsAssignableFrom(GetType())) return this;
+        return _shared.GetComponent(componentType);
+    }
 
     public void SetComponent<TComponent>(TComponent? instance) where TComponent : class
     {
@@ -134,7 +134,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
         _shared.SetComponent(instance);
     }
 
-    public TTarget GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
+    public object? GetTarget() => throw new NotImplementedException();
 
     private async Task RunMessageLoop()
     {
