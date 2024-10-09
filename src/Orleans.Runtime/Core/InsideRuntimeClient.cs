@@ -83,11 +83,13 @@ namespace Orleans.Runtime
             this.sharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
+                this.ConcreteGrainFactory,
                 this.messagingOptions.ResponseTimeout);
 
             this.systemSharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
+                this.ConcreteGrainFactory,
                 this.messagingOptions.SystemResponseTimeout);
         }
 
@@ -163,6 +165,7 @@ namespace Orleans.Runtime
                 // Register a callback for the request.
                 var callbackData = new CallbackData(sharedData, context, message);
                 callbacks.TryAdd((message.SendingGrain, message.Id), callbackData);
+                callbackData.SubscribeForCancellation(request);
             }
             else
             {
