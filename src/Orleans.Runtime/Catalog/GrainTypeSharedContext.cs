@@ -22,7 +22,7 @@ namespace Orleans.Runtime;
 public class GrainTypeSharedContext
 {
     private readonly IServiceProvider _serviceProvider;
-    private readonly Dictionary<Type, object> _components = new();
+    private readonly Dictionary<Type, object> _components = [];
     private InternalGrainRuntime? _internalGrainRuntime;
 
     public GrainTypeSharedContext(
@@ -98,23 +98,27 @@ public class GrainTypeSharedContext
     /// <summary>
     /// Gets a component.
     /// </summary>
-    /// <typeparam name="TComponent">The type specified in the corresponding <see cref="SetComponent{TComponent}"/> call.</typeparam>
-    public TComponent? GetComponent<TComponent>()
+    public TComponent? GetComponent<TComponent>() where TComponent : class => GetComponent(typeof(TComponent)) as TComponent;
+
+    /// <summary>
+    /// Gets a component.
+    /// </summary>
+    public object? GetComponent(Type componentType)
     {
-        if (typeof(TComponent) == typeof(PlacementStrategy) && PlacementStrategy is TComponent component)
+        if (componentType == typeof(PlacementStrategy) && PlacementStrategy is { }  component)
         {
             return component;
         }
 
         if (_components is null) return default;
-        _components.TryGetValue(typeof(TComponent), out var resultObj);
-        return (TComponent?)resultObj;
+        _components.TryGetValue(componentType, out var resultObj);
+        return resultObj;
     }
 
     /// <summary>
     /// Registers a component.
     /// </summary>
-    /// <typeparam name="TComponent">The type which can be used as a key to <see cref="GetComponent{TComponent}"/>.</typeparam>
+    /// <typeparam name="TComponent">The type which can be used as a key to <see cref="GetComponent"/>.</typeparam>
     public void SetComponent<TComponent>(TComponent? instance)
     {
         if (instance == null)
