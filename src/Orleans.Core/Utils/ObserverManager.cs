@@ -17,7 +17,7 @@ namespace Orleans.Utilities
     public class ObserverManager<TObserver> : ObserverManager<IAddressable, TObserver>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="ObserverManager{TObserver}"/> class. 
+        /// Initializes a new instance of the <see cref="ObserverManager{TObserver}"/> class.
         /// </summary>
         /// <param name="expiration">
         /// The expiration.
@@ -50,7 +50,7 @@ namespace Orleans.Utilities
         private readonly ILogger _log;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ObserverManager{TIdentity,TObserver}"/> class. 
+        /// Initializes a new instance of the <see cref="ObserverManager{TIdentity,TObserver}"/> class.
         /// </summary>
         /// <param name="expiration">
         /// The expiration.
@@ -152,45 +152,53 @@ namespace Orleans.Utilities
         public async Task Notify(Func<TObserver, Task> notification, Func<TObserver, bool> predicate = null)
         {
             var now = GetDateTime();
-            var defunct = default(List<TIdentity>);
+            var defunct = new List<TIdentity>();
+            var tasks = new List<Task>();
+
             foreach (var observer in _observers)
             {
-                if (observer.Value.LastSeen + ExpirationDuration < now)
+                var observerKey = observer.Key;
+                var observerValue = observer.Value;
+
+                if (observerValue.LastSeen + ExpirationDuration < now)
                 {
                     // Expired observers will be removed.
-                    defunct ??= new List<TIdentity>();
-                    defunct.Add(observer.Key);
+                    defunct.Add(observerKey);
                     continue;
                 }
 
                 // Skip observers which don't match the provided predicate.
-                if (predicate != null && !predicate(observer.Value.Observer))
+                if (predicate != null && !predicate(observerValue.Observer))
                 {
                     continue;
                 }
 
-                try
+                tasks.Add(Task.Run(async () =>
                 {
-                    await notification(observer.Value.Observer);
-                }
-                catch (Exception)
-                {
-                    // Failing observers are considered defunct and will be removed..
-                    defunct ??= new List<TIdentity>();
-                    defunct.Add(observer.Key);
-                }
+                    try
+                    {
+                        await notification(observerValue.Observer);
+                    }
+                    catch (Exception)
+                    {
+                        // Failing observers are considered defunct and will be removed.
+                        lock (defunct)
+                        {
+                            defunct.Add(observerKey);
+                        }
+                    }
+                }));
             }
 
+            await Task.WhenAll(tasks);
+
             // Remove defunct observers.
-            if (defunct != default(List<TIdentity>))
+            foreach (var observer in defunct)
             {
-                foreach (var observer in defunct)
+                _observers.Remove(observer, out _);
+                if (_log.IsEnabled(LogLevel.Debug))
                 {
-                    _observers.Remove(observer, out _);
-                    if (_log.IsEnabled(LogLevel.Debug))
-                    {
-                        _log.LogDebug("Removing defunct entry for {Id}. {Count} total observers after remove.", observer, _observers.Count);
-                    }
+                    _log.LogDebug("Removing defunct entry for {Id}. {Count} total observers after remove.", observer, _observers.Count);
                 }
             }
         }
@@ -207,45 +215,53 @@ namespace Orleans.Utilities
         public void Notify(Action<TObserver> notification, Func<TObserver, bool> predicate = null)
         {
             var now = GetDateTime();
-            var defunct = default(List<TIdentity>);
+            var defunct = new List<TIdentity>();
+            var tasks = new List<Task>();
+
             foreach (var observer in _observers)
             {
-                if (observer.Value.LastSeen + ExpirationDuration < now)
+                var observerKey = observer.Key;
+                var observerValue = observer.Value;
+
+                if (observerValue.LastSeen + ExpirationDuration < now)
                 {
                     // Expired observers will be removed.
-                    defunct ??= new List<TIdentity>();
-                    defunct.Add(observer.Key);
+                    defunct.Add(observerKey);
                     continue;
                 }
 
                 // Skip observers which don't match the provided predicate.
-                if (predicate != null && !predicate(observer.Value.Observer))
+                if (predicate != null && !predicate(observerValue.Observer))
                 {
                     continue;
                 }
 
-                try
+                tasks.Add(Task.Run(() =>
                 {
-                    notification(observer.Value.Observer);
-                }
-                catch (Exception)
-                {
-                    // Failing observers are considered defunct and will be removed..
-                    defunct ??= new List<TIdentity>();
-                    defunct.Add(observer.Key);
-                }
+                    try
+                    {
+                        notification(observerValue.Observer);
+                    }
+                    catch (Exception)
+                    {
+                        // Failing observers are considered defunct and will be removed.
+                        lock (defunct)
+                        {
+                            defunct.Add(observerKey);
+                        }
+                    }
+                }));
             }
 
+            Task.WhenAll(tasks).Wait();
+
             // Remove defunct observers.
-            if (defunct != default(List<TIdentity>))
+            foreach (var observer in defunct)
             {
-                foreach (var observer in defunct)
+                _observers.Remove(observer, out _);
+                if (_log.IsEnabled(LogLevel.Debug))
                 {
-                    _observers.Remove(observer, out _);
-                    if (_log.IsEnabled(LogLevel.Debug))
-                    {
-                        _log.LogDebug("Removing defunct entry for {Id}. {Count} total observers after remove.", observer, _observers.Count);
-                    }
+                    _log.LogDebug("Removing defunct entry for {Id}. {Count} total observers after remove.", observer, _observers.Count);
                 }
             }
         }
