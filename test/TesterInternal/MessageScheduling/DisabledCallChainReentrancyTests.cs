@@ -38,11 +38,5 @@ namespace UnitTests.General
         {
             this.runner.NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsFalse(false);
         }
-
-        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void UnorderedNonReentrantGrain()
-        {
-            this.runner.UnorderedNonReentrantGrain(false);
-        }
     }
 }

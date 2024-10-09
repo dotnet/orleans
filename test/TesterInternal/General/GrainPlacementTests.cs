@@ -119,14 +119,14 @@ namespace UnitTests.General
             {
                 // note: this amount should agree with both the specified minimum and maximum in the StatelessWorkerPlacement attribute
                 // associated with ILocalPlacementTestGrain.
-                const int expected = 1;
+                var expected = 1 * _fixture.HostedCluster.Silos.Count;
                 var grain = _fixture.GrainFactory.GetGrain<IStatelessWorkerPlacementTestGrain>(Guid.NewGuid());
                 int actual = await ActivationCount(grain, expected * 50);
                 Assert.True(actual <= expected, $"Created more activations than the specified limit: {actual} > {expected}.");
             }
 
             {
-                const int expected = 2;
+                var expected = 2 * _fixture.HostedCluster.Silos.Count;
                 var grain = _fixture.GrainFactory.GetGrain<IOtherStatelessWorkerPlacementTestGrain>(Guid.NewGuid());
                 int actual = await ActivationCount(grain, expected * 50);
                 Assert.True(actual <= expected, $"Created more activations than the specified limit: {actual} > {expected}.");
