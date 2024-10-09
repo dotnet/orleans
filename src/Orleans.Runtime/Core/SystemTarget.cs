@@ -101,22 +101,21 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the component with the specified type.
         /// </summary>
-        /// <typeparam name="TComponent">The component type.</typeparam>
         /// <returns>The component with the specified type.</returns>
-        public TComponent GetComponent<TComponent>()
+        public object GetComponent(Type componentType)
         {
-            TComponent result;
-            if (this is TComponent instanceResult)
+            object result;
+            if (componentType.IsAssignableFrom(GetType()))
             {
-                result = instanceResult;
+                result = this;
             }
-            else if (_components.TryGetValue(typeof(TComponent), out var resultObj))
+            else if (_components.TryGetValue(componentType, out var resultObj))
             {
-                result = (TComponent)resultObj;
+                result = resultObj;
             }
-            else if (typeof(TComponent) == typeof(PlacementStrategy))
+            else if (componentType == typeof(PlacementStrategy))
             {
-                result = (TComponent)(object)SystemTargetPlacementStrategy.Instance;
+                result = SystemTargetPlacementStrategy.Instance;
             }
             else
             {
@@ -225,25 +224,6 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        TComponent ITargetHolder.GetComponent<TComponent>()
-        {
-            var result = this.GetComponent<TComponent>();
-            if (result is null && typeof(IGrainExtension).IsAssignableFrom(typeof(TComponent)))
-            {
-                var implementation = this.ActivationServices.GetKeyedService<IGrainExtension>(typeof(TComponent));
-                if (implementation is not TComponent typedResult)
-                {
-                    throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TComponent)} is installed on this instance and no implementations are registered for automated install");
-                }
-
-                this.SetComponent<TComponent>(typedResult);
-                result = typedResult;
-            }
-
-            return result;
-        }
-
-        /// <inheritdoc/>
         public TExtensionInterface GetExtension<TExtensionInterface>()
             where TExtensionInterface : class, IGrainExtension
         {
@@ -284,7 +264,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)(object)this;
+        public object GetTarget()=> this;
 
         /// <inheritdoc/>
         public void Activate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) { }
