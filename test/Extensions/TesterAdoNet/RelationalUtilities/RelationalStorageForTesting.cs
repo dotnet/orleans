@@ -51,12 +51,7 @@ namespace UnitTests.General
                                 $"{this.ProviderMoniker}-Persistence.sql",
                                 $"{this.ProviderMoniker}-Reminders.sql",
                                 $"{this.ProviderMoniker}-Streaming.sql",
-                                }.Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Clustering-*.sql")
-                                .Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Persistence-*.sql"))
-                                .Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Reminders-*.sql"))
-                                .Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Streaming-*.sql"))
-                                .Select(f => Path.GetFileName(f))
-                                .OrderBy(f => f)).ToArray();
+                                };
 
         /// <summary>
         /// A query template to create a database with a given name.
