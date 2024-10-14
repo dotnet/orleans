@@ -8,6 +8,7 @@
   <ItemGroup>
     <!--<PackageReference Include="Microsoft.Data.SqlClient" Version="2.1.1" />-->
     <!--<PackageReference Include="MySqlConnector" Version="1.2.1" />-->
+    <PackageReference Include="Google.Protobuf" />
     <PackageReference Include="System.Data.SqlClient" />
     <!--<PackageReference Include="Microsoft.Data.Sqlite" Version="5.0.2" />-->
     <PackageReference Include="Npgsql" />
@@ -29,7 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None  Include="$(SourceRoot)src\AdoNet\**\*.sql"  Link="%(Filename)%(Extension)">
+    <None Include="$(SourceRoot)src\AdoNet\**\*.sql" Link="%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
