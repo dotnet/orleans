@@ -56,7 +56,11 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
         /// </summary>
-        public static GrainId Create(GrainType type, string key) => new GrainId(type, IdSpan.Create(key));
+        public static GrainId Create(GrainType type, string key)
+        {
+            ArgumentNullException.ThrowIfNullOrWhiteSpace(key);
+            return new GrainId(type, IdSpan.Create(key));
+        }
 
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.

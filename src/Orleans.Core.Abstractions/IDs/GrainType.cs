@@ -66,7 +66,11 @@ namespace Orleans.Runtime
         /// <returns>
         /// The newly created <see cref="GrainType"/> instance.
         /// </returns>
-        public static GrainType Create(string value) => new GrainType(Encoding.UTF8.GetBytes(value));
+        public static GrainType Create(string value)
+        {
+            ArgumentNullException.ThrowIfNullOrWhiteSpace(value);
+            return new GrainType(Encoding.UTF8.GetBytes(value));
+        }
 
         /// <summary>
         /// Converts a <see cref="GrainType"/> to a <see cref="IdSpan"/>.
