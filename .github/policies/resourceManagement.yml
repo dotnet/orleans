@@ -1,0 +1,199 @@
+id: 
+name: GitOps.PullRequestIssueManagement
+description: GitOps.PullRequestIssueManagement primitive
+owner: 
+resource: repository
+disabled: false
+where: 
+configuration:
+  resourceManagementConfiguration:
+    scheduledSearches:
+    - description: Close stale issues
+      frequencies:
+      - hourly:
+          hour: 6
+      filters:
+      - isIssue
+      - isOpen
+      - hasLabel:
+          label: 'Needs: author feedback'
+      - hasLabel:
+          label: 'Status: no recent activity'
+      - noActivitySince:
+          days: 3
+      actions:
+      - closeIssue
+    - description: Add no recent activity label to issues
+      frequencies:
+      - hourly:
+          hour: 6
+      filters:
+      - isIssue
+      - isOpen
+      - hasLabel:
+          label: 'Needs: author feedback'
+      - noActivitySince:
+          days: 4
+      - isNotLabeledWith:
+          label: 'Status: no recent activity'
+      actions:
+      - addLabel:
+          label: 'Status: no recent activity'
+      - addReply:
+          reply: This issue has been automatically marked as stale because it has been marked as requiring author feedback but has not had any activity for **4 days**. It will be closed if no further activity occurs **within 3 days of this comment**.
+    - description: Close duplicate issues
+      frequencies:
+      - hourly:
+          hour: 6
+      filters:
+      - isIssue
+      - isOpen
+      - hasLabel:
+          label: duplicate
+      actions:
+      - addReply:
+          reply: This issue has been marked as duplicate. It will be closed for housekeeping purposes.
+      - closeIssue
+    - description: Close stale pull requests
+      frequencies:
+      - hourly:
+          hour: 6
+      filters:
+      - isPullRequest
+      - isOpen
+      - hasLabel:
+          label: 'Needs: author feedback'
+      - hasLabel:
+          label: 'Status: no recent activity'
+      - noActivitySince:
+          days: 7
+      actions:
+      - closeIssue
+    - description: Add no recent activity label to pull requests
+      frequencies:
+      - hourly:
+          hour: 6
+      filters:
+      - isPullRequest
+      - isOpen
+      - hasLabel:
+          label: 'Needs: author feedback'
+      - noActivitySince:
+          days: 7
+      - isNotLabeledWith:
+          label: 'Status: no recent activity'
+      actions:
+      - addLabel:
+          label: 'Status: no recent activity'
+      - addReply:
+          reply: This pull request has been automatically marked as stale because it has been marked as requiring author feedback but has not had any activity for **7 days**. It will be closed if no further activity occurs **within 7 days of this comment**.
+    - description: Close Answered questions
+      frequencies:
+      - hourly:
+          hour: 6
+      filters:
+      - isIssue
+      - isOpen
+      - hasLabel:
+          label: ':heavy_check_mark: Resolution: Answered'
+      actions:
+      - addReply:
+          reply: Thanks for contacting us. We believe that the question you've raised has been answered. If you still feel a need to continue the discussion, feel free to reopen the issue and add your comments.
+      - addLabel:
+          label: 'Status: Resolved'
+      - closeIssue
+    - description: Close by Design
+      frequencies:
+      - hourly:
+          hour: 6
+      filters:
+      - isOpen
+      - isIssue
+      - hasLabel:
+          label: ':heavy_check_mark: Resolution: By Design'
+      actions:
+      - addReply:
+          reply: Thank you for your feedback. We're closing this issue as the behavior discussed is by design.
+      - addLabel:
+          label: 'Status: Resolved'
+      - closeIssue
+    - description: Close duplicates
+      frequencies:
+      - hourly:
+          hour: 6
+      filters:
+      - isOpen
+      - isIssue
+      - hasLabel:
+          label: ':heavy_check_mark: Resolution: Duplicate'
+      actions:
+      - addReply:
+          reply: >+
+            This issue has been marked as duplicate and has not had any activity for **1 day**. It will be closed for housekeeping purposes.
+
+      - addLabel:
+          label: 'Status: Resolved'
+      - closeIssue
+    - description: 'Label issues as Stale '
+      frequencies:
+      - daily:
+          time: 16:0
+      filters:
+      - isIssue
+      - isOpen
+      - hasNoLabel
+      - isNotAssigned
+      - isPartOfMilestone:
+          milestone: Triage
+      - created:
+          before: 365
+      actions:
+      - addLabel:
+          label: stale
+      - addReply:
+          reply: 'We are marking this issue as stale due to the lack of activity in the past six months. If there is no further activity within two weeks, this issue will be closed. You can always create a new issue based on the guidelines provided in our pinned announcement. '
+    - description: Mark old issues in the backlog as stale
+      frequencies:
+      - daily:
+          time: 17:0
+      filters:
+      - isOpen
+      - hasNoLabel
+      - isNotAssigned
+      - isPartOfMilestone:
+          milestone: Backlog
+      - created:
+          before: 365
+      - isIssue
+      actions:
+      - addLabel:
+          label: stale
+      - addReply:
+          reply: 'We are marking this issue as stale due to the lack of activity in the past six months. If there is no further activity within two weeks, this issue will be closed. You can always create a new issue based on the guidelines provided in our pinned announcement. '
+    - description: Close Stale Issues
+      frequencies:
+      - daily:
+          time: 15:0
+      - daily:
+          time: 18:0
+      filters:
+      - isIssue
+      - isOpen
+      - hasLabel:
+          label: stale
+      - noActivitySince:
+          days: 10
+      actions:
+      - addReply:
+          reply: 'This issue has been marked stale for the past 30 and is being closed due to lack of activity. '
+      - closeIssue
+    eventResponderTasks:
+    - if:
+      - payloadType: Pull_Request
+      - isAction:
+          action: Opened
+      then:
+      - addCodeFlowLink
+      description: Add a CodeFlow link to new pull requests
+onFailure: 
+onSuccess: 
