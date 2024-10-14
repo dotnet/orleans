@@ -26,7 +26,11 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new <see cref="ClientGrainId"/> instance.
         /// </summary>
-        public static ClientGrainId Create(string id) => Create(IdSpan.Create(id));
+        public static ClientGrainId Create(string id)
+        {
+            ArgumentNullException.ThrowIfNullOrWhiteSpace(id);
+            return Create(IdSpan.Create(id));
+        }
 
         /// <summary>
         /// Creates a new <see cref="ClientGrainId"/> instance.
