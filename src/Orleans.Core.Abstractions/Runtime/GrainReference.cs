@@ -470,15 +470,32 @@ namespace Orleans.Runtime
             result.Append('.');
             result.Append(request.GetMethodName());
             result.Append('(');
-            var argumentCount = request.GetArgumentCount();
-            for (var n = 0; n < argumentCount; n++)
+            var argTypes = request.GetMethod()?.GetParameters();
+            if (argTypes is not null)
             {
-                if (n > 0)
+                var argumentCount = argTypes.Length;
+                for (var n = 0; n < argumentCount; n++)
                 {
-                    result.Append(", ");
-                }
+                    if (n > 0)
+                    {
+                        result.Append(", ");
+                    }
 
-                result.Append(request.GetArgument(n));
+                    result.Append(argTypes[n].ParameterType);
+                }
+            }
+            else
+            {
+                var argumentCount = request.GetArgumentCount();
+                for (var n = 0; n < argumentCount; n++)
+                {
+                    if (n > 0)
+                    {
+                        result.Append(", ");
+                    }
+
+                    result.Append(request.GetArgument(n)?.GetType()?.ToString() ?? "null");
+                }
             }
 
             result.Append(')');
