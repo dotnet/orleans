@@ -55,7 +55,7 @@
     <PackageVersion Include="AWSSDK.SQS" Version="3.7.2.119" />
     <PackageVersion Include="Consul" Version="1.6.10.7" />
     <PackageVersion Include="Google.Cloud.PubSub.V1" Version="1.0.0-beta13" />
-    <PackageVersion Include="Google.Protobuf" Version="3.22.0" />
+    <PackageVersion Include="Google.Protobuf" Version="3.28.2" />
     <PackageVersion Include="protobuf-net" Version="3.1.22" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.2" />
     <PackageVersion Include="ZooKeeperNetEx" Version="3.4.12.4" />
@@ -77,13 +77,13 @@
     <PackageVersion Include="StructureMap.Microsoft.DependencyInjection" Version="2.0.0" />
     <PackageVersion Include="System.CodeDom" Version="7.0.0" />
     <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" />
-    <PackageVersion Include="Azure.Identity" Version="1.7.0" />
+    <PackageVersion Include="Azure.Identity" Version="1.12.1" />
     <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.4.0" />
     <PackageVersion Include="FSharp.Core" Version="7.0.0" />
     <PackageVersion Include="NSubstitute" Version="4.4.0" />
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.15" />
     <PackageVersion Include="CsCheck" Version="2.10.0" />
-    <PackageVersion Include="System.Data.SqlClient" Version="4.8.5" />
+    <PackageVersion Include="System.Data.SqlClient" Version="4.8.6" />
     <PackageVersion Include="Npgsql" Version="8.0.3" />
     <PackageVersion Include="MySql.Data" Version="8.0.31" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.AzureKeyVault" Version="3.1.24" />
