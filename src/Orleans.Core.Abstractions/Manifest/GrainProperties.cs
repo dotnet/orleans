@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -11,8 +12,11 @@ namespace Orleans.Metadata
     /// Information about a logical grain type <see cref="GrainType"/>.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
-    public sealed class GrainProperties
+    public sealed class GrainProperties : IEquatable<GrainProperties>
     {
+        [NonSerialized]
+        private int? _hashCode;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainProperties"/> class.
         /// </summary>
@@ -21,6 +25,7 @@ namespace Orleans.Metadata
         /// </param>
         public GrainProperties(ImmutableDictionary<string, string> values)
         {
+            ArgumentNullException.ThrowIfNull(values);
             this.Properties = values;
         }
 
@@ -38,10 +43,10 @@ namespace Orleans.Metadata
         /// </returns>
         public string ToDetailedString()
         {
-            if (this.Properties is null) return string.Empty;
+            if (Properties is null) return string.Empty;
             var result = new StringBuilder("[");
             bool first = true;
-            foreach (var entry in this.Properties)
+            foreach (var entry in Properties)
             {
                 if (!first)
                 {
@@ -54,6 +59,42 @@ namespace Orleans.Metadata
             result.Append("]");
 
             return result.ToString();
+        }
+
+        public override bool Equals(object? obj) => obj is GrainProperties other && Equals(other);
+
+        public bool Equals(GrainProperties? other)
+        {
+            if (ReferenceEquals(this, other)) return true;
+            if (other is null) return false;
+            if (Properties.Count != other.Properties.Count) return false;
+            foreach (var (key, value) in Properties)
+            {
+                if (!other.Properties.TryGetValue(key, out var otherValue) || !string.Equals(otherValue, value, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public override int GetHashCode()
+        {
+            if (!_hashCode.HasValue)
+            {
+                var hashCode = new HashCode();
+                hashCode.Add(Properties.Count);
+                foreach (var property in Properties)
+                {
+                    hashCode.Add(property.Key);
+                    hashCode.Add(property.Value);
+                }
+
+                _hashCode = hashCode.ToHashCode();
+            }
+
+            return _hashCode.Value;
         }
     }
 
