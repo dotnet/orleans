@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -10,8 +11,11 @@ namespace Orleans.Metadata
     /// Information about a communication interface.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
-    public sealed class GrainInterfaceProperties
+    public sealed class GrainInterfaceProperties : IEquatable<GrainInterfaceProperties>
     {
+        [NonSerialized]
+        private int? _hashCode;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainInterfaceProperties"/> class.
         /// </summary>
@@ -20,6 +24,7 @@ namespace Orleans.Metadata
         /// </param>
         public GrainInterfaceProperties(ImmutableDictionary<string, string> values)
         {
+            ArgumentNullException.ThrowIfNull(values);
             this.Properties = values;
         }
 
@@ -53,6 +58,42 @@ namespace Orleans.Metadata
             result.Append("]");
 
             return result.ToString();
+        }
+
+        public override bool Equals(object? obj) => obj is GrainInterfaceProperties other && Equals(other);
+
+        public bool Equals(GrainInterfaceProperties? other)
+        {
+            if (ReferenceEquals(this, other)) return true;
+            if (other is null) return false;
+            if (Properties.Count != other.Properties.Count) return false;
+            foreach (var (key, value) in Properties)
+            {
+                if (!other.Properties.TryGetValue(key, out var otherValue) || !string.Equals(otherValue, value, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public override int GetHashCode()
+        {
+            if (!_hashCode.HasValue)
+            {
+                var hashCode = new HashCode();
+                hashCode.Add(Properties.Count);
+                foreach (var property in Properties)
+                {
+                    hashCode.Add(property.Key);
+                    hashCode.Add(property.Value);
+                }
+
+                _hashCode = hashCode.ToHashCode();
+            }
+
+            return _hashCode.Value;
         }
     }
 

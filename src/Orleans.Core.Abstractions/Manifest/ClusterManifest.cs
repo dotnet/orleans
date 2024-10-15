@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.Linq;
 using Orleans.Runtime;
 
 namespace Orleans.Metadata
@@ -25,7 +26,7 @@ namespace Orleans.Metadata
         {
             Version = version;
             Silos = silos;
-            AllGrainManifests = silos.Values.ToImmutableArray();
+            AllGrainManifests = silos.Values.Distinct().ToImmutableArray();
         }
 
         /// <summary>

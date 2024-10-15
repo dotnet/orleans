@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -96,6 +97,10 @@ namespace Orleans.Runtime.Metadata
 
         private async Task<bool> UpdateManifest(ClusterMembershipSnapshot clusterMembership)
         {
+            var interfaceProperties = new HashSet<GrainInterfaceProperties>();
+            var grainProperties = new HashSet<GrainProperties>();
+            var manifests = new HashSet<GrainManifest>();
+
             var existingManifest = _current;
             var builder = existingManifest.Silos.ToBuilder();
             var modified = false;
@@ -112,10 +117,40 @@ namespace Orleans.Runtime.Metadata
                     continue;
                 }
 
-                if (status == SiloStatus.None || status == SiloStatus.Dead)
+                if (status is SiloStatus.None or SiloStatus.Dead)
                 {
                     builder.Remove(address);
                     modified = true;
+                }
+            }
+
+            // Populate deduplication structures.
+            foreach (var siloAddress in builder.Keys.ToList())
+            {
+                var siloManifest = builder[siloAddress];
+                if (!manifests.Add(siloManifest))
+                {
+                    if (manifests.TryGetValue(siloManifest, out var existing))
+                    {
+                        builder[siloAddress] = existing;
+                    }
+                    else
+                    {
+                        Debug.Fail("Unable to retrieve an existing manifest from the deduplication set.");
+                    }
+                }
+            }
+
+            foreach (var manifest in manifests)
+            {
+                foreach (var interfaceProps in manifest.Interfaces.Values)
+                {
+                    interfaceProperties.Add(interfaceProps);
+                }
+
+                foreach (var grainProps in manifest.Grains.Values)
+                {
+                    grainProperties.Add(grainProps);
                 }
             }
 
@@ -179,7 +214,7 @@ namespace Orleans.Runtime.Metadata
                     modified = true;
                     if (result.Value is not null)
                     {
-                        builder[result.Key] = result.Value;
+                        builder[result.Key] = DeduplicateManifest(result.Value);
                     }
                 }
             }
@@ -199,6 +234,47 @@ namespace Orleans.Runtime.Metadata
             }
 
             return fetchSuccess;
+
+            GrainManifest DeduplicateManifest(GrainManifest manifest)
+            {
+                // Deduplicate silo manifests.
+                if (manifests.TryGetValue(manifest, out var existing))
+                {
+                    return existing;
+                }
+
+                // Deduplicate interface manifests.
+                var manifestInterfaces = manifest.Interfaces.ToBuilder();
+                foreach (var (key, value) in manifest.Interfaces)
+                {
+                    if (!interfaceProperties.TryGetValue(value, out var existingValue))
+                    {
+                        interfaceProperties.Add(value);
+                    }
+                    else
+                    {
+                        manifestInterfaces[key] = existingValue;
+                    }
+                }
+
+                // Deduplicate grain manifests.
+                var manifestGrains = manifest.Grains.ToBuilder();
+                foreach (var (key, value) in manifest.Grains)
+                {
+                    if (!grainProperties.TryGetValue(value, out var existingValue))
+                    {
+                        grainProperties.Add(value);
+                    }
+                    else
+                    {
+                        manifestGrains[key] = existingValue;
+                    }
+                }
+
+                manifest = new GrainManifest(manifestGrains.ToImmutable(), manifestInterfaces.ToImmutable());
+                manifests.Add(manifest);
+                return manifest;
+            }
         }
 
         [MemberNotNull(nameof(_runTask))]
