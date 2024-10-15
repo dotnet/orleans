@@ -27,33 +27,14 @@ internal sealed class OrleansQueries
 
     public static Task<OrleansQueries> CreateInstance(ISession session)
     {
-        string? dc = null;
-        var isMultiDataCenter = false;
-        foreach (var dataCenter in session.Cluster.AllHosts().Where(h => h?.Datacenter is not null).Select(h => h.Datacenter))
-        {
-            dc ??= dataCenter;
-            if (dc != dataCenter)
-            {
-                isMultiDataCenter = true;
-                break;
-            }
-        }
-
-        return Task.FromResult(new OrleansQueries(session, isMultiDataCenter));
+        return Task.FromResult(new OrleansQueries(session));
     }
 
-    private OrleansQueries(ISession session, bool isMultiDataCenter)
+    private OrleansQueries(ISession session)
     {
-        if (isMultiDataCenter)
-        {
-            MembershipReadConsistencyLevel = ConsistencyLevel.LocalQuorum;
-            MembershipWriteConsistencyLevel = ConsistencyLevel.EachQuorum;
-        }
-        else
-        {
-            MembershipReadConsistencyLevel = ConsistencyLevel.Quorum;
-            MembershipWriteConsistencyLevel = ConsistencyLevel.Quorum;
-        }
+        MembershipReadConsistencyLevel = ConsistencyLevel.Quorum;
+        MembershipWriteConsistencyLevel = ConsistencyLevel.Quorum;
+
         Session = session;
     }
 
