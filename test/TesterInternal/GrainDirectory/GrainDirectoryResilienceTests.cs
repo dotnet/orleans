@@ -42,7 +42,7 @@ public sealed class GrainDirectoryResilienceTests
         log.LogInformation("ServiceId: '{ServiceId}'", testCluster.Options.ServiceId);
         log.LogInformation("ClusterId: '{ClusterId}'.", testCluster.Options.ClusterId);
 
-        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(15));
+        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
         var reconfigurationTimer = CoarseStopwatch.StartNew();
         var upperLimit = 10;
         var lowerLimit = 1; // Membership is kept on the primary, so we can't go below 1

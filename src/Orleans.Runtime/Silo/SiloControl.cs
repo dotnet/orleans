@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -98,7 +99,7 @@ namespace Orleans.Runtime
         public Task ForceActivationCollection(TimeSpan ageLimit)
         {
             logger.LogInformation("ForceActivationCollection");
-            return _activationCollector.CollectActivations(ageLimit);
+            return _activationCollector.CollectActivations(ageLimit, CancellationToken.None);
         }
 
         public Task ForceRuntimeStatisticsCollection()

@@ -261,14 +261,19 @@ namespace Orleans.Runtime
             if (list == null || list.Count == 0) return;
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("DeactivateActivations: {Count} activations.", list.Count);
-            await Parallel.ForEachAsync(list, cancellationToken, (activation, ct) =>
+            var options = new ParallelOptions
+            {
+                CancellationToken = CancellationToken.None,
+                MaxDegreeOfParallelism = Environment.ProcessorCount * 512
+            };
+            await Parallel.ForEachAsync(list, options, (activation, _) =>
             {
                 if (activation.GrainId.Type.IsSystemTarget())
                 {
                     return ValueTask.CompletedTask;
                 }
 
-                activation.Deactivate(reason, ct);
+                activation.Deactivate(reason, cancellationToken);
                 return new (activation.Deactivated);
             }).WaitAsync(cancellationToken);
         }
@@ -282,7 +287,12 @@ namespace Orleans.Runtime
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("DeactivateActivations: {Count} activations.", activations.Count);
             var reason = new DeactivationReason(DeactivationReasonCode.ShuttingDown, "This process is terminating.");
-            await Parallel.ForEachAsync(activations, cancellationToken, (kv, ct) =>
+            var options = new ParallelOptions
+            {
+                CancellationToken = CancellationToken.None,
+                MaxDegreeOfParallelism = Environment.ProcessorCount * 512
+            };
+            await Parallel.ForEachAsync(activations, options, (kv, _) =>
             {
                 if (kv.Key.IsSystemTarget())
                 {
@@ -290,8 +300,8 @@ namespace Orleans.Runtime
                 }
 
                 var activation = kv.Value;
-                activation.Deactivate(reason, ct);
-                return new (activation.Deactivated.WaitAsync(ct));
+                activation.Deactivate(reason, cancellationToken);
+                return new (activation.Deactivated);
             }).WaitAsync(cancellationToken);
         }
 
