@@ -247,7 +247,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
     public TComponent? GetComponent<TComponent>() where TComponent : class
     {
-        TComponent? result;
+        TComponent? result = default;
         if (GrainInstance is TComponent grainResult)
         {
             result = grainResult;
@@ -260,14 +260,14 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         {
             result = (TComponent)resultObj;
         }
+        else if (_shared.GetComponent<TComponent>() is { } sharedComponent)
+        {
+            result = sharedComponent;
+        }
         else if (ActivationServices.GetService<TComponent>() is { } component)
         {
             SetComponent(component);
             result = component;
-        }
-        else
-        {
-            result = _shared.GetComponent<TComponent>();
         }
 
         return result;

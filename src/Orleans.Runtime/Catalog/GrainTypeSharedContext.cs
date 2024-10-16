@@ -106,6 +106,11 @@ public class GrainTypeSharedContext
             return component;
         }
 
+        if (typeof(TComponent) == typeof(ILogger))
+        {
+            return (TComponent)Logger;
+        }
+
         if (_components is null) return default;
         _components.TryGetValue(typeof(TComponent), out var resultObj);
         return (TComponent?)resultObj;
