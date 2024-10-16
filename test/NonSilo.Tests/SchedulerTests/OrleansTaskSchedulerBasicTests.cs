@@ -1,12 +1,9 @@
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.TestingHost.Utils;
-using Orleans.Internal;
-using Orleans;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -53,8 +50,8 @@ namespace UnitTests.SchedulerTests
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) { }
         public Task Deactivated => Task.CompletedTask;
         public void Dispose() => (Scheduler as IDisposable)?.Dispose();
-        public TComponent GetComponent<TComponent>() where TComponent : class => throw new NotImplementedException();
-        public TTarget GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
+        public object GetComponent(Type componentType) => throw new NotImplementedException();
+        public object GetTarget() => throw new NotImplementedException();
         public void ReceiveMessage(object message) => throw new NotImplementedException();
 
         public void SetComponent<TComponent>(TComponent value) where TComponent : class => throw new NotImplementedException();

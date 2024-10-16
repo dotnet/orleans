@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -45,34 +46,31 @@ namespace Orleans
 
         public bool Equals(IGrainContext other) => ReferenceEquals(this, other);
 
-        public TComponent GetComponent<TComponent>() where TComponent : class
+        public TComponent GetComponent<TComponent>() where TComponent : class => (TComponent)GetComponent(typeof(TComponent));
+        public object GetComponent(Type componentType)
         {
-            if (this is TComponent component) return component;
-            if (_components.TryGetValue(typeof(TComponent), out var result))
+            if (componentType.IsAssignableFrom(GetType())) return this;
+            if (_components.TryGetValue(componentType, out var result))
             {
-                return (TComponent)result;
+                return result;
             }
-            else if (typeof(TComponent) == typeof(PlacementStrategy))
+            else if (componentType == typeof(PlacementStrategy))
             {
-                return (TComponent)(object)ClientObserversPlacement.Instance;
+                return ClientObserversPlacement.Instance;
             }
 
             lock (_lockObj)
             {
-                if (ActivationServices.GetService<TComponent>() is { } activatedComponent)
+                if (ActivationServices.GetService(componentType) is { } activatedComponent)
                 {
-                    return (TComponent)_components.GetOrAdd(typeof(TComponent), activatedComponent);
+                    return _components.GetOrAdd(componentType, activatedComponent);
                 }
             }
 
             return default;
         }
 
-        public TTarget GetTarget<TTarget>() where TTarget : class
-        {
-            if (this is TTarget target) return target;
-            return default;
-        }
+        public object GetTarget() => this;
 
         public void SetComponent<TComponent>(TComponent instance) where TComponent : class
         {
