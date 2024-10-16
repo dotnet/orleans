@@ -26,6 +26,7 @@ namespace Orleans.Runtime
         public static readonly GrainType ManifestProviderType = SystemTargetGrainId.CreateGrainType("manifest");
         public static readonly GrainType ActivationMigratorType = SystemTargetGrainId.CreateGrainType("migrator");
         public static readonly GrainType ActivationRepartitionerType = SystemTargetGrainId.CreateGrainType("repartitioner");
+        public static readonly GrainType ActivationRebalancerMonitorType = SystemTargetGrainId.CreateGrainType("rebalancer-monitor");
         public static readonly GrainType GrainDirectoryPartition = SystemTargetGrainId.CreateGrainType("dir.grain.part");
         public static readonly GrainType GrainDirectory = SystemTargetGrainId.CreateGrainType("dir.grain");
 
@@ -55,6 +56,7 @@ namespace Orleans.Runtime
             {ManifestProviderType, "ManifestProvider"},
             {ActivationMigratorType, "ActivationMigrator"},
             {ActivationRepartitionerType, "ActivationRepartitioner"},
+            {ActivationRebalancerMonitorType, "ActivationRebalancerMonitor"},
             {GrainDirectory, "GrainDirectory"},
         }.ToFrozenDictionary();
 
@@ -62,4 +64,4 @@ namespace Orleans.Runtime
         public static bool IsSingletonSystemTarget(GrainType id) => SingletonSystemTargetNames.ContainsKey(id);
     }
 }
- 
+

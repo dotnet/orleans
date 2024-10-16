@@ -411,6 +411,7 @@ namespace Orleans.Hosting
             services.AddSingleton<ActivationMigrationManager>();
             services.AddFromExisting<IActivationMigrationManager, ActivationMigrationManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationMigrationManager>();
+            services.AddSingleton<GrainMigratabilityChecker>();
 
             ApplyConfiguration(builder);
         }

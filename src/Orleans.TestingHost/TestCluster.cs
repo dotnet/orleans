@@ -17,6 +17,7 @@ using Microsoft.Extensions.Hosting;
 using Orleans.TestingHost.InMemoryTransport;
 using Orleans.TestingHost.UnixSocketTransport;
 using System.Net;
+using Orleans.Statistics;
 
 namespace Orleans.TestingHost
 {
@@ -140,6 +141,26 @@ namespace Orleans.TestingHost
             this.ConfigurationSources = configurationSources.ToArray();
             this.PortAllocator = portAllocator;
             this.CreateSiloAsync = DefaultCreateSiloAsync;
+        }
+
+        /// <summary>
+        /// Returns the <see cref="IServiceProvider"/> associated with the given <paramref name="silo"/>.
+        /// </summary>
+        /// <param name="silo">The silo process to the the service provider for.</param>
+        /// <remarks>If <paramref name="silo"/> is <see langword="null"/> one of the existing silos will be picked randomly.</remarks>
+        public IServiceProvider GetSiloServiceProvider(SiloAddress silo = null)
+        {
+            if (silo != null)
+            {
+                var handle = Silos.FirstOrDefault(x => x.SiloAddress.Equals(silo));
+                return handle != null ? ((InProcessSiloHandle)handle).SiloHost.Services :
+                    throw new ArgumentException($"The provided silo address '{silo}' is unknown.");
+            }
+            else
+            {
+                var index = Random.Shared.Next(Silos.Count);
+                return ((InProcessSiloHandle)Silos[index]).SiloHost.Services;
+            }
         }
 
         /// <summary>
@@ -676,10 +697,20 @@ namespace Orleans.TestingHost
                         default:
                             throw new ArgumentException($"Unsupported {nameof(ConnectionTransportType)}: {transport}");
                     }
+
+                    if (options.UseRealEnvironmentStatistics)
+                    {
+                        var descriptor = siloBuilder.Services.FirstOrDefault(descriptor => descriptor.ServiceType == typeof(IEnvironmentStatisticsProvider));
+                        if (descriptor != null)
+                        {
+                            siloBuilder.Services.Remove(descriptor);
+                            siloBuilder.Services.AddSingleton<IEnvironmentStatisticsProvider, EnvironmentStatisticsProvider>();
+                        }
+                    }
                 });
             });
         }
-        
+
         /// <summary>
         /// Start a new silo in the target cluster
         /// </summary>

@@ -40,7 +40,7 @@ internal interface IActivationRepartitionerSystemTarget : ISystemTarget
     ValueTask<ImmutableArray<(Edge, ulong)>> GetGrainCallFrequencies();
 
     /// <summary>
-    /// For sue in testing only! Flushes buffered messages.
+    /// For use in testing only! Flushes buffered messages.
     /// </summary>
     ValueTask FlushBuffers();
 }
