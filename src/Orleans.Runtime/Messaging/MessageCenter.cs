@@ -178,8 +178,8 @@ namespace Orleans.Runtime.Messaging
 
                 if (msg.TargetSilo is not { } targetSilo)
                 {
-                    log.LogError((int)ErrorCode.Runtime_Error_100113, "Message does not have a target silo: " + msg + " -- Call stack is: " + Utils.GetStackTrace());
-                    SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message to be sent does not have a target silo");
+                    log.LogError((int)ErrorCode.Runtime_Error_100113, "Message does not have a target silo: '{Message}'. Call stack: {StackTrace}", msg, Utils.GetStackTrace());
+                    SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message to be sent does not have a target silo.");
                     return;
                 }
 
@@ -198,13 +198,6 @@ namespace Orleans.Runtime.Messaging
                 }
                 else
                 {
-                    if (stopped)
-                    {
-                        log.LogInformation((int)ErrorCode.Runtime_Error_100115, "Message was queued for sending after outbound queue was stopped: {Message}", msg);
-                        SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message was queued for sending after outbound queue was stopped");
-                        return;
-                    }
-
                     if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection))
                     {
                         existingConnection.Send(msg);
@@ -213,8 +206,12 @@ namespace Orleans.Runtime.Messaging
                     else if (this.siloStatusOracle.IsDeadSilo(targetSilo))
                     {
                         // Do not try to establish
-                        this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
-                        this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead");
+                        if (msg.Direction is Message.Directions.Request or Message.Directions.OneWay)
+                        {
+                            this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
+                            this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead", new SiloUnavailableException());
+                        }
+
                         return;
                     }
                     else
@@ -373,6 +370,7 @@ namespace Orleans.Runtime.Messaging
                     message.AddToCacheInvalidationHeader(oldAddress, validAddress: destination);
                 }
 
+                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug(exc, "Forwarding {Message} to '{ForwardingAddress}' after '{FailedOperation}'", message, forwardingAddress, failedOperation);
                 forwardingSucceeded = this.TryForwardMessage(message, forwardingAddress);
             }
             catch (Exception exc2)
@@ -422,6 +420,7 @@ namespace Orleans.Runtime.Messaging
 
             message.ForwardCount = message.ForwardCount + 1;
             MessagingProcessingInstruments.OnDispatcherMessageForwared(message);
+
             ResendMessageImpl(message, forwardingAddress);
             return true;
         }
@@ -574,7 +573,7 @@ namespace Orleans.Runtime.Messaging
             {
                 MessagingInstruments.OnRejectedMessage(msg);
                 this.log.LogWarning(
-                    (int) ErrorCode.MessagingMessageFromUnknownActivation,
+                    (int)ErrorCode.MessagingMessageFromUnknownActivation,
                     "Received a message {Message} for an unknown SystemTarget: {Target}",
                      msg,
                      msg.TargetGrain);
@@ -593,17 +592,20 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 // Activation does not exists and is not a new placement.
-                log.LogInformation(
-                    (int)ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
-                    "Intermediate NonExistentActivation for message {Message}",
-                    msg);
+                if (log.IsEnabled(LogLevel.Debug))
+                {
+                    log.LogDebug(
+                        (int)ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
+                        "Unable to create local activation for message {Message}.",
+                        msg);
+                }
 
-                var nonExistentActivation = new GrainAddress { SiloAddress = msg.TargetSilo, GrainId = msg.TargetGrain };
-                ProcessRequestToInvalidActivation(msg, nonExistentActivation, null, "Non-existent activation");
+                var partialAddress = new GrainAddress { SiloAddress = msg.TargetSilo, GrainId = msg.TargetGrain };
+                ProcessRequestToInvalidActivation(msg, partialAddress, null, "Unable to create local activation");
             }
         }
 
-        internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason)
+        internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason, Exception? exception = null)
         {
             MessagingInstruments.OnRejectedMessage(msg);
 
@@ -616,7 +618,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 if (string.IsNullOrEmpty(reason)) reason = $"Rejection from silo {this._siloAddress} - Unknown reason.";
-                var error = this.messageFactory.CreateRejectionResponse(msg, rejectionType, reason);
+                var error = this.messageFactory.CreateRejectionResponse(msg, rejectionType, reason, exception);
                 // rejection msgs are always originated in the local silo, they are never remote.
                 this.ReceiveMessage(error);
             }

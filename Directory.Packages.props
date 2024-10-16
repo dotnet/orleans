@@ -51,10 +51,17 @@
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.21.1" />
     <PackageVersion Include="Azure.Storage.Queues" Version="12.19.1" />
     <!-- Aspire -->
-    <PackageVersion Include="Aspire.Hosting.AppHost" Version="8.1.0" />
-    <PackageVersion Include="Aspire.Hosting.Orleans" Version="8.1.0" />
-    <PackageVersion Include="Aspire.Hosting.Redis" Version="8.1.0" />
-    <PackageVersion Include="Aspire.StackExchange.Redis" Version="8.1.0" />
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="8.2.0" />
+    <PackageVersion Include="Aspire.Hosting.Orleans" Version="8.2.0" />
+    <PackageVersion Include="Aspire.Hosting.Redis" Version="8.2.0" />
+    <PackageVersion Include="Aspire.StackExchange.Redis" Version="8.2.0" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="8.8.0" />
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="8.2.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.9.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.9.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.9.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.9.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.9.0" />
     <!-- 3rd party packages -->
     <PackageVersion Include="Google.Cloud.PubSub.V1" Version="1.0.0-beta13" />
     <PackageVersion Include="AWSSDK.DynamoDBv2" Version="3.7.300.6" />
@@ -68,6 +75,7 @@
     <PackageVersion Include="KubernetesClient" Version="12.1.1" />
     <PackageVersion Include="CassandraCSharpDriver" Version="3.20.1" />
     <!-- Test related packages -->
+    <PackageVersion Include="coverlet.collector" Version="6.0.2" />
     <PackageVersion Include="FluentAssertions" Version="6.7.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.9.0-preview-23503-02" />
     <PackageVersion Include="BenchmarkDotNet" Version="0.13.12" />

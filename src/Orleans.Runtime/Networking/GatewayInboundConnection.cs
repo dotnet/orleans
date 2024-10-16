@@ -172,7 +172,8 @@ namespace Orleans.Runtime.Messaging
                 this.messageCenter.SendRejection(
                     msg,
                     Message.RejectionTypes.Transient,
-                    $"Silo {this.myAddress} is rejecting message: {msg}. Reason = {reason}");
+                    $"Silo {this.myAddress} is rejecting message: {msg}. Reason = {reason}",
+                    new SiloUnavailableException());
             }
             else
             {

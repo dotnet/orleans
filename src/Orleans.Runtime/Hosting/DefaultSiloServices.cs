@@ -193,7 +193,7 @@ namespace Orleans.Hosting
 
             services.TryAddSingleton<MessageFactory>();
 
-            services.TryAddSingleton(FactoryUtility.Create<GrainDirectoryPartition>);
+            services.TryAddSingleton(FactoryUtility.Create<LocalGrainDirectoryPartition>);
 
             // Placement
             services.AddSingleton<IConfigurationValidator, ActivationCountBasedPlacementOptionsValidator>();

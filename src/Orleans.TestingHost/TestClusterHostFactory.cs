@@ -179,7 +179,7 @@ namespace Orleans.TestingHost
             bool.TryParse(configuration[nameof(TestClusterOptions.ConfigureFileLogging)], out bool configureFileLogging);
             if (configureFileLogging)
             {
-                var fileName = TestingUtils.CreateTraceFileName(name, configuration[nameof(TestClusterOptions.ClusterId)]);
+                var fileName = TestingUtils.CreateTraceFileName(name, configuration["Orleans:ClusterId"]);
                 services.AddLogging(loggingBuilder => loggingBuilder.AddFile(fileName));
             }
         }

@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Internal;
 using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime
@@ -15,11 +14,12 @@ namespace Orleans.Runtime
     /// <summary>
     /// Identifies activations that have been idle long enough to be deactivated.
     /// </summary>
-    internal class ActivationCollector : IActivationWorkingSetObserver, ILifecycleParticipant<ISiloLifecycle>
+    internal class ActivationCollector : IActivationWorkingSetObserver, ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
         private readonly TimeSpan quantum;
         private readonly TimeSpan shortestAgeLimit;
         private readonly ConcurrentDictionary<DateTime, Bucket> buckets = new();
+        private readonly CancellationTokenSource _shutdownCts = new();
         private DateTime nextTicket;
         private static readonly List<ICollectibleGrainContext> nothing = new(0);
         private readonly ILogger logger;
@@ -74,7 +74,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="ageLimit">The age limit.</param>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        public Task CollectActivations(TimeSpan ageLimit) => CollectActivationsImpl(false, ageLimit);
+        public Task CollectActivations(TimeSpan ageLimit, CancellationToken cancellationToken) => CollectActivationsImpl(false, ageLimit, cancellationToken);
 
         /// <summary>
         /// Schedules the provided grain context for collection if it becomes idle for the specified duration.
@@ -213,7 +213,6 @@ namespace Orleans.Runtime
         {
             var now = DateTime.UtcNow;
             List<ICollectibleGrainContext> condemned = null;
-            var reason = GetDeactivationReason();
             while (DequeueQuantum(out var activations, now))
             {
                 // At this point, all tickets associated with activations are cancelled and any attempts to reschedule will fail silently.
@@ -225,15 +224,9 @@ namespace Orleans.Runtime
                         activation.CollectionTicket = default;
                         if (!activation.IsValid)
                         {
+                            // This is not an error scenario because the activation may have become invalid between the time
+                            // we captured a snapshot in 'DequeueQuantum' and now. We are not be able to observe such changes.
                             // Do nothing: don't collect, don't reschedule.
-                            // The activation can't be in Created or Activating, since we only ScheduleCollection after successfull activation.
-                            // If the activation is already in Deactivating or Invalid state, its already being collected or was collected
-                            // (both mean a bug, this activation should not be in the collector)
-                            // So in any state except for Valid we should just not collect and not reschedule.
-                            logger.LogWarning(
-                                (int)ErrorCode.Catalog_ActivationCollector_BadState_1,
-                                "ActivationCollector found an activation in a non Valid state. All activation inside the ActivationCollector should be in Valid state. Activation: {Activation}",
-                                activation);
                         }
                         else if (activation.KeepAliveUntil > now)
                         {
@@ -248,8 +241,8 @@ namespace Orleans.Runtime
                         else
                         {
                             // Atomically set Deactivating state, to disallow any new requests or new timer ticks to be dispatched on this activation.
-                            activation.Deactivate(reason, cancellationToken: default);
-                            AddActivationToList(activation, ref condemned);
+                            condemned ??= [];
+                            condemned.Add(activation);
                         }
                     }
                 }
@@ -267,7 +260,6 @@ namespace Orleans.Runtime
         {
             List<ICollectibleGrainContext> condemned = null;
             var now = DateTime.UtcNow;
-            var reason = GetDeactivationReason();
             foreach (var kv in buckets)
             {
                 var bucket = kv.Value;
@@ -294,10 +286,10 @@ namespace Orleans.Runtime
                             {
                                 if (bucket.TryRemove(activation))
                                 {
-                                    // we removed the activation from the collector. it's our responsibility to deactivate it.
-                                    activation.Deactivate(reason, cancellationToken: default);
-                                    AddActivationToList(activation, ref condemned);
+                                    condemned ??= [];
+                                    condemned.Add(activation);
                                 }
+
                                 // someone else has already deactivated the activation, so there's nothing to do.
                             }
                             else
@@ -317,12 +309,6 @@ namespace Orleans.Runtime
             var reasonText = "This activation has become idle.";
             var reason = new DeactivationReason(DeactivationReasonCode.ActivationIdle, reasonText);
             return reason;
-        }
-
-        private void AddActivationToList(ICollectibleGrainContext activation, ref List<ICollectibleGrainContext> condemned)
-        {
-            condemned ??= [];
-            condemned.Add(activation);
         }
 
         private void ThrowIfTicketIsInvalid(DateTime ticket)
@@ -372,9 +358,9 @@ namespace Orleans.Runtime
 
         void IActivationWorkingSetObserver.OnAdded(IActivationWorkingSetMember member)
         {
-            Interlocked.Increment(ref _activationCount);
             if (member is ICollectibleGrainContext activation)
             {
+                Interlocked.Increment(ref _activationCount);
                 if (activation.CollectionTicket == default)
                 {
                     ScheduleCollection(activation, activation.CollectionAgeLimit, DateTime.UtcNow);
@@ -410,10 +396,9 @@ namespace Orleans.Runtime
 
         void IActivationWorkingSetObserver.OnDeactivated(IActivationWorkingSetMember member)
         {
-            Interlocked.Decrement(ref _activationCount);
-            if (member is ICollectibleGrainContext activation)
+            if (member is ICollectibleGrainContext activation && TryCancelCollection(activation))
             {
-                TryCancelCollection(activation);
+                Interlocked.Decrement(ref _activationCount);
             }
         }
 
@@ -426,6 +411,7 @@ namespace Orleans.Runtime
 
         private async Task Stop(CancellationToken cancellationToken)
         {
+            using var registration = cancellationToken.Register(() => _shutdownCts.Cancel());
             _collectionTimer.Dispose();
 
             if (_collectionLoopTask is Task task)
@@ -439,18 +425,19 @@ namespace Orleans.Runtime
             lifecycle.Subscribe(
                 nameof(ActivationCollector),
                 ServiceLifecycleStage.RuntimeServices,
-                async cancellation => await Start(cancellation),
-                async cancellation => await Stop(cancellation));
+                Start,
+                Stop);
         }
 
         private async Task RunActivationCollectionLoop()
         {
             await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+            var cancellationToken = _shutdownCts.Token;
             while (await _collectionTimer.WaitForNextTickAsync())
             {
                 try
                 {
-                    await this.CollectActivationsImpl(true);
+                    await this.CollectActivationsImpl(true, ageLimit: default, cancellationToken);
                 }
                 catch (Exception exception)
                 {
@@ -459,7 +446,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit = default)
+        private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit, CancellationToken cancellationToken)
         {
             var watch = ValueStopwatch.StartNew();
             var number = Interlocked.Increment(ref collectionNumber);
@@ -478,12 +465,10 @@ namespace Orleans.Runtime
 
             List<ICollectibleGrainContext> list = scanStale ? ScanStale() : ScanAll(ageLimit);
             CatalogInstruments.ActivationCollections.Add(1);
-            var count = 0;
-            if (list != null && list.Count > 0)
+            if (list is { Count: > 0 })
             {
-                count = list.Count;
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("CollectActivations {Activations}", list.ToStrings(d => d.GrainId.ToString() + d.ActivationId));
-                await DeactivateActivationsFromCollector(list);
+                await DeactivateActivationsFromCollector(list, cancellationToken);
             }
 
             long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
@@ -497,31 +482,38 @@ namespace Orleans.Runtime
                     number,
                     memAfter,
                     _activationCount,
-                    count,
+                    list?.Count ?? 0,
                     ToString(),
                     watch.Elapsed);
             }
         }
 
-        private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list)
+        private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list, CancellationToken cancellationToken)
         {
-            var mtcs = new MultiTaskCompletionSource(list.Count);
-
-            logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {Count} to promptly Destroy.", list.Count);
+            logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "Deactivating '{Count}' idle activations.", list.Count);
             CatalogInstruments.ActivationShutdownViaCollection();
 
-            Action signalCompletion = mtcs.SetOneResult;
             var reason = GetDeactivationReason();
-            for (var i = 0; i < list.Count; i++)
+
+            var options = new ParallelOptions
             {
-                var activationData = list[i];
+                // Avoid passing the cancellation token, since we want all of these activations to be deactivated, even if cancellation is triggered.
+                CancellationToken = CancellationToken.None,
+                MaxDegreeOfParallelism = Environment.ProcessorCount * 512
+            };
 
+            await Parallel.ForEachAsync(list, options, async (activationData, token) =>
+            {
                 // Continue deactivation when ready.
-                activationData.Deactivate(reason);
-                activationData.Deactivated.GetAwaiter().OnCompleted(signalCompletion);
-            }
+                activationData.Deactivate(reason, cancellationToken);
+                await activationData.Deactivated.ConfigureAwait(false);
+            }).WaitAsync(cancellationToken);
+        }
 
-            await mtcs.Task;
+        public void Dispose()
+        {
+            _collectionTimer.Dispose();
+            _shutdownCts.Dispose();
         }
 
         private class Bucket
@@ -568,7 +560,7 @@ namespace Orleans.Runtime
                         item.CollectionTicket = default;
                     }
 
-                    result ??= new List<ICollectibleGrainContext>();
+                    result ??= [];
                     result.Add(pair.Value);
                 }
 
