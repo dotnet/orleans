@@ -86,6 +86,8 @@ namespace Orleans.Storage
             }
             else
             {
+                grainState.RecordExists = false;
+                grainState.ETag = null;
                 grainState.State = this.activatorProvider.GetActivator<T>().Create();
             }
             // Else leave grainState in previous default condition
