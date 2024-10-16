@@ -30,7 +30,6 @@ namespace Orleans.Transactions.AzureStorage.Tests
             {
                 hostBuilder
                     .ConfigureServices(services => services.AddKeyedSingleton<IRemoteCommitService, RemoteCommitService>(TransactionTestConstants.RemoteCommitService))
-                    .ConfigureTracingForTransactionTests()
                     .AddAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
                     {
                         options.TableServiceClient = AzureStorageOperationOptionsExtensions.GetTableServiceClient();
@@ -44,8 +43,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .UseTransactions()
-                    .ConfigureTracingForTransactionTests();
+                    .UseTransactions();
             }
         }
     }
@@ -68,7 +66,6 @@ namespace Orleans.Transactions.AzureStorage.Tests
             public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
-                    .ConfigureTracingForTransactionTests()
                     .AddFaultInjectionAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
                     {
                         options.TableServiceClient = AzureStorageOperationOptionsExtensions.GetTableServiceClient();
@@ -108,7 +105,6 @@ namespace Orleans.Transactions.AzureStorage.Tests
             public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
-                    .ConfigureTracingForTransactionTests()
                     .AddFaultInjectionAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
                     {
                         options.TableServiceClient = AzureStorageOperationOptionsExtensions.GetTableServiceClient();
