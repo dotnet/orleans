@@ -153,6 +153,12 @@ namespace Orleans.Runtime
                                 {
                                     var grainContext = (ActivationData)workItem.State;
                                     _workers.Remove(grainContext);
+                                    if (_workers.Count == 0)
+                                    {
+                                        // When the last worker is destroyed, we can consider the stateless worker grain
+                                        // activation to be destroyed as well
+                                        _shared.InternalRuntime.Catalog.UnregisterMessageTarget(this);
+                                    }
                                     break;
                                 }
                             default: throw new NotSupportedException($"Work item of type {workItem.Type} is not supported");
@@ -310,10 +316,6 @@ namespace Orleans.Runtime
         public void OnDestroyActivation(IGrainContext grainContext)
         {
             EnqueueWorkItem(WorkItemType.OnDestroyActivation, grainContext);
-            if (_workers.Count == 0)
-            {
-                _shared.InternalRuntime.Catalog.UnregisterMessageTarget(this);
-            }
         }
 
         public void Rehydrate(IRehydrationContext context)
