@@ -17,7 +17,7 @@ namespace Orleans.Runtime
         private readonly int _maxWorkers;
         private readonly List<ActivationData> _workers = new();
         private readonly ConcurrentQueue<(WorkItemType Type, object State)> _workItems = new();
-        private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
+        private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = false };
 
         /// <summary>
         /// The <see cref="Task"/> representing the <see cref="RunMessageLoop"/> invocation.
