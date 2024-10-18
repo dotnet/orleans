@@ -95,9 +95,33 @@ public class StatelessWorkerActivationTests : IClassFixture<StatelessWorkerActiv
         await Task.WhenAll(waiters);
     }
 
-    private static async Task Until(Func<Task<bool>> condition)
+    [Fact, TestCategory("BVT"), TestCategory("StatelessWorker")]
+    public async Task CatalogCleanupOnDeactivation()
     {
-        var maxTimeout = 40_000;
+        var workerGrain = _fixture.GrainFactory.GetGrain<IStatelessWorkerGrain>(0);
+        var mgmt = _fixture.GrainFactory.GetGrain<IManagementGrain>(0);
+        
+        var numActivations = await mgmt.GetGrainActivationCount((GrainReference)workerGrain);
+        Assert.Equal(0, numActivations);
+        
+        // Activate grain
+        await workerGrain.DummyCall();
+        
+        numActivations = await mgmt.GetGrainActivationCount((GrainReference)workerGrain);
+        Assert.Equal(1, numActivations);
+        
+        // Deactivate grain by forcing activation collection
+        await mgmt.ForceActivationCollection(TimeSpan.Zero);
+        
+        // The activation count for the stateless worker grain should become 0 again
+        await Until(
+            async () => await mgmt.GetGrainActivationCount((GrainReference)workerGrain) == 0,
+            5_000
+        );
+    }
+
+    private static async Task Until(Func<Task<bool>> condition, int maxTimeout = 40_000)
+    {
         while (!await condition() && (maxTimeout -= 10) > 0) await Task.Delay(10);
         Assert.True(maxTimeout > 0);
     }
