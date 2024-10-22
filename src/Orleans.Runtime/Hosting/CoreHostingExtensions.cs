@@ -153,7 +153,7 @@ namespace Orleans.Hosting
         /// <param name="siloBuilder">The silo builder to register the directory implementation with.</param>
         /// <param name="name">The name of the directory to register, or null to register the directory as the default.</param>
         /// <returns>The provided silo builder.</returns>
-        [Experimental("ORLEANSEXP002")]
+        [Experimental("ORLEANSEXP003")]
         public static ISiloBuilder AddDistributedGrainDirectory(this ISiloBuilder siloBuilder, string? name = null)
         {
             var services = siloBuilder.Services;
