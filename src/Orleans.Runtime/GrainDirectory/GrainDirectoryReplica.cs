@@ -120,22 +120,25 @@ internal sealed partial class GrainDirectoryReplica(
 
     ValueTask<bool> IGrainDirectoryPartition.AcknowledgeSnapshotTransferAsync(SiloAddress silo, int partitionIndex, MembershipVersion rangeVersion)
     {
-        RemoveSnapshotTransferPartner((silo, partitionIndex), rangeVersion);
+        RemoveSnapshotTransferPartner(
+            (silo, partitionIndex, rangeVersion),
+            snapshotFilter: (state, snapshot) => snapshot.DirectoryMembershipVersion == state.rangeVersion,
+            partnerFilter: (state, silo, partitionIndex) => silo.Equals(state.silo) && partitionIndex == state.partitionIndex);
         return new(true);
     }
 
-    private void RemoveSnapshotTransferPartner((SiloAddress Silo, int PartitionIndex) owner, MembershipVersion? rangeVersion)
+    private void RemoveSnapshotTransferPartner<TState>(TState state, Func<TState, PartitionSnapshotState, bool> snapshotFilter, Func<TState, SiloAddress, int, bool> partnerFilter)
     {
         for (var i = 0; i < _partitionSnapshots.Count; ++i)
         {
             var partitionSnapshot = _partitionSnapshots[i];
-            if (rangeVersion.HasValue && partitionSnapshot.DirectoryMembershipVersion != rangeVersion.Value)
+            if (!snapshotFilter(state, partitionSnapshot))
             {
                 continue;
             }
 
             var partners = partitionSnapshot.TransferPartners;
-            partners.RemoveWhere(p => p.SiloAddress.Equals(owner.Silo) && (owner.PartitionIndex < 0 || p.PartitionIndex == owner.PartitionIndex));
+            partners.RemoveWhere(p => partnerFilter(state, p.SiloAddress, p.PartitionIndex));
             if (partners.Count == 0)
             {
                 _partitionSnapshots.RemoveAt(i);
@@ -276,8 +279,31 @@ internal sealed partial class GrainDirectoryReplica(
             }
         }
 
-        RemoveSnapshotTransferPartner((change.SiloAddress, -1), rangeVersion: null);
+        RemoveSnapshotTransferPartner(
+            change.SiloAddress,
+            snapshotFilter: (state, snapshot) => true,
+            partnerFilter: (state, silo, partitionIndex) => silo.Equals(state));
     }
+
+    internal Task OnRecoveringPartition(MembershipVersion version, RingRange range, SiloAddress siloAddress, int partitionIndex) =>
+        this.QueueTask(
+            async () =>
+            {
+                try
+                {
+                    await WaitForRange(range, version);
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogWarning(exception, "Error waiting for range to unlock.");
+                }
+
+                // Remove all snapshots that are associated with the given replica prior or equal to the specified version.
+                RemoveSnapshotTransferPartner(
+                    (Version: version, SiloAddress: siloAddress, PartitionIndex: partitionIndex),
+                    snapshotFilter: (state, snapshot) => snapshot.DirectoryMembershipVersion <= state.Version,
+                    partnerFilter: (state, silo, partitionIndex) => partitionIndex == state.PartitionIndex && silo.Equals(state.SiloAddress));
+            });
 
     internal Task ProcessMembershipUpdateAsync(DirectoryMembershipSnapshot current) =>
         this.QueueAction(
@@ -301,15 +327,6 @@ internal sealed partial class GrainDirectoryReplica(
 
         var previousRange = previous.GetRange(_id, _partitionIndex);
         _currentRange = current.GetRange(_id, _partitionIndex);
-
-        // It is important that this method is synchronous, to ensure that updates are atomic.
-        var deltaSize = _currentRange.SizePercent - previousRange.SizePercent;
-        var meanSizePercent = current.Members.Length > 0 ? 100.0 / current.Members.Length : 0f;
-        var deviationFromMean = Math.Abs(meanSizePercent - _currentRange.SizePercent);
-        if (_logger.IsEnabled(LogLevel.Debug))
-        {
-            _logger.LogDebug("Updating view from '{PreviousVersion}' to '{Version}'. Now responsible for '{Range}' (Δ {DeltaPercent:0.00}%. {DeviationFromMean:0.00}% from ideal share).", previous.Version, current.Version, _currentRange, deltaSize, deviationFromMean);
-        }
 
         var removedRange = previousRange.Difference(_currentRange).SingleOrDefault();
         var addedRange = _currentRange.Difference(previousRange).SingleOrDefault();
@@ -347,7 +364,7 @@ internal sealed partial class GrainDirectoryReplica(
         var (tcs, sw) = LockRange(removedRange, current.Version);
         if (_logger.IsEnabled(LogLevel.Debug))
         {
-            _logger.LogDebug("Relinquishing ownership of range '{Range}'.", removedRange);
+            _logger.LogDebug("Relinquishing ownership of range '{Range}' at version '{Version}'.", removedRange, current.Version);
         }
 
         try
@@ -361,10 +378,6 @@ internal sealed partial class GrainDirectoryReplica(
             await WaitForRange(removedRange, previous.Version);
 
             GrainRuntime.CheckRuntimeContext(this);
-            if (_logger.IsEnabled(LogLevel.Trace))
-            {
-                _logger.LogTrace("Relinquishing ownership of range '{Range}'.", removedRange);
-            }
 
             foreach (var (range, ownerIndex, partitionIndex) in current.RangeOwners)
             {
@@ -396,14 +409,28 @@ internal sealed partial class GrainDirectoryReplica(
                 _directory.Remove(address.GrainId);
             }
 
-            if (transferPartners.Count > 0)
+            var isContiguous = current.Version.Value == previous.Version.Value + 1;
+            if (!isContiguous)
             {
-                _partitionSnapshots.Add(new PartitionSnapshotState(previous.Version, removedAddresses, transferPartners));
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug("Encountered non-contiguous update from '{Previous}' to '{Current}' while releasing range '{Range}'. Dropping snapshot.", previous.Version, current.Version, removedRange);
+                }
+
+                return;
             }
-            else
+
+            if (transferPartners.Count == 0)
             {
-                _logger.LogDebug("Dropping snapshot since there are no transfer partners.");
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug("No transfer partners for snapshot of range '{Range}' at version '{Version}'. Dropping snapshot.", removedRange, current.Version);
+                }
+
+                return;
             }
+
+            _partitionSnapshots.Add(new PartitionSnapshotState(previous.Version, removedAddresses, transferPartners));
         }
         finally
         {
@@ -641,7 +668,21 @@ internal sealed partial class GrainDirectoryReplica(
             var client = _grainFactory.GetSystemTarget<IGrainDirectoryClient>(Constants.GrainDirectory, siloAddress);
             var result = await InvokeOnClusterMember(
                 siloAddress,
-                async () => await client.GetRegisteredActivations(version, range, isValidation),
+                async () =>
+                {
+                    var innerSw = ValueStopwatch.StartNew();
+                    Immutable<List<GrainAddress>> result = default;
+                        if (isValidation)
+                        {
+                            result = await client.GetRegisteredActivations(version, range, isValidation: true);
+                        }
+                        else
+                        {
+                            result = await client.RecoverRegisteredActivations(version, range, _id, _partitionIndex);
+                        }
+
+                    return result;
+                },
                 new Immutable<List<GrainAddress>>([]),
                 nameof(GetRegisteredActivations));
 
