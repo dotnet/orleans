@@ -238,9 +238,9 @@ namespace NonSilo.Tests.Membership
             Assert.DoesNotContain(testAccessor.MonitoredSilos, monitoredSilo => staleCreatedOrJoiningSilos.Any(staleSilo => staleSilo.SiloAddress.Equals(monitoredSilo)));
 
             // the silos that previously had stale joining or created status' should now be evicted.
-            table = await this.membershipTable.ReadAll();
             if (evictWhenMaxJoinAttemptTimeExceeded)
             {
+                table = await this.membershipTable.ReadAll();
                 foreach (var entryKv in table.Members)
                 {
                     if (entryKv.Item1.SiloAddress.ToParsableString() == joiningSilo || entryKv.Item1.SiloAddress.ToParsableString() == createdSilo)
