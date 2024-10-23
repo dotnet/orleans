@@ -103,11 +103,18 @@ namespace NonSilo.Tests.Membership
             await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: false, numVotesForDeathDeclaration: 1);
         }
 
-        private async Task ClusterHealthMonitor_BasicScenario_Runner(bool enableIndirectProbes, int? numVotesForDeathDeclaration = default)
+        [Fact]
+        public async Task ClusterHealthMonitor_SilosWithStaleCreatedOrJoiningState()
+        {
+            await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: false, evictWhenMaxJoinAttemptTimeExceeded: true, numVotesForDeathDeclaration: 1);
+        }
+
+        private async Task ClusterHealthMonitor_BasicScenario_Runner(bool enableIndirectProbes, bool evictWhenMaxJoinAttemptTimeExceeded = false, int? numVotesForDeathDeclaration = default)
         {
             var clusterMembershipOptions = new ClusterMembershipOptions
             {
                 EnableIndirectProbes = enableIndirectProbes,
+                EvictWhenMaxJoinAttemptTimeExceeded = evictWhenMaxJoinAttemptTimeExceeded
             };
 
             if (numVotesForDeathDeclaration.HasValue)
@@ -181,9 +188,21 @@ namespace NonSilo.Tests.Membership
                 Entry(Silo("127.0.0.200:600@100"), SiloStatus.Active),
                 Entry(Silo("127.0.0.200:700@100"), SiloStatus.Active),
                 Entry(Silo("127.0.0.200:800@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:900@100"), SiloStatus.Active)
+                Entry(Silo("127.0.0.200:900@100"), SiloStatus.Active),
             };
 
+            var joiningSilo = "127.0.0.200:901@100";
+            var createdSilo = "127.0.0.200:902@100";
+
+            // default MaxJoinAttemptTime is 5 minutes, setting it to 6 minutes ago will make sure they are flagged immediately
+            var staleCreatedOrJoiningSilos = new[]
+            {
+                Entry(Silo(joiningSilo), SiloStatus.Joining, DateTime.UtcNow.AddMinutes(-6)),
+                Entry(Silo(createdSilo), SiloStatus.Created, DateTime.UtcNow.AddMinutes(-6)),
+            };
+
+            otherSilos = [.. otherSilos, .. staleCreatedOrJoiningSilos];
+            
             var lastVersion = testAccessor.ObservedVersion;
 
             // Add the new silos
@@ -214,6 +233,22 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(clusterMembershipOptions.NumProbedSilos, testAccessor.MonitoredSilos.Count);
             Assert.All(testAccessor.MonitoredSilos, m => m.Key.Equals(m.Value.SiloAddress));
             Assert.Empty(probeCalls);
+
+            // this silo should not be monitoring any of the stale silo entries with joining or created state
+            Assert.DoesNotContain(testAccessor.MonitoredSilos, monitoredSilo => staleCreatedOrJoiningSilos.Any(staleSilo => staleSilo.SiloAddress.Equals(monitoredSilo)));
+
+            // the silos that previously had stale joining or created status' should now be evicted.
+            table = await this.membershipTable.ReadAll();
+            if (evictWhenMaxJoinAttemptTimeExceeded)
+            {
+                foreach (var entryKv in table.Members)
+                {
+                    if (entryKv.Item1.SiloAddress.ToString() == joiningSilo || entryKv.Item1.SiloAddress.ToString() == createdSilo)
+                    {
+                        Assert.Equal(expected: SiloStatus.Dead, actual: entryKv.Item1.Status);
+                    }
+                }
+            }
 
             // Check that those silos are actually being probed periodically
             await UntilEqual(clusterMembershipOptions.NumProbedSilos, () =>
@@ -300,7 +335,12 @@ namespace NonSilo.Tests.Membership
             if (enableIndirectProbes && numVotesForDeathDeclaration <= 2 || numVotesForDeathDeclaration == 1)
             {
                 table = await this.membershipTable.ReadAll();
-                Assert.Equal(clusterMembershipOptions.NumProbedSilos, table.Members.Count(m => m.Item1.Status == SiloStatus.Dead));
+
+                var expectedDead = evictWhenMaxJoinAttemptTimeExceeded
+                    ? clusterMembershipOptions.NumProbedSilos + staleCreatedOrJoiningSilos.Length
+                    : clusterMembershipOptions.NumProbedSilos;
+
+                Assert.Equal(expectedDead, table.Members.Count(m => m.Item1.Status == SiloStatus.Dead));
 
                 // There is no more to test here, since all of the monitored silos have been killed.
                 return;
@@ -357,7 +397,7 @@ namespace NonSilo.Tests.Membership
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
-        private static MembershipEntry Entry(SiloAddress address, SiloStatus status) => new MembershipEntry { SiloAddress = address, Status = status };
+        private static MembershipEntry Entry(SiloAddress address, SiloStatus status, DateTime startTime = default) => new MembershipEntry { SiloAddress = address, Status = status, StartTime = startTime };
 
         private static async Task UntilEqual<T>(T expected, Func<T> getActual)
         {

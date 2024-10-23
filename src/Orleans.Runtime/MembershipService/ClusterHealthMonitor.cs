@@ -124,6 +124,7 @@ namespace Orleans.Runtime.MembershipService
                 {
                     try
                     {
+                        if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stale silo with a joining or created state found, calling `TryToSuspectOrKill`");
                         await this.membershipService.TryToSuspectOrKill(member.Key);
                     }
                     catch(Exception exception)
