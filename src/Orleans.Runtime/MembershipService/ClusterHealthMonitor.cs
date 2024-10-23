@@ -82,7 +82,10 @@ namespace Orleans.Runtime.MembershipService
 
                     var newMonitoredSilos = this.UpdateMonitoredSilos(tableSnapshot, this.monitoredSilos, utcNow);
 
-                    await this.EvictStaleStateSilos(tableSnapshot, utcNow);
+                    if (this.clusterMembershipOptions.CurrentValue.EvictWhenMaxJoinAttemptTimeExceeded)
+                    {
+                        await this.EvictStaleStateSilos(tableSnapshot, utcNow);
+                    }
 
                     foreach (var pair in this.monitoredSilos)
                     {
@@ -119,7 +122,18 @@ namespace Orleans.Runtime.MembershipService
                         now: utcNow,
                         maxJoinTime: this.clusterMembershipOptions.CurrentValue.MaxJoinAttemptTime))
                 {
-                    await this.membershipService.TryToSuspectOrKill(member.Key);
+                    try
+                    {
+                        await this.membershipService.TryToSuspectOrKill(member.Key);
+                    }
+                    catch(Exception exception)
+                    {
+                        log.LogError(
+                            exception,
+                            "Silo {suspectAddress} has had the status `{siloStatus}` for longer than `MaxJoinAttemptTime` but a call to `TryToSuspectOrKill` has failed",
+                            member.Value.SiloAddress,
+                            nameof(member.Value.Status));
+                    }
                 }
             }
 
