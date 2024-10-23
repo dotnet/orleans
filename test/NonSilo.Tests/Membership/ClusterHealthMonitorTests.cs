@@ -243,7 +243,7 @@ namespace NonSilo.Tests.Membership
             {
                 foreach (var entryKv in table.Members)
                 {
-                    if (entryKv.Item1.SiloAddress.ToString() == joiningSilo || entryKv.Item1.SiloAddress.ToString() == createdSilo)
+                    if (entryKv.Item1.SiloAddress.ToParsableString() == joiningSilo || entryKv.Item1.SiloAddress.ToParsableString() == createdSilo)
                     {
                         Assert.Equal(expected: SiloStatus.Dead, actual: entryKv.Item1.Status);
                     }
