@@ -188,7 +188,7 @@ namespace NonSilo.Tests.Membership
                 Entry(Silo("127.0.0.200:600@100"), SiloStatus.Active),
                 Entry(Silo("127.0.0.200:700@100"), SiloStatus.Active),
                 Entry(Silo("127.0.0.200:800@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:900@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.200:900@100"), SiloStatus.Active)
             };
 
             var joiningSilo = "127.0.0.200:901@100";
