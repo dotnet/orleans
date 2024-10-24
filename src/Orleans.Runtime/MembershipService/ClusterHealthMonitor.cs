@@ -133,7 +133,7 @@ namespace Orleans.Runtime.MembershipService
                             exception,
                             "Silo {suspectAddress} has had the status `{siloStatus}` for longer than `MaxJoinAttemptTime` but a call to `TryToSuspectOrKill` has failed",
                             member.Value.SiloAddress,
-                            nameof(member.Value.Status));
+                            member.Value.Status.ToString());
                     }
                 }
             }
