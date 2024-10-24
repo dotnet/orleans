@@ -9,7 +9,6 @@ using Orleans.Runtime.MembershipService;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
-using static Orleans.InterfaceToImplementationMappingCache;
 
 namespace NonSilo.Tests.Membership
 {
