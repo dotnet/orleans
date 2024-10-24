@@ -235,7 +235,7 @@ namespace NonSilo.Tests.Membership
             Assert.Empty(probeCalls);
 
             // this silo should not be monitoring any of the stale silo entries with joining or created state
-            Assert.DoesNotContain(testAccessor.MonitoredSilos, monitoredSilo => staleCreatedOrJoiningSilos.Any(staleSilo => staleSilo.SiloAddress.Equals(monitoredSilo)));
+            Assert.DoesNotContain(testAccessor.MonitoredSilos, monitoredSilo => staleCreatedOrJoiningSilos.Any(staleSilo => staleSilo.SiloAddress.Equals(monitoredSilo.Key)));
 
             // the silos that previously had stale joining or created status' should now be evicted.
             if (evictWhenMaxJoinAttemptTimeExceeded)
