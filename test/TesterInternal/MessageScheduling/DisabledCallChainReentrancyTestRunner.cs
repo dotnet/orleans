@@ -90,31 +90,5 @@ namespace UnitTests
             }
             this.logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsFalse Test finished OK.");
         }
-
-        public void UnorderedNonReentrantGrain(bool performDeadlockDetection)
-        {
-            IUnorderedNonReentrantGrain unonreentrant = this.grainFactory.GetGrain<IUnorderedNonReentrantGrain>(OrleansTestingBase.GetRandomGrainId());
-            unonreentrant.SetSelf(unonreentrant).Wait();
-            bool timeout = false;
-            bool deadlock = false;
-            try
-            {
-                timeout = !unonreentrant.Two().Wait(2000);
-            }
-            catch (Exception exc)
-            {
-                Assert.Fail($"Unexpected exception {exc.Message}: {exc.StackTrace}");
-            }
-            if (performDeadlockDetection)
-            {
-                Assert.True(deadlock, "Non-reentrant grain should deadlock");
-            }
-            else
-            {
-                Assert.True(timeout, "Non-reentrant grain should timeout");
-            }
-
-            this.logger.LogInformation("Reentrancy UnorderedNonReentrantGrain Test finished OK.");
-        }
     }
 }
