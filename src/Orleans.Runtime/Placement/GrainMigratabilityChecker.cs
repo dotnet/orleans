@@ -75,8 +75,7 @@ internal sealed class GrainMigratabilityChecker(
                 }
 
                 // It is immovable, but does the kind match with the parameter.
-                var isImmovable = ((ImmovableKind)actualKindValue & expectedKind) == expectedKind;
-                return isImmovable;
+                return ((ImmovableKind)actualKindValue & expectedKind) == expectedKind;
             }
 
             // Assume unknown grains are immovable.
