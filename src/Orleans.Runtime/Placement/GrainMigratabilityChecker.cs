@@ -1,4 +1,6 @@
+using Orleans.Concurrency;
 using Orleans.Metadata;
+using Orleans.Placement;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
@@ -20,7 +22,7 @@ internal sealed class GrainMigratabilityChecker(
     private FrozenDictionary<uint, bool>? _migratableStatusesCache;
     private long _lastRegeneratedCacheTimestamp = timeProvider.GetTimestamp();
 
-    public bool IsMigratable(GrainType grainType)
+    public bool IsMigratable(GrainType grainType, ImmovableKind expectedKind)
     {
         var hash = grainType.GetUniformHashCode();
         if (_migratableStatusesCache is { } cache && cache.TryGetValue(hash, out var isMigratable))
@@ -61,9 +63,20 @@ internal sealed class GrainMigratabilityChecker(
             if (_localManifest.Grains.TryGetValue(grainType, out var props))
             {
                 // If there is no 'Immovable' property, it is not immovable.
+                if (!props.Properties.TryGetValue(WellKnownGrainTypeProperties.Immovable, out var value))
+                {
+                    return false;
+                }
+
                 // If the value fails to parse, assume it's immovable.
-                // If the value is true, it's immovable.
-                return props.Properties.TryGetValue(WellKnownGrainTypeProperties.Immovable, out var value) && (!bool.TryParse(value, out var result) || result);
+                if (!byte.TryParse(value, out var actualKindValue))
+                {
+                    return true;
+                }
+
+                // It is immovable, but does the kind match with the parameter.
+                var isImmovable = ((ImmovableKind)actualKindValue & expectedKind) == expectedKind;
+                return isImmovable;
             }
 
             // Assume unknown grains are immovable.

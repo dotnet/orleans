@@ -213,7 +213,7 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
     /// This is simply to achieve initial balance between the 2 silos, as by default the primary
     /// will have 1 more activation than the secondary. That activations is 'sys.svc.clustering.dev'
     /// </summary>
-    [Immovable]
+    [Immovable(ImmovableKind.Repartitioner)]
     public class X : Grain, IX
     {
         public Task Ping() => Task.CompletedTask;

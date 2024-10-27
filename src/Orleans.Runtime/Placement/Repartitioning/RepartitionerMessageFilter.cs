@@ -1,5 +1,7 @@
 #nullable enable
 
+using Orleans.Placement;
+
 namespace Orleans.Runtime.Placement.Repartitioning;
 
 internal interface IRepartitionerMessageFilter
@@ -22,8 +24,8 @@ internal sealed class RepartitionerMessageFilter(GrainMigratabilityChecker check
             return false;
         }
 
-        isSenderMigratable = checker.IsMigratable(message.SendingGrain.Type);
-        isTargetMigratable = checker.IsMigratable(message.TargetGrain.Type);
+        isSenderMigratable = checker.IsMigratable(message.SendingGrain.Type, ImmovableKind.Repartitioner);
+        isTargetMigratable = checker.IsMigratable(message.TargetGrain.Type, ImmovableKind.Repartitioner);
 
         // If both are not migratable types we ignore this. But if one of them is not, then we allow passing, as we wish to move grains closer to them, as with any type of grain.
         return isSenderMigratable || isTargetMigratable;
