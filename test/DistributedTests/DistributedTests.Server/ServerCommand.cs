@@ -18,7 +18,8 @@ namespace DistributedTests.Server
             AddOption(OptionHelper.CreateOption<string>("--clusterId", isRequired: true));
             AddOption(OptionHelper.CreateOption("--siloPort", defaultValue: 11111));
             AddOption(OptionHelper.CreateOption("--gatewayPort", defaultValue: 30000));
-            AddOption(OptionHelper.CreateOption("--secretSource", defaultValue: SecretConfiguration.SecretSource.File));
+            AddOption(OptionHelper.CreateOption<Uri>("--azureQueueUri", isRequired: true));
+            AddOption(OptionHelper.CreateOption<Uri>("--azureTableUri", isRequired: true));
             AddOption(OptionHelper.CreateOption("--activationRepartitioning", defaultValue: false));
 
             foreach (var opt in siloConfigurator.Options)
