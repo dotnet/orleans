@@ -41,6 +41,7 @@ namespace Orleans
         private readonly LocalClientDetails _localClientDetails;
         private readonly ILoggerFactory loggerFactory;
 
+        private readonly ClientClusterManifestProvider _manifestProvider;
         private readonly SharedCallbackData sharedCallbackData;
         private readonly PeriodicTimer callbackTimer;
         private Task callbackTimerTask;
@@ -148,6 +149,8 @@ namespace Orleans
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             this.callbackTimer.Dispose();
+            await _manifestProvider.DisposeAsync();
+
             if (this.callbackTimerTask is { } task)
             {
                 await task.WaitAsync(cancellationToken);
@@ -184,7 +187,7 @@ namespace Orleans
             this.InternalGrainFactory.CreateObjectReference<IClientGatewayObserver>(this.gatewayObserver);
 
             await ExecuteWithRetries(
-                async () => await this.ServiceProvider.GetRequiredService<ClientClusterManifestProvider>().StartAsync(),
+                _manifestProvider.StartAsync,
                 retryFilter,
                 cancellationToken);
 
