@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Azure.Core;
+using Azure.Data.Tables;
 using Azure.Identity;
 using Azure.Storage.Queues;
 
@@ -11,6 +13,28 @@ namespace DistributedTests.Common;
 
 public static class TokenCredentialHelper
 {
+    private static string EmulatorConnectionString = "UseDevelopmentStorage=true";
+
+    public static TableServiceClient CreateTableServiceClient(this Uri azureTableUri)
+    {
+        if (azureTableUri.IsLoopback)
+        {
+            // Assume it's the emulator/azurite
+            return new TableServiceClient(EmulatorConnectionString);
+        }
+        return new TableServiceClient(azureTableUri, GetTokenCredential());
+    }
+
+    public static QueueServiceClient CreateQueueServiceClient(this Uri azureQueueUri)
+    {
+        if (azureQueueUri.IsLoopback)
+        {
+            // Assume it's the emulator/azurite
+            return new QueueServiceClient(EmulatorConnectionString);
+        }
+        return new QueueServiceClient(azureQueueUri, GetTokenCredential());
+    }
+
     public static TokenCredential GetTokenCredential()
     {
         var tenantId = Environment.GetEnvironmentVariable("TENANT_ID");

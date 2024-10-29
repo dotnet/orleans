@@ -48,7 +48,7 @@ namespace DistributedTests.Client.LoadGeneratorScenario
             var hostBuilder = new HostBuilder().UseOrleansClient((ctx, builder) =>
                 builder.Configure<ClusterOptions>(options => { options.ClusterId = clientParams.ClusterId; options.ServiceId = clientParams.ServiceId; })
                        .Configure<ConnectionOptions>(options => clientParams.ConnectionsPerEndpoint = 2)
-                       .UseAzureStorageClustering(options => options.TableServiceClient = new(clientParams.AzureTableUri, TokenCredentialHelper.GetTokenCredential())));
+                       .UseAzureStorageClustering(options => options.TableServiceClient = clientParams.AzureTableUri.CreateTableServiceClient()));
             using var host = hostBuilder.Build();
 
             _logger.LogInformation("Connecting to cluster...");

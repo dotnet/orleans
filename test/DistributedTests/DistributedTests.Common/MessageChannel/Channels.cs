@@ -72,7 +72,7 @@ namespace DistributedTests.Common.MessageChannel
         private static readonly string SILO_TO_CLIENT_QUEUE = "client-{0}";
 
         public static Task<ISendChannel> CreateSendChannel(string clusterId, Uri azureQueueUri)
-            => CreateSendChannel(clusterId, new QueueServiceClient(azureQueueUri, TokenCredentialHelper.GetTokenCredential()));
+            => CreateSendChannel(clusterId, azureQueueUri.CreateQueueServiceClient());
 
         public static async Task<ISendChannel> CreateSendChannel(string clusterId, QueueServiceClient queueServiceClient)
         {
@@ -86,7 +86,7 @@ namespace DistributedTests.Common.MessageChannel
         }
 
         public static Task<IReceiveChannel> CreateReceiveChannel(string serverName, string clusterId, Uri azureQueueUri)
-            => CreateReceiveChannel(serverName, clusterId, new QueueServiceClient(azureQueueUri, TokenCredentialHelper.GetTokenCredential()));
+            => CreateReceiveChannel(serverName, clusterId, azureQueueUri.CreateQueueServiceClient());
 
         public static async Task<IReceiveChannel> CreateReceiveChannel(string serverName, string clusterId, QueueServiceClient queueServiceClient)
         {

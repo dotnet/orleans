@@ -171,6 +171,9 @@ results:
 
 profiles:
   local:
+    variables:
+      azureQueueUri: "http://127.0.0.1:10001"
+      azureTableUri: "http://127.0.0.1:10002"
     jobs:
       server:
         endpoints:

@@ -74,7 +74,7 @@ namespace DistributedTests.Server
                 .Configure<SiloOptions>(options => options.SiloName = _siloName)
                 .Configure<ClusterOptions>(options => { options.ClusterId = commonParameters.ClusterId; options.ServiceId = commonParameters.ServiceId; })
                 .ConfigureEndpoints(siloPort: commonParameters.SiloPort, gatewayPort: commonParameters.GatewayPort)
-                .UseAzureStorageClustering(options => options.TableServiceClient = new(commonParameters.AzureTableUri, TokenCredentialHelper.GetTokenCredential()));
+                .UseAzureStorageClustering(options => options.TableServiceClient = commonParameters.AzureTableUri.CreateTableServiceClient());
 
             if (commonParameters.ActivationRepartitioning)
             {
