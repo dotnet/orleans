@@ -76,7 +76,6 @@ namespace DistributedTests.Common.MessageChannel
 
         public static async Task<ISendChannel> CreateSendChannel(string clusterId, QueueServiceClient queueServiceClient)
         {
-            Console.WriteLine($"CreateSendChannel {queueServiceClient.Uri} {string.Format(SILO_TO_CLIENT_QUEUE, clusterId)}");
             var writeQueue = queueServiceClient.GetQueueClient(string.Format(CLIENT_TO_SERVER_QUEUE, clusterId));
             var readQueue = queueServiceClient.GetQueueClient(string.Format(SILO_TO_CLIENT_QUEUE, clusterId));
 

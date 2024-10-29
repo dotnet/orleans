@@ -19,7 +19,7 @@ namespace DistributedTests.Client.Commands
             public string ServiceId { get; set; }
             public string ClusterId { get; set; }
             public Uri AzureTableUri { get; set; }
-            public string AzureQueueUri { get; set; }
+            public Uri AzureQueueUri { get; set; }
             public string CounterKey { get; set; }
             public List<string> Counters { get; set; }
         }
