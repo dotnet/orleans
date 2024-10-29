@@ -42,16 +42,7 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
 
         writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
-        if (value.Count > 0)
-        {
-            UInt32Codec.WriteField(ref writer, 0, (uint)value.Count);
-            uint innerFieldIdDelta = 1;
-            foreach (var element in value)
-            {
-                _fieldCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, element);
-                innerFieldIdDelta = 0;
-            }
-        }
+        Serialize(ref writer, value);
 
         writer.WriteEndObject();
     }
