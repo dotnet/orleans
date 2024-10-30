@@ -627,6 +627,16 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
+        public Task CancellationTokenCallbackThrow(CancellationToken tc)
+        {
+            tc.Register(() =>
+            {
+                throw new InvalidOperationException("From cancellation token callback");
+            });
+
+            return Task.CompletedTask;
+        }
+
         public Task<T> GetLastValue()
         {
             return Task.FromResult(lastValue);
@@ -646,6 +656,25 @@ namespace UnitTests.Grains
             var tcs = new TaskCompletionSource<bool>();
             var orleansTs = TaskScheduler.Current;
             tc.CancellationToken.Register(() =>
+            {
+                if (TaskScheduler.Current != orleansTs)
+                {
+                    tcs.SetException(new Exception("Callback executed on wrong thread"));
+                }
+                else
+                {
+                    tcs.SetResult(true);
+                }
+            });
+
+            return tcs.Task;
+        }
+
+        public Task<bool> CancellationTokenCallbackResolve(CancellationToken tc)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+            var orleansTs = TaskScheduler.Current;
+            tc.Register(() =>
             {
                 if (TaskScheduler.Current != orleansTs)
                 {
@@ -681,6 +710,11 @@ namespace UnitTests.Grains
             await target.LongWait(tc, delay);
         }
 
+        public async Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, CancellationToken tc, TimeSpan delay)
+        {
+            await target.LongWait(tc, delay);
+        }
+
         public async Task CallOtherLongRunningTaskWithLocalToken(ILongRunningTaskGrain<T> target, TimeSpan delay, TimeSpan delayBeforeCancel)
         {
             var tcs = new GrainCancellationTokenSource();
@@ -693,6 +727,11 @@ namespace UnitTests.Grains
         public async Task LongWait(GrainCancellationToken tc, TimeSpan delay)
         {
             await Task.Delay(delay, tc.CancellationToken);
+        }
+
+        public async Task LongWait(CancellationToken tc, TimeSpan delay)
+        {
+            await Task.Delay(delay, tc);
         }
 
         public async Task<T> LongRunningTask(T t, TimeSpan delay)

@@ -25,6 +25,7 @@ using System.CodeDom.Compiler;
 using System.Collections;
 using Orleans.Serialization.Invocation;
 using System.Globalization;
+using System.Threading;
 
 namespace Orleans.Serialization.UnitTests
 {
@@ -3831,5 +3832,25 @@ namespace Orleans.Serialization.UnitTests
 
             return string.Equals(left.Message, right.Message, StringComparison.Ordinal);
         }
+    }
+
+    public class CancellationTokenCodecTests(ITestOutputHelper output) : FieldCodecTester<CancellationToken, CancellationTokenCodec>(output)
+    {
+        protected override CancellationToken CreateValue() => default;
+        protected override CancellationToken[] TestValues =>
+        [
+            new CancellationToken(),
+            new CancellationToken(true)
+        ];
+    }
+
+    public class CancellationTokenCopierTests(ITestOutputHelper output) : CopierTester<CancellationToken, IDeepCopier<CancellationToken>>(output)
+    {
+        protected override CancellationToken CreateValue() => default;
+        protected override CancellationToken[] TestValues =>
+        [
+            new CancellationToken(),
+            new CancellationToken(true)
+        ];
     }
 }
