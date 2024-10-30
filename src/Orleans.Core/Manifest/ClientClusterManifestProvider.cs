@@ -88,7 +88,7 @@ namespace Orleans.Runtime
                 _logger.LogError(exception, "Error cancelling shutdown token.");
             }
 
-            if (_runTask is { } task)
+            if (_runTask is { IsCompleted: false } task)
             {
                 await task.WaitAsync(cancellationToken);
             }
