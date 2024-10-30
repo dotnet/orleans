@@ -77,6 +77,23 @@ namespace Orleans.Runtime
             return _initialized.Task;
         }
 
+        public async Task StopAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                _cancellation.Cancel();
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Error cancelling shutdown token.");
+            }
+
+            if (_runTask is { } task)
+            {
+                await task.WaitAsync(cancellationToken);
+            }
+        }
+
         private async Task RunAsync()
         {
             try
