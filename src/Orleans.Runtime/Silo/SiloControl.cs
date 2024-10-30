@@ -10,6 +10,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Metadata;
+using Orleans.Placement;
 using Orleans.Providers;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
@@ -307,7 +308,7 @@ namespace Orleans.Runtime
             var remainingCount = count;
             foreach (var (grainId, grainContext) in activationDirectory)
             {
-                if (!_migratabilityChecker.IsMigratable(grainId.Type))
+                if (!_migratabilityChecker.IsMigratable(grainId.Type, ImmovableKind.Rebalancer))
                 {
                     continue;
                 }
