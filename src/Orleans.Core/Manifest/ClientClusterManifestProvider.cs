@@ -82,15 +82,18 @@ namespace Orleans.Runtime
             try
             {
                 _cancellation.Cancel();
+                if (_runTask is { IsCompleted: false } _task)
+                {
+                    await _task.WaitAsync(cancellationToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation("Stoping of {Component} was canceled.", nameof(ClientClusterManifestProvider));
             }
             catch (Exception exception)
             {
-                _logger.LogError(exception, "Error cancelling shutdown token.");
-            }
-
-            if (_runTask is { IsCompleted: false } task)
-            {
-                await task.WaitAsync(cancellationToken);
+                _logger.LogError(exception, "Error stopping {Component}.", nameof(ClientClusterManifestProvider));
             }
         }
 
