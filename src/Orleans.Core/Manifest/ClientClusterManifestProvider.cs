@@ -85,10 +85,7 @@ namespace Orleans.Runtime
 
                 if (_runTask is { IsCompleted: false } _task)
                 {
-                    if (!cancellationToken.IsCancellationRequested)
-                    {
-                        await _task.WaitAsync(cancellationToken);
-                    }
+                    await _task.WaitAsync(cancellationToken);
                 }
             }
             catch (OperationCanceledException)
