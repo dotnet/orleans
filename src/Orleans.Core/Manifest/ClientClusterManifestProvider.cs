@@ -93,11 +93,11 @@ namespace Orleans.Runtime
             }
             catch (OperationCanceledException)
             {
-                _logger.LogInformation("Stoping of {Component} was canceled.", nameof(ClientClusterManifestProvider));
+                _logger.LogInformation("Graceful shutdown of cluster manifest provider was canceled.");
             }
             catch (Exception exception)
             {
-                _logger.LogError(exception, "Error stopping {Component}.", nameof(ClientClusterManifestProvider));
+                _logger.LogError(exception, "Error stopping cluster manifest provider.");
             }
         }
 
