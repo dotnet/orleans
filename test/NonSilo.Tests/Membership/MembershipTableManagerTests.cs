@@ -288,7 +288,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_Superseded()
         {
-            // The table includes a sucessor to this silo.
+            // The table includes a successor to this silo.
             var successor = Entry(Silo("127.0.0.1:100@200"), SiloStatus.Active);
 
             var otherSilos = new[]

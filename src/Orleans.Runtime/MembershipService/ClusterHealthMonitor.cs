@@ -78,7 +78,14 @@ namespace Orleans.Runtime.MembershipService
                 if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting to process membership updates");
                 await foreach (var tableSnapshot in this.membershipService.MembershipTableUpdates.WithCancellation(this.shutdownCancellation.Token))
                 {
-                    var newMonitoredSilos = this.UpdateMonitoredSilos(tableSnapshot, this.monitoredSilos, DateTime.UtcNow);
+                    var utcNow = DateTime.UtcNow;
+
+                    var newMonitoredSilos = this.UpdateMonitoredSilos(tableSnapshot, this.monitoredSilos, utcNow);
+
+                    if (this.clusterMembershipOptions.CurrentValue.EvictWhenMaxJoinAttemptTimeExceeded)
+                    {
+                        await this.EvictStaleStateSilos(tableSnapshot, utcNow);
+                    }
 
                     foreach (var pair in this.monitoredSilos)
                     {
@@ -100,6 +107,45 @@ namespace Orleans.Runtime.MembershipService
             finally
             {
                 if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopped processing membership updates");
+            }
+        }
+
+        private async Task EvictStaleStateSilos(
+            MembershipTableSnapshot membership,
+            DateTime utcNow)
+        {
+            foreach (var member in membership.Entries)
+            {
+                if (IsCreatedOrJoining(member.Value.Status)
+                    && HasExceededMaxJoinTime(
+                        startTime: member.Value.StartTime,
+                        now: utcNow,
+                        maxJoinTime: this.clusterMembershipOptions.CurrentValue.MaxJoinAttemptTime))
+                {
+                    try
+                    {
+                        if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stale silo with a joining or created state found, calling `TryToSuspectOrKill`");
+                        await this.membershipService.TryToSuspectOrKill(member.Key);
+                    }
+                    catch(Exception exception)
+                    {
+                        log.LogError(
+                            exception,
+                            "Silo {suspectAddress} has had the status `{siloStatus}` for longer than `MaxJoinAttemptTime` but a call to `TryToSuspectOrKill` has failed",
+                            member.Value.SiloAddress,
+                            member.Value.Status.ToString());
+                    }
+                }
+            }
+
+            static bool IsCreatedOrJoining(SiloStatus status)
+            {
+                return status == SiloStatus.Created || status == SiloStatus.Joining;
+            }
+
+            static bool HasExceededMaxJoinTime(DateTime startTime, DateTime now, TimeSpan maxJoinTime)
+            {
+                return now > startTime.Add(maxJoinTime);
             }
         }
 
