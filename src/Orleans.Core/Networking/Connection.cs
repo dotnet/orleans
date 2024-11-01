@@ -486,7 +486,7 @@ namespace Orleans.Runtime.Messaging
                     // If the message was a response, propagate the exception to the intended recipient.
                     message.Result = Message.ResponseTypes.Error;
                     message.BodyObject = Response.FromException(exception);
-                    this.MessageCenter.DispatchLocalMessage(message);
+                    this.OnReceivedMessage(message);
                 }
             }
 
