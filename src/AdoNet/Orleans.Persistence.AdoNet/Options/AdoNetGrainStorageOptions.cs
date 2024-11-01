@@ -43,6 +43,15 @@ namespace Orleans.Configuration
         /// Gets or sets the hasher picker to use for this storage provider. 
         /// </summary>
         public IStorageHasherPicker HashPicker { get; set; }
+
+        /// <summary>
+        /// Sets legacy Orleans v3-compatible hash picker to use for this storage provider. Invoke this method if you need to run
+        /// Orleans v7+ silo against existing Orleans v3-initialized database and keep existing grain state.
+        /// </summary>
+        public void UseOrleans3CompatibleHasher()
+        {
+            this.HashPicker = new StorageHasherPicker(new[] { new Orleans3CompatibleHasher() });
+        }
     }
 
     /// <summary>
@@ -84,6 +93,9 @@ namespace Orleans.Configuration
         }
     }
 
+    /// <summary>
+    /// Provides default configuration HashPicker for AdoNetGrainStorageOptions.
+    /// </summary>
     public class DefaultAdoNetGrainStorageOptionsHashPickerConfigurator : IPostConfigureOptions<AdoNetGrainStorageOptions>
     {
         public void PostConfigure(string name, AdoNetGrainStorageOptions options)
