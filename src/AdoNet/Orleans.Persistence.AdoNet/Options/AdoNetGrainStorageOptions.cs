@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using Orleans.Persistence.AdoNet.Storage;
 using Orleans.Runtime;
 using Orleans.Storage;
@@ -37,6 +38,11 @@ namespace Orleans.Configuration
 
         /// <inheritdoc/>
         public IGrainStorageSerializer GrainStorageSerializer { get; set; }
+
+        /// <summary>
+        /// Gets or sets the hasher picker to use for this storage provider. 
+        /// </summary>
+        public IStorageHasherPicker HashPicker { get; set; }
     }
 
     /// <summary>
@@ -70,6 +76,23 @@ namespace Orleans.Configuration
             {
                 throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". {nameof(options.ConnectionString)} is required.");
             }
+
+            if (this.options.HashPicker == null)
+            {
+                throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} {name}. {nameof(options.HashPicker)} is required.");
+            }
+        }
+    }
+
+    public class DefaultAdoNetGrainStorageOptionsHashPickerConfigurator : IPostConfigureOptions<AdoNetGrainStorageOptions>
+    {
+        public void PostConfigure(string name, AdoNetGrainStorageOptions options)
+        {
+            // preserving explicitly configured HashPicker
+            if (options.HashPicker != null)
+                return;
+
+            options.HashPicker = new StorageHasherPicker(new[] { new OrleansDefaultHasher() });
         }
     }
 }
