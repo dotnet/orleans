@@ -204,6 +204,8 @@ public sealed class CollectionCopier<T> : IDeepCopier<Collection<T>>, IBaseCopie
     /// <inheritdoc/>
     public void DeepCopy(Collection<T> input, Collection<T> output, CopyContext context)
     {
+        output.Clear();
+
         foreach (var item in input)
         {
             output.Add(_copier.DeepCopy(item, context));
