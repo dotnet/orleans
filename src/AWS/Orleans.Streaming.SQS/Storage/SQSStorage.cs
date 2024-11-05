@@ -37,6 +37,10 @@ namespace OrleansAWSUtils.Storage
         private string queueUrl;
         private AmazonSQSClient sqsClient;
 
+        private List<string> receiveAttributes;
+        private List<string> receiveMessageAttributes;
+
+
         /// <summary>
         /// The queue Name
         /// </summary>
@@ -57,6 +61,9 @@ namespace OrleansAWSUtils.Storage
             ParseDataConnectionString(sqsOptions.ConnectionString);
             Logger = loggerFactory.CreateLogger<SQSStorage>();
             CreateClient();
+
+            receiveAttributes = [..sqsOptions.ReceiveAttributes];
+            receiveMessageAttributes = [.. sqsOptions.ReceiveMessageAttributes];
         }
 
         private void ParseDataConnectionString(string dataConnectionString)
@@ -156,6 +163,7 @@ namespace OrleansAWSUtils.Storage
 
                     if (sqsOptions.FifoQueue)
                     {
+                        // The stream must have these attributes to be a valid FIFO queue.
                         createQueueRequest.Attributes = new()
                         {
                             { QueueAttributeName.FifoQueue, "true" },
@@ -166,7 +174,14 @@ namespace OrleansAWSUtils.Storage
 
                         // We require to bring down the AWS set SequenceNumber when on a FIFO queue
                         // in order to populate the SQSFIFOSequenceToken from it.
-                        sqsOptions.ReceiveAttributes.Add("SequenceNumber");
+
+                        if (!receiveMessageAttributes.Contains(MessageSystemAttributeName.SequenceNumber))
+                            receiveMessageAttributes.Add(MessageSystemAttributeName.SequenceNumber);
+                        if (!receiveMessageAttributes.Contains(MessageSystemAttributeName.MessageGroupId))
+                            receiveMessageAttributes.Add(MessageSystemAttributeName.MessageGroupId);
+
+                        // FIFO Queue does not support Long Polling
+                        sqsOptions.ReceiveWaitTimeSeconds = null;
                     }
 
                     if (sqsOptions.ReceiveWaitTimeSeconds.HasValue)
@@ -254,8 +269,8 @@ namespace OrleansAWSUtils.Storage
                 {
                     QueueUrl = queueUrl,
                     MaxNumberOfMessages = count <= MAX_NUMBER_OF_MESSAGE_TO_PEEK ? count : MAX_NUMBER_OF_MESSAGE_TO_PEEK,
-                    AttributeNames = sqsOptions.ReceiveAttributes,
-                    MessageAttributeNames = sqsOptions.ReceiveMessageAttributes,
+                    AttributeNames = receiveAttributes,
+                    MessageAttributeNames = receiveMessageAttributes,
                 };
 
                 if (sqsOptions.ReceiveWaitTimeSeconds.HasValue)

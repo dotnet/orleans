@@ -64,7 +64,7 @@ namespace OrleansAWSUtils.Streams
             if (this.sqsOptions.FifoQueue)
             {
                 // Ensure the SQS Queue ensures FIFO order of messages over this QueueId.
-                sqsRequest.MessageGroupId = queueId.ToString();
+                sqsRequest.MessageGroupId = streamId.ToString();
             }
             
             foreach (var attr in sqsMessage.Attributes)

@@ -1,7 +1,9 @@
 using System;
 using System.Globalization;
+using System.IO;
 using Newtonsoft.Json;
 using Orleans;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace OrleansAWSUtils.Streams
@@ -14,11 +16,18 @@ namespace OrleansAWSUtils.Streams
     public class SQSFIFOSequenceToken : StreamSequenceToken
     {
         /// <summary>
+        /// Gets the StreamId this SQS FIFO sequence token is related to,
+        /// as the SqsSequenceNumber is partitioned by StreamId (SQS MessageGroupId)
+        /// </summary>
+        [Id(2)][JsonProperty] public StreamId StreamId { get; set; }
+
+        /// <summary>
         /// Gets the number of event batches in stream prior to this event batch
         /// </summary>
         [Id(0)]
         [JsonProperty]
         public UInt128 SqsSequenceNumber { get; set; }
+
 
         /// <summary>
         /// Gets the number of event batches in stream prior to this event batch
@@ -40,8 +49,9 @@ namespace OrleansAWSUtils.Streams
         /// Initializes a new instance of the <see cref="SQSFIFOSequenceToken"/> class.
         /// </summary>
         /// <param name="seqNumber">The sequence number.</param>
-        public SQSFIFOSequenceToken(UInt128 seqNumber)
+        public SQSFIFOSequenceToken(StreamId streamId, UInt128 seqNumber)
         {
+            StreamId = streamId;
             SqsSequenceNumber = seqNumber;
             EventIndex = 0;
         }
@@ -49,10 +59,12 @@ namespace OrleansAWSUtils.Streams
         /// <summary>
         /// Initializes a new instance of the <see cref="SQSFIFOSequenceToken"/> class.
         /// </summary>
+        /// <param name="streamId">The stream id for which this token relates.</param>
         /// <param name="seqNumber">The sequence number.</param>
         /// <param name="eventInd">The event index, for events which are part of a batch of events.</param>
-        public SQSFIFOSequenceToken(UInt128 seqNumber, int eventInd)
+        public SQSFIFOSequenceToken(StreamId streamId, UInt128 seqNumber, int eventInd)
         {
+            StreamId = streamId;
             SqsSequenceNumber = seqNumber;
             EventIndex = eventInd;
         }
@@ -72,9 +84,9 @@ namespace OrleansAWSUtils.Streams
         /// </summary>
         /// <param name="eventInd">The event index.</param>
         /// <returns>A new sequence token.</returns>
-        public SQSFIFOSequenceToken CreateSequenceTokenForEvent(int eventInd)
+        public SQSFIFOSequenceToken CreateSequenceTokenForEvent(StreamId streamId, int eventInd)
         {
-            return new SQSFIFOSequenceToken(SqsSequenceNumber, eventInd);
+            return new SQSFIFOSequenceToken(streamId, SqsSequenceNumber, eventInd);
         }
 
         /// <inheritdoc/>
@@ -87,8 +99,14 @@ namespace OrleansAWSUtils.Streams
         public override bool Equals(StreamSequenceToken other)
         {
             var token = other as SQSFIFOSequenceToken;
-            return token != null && (token.SqsSequenceNumber == SqsSequenceNumber &&
-                                     token.EventIndex == EventIndex);
+            if (token == null)
+                return false;
+
+            if (token.StreamId != StreamId)
+                return false;
+            
+            return (token.SqsSequenceNumber == SqsSequenceNumber &&
+                    token.EventIndex == EventIndex);
         }
 
         /// <inheritdoc/>
@@ -100,6 +118,9 @@ namespace OrleansAWSUtils.Streams
             var token = other as SQSFIFOSequenceToken;
             if (token == null)
                 throw new ArgumentOutOfRangeException(nameof(other));
+
+            if(token.StreamId != StreamId)
+                throw new ArgumentOutOfRangeException(nameof(other), "Cannot compare between tokens of different StreamIds");
 
             int difference = SqsSequenceNumber.CompareTo(token.SqsSequenceNumber);
             return difference != 0 ? difference : EventIndex.CompareTo(token.EventIndex);
@@ -115,7 +136,7 @@ namespace OrleansAWSUtils.Streams
         /// <inheritdoc/>
         public override string ToString()
         {
-            return string.Format(CultureInfo.InvariantCulture, "[SQSFIFOSequenceToken: SeqNum={0}, EventIndex={1}]", SqsSequenceNumber, EventIndex);
+            return string.Format(CultureInfo.InvariantCulture, "[SQSFIFOSequenceToken: SeqNum={0}, EventIndex={1}, StreamId={2}]", SqsSequenceNumber, EventIndex, StreamId);
         }
     }
 }

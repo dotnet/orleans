@@ -9,7 +9,6 @@ using Orleans.Configuration;
 using Orleans;
 using Orleans.Configuration.Overrides;
 using Orleans.Streaming.SQS.Streams;
-using Orleans.Runtime;
 
 namespace OrleansAWSUtils.Streams
 {
@@ -44,9 +43,12 @@ namespace OrleansAWSUtils.Streams
             this.dataAdapter = dataAdapter;
             this.loggerFactory = loggerFactory;
             streamQueueMapper = new HashRingBasedStreamQueueMapper(queueMapperOptions, this.providerName);
-            adapterCache = new SimpleQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
-        }
 
+            if (sqsOptions.FifoQueue)
+                adapterCache = new StreamIdPartitionedQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
+            else
+                adapterCache = new SimpleQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
+        }
 
         /// <summary> Init the factory.</summary>
         public virtual void Init()

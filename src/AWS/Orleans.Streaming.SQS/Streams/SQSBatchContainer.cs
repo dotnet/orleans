@@ -7,6 +7,9 @@ using Orleans.Streams;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using Amazon.SQS;
+using Amazon.SQS.Model;
 using SQSMessage = Amazon.SQS.Model.Message;
 
 namespace OrleansAWSUtils.Streams
@@ -62,17 +65,17 @@ namespace OrleansAWSUtils.Streams
 
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
-            static StreamSequenceToken CreateStreamSequenceToken(StreamSequenceToken tok, int eventIndex)
+            static StreamSequenceToken CreateStreamSequenceToken(StreamId streamId, StreamSequenceToken tok, int eventIndex)
             {
                 return tok switch
                 {
                     EventSequenceTokenV2 v2Tok => v2Tok.CreateSequenceTokenForEvent(eventIndex),
-                    SQSFIFOSequenceToken fifoTok => fifoTok.CreateSequenceTokenForEvent(eventIndex),
+                    SQSFIFOSequenceToken fifoTok => fifoTok.CreateSequenceTokenForEvent(streamId, eventIndex),
                     _ => throw new NotSupportedException("Unknown SequenceToken provided.")
                 };
             }
 
-            return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, CreateStreamSequenceToken(sequenceToken, i)));
+            return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, CreateStreamSequenceToken(StreamId, sequenceToken, i)));
         }
 
         internal static SQSMessage ToSQSMessage<T>(
@@ -89,7 +92,7 @@ namespace OrleansAWSUtils.Streams
             };
             return new SQSMessage
             {
-                Body = payload.ToString()
+                Body = payload.ToString(),
             };
         }
 
@@ -98,9 +101,15 @@ namespace OrleansAWSUtils.Streams
             var json = JObject.Parse(msg.Body);
             var sqsBatch = serializer.Deserialize(json["payload"].ToObject<byte[]>());
             sqsBatch.Message = msg;
+            
+            if (msg.Attributes.TryGetValue(MessageSystemAttributeName.SequenceNumber, out var fifoSeqNum))
+            {
+                if(!msg.Attributes.TryGetValue(MessageSystemAttributeName.MessageGroupId, out var messageGroupId))
+                    throw new ArgumentException("FIFO SQS message does not have MessageGroupId attribute", nameof(msg));
 
-            if(msg.Attributes.TryGetValue("SequenceNumber", out var fifoSeqNum))
-                sqsBatch.sequenceToken = new SQSFIFOSequenceToken(UInt128.Parse(fifoSeqNum));
+                var streamId = StreamId.Parse(Encoding.UTF8.GetBytes(messageGroupId));
+                sqsBatch.sequenceToken = new SQSFIFOSequenceToken(streamId, UInt128.Parse(fifoSeqNum));
+            }
             else 
                 sqsBatch.sequenceToken = new EventSequenceTokenV2(sequenceNumber);
 
