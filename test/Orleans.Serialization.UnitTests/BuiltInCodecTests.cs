@@ -2215,6 +2215,56 @@ namespace Orleans.Serialization.UnitTests
         protected override Collection<int>[] TestValues => [null, new Collection<int>(), CreateValue(), CreateValue(), CreateValue()];
     }
 
+    [GenerateSerializer]
+    public class TypeWithCollectionBase : Collection<int>
+    {
+        public TypeWithCollectionBase() : this(true) { }
+        public TypeWithCollectionBase(bool addDefaultValue)
+        {
+            if (addDefaultValue)
+            {
+                this.Add(42);
+            }
+        }
+
+        [Id(0)]
+        public int OtherProperty { get; set; }
+
+        public override string ToString() => $"[OtherProperty: {OtherProperty}, Values: [{string.Join(", ", this)}]]";
+    }
+
+    public class CollectionBaseCodecTests(ITestOutputHelper output) : FieldCodecTester<TypeWithCollectionBase, IFieldCodec<TypeWithCollectionBase>>(output)
+    {
+        private static TypeWithCollectionBase AddValues(TypeWithCollectionBase value)
+        {
+            value.Add(1);
+            value.Add(2);
+            value.Add(3);
+            return value;
+        }
+
+        protected override TypeWithCollectionBase[] TestValues => [null, new(), new(addDefaultValue: false), new() { 15 }, AddValues(new() { OtherProperty = 123 })];
+
+        protected override TypeWithCollectionBase CreateValue() => AddValues(new() { OtherProperty = Random.Next() });
+        protected override bool Equals(TypeWithCollectionBase left, TypeWithCollectionBase right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.OtherProperty == right.OtherProperty;
+    }
+
+    public class CollectionBaseCopierTests(ITestOutputHelper output) : CopierTester<TypeWithCollectionBase, IDeepCopier<TypeWithCollectionBase>>(output)
+    {
+        private static TypeWithCollectionBase AddValues(TypeWithCollectionBase value)
+        {
+            value.Add(1);
+            value.Add(2);
+            value.Add(3);
+            return value;
+        }
+
+        protected override TypeWithCollectionBase[] TestValues => [null, new(), new(addDefaultValue: false), new() { 15 }, AddValues(new() { OtherProperty = 123 })];
+
+        protected override TypeWithCollectionBase CreateValue() => AddValues(new() { OtherProperty = Random.Next() });
+        protected override bool Equals(TypeWithCollectionBase left, TypeWithCollectionBase right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.OtherProperty == right.OtherProperty;
+    }
+
     public class ReadOnlyCollectionCodecTests(ITestOutputHelper output) : FieldCodecTester<ReadOnlyCollection<int>, ReadOnlyCollectionCodec<int>>(output)
     {
         protected override ReadOnlyCollection<int> CreateValue()

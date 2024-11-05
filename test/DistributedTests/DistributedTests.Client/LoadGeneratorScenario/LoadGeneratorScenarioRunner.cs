@@ -1,3 +1,5 @@
+using Azure.Identity;
+using DistributedTests.Common;
 using Microsoft.Crank.EventSources;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -11,7 +13,8 @@ namespace DistributedTests.Client.LoadGeneratorScenario
         public string ServiceId { get; set; }
         public string ClusterId { get; set; }
         public int ConnectionsPerEndpoint { get; set; }
-        public SecretConfiguration.SecretSource SecretSource { get;set; }
+        public Uri AzureTableUri { get; set; }
+        public Uri AzureQueueUri { get; set; }
     }
 
     public class LoadGeneratorParameters
@@ -35,16 +38,17 @@ namespace DistributedTests.Client.LoadGeneratorScenario
 
         public async Task Run(ClientParameters clientParams, LoadGeneratorParameters loadParams)
         {
+            Console.WriteLine($"AzureTableUri: {clientParams.AzureTableUri}");
+
             // Register the measurements. n0 -> format as natural number
             BenchmarksEventSource.Register("requests", Operations.Sum, Operations.Sum, "Requests", "Number of requests completed", "n0");
             BenchmarksEventSource.Register("failures", Operations.Sum, Operations.Sum, "Failures", "Number of failures", "n0");
             BenchmarksEventSource.Register("rps", Operations.Sum, Operations.Median, "Median RPS", "Rate per second", "n0");
 
-            var secrets = SecretConfiguration.Load(clientParams.SecretSource);
             var hostBuilder = new HostBuilder().UseOrleansClient((ctx, builder) =>
                 builder.Configure<ClusterOptions>(options => { options.ClusterId = clientParams.ClusterId; options.ServiceId = clientParams.ServiceId; })
                        .Configure<ConnectionOptions>(options => clientParams.ConnectionsPerEndpoint = 2)
-                       .UseAzureStorageClustering(options => options.TableServiceClient = new(secrets.ClusteringConnectionString)));
+                       .UseAzureStorageClustering(options => options.TableServiceClient = clientParams.AzureTableUri.CreateTableServiceClient()));
             using var host = hostBuilder.Build();
 
             _logger.LogInformation("Connecting to cluster...");

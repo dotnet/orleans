@@ -77,6 +77,27 @@ namespace Orleans.Runtime
             return _initialized.Task;
         }
 
+        public async Task StopAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                _cancellation.Cancel();
+
+                if (_runTask is { IsCompleted: false } _task)
+                {
+                    await _task.WaitAsync(cancellationToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation("Graceful shutdown of cluster manifest provider was canceled.");
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Error stopping cluster manifest provider.");
+            }
+        }
+
         private async Task RunAsync()
         {
             try

@@ -176,7 +176,7 @@ namespace Orleans.Runtime.Messaging
             //    connected to that gateway)
             // So, if the TargetGrain is a SystemTarget we always trust the value from Message.TargetSilo and forward
             // it to this address...
-            // EXCEPT if the value is equal to the current GatewayAdress: in this case we will return
+            // EXCEPT if the value is equal to the current GatewayAddress: in this case we will return
             // null and the local dispatcher will forward the Message to a local SystemTarget activation
             if (msg.TargetGrain.IsSystemTarget() && !IsTargetingLocalGateway(msg.TargetSilo))
             {
