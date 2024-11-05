@@ -1,9 +1,11 @@
+using Orleans.Storage;
+
 namespace Orleans.Storage
 {
     /// <summary>
-    /// Orleans v3-compatible hasher implementation which can be used in Orleans v3 -> v7 migration scenarios without persistent data loss.
+    /// Orleans v3-compatible hasher implementation for non-string-only grain key ids.
     /// </summary>
-    public class Orleans3CompatibleHasher : IHasher
+    internal class Orleans3CompatibleHasher : IHasher
     {
         /// <summary>
         /// <see cref="IHasher.Description"/>

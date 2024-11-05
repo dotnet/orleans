@@ -104,7 +104,8 @@ namespace Orleans.Configuration
             if (options.HashPicker != null)
                 return;
 
-            options.HashPicker = new StorageHasherPicker(new[] { new OrleansDefaultHasher() });
+            // content-aware hashing with different pickers, unable to use standard StorageHasherPicker
+            options.HashPicker = new Orleans3CompatibleStorageHashPicker();
         }
     }
 }
