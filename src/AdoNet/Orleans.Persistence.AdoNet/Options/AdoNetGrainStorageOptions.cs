@@ -50,7 +50,7 @@ namespace Orleans.Configuration
         /// </summary>
         public void UseOrleans3CompatibleHasher()
         {
-            this.HashPicker = new StorageHasherPicker(new[] { new Orleans3CompatibleHasher() });
+            this.HashPicker = new Orleans3CompatibleStorageHashPicker();
         }
     }
 
