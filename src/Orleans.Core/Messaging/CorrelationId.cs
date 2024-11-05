@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 
 #nullable enable
 namespace Orleans.Runtime
@@ -28,13 +29,21 @@ namespace Orleans.Runtime
 
         public int CompareTo(CorrelationId other) => id.CompareTo(other.id);
 
-        public override string ToString() => id.ToString();
+        public override string ToString() => id.ToString("X16");
 
-        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => id.ToString(format, formatProvider);
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => id.ToString(format ?? "X16", formatProvider);
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
-            => id.TryFormat(destination, out charsWritten, format, provider);
+        {
+            if (format.IsEmpty)
+            {
+                format = "X16";
+            }
 
+            return id.TryFormat(destination, out charsWritten, format, provider);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal long ToInt64() => id;
     }
 }
