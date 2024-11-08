@@ -44,14 +44,12 @@ namespace Orleans.Storage
             var extendedLength = data.Length + 8;
 
             const int maxOnStack = 256;
-            var rentedBuffer = extendedLength > maxOnStack
-                ? ArrayPool<byte>.Shared.Rent(extendedLength)
-                : null;
+            byte[] rentedBuffer = null;
 
             // assuming code below never throws, so calling ArrayPool.Return without try/finally block for JIT optimization
 
-            var buffer = rentedBuffer is not null
-                ? rentedBuffer.AsSpan()
+            var buffer = extendedLength > maxOnStack
+                ? (rentedBuffer = ArrayPool<byte>.Shared.Rent(extendedLength)).AsSpan()
                 : stackalloc byte[maxOnStack];
 
             buffer = buffer[..extendedLength];
@@ -79,14 +77,12 @@ namespace Orleans.Storage
                 return false;
 
             const int maxOnStack = 256;
-            var rentedBuffer = grainTypeByteCount > maxOnStack
-                ? ArrayPool<byte>.Shared.Rent(grainTypeByteCount)
-                : null;
+            byte[] rentedBuffer = null;
 
             // assuming code below never throws, so calling ArrayPool.Return without try/finally block for JIT optimization
 
-            var buffer = rentedBuffer is not null
-                ? rentedBuffer.AsSpan()
+            var buffer = grainTypeByteCount > maxOnStack
+                ? (rentedBuffer = ArrayPool<byte>.Shared.Rent(grainTypeByteCount)).AsSpan()
                 : stackalloc byte[maxOnStack];
 
             buffer = buffer[..grainTypeByteCount];
