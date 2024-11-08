@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Text;
 
 namespace Orleans.Storage
@@ -37,17 +38,63 @@ namespace Orleans.Storage
             // PickHasher parameters are the same for both calls so we need to analyze data content to distinguish these cases.
             // It doesn't word if string key is equal to grain type name, but we consider this edge case to be negligibly rare.
 
-            // reducing allocations if data is not a grain type
-            if (data.Length >= _grainType.Length && Encoding.UTF8.GetByteCount(_grainType) == data.Length)
+            if (IsGrainTypeName(data))
+                return _innerHasher.Hash(data);
+
+            var extendedLength = data.Length + 8;
+            if (extendedLength <= 256)
             {
-                var grainTypeBytes = Encoding.UTF8.GetBytes(_grainType);
-                if (grainTypeBytes.AsSpan().SequenceEqual(data))
-                    return _innerHasher.Hash(data);
+                Span<byte> extended = stackalloc byte[extendedLength];
+                data.AsSpan().CopyTo(extended);
+                return _innerHasher.Hash(extended);
             }
 
-            var extendedData = new byte[data.Length + 8];
-            data.CopyTo(extendedData, 0);
-            return _innerHasher.Hash(extendedData);
+            var buffer = ArrayPool<byte>.Shared.Rent(extendedLength);
+            try
+            {
+                data.AsSpan().CopyTo(buffer);
+                Array.Clear(buffer, data.Length, 8);
+                return _innerHasher.Hash(buffer.AsSpan(0, extendedLength));
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
+        }
+
+        private bool IsGrainTypeName(byte[] data)
+        {
+            // at least 1 byte per char
+            if (data.Length < _grainType.Length)
+                return false;
+
+            var grainTypeByteCount = Encoding.UTF8.GetByteCount(_grainType);
+            if (grainTypeByteCount != data.Length)
+                return false;
+
+            if (grainTypeByteCount <= 256)
+            {
+                Span<byte> grainTypeBytes = stackalloc byte[grainTypeByteCount];
+                if (!Encoding.UTF8.TryGetBytes(_grainType, grainTypeBytes, out _))
+                    throw new InvalidOperationException();
+
+                return grainTypeBytes.SequenceEqual(data);
+            }
+
+            var buffer = ArrayPool<byte>.Shared.Rent(grainTypeByteCount);
+            try
+            {
+                var grainTypeBytes = buffer.AsSpan(0, grainTypeByteCount);
+
+                if (!Encoding.UTF8.TryGetBytes(_grainType, grainTypeBytes, out _))
+                    throw new InvalidOperationException();
+
+                return grainTypeBytes.SequenceEqual(data);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
         }
     }
 }
