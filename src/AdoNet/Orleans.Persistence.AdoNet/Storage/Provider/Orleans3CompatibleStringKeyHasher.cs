@@ -42,24 +42,34 @@ namespace Orleans.Storage
                 return _innerHasher.Hash(data);
 
             var extendedLength = data.Length + 8;
-            if (extendedLength <= 256)
+
+            var buffer = extendedLength switch
             {
-                Span<byte> extended = stackalloc byte[extendedLength];
-                data.AsSpan().CopyTo(extended);
-                return _innerHasher.Hash(extended);
+                <= 32 => stackalloc byte[32],
+                <= 64 => stackalloc byte[64],
+                <= 128 => stackalloc byte[128],
+                <= 256 => stackalloc byte[256],
+                _ => Span<byte>.Empty
+            };
+
+            byte[] rentedBuffer = null;
+            if (buffer.IsEmpty)
+            {
+                // assuming code below never throws, so calling ArrayPool.Return without try/finally block for JIT optimization
+                rentedBuffer = ArrayPool<byte>.Shared.Rent(extendedLength);
+                buffer = rentedBuffer.AsSpan();
             }
 
-            var buffer = ArrayPool<byte>.Shared.Rent(extendedLength);
-            try
-            {
-                data.AsSpan().CopyTo(buffer);
-                Array.Clear(buffer, data.Length, 8);
-                return _innerHasher.Hash(buffer.AsSpan(0, extendedLength));
-            }
-            finally
-            {
-                ArrayPool<byte>.Shared.Return(buffer);
-            }
+            data.AsSpan().CopyTo(buffer);
+            // buffer may contain arbitrary data, setting zeros in 'extension' segment
+            buffer.Slice(data.Length, 8).Clear();
+
+            var hash = _innerHasher.Hash(buffer[..extendedLength]);
+
+            if (rentedBuffer is not null)
+                ArrayPool<byte>.Shared.Return(rentedBuffer);
+
+            return hash;
         }
 
         private bool IsGrainTypeName(byte[] data)
@@ -72,29 +82,29 @@ namespace Orleans.Storage
             if (grainTypeByteCount != data.Length)
                 return false;
 
-            if (grainTypeByteCount <= 256)
+            var buffer = grainTypeByteCount switch
             {
-                Span<byte> grainTypeBytes = stackalloc byte[grainTypeByteCount];
-                if (!Encoding.UTF8.TryGetBytes(_grainType, grainTypeBytes, out _))
-                    throw new InvalidOperationException();
+                <= 32 => stackalloc byte[32],
+                <= 64 => stackalloc byte[64],
+                <= 128 => stackalloc byte[128],
+                <= 256 => stackalloc byte[256],
+                _ => Span<byte>.Empty
+            };
 
-                return grainTypeBytes.SequenceEqual(data);
+            byte[] rentedBuffer = null;
+            if (buffer.IsEmpty)
+            {
+                // assuming code below never throws, so calling ArrayPool.Return without try/finally block for JIT optimization
+                rentedBuffer = ArrayPool<byte>.Shared.Rent(grainTypeByteCount);
+                buffer = rentedBuffer.AsSpan();
             }
 
-            var buffer = ArrayPool<byte>.Shared.Rent(grainTypeByteCount);
-            try
-            {
-                var grainTypeBytes = buffer.AsSpan(0, grainTypeByteCount);
+            var bytesWritten = Encoding.UTF8.GetBytes(_grainType, buffer);
+            var isGrainType = buffer[..bytesWritten].SequenceEqual(data);
+            if (rentedBuffer is not null)
+                ArrayPool<byte>.Shared.Return(rentedBuffer);
 
-                if (!Encoding.UTF8.TryGetBytes(_grainType, grainTypeBytes, out _))
-                    throw new InvalidOperationException();
-
-                return grainTypeBytes.SequenceEqual(data);
-            }
-            finally
-            {
-                ArrayPool<byte>.Shared.Return(buffer);
-            }
+            return isGrainType;
         }
     }
 }

@@ -5,11 +5,16 @@ namespace Orleans.Storage
     // Based on the version in http://home.comcast.net/~bretm/hash/7.html, which is based on that
     // in http://burtleburtle.net/bob/hash/evahash.html.
     // Note that we only use the version that takes three ulongs, which was written by the Orleans team.
-    // implementation restored from Orleans v3.7.2: https://github.com/dotnet/orleans/blob/b24e446abfd883f0e4ed614f5267eaa3331548dc/src/Orleans.Core.Abstractions/IDs/JenkinsHash.cs
+    // implementation restored from Orleans v3.7.2: https://github.com/dotnet/orleans/blob/b24e446abfd883f0e4ed614f5267eaa3331548dc/src/Orleans.Core.Abstractions/IDs/JenkinsHash.cs,
+    // trimmed and slightly optimized
     internal static class JenkinsHash
     {
-        private static void Mix(ref uint a, ref uint b, ref uint c)
+        private static void Mix(ref uint aa, ref uint bb, ref uint cc)
         {
+            uint a = aa;
+            uint b = bb;
+            uint c = cc;
+
             a -= b; a -= c; a ^= (c >> 13);
             b -= c; b -= a; b ^= (a << 8);
             c -= a; c -= b; c ^= (b >> 13);
@@ -19,6 +24,10 @@ namespace Orleans.Storage
             a -= b; a -= c; a ^= (c >> 3);
             b -= c; b -= a; b ^= (a << 10);
             c -= a; c -= b; c ^= (b >> 15);
+
+            aa = a;
+            bb = b;
+            cc = c;
         }
 
         // This is the reference implementation of the Jenkins hash.
@@ -30,7 +39,7 @@ namespace Orleans.Storage
             uint c = 0;
             int i = 0;
 
-            while (i + 12 <= len)
+            while (i <= len - 12)
             {
                 a += (uint)data[i++] |
                     ((uint)data[i++] << 8) |
