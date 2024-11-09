@@ -1,4 +1,3 @@
-using Orleans.Concurrency;
 using Orleans.Metadata;
 using Orleans.Placement;
 using System;
@@ -15,31 +14,39 @@ internal sealed class GrainMigratabilityChecker(
     IClusterManifestProvider clusterManifestProvider,
     TimeProvider timeProvider)
 {
+    // We override equality and hashcode as this type is used as the dictionary key,
+    // and record structs use default equality comparer, which for an enum is not that great for performance.
+    private readonly record struct StatusKey(uint Hash, ImmovableKind Kind) : IEquatable<StatusKey>
+    {
+        public bool Equals(StatusKey other) => Hash == other.Hash && Kind == other.Kind;
+        public override int GetHashCode() => HashCode.Combine(Hash, Kind);
+    }
+
     private readonly GrainManifest _localManifest = clusterManifestProvider.LocalGrainManifest;
     private readonly PlacementStrategyResolver _strategyResolver = strategyResolver;
     private readonly TimeProvider _timeProvider = timeProvider;
-    private readonly ConcurrentDictionary<uint, bool> _migratableStatuses = new();
-    private FrozenDictionary<uint, bool>? _migratableStatusesCache;
+    private readonly ConcurrentDictionary<StatusKey, bool> _migratableStatuses = new();
+    private FrozenDictionary<StatusKey, bool>? _migratableStatusesCache;
     private long _lastRegeneratedCacheTimestamp = timeProvider.GetTimestamp();
 
     public bool IsMigratable(GrainType grainType, ImmovableKind expectedKind)
     {
-        var hash = grainType.GetUniformHashCode();
-        if (_migratableStatusesCache is { } cache && cache.TryGetValue(hash, out var isMigratable))
+        var statusKey = new StatusKey(grainType.GetUniformHashCode(), expectedKind);
+        if (_migratableStatusesCache is { } cache && cache.TryGetValue(statusKey, out var isMigratable))
         {
             return isMigratable;
         }
 
-        return IsMigratableRare(grainType, hash);
+        return IsMigratableRare(grainType, statusKey);
 
-        bool IsMigratableRare(GrainType grainType, uint hash)
+        bool IsMigratableRare(GrainType grainType, StatusKey statusKey)
         {
             // _migratableStatuses holds statuses for each grain type if its migratable type or not, so we can make fast lookups.
             // since we don't anticipate a huge number of grain *types*, i think its just fine to have this in place as fast-check.
-            if (!_migratableStatuses.TryGetValue(hash, out var isMigratable))
+            if (!_migratableStatuses.TryGetValue(statusKey, out var isMigratable))
             {
                 isMigratable = !(grainType.IsClient() || grainType.IsSystemTarget() || grainType.IsGrainService() || IsStatelessWorker(grainType) || IsImmovable(grainType));
-                _migratableStatuses.TryAdd(hash, isMigratable);
+                _migratableStatuses.TryAdd(statusKey, isMigratable);
             }
 
             // Regenerate the cache periodically.
