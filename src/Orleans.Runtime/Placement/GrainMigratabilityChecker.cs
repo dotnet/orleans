@@ -16,10 +16,10 @@ internal sealed class GrainMigratabilityChecker(
 {
     // We override equality and hashcode as this type is used as the dictionary key,
     // and record structs use default equality comparer, which for an enum is not that great for performance.
-    private readonly record struct StatusKey(uint Hash, ImmovableKind Kind) : IEquatable<StatusKey>
+    private readonly record struct StatusKey(GrainType Type, ImmovableKind Kind) : IEquatable<StatusKey>
     {
-        public bool Equals(StatusKey other) => Hash == other.Hash && Kind == other.Kind;
-        public override int GetHashCode() => HashCode.Combine(Hash, Kind);
+        public bool Equals(StatusKey other) => Type == other.Type && Kind == other.Kind;
+        public override int GetHashCode() => HashCode.Combine(Type.GetUniformHashCode(), Kind);
     }
 
     private readonly GrainManifest _localManifest = clusterManifestProvider.LocalGrainManifest;
@@ -31,7 +31,7 @@ internal sealed class GrainMigratabilityChecker(
 
     public bool IsMigratable(GrainType grainType, ImmovableKind expectedKind)
     {
-        var statusKey = new StatusKey(grainType.GetUniformHashCode(), expectedKind);
+        var statusKey = new StatusKey(grainType, expectedKind);
         if (_migratableStatusesCache is { } cache && cache.TryGetValue(statusKey, out var isMigratable))
         {
             return isMigratable;
