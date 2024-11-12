@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Orleans.Metadata;
 using Orleans.Runtime;
+using static Orleans.Placement.ImmovableAttribute;
 
 namespace Orleans.Placement
 {
@@ -113,14 +114,40 @@ namespace Orleans.Placement
     }
 
     /// <summary>
-    /// Ensures that when active-rebalancing is enabled, activations of this grain type will not be migrated automatically.
+    /// Ensures that activations of this grain type will not be migrated automatically.
     /// </summary>
     /// <remarks>Activations can still be migrated by user initiated code.</remarks>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
-    public sealed class ImmovableAttribute : Attribute, IGrainPropertiesProviderAttribute
+    public sealed class ImmovableAttribute(ImmovableKind kind = ImmovableKind.Any)
+        : Attribute, IGrainPropertiesProviderAttribute
     {
+        /// <summary>
+        /// The kind of immovability.
+        /// </summary>
+        public ImmovableKind Kind { get; } = kind;
+
         /// <inheritdoc/>
         public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
-            => properties[WellKnownGrainTypeProperties.Immovable] = "true";
+            => properties[WellKnownGrainTypeProperties.Immovable] = ((byte)Kind).ToString();
+    }
+
+    /// <summary>
+    /// Emphasizes that immovability is restricted to certain components.
+    /// </summary>
+    [Flags]
+    public enum ImmovableKind : byte
+    {
+        /// <summary>
+        /// Activations of this grain type will not be migrated by the repartitioner.
+        /// </summary>
+        Repartitioner = 1,
+        /// <summary>
+        /// Activations of this grain type will not be migrated by the rebalancer.
+        /// </summary>
+        Rebalancer = 2,
+        /// <summary>
+        /// Activations of this grain type will not be migrated by anything.
+        /// </summary>
+        Any = Repartitioner | Rebalancer
     }
 }
