@@ -16,6 +16,7 @@ using Orleans.Configuration.Overrides;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Providers.Azure;
 using Orleans.Runtime;
+using Orleans.Serialization.Serializers;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace Orleans.Storage
@@ -28,6 +29,7 @@ namespace Orleans.Storage
         private readonly AzureTableStorageOptions options;
         private readonly ClusterOptions clusterOptions;
         private readonly IGrainStorageSerializer storageSerializer;
+        private readonly IActivatorProvider activatorProvider;
         private readonly ILogger logger;
 
         private GrainStateTableDataManager tableDataManager;
@@ -55,6 +57,7 @@ namespace Orleans.Storage
             this.clusterOptions = clusterOptions.Value;
             this.name = name;
             this.storageSerializer = options.GrainStorageSerializer;
+            this.activatorProvider = services.GetRequiredService<IActivatorProvider>();
             this.logger = logger;
         }
 
@@ -80,6 +83,12 @@ namespace Orleans.Storage
                 grainState.RecordExists = loadedState != null;
                 grainState.State = loadedState ?? Activator.CreateInstance<T>();
                 grainState.ETag = entity.ETag.ToString();
+            }
+            else
+            {
+                grainState.RecordExists = false;
+                grainState.ETag = null;
+                grainState.State = this.activatorProvider.GetActivator<T>().Create();
             }
             // Else leave grainState in previous default condition
         }
@@ -160,6 +169,7 @@ namespace Orleans.Storage
                 else
                 {
                     await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                    grainState.State = this.activatorProvider.GetActivator<T>().Create();
                 }
 
                 grainState.ETag = entity.ETag.ToString(); // Update in-memory data to the new ETag
@@ -351,7 +361,8 @@ namespace Orleans.Storage
                 var input = binaryData.Length > 0
                     ? new BinaryData(binaryData)
                     : new BinaryData(stringData);
-                dataValue = this.storageSerializer.Deserialize<T>(input);
+                if(input.Length > 0)
+                    dataValue = this.storageSerializer.Deserialize<T>(input);
             }
             catch (Exception exc)
             {
