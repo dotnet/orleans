@@ -50,6 +50,7 @@ namespace Orleans.Configuration
         /// </summary>
         public void UseOrleans3CompatibleHasher()
         {
+            // content-aware hashing with different pickers, unable to use standard StorageHasherPicker
             this.HashPicker = new Orleans3CompatibleStorageHashPicker();
         }
     }
@@ -104,7 +105,7 @@ namespace Orleans.Configuration
             if (options.HashPicker != null)
                 return;
 
-            // content-aware hashing with different pickers, unable to use standard StorageHasherPicker
+            // set default IHashPicker if not configured yet
             options.HashPicker = new StorageHasherPicker(new[] { new OrleansDefaultHasher() });
         }
     }
