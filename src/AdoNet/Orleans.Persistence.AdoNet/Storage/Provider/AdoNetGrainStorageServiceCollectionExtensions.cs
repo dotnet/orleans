@@ -61,6 +61,7 @@ namespace Orleans.Hosting
             configureOptions?.Invoke(services.AddOptions<AdoNetGrainStorageOptions>(name));
             services.ConfigureNamedOptionForLogging<AdoNetGrainStorageOptions>(name);
             services.AddTransient<IPostConfigureOptions<AdoNetGrainStorageOptions>, DefaultStorageProviderSerializerOptionsConfigurator<AdoNetGrainStorageOptions>>();
+            services.AddTransient<IPostConfigureOptions<AdoNetGrainStorageOptions>, DefaultAdoNetGrainStorageOptionsHashPickerConfigurator>();
             services.AddTransient<IConfigurationValidator>(sp => new AdoNetGrainStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AdoNetGrainStorageOptions>>().Get(name), name));
             return services.AddGrainStorage(name, AdoNetGrainStorageFactory.Create);
         }
