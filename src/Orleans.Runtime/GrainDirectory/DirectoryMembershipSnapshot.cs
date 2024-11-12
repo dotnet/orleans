@@ -52,7 +52,7 @@ internal sealed class DirectoryMembershipSnapshot
             {
                 var hashCode = hashCodes[partitionIndex];
                 hashIndexPairs.Add((hashCode, memberIndex, partitionIndex));
-                partitionReferences.Add(grainFactory?.GetSystemTarget<IGrainDirectoryPartition>(GrainDirectoryReplica.CreateGrainId(activeMember, partitionIndex).GrainId)!);
+                partitionReferences.Add(grainFactory?.GetSystemTarget<IGrainDirectoryPartition>(GrainDirectoryPartition.CreateGrainId(activeMember, partitionIndex).GrainId)!);
             }
 
             memberPartitions.Add(partitionReferences.ToImmutable());

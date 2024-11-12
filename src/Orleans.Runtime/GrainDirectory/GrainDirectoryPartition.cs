@@ -20,7 +20,7 @@ namespace Orleans.Runtime.GrainDirectory;
 /// Represents a single contiguous partition of the distributed grain directory.
 /// </summary>
 /// <param name="partitionIndex">The index of this partition on this silo. Each silo hosts a fixed number of dynamically sized partitions.</param>
-internal sealed partial class GrainDirectoryReplica(
+internal sealed partial class GrainDirectoryPartition(
     int partitionIndex,
     DistributedGrainDirectory owner,
     ILocalSiloDetails localSiloDetails,
@@ -37,18 +37,18 @@ internal sealed partial class GrainDirectoryReplica(
     private readonly IInternalGrainFactory _grainFactory = grainFactory;
     private readonly CancellationTokenSource _drainSnapshotsCts = new();
     private readonly SiloAddress _id = localSiloDetails.SiloAddress;
-    private readonly ILogger<GrainDirectoryReplica> _logger = loggerFactory.CreateLogger<GrainDirectoryReplica>();
+    private readonly ILogger<GrainDirectoryPartition> _logger = loggerFactory.CreateLogger<GrainDirectoryPartition>();
     private readonly TaskCompletionSource _snapshotsDrainedTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly AsyncEnumerable<DirectoryMembershipSnapshot> _viewUpdates = new(
         DirectoryMembershipSnapshot.Default,
         (previous, proposed) => proposed.Version >= previous.Version,
         _ => { });
 
-    // Ranges which cannot be served currently, eg because the replica is currently transferring them from a previous owner.
+    // Ranges which cannot be served currently, eg because the partition is currently transferring them from a previous owner.
     // Requests in these ranges must wait for the range to become available.
     private readonly List<(RingRange Range, MembershipVersion Version, TaskCompletionSource Completion)> _rangeLocks = [];
 
-    // Ranges which were previously at least partially owned by this replica, but which are pending transfer to a new replica.  
+    // Ranges which were previously at least partially owned by this partition, but which are pending transfer to a new partition.  
     private readonly List<PartitionSnapshotState> _partitionSnapshots = [];
 
     // Tracked for diagnostic purposes only.
@@ -114,7 +114,7 @@ internal sealed partial class GrainDirectoryReplica(
             return rangeSnapshot;
         }
 
-        _logger.LogWarning("Received a request for a snapshot which this replica does not have, version '{Version}', range version '{RangeVersion}', range '{Range}'.", version, rangeVersion, range);
+        _logger.LogWarning("Received a request for a snapshot which this partition does not have, version '{Version}', range version '{RangeVersion}', range '{Range}'.", version, rangeVersion, range);
         return null;
     }
 
@@ -229,7 +229,7 @@ internal sealed partial class GrainDirectoryReplica(
         }
     }
 
-    public IGrainDirectoryPartition GetReplicaReference(SiloAddress address, int partitionIndex) => _grainFactory.GetSystemTarget<IGrainDirectoryPartition>(CreateGrainId(address, partitionIndex).GrainId);
+    public IGrainDirectoryPartition GetPartitionReference(SiloAddress address, int partitionIndex) => _grainFactory.GetSystemTarget<IGrainDirectoryPartition>(CreateGrainId(address, partitionIndex).GrainId);
 
     internal async Task OnShuttingDown(CancellationToken token)
     {
@@ -298,7 +298,7 @@ internal sealed partial class GrainDirectoryReplica(
                     _logger.LogWarning(exception, "Error waiting for range to unlock.");
                 }
 
-                // Remove all snapshots that are associated with the given replica prior or equal to the specified version.
+                // Remove all snapshots that are associated with the given partition prior or equal to the specified version.
                 RemoveSnapshotTransferPartner(
                     (Version: version, SiloAddress: siloAddress, PartitionIndex: partitionIndex),
                     snapshotFilter: (state, snapshot) => snapshot.DirectoryMembershipVersion <= state.Version,
@@ -531,7 +531,7 @@ internal sealed partial class GrainDirectoryReplica(
         DirectoryInstruments.RangeLockHeldDuration.Record((long)heldDuration.TotalMilliseconds);
         if (ShutdownToken.IsCancellationRequested)
         {
-            // If the replica is stopped, the range is never unlocked and the task is cancelled instead.
+            // If the partition is stopped, the range is never unlocked and the task is cancelled instead.
             tcs.SetCanceled(ShutdownToken);
         }
         else
@@ -551,10 +551,10 @@ internal sealed partial class GrainDirectoryReplica(
                 _logger.LogTrace("Requesting entries for ranges '{Range}' from '{PreviousOwner}' at version '{PreviousVersion}'.", addedRange, previousOwner, previousVersion);
             }
 
-            var replica = GetReplicaReference(previousOwner, partitionIndex);
+            var partition = GetPartitionReference(previousOwner, partitionIndex);
 
             // Alternatively, the previous owner could push the snapshot. The pull-based approach is used here because it is simpler.
-            var snapshot = await replica.GetSnapshotAsync(current.Version, previousVersion, addedRange).AsTask().WaitAsync(ShutdownToken);
+            var snapshot = await partition.GetSnapshotAsync(current.Version, previousVersion, addedRange).AsTask().WaitAsync(ShutdownToken);
 
             if (snapshot is null)
             {
@@ -565,7 +565,7 @@ internal sealed partial class GrainDirectoryReplica(
             // The acknowledgement step lets the previous owner know that the snapshot has been received so that it can proceed.
             InvokeOnClusterMember(
                 previousOwner,
-                async () => await replica.AcknowledgeSnapshotTransferAsync(_id, _partitionIndex, previousVersion),
+                async () => await partition.AcknowledgeSnapshotTransferAsync(_id, _partitionIndex, previousVersion),
                 false,
                 nameof(IGrainDirectoryPartition.AcknowledgeSnapshotTransferAsync)).Ignore();
 
