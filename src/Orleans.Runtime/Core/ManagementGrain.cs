@@ -60,8 +60,6 @@ namespace Orleans.Runtime.Management
 
         public async Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false)
         {
-            logger.LogInformation("GetDetailedHosts OnlyActive={OnlyActive}", onlyActive);
-
             await this.membershipTableManager.Refresh();
 
             var table = this.membershipTableManager.MembershipTableSnapshot;

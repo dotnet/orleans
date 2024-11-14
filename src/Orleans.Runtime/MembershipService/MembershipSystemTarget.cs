@@ -158,10 +158,10 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exception)
             {
-                this.log.LogError(
+                this.log.LogWarning(
                     (int)ErrorCode.MembershipGossipSendFailure,
                     exception,
-                    "Exception while sending gossip notification to remote silo {Silo}",
+                    "Error sending gossip notification to remote silo '{Silo}'.",
                     silo);
             }
         }
@@ -177,7 +177,7 @@ namespace Orleans.Runtime.MembershipService
                 this.log.LogError(
                     (int)ErrorCode.MembershipGossipProcessingFailure,
                     exception,
-                    "Error refreshing membership table");
+                    "Error refreshing membership table.");
             }
         }
 

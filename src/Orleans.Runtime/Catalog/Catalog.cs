@@ -166,6 +166,7 @@ namespace Orleans.Runtime
                         ActivationId = ActivationId.NewId(),
                         MembershipVersion = MembershipVersion.MinValue,
                     };
+
                     result = this.grainActivator.CreateInstance(address);
                     activations.RecordNewTarget(result);
                 }

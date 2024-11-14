@@ -258,7 +258,7 @@ namespace Orleans.Runtime.MembershipService
                     }
                     catch (Exception exception)
                     {
-                        this.log.LogError(
+                        this.log.LogWarning(
                             (int)ErrorCode.MembershipUpdateIAmAliveFailure,
                             exception,
                             "Failed to refresh membership table, will retry shortly");
@@ -270,7 +270,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
             {
-                this.log.LogError(exception, "Error refreshing membership table");
+                this.log.LogWarning(exception, "Error refreshing membership table");
                 this.fatalErrorHandler.OnFatalException(this, nameof(PeriodicallyRefreshMembershipTable), exception);
             }
             finally
@@ -363,7 +363,7 @@ namespace Orleans.Runtime.MembershipService
                 else
                 {
                     wasThrownLocally = true;
-                    log.LogError(
+                    log.LogInformation(
                         (int)ErrorCode.MembershipFailedToWriteConditional,
                         "Silo {MyAddress} failed to update its status to {Status} in the membership table due to write contention on the table after {NumCalls} attempts.",
                         myAddress,
@@ -374,7 +374,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)  when (!wasThrownLocally)
             {
-                log.LogError(
+                log.LogWarning(
                     (int)ErrorCode.MembershipFailedToWrite,
                     exc,
                     "Silo {MyAddress} failed to update its status to {Status} in the table due to failures (socket failures or table read/write failures) after {NumCalls} attempts",

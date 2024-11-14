@@ -73,7 +73,7 @@ namespace Orleans.Runtime.MembershipService
                     }
                     catch (Exception exception)
                     {
-                        this.log.LogError(
+                        this.log.LogWarning(
                             (int)ErrorCode.MembershipUpdateIAmAliveFailure,
                             exception,
                             "Failed to update table entry for this silo, will retry shortly");
