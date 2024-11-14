@@ -1206,14 +1206,15 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         {
             if (_shared.Logger.IsEnabled(LogLevel.Debug))
             {
-                _shared.Logger.LogDebug("Rehydrating grain from previous activation");
+                _shared.Logger.LogDebug("Rehydrating grain '{GrainContext}' from previous activation.", this);
             }
 
             lock (this)
             {
                 if (State != ActivationState.Creating)
                 {
-                    throw new InvalidOperationException($"Attempted to rehydrate a grain in the {State} state");
+                    _shared.Logger.LogWarning("Ignoring attempt to rehydrate grain '{GrainContext}' in the '{State}' state.", this, State);
+                    return;
                 }
 
                 if (context.TryGetValue(GrainAddressMigrationContextKey, out GrainAddress? previousRegistration) && previousRegistration is not null)
