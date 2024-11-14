@@ -58,6 +58,7 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
     private const int MaxBatchSize = 1_000;
     private readonly ConcurrentDictionary<SiloAddress, (Task PumpTask, Channel<MigrationWorkItem> WorkItemChannel)> _workers = new();
     private readonly ObjectPool<MigrationWorkItem> _workItemPool = ObjectPool.Create(new MigrationWorkItem.ObjectPoolPolicy());
+    private readonly CancellationTokenSource _shuttingDownCts = new();
     private readonly ILogger<ActivationMigrationManager> _logger;
     private readonly IInternalGrainFactory _grainFactory;
     private readonly Catalog _catalog;
@@ -214,7 +215,7 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
                     }
 
                     // Attempt to migrate the batch.
-                    await remote.AcceptMigratingGrains(batch);
+                    await remote.AcceptMigratingGrains(batch).AsTask().WaitAsync(_shuttingDownCts.Token);
 
                     foreach (var item in items)
                     {
@@ -228,7 +229,10 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
                 }
                 catch (Exception exception)
                 {
-                    _logger.LogError(exception, "Error while migrating {Count} grain activations to {SiloAddress}", items.Count, targetSilo);
+                    if (!_shuttingDownCts.IsCancellationRequested)
+                    {
+                        _logger.LogError(exception, "Error while migrating {Count} grain activations to {SiloAddress}", items.Count, targetSilo);
+                    }
 
                     foreach (var item in items)
                     {
@@ -316,7 +320,16 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
             workerTasks.Add(value.PumpTask);
         }
 
-        await Task.WhenAll(workerTasks).WaitAsync(cancellationToken);
+        try
+        {
+            _shuttingDownCts.Cancel();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Error signaling shutdown.");
+        }
+
+        await Task.WhenAll(workerTasks).WaitAsync(cancellationToken).SuppressThrowing();
     }
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
