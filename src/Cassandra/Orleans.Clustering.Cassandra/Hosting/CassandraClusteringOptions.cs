@@ -15,9 +15,9 @@ public class CassandraClusteringOptions
     /// Optionally configure time-to-live behavior for the membership table row data in Cassandra itself, allowing
     /// defunct silo cleanup even if a cluster is no longer running.
     /// <para/>
-    /// When this is <c>true</c>, <see cref="ClusterMembershipOptions.DefunctSiloCleanupPeriod"/> must be non-null as
-    /// well (to verify that defunct cleanup is desired), and only then will the Cassandra TTL be set to
-    /// <see cref="ClusterMembershipOptions.DefunctSiloExpiration"/>.
+    /// When this is <c>true</c>, <see cref="ClusterMembershipOptions.DefunctSiloCleanupPeriod"/> CAN be null to enable
+    /// Cassandra-only defunct silo cleanup. Either way, the Cassandra TTL will still be configured from the
+    /// configured <see cref="ClusterMembershipOptions.DefunctSiloExpiration"/> value.
     /// </summary>
     /// <remarks>
     /// Initial implementation of https://github.com/dotnet/orleans/issues/9164 in that it only affects silo entries
@@ -28,7 +28,7 @@ public class CassandraClusteringOptions
     public bool UseCassandraTtl { get; set; }
 
     internal int? GetCassandraTtlSeconds(ClusterMembershipOptions clusterMembershipOptions) =>
-        UseCassandraTtl && clusterMembershipOptions.DefunctSiloCleanupPeriod.HasValue
+        UseCassandraTtl
             ? Convert.ToInt32(
                 Math.Round(
                     clusterMembershipOptions.DefunctSiloExpiration.TotalSeconds,
