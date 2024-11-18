@@ -337,9 +337,27 @@ namespace Orleans.Runtime.Membership
             return JsonConvert.DeserializeObject<T>(Encoding.UTF8.GetString(data), MembershipSerializerSettings.Instance);
         }
 
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
-            throw new NotImplementedException();
+            await ZooKeeper.Using(this.deploymentConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, this.watcher, async (zk) =>
+            {
+                var childrenResult = await zk.getChildrenAsync(this.clusterPath);
+                var deleteTasks = new List<Task>();
+
+                foreach (var child in childrenResult.Children)
+                {
+                    var rowPath = $"{this.clusterPath}/{child}";
+                    var rowData = await zk.getDataAsync(rowPath);
+                    var membershipEntry = Deserialize<MembershipEntry>(rowData.Data);
+
+                    if (membershipEntry.Status == SiloStatus.Dead && membershipEntry.IAmAliveTime < beforeDate)
+                    {
+                        deleteTasks.Add(ZKUtil.deleteRecursiveAsync(zk, rowPath));
+                    }
+                }
+
+                await Task.WhenAll(deleteTasks);
+            });
         }
     }
 
