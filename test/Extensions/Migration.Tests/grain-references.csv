@@ -138,7 +138,7 @@ UnitTests.GrainInterfaces.ISampleStreaming_ProducerGrain;a6a8932b-e8f1-420e-bef2
 UnitTests.GrainInterfaces.ICreateGrainReferenceTestGrain;166622289;null;{"Id":{"Type":"creategrainreferencetest","Key":"9EE7451"},"Interface":"UnitTests.GrainInterfaces.ICreateGrainReferenceTestGrain"}
 UnitTests.GrainInterfaces.IServiceIdGrain;55fc723f-7d64-420a-9661-0a1c5c93d1a8;null;{"Id":{"Type":"serviceid","Key":"55fc723f7d64420a96610a1c5c93d1a8"},"Interface":"UnitTests.GrainInterfaces.IServiceIdGrain"}
 UnitTests.GrainInterfaces.IPersistenceUserHandledErrorGrain;03a0c37b-fb76-4510-ae23-1b7ca9d72cbd;null;{"Id":{"Type":"persistenceuserhandlederror","Key":"03a0c37bfb764510ae231b7ca9d72cbd"},"Interface":"UnitTests.GrainInterfaces.IPersistenceUserHandledErrorGrain"}
-UnitTests.GrainInterfaces.IClientAddressableTestConsumer;193080663;null;{"Id":{"Type":"clientaddressabletestconsumer","Key":"B822D57"},"Interface":"UnitTests.GrainIntefrfaces.IClientAddressableTestConsumer"}
+UnitTests.GrainInterfaces.IClientAddressableTestConsumer;193080663;null;{"Id":{"Type":"clientaddressabletestconsumer","Key":"B822D57"},"Interface":"UnitTests.GrainInterfaces.IClientAddressableTestConsumer"}
 UnitTests.GrainInterfaces.ITestContentGrain;609768672;null;{"Id":{"Type":"testcontent","Key":"245854E0"},"Interface":"UnitTests.GrainInterfaces.ITestContentGrain"}
 UnitTests.GrainInterfaces.ISlowConsumingGrain;897d3182-7da0-49a3-9849-fa3d0bc84f45;null;{"Id":{"Type":"slowconsuming","Key":"897d31827da049a39849fa3d0bc84f45"},"Interface":"UnitTests.GrainInterfaces.ISlowConsumingGrain"}
 Orleans.SqlUtils.StorageProvider.GrainInterfaces.ICustomerGrain;952648284;null;{"Id":{"Type":"customer","Key":"38C8425C"},"Interface":"Orleans.SqlUtils.StorageProvider.GrainInterfaces.ICustomerGrain"}

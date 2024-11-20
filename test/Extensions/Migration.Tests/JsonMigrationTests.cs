@@ -1,11 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
-using Orleans.Persistence.Migration;
 using Orleans.Persistence.Migration.Serialization;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
-using UnitTests.GrainInterfaces;
 using Xunit;
 
 namespace Migration.Tests
@@ -32,7 +28,7 @@ namespace Migration.Tests
             }
         }
 
-        [SkippableTheory]
+        [Theory]
         [CsvDataReader("grain-references.csv")]
         public void GrainRefenceSerializerTest(Type grainInterfaceType, string key, string keyExt, string expected)
         {
