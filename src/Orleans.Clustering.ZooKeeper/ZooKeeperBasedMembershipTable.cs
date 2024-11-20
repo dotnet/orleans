@@ -320,9 +320,8 @@ public class ZooKeeperBasedMembershipTable : IMembershipTable
 
         foreach (var child in childrenResult.Children)
         {
-            var rowPath = $"{_clusterPath}/{child}";
-            var rowData = await _zk.getDataAsync(rowPath);
-            var membershipEntry = Deserialize<MembershipEntry>(rowData.Data);
+            var siloData = await GetRow(_zk, SiloAddress.FromParsableString(child));
+            var membershipEntry = siloData.Item1;
 
             if (membershipEntry.Status == SiloStatus.Dead && membershipEntry.IAmAliveTime < beforeDate)
             {
@@ -332,7 +331,7 @@ public class ZooKeeperBasedMembershipTable : IMembershipTable
                         membershipEntry.Status,
                         membershipEntry.IAmAliveTime);
 
-                deleteTasks.Add(ZKUtil.deleteRecursiveAsync(_zk, rowPath));
+                deleteTasks.Add(ZKUtil.deleteRecursiveAsync(_zk, $"{_clusterPath}/{child}"));
             }
         }
 
