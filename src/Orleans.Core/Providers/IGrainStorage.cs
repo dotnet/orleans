@@ -5,7 +5,6 @@ using Orleans.Runtime;
 using System.Net;
 using System.Collections.Generic;
 using System.Threading;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Storage
 {
@@ -14,12 +13,21 @@ namespace Orleans.Storage
         public string Name { get; }
         public GrainReference GrainReference { get; }
         public IGrainState GrainState { get; }
+        public StorageMigrationEntryClient MigrationEntryClient { get; }
 
-        public StorageEntry(string name, GrainReference grainReference, IGrainState grainState)
+        public StorageEntry(string name, GrainReference grainReference, IGrainState grainState, StorageMigrationEntryClient migrationEntryClient)
         {
-            this.Name = name;
-            this.GrainReference = grainReference;
-            this.GrainState = grainState;
+            Name = name;
+            GrainReference = grainReference;
+            GrainState = grainState;
+            MigrationEntryClient = migrationEntryClient;
+        }
+
+        public interface StorageMigrationEntryClient
+        {
+            bool IsMigratedEntry { get; }
+
+            Task MarkMigratedAsync(CancellationToken cancellationToken);
         }
     }
 

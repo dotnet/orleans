@@ -1,9 +1,10 @@
-using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Persistence.Migration;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Storage;
@@ -99,6 +100,18 @@ namespace Orleans.Hosting
         public static IServiceCollection AddMigrationAzureBlobGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<AzureBlobStorageOptions>> configureOptions = null)
         {
             return services.AddMigrationAzureBlobGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
+        }
+
+        public static ISiloBuilder AddOfflineMigrator(this ISiloBuilder builder, string oldStorage, string newStorage, OfflineMigrator.Options options)
+            => builder.ConfigureServices(services => services.AddOfflineMigrator(oldStorage, newStorage, options));
+
+        public static IServiceCollection AddOfflineMigrator(this IServiceCollection services, string oldStorageName, string newStorageName, OfflineMigrator.Options options = null)
+        {
+            return services.AddSingleton(sp => new OfflineMigrator(
+                sp.GetService<ILogger<OfflineMigrator>>(),
+                sp.GetRequiredServiceByName<IGrainStorage>(oldStorageName),
+                sp.GetRequiredServiceByName<IGrainStorage>(newStorageName),
+                options));
         }
 
         /// <summary>

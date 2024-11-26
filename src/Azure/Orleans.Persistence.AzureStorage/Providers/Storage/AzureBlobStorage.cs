@@ -15,10 +15,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans.Configuration;
-using Orleans.Persistence.AzureStorage;
+using Orleans.Persistence.AzureStorage.Providers.Storage;
 using Orleans.Providers.Azure;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
@@ -29,6 +28,8 @@ namespace Orleans.Storage
     /// </summary>
     public class AzureBlobGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
+        static Regex _pickAllBlobsRegex = new Regex("(?<name>[^-]+)-(?<reference>[^-]+).json");
+
         private JsonSerializerSettings jsonSettings;
 
         private BlobContainerClient container;
@@ -314,18 +315,21 @@ namespace Orleans.Storage
 
         public async IAsyncEnumerable<StorageEntry> GetAll([EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            var regex = new Regex("(?<name>[^-]+)-(?<reference>[^-]+).json");
-            await foreach (var item in this.container.GetBlobsAsync(cancellationToken: cancellationToken))
+            await foreach (var blob in this.container.GetBlobsAsync(traits: BlobTraits.Metadata, cancellationToken: cancellationToken))
             {
-                var match = regex.Match(item.Name);
-                if (match.Success)
+                var match = _pickAllBlobsRegex.Match(blob.Name);
+                if (!match.Success)
                 {
-                    var name = match.Groups["name"].Value;
-                    var reference = GrainReference.FromKeyString(match.Groups["reference"].Value, this.grainReferenceRuntime);
-                    var state = new GrainState<object>();
-                    await ReadStateAsync(name, reference, state);
-                    yield return new StorageEntry(name, reference, state);
+                    continue;
                 }
+
+                var name = match.Groups["name"].Value;
+                var reference = GrainReference.FromKeyString(match.Groups["reference"].Value, this.grainReferenceRuntime);
+                var state = new GrainState<object>();
+                await ReadStateAsync(name, reference, state);
+
+                var storageMigrationEntry = new AzureStorageBlobEntryClient(container, blob);
+                yield return new StorageEntry(name, reference, state, storageMigrationEntry);
             }
         }
     }

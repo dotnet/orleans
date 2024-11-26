@@ -6,6 +6,9 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
+#if NET7_0_OR_GREATER
+using Orleans.Persistence.Migration;
+#endif
 
 namespace Tester.AzureUtils.Migration
 {
@@ -67,6 +70,21 @@ namespace Tester.AzureUtils.Migration
                 return this.migrationStorage;
             }
         }
+
+#if NET7_0_OR_GREATER
+        private OfflineMigrator? offlineMigrator;
+        private OfflineMigrator OfflineMigrator
+        {
+            get
+            {
+                if (this.offlineMigrator == null)
+                {
+                    this.offlineMigrator = ServiceProvider.GetRequiredService<OfflineMigrator>();
+                }
+                return this.offlineMigrator;
+            }
+        }
+#endif
 
         protected MigrationBaseTests(BaseAzureTestClusterFixture fixture)
         {
@@ -151,6 +169,69 @@ namespace Tester.AzureUtils.Migration
             await DestinationStorage.ReadStateAsync(stateName, (GrainReference)grain, newGrainState2);
             Assert.False(oldGrainState2.RecordExists);
             Assert.False(newGrainState2.RecordExists);
+        }
+
+#if NET7_0_OR_GREATER
+        [Fact]
+        public async Task OfflineMigrator_SampleRun()
+        {
+            var originalEntries = await GenerateGrainsAndSaveAsync(n: 5);
+
+            var stats = await OfflineMigrator.MigrateAsync(CancellationToken.None);
+            Assert.Equal(originalEntries.Count, stats.MigratedEntries);
+            Assert.Equal(0, stats.SkippedEntries);
+            Assert.Equal(0, stats.FailedEntries);
+
+            var stats2 = await OfflineMigrator.MigrateAsync(CancellationToken.None);
+            Assert.Equal(0, stats2.MigratedEntries);
+            Assert.Equal(originalEntries.Count, stats2.SkippedEntries);
+            Assert.Equal(0, stats2.FailedEntries);
+        }
+#endif
+
+        [Fact]
+        public async Task GetAll_ReturnsAllListedReferences()
+        {
+            var originalEntries = await GenerateGrainsAndSaveAsync();
+
+            var counter = 0;
+            await foreach (var storageEntry in SourceStorage.GetAll(CancellationToken.None))
+            {
+                counter++;
+                Assert.NotNull(storageEntry.GrainReference);
+                Assert.True(originalEntries.ContainsKey(storageEntry.GrainReference.GrainIdentity.PrimaryKey));
+            }
+
+            Assert.Equal(originalEntries.Count, counter);
+        }
+
+        private async Task<IDictionary<Guid, StorageEntryRef>> GenerateGrainsAndSaveAsync(int n = 100)
+        {
+            var random = new Random();
+            var stateName = (typeof(SimplePersistentGrain)).FullName;
+
+            var storageEntries = new Dictionary<Guid, StorageEntryRef>(n);
+            for (int i = 0; i < n; i++)
+            {
+                var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(i);
+                var oldGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
+                var grainReference = (GrainReference)grain;
+                await SourceStorage.WriteStateAsync(stateName, grainReference, oldGrainState);
+
+                storageEntries[grainReference.GrainIdentity.PrimaryKey] = new(grainReference);
+            }
+
+            return storageEntries;
+        }
+
+        struct StorageEntryRef
+        {
+            public GrainReference GrainReference;
+
+            public StorageEntryRef(GrainReference grainReference)
+            {
+                GrainReference = grainReference;
+            }
         }
     }
 }

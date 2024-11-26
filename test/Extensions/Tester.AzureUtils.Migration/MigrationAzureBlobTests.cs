@@ -39,9 +39,10 @@ namespace Tester.AzureUtils.Migration
                     {
                         options.ConfigureTestDefaults();
                         options.ContainerName = $"destination{Guid}";
-                    });
+                    })
+                    .AddOfflineMigrator(SourceStorageName, DestinationStorageName);
             }
-        }
+        }   
 
         public MigrationAzureBlobTests(Fixture fixture) : base(fixture)
         {
