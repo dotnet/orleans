@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>net7.0</TargetFrameworks>
@@ -10,6 +10,7 @@
     <ProjectReference Include="..\..\Orleans.Persistence.Migration\Orleans.Persistence.Migration.csproj" />
     <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
     <ProjectReference Include="..\Orleans.Persistence.AzureStorage\Orleans.Persistence.AzureStorage.csproj" />
+    <ProjectReference Include="..\Orleans.Reminders.AzureStorage\Orleans.Reminders.AzureStorage.csproj" />
   </ItemGroup>
 
   <ItemGroup>

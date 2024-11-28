@@ -29,7 +29,7 @@ namespace Orleans.Persistence.Migration
         /// Careful: is a long-time running operation.<br/>
         /// Goes through all the data items in the old storage and migrates them in a new format to the new storage.
         /// </summary>
-        public async Task<MigrationStats> MigrateAsync(CancellationToken cancellationToken)
+        public async Task<MigrationStats> MigrateGrainsAsync(CancellationToken cancellationToken)
         {
             var migrationStats = new MigrationStats();
             await foreach (var storageEntry in _oldStorage.GetAll(cancellationToken))
@@ -58,6 +58,12 @@ namespace Orleans.Persistence.Migration
             }
 
             return migrationStats;
+        }
+
+        public Task<MigrationStats> MigrateRemindersAsync(CancellationToken cancellationToken)
+        {
+            //
+            throw new NotImplementedException();
         }
 
         public class MigrationStats

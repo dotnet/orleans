@@ -4,8 +4,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Persistence.AzureStorage.Migration.Reminders;
+using Orleans.Persistence.AzureStorage.Migration.Reminders.Storage;
 using Orleans.Persistence.Migration;
 using Orleans.Providers;
+using Orleans.Reminders.AzureStorage;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.Storage.Migration.AzureStorage;
@@ -14,6 +17,8 @@ namespace Orleans.Hosting
 {
     public static class AzureBlobSiloBuilderExtensions
     {
+        #region Grains
+
         /// <summary>
         /// Configure silo to use azure blob storage as the default grain storage.
         /// </summary>
@@ -102,7 +107,7 @@ namespace Orleans.Hosting
             return services.AddMigrationAzureBlobGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
         }
 
-        public static ISiloBuilder AddOfflineMigrator(this ISiloBuilder builder, string oldStorage, string newStorage, OfflineMigrator.Options options)
+        public static ISiloBuilder AddOfflineMigrator(this ISiloBuilder builder, string oldStorage, string newStorage, OfflineMigrator.Options options = null)
             => builder.ConfigureServices(services => services.AddOfflineMigrator(oldStorage, newStorage, options));
 
         public static IServiceCollection AddOfflineMigrator(this IServiceCollection services, string oldStorageName, string newStorageName, OfflineMigrator.Options options = null)
@@ -130,5 +135,38 @@ namespace Orleans.Hosting
             return services.AddSingletonNamedService<IGrainStorage>(name, MigrationAzureBlobGrainStorageFactory.Create)
                            .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
         }
+
+        #endregion
+
+        #region Reminders
+
+        /// <summary>
+        /// Use Azure Table Storage for migrated Reminder's data and current data.
+        /// </summary>
+        public static ISiloBuilder UseMigrationAzureTableReminderStorage(
+            this ISiloBuilder builder,
+            Action<AzureTableReminderStorageOptions> configureStorageOptions,
+            Action<AzureTableMigrationReminderStorageOptions> configureMigratedStorageOptions)
+        {
+            return builder.ConfigureServices(services => services.UseMigrationAzureTableReminderStorage(configureStorageOptions, configureMigratedStorageOptions));
+        }
+
+        /// <summary>
+        /// Use Azure Table Storage for migrated Reminder's data and current data
+        /// </summary>
+        public static IServiceCollection UseMigrationAzureTableReminderStorage(
+            this IServiceCollection services,
+            Action<AzureTableReminderStorageOptions> configureStorageOptions,
+            Action<AzureTableMigrationReminderStorageOptions> configureMigratedStorageOptions)
+        {
+            services.AddSingleton<IReminderTable, MigrationAzureTableReminderStorage>();
+            services.Configure<AzureTableReminderStorageOptions>(configureStorageOptions);
+            services.Configure<AzureTableMigrationReminderStorageOptions>(configureMigratedStorageOptions);
+            services.ConfigureFormatter<AzureTableReminderStorageOptions>();
+
+            return services;
+        }
+
+        #endregion
     }
 }

@@ -2,12 +2,13 @@
 using Orleans.Hosting;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
+using Tester.AzureUtils.Migration.Abstractions;
 using Xunit;
 
 namespace Tester.AzureUtils.Migration
 {
     [TestCategory("Functionals"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureBlobStorage")]
-    public class MigrationAzureBlobTests : MigrationBaseTests, IClassFixture<MigrationAzureBlobTests.Fixture>
+    public class MigrationAzureBlobTests : MigrationGrainsBaseTests, IClassFixture<MigrationAzureBlobTests.Fixture>
     {
         public static Guid Guid = Guid.NewGuid();
 

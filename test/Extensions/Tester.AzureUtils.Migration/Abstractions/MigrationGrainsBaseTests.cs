@@ -6,89 +6,19 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
+using Microsoft.Extensions.DependencyInjection;
+
 #if NET7_0_OR_GREATER
 using Orleans.Persistence.Migration;
 #endif
 
-namespace Tester.AzureUtils.Migration
+namespace Tester.AzureUtils.Migration.Abstractions
 {
-    public abstract class MigrationBaseTests
+    public abstract class MigrationGrainsBaseTests : MigrationBaseTests
     {
-        protected BaseAzureTestClusterFixture fixture;
-        public const string SourceStorageName = "source-storage";
-        public const string DestinationStorageName = "destination-storage";
-
-        private IServiceProvider? serviceProvider;
-        private IServiceProvider ServiceProvider
+        protected MigrationGrainsBaseTests(BaseAzureTestClusterFixture fixture)
+            : base(fixture)
         {
-            get
-            {
-                if (this.serviceProvider == null)
-                {
-                    var silo = (InProcessSiloHandle)this.fixture.HostedCluster.Primary;
-                    this.serviceProvider = silo.SiloHost.Services;
-                }
-                return this.serviceProvider;
-            }
-        }
-
-        private IGrainStorage? sourceStorage;
-        private IGrainStorage SourceStorage
-        {
-            get
-            {
-                if (this.sourceStorage == null)
-                {
-                    this.sourceStorage = ServiceProvider.GetRequiredServiceByName<IGrainStorage>(SourceStorageName);
-                }
-                return this.sourceStorage;
-            }
-        }
-
-        private IGrainStorage? destinationStorage;
-        private IGrainStorage DestinationStorage
-        {
-            get
-            {
-                if (this.destinationStorage == null)
-                {
-                    this.destinationStorage = ServiceProvider.GetRequiredServiceByName<IGrainStorage>(DestinationStorageName);
-                }
-                return this.destinationStorage;
-            }
-        }
-
-        private IGrainStorage? migrationStorage;
-        private IGrainStorage MigrationStorage
-        {
-            get
-            {
-                if (this.migrationStorage == null)
-                {
-                    this.migrationStorage = ServiceProvider.GetRequiredServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME);
-                }
-                return this.migrationStorage;
-            }
-        }
-
-#if NET7_0_OR_GREATER
-        private OfflineMigrator? offlineMigrator;
-        private OfflineMigrator OfflineMigrator
-        {
-            get
-            {
-                if (this.offlineMigrator == null)
-                {
-                    this.offlineMigrator = ServiceProvider.GetRequiredService<OfflineMigrator>();
-                }
-                return this.offlineMigrator;
-            }
-        }
-#endif
-
-        protected MigrationBaseTests(BaseAzureTestClusterFixture fixture)
-        {
-            this.fixture = fixture;
         }
 
         [Fact]
@@ -96,10 +26,10 @@ namespace Tester.AzureUtils.Migration
         {
             var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(100);
             var grainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
-            var stateName = (typeof(SimplePersistentGrain)).FullName;
+            var stateName = typeof(SimplePersistentGrain).FullName;
 
             // Write directly to source storage
-            await SourceStorage.WriteStateAsync(stateName, (GrainReference) grain, grainState);
+            await SourceStorage.WriteStateAsync(stateName, (GrainReference)grain, grainState);
 
             Assert.Equal(grainState.State.A, await grain.GetA());
             Assert.Equal(grainState.State.A * grainState.State.B, await grain.GetAxB());
@@ -111,7 +41,7 @@ namespace Tester.AzureUtils.Migration
             var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(200);
             var oldGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
             var newGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 20, B = 30 });
-            var stateName = (typeof(SimplePersistentGrain)).FullName;
+            var stateName = typeof(SimplePersistentGrain).FullName;
 
             // Write directly to storages
             await SourceStorage.WriteStateAsync(stateName, (GrainReference)grain, oldGrainState);
@@ -127,7 +57,7 @@ namespace Tester.AzureUtils.Migration
             var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(300);
             var oldGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
             var newState = new SimplePersistentGrain_State { A = 20, B = 30 };
-            var stateName = (typeof(SimplePersistentGrain)).FullName;
+            var stateName = typeof(SimplePersistentGrain).FullName;
 
             // Write directly to source storage
             await SourceStorage.WriteStateAsync(stateName, (GrainReference)grain, oldGrainState);
@@ -151,7 +81,7 @@ namespace Tester.AzureUtils.Migration
             var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(400);
             var oldGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
             var newGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 20, B = 30 });
-            var stateName = (typeof(SimplePersistentGrain)).FullName;
+            var stateName = typeof(SimplePersistentGrain).FullName;
 
             // Write directly to storages
             await SourceStorage.WriteStateAsync(stateName, (GrainReference)grain, oldGrainState);
@@ -177,12 +107,12 @@ namespace Tester.AzureUtils.Migration
         {
             var originalEntries = await GenerateGrainsAndSaveAsync(n: 5);
 
-            var stats = await OfflineMigrator.MigrateAsync(CancellationToken.None);
+            var stats = await OfflineMigrator.MigrateGrainsAsync(CancellationToken.None);
             Assert.Equal(originalEntries.Count, stats.MigratedEntries);
             Assert.Equal(0, stats.SkippedEntries);
             Assert.Equal(0, stats.FailedEntries);
 
-            var stats2 = await OfflineMigrator.MigrateAsync(CancellationToken.None);
+            var stats2 = await OfflineMigrator.MigrateGrainsAsync(CancellationToken.None);
             Assert.Equal(0, stats2.MigratedEntries);
             Assert.Equal(originalEntries.Count, stats2.SkippedEntries);
             Assert.Equal(0, stats2.FailedEntries);
@@ -208,10 +138,10 @@ namespace Tester.AzureUtils.Migration
         private async Task<IDictionary<Guid, StorageEntryRef>> GenerateGrainsAndSaveAsync(int n = 100)
         {
             var random = new Random();
-            var stateName = (typeof(SimplePersistentGrain)).FullName;
+            var stateName = typeof(SimplePersistentGrain).FullName;
 
             var storageEntries = new Dictionary<Guid, StorageEntryRef>(n);
-            for (int i = 0; i < n; i++)
+            for (var i = 0; i < n; i++)
             {
                 var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(i);
                 var oldGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
