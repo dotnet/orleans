@@ -56,7 +56,16 @@ namespace Orleans.Persistence.Migration
                     // if ETag is not nullified, WriteAsync will try to match by the ETag on probably non-existing blob
                     storageEntry.GrainState.ETag = null;
 
-                    await _newStorage.WriteStateAsync(storageEntry.Name, storageEntry.GrainReference, storageEntry.GrainState);
+                    try
+                    {
+                        await _newStorage.WriteStateAsync(storageEntry.Name, storageEntry.GrainReference, storageEntry.GrainState);
+                    }
+                    catch (InconsistentStateException ex) when (ex.InnerException is Azure.RequestFailedException reqExc && reqExc.Message.StartsWith("The specified blob already exists"))
+                    {
+                        _logger.Debug("Migrated blob already exists, but was not skipped: {entryName};", storageEntry.GrainReference?.GrainIdentity?.PrimaryKey);
+                        // ignore: we have already migrated this entry to new storage.
+                    }
+                    
                     await storageEntry.MigrationEntryClient.MarkMigratedAsync(cancellationToken);
                     migrationStats.MigratedEntries++;
                 }

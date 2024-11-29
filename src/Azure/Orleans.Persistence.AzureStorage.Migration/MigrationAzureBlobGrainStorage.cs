@@ -253,7 +253,7 @@ namespace Orleans.Storage.Migration.AzureStorage
                 var options = new BlobUploadOptions
                 {
                     HttpHeaders = new BlobHttpHeaders { ContentType = mimeType },
-                    Conditions = conditions,
+                    Conditions = conditions
                 };
 
                 var result = await DoOptimisticUpdate(
