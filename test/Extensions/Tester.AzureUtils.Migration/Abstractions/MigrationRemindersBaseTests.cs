@@ -101,6 +101,39 @@ namespace Tester.AzureUtils.Migration.Abstractions
             Assert.Equal(reminderName, readEntry.ReminderName);
         }
 
+        [Fact]
+        public async Task OfflineMigrator_ProperlyMigratesData()
+        {
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(100);
+            var grainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
+            var stateName = typeof(SimplePersistentGrain).FullName;
+            var grainReference = (GrainReference)grain;
+
+            var defaultEntryBuilder = DefaultReminderTableEntryBuilder.Instance;
+            var reminderName = GenerateReminderName();
+            var migrationEntryRowKey = MigrationEntryBuilder.ConstructRowKey(grainReference, reminderName);
+            var oldEntryRowKey = defaultEntryBuilder.ConstructRowKey(grainReference, reminderName);
+
+            var reminderEntry = new ReminderEntry
+            {
+                GrainRef = grainReference,
+                ReminderName = reminderName,
+                StartAt = DateTime.UtcNow,
+                Period = TimeSpan.FromMinutes(1)
+            };
+
+            var res = await ReminderTable.UpsertRow(reminderEntry);
+
+            var stats = await OfflineMigrator.MigrateRemindersAsync(
+                CancellationToken.None,
+                startingGrainRefHashCode: grainReference.GrainIdentity.GetUniformHashCode() - 1);
+
+            Assert.NotNull(stats);
+            Assert.True(stats.MigratedEntries > 0);
+            Assert.Equal(0, stats.FailedEntries);
+            Assert.Equal(0, stats.SkippedEntries);
+        }
+
         private static string GenerateReminderName() => "Reminder" + Guid.NewGuid().ToString().Replace("-", "");
 
         private TableClient GetOldTableClient() => GetTable(MigrationAzureTableTests.OldTableName);

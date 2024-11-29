@@ -107,14 +107,14 @@ namespace Tester.AzureUtils.Migration.Abstractions
         }
 
 #if NET7_0_OR_GREATER
-        private OfflineMigrator? offlineMigrator;
-        protected OfflineMigrator OfflineMigrator
+        private AzureStorageOfflineMigrator? offlineMigrator;
+        protected AzureStorageOfflineMigrator OfflineMigrator
         {
             get
             {
                 if (this.offlineMigrator == null)
                 {
-                    this.offlineMigrator = ServiceProvider.GetRequiredService<OfflineMigrator>();
+                    this.offlineMigrator = ServiceProvider.GetRequiredService<AzureStorageOfflineMigrator>();
                 }
                 return this.offlineMigrator;
             }

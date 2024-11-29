@@ -107,16 +107,24 @@ namespace Orleans.Hosting
             return services.AddMigrationAzureBlobGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
         }
 
-        public static ISiloBuilder AddOfflineMigrator(this ISiloBuilder builder, string oldStorage, string newStorage, OfflineMigrator.Options options = null)
+        public static ISiloBuilder AddOfflineMigrator(this ISiloBuilder builder, string oldStorage, string newStorage, AzureStorageOfflineMigrator.Options options = null)
             => builder.ConfigureServices(services => services.AddOfflineMigrator(oldStorage, newStorage, options));
 
-        public static IServiceCollection AddOfflineMigrator(this IServiceCollection services, string oldStorageName, string newStorageName, OfflineMigrator.Options options = null)
+        public static IServiceCollection AddOfflineMigrator(
+            this IServiceCollection services,
+            string oldStorageName,
+            string newStorageName,
+            AzureStorageOfflineMigrator.Options options = null)
         {
-            return services.AddSingleton(sp => new OfflineMigrator(
-                sp.GetService<ILogger<OfflineMigrator>>(),
-                sp.GetRequiredServiceByName<IGrainStorage>(oldStorageName),
-                sp.GetRequiredServiceByName<IGrainStorage>(newStorageName),
-                options));
+            return services.AddSingleton(sp =>
+            {
+                return new AzureStorageOfflineMigrator(
+                    sp.GetService<ILogger<AzureStorageOfflineMigrator>>(),
+                    sp.GetRequiredServiceByName<IGrainStorage>(oldStorageName),
+                    sp.GetRequiredServiceByName<IGrainStorage>(newStorageName),
+                    sp.GetService<IReminderTable>(),
+                    options);
+            });
         }
 
         /// <summary>

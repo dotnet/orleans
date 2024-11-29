@@ -1,21 +1,25 @@
 using Microsoft.Extensions.Logging;
+using Orleans.Persistence.AzureStorage.Migration.Reminders;
 using Orleans.Runtime;
 using Orleans.Storage;
 
 namespace Orleans.Persistence.Migration
 {
-    public class OfflineMigrator
+    public class AzureStorageOfflineMigrator
     {
-        private readonly ILogger<OfflineMigrator> _logger;
+        private readonly ILogger<AzureStorageOfflineMigrator> _logger;
         private readonly Options _options;
 
         private readonly IGrainStorage _oldStorage;
         private readonly IGrainStorage _newStorage;
 
-        public OfflineMigrator(
-            ILogger<OfflineMigrator> logger,
+        readonly MigrationAzureTableReminderStorage _reminderMigrationStorage;
+
+        public AzureStorageOfflineMigrator(
+            ILogger<AzureStorageOfflineMigrator> logger,
             IGrainStorage oldStorage,
             IGrainStorage newStorage,
+            IReminderTable reminderTable,
             Options options)
         {
             _logger = logger;
@@ -23,6 +27,10 @@ namespace Orleans.Persistence.Migration
 
             _oldStorage = oldStorage;
             _newStorage = newStorage;
+
+            _reminderMigrationStorage = reminderTable is MigrationAzureTableReminderStorage migrationAzureTableReminderStorage
+                ? migrationAzureTableReminderStorage
+                : null;
         }
 
         /// <summary>
@@ -31,6 +39,8 @@ namespace Orleans.Persistence.Migration
         /// </summary>
         public async Task<MigrationStats> MigrateGrainsAsync(CancellationToken cancellationToken)
         {
+            _logger.Debug("Starting offline grains migration");
+
             var migrationStats = new MigrationStats();
             await foreach (var storageEntry in _oldStorage.GetAll(cancellationToken))
             {
@@ -57,13 +67,41 @@ namespace Orleans.Persistence.Migration
                 }
             }
 
+            _logger.Debug("Finished offline grains migration");
             return migrationStats;
         }
 
-        public Task<MigrationStats> MigrateRemindersAsync(CancellationToken cancellationToken)
+        public async Task<MigrationStats> MigrateRemindersAsync(CancellationToken cancellationToken, uint startingGrainRefHashCode = 0)
         {
-            //
-            throw new NotImplementedException();
+            if (_reminderMigrationStorage is null)
+            {
+                throw new InvalidOperationException("Migration reminder storage is not available. Use 'UseMigrationAzureTableReminderStorage()' to register Reminder's migration component.");
+            }
+
+            _logger.Debug("Starting offline reminders migration");
+            var migrationStats = new MigrationStats();
+
+            uint currentPointer = startingGrainRefHashCode;
+            while (true)
+            {
+                var entries = await _reminderMigrationStorage.DefaultReminderTable.ReadRows(currentPointer, currentPointer + _options.RemindersMigrationBatchSize);
+                _logger.Debug($"Fetched batch: {entries.Reminders.Count} reminders");
+                if (entries.Reminders.Count == 0)
+                {
+                    break;
+                }
+
+                foreach (var entry in entries.Reminders)
+                {
+                    await _reminderMigrationStorage.MigrationReminderTable.UpsertRow(entry);
+                    migrationStats.MigratedEntries++;
+                }
+
+                currentPointer += _options.RemindersMigrationBatchSize;
+            }
+
+            _logger.Debug("Finished offline reminders migration");
+            return migrationStats;
         }
 
         public class MigrationStats
@@ -76,6 +114,7 @@ namespace Orleans.Persistence.Migration
         public class Options
         {
             public bool DontSkipMigrateEntries { get; set; } = false;
+            public uint RemindersMigrationBatchSize { get; set; } = 10000;
         }
     }
 }

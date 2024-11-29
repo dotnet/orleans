@@ -29,6 +29,23 @@ namespace Tester.AzureUtils.Migration
             public void Configure(ISiloBuilder siloBuilder)
             {
                 siloBuilder
+                    // needed for the OfflineMigrator
+                    .AddMigrationGrainStorageAsDefault(options =>
+                    {
+                        options.SourceStorageName = SourceStorageName;
+                        options.DestinationStorageName = DestinationStorageName;
+                    })
+                    .AddAzureBlobGrainStorage(SourceStorageName, options =>
+                    {
+                        options.ConfigureTestDefaults();
+                        options.ContainerName = $"source{Guid}";
+                    })
+                    .AddMigrationAzureBlobGrainStorage(DestinationStorageName, options =>
+                    {
+                        options.ConfigureTestDefaults();
+                        options.ContainerName = $"destination{Guid}";
+                    })
+                    // -------------------------------------
                     .AddMigrationTools()
                     .UseMigrationAzureTableReminderStorage(
                         oldStorageOptions =>
@@ -41,7 +58,8 @@ namespace Tester.AzureUtils.Migration
                             migrationOptions.ConfigureTestDefaults();
                             migrationOptions.TableName = DestinationTableName;
                         }
-                    );
+                    )
+                    .AddOfflineMigrator(SourceStorageName, DestinationStorageName);
             }
         }   
 

@@ -28,7 +28,7 @@ namespace Orleans.Persistence.Migration
                 return JsonConvert.SerializeObject(obj);
             }
 
-            public static MigrationEtag ParseFromJson(string json) => (MigrationEtag) JsonConvert.DeserializeObject(json, typeof(MigrationEtag));
+            public static MigrationEtag ParseFromJson(string json) => (MigrationEtag)JsonConvert.DeserializeObject(json, typeof(MigrationEtag));
         }
 
         private readonly IGrainStorage _sourceStorage;
@@ -65,7 +65,7 @@ namespace Orleans.Persistence.Migration
 
         public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            MigrationEtag etag = new MigrationEtag();
+            var etag = new MigrationEtag();
             if (grainState.RecordExists)
             {
                 var eTag = MigrationEtag.ParseFromJson(grainState.ETag);
