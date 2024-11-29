@@ -40,8 +40,7 @@ namespace Orleans.Persistence.AzureStorage.Migration.Reminders
 
         public Task<string> UpsertRow(ReminderEntry entry)
         {
-            MigrationReminderTable.UpsertRow(entry).GetAwaiter().GetResult();
-            // Task.Run(() => _newTable.UpsertRow(entry)); // run in background is better here probably?
+            Task.Run(() => MigrationReminderTable.UpsertRow(entry)); // run in background is better here probably?
             return DefaultReminderTable.UpsertRow(entry);
         }
 
