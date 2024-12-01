@@ -16,6 +16,9 @@ namespace Orleans.Hosting;
 
 public sealed class EventHubsStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, IProviderBuilder<IClientBuilder>
 {
+    private const string EventHubNameConfigurationKey = "EventHubName";
+    private const string ConsumerGroupConfigurationKey = "ConsumerGroup";
+
     public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
     {
         builder.AddEventHubsStreams(
@@ -31,41 +34,45 @@ public sealed class EventHubsStreamProviderBuilder : IProviderBuilder<ISiloBuild
     }
 
     private static Action<OptionsBuilder<EventHubOptions>> GetEventHubOptionsBuilder(string name, IConfigurationSection configurationSection)
-{
-    return (OptionsBuilder<EventHubOptions> optionsBuilder) =>
     {
-        optionsBuilder.Configure<IServiceProvider>((options, services) =>
+        return (OptionsBuilder<EventHubOptions> optionsBuilder) =>
         {
-            var serviceKey = configurationSection["ServiceKey"];
-            var configuration = services.GetRequiredService<IConfiguration>();
-
-            if (!string.IsNullOrEmpty(serviceKey))
+            optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
-                // Load from the root named options, then by aspire options
-                // E.g. [ServiceKey]__EventHubName, then Orleans__Streaming__[ServiceKey]__EventHubName
-                var namedSection = configuration.GetSection(serviceKey);
-                var eventHubName = namedSection["EventHubName"] ?? configuration["EventHubName"];
-                var consumerGroup = namedSection["ConsumerGroup"] ?? configuration["ConsumerGroup"];
+                var serviceKey = configurationSection["ServiceKey"];
+                var configuration = services.GetRequiredService<IConfiguration>();
 
-                if(eventHubName is null)
-                {
-                    throw new OrleansConfigurationException("No event hub name has been specified. Please provide the Event Hub Name via a root service named EventHubOptions configuration or as part of the Aspire resource configuration.");
-                }
+                    if (string.IsNullOrEmpty(serviceKey))
+                    {
+                        throw new OrleansConfigurationException("Missing service key. No connection string has been configured for Azure EventHub Streaming");
+                    }
 
-                if(consumerGroup is null)
-                {
-                    throw new OrleansConfigurationException("No consumer group has been specified. Please provide the Consumer Group via a root service named EventHubOptions configuration or as part of the Aspire resource configuration.");
-                }
+                    var connectionString = configuration.GetConnectionString(serviceKey);
 
-                options.ConfigureEventHubConnection(
-                    configuration.GetConnectionString(serviceKey),
-                    eventHubName,
-                    consumerGroup
-                );
-            }
-        });
-    };
-}
+                    // Load from the root named options, then by aspire options
+                    // E.g. [name]__EventHubName, then Orleans__Streaming__[name]__EventHubName
+                    var namedSection = configuration.GetSection(name);
+                    var eventHubName = namedSection[EventHubNameConfigurationKey] ?? configurationSection[EventHubNameConfigurationKey];
+                    var consumerGroup = namedSection[ConsumerGroupConfigurationKey] ?? configurationSection[ConsumerGroupConfigurationKey];
+
+                    if(eventHubName is null)
+                    {
+                        throw new OrleansConfigurationException("No event hub name has been specified. Please provide the Event Hub Name via a root service named EventHubOptions configuration or as part of the Aspire resource configuration.");
+                    }
+
+                    if(consumerGroup is null)
+                    {
+                        throw new OrleansConfigurationException("No consumer group has been specified. Please provide the Consumer Group via a root service named EventHubOptions configuration or as part of the Aspire resource configuration.");
+                    }
+
+                    options.ConfigureEventHubConnection(
+                        connectionString,
+                        eventHubName,
+                        consumerGroup
+                    );
+            });
+        };
+    }
 
     private static Action<OptionsBuilder<AzureTableStreamCheckpointerOptions>> GetEventHubCheckpointerOptionsBuilder(string name, IConfigurationSection configurationSection)
     {
