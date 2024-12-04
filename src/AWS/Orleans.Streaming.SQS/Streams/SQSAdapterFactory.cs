@@ -8,7 +8,7 @@ using Orleans.Streams;
 using Orleans.Configuration;
 using Orleans;
 using Orleans.Configuration.Overrides;
-using Orleans.Serialization;
+using Orleans.Streaming.SQS.Streams;
 
 namespace OrleansAWSUtils.Streams
 {
@@ -18,7 +18,7 @@ namespace OrleansAWSUtils.Streams
         private readonly string providerName;
         private readonly SqsOptions sqsOptions;
         private readonly ClusterOptions clusterOptions;
-        private readonly Serializer<SQSBatchContainer> serializer;
+        private readonly ISQSDataAdapter dataAdapter;
         private readonly ILoggerFactory loggerFactory;
         private readonly HashRingBasedStreamQueueMapper streamQueueMapper;
         private readonly IQueueAdapterCache adapterCache;
@@ -34,18 +34,21 @@ namespace OrleansAWSUtils.Streams
             HashRingStreamQueueMapperOptions queueMapperOptions,
             SimpleQueueCacheOptions cacheOptions,
             IOptions<ClusterOptions> clusterOptions, 
-            Orleans.Serialization.Serializer serializer, 
+            ISQSDataAdapter dataAdapter, 
             ILoggerFactory loggerFactory)
         {
             this.providerName = name;
             this.sqsOptions = sqsOptions;
             this.clusterOptions = clusterOptions.Value;
-            this.serializer = serializer.GetSerializer<SQSBatchContainer>();
+            this.dataAdapter = dataAdapter;
             this.loggerFactory = loggerFactory;
             streamQueueMapper = new HashRingBasedStreamQueueMapper(queueMapperOptions, this.providerName);
-            adapterCache = new SimpleQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
-        }
 
+            if (sqsOptions.FifoQueue)
+                adapterCache = new StreamIdPartitionedQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
+            else
+                adapterCache = new SimpleQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
+        }
 
         /// <summary> Init the factory.</summary>
         public virtual void Init()
@@ -60,7 +63,7 @@ namespace OrleansAWSUtils.Streams
         /// <summary>Creates the Azure Queue based adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new SQSAdapter(this.serializer, this.streamQueueMapper, this.loggerFactory, this.sqsOptions.ConnectionString, this.clusterOptions.ServiceId, this.providerName);
+            var adapter = new SQSAdapter(this.dataAdapter, this.streamQueueMapper, this.loggerFactory, this.sqsOptions, this.clusterOptions.ServiceId, this.providerName);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 
@@ -92,7 +95,10 @@ namespace OrleansAWSUtils.Streams
             var cacheOptions = services.GetOptionsByName<SimpleQueueCacheOptions>(name);
             var queueMapperOptions = services.GetOptionsByName<HashRingStreamQueueMapperOptions>(name);
             IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(name);
-            var factory = ActivatorUtilities.CreateInstance<SQSAdapterFactory>(services, name, sqsOptions, cacheOptions, queueMapperOptions, clusterOptions);
+            var dataAdapter = services.GetKeyedService<ISQSDataAdapter>(name)
+                               ?? services.GetService<ISQSDataAdapter>()
+                               ?? ActivatorUtilities.CreateInstance<SQSDataAdapter>(services);
+            var factory = ActivatorUtilities.CreateInstance<SQSAdapterFactory>(services, name, sqsOptions, cacheOptions, queueMapperOptions, clusterOptions, dataAdapter);
             factory.Init();
             return factory;
         }
