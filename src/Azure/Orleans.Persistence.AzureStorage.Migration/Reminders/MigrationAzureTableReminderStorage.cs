@@ -38,16 +38,16 @@ namespace Orleans.Persistence.AzureStorage.Migration.Reminders
             await DefaultReminderTable.Init();
         }
 
-        public Task<string> UpsertRow(ReminderEntry entry)
+        public async Task<string> UpsertRow(ReminderEntry entry)
         {
-            Task.Run(() => MigrationReminderTable.UpsertRow(entry)); // run in background is better here probably?
-            return DefaultReminderTable.UpsertRow(entry);
+            await MigrationReminderTable.UpsertRow(entry);
+            return await DefaultReminderTable.UpsertRow(entry);
         }
 
-        public Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag)
+        public async Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag)
         {
-            Task.Run(() => MigrationReminderTable.RemoveRow(grainRef, reminderName, eTag)); // run in background is better here probably?
-            return DefaultReminderTable.RemoveRow(grainRef, reminderName, eTag);
+            await MigrationReminderTable.RemoveRow(grainRef, reminderName, eTag);
+            return await DefaultReminderTable.RemoveRow(grainRef, reminderName, eTag);
         }
 
         public Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName) => DefaultReminderTable.ReadRow(grainRef, reminderName);

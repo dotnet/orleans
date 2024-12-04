@@ -27,10 +27,4 @@
     <ProjectReference Include="..\TesterAzureUtils\Tester.AzureUtils.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="OrleansTestSecrets.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
 </Project>
