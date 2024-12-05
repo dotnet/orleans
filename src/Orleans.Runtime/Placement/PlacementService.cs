@@ -13,6 +13,10 @@ using Orleans.Runtime.Versions;
 
 namespace Orleans.Runtime.Placement
 {
+    public interface IPlacementFilter
+    {
+        public IEnumerable<SiloAddress> FilterSilos(PlacementTarget target, IEnumerable<SiloAddress> candidateSilos);
+    }
     /// <summary>
     /// Central point for placement decisions.
     /// </summary>
@@ -20,6 +24,7 @@ namespace Orleans.Runtime.Placement
     {
         private const int PlacementWorkerCount = 16;
         private readonly PlacementStrategyResolver _strategyResolver;
+        private readonly List<IPlacementFilter> _placementFilters;
         private readonly PlacementDirectorResolver _directorResolver;
         private readonly ILogger<PlacementService> _logger;
         private readonly GrainLocator _grainLocator;
@@ -41,10 +46,12 @@ namespace Orleans.Runtime.Placement
             GrainVersionManifest grainInterfaceVersions,
             CachedVersionSelectorManager versionSelectorManager,
             PlacementDirectorResolver directorResolver,
-            PlacementStrategyResolver strategyResolver)
+            PlacementStrategyResolver strategyResolver,
+            IEnumerable<IPlacementFilter> placementFilters)
         {
             LocalSilo = localSiloDetails.SiloAddress;
             _strategyResolver = strategyResolver;
+            _placementFilters = placementFilters.ToList();
             _directorResolver = directorResolver;
             _logger = logger;
             _grainLocator = grainLocator;
@@ -129,7 +136,19 @@ namespace Orleans.Runtime.Placement
                     + $"All known nodes compatible with interface version: {allWithTypeString}");
             }
 
-            return compatibleSilos;
+            if (_placementFilters.Count == 0)
+            {
+                return compatibleSilos;
+            }
+
+            IEnumerable<SiloAddress> candidateSilos = compatibleSilos;
+
+            foreach (var filter in _placementFilters)
+            {
+                candidateSilos = filter.FilterSilos(target, candidateSilos);
+            }
+
+            return candidateSilos.ToArray();
         }
 
         public SiloAddress[] AllActiveSilos
