@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -23,6 +24,7 @@ namespace Orleans.Runtime
         private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
         private readonly GrainContextActivator grainActivator;
+        private readonly ConcurrentDictionary<GrainId, object> grainLocks = new();
 
         public Catalog(
             ILocalSiloDetails localSiloDetails,
@@ -148,8 +150,10 @@ namespace Orleans.Runtime
                 return null;
             }
 
+            var lockObj = grainLocks.GetOrAdd(grainId, _ => new object());
+
             // Lock over all activations to try to prevent multiple instances of the same activation being created concurrently.
-            lock (activations)
+            lock (lockObj)
             {
                 if (TryGetGrainContext(grainId, out result))
                 {
@@ -171,6 +175,8 @@ namespace Orleans.Runtime
                     activations.RecordNewTarget(result);
                 }
             } // End lock
+
+            grainLocks.TryRemove(grainId, out _);
 
             if (result is null)
             {
