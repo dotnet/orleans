@@ -47,4 +47,8 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="GrainDirectory\" />
+  </ItemGroup>
 </Project>
