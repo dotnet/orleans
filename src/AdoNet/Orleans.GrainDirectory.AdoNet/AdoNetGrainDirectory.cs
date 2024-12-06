@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.PortableExecutable;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -11,10 +13,11 @@ using Orleans.Runtime;
 
 namespace Orleans.GrainDirectory.AdoNet;
 
-internal sealed partial class AdoNetGrainDirectory(AdoNetGrainDirectoryOptions options, RelationalOrleansQueries queries, ILogger<AdoNetGrainDirectory> logger, IOptions<ClusterOptions> clusterOptions, IHostApplicationLifetime lifetime) : IGrainDirectory
+internal sealed partial class AdoNetGrainDirectory(AdoNetGrainDirectoryOptions options, ILogger<AdoNetGrainDirectory> logger, IOptions<ClusterOptions> clusterOptions, IHostApplicationLifetime lifetime) : IGrainDirectory
 {
     private readonly ILogger _logger = logger;
     private readonly string _clusterId = clusterOptions.Value.ClusterId;
+    private RelationalOrleansQueries _queries;
 
     /// <summary>
     /// Looks up a grain activation.
@@ -25,6 +28,8 @@ internal sealed partial class AdoNetGrainDirectory(AdoNetGrainDirectoryOptions o
     {
         try
         {
+            var queries = await GetQueriesAsync();
+
             var entry = await queries
                 .LookupGrainActivationAsync(_clusterId, grainId.ToString())
                 .WaitAsync(lifetime.ApplicationStopping);
@@ -49,6 +54,8 @@ internal sealed partial class AdoNetGrainDirectory(AdoNetGrainDirectoryOptions o
 
         try
         {
+            var queries = await GetQueriesAsync();
+
             var count = await queries
                 .RegisterGrainActivationAsync(_clusterId, address.GrainId.ToString(), address.SiloAddress.ToParsableString(), address.ActivationId.ToParsableString())
                 .WaitAsync(lifetime.ApplicationStopping);
@@ -80,6 +87,8 @@ internal sealed partial class AdoNetGrainDirectory(AdoNetGrainDirectoryOptions o
 
         try
         {
+            var queries = await GetQueriesAsync();
+
             var count = await queries
                 .UnregisterGrainActivationAsync(_clusterId, address.GrainId.ToString(), address.ActivationId.ToParsableString())
                 .WaitAsync(lifetime.ApplicationStopping);
@@ -113,6 +122,8 @@ internal sealed partial class AdoNetGrainDirectory(AdoNetGrainDirectoryOptions o
         {
             var siloAddressesAsString = string.Join('|', siloAddresses.Select(x => x.ToParsableString()));
 
+            var queries = await GetQueriesAsync();
+
             var count = await queries
                 .UnregisterGrainActivationsAsync(_clusterId, siloAddressesAsString)
                 .WaitAsync(lifetime.ApplicationStopping);
@@ -126,6 +137,44 @@ internal sealed partial class AdoNetGrainDirectory(AdoNetGrainDirectoryOptions o
         {
             LogFailedToUnregisterSilos(ex, _clusterId, siloAddresses);
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Unfortunate implementation detail to account for lack of async lifetime.
+    /// Ideally this concern will be moved upstream so this won't be needed.
+    /// </summary>
+    private readonly SemaphoreSlim _semaphore = new(1);
+
+    /// <summary>
+    /// Ensures queries are loaded only once while allowing for recovery if the load fails.
+    /// </summary>
+    private ValueTask<RelationalOrleansQueries> GetQueriesAsync()
+    {
+        // attempt fast path
+        return _queries is not null ? new(_queries) : new(CoreAsync());
+
+        // slow path
+        async Task<RelationalOrleansQueries> CoreAsync()
+        {
+            await _semaphore.WaitAsync(lifetime.ApplicationStopping);
+            try
+            {
+                // attempt fast path again
+                if (_queries is not null)
+                {
+                    return _queries;
+                }
+
+                // slow path - the member variable will only be set if the call succeeds
+                return _queries = await RelationalOrleansQueries
+                    .CreateInstance(options.Invariant, options.ConnectionString)
+                    .WaitAsync(lifetime.ApplicationStopping);
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
         }
     }
 
