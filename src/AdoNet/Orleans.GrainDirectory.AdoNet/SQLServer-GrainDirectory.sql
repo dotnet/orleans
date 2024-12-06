@@ -137,6 +137,8 @@ WHERE
     AND ActivationId = @ActivationId
 OPTION (FAST 1, OPTIMIZE FOR (@ClusterId UNKNOWN, @GrainIdHash UNKNOWN, @GrainId UNKNOWN, @ActivationId UNKNOWN));
 
+SELECT @@ROWCOUNT;
+
 COMMIT;
 
 GO
