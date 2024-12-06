@@ -39,6 +39,7 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders\Orleans.Reminders.csproj" />
     <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Streaming.AdoNet\Orleans.Streaming.AdoNet.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
+    <ProjectReference Include="..\..\..\src\AdoNet\Orleans.GrainDirectory.AdoNet\Orleans.GrainDirectory.AdoNet.csproj" />
   </ItemGroup>
 
   <ItemGroup>

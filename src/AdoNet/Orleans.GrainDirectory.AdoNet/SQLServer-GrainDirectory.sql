@@ -166,8 +166,7 @@ SELECT
     ClusterId,
     GrainId,
     SiloAddress,
-    ActivationId,
-    CreatedOn
+    ActivationId
 FROM
     OrleansGrainDirectory
 WHERE
