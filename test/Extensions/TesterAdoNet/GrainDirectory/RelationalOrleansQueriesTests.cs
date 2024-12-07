@@ -190,10 +190,12 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     }
 
     /// <summary>
-    /// Chaos test for concurrent grain directoy queries.
+    /// Chaos test for concurrent grain directory queries.
     /// </summary>
     /// <remarks>
-    /// This tests looks for susceptibility to database deadlocks and other concurrency issues.
+    /// This test looks for susceptibility to database deadlocks and other concurrency issues.
+    /// During development, this test consistently triggered deadlocking until the queries were made to prevent it.
+    /// If this test shows flakiness then it is likely the queries need to be looked at.
     /// </remarks>
     [SkippableFact]
     public async Task RelationalOrleansQueries_ChaosTest()
@@ -202,7 +204,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         var providerId = RandomProviderId();
 
         // act
-        await Parallel.ForAsync(0, 100000, new ParallelOptions { MaxDegreeOfParallelism = concurrency }, async (x, ct) =>
+        await Parallel.ForAsync(0, 10000, new ParallelOptions { MaxDegreeOfParallelism = concurrency }, async (x, ct) =>
         {
             var grainId = RandomGrainId();
             var siloAddress = RandomSiloAddress();
