@@ -8,11 +8,12 @@ namespace Orleans.GrainDirectory.AdoNet;
 /// </summary>
 internal sealed record AdoNetGrainDirectoryEntry(
     string ClusterId,
+    string ProviderId,
     string GrainId,
     string SiloAddress,
     string ActivationId)
 {
-    public AdoNetGrainDirectoryEntry() : this("", "", "", "")
+    public AdoNetGrainDirectoryEntry() : this("", "", "", "", "")
     {
     }
 
@@ -23,13 +24,14 @@ internal sealed record AdoNetGrainDirectoryEntry(
         ActivationId = Runtime.ActivationId.FromParsableString(ActivationId)
     };
 
-    public static AdoNetGrainDirectoryEntry FromGrainAddress(string clusterId, GrainAddress address)
+    public static AdoNetGrainDirectoryEntry FromGrainAddress(string clusterId, string providerId, GrainAddress address)
     {
         ArgumentNullException.ThrowIfNull(clusterId);
         ArgumentNullException.ThrowIfNull(address);
 
         return new AdoNetGrainDirectoryEntry(
             clusterId,
+            providerId,
             address.GrainId.ToString(),
             address.SiloAddress.ToParsableString(),
             address.ActivationId.ToParsableString());

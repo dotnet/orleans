@@ -593,9 +593,10 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="siloAddress">The silo address.</param>
         /// <param name="activationId">The activation identifier.</param>
         /// <returns>The count of rows affected.</returns>
-        internal Task<int> RegisterGrainActivationAsync(string clusterId, string grainId, string siloAddress, string activationId)
+        internal Task<int> RegisterGrainActivationAsync(string clusterId, string providerId, string grainId, string siloAddress, string activationId)
         {
             ArgumentNullException.ThrowIfNull(clusterId);
+            ArgumentNullException.ThrowIfNull(providerId);
             ArgumentNullException.ThrowIfNull(grainId);
             ArgumentNullException.ThrowIfNull(siloAddress);
             ArgumentNullException.ThrowIfNull(activationId);
@@ -608,6 +609,7 @@ namespace Orleans.Tests.SqlUtils
                 command => new DbStoredQueries.Columns(command)
                 {
                     ClusterId = clusterId,
+                    ProviderId = providerId,
                     GrainIdHash = grainIdHash,
                     GrainId = grainId,
                     SiloAddressAsString = siloAddress,
@@ -623,9 +625,10 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="grainId">The grain identifier.</param>
         /// <param name="activationId">The activation identifier.</param>
         /// <returns>The count of rows affected.</returns>
-        internal Task<int> UnregisterGrainActivationAsync(string clusterId, string grainId, string activationId)
+        internal Task<int> UnregisterGrainActivationAsync(string clusterId, string providerId, string grainId, string activationId)
         {
             ArgumentNullException.ThrowIfNull(clusterId);
+            ArgumentNullException.ThrowIfNull(providerId);
             ArgumentNullException.ThrowIfNull(grainId);
             ArgumentNullException.ThrowIfNull(activationId);
 
@@ -637,6 +640,7 @@ namespace Orleans.Tests.SqlUtils
                 command => new DbStoredQueries.Columns(command)
                 {
                     ClusterId = clusterId,
+                    ProviderId = providerId,
                     GrainIdHash = grainIdHash,
                     GrainId = grainId,
                     ActivationId = activationId
@@ -650,9 +654,10 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="clusterId">The cluster identifier.</param>
         /// <param name="grainId">The grain identifier.</param>
         /// <returns>The grain activation if found or null if not.</returns>
-        internal Task<AdoNetGrainDirectoryEntry> LookupGrainActivationAsync(string clusterId, string grainId)
+        internal Task<AdoNetGrainDirectoryEntry> LookupGrainActivationAsync(string clusterId, string providerId, string grainId)
         {
             ArgumentNullException.ThrowIfNull(clusterId);
+            ArgumentNullException.ThrowIfNull(providerId);
             ArgumentNullException.ThrowIfNull(grainId);
 
             var grainIdHash = (int)StableHash.ComputeHash(grainId);
@@ -661,12 +666,14 @@ namespace Orleans.Tests.SqlUtils
                 dbStoredQueries.LookupGrainActivationKey,
                 record => new AdoNetGrainDirectoryEntry(
                     (string)record[nameof(AdoNetGrainDirectoryEntry.ClusterId)],
+                    (string)record[nameof(AdoNetGrainDirectoryEntry.ProviderId)],
                     (string)record[nameof(AdoNetGrainDirectoryEntry.GrainId)],
                     (string)record[nameof(AdoNetGrainDirectoryEntry.SiloAddress)],
                     (string)record[nameof(AdoNetGrainDirectoryEntry.ActivationId)]),
                 command => new DbStoredQueries.Columns(command)
                 {
                     ClusterId = clusterId,
+                    ProviderId = providerId,
                     GrainIdHash = grainIdHash,
                     GrainId = grainId,
                 },
@@ -679,9 +686,10 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="clusterId">The cluster identifier.</param>
         /// <param name="siloAddresses">The pipe separated set of silos.</param>
         /// <returns>The count of rows affected.</returns>
-        internal Task<int> UnregisterGrainActivationsAsync(string clusterId, string siloAddresses)
+        internal Task<int> UnregisterGrainActivationsAsync(string clusterId, string providerId, string siloAddresses)
         {
             ArgumentNullException.ThrowIfNull(clusterId);
+            ArgumentNullException.ThrowIfNull(providerId);
             ArgumentNullException.ThrowIfNull(siloAddresses);
 
             return ReadAsync(
@@ -690,6 +698,7 @@ namespace Orleans.Tests.SqlUtils
                 command => new DbStoredQueries.Columns(command)
                 {
                     ClusterId = clusterId,
+                    ProviderId = providerId,
                     SiloAddresses = siloAddresses
                 },
                 result => result.Single());

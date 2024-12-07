@@ -13,7 +13,7 @@ using Orleans.Runtime;
 
 namespace Orleans.GrainDirectory.AdoNet;
 
-internal sealed partial class AdoNetGrainDirectory(AdoNetGrainDirectoryOptions options, ILogger<AdoNetGrainDirectory> logger, IOptions<ClusterOptions> clusterOptions, IHostApplicationLifetime lifetime) : IGrainDirectory
+internal sealed partial class AdoNetGrainDirectory(string name, AdoNetGrainDirectoryOptions options, ILogger<AdoNetGrainDirectory> logger, IOptions<ClusterOptions> clusterOptions, IHostApplicationLifetime lifetime) : IGrainDirectory
 {
     private readonly ILogger _logger = logger;
     private readonly string _clusterId = clusterOptions.Value.ClusterId;
@@ -31,7 +31,7 @@ internal sealed partial class AdoNetGrainDirectory(AdoNetGrainDirectoryOptions o
             var queries = await GetQueriesAsync();
 
             var entry = await queries
-                .LookupGrainActivationAsync(_clusterId, grainId.ToString())
+                .LookupGrainActivationAsync(_clusterId, name, grainId.ToString())
                 .WaitAsync(lifetime.ApplicationStopping);
 
             return entry?.ToGrainAddress();
@@ -57,7 +57,7 @@ internal sealed partial class AdoNetGrainDirectory(AdoNetGrainDirectoryOptions o
             var queries = await GetQueriesAsync();
 
             var count = await queries
-                .RegisterGrainActivationAsync(_clusterId, address.GrainId.ToString(), address.SiloAddress.ToParsableString(), address.ActivationId.ToParsableString())
+                .RegisterGrainActivationAsync(_clusterId, name, address.GrainId.ToString(), address.SiloAddress.ToParsableString(), address.ActivationId.ToParsableString())
                 .WaitAsync(lifetime.ApplicationStopping);
 
             if (count > 0)
@@ -90,7 +90,7 @@ internal sealed partial class AdoNetGrainDirectory(AdoNetGrainDirectoryOptions o
             var queries = await GetQueriesAsync();
 
             var count = await queries
-                .UnregisterGrainActivationAsync(_clusterId, address.GrainId.ToString(), address.ActivationId.ToParsableString())
+                .UnregisterGrainActivationAsync(_clusterId, name, address.GrainId.ToString(), address.ActivationId.ToParsableString())
                 .WaitAsync(lifetime.ApplicationStopping);
 
             if (count > 0)
@@ -125,7 +125,7 @@ internal sealed partial class AdoNetGrainDirectory(AdoNetGrainDirectoryOptions o
             var queries = await GetQueriesAsync();
 
             var count = await queries
-                .UnregisterGrainActivationsAsync(_clusterId, siloAddressesAsString)
+                .UnregisterGrainActivationsAsync(_clusterId, name, siloAddressesAsString)
                 .WaitAsync(lifetime.ApplicationStopping);
 
             if (count > 0)

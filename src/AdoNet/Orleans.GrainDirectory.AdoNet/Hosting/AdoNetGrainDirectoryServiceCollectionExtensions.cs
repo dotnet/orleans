@@ -26,7 +26,7 @@ public static class AdoNetGrainDirectoryServiceCollectionExtensions
             {
                 var options = sp.GetOptionsByName<AdoNetGrainDirectoryOptions>(name);
 
-                return ActivatorUtilities.CreateInstance<AdoNetGrainDirectory>(sp, options);
+                return ActivatorUtilities.CreateInstance<AdoNetGrainDirectory>(sp, name, options);
             });
     }
 }
