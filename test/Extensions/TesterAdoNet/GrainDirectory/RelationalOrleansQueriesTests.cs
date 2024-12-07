@@ -87,10 +87,15 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory");
 
         // act
-        var count = await _queries.RegisterGrainActivationAsync(clusterId, providerId, grainId, siloAddress, activationId);
+        var entry = await _queries.RegisterGrainActivationAsync(clusterId, providerId, grainId, siloAddress, activationId);
 
         // assert
-        Assert.Equal(1, count);
+        Assert.NotNull(entry);
+        Assert.Equal(clusterId, entry.ClusterId);
+        Assert.Equal(providerId, entry.ProviderId);
+        Assert.Equal(grainId, entry.GrainId);
+        Assert.Equal(siloAddress, entry.SiloAddress);
+        Assert.Equal(activationId, entry.ActivationId);
 
         var results = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory");
         var result = Assert.Single(results);
@@ -117,12 +122,12 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory");
 
         // act
-        var count1 = await _queries.RegisterGrainActivationAsync(clusterId, providerId, grainId, siloAddress, activationId);
-        var count2 = await _queries.UnregisterGrainActivationAsync(clusterId, providerId, grainId, activationId);
+        var entry = await _queries.RegisterGrainActivationAsync(clusterId, providerId, grainId, siloAddress, activationId);
+        var count = await _queries.UnregisterGrainActivationAsync(clusterId, providerId, grainId, activationId);
 
         // assert
-        Assert.Equal(1, count1);
-        Assert.Equal(1, count2);
+        Assert.NotNull(entry);
+        Assert.Equal(1, count);
 
         var results = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory");
         Assert.Empty(results);
@@ -144,11 +149,11 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory");
 
         // act
-        var count = await _queries.RegisterGrainActivationAsync(clusterId, providerId, grainId, siloAddress, activationId);
+        var entry = await _queries.RegisterGrainActivationAsync(clusterId, providerId, grainId, siloAddress, activationId);
         var result = await _queries.LookupGrainActivationAsync(clusterId, providerId, grainId);
 
         // assert
-        Assert.Equal(1, count);
+        Assert.NotNull(entry);
         Assert.NotNull(result);
         Assert.Equal(clusterId, result.ClusterId);
         Assert.Equal(providerId, result.ProviderId);

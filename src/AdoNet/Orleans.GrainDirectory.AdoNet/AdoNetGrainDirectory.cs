@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection.PortableExecutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
@@ -56,19 +55,14 @@ internal sealed partial class AdoNetGrainDirectory(string name, AdoNetGrainDirec
         {
             var queries = await GetQueriesAsync();
 
-            var count = await queries
+            // this call is expected to register a new entry or return the existing one if found in a thread safe manner
+            var entry = await queries
                 .RegisterGrainActivationAsync(_clusterId, name, address.GrainId.ToString(), address.SiloAddress.ToParsableString(), address.ActivationId.ToParsableString())
                 .WaitAsync(lifetime.ApplicationStopping);
 
-            if (count > 0)
-            {
-                LogRegistered(_clusterId, address.GrainId, address.SiloAddress, address.ActivationId);
-                return address;
-            }
-            else
-            {
-                return await Lookup(address.GrainId);
-            }
+            LogRegistered(_clusterId, address.GrainId, address.SiloAddress, address.ActivationId);
+
+            return entry.ToGrainAddress();
         }
         catch (Exception ex)
         {
