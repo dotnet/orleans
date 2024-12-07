@@ -82,49 +82,66 @@ DECLARE @Now DATETIMEOFFSET(3) = CAST(SYSUTCDATETIME() AS DATETIMEOFFSET(3));
 
 BEGIN TRANSACTION;
 
-/* Place and hold a lock on the hash range upfront to prevent both duplicates and deadlocks. */
-/* This is required to ensure the server always locks the index before it locks the underlying table. */
-DECLARE @Locked INT =
-(
-    SELECT COUNT(*)
-    FROM OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(IX_OrleansGrainDirectory_Lookup))
-    WHERE
-        ClusterId = @ClusterId
-        AND ProviderId = @ProviderId
-        AND GrainIdHash = @GrainIdHash
-);
-
-/* It is now safe to add the entry. */
-INSERT INTO OrleansGrainDirectory
-(
+/* First we check if the entry already exists. */
+/* This also induces and holds a lock on the hash index upfront to prevent both duplicates and deadlocks. */
+/* This is also required to ensure the server always locks the index before it locks the underlying table upon modification. */
+SELECT
     ClusterId,
     ProviderId,
-    GrainIdHash,
     GrainId,
     SiloAddress,
     ActivationId,
     CreatedOn
-)
-SELECT
-    @ClusterId,
-    @ProviderId,
-    @GrainIdHash,
-    @GrainId,
-    @SiloAddress,
-    @ActivationId,
-    @Now
-WHERE NOT EXISTS
-(
-    SELECT 1
-    FROM OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(IX_OrleansGrainDirectory_Lookup))
-    WHERE
-        ClusterId = @ClusterId
-        AND ProviderId = @ProviderId
-        AND GrainIdHash = @GrainIdHash
-        AND GrainId = @GrainId
-);
+FROM
+    OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(IX_OrleansGrainDirectory_Lookup))
+WHERE
+    ClusterId = @ClusterId
+    AND ProviderId = @ProviderId
+    AND GrainIdHash = @GrainIdHash
+    AND GrainId = @GrainId;
 
-SELECT @@ROWCOUNT;
+/* If no current entry was found we can add a new one now. */
+IF @@ROWCOUNT = 0
+BEGIN
+    INSERT INTO OrleansGrainDirectory
+    (
+        ClusterId,
+        ProviderId,
+        GrainIdHash,
+        GrainId,
+        SiloAddress,
+        ActivationId,
+        CreatedOn
+    )
+    OUTPUT
+        INSERTED.ClusterId,
+        INSERTED.ProviderId,
+        INSERTED.GrainId,
+        INSERTED.SiloAddress,
+        INSERTED.ActivationId,
+        INSERTED.CreatedOn
+    SELECT
+        @ClusterId,
+        @ProviderId,
+        @GrainIdHash,
+        @GrainId,
+        @SiloAddress,
+        @ActivationId,
+        @Now
+
+    /* This check should not be required given we are already holding a lock on the hash. */
+    /* However it is included here as an extra safety measure. */
+    WHERE NOT EXISTS
+    (
+        SELECT 1
+        FROM OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(IX_OrleansGrainDirectory_Lookup))
+        WHERE
+            ClusterId = @ClusterId
+            AND ProviderId = @ProviderId
+            AND GrainIdHash = @GrainIdHash
+            AND GrainId = @GrainId
+    );
+END
 
 COMMIT;
 
@@ -154,8 +171,8 @@ SET XACT_ABORT ON;
 
 BEGIN TRANSACTION;
 
-/* Place and hold a lock on the hash range upfront to prevent both duplicates and deadlocks. */
-/* This is required to ensure the server always locks the index before it locks the underlying table. */
+/* Induce a lock on the hash index upfront to prevent both duplicates and deadlocks. */
+/* This is required to ensure the server always locks the index before it locks the underlying table upon modification. */
 DECLARE @Locked INT =
 (
     SELECT COUNT(*)
@@ -164,6 +181,7 @@ DECLARE @Locked INT =
         ClusterId = @ClusterId
         AND ProviderId = @ProviderId
         AND GrainIdHash = @GrainIdHash
+        AND GrainId = @GrainId
 );
 
 /* It is now safe to remove the entry. */

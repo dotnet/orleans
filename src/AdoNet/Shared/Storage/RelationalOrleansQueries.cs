@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -593,7 +592,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="siloAddress">The silo address.</param>
         /// <param name="activationId">The activation identifier.</param>
         /// <returns>The count of rows affected.</returns>
-        internal Task<int> RegisterGrainActivationAsync(string clusterId, string providerId, string grainId, string siloAddress, string activationId)
+        internal Task<AdoNetGrainDirectoryEntry> RegisterGrainActivationAsync(string clusterId, string providerId, string grainId, string siloAddress, string activationId)
         {
             ArgumentNullException.ThrowIfNull(clusterId);
             ArgumentNullException.ThrowIfNull(providerId);
@@ -605,7 +604,12 @@ namespace Orleans.Tests.SqlUtils
 
             return ReadAsync(
                 dbStoredQueries.RegisterGrainActivationKey,
-                record => record.GetInt32(0),
+                record => new AdoNetGrainDirectoryEntry(
+                    (string)record[nameof(AdoNetGrainDirectoryEntry.ClusterId)],
+                    (string)record[nameof(AdoNetGrainDirectoryEntry.ProviderId)],
+                    (string)record[nameof(AdoNetGrainDirectoryEntry.GrainId)],
+                    (string)record[nameof(AdoNetGrainDirectoryEntry.SiloAddress)],
+                    (string)record[nameof(AdoNetGrainDirectoryEntry.ActivationId)]),
                 command => new DbStoredQueries.Columns(command)
                 {
                     ClusterId = clusterId,
