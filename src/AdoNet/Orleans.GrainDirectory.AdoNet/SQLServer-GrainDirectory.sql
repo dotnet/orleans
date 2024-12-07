@@ -90,8 +90,7 @@ SELECT
     ProviderId,
     GrainId,
     SiloAddress,
-    ActivationId,
-    CreatedOn
+    ActivationId
 FROM
     OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(IX_OrleansGrainDirectory_Lookup))
 WHERE
@@ -118,8 +117,7 @@ BEGIN
         INSERTED.ProviderId,
         INSERTED.GrainId,
         INSERTED.SiloAddress,
-        INSERTED.ActivationId,
-        INSERTED.CreatedOn
+        INSERTED.ActivationId
     SELECT
         @ClusterId,
         @ProviderId,
@@ -229,7 +227,7 @@ SELECT
     SiloAddress,
     ActivationId
 FROM
-    OrleansGrainDirectory WITH (INDEX(IX_OrleansGrainDirectory_Lookup))
+    OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(IX_OrleansGrainDirectory_Lookup))
 WHERE
     ClusterId = @ClusterId
     AND ProviderId = @ProviderId
