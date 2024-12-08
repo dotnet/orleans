@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Npgsql;
 using Orleans.Configuration;
 using Orleans.GrainDirectory.AdoNet;
 using Orleans.Tests.SqlUtils;
@@ -16,6 +17,17 @@ namespace Tester.AdoNet.GrainDirectory;
 /// </summary>
 public class SqlServerAdoNetGrainDirectoryTests() : AdoNetGrainDirectoryTests(AdoNetInvariants.InvariantNameSqlServer, 90)
 {
+}
+
+/// <summary>
+/// Tests for <see cref="AdoNetGrainDirectory"/> against PostgreSQL.
+/// </summary>
+public class PostgreSQLAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
+{
+    public PostgreSQLAdoNetGrainDirectoryTests() : base(AdoNetInvariants.InvariantNamePostgreSql, 90)
+    {
+        NpgsqlConnection.ClearAllPools();
+    }
 }
 
 /// <summary>

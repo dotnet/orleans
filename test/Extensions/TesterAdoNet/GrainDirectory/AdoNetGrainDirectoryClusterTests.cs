@@ -1,3 +1,4 @@
+using Npgsql;
 using Orleans.TestingHost;
 using Orleans.Tests.SqlUtils;
 using Tester.Directories;
@@ -12,6 +13,17 @@ namespace Tester.AdoNet.GrainDirectory;
 /// </summary>
 public class SqlServerAdoNetGrainDirectoryClusterTests() : AdoNetGrainDirectoryClusterTests(AdoNetInvariants.InvariantNameSqlServer)
 {
+}
+
+/// <summary>
+/// Cluster tests for ADO.NET Grain Directory against PostgreSQL.
+/// </summary>
+public class PostgreSqlAdoNetGrainDirectoryClusterTests : AdoNetGrainDirectoryClusterTests
+{
+    public PostgreSqlAdoNetGrainDirectoryClusterTests() : base(AdoNetInvariants.InvariantNamePostgreSql)
+    {
+        NpgsqlConnection.ClearAllPools();
+    }
 }
 
 /// <summary>

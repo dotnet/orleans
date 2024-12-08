@@ -1,3 +1,4 @@
+using Npgsql;
 using Orleans.GrainDirectory.AdoNet;
 using Orleans.GrainDirectory.AdoNet.Storage;
 using UnitTests.General;
@@ -10,6 +11,17 @@ namespace Tester.AdoNet.GrainDirectory;
 /// </summary>
 public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNameSqlServer, 90)
 {
+}
+
+/// <summary>
+/// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against PostgreSQL.
+/// </summary>
+public class PostgreSqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
+{
+    public PostgreSqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNamePostgreSql, 90)
+    {
+        NpgsqlConnection.ClearAllPools();
+    }
 }
 
 /*
@@ -25,18 +37,7 @@ public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 }
 */
 
-/*
-/// <summary>
-/// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against PostgreSQL.
-/// </summary>
-public class PostgreSqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
-{
-    public PostgreSqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNamePostgreSql, 99)
-    {
-        NpgsqlConnection.ClearAllPools();
-    }
-}
-*/
+
 
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/>.
