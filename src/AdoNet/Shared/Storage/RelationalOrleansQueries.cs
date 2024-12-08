@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -14,10 +13,12 @@ namespace Orleans.Persistence.AdoNet.Storage
 #elif REMINDERS_ADONET
 namespace Orleans.Reminders.AdoNet.Storage
 #elif STREAMING_ADONET
-
 namespace Orleans.Streaming.AdoNet.Storage
+#elif GRAINDIRECTORY_ADONET
+namespace Orleans.GrainDirectory.AdoNet.Storage
 #elif TESTER_SQLUTILS
 using Orleans.Streaming.AdoNet;
+using Orleans.GrainDirectory.AdoNet;
 namespace Orleans.Tests.SqlUtils
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
@@ -577,6 +578,134 @@ namespace Orleans.Tests.SqlUtils
                     QueueId = queueId,
                     MaxCount = maxCount
                 });
+        }
+
+#endif
+
+#if GRAINDIRECTORY_ADONET || TESTER_SQLUTILS
+
+        /// <summary>
+        /// Registers a new grain activation.
+        /// </summary>
+        /// <param name="clusterId">The cluster identifier.</param>
+        /// <param name="grainId">The grain identifier.</param>
+        /// <param name="siloAddress">The silo address.</param>
+        /// <param name="activationId">The activation identifier.</param>
+        /// <returns>The count of rows affected.</returns>
+        internal Task<AdoNetGrainDirectoryEntry> RegisterGrainActivationAsync(string clusterId, string providerId, string grainId, string siloAddress, string activationId)
+        {
+            ArgumentNullException.ThrowIfNull(clusterId);
+            ArgumentNullException.ThrowIfNull(providerId);
+            ArgumentNullException.ThrowIfNull(grainId);
+            ArgumentNullException.ThrowIfNull(siloAddress);
+            ArgumentNullException.ThrowIfNull(activationId);
+
+            var grainIdHash = (int)StableHash.ComputeHash(grainId);
+
+            return ReadAsync(
+                dbStoredQueries.RegisterGrainActivationKey,
+                record => new AdoNetGrainDirectoryEntry(
+                    (string)record[nameof(AdoNetGrainDirectoryEntry.ClusterId)],
+                    (string)record[nameof(AdoNetGrainDirectoryEntry.ProviderId)],
+                    (string)record[nameof(AdoNetGrainDirectoryEntry.GrainId)],
+                    (string)record[nameof(AdoNetGrainDirectoryEntry.SiloAddress)],
+                    (string)record[nameof(AdoNetGrainDirectoryEntry.ActivationId)]),
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ClusterId = clusterId,
+                    ProviderId = providerId,
+                    GrainIdHash = grainIdHash,
+                    GrainId = grainId,
+                    SiloAddressAsString = siloAddress,
+                    ActivationId = activationId
+                },
+                result => result.Single());
+        }
+
+        /// <summary>
+        /// Unregisters a grain activation.
+        /// </summary>
+        /// <param name="clusterId">The cluster identifier.</param>
+        /// <param name="grainId">The grain identifier.</param>
+        /// <param name="activationId">The activation identifier.</param>
+        /// <returns>The count of rows affected.</returns>
+        internal Task<int> UnregisterGrainActivationAsync(string clusterId, string providerId, string grainId, string activationId)
+        {
+            ArgumentNullException.ThrowIfNull(clusterId);
+            ArgumentNullException.ThrowIfNull(providerId);
+            ArgumentNullException.ThrowIfNull(grainId);
+            ArgumentNullException.ThrowIfNull(activationId);
+
+            var grainIdHash = (int)StableHash.ComputeHash(grainId);
+
+            return ReadAsync(
+                dbStoredQueries.UnregisterGrainActivationKey,
+                record => record.GetInt32(0),
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ClusterId = clusterId,
+                    ProviderId = providerId,
+                    GrainIdHash = grainIdHash,
+                    GrainId = grainId,
+                    ActivationId = activationId
+                },
+                result => result.Single());
+        }
+
+        /// <summary>
+        /// Looks up a grain activation.
+        /// </summary>
+        /// <param name="clusterId">The cluster identifier.</param>
+        /// <param name="grainId">The grain identifier.</param>
+        /// <returns>The grain activation if found or null if not.</returns>
+        internal Task<AdoNetGrainDirectoryEntry> LookupGrainActivationAsync(string clusterId, string providerId, string grainId)
+        {
+            ArgumentNullException.ThrowIfNull(clusterId);
+            ArgumentNullException.ThrowIfNull(providerId);
+            ArgumentNullException.ThrowIfNull(grainId);
+
+            var grainIdHash = (int)StableHash.ComputeHash(grainId);
+
+            return ReadAsync(
+                dbStoredQueries.LookupGrainActivationKey,
+                record => new AdoNetGrainDirectoryEntry(
+                    (string)record[nameof(AdoNetGrainDirectoryEntry.ClusterId)],
+                    (string)record[nameof(AdoNetGrainDirectoryEntry.ProviderId)],
+                    (string)record[nameof(AdoNetGrainDirectoryEntry.GrainId)],
+                    (string)record[nameof(AdoNetGrainDirectoryEntry.SiloAddress)],
+                    (string)record[nameof(AdoNetGrainDirectoryEntry.ActivationId)]),
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ClusterId = clusterId,
+                    ProviderId = providerId,
+                    GrainIdHash = grainIdHash,
+                    GrainId = grainId,
+                },
+                result => result.SingleOrDefault());
+        }
+
+        /// <summary>
+        /// Unregisters all grain activations for a set of silos.
+        /// </summary>
+        /// <param name="clusterId">The cluster identifier.</param>
+        /// <param name="siloAddresses">The pipe separated set of silos.</param>
+        /// <returns>The count of rows affected.</returns>
+        internal Task<int> UnregisterGrainActivationsAsync(string clusterId, string providerId, string siloAddresses)
+        {
+            ArgumentNullException.ThrowIfNull(clusterId);
+            ArgumentNullException.ThrowIfNull(providerId);
+            ArgumentNullException.ThrowIfNull(siloAddresses);
+
+            return ReadAsync(
+                dbStoredQueries.UnregisterGrainActivationsKey,
+                record => record.GetInt32(0),
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ClusterId = clusterId,
+                    ProviderId = providerId,
+                    SiloAddresses = siloAddresses
+                },
+                result => result.Single());
         }
 
 #endif
