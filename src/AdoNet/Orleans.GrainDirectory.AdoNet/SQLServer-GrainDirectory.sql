@@ -1,7 +1,7 @@
 /*
 Orleans Grain Directory.
 
-This tables stores the location of all grains in the cluster.
+This table stores the location of all grains in the cluster.
 
 The rationale for this table is as follows:
 
