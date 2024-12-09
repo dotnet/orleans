@@ -114,12 +114,10 @@ internal sealed partial class AdoNetGrainDirectory(string name, AdoNetGrainDirec
 
         try
         {
-            var siloAddressesAsString = string.Join('|', siloAddresses.Select(x => x.ToParsableString()));
-
             var queries = await GetQueriesAsync();
 
             var count = await queries
-                .UnregisterGrainActivationsAsync(_clusterId, name, siloAddressesAsString)
+                .UnregisterGrainActivationsAsync(_clusterId, name, GetSilosAddressesAsString(siloAddresses))
                 .WaitAsync(lifetime.ApplicationStopping);
 
             if (count > 0)
@@ -132,6 +130,8 @@ internal sealed partial class AdoNetGrainDirectory(string name, AdoNetGrainDirec
             LogFailedToUnregisterSilos(ex, _clusterId, siloAddresses);
             throw;
         }
+
+        static string GetSilosAddressesAsString(IEnumerable<SiloAddress> siloAddresses) => string.Join('|', siloAddresses.Select(x => x.ToParsableString()));
     }
 
     /// <summary>
