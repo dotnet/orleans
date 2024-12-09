@@ -1,3 +1,4 @@
+using MySql.Data.MySqlClient;
 using Npgsql;
 using Orleans.TestingHost;
 using Orleans.Tests.SqlUtils;
@@ -23,6 +24,17 @@ public class PostgreSqlAdoNetGrainDirectoryClusterTests : AdoNetGrainDirectoryCl
     public PostgreSqlAdoNetGrainDirectoryClusterTests() : base(AdoNetInvariants.InvariantNamePostgreSql)
     {
         NpgsqlConnection.ClearAllPools();
+    }
+}
+
+/// <summary>
+/// Cluster tests for ADO.NET Grain Directory against MySQL.
+/// </summary>
+public class MySqlAdoNetGrainDirectoryClusterTests : AdoNetGrainDirectoryClusterTests
+{
+    public MySqlAdoNetGrainDirectoryClusterTests() : base(AdoNetInvariants.InvariantNameMySql)
+    {
+        MySqlConnection.ClearAllPools();
     }
 }
 

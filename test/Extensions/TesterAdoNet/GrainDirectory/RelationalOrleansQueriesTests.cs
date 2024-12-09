@@ -1,3 +1,4 @@
+using MySql.Data.MySqlClient;
 using Npgsql;
 using Orleans.GrainDirectory.AdoNet;
 using Orleans.GrainDirectory.AdoNet.Storage;
@@ -24,20 +25,16 @@ public class PostgreSqlRelationalOrleansQueriesTests : RelationalOrleansQueriesT
     }
 }
 
-/*
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against MySQL.
 /// </summary>
 public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 {
-    public MySqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNameMySql, 100)
+    public MySqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNameMySql, 90)
     {
         MySqlConnection.ClearAllPools();
     }
 }
-*/
-
-
 
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/>.

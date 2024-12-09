@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using MySql.Data.MySqlClient;
 using Npgsql;
 using Orleans.Configuration;
 using Orleans.GrainDirectory.AdoNet;
@@ -22,11 +23,22 @@ public class SqlServerAdoNetGrainDirectoryTests() : AdoNetGrainDirectoryTests(Ad
 /// <summary>
 /// Tests for <see cref="AdoNetGrainDirectory"/> against PostgreSQL.
 /// </summary>
-public class PostgreSQLAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
+public class PostgreSqlAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
 {
-    public PostgreSQLAdoNetGrainDirectoryTests() : base(AdoNetInvariants.InvariantNamePostgreSql, 90)
+    public PostgreSqlAdoNetGrainDirectoryTests() : base(AdoNetInvariants.InvariantNamePostgreSql, 90)
     {
         NpgsqlConnection.ClearAllPools();
+    }
+}
+
+/// <summary>
+/// Tests for <see cref="AdoNetGrainDirectory"/> against MySQL.
+/// </summary>
+public class MySqlAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
+{
+    public MySqlAdoNetGrainDirectoryTests() : base(AdoNetInvariants.InvariantNameMySql, 90)
+    {
+        MySqlConnection.ClearAllPools();
     }
 }
 
