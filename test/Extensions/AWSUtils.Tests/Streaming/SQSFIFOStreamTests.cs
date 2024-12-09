@@ -11,7 +11,7 @@ using OrleansAWSUtils.Streams;
 namespace AWSUtils.Tests.Streaming
 {
     [TestCategory("AWS"), TestCategory("SQS")]
-    public class SQSStreamTests : TestClusterPerTest
+    public class SQSFIFOStreamTests : TestClusterPerTest
     {
         public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSProvider";
 
@@ -34,11 +34,37 @@ namespace AWSUtils.Tests.Streaming
                 hostBuilder
                     .AddSqsStreams("SQSProvider", options =>
                     {
-                        options.ConnectionString = AWSTestConstants.SqsConnectionString;
+                        options.ConfigurePullingAgent(agent =>
+                        {
+                            agent.Configure(x =>
+                            {
+                                x.MaxEventDeliveryTime = TimeSpan.FromSeconds(55);
+                                x.GetQueueMsgsTimerPeriod = TimeSpan.FromMilliseconds(25);
+                            });
+                        });
+                        options.ConfigureSqs(opt =>
+                        opt.Configure(sqs => 
+                        {
+                            sqs.FifoQueue = true;
+                            sqs.ConnectionString = AWSTestConstants.SqsConnectionString;
+                        }));
                     })
                     .AddSqsStreams("SQSProvider2", options =>
                      {
-                         options.ConnectionString = AWSTestConstants.SqsConnectionString;
+                         options.ConfigurePullingAgent(agent =>
+                         {
+                             agent.Configure(x =>
+                             {
+                                 x.MaxEventDeliveryTime = TimeSpan.FromSeconds(55);
+                                 x.GetQueueMsgsTimerPeriod = TimeSpan.FromMilliseconds(25);
+                             });
+                         });
+                         options.ConfigureSqs(opt =>
+                             opt.Configure(sqs =>
+                             {
+                                 sqs.FifoQueue = true;
+                                 sqs.ConnectionString = AWSTestConstants.SqsConnectionString;
+                             }));
                      })
                     .AddMemoryGrainStorage("MemoryStore", op=>op.NumStorageGrains = 1);
 
@@ -73,9 +99,14 @@ namespace AWSUtils.Tests.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddSqsStreams("SQSProvider", (System.Action<Orleans.Configuration.SqsOptions>)(options =>
+                    .AddSqsStreams("SQSProvider", (options =>
                     {
-                        options.ConnectionString = AWSTestConstants.SqsConnectionString;
+                        options.ConfigureSqs(opt =>
+                            opt.Configure(sqs =>
+                            {
+                                sqs.FifoQueue = true;
+                                sqs.ConnectionString = AWSTestConstants.SqsConnectionString;
+                            }));
                     }));
             }
         }
