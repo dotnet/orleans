@@ -56,60 +56,16 @@ ON OrleansGrainDirectory
 
 DELIMITER $$
 
-/* Registers a new grain activation */
-CREATE PROCEDURE RegisterGrainActivation
+INSERT INTO OrleansQuery
 (
-    IN _ClusterId NVARCHAR(150),
-    IN _ProviderId NVARCHAR(150),
-    IN _GrainIdHash INT,
-    IN _GrainId TEXT,
-    IN _SiloAddress NVARCHAR(100),
-    IN _ActivationId NVARCHAR(100)
+	QueryKey,
+	QueryText
 )
-BEGIN
-
-DECLARE _Now DATETIME(3) DEFAULT UTC_TIMESTAMP(3);
-
-SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
-START TRANSACTION;
-
 SELECT
-    ClusterId,
-    ProviderId,
-    GrainId,
-    SiloAddress,
-    ActivationId
-FROM
-    OrleansGrainDirectory
-WHERE
-    ClusterId = _ClusterId
-    AND ProviderId = _ProviderId
-    AND GrainIdHash = _GrainIdHash
-    AND GrainId = _GrainId
-FOR UPDATE;
-
-IF FOUND_ROWS() = 0 THEN
-
-    INSERT INTO OrleansGrainDirectory
-    (
-        ClusterId,
-        ProviderId,
-        GrainIdHash,
-        GrainId,
-        SiloAddress,
-        ActivationId,
-        CreatedOn
-    )
-    VALUES
-    (
-        _ClusterId,
-        _ProviderId,
-        _GrainIdHash,
-        _GrainId,
-        _SiloAddress,
-        _ActivationId,
-        _Now
-    );
+	'RegisterGrainActivationKey',
+	'
+    SET AUTOCOMMIT = 0;
+    LOCK TABLES OrleansGrainDirectory WRITE;
 
     SELECT
         ClusterId,
@@ -120,71 +76,52 @@ IF FOUND_ROWS() = 0 THEN
     FROM
         OrleansGrainDirectory
     WHERE
-        ClusterId = _ClusterId
-        AND ProviderId = _ProviderId
-        AND GrainIdHash = _GrainIdHash
-        AND GrainId = _GrainId;
+        ClusterId = @ClusterId
+        AND ProviderId = @ProviderId
+        AND GrainIdHash = @GrainIdHash
+        AND GrainId = @GrainId;
 
-END IF;
+    IF FOUND_ROWS() = 0 THEN
 
-COMMIT;
+        INSERT INTO OrleansGrainDirectory
+        (
+            ClusterId,
+            ProviderId,
+            GrainIdHash,
+            GrainId,
+            SiloAddress,
+            ActivationId,
+            CreatedOn
+        )
+        SELECT
+            @ClusterId,
+            @ProviderId,
+            @GrainIdHash,
+            @GrainId,
+            @SiloAddress,
+            @ActivationId,
+            UTC_TIMESTAMP(3);
 
-END;
+        SELECT
+            ClusterId,
+            ProviderId,
+            GrainId,
+            SiloAddress,
+            ActivationId
+        FROM
+            OrleansGrainDirectory
+        WHERE
+            ClusterId = @ClusterId
+            AND ProviderId = @ProviderId
+            AND GrainIdHash = @GrainIdHash
+            AND GrainId = @GrainId;
 
-DELIMITER $$
+    END IF;
 
-INSERT INTO OrleansQuery
-(
-	QueryKey,
-	QueryText
-)
-SELECT
-	'RegisterGrainActivationKey',
-	'CALL RegisterGrainActivation (@ClusterId, @ProviderId, @GrainIdHash, @GrainId, @SiloAddress, @ActivationId)'
+    COMMIT;
+    UNLOCK TABLES;
+    '
 ;
-
-DELIMITER $$
-
-/* Unregisters an existing grain activation */
-CREATE PROCEDURE UnregisterGrainActivation
-(
-    IN _ClusterId NVARCHAR(150),
-    IN _ProviderId NVARCHAR(150),
-    IN _GrainIdHash INT,
-    IN _GrainId TEXT,
-    IN _ActivationId NVARCHAR(100)
-)
-BEGIN
-
-SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
-START TRANSACTION;
-
-CREATE TEMPORARY TABLE _Batch AS
-SELECT
-    *
-FROM
-    OrleansGrainDirectory
-WHERE
-    ClusterId = _ClusterId
-    AND ProviderId = _ProviderId
-    AND GrainIdHash = _GrainIdHash
-    AND GrainId = _GrainId
-FOR UPDATE;
-
-DELETE FROM OrleansGrainDirectory
-WHERE ClusterId = _ClusterId
-    AND ProviderId = _ProviderId
-    AND GrainIdHash = _GrainIdHash
-    AND GrainId = _GrainId
-    AND ActivationId = _ActivationId;
-
-SELECT ROW_COUNT();
-
-DROP TEMPORARY TABLE _Batch;
-
-COMMIT;
-
-END;
 
 DELIMITER $$
 
@@ -195,41 +132,24 @@ INSERT INTO OrleansQuery
 )
 SELECT
 	'UnregisterGrainActivationKey',
-	'CALL UnregisterGrainActivation (@ClusterId, @ProviderId, @GrainIdHash, @GrainId, @ActivationId)'
+	'
+    SET AUTOCOMMIT = 0;
+    LOCK TABLES OrleansGrainDirectory WRITE;
+
+    DELETE FROM OrleansGrainDirectory
+    WHERE
+        ClusterId = @ClusterId
+        AND ProviderId = @ProviderId
+        AND GrainIdHash = @GrainIdHash
+        AND GrainId = @GrainId
+        AND ActivationId = @ActivationId;
+
+    SELECT ROW_COUNT();
+
+    COMMIT;
+    UNLOCK TABLES;
+    '
 ;
-
-DELIMITER $$
-
-/* Looks up an existing grain activation */
-CREATE PROCEDURE LookupGrainActivation
-(
-    IN _ClusterId NVARCHAR(150),
-    IN _ProviderId NVARCHAR(150),
-    IN _GrainIdHash INT,
-    IN _GrainId TEXT
-)
-BEGIN
-
-SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
-START TRANSACTION;
-
-SELECT
-    ClusterId,
-    ProviderId,
-    GrainId,
-    SiloAddress,
-    ActivationId
-FROM
-    OrleansGrainDirectory
-WHERE
-    ClusterId = _ClusterId
-    AND ProviderId = _ProviderId
-    AND GrainIdHash = _GrainIdHash
-    AND GrainId = _GrainId;
-
-COMMIT;
-
-END;
 
 DELIMITER $$
 
@@ -240,61 +160,28 @@ INSERT INTO OrleansQuery
 )
 SELECT
     'LookupGrainActivationKey',
-    'CALL LookupGrainActivation(@ClusterId, @ProviderId, @GrainIdHash, @GrainId)'
+    '
+    SET AUTOCOMMIT = 0;
+    LOCK TABLES OrleansGrainDirectory WRITE;
+
+    SELECT
+        ClusterId,
+        ProviderId,
+        GrainId,
+        SiloAddress,
+        ActivationId
+    FROM
+        OrleansGrainDirectory
+    WHERE
+        ClusterId = @ClusterId
+        AND ProviderId = @ProviderId
+        AND GrainIdHash = @GrainIdHash
+        AND GrainId = @GrainId;
+
+    COMMIT;
+    UNLOCK TABLES;
+    '
 ;
-
-DELIMITER $$
-
-/* Unregisters all grain activations in the specified silos */
-CREATE PROCEDURE UnregisterGrainActivations
-(
-    IN _ClusterId NVARCHAR(150),
-    IN _ProviderId NVARCHAR(150),
-    IN _SiloAddresses TEXT
-)
-BEGIN
-
-CREATE TEMPORARY TABLE TempSiloAddresses
-(
-    SiloAddress NVARCHAR(100) NOT NULL,
-    Level INT NOT NULL
-);
-
-INSERT INTO TempSiloAddresses
-(
-    SiloAddress,
-    Level
-)
-WITH RECURSIVE SiloAddressesCTE AS
-(
-    SELECT 
-        SUBSTRING_INDEX(_SiloAddresses, '|', 1) AS Value,
-  		SUBSTRING(_SiloAddresses, CHAR_LENGTH(SUBSTRING_INDEX(_SiloAddresses, '|', 1)) + 2, CHAR_LENGTH(_SiloAddresses)) AS Others,
-        1 AS Level
-    UNION ALL
-    SELECT 
-        SUBSTRING_INDEX(Others, '|', 1) AS Value,
-        SUBSTRING(Others, CHAR_LENGTH(SUBSTRING_INDEX(Others, '|', 1)) + 2, CHAR_LENGTH(Others)) AS Others,
-        Level + 1
-    FROM SiloAddressesCTE
-    WHERE Others != ''
-)
-SELECT Value, Level FROM SiloAddressesCTE;
-
-SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
-START TRANSACTION;
-
-DELETE FROM OrleansGrainDirectory
-WHERE
-    ClusterId = _ClusterId
-    AND ProviderId = _ProviderId
-    AND SiloAddress IN (SELECT SiloAddress FROM TempSiloAddresses);
-
-SELECT ROW_COUNT();
-
-COMMIT;
-
-END;
 
 DELIMITER $$
 
@@ -305,5 +192,46 @@ INSERT INTO OrleansQuery
 )
 SELECT
 	'UnregisterGrainActivationsKey',
-	'CALL UnregisterGrainActivations (@ClusterId, @ProviderId, @SiloAddresses)'
+	'
+    CREATE TEMPORARY TABLE TempSiloAddresses
+    (
+        SiloAddress NVARCHAR(100) NOT NULL,
+        Level INT NOT NULL
+    );
+
+    INSERT INTO TempSiloAddresses
+    (
+        SiloAddress,
+        Level
+    )
+    WITH RECURSIVE SiloAddressesCTE AS
+    (
+        SELECT 
+            SUBSTRING_INDEX(@SiloAddresses, ''|'', 1) AS Value,
+  		    SUBSTRING(@SiloAddresses, CHAR_LENGTH(SUBSTRING_INDEX(@SiloAddresses, ''|'', 1)) + 2, CHAR_LENGTH(@SiloAddresses)) AS Others,
+            1 AS Level
+        UNION ALL
+        SELECT 
+            SUBSTRING_INDEX(Others, ''|'', 1) AS Value,
+            SUBSTRING(Others, CHAR_LENGTH(SUBSTRING_INDEX(Others, ''|'', 1)) + 2, CHAR_LENGTH(Others)) AS Others,
+            Level + 1
+        FROM SiloAddressesCTE
+        WHERE Others != ''''
+    )
+    SELECT Value, Level FROM SiloAddressesCTE;
+
+    SET AUTOCOMMIT = 0;
+    LOCK TABLE OrleansGrainDirectory WRITE;
+
+    DELETE FROM OrleansGrainDirectory
+    WHERE
+        ClusterId = @ClusterId
+        AND ProviderId = @ProviderId
+        AND SiloAddress IN (SELECT SiloAddress FROM TempSiloAddresses);
+
+    SELECT ROW_COUNT();
+
+    COMMIT;
+    UNLOCK TABLES;
+    '
 ;
