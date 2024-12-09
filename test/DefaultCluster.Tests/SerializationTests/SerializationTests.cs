@@ -1,4 +1,6 @@
 using System;
+using System.Net.Http;
+
 using NodaTime;
 using Orleans.Serialization;
 using TestExtensions;
@@ -11,6 +13,26 @@ namespace DefaultCluster.Tests
     {
         public SerializationTests(DefaultClusterFixture fixture) : base(fixture)
         {
+        }
+
+        [Fact]
+        public void GigTest()
+        {
+            var expected = ThrowAndCatch(new HttpRequestException("HTTP request exception"));
+            var actual = this.HostedCluster.SerializationManager.RoundTripSerializationForTesting(expected);
+
+            Assert.Equal(expected.Message, actual.Message);
+            static T ThrowAndCatch<T>(T exception) where T : Exception
+            {
+                try
+                {
+                    throw exception;
+                }
+                catch (T ex)
+                {
+                    return ex;
+                }
+            }
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Serialization")]

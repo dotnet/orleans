@@ -2,64 +2,72 @@ using System.Threading.Tasks;
 using org.apache.zookeeper;
 using Microsoft.Extensions.Logging;
 using static org.apache.zookeeper.Watcher.Event;
+using System.Threading;
 
-namespace Orleans.Runtime.Membership;
-
-/// <summary>
-/// the state of every ZooKeeper client and its push notifications are published using watchers.
-/// in orleans the watcher is only for debugging purposes
-/// </summary>
-internal class ZooKeeperWatcher : Watcher
+namespace Orleans.Runtime.Membership
 {
-    private readonly ILogger logger;
-    // we don't really need the type, however netstandard2.0 doesn't have non generic TaskCompletionSource
-    private TaskCompletionSource<KeeperState> tcs = new();
-
-    public Task WaitForConnectionAsync() => tcs.Task;
-
-    public ZooKeeperWatcher(ILogger logger)
+    /// <summary>
+    /// the state of every ZooKeeper client and its push notifications are published using watchers.
+    /// in orleans the watcher is only for debugging purposes
+    /// </summary>
+    internal class ZooKeeperWatcher : Watcher
     {
-        this.logger = logger;
-    }
+        private readonly ILogger logger;
+        private TaskCompletionSource<KeeperState> _tcs = new();
 
-    public override Task process(WatchedEvent ev)
-    {
-        if (logger.IsEnabled(LogLevel.Debug))
+        public ZooKeeperWatcher(ILogger logger)
         {
-            logger.Debug(ev.ToString());
+            this.logger = logger;
         }
 
-        switch (ev.getState())
+        public async Task<KeeperState> WaitForConnectionAsync(CancellationToken tk)
         {
-            case KeeperState.AuthFailed:
-                logger.LogError("ZooKeeper authentication failed", ev);
-                ResetTaskCompletionSource(ref tcs);
-                break;
-            case KeeperState.Expired:
-                logger.LogError("ZooKeeper session expired", ev);
-                ResetTaskCompletionSource(ref tcs);
-                break;
-            case KeeperState.Disconnected:
-                logger.LogError("ZooKeeper disconnected", ev);
-                ResetTaskCompletionSource(ref tcs);
-                break;
-            case KeeperState.SyncConnected:
-                logger.LogInformation("ZooKeeper connected", ev);
-                tcs.TrySetResult(KeeperState.SyncConnected);
-                break;
-            case KeeperState.ConnectedReadOnly:
-                logger.LogInformation("ZooKeeper connected", ev);
-                tcs.TrySetResult(KeeperState.ConnectedReadOnly);
-                break;
+            tk.Register(static (tcs)
+                => (tcs as TaskCompletionSource<KeeperException>)?.TrySetCanceled(),
+                _tcs);
+
+            return await _tcs.Task;
         }
 
-        return Task.CompletedTask;
-
-        static void ResetTaskCompletionSource(ref TaskCompletionSource<KeeperState> tcs)
+        public override Task process(WatchedEvent ev)
         {
-            if (tcs.Task.IsCompleted)
+            if (logger.IsEnabled(LogLevel.Debug))
             {
-                tcs = new();
+                logger.Debug(ev.ToString());
+            }
+
+            switch (ev.getState())
+            {
+                case KeeperState.AuthFailed:
+                    logger.LogError("ZooKeeper authentication failed", ev);
+                    _tcs.TrySetResult(KeeperState.AuthFailed);
+                    break;
+                case KeeperState.Expired:
+                    logger.LogError("ZooKeeper session expired", ev);
+                    _tcs.TrySetResult(KeeperState.Expired);
+                    break;
+                case KeeperState.Disconnected:
+                    logger.LogError("ZooKeeper disconnected", ev);
+                    ResetTaskCompletionSource(ref _tcs);
+                    break;
+                case KeeperState.SyncConnected:
+                    logger.LogInformation("ZooKeeper connected", ev);
+                    _tcs.TrySetResult(KeeperState.SyncConnected);
+                    break;
+                case KeeperState.ConnectedReadOnly:
+                    logger.LogInformation("ZooKeeper connected readonly", ev);
+                    _tcs.TrySetResult(KeeperState.ConnectedReadOnly);
+                    break;
+            }
+
+            return Task.CompletedTask;
+
+            static void ResetTaskCompletionSource(ref TaskCompletionSource<KeeperState> tcs)
+            {
+                if (tcs.Task.IsCompleted)
+                {
+                    tcs = new();
+                }
             }
         }
     }
