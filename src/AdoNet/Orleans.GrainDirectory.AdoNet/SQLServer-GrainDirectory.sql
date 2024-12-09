@@ -36,33 +36,22 @@ CREATE TABLE OrleansGrainDirectory
     ActivationId NVARCHAR(100) NOT NULL,
 
     /* Holds the time at which the grain was added to the directory */
-    CreatedOn DATETIMEOFFSET(3) NOT NULL
+    CreatedOn DATETIMEOFFSET(3) NOT NULL,
 )
 GO
 
-ALTER TABLE OrleansGrainDirectory
-SET (LOCK_ESCALATION = DISABLE)
-GO
-
-/*
-This index is a workaround for the GrainId being too large to index by SQL Server.
-Instead we index a stable hash of the GrainId.
-Collisions are possible yet handled by careful use of locks on this index.
-*/
-CREATE NONCLUSTERED INDEX IX_OrleansGrainDirectory_Lookup
+/* This turns the table into a CLUSTERED INDEX that allows duplication on the hash. */
+CREATE CLUSTERED INDEX CI_OrleansGrainDirectory
 ON OrleansGrainDirectory
 (
     ClusterId ASC,
     ProviderId ASC,
     GrainIdHash ASC
 )
-INCLUDE
-(
-    GrainId,
-    SiloAddress,
-    ActivationId,
-    CreatedOn
-)
+GO
+
+ALTER TABLE OrleansGrainDirectory
+SET (LOCK_ESCALATION = DISABLE)
 GO
 
 /* Registers a new grain activation */
@@ -82,9 +71,9 @@ DECLARE @Now DATETIMEOFFSET(3) = CAST(SYSUTCDATETIME() AS DATETIMEOFFSET(3));
 
 BEGIN TRANSACTION;
 
-/* First we check if the entry already exists. */
-/* This also induces and holds a lock on the hash index upfront to prevent both duplicates and deadlocks. */
-/* This is also required to ensure the server always locks the index before it locks the underlying table upon modification. */
+/* Get the existing entry if it exists. */
+/* This also places a lock on the hash index pages upfront in case we need to add a new entry. */
+/* This lock is required to prevent both deadlocks and duplicates. */
 SELECT
     ClusterId,
     ProviderId,
@@ -92,53 +81,62 @@ SELECT
     SiloAddress,
     ActivationId
 FROM
-    OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(IX_OrleansGrainDirectory_Lookup))
+    OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(CI_OrleansGrainDirectory))
 WHERE
     ClusterId = @ClusterId
     AND ProviderId = @ProviderId
     AND GrainIdHash = @GrainIdHash
     AND GrainId = @GrainId;
 
-/* If no current entry was found we can add a new one now. */
+/* Otherwise add a new entry if one does exist yet. */
 IF @@ROWCOUNT = 0
 BEGIN
-    INSERT INTO OrleansGrainDirectory
+
+    MERGE INTO OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(CI_OrleansGrainDirectory)) AS Target
+    USING
     (
-        ClusterId,
-        ProviderId,
-        GrainIdHash,
-        GrainId,
-        SiloAddress,
-        ActivationId,
-        CreatedOn
-    )
+        SELECT
+            @ClusterId AS ClusterId,
+            @ProviderId AS ProviderId,
+            @GrainIdHash AS GrainIdHash,
+            @GrainId AS GrainId,
+            @SiloAddress AS SiloAddress,
+            @ActivationId AS ActivationId,
+            @Now AS CreatedOn
+    ) AS Source
+    ON
+        Target.ClusterId = Source.ClusterId
+        AND Target.ProviderId = Source.ProviderId
+        AND Target.GrainIdHash = Source.GrainIdHash
+        AND Target.GrainId = Source.GrainId
+    WHEN NOT MATCHED BY TARGET THEN
+        INSERT
+        (
+            ClusterId,
+            ProviderId,
+            GrainIdHash,
+            GrainId,
+            SiloAddress,
+            ActivationId,
+            CreatedOn
+        )
+        VALUES
+        (
+            Source.ClusterId,
+            Source.ProviderId,
+            Source.GrainIdHash,
+            Source.GrainId,
+            Source.SiloAddress,
+            Source.ActivationId,
+            Source.CreatedOn
+        )
     OUTPUT
         INSERTED.ClusterId,
         INSERTED.ProviderId,
         INSERTED.GrainId,
         INSERTED.SiloAddress,
-        INSERTED.ActivationId
-    SELECT
-        @ClusterId,
-        @ProviderId,
-        @GrainIdHash,
-        @GrainId,
-        @SiloAddress,
-        @ActivationId,
-        @Now
+        INSERTED.ActivationId;
 
-    /* This check should not be required given we are already holding a lock on the hash. */
-    /* However it is included here as an extra safety measure. */
-    WHERE NOT EXISTS
-    (
-        SELECT 1
-        FROM OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(IX_OrleansGrainDirectory_Lookup))
-        WHERE
-            ClusterId = @ClusterId
-            AND ProviderId = @ProviderId
-            AND GrainIdHash = @GrainIdHash
-            AND GrainId = @GrainId
-    );
 END
 
 COMMIT;
@@ -167,24 +165,10 @@ AS
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 
-BEGIN TRANSACTION;
-
-/* Induce a lock on the hash index upfront to prevent both duplicates and deadlocks. */
-/* This is required to ensure the server always locks the index before it locks the underlying table upon modification. */
-DECLARE @Locked INT =
-(
-    SELECT COUNT(*)
-    FROM OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(IX_OrleansGrainDirectory_Lookup))
-    WHERE
-        ClusterId = @ClusterId
-        AND ProviderId = @ProviderId
-        AND GrainIdHash = @GrainIdHash
-        AND GrainId = @GrainId
-);
-
-/* It is now safe to remove the entry. */
+/* Delete the entry if it exists. */
+/* This places a lock on the hash index pages upfront to prevent deadlocks. */
 DELETE OrleansGrainDirectory
-FROM OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(IX_OrleansGrainDirectory_Lookup))
+FROM OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(CI_OrleansGrainDirectory))
 WHERE
     ClusterId = @ClusterId
     AND ProviderId = @ProviderId
@@ -193,8 +177,6 @@ WHERE
     AND ActivationId = @ActivationId;
 
 SELECT @@ROWCOUNT;
-
-COMMIT;
 
 GO
 
@@ -220,6 +202,8 @@ AS
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 
+/* Get the existing entry if it exists. */
+/* This also places a lock on the hash index pages upfront to prevent deadlocks with registration. */
 SELECT
     ClusterId,
     ProviderId,
@@ -227,7 +211,7 @@ SELECT
     SiloAddress,
     ActivationId
 FROM
-    OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(IX_OrleansGrainDirectory_Lookup))
+    OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(CI_OrleansGrainDirectory))
 WHERE
     ClusterId = @ClusterId
     AND ProviderId = @ProviderId
@@ -259,6 +243,8 @@ SET XACT_ABORT ON;
 
 BEGIN TRANSACTION;
 
+/* Delete the entries if they exist. */
+/* This places a exclusive lock on the entire table to prevent deadlocks with registration. */
 DELETE OrleansGrainDirectory
 FROM OrleansGrainDirectory WITH (TABLOCKX)
 WHERE
