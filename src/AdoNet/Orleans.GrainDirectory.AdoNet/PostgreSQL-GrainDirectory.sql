@@ -39,7 +39,7 @@ CREATE TABLE OrleansGrainDirectory
     CreatedOn TIMESTAMPTZ NOT NULL
 );
 
-/* This turns the table into a CLUSTERED INDEX that allows duplication on the hash. */
+/* This index allows duplication on the hash. */
 CREATE INDEX IX_OrleansGrainDirectory
 ON OrleansGrainDirectory
 (
