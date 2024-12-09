@@ -3,17 +3,17 @@ Orleans Grain Directory.
 
 This table stores the location of all grains in the cluster.
 
-The rationale for this table is as follows:
+The demands for this table are as follows:
 
 1. The table will see rows inserted individually, as new grains are added.
 2. The table will see rows deleted at random as grains are deactivated, without regard for order.
 3. Insert/Delete churn is expected to be very high.
 4. The GrainId is too large to be indexed by SQL Server.
 
-Given the above, the table cannot be a clustered index.
-Not only is the GrainId too large to index directly, the expected insert/delete churn would cause fragmentation to the point of rendering the directory unusable.
-Therefore the design choice is to use a heap table with a non-clustered index on the stable hash of the grain key.
+To address these demands, this table is implemented as a non-unique clustered index.
+This index covers the hash of the grain id to allow for fast lookups.
 Uniqueness is then guaranteed by careful use of locks on the hash index.
+
 */
 CREATE TABLE OrleansGrainDirectory
 (
