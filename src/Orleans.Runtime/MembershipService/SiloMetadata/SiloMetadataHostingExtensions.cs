@@ -1,0 +1,90 @@
+using System.Collections.Generic;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration.Internal;
+using Orleans.Hosting;
+using Orleans.Runtime.Placement.Filtering;
+
+namespace Orleans.Runtime.MembershipService.SiloMetadata;
+
+public static class SiloMetadataHostingExtensions
+{
+
+    /// <summary>
+    /// Configure silo metadata from the builder configuration.
+    /// </summary>
+    /// <param name="builder">Silo builder</param>
+    /// <remarks>
+    /// Get the ORLEANS__METADATA section from config
+    /// Key/value pairs in configuration as a <see cref="Dictionary{TKey,TValue}"/> will look like this as environment variables:
+    /// ORLEANS__METADATA__key1=value1
+    /// </remarks>
+    /// <returns></returns>
+    public static ISiloBuilder UseSiloMetadata(this ISiloBuilder builder) => builder.UseSiloMetadata(builder.Configuration);
+
+    /// <summary>
+    /// Configure silo metadata from configuration.
+    /// </summary>
+    /// <param name="builder">Silo builder</param>
+    /// <param name="configuration">Configuration to pull from</param>
+    /// <remarks>
+    /// Get the ORLEANS__METADATA section from config
+    /// Key/value pairs in configuration as a <see cref="Dictionary{TKey,TValue}"/> will look like this as environment variables:
+    /// ORLEANS__METADATA__key1=value1
+    /// </remarks>
+    /// <returns></returns>
+    public static ISiloBuilder UseSiloMetadata(this ISiloBuilder builder, IConfiguration configuration)
+    {
+
+        var metadataConfigSection = builder.Configuration.GetSection("ORLEANS").GetSection("METADATA");
+
+        return builder.UseSiloMetadata(metadataConfigSection);
+    }
+
+    /// <summary>
+    /// Configure silo metadata from configuration section.
+    /// </summary>
+    /// <param name="builder">Silo builder</param>
+    /// <param name="configurationSection">Configuration section to pull from</param>
+    /// <remarks>
+    /// Get the ORLEANS__METADATA section from config section
+    /// Key/value pairs in configuration as a <see cref="Dictionary{TKey,TValue}"/> will look like this as environment variables:
+    /// ORLEANS__METADATA__key1=value1
+    /// </remarks>
+    /// <returns></returns>
+    public static ISiloBuilder UseSiloMetadata(this ISiloBuilder builder, IConfigurationSection configurationSection)
+    {
+        var dictionary = configurationSection.Get<Dictionary<string, string>>();
+
+        return builder.UseSiloMetadata(dictionary ?? new Dictionary<string, string>());
+    }
+
+    /// <summary>
+    /// Configure silo metadata from configuration section.
+    /// </summary>
+    /// <param name="builder">Silo builder</param>
+    /// <param name="metadata">Metadata to add</param>
+    /// <returns></returns>
+    public static ISiloBuilder UseSiloMetadata(this ISiloBuilder builder, Dictionary<string, string> metadata)
+    {
+        builder.ConfigureServices(services =>
+        {
+            services
+                .AddOptionsWithValidateOnStart<SiloMetadata>()
+                .Configure(m =>
+                {
+                    m.AddMetadata(metadata);
+                });
+
+            services.AddGrainService<SiloMetadataGrainService>();
+            services.AddSingleton<SiloMetadataCache>();
+            services.AddFromExisting<ISiloMetadataCache, SiloMetadataCache>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloMetadataCache>();
+            services.AddSingleton<ISiloMetadataClient, SiloMetadataClient>();
+            // Placement filters
+            services.AddPlacementFilter<PreferredSiloMetadataPlacementFilterStrategy, PreferredSiloMetadataPlacementFilterDirector>(ServiceLifetime.Transient);
+            services.AddPlacementFilter<RequiredSiloMetadataPlacementFilterStrategy, RequiredSiloMetadataFilterDirector>(ServiceLifetime.Transient);
+        });
+        return builder;
+    }
+}
