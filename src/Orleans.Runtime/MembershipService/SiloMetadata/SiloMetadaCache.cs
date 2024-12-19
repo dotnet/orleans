@@ -52,7 +52,7 @@ internal class SiloMetadataCache(
             await foreach (var update in membershipTableManager.MembershipTableUpdates.WithCancellation(ct))
             {
                 // Add entries for members that aren't already in the cache
-                foreach (var membershipEntry in update.Entries)
+                foreach (var membershipEntry in update.Entries.Where(e => e.Value.Status != SiloStatus.Dead))
                 {
                     if (!_metadata.ContainsKey(membershipEntry.Key))
                     {
@@ -66,6 +66,12 @@ internal class SiloMetadataCache(
                             logger.LogError(exception, "Error fetching metadata for silo {Silo}", membershipEntry.Key);
                         }
                     }
+                }
+
+                // Add entries for members that aren't already in the cache
+                foreach (var membershipEntry in update.Entries.Where(e => e.Value.Status == SiloStatus.Dead))
+                {
+                    _metadata.TryRemove(membershipEntry.Key, out _);
                 }
 
                 // Remove entries for members that are no longer in the table
