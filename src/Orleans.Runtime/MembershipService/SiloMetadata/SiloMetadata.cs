@@ -12,6 +12,6 @@ public record SiloMetadata
     [Id(0)]
     public ImmutableDictionary<string, string> Metadata { get; private set; } = ImmutableDictionary<string, string>.Empty;
 
-    internal void AddMetadata(IEnumerable<KeyValuePair<string, string>> metadata) => Metadata = Metadata.AddRange(metadata);
-    internal void AddMetadata(string key, string value) => Metadata = Metadata.Add(key, value);
+    internal void AddMetadata(IEnumerable<KeyValuePair<string, string>> metadata) => Metadata = Metadata.SetItems(metadata);
+    internal void AddMetadata(string key, string value) => Metadata = Metadata.SetItem(key, value);
 }
