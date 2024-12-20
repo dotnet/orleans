@@ -125,6 +125,40 @@ public class SiloMetadataPlacementFilterTests : TestClusterPerTest
     /// </summary>
     /// <returns></returns>
     [Fact, TestCategory("Functional")]
+    public async Task PlacementFilter_PreferredMultipleFilterCanBeCalled()
+    {
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
+        var id = 0;
+        foreach (var hostedClusterSilo in HostedCluster.Silos)
+        {
+            var dict = new Dictionary<SiloAddress, int>();
+            foreach (var clusterSilo in HostedCluster.Silos)
+            {
+                dict[clusterSilo.SiloAddress] = 0;
+            }
+            for (var i = 0; i < 50; i++)
+            {
+                ++id;
+                var firstSp = HostedCluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);
+                var firstSiloMetadataCache = firstSp.GetRequiredService<IClusterClient>();
+                var managementGrain = firstSiloMetadataCache.GetGrain<IPreferredMatchMultipleFilteredGrain>(id);
+                var hostingSilo = await managementGrain.GetHostingSilo();
+                Assert.NotNull(hostingSilo);
+                dict[hostingSilo] = dict.TryGetValue(hostingSilo, out var count) ? count + 1 : 1;
+            }
+
+            foreach (var kv in dict)
+            {
+                Assert.True(kv.Value >= 1, $"Silo {kv.Key} did not host at least 1 grain");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Unique silo metadata is set up to be different for each silo, so this will still place on any of the two silos since just the matching silos (just the one) is not enough to make the minimum desired candidates.
+    /// </summary>
+    /// <returns></returns>
+    [Fact, TestCategory("Functional")]
     public async Task PlacementFilter_PreferredMin2FilterCanBeCalledWithLargerCluster()
     {
         await HostedCluster.WaitForLivenessToStabilizeAsync();
@@ -228,6 +262,19 @@ public interface IPreferredMatchMin2FilteredGrain : IGrainWithIntegerKey
 [PreferredMatchSiloMetadataPlacementFilter(["unique"])]
 #pragma warning restore ORLEANSEXP004
 public class PreferredMatchMinTwoFilteredGrain(ILocalSiloDetails localSiloDetails) : Grain, IPreferredMatchMin2FilteredGrain
+{
+    public Task<SiloAddress> GetHostingSilo() => Task.FromResult(localSiloDetails.SiloAddress);
+}
+
+public interface IPreferredMatchMultipleFilteredGrain : IGrainWithIntegerKey
+{
+    Task<SiloAddress> GetHostingSilo();
+}
+
+#pragma warning disable ORLEANSEXP004
+[PreferredMatchSiloMetadataPlacementFilter(["unique", "other"], 2)]
+#pragma warning restore ORLEANSEXP004
+public class PreferredMatchMultipleFilteredGrain(ILocalSiloDetails localSiloDetails) : Grain, IPreferredMatchMultipleFilteredGrain
 {
     public Task<SiloAddress> GetHostingSilo() => Task.FromResult(localSiloDetails.SiloAddress);
 }
