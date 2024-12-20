@@ -82,8 +82,8 @@ public static class SiloMetadataHostingExtensions
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloMetadataCache>();
             services.AddSingleton<ISiloMetadataClient, SiloMetadataClient>();
             // Placement filters
-            services.AddPlacementFilter<PreferredSiloMetadataPlacementFilterStrategy, PreferredSiloMetadataPlacementFilterDirector>(ServiceLifetime.Transient);
-            services.AddPlacementFilter<RequiredSiloMetadataPlacementFilterStrategy, RequiredSiloMetadataFilterDirector>(ServiceLifetime.Transient);
+            services.AddPlacementFilter<PreferredMatchSiloMetadataPlacementFilterStrategy, PreferredMatchSiloMetadataPlacementFilterDirector>(ServiceLifetime.Transient);
+            services.AddPlacementFilter<RequiredMatchSiloMetadataPlacementFilterStrategy, RequiredMatchSiloMetadataFilterDirector>(ServiceLifetime.Transient);
         });
         return builder;
     }
