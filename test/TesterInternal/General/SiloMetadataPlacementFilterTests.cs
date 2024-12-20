@@ -8,7 +8,7 @@ using Xunit;
 
 namespace UnitTests.General;
 
-[TestCategory("Placement"), TestCategory("Filters")]
+[TestCategory("Placement"), TestCategory("Filters"), TestCategory("SiloMetadata")]
 public class SiloMetadataPlacementFilterTests : TestClusterPerTest
 {
     protected override void ConfigureTestCluster(TestClusterBuilder builder)
