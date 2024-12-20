@@ -5,7 +5,7 @@ using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
 
-namespace UnitTests.General;
+namespace UnitTests.SiloMetadataTests;
 
 
 [TestCategory("SiloMetadata")]
@@ -37,14 +37,14 @@ public class SiloMetadataConfigTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task SiloMetadata_CanBeSetAndRead()
     {
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
         HostedCluster.AssertAllSiloMetadataMatchesOnAllSilos(SiloConfigurator.Metadata.Select(kv => kv.Key.Split(':').Last()).ToArray());
     }
 
     [Fact, TestCategory("Functional")]
     public async Task SiloMetadata_HasConfiguredValues()
     {
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
 
         var first = HostedCluster.Silos.First();
         var firstSp = HostedCluster.GetSiloServiceProvider(first.SiloAddress);
@@ -82,14 +82,14 @@ public class SiloMetadataTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task SiloMetadata_CanBeSetAndRead()
     {
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
         HostedCluster.AssertAllSiloMetadataMatchesOnAllSilos(["host.id"]);
     }
 
     [Fact, TestCategory("Functional")]
     public async Task SiloMetadata_NewSilosHaveMetadata()
     {
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
         await HostedCluster.StartAdditionalSiloAsync();
         HostedCluster.AssertAllSiloMetadataMatchesOnAllSilos(["host.id"]);
     }
@@ -97,7 +97,7 @@ public class SiloMetadataTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task SiloMetadata_RemovedSiloHasNoMetadata()
     {
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
         HostedCluster.AssertAllSiloMetadataMatchesOnAllSilos(["host.id"]);
         var first = HostedCluster.Silos.First();
         var firstSp = HostedCluster.GetSiloServiceProvider(first.SiloAddress);
@@ -117,8 +117,8 @@ public class SiloMetadataTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task SiloMetadata_BadSiloAddressHasNoMetadata()
     {
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-        var first = this.HostedCluster.Silos.First();
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
+        var first = HostedCluster.Silos.First();
         var firstSp = HostedCluster.GetSiloServiceProvider(first.SiloAddress);
         var firstSiloMetadataCache = firstSp.GetRequiredService<ISiloMetadataCache>();
         var metadata = firstSiloMetadataCache.GetMetadata(SiloAddress.Zero);
