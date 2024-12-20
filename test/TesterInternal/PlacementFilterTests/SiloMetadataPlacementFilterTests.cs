@@ -5,7 +5,7 @@ using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
 
-namespace UnitTests.General;
+namespace UnitTests.PlacementFilterTests;
 
 [TestCategory("Placement"), TestCategory("Filters"), TestCategory("SiloMetadata")]
 public class SiloMetadataPlacementFilterTests : TestClusterPerTest
@@ -32,8 +32,8 @@ public class SiloMetadataPlacementFilterTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task PlacementFilter_GrainWithoutFilterCanBeCalled()
     {
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-        var managementGrain = this.Client.GetGrain<IManagementGrain>(0);
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
+        var managementGrain = Client.GetGrain<IManagementGrain>(0);
         var silos = await managementGrain.GetHosts(true);
         Assert.NotNull(silos);
     }
@@ -45,11 +45,11 @@ public class SiloMetadataPlacementFilterTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task PlacementFilter_RequiredFilterCanBeCalled()
     {
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-        int id = 0;
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
+        var id = 0;
         foreach (var hostedClusterSilo in HostedCluster.Silos)
         {
-            for (int i = 0; i < 50; i++)
+            for (var i = 0; i < 50; i++)
             {
                 ++id;
                 var firstSp = HostedCluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);
@@ -69,11 +69,11 @@ public class SiloMetadataPlacementFilterTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task PlacementFilter_PreferredFilterCanBeCalled()
     {
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-        int id = 0;
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
+        var id = 0;
         foreach (var hostedClusterSilo in HostedCluster.Silos)
         {
-            for (int i = 0; i < 50; i++)
+            for (var i = 0; i < 50; i++)
             {
                 ++id;
                 var firstSp = HostedCluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);
@@ -93,8 +93,8 @@ public class SiloMetadataPlacementFilterTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task PlacementFilter_PreferredMin2FilterCanBeCalled()
     {
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-        int id = 0;
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
+        var id = 0;
         foreach (var hostedClusterSilo in HostedCluster.Silos)
         {
             var dict = new Dictionary<SiloAddress, int>();
@@ -102,7 +102,7 @@ public class SiloMetadataPlacementFilterTests : TestClusterPerTest
             {
                 dict[clusterSilo.SiloAddress] = 0;
             }
-            for (int i = 0; i < 50; i++)
+            for (var i = 0; i < 50; i++)
             {
                 ++id;
                 var firstSp = HostedCluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);
@@ -127,10 +127,10 @@ public class SiloMetadataPlacementFilterTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task PlacementFilter_PreferredMin2FilterCanBeCalledWithLargerCluster()
     {
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
         await HostedCluster.StartAdditionalSiloAsync();
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-        int id = 0;
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
+        var id = 0;
         foreach (var hostedClusterSilo in HostedCluster.Silos)
         {
             var dict = new Dictionary<SiloAddress, int>();
@@ -138,7 +138,7 @@ public class SiloMetadataPlacementFilterTests : TestClusterPerTest
             {
                 dict[clusterSilo.SiloAddress] = 0;
             }
-            for (int i = 0; i < 50; i++)
+            for (var i = 0; i < 50; i++)
             {
                 ++id;
                 var firstSp = HostedCluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);
@@ -163,10 +163,10 @@ public class SiloMetadataPlacementFilterTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task PlacementFilter_PreferredNoMetadataFilterCanBeCalled()
     {
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
         await HostedCluster.StartAdditionalSiloAsync();
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-        int id = 0;
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
+        var id = 0;
         foreach (var hostedClusterSilo in HostedCluster.Silos)
         {
             var dict = new Dictionary<SiloAddress, int>();
@@ -174,7 +174,7 @@ public class SiloMetadataPlacementFilterTests : TestClusterPerTest
             {
                 dict[clusterSilo.SiloAddress] = 0;
             }
-            for (int i = 0; i < 50; i++)
+            for (var i = 0; i < 50; i++)
             {
                 ++id;
                 var firstSp = HostedCluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);

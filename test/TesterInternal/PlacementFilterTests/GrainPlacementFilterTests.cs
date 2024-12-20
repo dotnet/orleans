@@ -5,7 +5,7 @@ using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
 
-namespace UnitTests.General;
+namespace UnitTests.PlacementFilterTests;
 
 [TestCategory("Placement"), TestCategory("Filters")]
 public class GrainPlacementFilterTests : TestClusterPerTest
@@ -29,8 +29,8 @@ public class GrainPlacementFilterTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task PlacementFilter_GrainWithoutFilterCanBeCalled()
     {
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-        var managementGrain = this.Client.GetGrain<IManagementGrain>(0);
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
+        var managementGrain = Client.GetGrain<IManagementGrain>(0);
         var silos = await managementGrain.GetHosts(true);
         Assert.NotNull(silos);
     }
