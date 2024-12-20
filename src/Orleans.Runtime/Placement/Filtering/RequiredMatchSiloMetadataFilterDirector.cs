@@ -4,35 +4,27 @@ using Orleans.Runtime.MembershipService.SiloMetadata;
 
 namespace Orleans.Runtime.Placement.Filtering;
 
-internal class RequiredSiloMetadataFilterDirector(ILocalSiloDetails localSiloDetails, ISiloMetadataCache siloMetadataCache)
+internal class RequiredMatchSiloMetadataFilterDirector(ILocalSiloDetails localSiloDetails, ISiloMetadataCache siloMetadataCache)
     : IPlacementFilterDirector
 {
     public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, IEnumerable<SiloAddress> silos)
     {
-        var metadataKeys = (filterStrategy as RequiredSiloMetadataPlacementFilterStrategy)?.MetadataKeys ?? [];
+        var metadataKeys = (filterStrategy as RequiredMatchSiloMetadataPlacementFilterStrategy)?.MetadataKeys ?? [];
 
         // yield return all silos if no silos match any metadata keys
         if (metadataKeys.Length == 0)
         {
-            foreach (var silo in silos)
-            {
-                yield return silo;
-            }
+            return silos;
         }
-        else
+
+        var localMetadata = siloMetadataCache.GetMetadata(localSiloDetails.SiloAddress);
+        var localRequiredMetadata = GetMetadata(localMetadata, metadataKeys);
+
+        return silos.Where(silo =>
         {
-            var localMetadata = siloMetadataCache.GetMetadata(localSiloDetails.SiloAddress);
-            var localRequiredMetadata = GetMetadata(localMetadata, metadataKeys);
-            
-            foreach (var silo in silos)
-            {
-                var remoteMetadata = siloMetadataCache.GetMetadata(silo);
-                if(DoesMetadataMatch(localRequiredMetadata, remoteMetadata, metadataKeys))
-                {
-                    yield return silo;
-                }
-            }
-        }
+            var remoteMetadata = siloMetadataCache.GetMetadata(silo);
+            return DoesMetadataMatch(localRequiredMetadata, remoteMetadata, metadataKeys);
+        });
     }
 
     private static bool DoesMetadataMatch(string[] localMetadata, SiloMetadata siloMetadata, string[] metadataKeys)

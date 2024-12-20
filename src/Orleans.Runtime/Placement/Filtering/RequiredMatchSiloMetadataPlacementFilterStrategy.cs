@@ -4,11 +4,11 @@ using Orleans.Metadata;
 
 namespace Orleans.Runtime.Placement.Filtering;
 
-public class RequiredSiloMetadataPlacementFilterStrategy(string[] metadataKeys) : PlacementFilterStrategy
+public class RequiredMatchSiloMetadataPlacementFilterStrategy(string[] metadataKeys) : PlacementFilterStrategy
 {
     public string[] MetadataKeys { get; private set; } = metadataKeys;
 
-    public RequiredSiloMetadataPlacementFilterStrategy() : this([])
+    public RequiredMatchSiloMetadataPlacementFilterStrategy() : this([])
     {
     }
 
