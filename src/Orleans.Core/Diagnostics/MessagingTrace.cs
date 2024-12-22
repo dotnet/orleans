@@ -25,42 +25,26 @@ namespace Orleans.Runtime
         public const string InvokeMessageEventName = Category + ".Invoke";
         public const string RejectSendMessageToDeadSiloEventName = Category + ".Reject.TargetDead";
 
-        private static readonly Action<ILogger, Message, MessagingInstruments.Phase, Exception> LogDropExpiredMessage
-            = LoggerMessage.Define<Message, MessagingInstruments.Phase>(
-                LogLevel.Warning,
-                new EventId((int)ErrorCode.Messaging_DroppingExpiredMessage, DropExpiredMessageEventName),
-                "Dropping expired message {Message} at phase {Phase}");
+        private static partial class Log
+        {
+            [LoggerMessage(1, LogLevel.Warning, "Dropping expired message {Message} at phase {Phase}")]
+            public static partial void DropExpiredMessage(ILogger logger, Message message, MessagingInstruments.Phase phase);
 
-        private static readonly Action<ILogger, Message, Exception> LogDropBlockedApplicationMessage
-            = LoggerMessage.Define<Message>(
-                LogLevel.Warning,
-                new EventId((int)ErrorCode.Messaging_DroppingBlockedMessage, DropBlockedApplicationMessageEventName),
-                "Dropping message {Message} since this silo is blocking application messages");
+            [LoggerMessage(2, LogLevel.Warning, "Dropping message {Message} since this silo is blocking application messages")]
+            public static partial void DropBlockedApplicationMessage(ILogger logger, Message message);
 
-        private static readonly Action<ILogger, Message, Exception> LogEnqueueInboundMessage
-            = LoggerMessage.Define<Message>(
-                LogLevel.Trace,
-                new EventId((int)ErrorCode.Messaging_Inbound_Enqueue, EnqueueInboundMessageEventName),
-                "Enqueueing inbound message {Message}");
+            [LoggerMessage(3, LogLevel.Trace, "Enqueueing inbound message {Message}")]
+            public static partial void EnqueueInboundMessage(ILogger logger, Message message);
 
-        private static readonly Action<ILogger, Message, Exception> LogDequeueInboundMessage
-            = LoggerMessage.Define<Message>(
-                LogLevel.Trace,
-                new EventId((int)ErrorCode.Messaging_Inbound_Dequeue, DequeueInboundMessageEventName),
-                "Dequeueing inbound message {Message}");
+            [LoggerMessage(4, LogLevel.Trace, "Dequeueing inbound message {Message}")]
+            public static partial void DequeueInboundMessage(ILogger logger, Message message);
 
-        private static readonly Action<ILogger, SiloAddress, Message, string, Exception> LogSiloDropSendingMessage
-            = LoggerMessage.Define<SiloAddress, Message, string>(
-                LogLevel.Warning,
-                new EventId((int)ErrorCode.Messaging_OutgoingMS_DroppingMessage, DropSendingMessageEventName),
-                "Silo {SiloAddress} is dropping message {Message}. Reason: {Reason}");
+            [LoggerMessage(5, LogLevel.Warning, "Silo {SiloAddress} is dropping message {Message}. Reason: {Reason}")]
+            public static partial void SiloDropSendingMessage(ILogger logger, SiloAddress localSiloAddress, Message message, string reason);
 
-        private static readonly Action<ILogger, SiloAddress, SiloAddress, Message, Exception> LogRejectSendMessageToDeadSilo
-            = LoggerMessage.Define<SiloAddress, SiloAddress, Message>(
-                LogLevel.Information,
-                new EventId((int)ErrorCode.MessagingSendingRejection, RejectSendMessageToDeadSiloEventName),
-                  "Silo {SiloAddress} is rejecting message to known-dead silo {DeadSilo}: {Message}");
-
+            [LoggerMessage(6, LogLevel.Information, "Silo {SiloAddress} is rejecting message to known-dead silo {DeadSilo}: {Message}")]
+            public static partial void RejectSendMessageToDeadSilo(ILogger logger, SiloAddress localSilo, SiloAddress deadSilo, Message message);
+        }
 
         private readonly ILogger log;
 
@@ -107,7 +91,7 @@ namespace Orleans.Runtime
             }
 
             MessagingInstruments.OnMessageExpired(phase);
-            LogDropExpiredMessage(this, message, phase, null);
+            Log.DropExpiredMessage(this.log, message, phase);
         }
 
         internal void OnDropBlockedApplicationMessage(Message message)
@@ -117,13 +101,13 @@ namespace Orleans.Runtime
                 this.Write(DropBlockedApplicationMessageEventName, message);
             }
 
-            LogDropBlockedApplicationMessage(this, message, null);
+            Log.DropBlockedApplicationMessage(this.log, message);
         }
 
         internal void OnSiloDropSendingMessage(SiloAddress localSiloAddress, Message message, string reason)
         {
             MessagingInstruments.OnDroppedSentMessage(message);
-            LogSiloDropSendingMessage(this, localSiloAddress, message, reason, null);
+            Log.SiloDropSendingMessage(this.log, localSiloAddress, message, reason);
         }
 
         public void OnEnqueueInboundMessage(Message message)
@@ -133,7 +117,7 @@ namespace Orleans.Runtime
                 this.Write(EnqueueInboundMessageEventName, message);
             }
 
-            LogEnqueueInboundMessage(this, message, null);
+            Log.EnqueueInboundMessage(this.log, message);
         }
 
         public void OnDequeueInboundMessage(Message message)
@@ -143,7 +127,7 @@ namespace Orleans.Runtime
                 this.Write(DequeueInboundMessageEventName, message);
             }
 
-            LogDequeueInboundMessage(this, message, null);
+            Log.DequeueInboundMessage(this.log, message);
         }
 
         internal void OnCreateMessage(Message message)
@@ -189,12 +173,11 @@ namespace Orleans.Runtime
                 this.Write(RejectSendMessageToDeadSiloEventName, message);
             }
 
-            LogRejectSendMessageToDeadSilo(
-                this,
+            Log.RejectSendMessageToDeadSilo(
+                this.log,
                 localSilo,
                 message.TargetSilo,
-                message,
-                null);
+                message);
         }
 
         internal void OnSendRequest(Message message)

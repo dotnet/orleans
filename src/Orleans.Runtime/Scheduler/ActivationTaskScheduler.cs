@@ -32,7 +32,31 @@ namespace Orleans.Runtime.Scheduler
 #if EXTRA_STATS
             turnsExecutedStatistic = CounterStatistic.FindOrCreate(name + ".TasksExecuted");
 #endif
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Created {TaskScheduler} with GrainContext={GrainContext}", this, workerGroup.GrainContext);
+            Log.Created(this.logger, this, workerGroup.GrainContext);
+        }
+
+        private static partial class Log
+        {
+            [LoggerMessage(1, LogLevel.Debug, "Created {TaskScheduler} with GrainContext={GrainContext}")]
+            public static partial void Created(ILogger logger, ActivationTaskScheduler taskScheduler, IGrainContext grainContext);
+
+            [LoggerMessage(2, LogLevel.Warning, "RunTask: Incomplete base.TryExecuteTask for Task Id={TaskId} with Status={TaskStatus}")]
+            public static partial void TryExecuteTaskNotDone(ILogger logger, int taskId, TaskStatus taskStatus);
+
+            [LoggerMessage(3, LogLevel.Trace, "{TaskScheduler} QueueTask Task Id={TaskId}")]
+            public static partial void QueueTask(ILogger logger, long taskSchedulerId, int taskId);
+
+            [LoggerMessage(4, LogLevel.Trace, "{TaskScheduler} TryExecuteTaskInline Task Id={TaskId} Status={Status} PreviouslyQueued={PreviouslyQueued} CanExecute={CanExecute} Queued={Queued}")]
+            public static partial void TryExecuteTaskInline(ILogger logger, long taskSchedulerId, int taskId, TaskStatus taskStatus, bool previouslyQueued, bool canExecute, int queued);
+
+            [LoggerMessage(5, LogLevel.Trace, "{TaskScheduler} Completed TryExecuteTaskInline Task Id={TaskId} Status={Status} Execute=No")]
+            public static partial void CompletedTryExecuteTaskInlineNo(ILogger logger, long taskSchedulerId, int taskId, TaskStatus taskStatus);
+
+            [LoggerMessage(6, LogLevel.Trace, "{TaskScheduler} TryExecuteTaskInline Task Id={TaskId} Thread={Thread} Execute=Yes")]
+            public static partial void TryExecuteTaskInlineYes(ILogger logger, long taskSchedulerId, int taskId, int threadId);
+
+            [LoggerMessage(7, LogLevel.Trace, "{TaskScheduler} Completed TryExecuteTaskInline Task Id={TaskId} Thread={Thread} Execute=Done Ok={Ok}")]
+            public static partial void CompletedTryExecuteTaskInlineDone(ILogger logger, long taskSchedulerId, int taskId, int threadId, bool ok);
         }
 
         /// <summary>Gets an enumerable of the tasks currently scheduled on this scheduler.</summary>
@@ -46,19 +70,9 @@ namespace Orleans.Runtime.Scheduler
             if (!done)
             {
 #if DEBUG
-                LogTryExecuteTaskNotDone(task);
+                Log.TryExecuteTaskNotDone(this.logger, task.Id, task.Status);
 #endif
             }
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private void LogTryExecuteTaskNotDone(Task task)
-        {
-            logger.LogWarning(
-                (int)ErrorCode.SchedulerTaskExecuteIncomplete4,
-                "RunTask: Incomplete base.TryExecuteTask for Task Id={TaskId} with Status={TaskStatus}",
-                task.Id,
-                task.Status);
         }
 
         /// <summary>Queues a task to the scheduler.</summary>
@@ -66,7 +80,7 @@ namespace Orleans.Runtime.Scheduler
         protected override void QueueTask(Task task)
         {
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("{TaskScheduler} QueueTask Task Id={TaskId}", myId, task.Id);
+            Log.QueueTask(this.logger, myId, task.Id);
 #endif
             workerGroup.EnqueueTask(task);
         }
@@ -84,22 +98,12 @@ namespace Orleans.Runtime.Scheduler
             var canExecuteInline = !taskWasPreviouslyQueued && Equals(RuntimeContext.Current, workerGroup.GrainContext);
 
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace))
-            {
-                logger.LogTrace(
-                    "{TaskScheduler} TryExecuteTaskInline Task Id={TaskId} Status={Status} PreviouslyQueued={PreviouslyQueued} CanExecute={CanExecute} Queued={Queued}",
-                    myId,
-                    task.Id,
-                    task.Status,
-                    taskWasPreviouslyQueued,
-                    canExecuteInline,
-                    workerGroup.ExternalWorkItemCount);
-            }
+            Log.TryExecuteTaskInline(this.logger, myId, task.Id, task.Status, taskWasPreviouslyQueued, canExecuteInline, workerGroup.ExternalWorkItemCount);
 #endif
             if (!canExecuteInline)
             {
 #if DEBUG
-                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("{TaskScheduler} Completed TryExecuteTaskInline Task Id={TaskId} Status={Status} Execute=No", myId, task.Id, task.Status);
+                Log.CompletedTryExecuteTaskInlineNo(this.logger, myId, task.Id, task.Status);
 #endif
                 return false;
             }
@@ -108,29 +112,18 @@ namespace Orleans.Runtime.Scheduler
             turnsExecutedStatistic.Increment();
 #endif
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace))
-                logger.LogTrace(
-                    "{TaskScheduler} TryExecuteTaskInline Task Id={TaskId} Thread={Thread} Execute=Yes",
-                    myId,
-                    task.Id,
-                    Thread.CurrentThread.ManagedThreadId);
+            Log.TryExecuteTaskInlineYes(this.logger, myId, task.Id, Thread.CurrentThread.ManagedThreadId);
 #endif
             // Try to run the task.
             bool done = TryExecuteTask(task);
             if (!done)
             {
 #if DEBUG
-                LogTryExecuteTaskNotDone(task);
+                Log.TryExecuteTaskNotDone(this.logger, task.Id, task.Status);
 #endif
             }
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace))
-                logger.LogTrace(
-                    "{TaskScheduler} Completed TryExecuteTaskInline Task Id={TaskId} Thread={Thread} Execute=Done Ok={Ok}",
-                    myId,
-                    task.Id,
-                    Thread.CurrentThread.ManagedThreadId,
-                    done);
+            Log.CompletedTryExecuteTaskInlineDone(this.logger, myId, task.Id, Thread.CurrentThread.ManagedThreadId, done);
 #endif
             return done;
         }

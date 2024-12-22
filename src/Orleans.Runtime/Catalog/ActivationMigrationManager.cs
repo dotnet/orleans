@@ -153,10 +153,7 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
 
         try
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Monitoring cluster membership updates");
-            }
+            Log.MonitoringClusterMembershipUpdates(_logger);
 
             var previousSnapshot = _clusterMembershipService.CurrentSnapshot;
             await foreach (var snapshot in _clusterMembershipService.MembershipUpdates)
@@ -175,16 +172,13 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
                 }
                 catch (Exception exception)
                 {
-                    _logger.LogError(exception, "Error processing cluster membership updates");
+                    Log.ErrorProcessingClusterMembershipUpdates(_logger, exception);
                 }
             }
         }
         finally
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("No longer monitoring cluster membership updates");
-            }
+            Log.NoLongerMonitoringClusterMembershipUpdates(_logger);
         }
     }
 
@@ -195,10 +189,7 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
             var remote = _grainFactory.GetSystemTarget<IActivationMigrationManagerSystemTarget>(Constants.ActivationMigratorType, targetSilo);
             await Task.Yield();
 
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Starting migration worker for target silo {SiloAddress}", targetSilo);
-            }
+            Log.StartingMigrationWorker(_logger, targetSilo);
 
             var items = new List<MigrationWorkItem>();
             var batch = new List<GrainMigrationPackage>();
@@ -222,16 +213,13 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
                         item.SetCompleted();
                     }
 
-                    if (_logger.IsEnabled(LogLevel.Debug))
-                    {
-                        _logger.LogDebug("Migrated {Count} activations to target silo {SiloAddress}", items.Count, targetSilo);
-                    }
+                    Log.MigratedActivations(_logger, items.Count, targetSilo);
                 }
                 catch (Exception exception)
                 {
                     if (!_shuttingDownCts.IsCancellationRequested)
                     {
-                        _logger.LogError(exception, "Error while migrating {Count} grain activations to {SiloAddress}", items.Count, targetSilo);
+                        Log.ErrorWhileMigrating(_logger, exception, items.Count, targetSilo);
                     }
 
                     foreach (var item in items)
@@ -257,10 +245,7 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
         }
         finally
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Exiting migration worker for target silo {SiloAddress}", targetSilo);
-            }
+            Log.ExitingMigrationWorker(_logger, targetSilo);
         }
     }
 
@@ -295,10 +280,7 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
     {
         if (_workers.TryRemove(targetSilo, out var entry))
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Target silo {SiloAddress} is no longer active, so this migration activation worker is terminating", targetSilo);
-            }
+            Log.TerminatingMigrationWorker(_logger, targetSilo);
 
             entry.WorkItemChannel.Writer.TryComplete();
 
@@ -326,7 +308,7 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
         }
         catch (Exception exception)
         {
-            _logger.LogWarning(exception, "Error signaling shutdown.");
+            Log.ErrorSignalingShutdown(_logger, exception);
         }
 
         await Task.WhenAll(workerTasks).WaitAsync(cancellationToken).SuppressThrowing();
@@ -379,5 +361,35 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
                 return true;
             }
         }
+    }
+
+    private static partial class Log
+    {
+        [LoggerMessage(1, LogLevel.Debug, "Monitoring cluster membership updates")]
+        public static partial void MonitoringClusterMembershipUpdates(ILogger logger);
+
+        [LoggerMessage(2, LogLevel.Error, "Error processing cluster membership updates")]
+        public static partial void ErrorProcessingClusterMembershipUpdates(ILogger logger, Exception exception);
+
+        [LoggerMessage(3, LogLevel.Debug, "No longer monitoring cluster membership updates")]
+        public static partial void NoLongerMonitoringClusterMembershipUpdates(ILogger logger);
+
+        [LoggerMessage(4, LogLevel.Debug, "Starting migration worker for target silo {SiloAddress}")]
+        public static partial void StartingMigrationWorker(ILogger logger, SiloAddress SiloAddress);
+
+        [LoggerMessage(5, LogLevel.Debug, "Migrated {Count} activations to target silo {SiloAddress}")]
+        public static partial void MigratedActivations(ILogger logger, int Count, SiloAddress SiloAddress);
+
+        [LoggerMessage(6, LogLevel.Error, "Error while migrating {Count} grain activations to {SiloAddress}")]
+        public static partial void ErrorWhileMigrating(ILogger logger, Exception exception, int Count, SiloAddress SiloAddress);
+
+        [LoggerMessage(7, LogLevel.Debug, "Exiting migration worker for target silo {SiloAddress}")]
+        public static partial void ExitingMigrationWorker(ILogger logger, SiloAddress SiloAddress);
+
+        [LoggerMessage(8, LogLevel.Debug, "Target silo {SiloAddress} is no longer active, so this migration activation worker is terminating")]
+        public static partial void TerminatingMigrationWorker(ILogger logger, SiloAddress SiloAddress);
+
+        [LoggerMessage(9, LogLevel.Warning, "Error signaling shutdown.")]
+        public static partial void ErrorSignalingShutdown(ILogger logger, Exception exception);
     }
 }

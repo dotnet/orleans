@@ -28,6 +28,36 @@ namespace Orleans
         private List<IIncomingGrainCallFilter> GrainCallFilters
             => _grainCallFilters ??= new List<IIncomingGrainCallFilter>(runtimeClient.ServiceProvider.GetServices<IIncomingGrainCallFilter>());
 
+        private static partial class Log
+        {
+            [LoggerMessage(1, LogLevel.Error, "Message is not addressed to an observer. {Message}")]
+            public static partial void MessageNotAddressedToObserver(ILogger logger, Message message);
+
+            [LoggerMessage(2, LogLevel.Error, "Unexpected target grain in request: {TargetGrain}. Message: {Message}")]
+            public static partial void UnexpectedTargetGrain(ILogger logger, GrainId targetGrain, Message message);
+
+            [LoggerMessage(3, LogLevel.Warning, "Object associated with Observer ID {ObserverId} has been garbage collected. Deleting object reference and unregistering it. Message = {Message}")]
+            public static partial void ObjectGarbageCollected(ILogger logger, ObserverGrainId observerId, Message message);
+
+            [LoggerMessage(4, LogLevel.Trace, "InvokeLocalObjectAsync {Message} start {Start}")]
+            public static partial void InvokeLocalObjectAsync(ILogger logger, Message message, bool start);
+
+            [LoggerMessage(5, LogLevel.Warning, "Exception during message body deserialization in LocalObjectMessagePumpAsync for message: {Message}")]
+            public static partial void MessageBodyDeserializationException(ILogger logger, Exception exception, Message message);
+
+            [LoggerMessage(6, LogLevel.Warning, "Exception in LocalObjectMessagePumpAsync")]
+            public static partial void LocalObjectMessagePumpException(ILogger logger, Exception exception);
+
+            [LoggerMessage(7, LogLevel.Warning, "Exception trying to send a response.")]
+            public static partial void SendResponseException(ILogger logger, Exception exception);
+
+            [LoggerMessage(8, LogLevel.Error, "Exception during invocation of notification {Request}, interface {Interface}. Ignoring exception because this is a one way request.")]
+            public static partial void InvocationExceptionOneWay(ILogger logger, Exception exception, string request, int interfaceType);
+
+            [LoggerMessage(9, LogLevel.Warning, "Exception trying to send an exception response")]
+            public static partial void SendExceptionResponseException(ILogger logger, Exception exception);
+        }
+
         public InvokableObjectManager(
             IGrainContext rootGrainContext,
             IRuntimeClient runtimeClient,
@@ -60,10 +90,7 @@ namespace Orleans
         {
             if (!ObserverGrainId.TryParse(message.TargetGrain, out var observerId))
             {
-                this.logger.LogError(
-                    (int)ErrorCode.ProxyClient_OGC_TargetNotFound_2,
-                    "Message is not addressed to an observer. {Message}",
-                    message);
+                Log.MessageNotAddressedToObserver(this.logger, message);
                 return;
             }
 
@@ -73,11 +100,7 @@ namespace Orleans
             }
             else
             {
-                this.logger.LogError(
-                    (int)ErrorCode.ProxyClient_OGC_TargetNotFound,
-                    "Unexpected target grain in request: {TargetGrain}. Message: {Message}",
-                    message.TargetGrain,
-                    message);
+                Log.UnexpectedTargetGrain(this.logger, message.TargetGrain, message);
             }
         }
 
@@ -155,11 +178,7 @@ namespace Orleans
                 if (obj == null)
                 {
                     //// Remove from the dictionary record for the garbage collected object? But now we won't be able to detect invalid dispatch IDs anymore.
-                    _manager.logger.LogWarning(
-                        (int)ErrorCode.Runtime_Error_100162,
-                        "Object associated with Observer ID {ObserverId} has been garbage collected. Deleting object reference and unregistering it. Message = {message}",
-                        this.ObserverId,
-                        message);
+                    Log.ObjectGarbageCollected(_manager.logger, this.ObserverId, message);
 
                     // Try to remove. If it's not there, we don't care.
                     _manager.TryDeregister(this.ObserverId);
@@ -174,8 +193,7 @@ namespace Orleans
                     this.Running = true;
                 }
 
-                if (_manager.logger.IsEnabled(LogLevel.Trace))
-                    _manager.logger.LogTrace("InvokeLocalObjectAsync {Message} start {Start}", message, start);
+                Log.InvokeLocalObjectAsync(_manager.logger, message, start);
 
                 if (start)
                 {
@@ -243,13 +261,7 @@ namespace Orleans
                         }
                         catch (Exception deserializationException)
                         {
-                            if (_manager.logger.IsEnabled(LogLevel.Warning))
-                            {
-                                _manager.logger.LogWarning(
-                                    deserializationException,
-                                    "Exception during message body deserialization in " + nameof(LocalObjectMessagePumpAsync) + " for message: {Message}",
-                                    message);
-                            }
+                            Log.MessageBodyDeserializationException(_manager.logger, deserializationException, message);
 
                             _manager.runtimeClient.SendResponse(message, Response.FromException(deserializationException));
                             continue;
@@ -285,9 +297,7 @@ namespace Orleans
                     catch (Exception outerException)
                     {
                         // ignore, keep looping.
-                        _manager.logger.LogWarning(
-                            outerException,
-                            "Exception in " + nameof(LocalObjectMessagePumpAsync));
+                        Log.LocalObjectMessagePumpException(_manager.logger, outerException);
                     }
                 }
             }
@@ -310,7 +320,7 @@ namespace Orleans
                 catch (Exception exc2)
                 {
                     _manager.runtimeClient.SendResponse(message, Response.FromException(exc2));
-                    _manager.logger.LogWarning((int)ErrorCode.ProxyClient_OGC_SendResponseFailed, exc2, "Exception trying to send a response.");
+                    Log.SendResponseException(_manager.logger, exc2);
                     return;
                 }
 
@@ -327,12 +337,7 @@ namespace Orleans
                 {
                     case Message.Directions.OneWay:
                         {
-                            _manager.logger.LogError(
-                                (int)ErrorCode.ProxyClient_OGC_UnhandledExceptionInOneWayInvoke,
-                                exception,
-                                "Exception during invocation of notification {Request}, interface {Interface}. Ignoring exception because this is a one way request.",
-                                request.ToString(),
-                                message.InterfaceType);
+                            Log.InvocationExceptionOneWay(_manager.logger, exception, request.ToString(), message.InterfaceType);
                             break;
                         }
 
@@ -347,10 +352,7 @@ namespace Orleans
                             catch (Exception ex2)
                             {
                                 _manager.runtimeClient.SendResponse(message, Response.FromException(ex2));
-                                _manager.logger.LogWarning(
-                                    (int)ErrorCode.ProxyClient_OGC_SendExceptionResponseFailed,
-                                    ex2,
-                                    "Exception trying to send an exception response");
+                                Log.SendExceptionResponseException(_manager.logger, ex2);
                                 return;
                             }
 

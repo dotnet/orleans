@@ -56,10 +56,7 @@ namespace Orleans.Runtime.Metadata
         {
             try
             {
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug("Starting to process membership updates");
-                }
+                Log.StartingToProcessMembershipUpdates(_logger);
 
                 var cancellation = _cancellation.Token;
                 await foreach (var _ in _clusterMembershipService.MembershipUpdates.WithCancellation(cancellation))
@@ -85,10 +82,7 @@ namespace Orleans.Runtime.Metadata
             }
             finally
             {
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug("Stopped processing membership updates");
-                }
+                Log.StoppedProcessingMembershipUpdates(_logger);
             }
         }
 
@@ -168,7 +162,7 @@ namespace Orleans.Runtime.Metadata
                 if (result.Exception is Exception exception)
                 {
                     fetchSuccess = false;
-                    _logger.LogWarning(exception, "Error retrieving silo manifest for silo {SiloAddress}", result.Key);
+                    Log.ErrorRetrievingSiloManifest(_logger, exception, result.Key);
                 }
                 else
                 {
@@ -232,6 +226,18 @@ namespace Orleans.Runtime.Metadata
         public void Dispose()
         {
             _cancellation.Cancel();
+        }
+
+        private static partial class Log
+        {
+            [LoggerMessage(1, LogLevel.Debug, "Starting to process membership updates")]
+            public static partial void StartingToProcessMembershipUpdates(ILogger logger);
+
+            [LoggerMessage(2, LogLevel.Debug, "Stopped processing membership updates")]
+            public static partial void StoppedProcessingMembershipUpdates(ILogger logger);
+
+            [LoggerMessage(3, LogLevel.Warning, "Error retrieving silo manifest for silo {SiloAddress}")]
+            public static partial void ErrorRetrievingSiloManifest(ILogger logger, Exception exception, SiloAddress SiloAddress);
         }
     }
 }

@@ -88,33 +88,33 @@ namespace Orleans.Runtime
 
         public Task Ping(string message)
         {
-            logger.LogInformation("Ping");
+            Log.Ping(logger);
             return Task.CompletedTask;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods", MessageId = "System.GC.Collect")]
         public Task ForceGarbageCollection()
         {
-            logger.LogInformation("ForceGarbageCollection");
+            Log.ForceGarbageCollection(logger);
             GC.Collect();
             return Task.CompletedTask;
         }
 
         public Task ForceActivationCollection(TimeSpan ageLimit)
         {
-            logger.LogInformation("ForceActivationCollection");
+            Log.ForceActivationCollection(logger);
             return _activationCollector.CollectActivations(ageLimit, CancellationToken.None);
         }
 
         public Task ForceRuntimeStatisticsCollection()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("ForceRuntimeStatisticsCollection");
+            Log.ForceRuntimeStatisticsCollection(logger);
             return this.deploymentLoadPublisher.RefreshClusterStatistics();
         }
 
         public Task<SiloRuntimeStatistics> GetRuntimeStatistics()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetRuntimeStatistics");
+            Log.GetRuntimeStatistics(logger);
             var activationCount = this.activationDirectory.Count;
             var stats = new SiloRuntimeStatistics(
                 activationCount,
@@ -127,7 +127,7 @@ namespace Orleans.Runtime
 
         public Task<List<Tuple<GrainId, string, int>>> GetGrainStatistics()
         {
-            logger.LogInformation("GetGrainStatistics");
+            Log.GetGrainStatistics(logger);
             var counts = new Dictionary<string, Dictionary<GrainId, int>>();
             lock (activationDirectory)
             {
@@ -238,11 +238,7 @@ namespace Orleans.Runtime
 
             if (controllable == null)
             {
-                logger.LogError(
-                    (int)ErrorCode.Provider_ProviderNotFound,
-                    "Could not find a controllable service for type {ProviderTypeFullName} and name {ProviderName}.",
-                    typeof(IControllable).FullName,
-                    providerName);
+                Log.SendControlCommandToProvider(logger, typeof(IControllable).FullName, providerName);
                 throw new ArgumentException($"Could not find a controllable service for type {typeof(IControllable).FullName} and name {providerName}.");
             }
 
@@ -344,6 +340,30 @@ namespace Orleans.Runtime
                 }
             }
             return stats;
+        }
+
+        private static partial class Log
+        {
+            [LoggerMessage(1, LogLevel.Information, "Ping")]
+            public static partial void Ping(ILogger logger);
+
+            [LoggerMessage(2, LogLevel.Information, "ForceGarbageCollection")]
+            public static partial void ForceGarbageCollection(ILogger logger);
+
+            [LoggerMessage(3, LogLevel.Information, "ForceActivationCollection")]
+            public static partial void ForceActivationCollection(ILogger logger);
+
+            [LoggerMessage(4, LogLevel.Debug, "ForceRuntimeStatisticsCollection")]
+            public static partial void ForceRuntimeStatisticsCollection(ILogger logger);
+
+            [LoggerMessage(5, LogLevel.Debug, "GetRuntimeStatistics")]
+            public static partial void GetRuntimeStatistics(ILogger logger);
+
+            [LoggerMessage(6, LogLevel.Information, "GetGrainStatistics")]
+            public static partial void GetGrainStatistics(ILogger logger);
+
+            [LoggerMessage(7, LogLevel.Error, "Could not find a controllable service for type {ProviderTypeFullName} and name {ProviderName}.")]
+            public static partial void SendControlCommandToProvider(ILogger logger, string ProviderTypeFullName, string ProviderName);
         }
     }
 }

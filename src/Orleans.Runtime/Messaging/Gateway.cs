@@ -79,7 +79,7 @@ namespace Orleans.Runtime.Messaging
                 }
                 catch (Exception exception)
                 {
-                    logger.LogError(exception, "Error performing gateway maintenance");
+                    LogErrorPerformingGatewayMaintenance(logger, exception);
                 }
             }
         }
@@ -122,7 +122,7 @@ namespace Orleans.Runtime.Messaging
 
         internal void RecordOpenedConnection(GatewayInboundConnection connection, ClientGrainId clientId)
         {
-            logger.LogInformation((int)ErrorCode.GatewayClientOpenedSocket, "Recorded opened connection from endpoint {EndPoint}, client ID {ClientId}.", connection.RemoteEndPoint, clientId);
+            LogRecordedOpenedConnection(logger, connection.RemoteEndPoint, clientId);
             lock (clients)
             {
                 if (clients.TryGetValue(clientId, out var clientState))
@@ -159,11 +159,7 @@ namespace Orleans.Runtime.Messaging
                 clientsCollectionVersion++;
             }
 
-            logger.LogInformation(
-                (int)ErrorCode.GatewayClientClosedSocket,
-                "Recorded closed socket from endpoint {Endpoint}, client ID {clientId}.",
-                connection.RemoteEndPoint?.ToString() ?? "null",
-                clientState.Id);
+            LogRecordedClosedSocket(logger, connection.RemoteEndPoint?.ToString() ?? "null", clientState.Id);
         }
 
         internal SiloAddress TryToReroute(Message msg)
@@ -230,14 +226,7 @@ namespace Orleans.Runtime.Messaging
                     {
                         if (clients.TryGetValue(kv.Key, out var client) && client.ReadyToDrop())
                         {
-                            if (logger.IsEnabled(LogLevel.Information))
-                            {
-                                logger.LogInformation(
-                                    (int)ErrorCode.GatewayDroppingClient,
-                                    "Dropping client {ClientId}, {IdleDuration} after disconnect with no reconnect",
-                                    kv.Key,
-                                    client.DisconnectedSince);
-                            }
+                            LogDroppingClient(logger, kv.Key, client.DisconnectedSince);
 
                             if (clients.TryRemove(kv.Key, out _))
                             {
@@ -339,11 +328,7 @@ namespace Orleans.Runtime.Messaging
                 var existing = Interlocked.Exchange(ref _connection, connection);
                 if (existing is not null)
                 {
-                    _gateway.logger.LogWarning(
-                        "Client {ClientId} received new connection ({NewConnection}) before the previous connection ({PreviousConnection}) had been removed",
-                        Id.GrainId,
-                        connection,
-                        existing);
+                    LogClientReceivedNewConnection(_gateway.logger, Id.GrainId, connection, existing);
                 }
 
                 _disconnectedSince.Reset();
@@ -373,7 +358,7 @@ namespace Orleans.Runtime.Messaging
                 _pendingToSend.Enqueue(msg);
                 _signal.Signal();
 #if DEBUG
-                if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.LogTrace("Queued message {Message} for client {TargetGrain}", msg, msg.TargetGrain);
+                LogQueuedMessageForClient(_gateway.logger, msg, msg.TargetGrain);
 #endif
             }
 
@@ -403,7 +388,7 @@ namespace Orleans.Runtime.Messaging
                             if (TrySend(connection, message))
                             {
 #if DEBUG
-                                if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.LogTrace("Sent queued message {Message} to client {ClientId}", message, Id);
+                                LogSentQueuedMessageToClient(_gateway.logger, message, Id);
 #endif
                             }
                             else
@@ -416,7 +401,7 @@ namespace Orleans.Runtime.Messaging
                     }
                     catch (Exception exception)
                     {
-                        _gateway.logger.LogWarning(exception, "Exception in message loop for client {ClientId}", Id);
+                        LogExceptionInMessageLoop(_gateway.logger, exception, Id);
                     }
                 }
             }
@@ -497,5 +482,29 @@ namespace Orleans.Runtime.Messaging
                 }
             }
         }
+
+        private static readonly Action<ILogger, Exception> LogErrorPerformingGatewayMaintenance =
+            LoggerMessage.Define(LogLevel.Error, new EventId((int)ErrorCode.GatewayMaintenanceError, nameof(ErrorCode.GatewayMaintenanceError)), "Error performing gateway maintenance");
+
+        private static readonly Action<ILogger, EndPoint, ClientGrainId, Exception> LogRecordedOpenedConnection =
+            LoggerMessage.Define<EndPoint, ClientGrainId>(LogLevel.Information, new EventId((int)ErrorCode.GatewayClientOpenedSocket, nameof(ErrorCode.GatewayClientOpenedSocket)), "Recorded opened connection from endpoint {EndPoint}, client ID {ClientId}.");
+
+        private static readonly Action<ILogger, string, ClientGrainId, Exception> LogRecordedClosedSocket =
+            LoggerMessage.Define<string, ClientGrainId>(LogLevel.Information, new EventId((int)ErrorCode.GatewayClientClosedSocket, nameof(ErrorCode.GatewayClientClosedSocket)), "Recorded closed socket from endpoint {Endpoint}, client ID {clientId}.");
+
+        private static readonly Action<ILogger, ClientGrainId, TimeSpan, Exception> LogDroppingClient =
+            LoggerMessage.Define<ClientGrainId, TimeSpan>(LogLevel.Information, new EventId((int)ErrorCode.GatewayDroppingClient, nameof(ErrorCode.GatewayDroppingClient)), "Dropping client {ClientId}, {IdleDuration} after disconnect with no reconnect");
+
+        private static readonly Action<ILogger, GrainId, GatewayInboundConnection, GatewayInboundConnection, Exception> LogClientReceivedNewConnection =
+            LoggerMessage.Define<GrainId, GatewayInboundConnection, GatewayInboundConnection>(LogLevel.Warning, new EventId((int)ErrorCode.GatewayClientReceivedNewConnection, nameof(ErrorCode.GatewayClientReceivedNewConnection)), "Client {ClientId} received new connection ({NewConnection}) before the previous connection ({PreviousConnection}) had been removed");
+
+        private static readonly Action<ILogger, Message, GrainId, Exception> LogQueuedMessageForClient =
+            LoggerMessage.Define<Message, GrainId>(LogLevel.Trace, new EventId((int)ErrorCode.GatewayQueuedMessageForClient, nameof(ErrorCode.GatewayQueuedMessageForClient)), "Queued message {Message} for client {TargetGrain}");
+
+        private static readonly Action<ILogger, Message, ClientGrainId, Exception> LogSentQueuedMessageToClient =
+            LoggerMessage.Define<Message, ClientGrainId>(LogLevel.Trace, new EventId((int)ErrorCode.GatewaySentQueuedMessageToClient, nameof(ErrorCode.GatewaySentQueuedMessageToClient)), "Sent queued message {Message} to client {ClientId}");
+
+        private static readonly Action<ILogger, Exception, ClientGrainId, Exception> LogExceptionInMessageLoop =
+            LoggerMessage.Define<Exception, ClientGrainId>(LogLevel.Warning, new EventId((int)ErrorCode.GatewayExceptionInMessageLoop, nameof(ErrorCode.GatewayExceptionInMessageLoop)), "Exception in message loop for client {ClientId}");
     }
 }

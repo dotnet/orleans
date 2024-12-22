@@ -21,6 +21,27 @@ namespace Orleans.Runtime
     /// </summary>
     internal class ClientClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable, IDisposable
     {
+        private static partial class Log
+        {
+            [LoggerMessage(1, LogLevel.Debug, "Refreshed cluster manifest")]
+            public static partial void RefreshedClusterManifest(ILogger logger);
+
+            [LoggerMessage(2, LogLevel.Debug, "Stopped refreshing cluster manifest")]
+            public static partial void StoppedRefreshingClusterManifest(ILogger logger);
+
+            [LoggerMessage(3, LogLevel.Information, "Graceful shutdown of cluster manifest provider was canceled.")]
+            public static partial void GracefulShutdownCanceled(ILogger logger);
+
+            [LoggerMessage(4, LogLevel.Error, "Error stopping cluster manifest provider.")]
+            public static partial void ErrorStoppingClusterManifestProvider(ILogger logger, Exception exception);
+
+            [LoggerMessage(5, LogLevel.Warning, "Error trying to get cluster manifest from gateway {Gateway}")]
+            public static partial void ErrorGettingClusterManifest(ILogger logger, Exception exception, SiloAddress gateway);
+
+            [LoggerMessage(6, LogLevel.Warning, "Failed to fetch cluster manifest update from {Provider}.")]
+            public static partial void FailedToFetchClusterManifestUpdate(ILogger logger, Exception exception, IClusterManifestSystemTarget provider);
+        }
+
         private readonly TaskCompletionSource<bool> _initialized = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly ILogger<ClientClusterManifestProvider> _logger;
         private readonly TypeManagementOptions _typeManagementOptions;
@@ -90,11 +111,11 @@ namespace Orleans.Runtime
             }
             catch (OperationCanceledException)
             {
-                _logger.LogInformation("Graceful shutdown of cluster manifest provider was canceled.");
+                Log.GracefulShutdownCanceled(_logger);
             }
             catch (Exception exception)
             {
-                _logger.LogError(exception, "Error stopping cluster manifest provider.");
+                Log.ErrorStoppingClusterManifestProvider(_logger, exception);
             }
         }
 
@@ -182,16 +203,13 @@ namespace Orleans.Runtime
 
                         _initialized.TrySetResult(true);
 
-                        if (_logger.IsEnabled(LogLevel.Debug))
-                        {
-                            _logger.LogDebug("Refreshed cluster manifest");
-                        }
+                        Log.RefreshedClusterManifest(_logger);
 
                         await Task.WhenAny(cancellationTask, Task.Delay(_typeManagementOptions.TypeMapRefreshInterval));
                     }
                     catch (Exception exception)
                     {
-                        _logger.LogWarning(exception, "Error trying to get cluster manifest from gateway {Gateway}", gateway);
+                        Log.ErrorGettingClusterManifest(_logger, exception, gateway);
                         await Task.Delay(StandardExtensions.Min(_typeManagementOptions.TypeMapRefreshInterval, TimeSpan.FromSeconds(5)));
 
                         // Reset the gateway so that another will be selected on the next iteration.
@@ -203,10 +221,7 @@ namespace Orleans.Runtime
             {
                 _initialized.TrySetResult(false);
 
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug("Stopped refreshing cluster manifest");
-                }
+                Log.StoppedRefreshingClusterManifest(_logger);
             }
         }
 
@@ -220,7 +235,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exception)
             {
-                _logger.LogWarning(exception, "Failed to fetch cluster manifest update from {Provider}.", provider);
+                Log.FailedToFetchClusterManifestUpdate(_logger, exception, provider);
 
                 // If the provider does not support the new API, fall back to the old one.
                 var manifest = await provider.GetClusterManifest();

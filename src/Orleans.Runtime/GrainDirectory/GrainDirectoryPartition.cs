@@ -81,7 +81,7 @@ internal sealed partial class GrainDirectoryPartition(
     {
         if (_logger.IsEnabled(LogLevel.Trace))
         {
-            _logger.LogTrace("GetSnapshotAsync('{Version}', '{RangeVersion}', '{Range}')", version, rangeVersion, range);
+            Log.GetSnapshotAsync(_logger, version, rangeVersion, range);
         }
 
         // Wait for the range to be unlocked.
@@ -108,13 +108,13 @@ internal sealed partial class GrainDirectoryPartition(
             var rangeSnapshot = new GrainDirectoryPartitionSnapshot(rangeVersion, partitionAddresses);
             if (_logger.IsEnabled(LogLevel.Debug))
             {
-                _logger.LogDebug("Transferring '{Count}' entries in range '{Range}' from version '{Version}' snapshot.", partitionAddresses.Count, range, rangeVersion);
+                Log.TransferringEntries(_logger, partitionAddresses.Count, range, rangeVersion);
             }
 
             return rangeSnapshot;
         }
 
-        _logger.LogWarning("Received a request for a snapshot which this partition does not have, version '{Version}', range version '{RangeVersion}', range '{Range}'.", version, rangeVersion, range);
+        Log.ReceivedRequestForSnapshot(_logger, version, rangeVersion, range);
         return null;
     }
 
@@ -146,7 +146,7 @@ internal sealed partial class GrainDirectoryPartition(
 
                 if (_logger.IsEnabled(LogLevel.Debug))
                 {
-                    _logger.LogDebug("Removing version '{Version}' snapshot. Current snapshots: [{CurrentSnapshots}].", partitionSnapshot.DirectoryMembershipVersion, string.Join(", ", _partitionSnapshots.Select(s => s.DirectoryMembershipVersion)));
+                    Log.RemovingSnapshot(_logger, partitionSnapshot.DirectoryMembershipVersion, string.Join(", ", _partitionSnapshots.Select(s => s.DirectoryMembershipVersion)));
                 }
 
                 // If shutdown has been requested and there are no more pending snapshots, signal completion.
@@ -264,7 +264,7 @@ internal sealed partial class GrainDirectoryPartition(
         {
             if (_logger.IsEnabled(LogLevel.Debug))
             {
-                _logger.LogDebug("Deleting '{Count}' entries located on now-defunct silo '{SiloAddress}'.", toRemove.Count, change.SiloAddress);
+                Log.DeletingEntries(_logger, toRemove.Count, change.SiloAddress);
             }
 
             foreach (var grainAddress in toRemove)
@@ -295,7 +295,7 @@ internal sealed partial class GrainDirectoryPartition(
                 }
                 catch (Exception exception)
                 {
-                    _logger.LogWarning(exception, "Error waiting for range to unlock.");
+                    Log.ErrorWaitingForRange(_logger, exception);
                 }
 
                 // Remove all snapshots that are associated with the given partition prior or equal to the specified version.
@@ -319,7 +319,7 @@ internal sealed partial class GrainDirectoryPartition(
 
         if (_logger.IsEnabled(LogLevel.Trace))
         {
-            _logger.LogTrace("Observed membership version '{Version}'.", current.Version);
+            Log.ObservedMembershipVersion(_logger, current.Version);
         }
 
         var previous = CurrentView;
@@ -364,7 +364,7 @@ internal sealed partial class GrainDirectoryPartition(
         var (tcs, sw) = LockRange(removedRange, current.Version);
         if (_logger.IsEnabled(LogLevel.Debug))
         {
-            _logger.LogDebug("Relinquishing ownership of range '{Range}' at version '{Version}'.", removedRange, current.Version);
+            Log.RelinquishingOwnership(_logger, removedRange, current.Version);
         }
 
         try
@@ -414,7 +414,7 @@ internal sealed partial class GrainDirectoryPartition(
             {
                 if (_logger.IsEnabled(LogLevel.Debug))
                 {
-                    _logger.LogDebug("Encountered non-contiguous update from '{Previous}' to '{Current}' while releasing range '{Range}'. Dropping snapshot.", previous.Version, current.Version, removedRange);
+                    Log.EncounteredNonContiguousUpdate(_logger, previous.Version, current.Version, removedRange);
                 }
 
                 return;
@@ -424,7 +424,7 @@ internal sealed partial class GrainDirectoryPartition(
             {
                 if (_logger.IsEnabled(LogLevel.Debug))
                 {
-                    _logger.LogDebug("No transfer partners for snapshot of range '{Range}' at version '{Version}'. Dropping snapshot.", removedRange, current.Version);
+                    Log.NoTransferPartners(_logger, removedRange, current.Version);
                 }
 
                 return;
@@ -450,7 +450,7 @@ internal sealed partial class GrainDirectoryPartition(
             CoarseStopwatch stopwatch = default;
             if (_logger.IsEnabled(LogLevel.Debug))
             {
-                _logger.LogDebug("Acquiring range '{Range}'.", addedRange);
+                Log.AcquiringRange(_logger, addedRange);
                 stopwatch = CoarseStopwatch.StartNew();
             }
 
@@ -489,10 +489,7 @@ internal sealed partial class GrainDirectoryPartition(
             {
                 if (_logger.IsEnabled(LogLevel.Debug))
                 {
-                    _logger.LogDebug(
-                        "Non-contiguous view change detected: '{PreviousVersion}' to '{CurrentVersion}'. Performing recovery.",
-                        previous.Version,
-                        current.Version);
+                    Log.NonContiguousViewChange(_logger, previous.Version, current.Version, addedRange);
                 }
 
                 success = false;
@@ -510,7 +507,7 @@ internal sealed partial class GrainDirectoryPartition(
 
             if (_logger.IsEnabled(LogLevel.Debug))
             {
-                _logger.LogDebug("Completed transferring entries for range '{Range}' at version '{Version}' took {Elapsed}ms.{Recovered}", addedRange, current.Version, stopwatch.ElapsedMilliseconds, recovered ? " Recovered" : "");
+                Log.CompletedTransferringEntries(_logger, addedRange, current.Version, stopwatch.ElapsedMilliseconds, recovered);
             }
         }
         finally
@@ -548,7 +545,7 @@ internal sealed partial class GrainDirectoryPartition(
             var stopwatch = ValueStopwatch.StartNew();
             if (_logger.IsEnabled(LogLevel.Trace))
             {
-                _logger.LogTrace("Requesting entries for ranges '{Range}' from '{PreviousOwner}' at version '{PreviousVersion}'.", addedRange, previousOwner, previousVersion);
+                Log.RequestingEntries(_logger, addedRange, previousOwner, previousVersion);
             }
 
             var partition = GetPartitionReference(previousOwner, partitionIndex);
@@ -558,7 +555,7 @@ internal sealed partial class GrainDirectoryPartition(
 
             if (snapshot is null)
             {
-                _logger.LogWarning("Expected a valid snapshot from previous owner '{PreviousOwner}' for part of ranges '{Range}', but found none.", previousOwner, addedRange);
+                Log.ExpectedValidSnapshot(_logger, previousOwner, addedRange);
                 return false;
             }
 
@@ -577,13 +574,13 @@ internal sealed partial class GrainDirectoryPartition(
             {
                 DebugAssertOwnership(current, entry.GrainId);
 
-                _logger.LogTrace("Received '{Entry}' via snapshot from '{PreviousOwner}' for version '{Version}'.", entry, previousOwner, previousVersion);
+                Log.ReceivedEntryViaSnapshot(_logger, entry, previousOwner, previousVersion);
                 _directory[entry.GrainId] = entry;
             }
 
             if (_logger.IsEnabled(LogLevel.Debug))
             {
-                _logger.LogDebug("Transferred '{Count}' entries for range '{Range}' from '{PreviousOwner}'.", snapshot.GrainAddresses.Count, addedRange, previousOwner);
+                Log.TransferredEntries(_logger, snapshot.GrainAddresses.Count, addedRange, previousOwner);
             }
 
             DirectoryInstruments.SnapshotTransferCount.Add(1);
@@ -595,11 +592,11 @@ internal sealed partial class GrainDirectoryPartition(
         {
             if (exception is SiloUnavailableException)
             {
-                _logger.LogWarning("Remote host became unavailable while transferring ownership of range '{Range}'. Recovery will be performed.", addedRange);
+                Log.RemoteHostUnavailable(_logger, addedRange);
             }
             else
             {
-                _logger.LogWarning(exception, "Error transferring ownership of range '{Range}'. Recovery will be performed.", addedRange);
+                Log.ErrorTransferringOwnership(_logger, exception, addedRange);
             }
 
             return false;
@@ -612,7 +609,7 @@ internal sealed partial class GrainDirectoryPartition(
         GrainRuntime.CheckRuntimeContext(this);
         if (_logger.IsEnabled(LogLevel.Debug))
         {
-            _logger.LogDebug("Recovering activations from range '{Range}' at version '{Version}'.", addedRange, current.Version);
+            Log.RecoveringActivations(_logger, addedRange, current.Version);
         }
 
         await foreach (var activations in GetRegisteredActivations(current, addedRange, isValidation: false))
@@ -621,7 +618,7 @@ internal sealed partial class GrainDirectoryPartition(
             foreach (var entry in activations)
             {
                 DebugAssertOwnership(current, entry.GrainId);
-                _logger.LogTrace("Recovered '{Entry}' for version '{Version}'.", entry, current.Version);
+                Log.RecoveredEntry(_logger, entry, current.Version);
                 _directory[entry.GrainId] = entry;
             }
         }
@@ -630,7 +627,7 @@ internal sealed partial class GrainDirectoryPartition(
         DirectoryInstruments.RangeRecoveryDuration.Record((long)stopwatch.Elapsed.TotalMilliseconds);
         if (_logger.IsEnabled(LogLevel.Debug))
         {
-            _logger.LogDebug("Completed recovering activations from range '{Range}' at version '{Version}' took '{Elapsed}'.", addedRange, current.Version, stopwatch.Elapsed);
+            Log.CompletedRecoveringActivations(_logger, addedRange, current.Version, stopwatch.Elapsed);
         }
     }
 
@@ -688,7 +685,7 @@ internal sealed partial class GrainDirectoryPartition(
 
             if (_logger.IsEnabled(LogLevel.Debug))
             {
-                _logger.LogDebug("Recovered '{Count}' entries from silo '{SiloAddress}' for ranges '{Range}' at version '{Version}' in {ElapsedMilliseconds}ms.", result.Value.Count, siloAddress, range, version, stopwatch.Elapsed.TotalMilliseconds);
+                Log.RecoveredEntries(_logger, result.Value.Count, siloAddress, range, version, stopwatch.Elapsed.TotalMilliseconds);
             }
 
             return result.Value;
@@ -714,7 +711,7 @@ internal sealed partial class GrainDirectoryPartition(
             {
                 if (ex is not OrleansMessageRejectionException)
                 {
-                    _logger.LogError(ex, "Error invoking operation '{Operation}' on silo '{SiloAddress}'.", operationName, siloAddress);
+                    Log.ErrorInvokingOperation(_logger, ex, operationName, siloAddress);
                 }
 
                 await _owner.RefreshViewAsync(default, CancellationToken.None);
@@ -777,14 +774,14 @@ internal sealed partial class GrainDirectoryPartition(
                         if (!existingEntry.Equals(entry))
                         {
                             ++mismatched;
-                            _logger.LogError("Integrity violation: Recovered entry '{RecoveredRecord}' does not match existing entry '{LocalRecord}'.", entry, existingEntry);
+                            Log.IntegrityViolationRecoveredEntry(_logger, entry, existingEntry);
                             Debug.Fail($"Integrity violation: Recovered entry '{entry}' does not match existing entry '{existingEntry}'.");
                         }
                     }
                     else
                     {
                         ++missing;
-                        _logger.LogError("Integrity violation: Recovered entry '{RecoveredRecord}' not found in directory.", entry);
+                        Log.IntegrityViolationRecoveredEntryNotFound(_logger, entry);
                         Debug.Fail($"Integrity violation: Recovered entry '{entry}' not found in directory.");
                     }
                 }
@@ -809,4 +806,85 @@ internal sealed partial class GrainDirectoryPartition(
         MembershipVersion DirectoryMembershipVersion,
         List<GrainAddress> GrainAddresses,
         HashSet<(SiloAddress SiloAddress, int PartitionIndex)> TransferPartners);
+
+    private static partial class Log
+    {
+        [LoggerMessage(1, LogLevel.Trace, "GetSnapshotAsync('{Version}', '{RangeVersion}', '{Range}')")]
+        public static partial void GetSnapshotAsync(ILogger logger, MembershipVersion version, MembershipVersion rangeVersion, RingRange range);
+
+        [LoggerMessage(2, LogLevel.Debug, "Transferring '{Count}' entries in range '{Range}' from version '{Version}' snapshot.")]
+        public static partial void TransferringEntries(ILogger logger, int count, RingRange range, MembershipVersion version);
+
+        [LoggerMessage(3, LogLevel.Warning, "Received a request for a snapshot which this partition does not have, version '{Version}', range version '{RangeVersion}', range '{Range}'.")]
+        public static partial void ReceivedRequestForSnapshot(ILogger logger, MembershipVersion version, MembershipVersion rangeVersion, RingRange range);
+
+        [LoggerMessage(4, LogLevel.Debug, "Removing version '{Version}' snapshot. Current snapshots: [{CurrentSnapshots}].")]
+        public static partial void RemovingSnapshot(ILogger logger, MembershipVersion version, string currentSnapshots);
+
+        [LoggerMessage(5, LogLevel.Debug, "Deleting '{Count}' entries located on now-defunct silo '{SiloAddress}'.")]
+        public static partial void DeletingEntries(ILogger logger, int count, SiloAddress siloAddress);
+
+        [LoggerMessage(6, LogLevel.Warning, "Error waiting for range to unlock.")]
+        public static partial void ErrorWaitingForRange(ILogger logger, Exception exception);
+
+        [LoggerMessage(7, LogLevel.Trace, "Observed membership version '{Version}'.")]
+        public static partial void ObservedMembershipVersion(ILogger logger, MembershipVersion version);
+
+        [LoggerMessage(8, LogLevel.Debug, "Relinquishing ownership of range '{Range}' at version '{Version}'.")]
+        public static partial void RelinquishingOwnership(ILogger logger, RingRange range, MembershipVersion version);
+
+        [LoggerMessage(9, LogLevel.Debug, "Encountered non-contiguous update from '{Previous}' to '{Current}' while releasing range '{Range}'. Dropping snapshot.")]
+        public static partial void EncounteredNonContiguousUpdate(ILogger logger, MembershipVersion previous, MembershipVersion current, RingRange range);
+
+        [LoggerMessage(10, LogLevel.Debug, "No transfer partners for snapshot of range '{Range}' at version '{Version}'. Dropping snapshot.")]
+        public static partial void NoTransferPartners(ILogger logger, RingRange range, MembershipVersion version);
+
+        [LoggerMessage(11, LogLevel.Debug, "Acquiring range '{Range}'.")]
+        public static partial void AcquiringRange(ILogger logger, RingRange range);
+
+        [LoggerMessage(12, LogLevel.Debug, "Non-contiguous view change detected: '{PreviousVersion}' to '{CurrentVersion}'. Performing recovery.")]
+        public static partial void NonContiguousViewChange(ILogger logger, MembershipVersion previousVersion, MembershipVersion currentVersion, RingRange range);
+
+        [LoggerMessage(13, LogLevel.Debug, "Completed transferring entries for range '{Range}' at version '{Version}' took {Elapsed}ms.{Recovered}")]
+        public static partial void CompletedTransferringEntries(ILogger logger, RingRange range, MembershipVersion version, long elapsed, bool recovered);
+
+        [LoggerMessage(14, LogLevel.Trace, "Requesting entries for ranges '{Range}' from '{PreviousOwner}' at version '{PreviousVersion}'.")]
+        public static partial void RequestingEntries(ILogger logger, RingRange range, SiloAddress previousOwner, MembershipVersion previousVersion);
+
+        [LoggerMessage(15, LogLevel.Warning, "Expected a valid snapshot from previous owner '{PreviousOwner}' for part of ranges '{Range}', but found none.")]
+        public static partial void ExpectedValidSnapshot(ILogger logger, SiloAddress previousOwner, RingRange range);
+
+        [LoggerMessage(16, LogLevel.Trace, "Received '{Entry}' via snapshot from '{PreviousOwner}' for version '{Version}'.")]
+        public static partial void ReceivedEntryViaSnapshot(ILogger logger, GrainAddress entry, SiloAddress previousOwner, MembershipVersion version);
+
+        [LoggerMessage(17, LogLevel.Debug, "Transferred '{Count}' entries for range '{Range}' from '{PreviousOwner}'.")]
+        public static partial void TransferredEntries(ILogger logger, int count, RingRange range, SiloAddress previousOwner);
+
+        [LoggerMessage(18, LogLevel.Warning, "Remote host became unavailable while transferring ownership of range '{Range}'. Recovery will be performed.")]
+        public static partial void RemoteHostUnavailable(ILogger logger, RingRange range);
+
+        [LoggerMessage(19, LogLevel.Warning, "Error transferring ownership of range '{Range}'. Recovery will be performed.")]
+        public static partial void ErrorTransferringOwnership(ILogger logger, Exception exception, RingRange range);
+
+        [LoggerMessage(20, LogLevel.Debug, "Recovering activations from range '{Range}' at version '{Version}'.")]
+        public static partial void RecoveringActivations(ILogger logger, RingRange range, MembershipVersion version);
+
+        [LoggerMessage(21, LogLevel.Trace, "Recovered '{Entry}' for version '{Version}'.")]
+        public static partial void RecoveredEntry(ILogger logger, GrainAddress entry, MembershipVersion version);
+
+        [LoggerMessage(22, LogLevel.Debug, "Completed recovering activations from range '{Range}' at version '{Version}' took '{Elapsed}'.")]
+        public static partial void CompletedRecoveringActivations(ILogger logger, RingRange range, MembershipVersion version, TimeSpan elapsed);
+
+        [LoggerMessage(23, LogLevel.Debug, "Recovered '{Count}' entries from silo '{SiloAddress}' for ranges '{Range}' at version '{Version}' in {ElapsedMilliseconds}ms.")]
+        public static partial void RecoveredEntries(ILogger logger, int count, SiloAddress siloAddress, RingRange range, MembershipVersion version, long elapsedMilliseconds);
+
+        [LoggerMessage(24, LogLevel.Error, "Error invoking operation '{Operation}' on silo '{SiloAddress}'.")]
+        public static partial void ErrorInvokingOperation(ILogger logger, Exception exception, string operation, SiloAddress siloAddress);
+
+        [LoggerMessage(25, LogLevel.Error, "Integrity violation: Recovered entry '{RecoveredRecord}' does not match existing entry '{LocalRecord}'.")]
+        public static partial void IntegrityViolationRecoveredEntry(ILogger logger, GrainAddress recoveredRecord, GrainAddress localRecord);
+
+        [LoggerMessage(26, LogLevel.Error, "Integrity violation: Recovered entry '{RecoveredRecord}' not found in directory.")]
+        public static partial void IntegrityViolationRecoveredEntryNotFound(ILogger logger, GrainAddress recoveredRecord);
+    }
 }
