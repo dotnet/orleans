@@ -3,6 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -27,9 +28,20 @@ namespace Orleans.Runtime
         /// </summary>
 #pragma warning disable IDE0052 // Remove unread private members
         private readonly Task _messageLoopTask;
+        private readonly Task _workerAdjustmentTask;
 #pragma warning restore IDE0052 // Remove unread private members
 
         private GrainReference? _grainReference;
+
+        // Hill Climbing Variables
+        private int _queueLength = 0;
+        private const int MovingAverageWindow = 5;
+        private const int MinQueueLength = 10;
+        private const int MinWaitingCount = 1;
+        private const int WorkerRemovalBackoffMs = 1000;
+        private const int WorkerRemovalPeriodMs = 500;
+        private PeriodicTimer? _monitorTimer;
+        private DateTime _lastWorkerRemovalTime = DateTime.MinValue;
 
         public StatelessWorkerGrainContext(
             GrainAddress address,
@@ -41,6 +53,7 @@ namespace Orleans.Runtime
             _innerActivator = innerActivator;
             _maxWorkers = ((StatelessWorkerPlacement)_shared.PlacementStrategy).MaxLocal;
             _messageLoopTask = Task.Run(RunMessageLoop);
+            _workerAdjustmentTask = PeriodicallyRemoveWorkers();
         }
 
         public GrainReference GrainReference => _grainReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
@@ -77,6 +90,7 @@ namespace Orleans.Runtime
 
         public void ReceiveMessage(object message)
         {
+            _queueLength++;
             EnqueueWorkItem(WorkItemType.Message, message);
         }
 
@@ -87,6 +101,7 @@ namespace Orleans.Runtime
 
         public async ValueTask DisposeAsync()
         {
+            _monitorTimer?.Dispose();
             var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             EnqueueWorkItem(WorkItemType.DisposeAsync, new DisposeAsyncWorkItemState(completion));
             await completion.Task;
@@ -130,6 +145,7 @@ namespace Orleans.Runtime
                         {
                             case WorkItemType.Message:
                                 ReceiveMessageInternal(workItem.State);
+                                _queueLength--;
                                 break;
                             case WorkItemType.Deactivate:
                                 {
@@ -236,7 +252,44 @@ namespace Orleans.Runtime
             }
         }
 
-        private ActivationData CreateWorker(object message)
+        private async Task PeriodicallyRemoveWorkers()
+        {
+            _monitorTimer = new(TimeSpan.FromMilliseconds(WorkerRemovalPeriodMs));
+
+            try
+            {
+                while (await _monitorTimer.WaitForNextTickAsync())
+                {
+                    var avgWaitingCount = _workers.Count > 0 ? _workers.Average(w => w.WaitingCount) : 0;
+
+                    if (_queueLength < MinQueueLength &&
+                        avgWaitingCount < MinWaitingCount &&
+                        (DateTime.Now - _lastWorkerRemovalTime).TotalMilliseconds > WorkerRemovalBackoffMs)
+                    {
+                        // Find inactive workers and mark them for deactivation
+                        foreach (var worker in _workers)
+                        {
+                            if (worker.IsInactive)
+                            {
+                                using var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
+                                worker.Deactivate(new(DeactivationReasonCode.RuntimeRequested,
+                                    $"Worker deactivated due to heuristics: QueueLength {_queueLength}, Avg Waiting Count {avgWaitingCount}"),
+                                    cancellation.Token);
+
+                                _lastWorkerRemovalTime = DateTime.UtcNow;
+                                break; // Deactivate only one worker at a time
+                            }
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Ignore
+            }
+        }
+
+        private ActivationData CreateWorker(object? message)
         {
             var address = GrainAddress.GetAddress(_address.SiloAddress, _address.GrainId, ActivationId.NewId());
             var newWorker = (ActivationData)_innerActivator.CreateContext(address);
@@ -246,7 +299,7 @@ namespace Orleans.Runtime
 
             // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
             var requestContext = (message as Message)?.RequestContextData ?? new Dictionary<string, object>();
-            var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
+            using var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
             newWorker.Activate(requestContext, cancellation.Token);
 
             _workers.Add(newWorker);
