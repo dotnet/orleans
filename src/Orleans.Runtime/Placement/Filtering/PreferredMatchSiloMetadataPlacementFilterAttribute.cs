@@ -11,5 +11,5 @@ namespace Orleans.Runtime.Placement.Filtering;
 /// <remarks>Example: If keys ["first","second"] are specified, then it will attempt to return only silos where both keys match the local silo's metadata values. If there are not sufficient silos matching both, then it will also include silos matching only the second key. Finally, if there are still fewer than minCandidates results then it will include all silos.</remarks>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
 [Experimental("ORLEANSEXP004")]
-public class PreferredMatchSiloMetadataPlacementFilterAttribute(string[] orderedMetadataKeys, int minCandidates = 2)
-    : PlacementFilterAttribute(new PreferredMatchSiloMetadataPlacementFilterStrategy(orderedMetadataKeys, minCandidates));
+public class PreferredMatchSiloMetadataPlacementFilterAttribute(string[] orderedMetadataKeys, int minCandidates = 2, int order = 0)
+    : PlacementFilterAttribute(new PreferredMatchSiloMetadataPlacementFilterStrategy(orderedMetadataKeys, minCandidates, order));

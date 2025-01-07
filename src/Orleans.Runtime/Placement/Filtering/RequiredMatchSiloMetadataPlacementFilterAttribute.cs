@@ -9,5 +9,5 @@ namespace Orleans.Runtime.Placement.Filtering;
 /// <param name="metadataKeys"></param>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
 [Experimental("ORLEANSEXP004")]
-public class RequiredMatchSiloMetadataPlacementFilterAttribute(string[] metadataKeys)
-    : PlacementFilterAttribute(new RequiredMatchSiloMetadataPlacementFilterStrategy(metadataKeys));
+public class RequiredMatchSiloMetadataPlacementFilterAttribute(string[] metadataKeys, int order = 0)
+    : PlacementFilterAttribute(new RequiredMatchSiloMetadataPlacementFilterStrategy(metadataKeys, order));

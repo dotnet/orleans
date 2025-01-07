@@ -6,14 +6,35 @@ namespace Orleans.Runtime.Placement.Filtering;
 
 public abstract class PlacementFilterStrategy
 {
+    public int Order { get; private set; }
+
+    protected PlacementFilterStrategy(int order)
+    {
+        Order = order;
+    }
+
     /// <summary>
     /// Initializes an instance of this type using the provided grain properties.
     /// </summary>
     /// <param name="properties">
     /// The grain properties.
     /// </param>
-    public virtual void Initialize(GrainProperties properties)
+    public void Initialize(GrainProperties properties)
     {
+        var orderProperty = GetPlacementFilterGrainProperty("order", properties);
+        if (!int.TryParse(orderProperty, out var parsedOrder))
+        {
+            throw new ArgumentException("Invalid order property value.");
+        }
+
+        Order = parsedOrder;
+
+        AdditionalInitialize(properties);
+    }
+
+    public virtual void AdditionalInitialize(GrainProperties properties)
+    {
+
     }
 
     /// <summary>
@@ -34,6 +55,8 @@ public abstract class PlacementFilterStrategy
         {
             properties[WellKnownGrainTypeProperties.PlacementFilter] = typeName;
         }
+
+        properties[$"{WellKnownGrainTypeProperties.PlacementFilter}.{typeName}.order"] = Order.ToString();
 
         foreach (var additionalGrainProperty in GetAdditionalGrainProperties(services, grainClass, grainType, properties))
         {

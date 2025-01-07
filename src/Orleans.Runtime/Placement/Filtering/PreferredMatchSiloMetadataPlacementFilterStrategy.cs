@@ -4,19 +4,18 @@ using Orleans.Metadata;
 
 namespace Orleans.Runtime.Placement.Filtering;
 
-public class PreferredMatchSiloMetadataPlacementFilterStrategy(string[] orderedMetadataKeys, int minCandidates)
-    : PlacementFilterStrategy
+public class PreferredMatchSiloMetadataPlacementFilterStrategy(string[] orderedMetadataKeys, int minCandidates, int order)
+    : PlacementFilterStrategy(order)
 {
     public string[] OrderedMetadataKeys { get; set; } = orderedMetadataKeys;
     public int MinCandidates { get; set; } = minCandidates;
 
-    public PreferredMatchSiloMetadataPlacementFilterStrategy() : this([], 1)
+    public PreferredMatchSiloMetadataPlacementFilterStrategy() : this([], 1, 0)
     {
     }
 
-    public override void Initialize(GrainProperties properties)
+    public override void AdditionalInitialize(GrainProperties properties)
     {
-        base.Initialize(properties);
         OrderedMetadataKeys = GetPlacementFilterGrainProperty("ordered-metadata-keys", properties).Split(",");
         var minCandidatesProperty = GetPlacementFilterGrainProperty("min-candidates", properties);
         if (!int.TryParse(minCandidatesProperty, out var parsedMinCandidates))

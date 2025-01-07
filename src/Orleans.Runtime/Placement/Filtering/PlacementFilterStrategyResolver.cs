@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Metadata;
 
@@ -55,7 +56,14 @@ public sealed class PlacementFilterStrategyResolver
                     throw new KeyNotFoundException($"Could not resolve placement filter strategy {filterId} for grain type {grainType}. Ensure that dependencies for that filter have been configured in the Container. This is often through a .Use* extension method provided by the implementation.");
                 }
             }
-            return filterList.ToArray();
+
+            var orderedFilters = filterList.OrderBy(f => f.Order).ToArray();
+            // check that the order is unique
+            if (orderedFilters.Select(f => f.Order).Distinct().Count() != orderedFilters.Length)
+            {
+                throw new InvalidOperationException($"Placement filters for grain type {grainType} have duplicate order values. Order values must be specified if more than one filter is applied and must be unique.");
+            }
+            return orderedFilters;
         }
 
         return [];
