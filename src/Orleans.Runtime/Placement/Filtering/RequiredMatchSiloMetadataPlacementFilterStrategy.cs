@@ -4,17 +4,17 @@ using Orleans.Metadata;
 
 namespace Orleans.Runtime.Placement.Filtering;
 
-public class RequiredMatchSiloMetadataPlacementFilterStrategy(string[] metadataKeys) : PlacementFilterStrategy
+public class RequiredMatchSiloMetadataPlacementFilterStrategy(string[] metadataKeys, int order)
+    : PlacementFilterStrategy(order)
 {
     public string[] MetadataKeys { get; private set; } = metadataKeys;
 
-    public RequiredMatchSiloMetadataPlacementFilterStrategy() : this([])
+    public RequiredMatchSiloMetadataPlacementFilterStrategy() : this([], 0)
     {
     }
 
-    public override void Initialize(GrainProperties properties)
+    public override void AdditionalInitialize(GrainProperties properties)
     {
-        base.Initialize(properties);
         MetadataKeys = GetPlacementFilterGrainProperty("metadata-keys", properties).Split(",");
     }
 

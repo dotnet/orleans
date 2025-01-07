@@ -60,7 +60,7 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
                 {testOtherSiloAddress, SiloMetadata.Empty},
                 {testLocalSiloAddress, siloMetadata},
             }));
-        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 1), new PlacementTarget(),
+        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 1, 0), new PlacementTarget(),
             new List<SiloAddress>() { testOtherSiloAddress }).ToList();
         Assert.NotEmpty(result);
     }
@@ -114,7 +114,7 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
                 {testOtherSiloAddress3, otherSiloMetadata3},
                 {testLocalSiloAddress, localSiloMetadata},
             }));
-        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy([key], minCandidates), new PlacementTarget(),
+        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy([key], minCandidates, 0), new PlacementTarget(),
             new List<SiloAddress>() { testOtherSiloAddress1, testOtherSiloAddress2, testOtherSiloAddress3 }).ToList();
         Assert.NotEmpty(result);
         Assert.Equal(expectedCount, result.Count);
@@ -168,7 +168,7 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
                 {testOtherSiloAddress3, otherSiloMetadata3},
                 {testLocalSiloAddress, localSiloMetadata},
             }));
-        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy(keys, minCandidates), new PlacementTarget(),
+        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy(keys, minCandidates, 0), new PlacementTarget(),
             new List<SiloAddress>() { testOtherSiloAddress1, testOtherSiloAddress2, testOtherSiloAddress3 }).ToList();
         Assert.NotEmpty(result);
         Assert.Equal(expectedCount, result.Count);
