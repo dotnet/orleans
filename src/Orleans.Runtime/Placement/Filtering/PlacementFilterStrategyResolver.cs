@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Metadata;
+using Orleans.Placement;
 
 namespace Orleans.Runtime.Placement.Filtering;
 

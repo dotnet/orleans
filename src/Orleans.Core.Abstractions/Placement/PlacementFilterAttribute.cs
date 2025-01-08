@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using Orleans.Metadata;
+using Orleans.Runtime;
 
-namespace Orleans.Runtime.Placement.Filtering;
+namespace Orleans.Placement;
 
 /// <summary>
 /// Base for all placement filter marker attributes.

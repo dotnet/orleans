@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
+using Orleans.Placement;
 
 namespace Orleans.Runtime.Placement.Filtering;
 
