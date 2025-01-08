@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 
+#nullable enable
 namespace Orleans.Runtime.MembershipService.SiloMetadata;
 
 [GenerateSerializer]

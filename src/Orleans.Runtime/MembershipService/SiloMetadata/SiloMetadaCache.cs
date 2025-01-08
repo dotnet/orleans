@@ -8,8 +8,9 @@ using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Internal;
 
-namespace Orleans.Runtime.MembershipService.SiloMetadata;
 #nullable enable
+namespace Orleans.Runtime.MembershipService.SiloMetadata;
+
 internal class SiloMetadataCache(
     ISiloMetadataClient siloMetadataClient,
     MembershipTableManager membershipTableManager,

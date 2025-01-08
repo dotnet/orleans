@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Metadata;
 using Orleans.Placement;
 
+#nullable enable
 namespace Orleans.Runtime.Placement.Filtering;
 
 /// <summary>

@@ -3,6 +3,7 @@ using System.Linq;
 using Orleans.Placement;
 using Orleans.Runtime.MembershipService.SiloMetadata;
 
+#nullable enable
 namespace Orleans.Runtime.Placement.Filtering;
 
 internal class RequiredMatchSiloMetadataPlacementFilterDirector(ILocalSiloDetails localSiloDetails, ISiloMetadataCache siloMetadataCache)
@@ -28,7 +29,7 @@ internal class RequiredMatchSiloMetadataPlacementFilterDirector(ILocalSiloDetail
         });
     }
 
-    private static bool DoesMetadataMatch(string[] localMetadata, SiloMetadata siloMetadata, string[] metadataKeys)
+    private static bool DoesMetadataMatch(string?[] localMetadata, SiloMetadata siloMetadata, string[] metadataKeys)
     {
         for (var i = 0; i < metadataKeys.Length; i++)
         {
@@ -40,9 +41,9 @@ internal class RequiredMatchSiloMetadataPlacementFilterDirector(ILocalSiloDetail
 
         return true;
     }
-    private static string[] GetMetadata(SiloMetadata siloMetadata, string[] metadataKeys)
+    private static string?[] GetMetadata(SiloMetadata siloMetadata, string[] metadataKeys)
     {
-        var result = new string[metadataKeys.Length];
+        var result = new string?[metadataKeys.Length];
         for (var i = 0; i < metadataKeys.Length; i++)
         {
             result[i] = siloMetadata.Metadata?.GetValueOrDefault(metadataKeys[i]);
