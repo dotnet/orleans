@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Orleans.Metadata;
 using Orleans.Placement;
 
+#nullable enable
 namespace Orleans.Runtime.Placement.Filtering;
 
 public class RequiredMatchSiloMetadataPlacementFilterStrategy(string[] metadataKeys, int order)
@@ -16,7 +17,12 @@ public class RequiredMatchSiloMetadataPlacementFilterStrategy(string[] metadataK
 
     public override void AdditionalInitialize(GrainProperties properties)
     {
-        MetadataKeys = GetPlacementFilterGrainProperty("metadata-keys", properties).Split(",");
+        var placementFilterGrainProperty = GetPlacementFilterGrainProperty("metadata-keys", properties);
+        if (placementFilterGrainProperty is null)
+        {
+            throw new ArgumentException("Invalid metadata-keys property value.");
+        }
+        MetadataKeys = placementFilterGrainProperty.Split(",");
     }
 
     protected override IEnumerable<KeyValuePair<string, string>> GetAdditionalGrainProperties(IServiceProvider services, Type grainClass, GrainType grainType,

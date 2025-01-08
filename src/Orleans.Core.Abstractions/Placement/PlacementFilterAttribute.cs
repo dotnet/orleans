@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
+#nullable enable
 namespace Orleans.Placement;
 
 /// <summary>

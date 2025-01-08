@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Placement;
 
+#nullable enable
 namespace Orleans.Runtime.Placement.Filtering;
 
 /// <summary>

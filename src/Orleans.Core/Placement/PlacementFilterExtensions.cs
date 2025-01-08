@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
+#nullable enable
 namespace Orleans.Placement;
 
 public static class PlacementFilterExtensions

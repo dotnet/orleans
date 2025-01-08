@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
+#nullable enable
 namespace Orleans.Placement;
 
 public abstract class PlacementFilterStrategy
@@ -65,7 +66,7 @@ public abstract class PlacementFilterStrategy
         }
     }
 
-    protected string GetPlacementFilterGrainProperty(string key, GrainProperties properties)
+    protected string? GetPlacementFilterGrainProperty(string key, GrainProperties properties)
     {
         var typeName = GetType().Name;
         return properties.Properties.TryGetValue($"{WellKnownGrainTypeProperties.PlacementFilter}.{typeName}.{key}", out var value) ? value : null;
