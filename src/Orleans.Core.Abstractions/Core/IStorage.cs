@@ -66,7 +66,7 @@ namespace Orleans.Core
         /// <returns>
         /// A <see cref="Task"/> representing the operation.
         /// </returns>
-        Task ClearStateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        Task ClearStateAsync(CancellationToken cancellationToken) => ClearStateAsync();
 
         /// <summary>
         /// (Optional) Writes grain state to storage.
@@ -78,7 +78,7 @@ namespace Orleans.Core
         /// <returns>
         /// A <see cref="Task"/> representing the operation.
         /// </returns>
-        Task WriteStateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        Task WriteStateAsync(CancellationToken cancellationToken) => WriteStateAsync();
 
         /// <summary>
         /// (Optional) Reads grain state from storage.
@@ -90,7 +90,7 @@ namespace Orleans.Core
         /// <returns>
         /// A <see cref="Task"/> representing the operation.
         /// </returns>
-        Task ReadStateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        Task ReadStateAsync(CancellationToken cancellationToken) => ReadStateAsync();
     }
 
     /// <summary>
