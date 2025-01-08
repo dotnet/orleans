@@ -23,7 +23,6 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
-          3.1.x
           8.0.x
     - name: Build
       run: dotnet build
@@ -55,10 +54,9 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
-          3.1.x
           8.0.x
     - name: Test
-      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
         ORLEANSREDISCONNECTIONSTRING: "localhost:6379,ssl=False,abortConnect=False"
     - name: Archive Test Results
@@ -83,10 +81,9 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
-          3.1.x
           8.0.x
     - name: Test
-      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Clustering)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Clustering)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
         CASSANDRAVERSION: ${{ matrix.dbversion }}
     - name: Archive Test Results
@@ -123,10 +120,9 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
-          3.1.x
           8.0.x
     - name: Test
-      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
         ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
@@ -159,10 +155,9 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
-          3.1.x
           8.0.x
     - name: Test
-      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
@@ -197,10 +192,9 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
-          3.1.x
           8.0.x
     - name: Test
-      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;"
@@ -235,10 +229,9 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
-          3.1.x
           8.0.x
     - name: Test
-      run: dotnet test --filter "Category=${{ matrix.provider }}&Category=${{ matrix.suite }}" --framework ${{ matrix.framework }} --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&Category=${{ matrix.suite }}" --framework ${{ matrix.framework }} --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
@@ -284,7 +277,7 @@ jobs:
         $IPAddress = "127.0.0.1" #(Get-NetIPAddress -AddressFamily IPV4 -AddressState Preferred -PrefixOrigin Manual | Select-Object IPAddress -First 1).IPAddress ?? "127.0.0.1"
         Add-Content -Path $env:GITHUB_ENV -Value "ORLEANSCOSMOSDBACCOUNTENDPOINT=https://$($IPAddress):8081/"
     - name: Test
-      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --framework ${{ matrix.framework }} --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --framework ${{ matrix.framework }} --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         #ORLEANSCOSMOSDBACCOUNTENDPOINT: "https://127.0.0.1:8081/"
@@ -318,10 +311,9 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
-          3.1.x
           8.0.x
     - name: Test
-      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
@@ -355,10 +347,9 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
-          3.1.x
           8.0.x
     - name: Test
-      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
         ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
     - name: Archive Test Results
@@ -393,10 +384,9 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
-          3.1.x
           8.0.x
     - name: Test
-      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
         ORLEANSDYNAMODBSERVICE: "http://127.0.0.1:8000"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
