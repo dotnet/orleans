@@ -1,7 +1,6 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Placement;
 using Orleans.Runtime.Placement;
-using Orleans.Runtime.Placement.Filtering;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;

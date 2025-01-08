@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration.Internal;
 using Orleans.Hosting;
+using Orleans.Placement;
 using Orleans.Runtime.Placement.Filtering;
 
 namespace Orleans.Runtime.MembershipService.SiloMetadata;

@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Placement;
 
 namespace Orleans.Runtime.Placement.Filtering;
 

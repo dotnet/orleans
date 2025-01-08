@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using Orleans.Runtime;
+using Orleans.Runtime.Placement;
 
-namespace Orleans.Runtime.Placement.Filtering;
+namespace Orleans.Placement;
 
 public interface IPlacementFilterDirector
 {

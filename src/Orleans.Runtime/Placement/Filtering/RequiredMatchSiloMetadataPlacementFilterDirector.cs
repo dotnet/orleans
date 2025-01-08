@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Orleans.Placement;
 using Orleans.Runtime.MembershipService.SiloMetadata;
 
 namespace Orleans.Runtime.Placement.Filtering;
