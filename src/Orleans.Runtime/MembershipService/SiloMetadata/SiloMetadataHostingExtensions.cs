@@ -29,9 +29,9 @@ public static class SiloMetadataHostingExtensions
     /// <param name="builder">Silo builder</param>
     /// <param name="configuration">Configuration to pull from</param>
     /// <remarks>
-    /// Get the Orleans:Metadata section from config
+    /// Get the ORLEANS__METADATA section from config
     /// Key/value pairs in configuration as a <see cref="Dictionary{TKey,TValue}"/> will look like this as environment variables:
-    /// Orleans:Metadata:key1=value1
+    /// ORLEANS__METADATA__key1=value1
     /// </remarks>
     /// <returns></returns>
     public static ISiloBuilder UseSiloMetadata(this ISiloBuilder builder, IConfiguration configuration)
