@@ -68,7 +68,7 @@ internal class SiloMetadataCache(
                     }
                 }
 
-                // Add entries for members that aren't already in the cache
+                // Remove entries for members that are now dead
                 foreach (var membershipEntry in update.Entries.Where(e => e.Value.Status == SiloStatus.Dead))
                 {
                     _metadata.TryRemove(membershipEntry.Key, out _);
