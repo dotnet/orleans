@@ -55,7 +55,7 @@ namespace Orleans.Hosting
                 }
                 catch (Exception ex)
                 {
-                    this.logger.LogError("An error occurred stopping the application", ex);
+                    this.logger.LogError(ex, "An error occurred stopping the application");
                 }
             }
         }
@@ -71,7 +71,7 @@ namespace Orleans.Hosting
             }
             catch (Exception ex)
             {
-                this.logger.LogError("An error occurred starting the application", ex);
+                this.logger.LogError(ex, "An error occurred starting the application");
             }
         }
 
@@ -86,7 +86,7 @@ namespace Orleans.Hosting
             }
             catch (Exception ex)
             {
-                this.logger.LogError("An error occurred stopping the application", ex);
+                this.logger.LogError(ex, "An error occurred stopping the application");
             }
         }
 

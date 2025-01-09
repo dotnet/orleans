@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Persistence.Cosmos</PackageId>
+    <Title>Microsoft Orleans Persistence Azure Cosmos Db</Title>
+    <Description>Microsoft Orleans persistence providers for Cosmos Db</Description>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable> <!-- explicitly is not packable: maybe will be released later -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Azure.Cosmos" Version="$(AzureCosmosDbVersion)" />
+    <PackageReference Include="Microsoft.Azure.Cosmos.Encryption" Version="$(AzureCosmosDbEncryptionVersion)" />
+  </ItemGroup>
+  
+</Project>
