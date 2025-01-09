@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -16,8 +17,18 @@ namespace Orleans
         /// <summary>
         /// Initializes this instance.
         /// </summary>
-        /// <returns>A Task representing the work performed.</returns>
-        Task Init();
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        Task StartAsync(CancellationToken cancellationToken = default)
+#pragma warning disable CS0618 // Type or member is obsolete
+            => Init();
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        /// <summary>
+        /// Initializes this instance.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        [Obsolete("Implement and use StartAsync instead")]
+        Task Init() => Task.CompletedTask;
 
         /// <summary>
         /// Reads the reminder table entries associated with the specified grain.
@@ -27,7 +38,8 @@ namespace Orleans
         Task<ReminderTableData> ReadRows(GrainId grainId);
 
         /// <summary>
-        /// Return all rows that have their <see cref="GrainId.GetUniformHashCode"/> in the range (start, end]
+        /// Returns all rows that have their <see cref="GrainId.GetUniformHashCode"/> in the range (begin, end].
+        /// If begin is greater or equal to end, returns all entries with hash greater begin or hash less or equal to end.
         /// </summary>
         /// <param name="begin">The exclusive lower bound.</param>
         /// <param name="end">The inclusive upper bound.</param>
@@ -35,7 +47,7 @@ namespace Orleans
         Task<ReminderTableData> ReadRows(uint begin, uint end);
 
         /// <summary>
-        /// Reads a specifie entry.
+        /// Reads the specified entry.
         /// </summary>
         /// <param name="grainId">The grain ID.</param>
         /// <param name="reminderName">Name of the reminder.</param>
@@ -63,6 +75,13 @@ namespace Orleans
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         Task TestOnlyClearTable();
+
+        /// <summary>
+        /// Stops the reminder table.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        Task StopAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     /// <summary>

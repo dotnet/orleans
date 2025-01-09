@@ -139,6 +139,12 @@ namespace Benchmarks
             {
                 new PingBenchmark(numSilos: 2, startClient: true).PingConcurrent().GetAwaiter().GetResult();
             },
+            ["ConcurrentPing_TwoSilos_Forever"] = _ =>
+            {
+                Console.WriteLine("## Client to 2 Silos ##");
+                var test = new PingBenchmark(numSilos: 2, startClient: true);
+                test.PingConcurrentForever().GetAwaiter().GetResult();
+            },
             ["ConcurrentPing_HostedClient"] = _ =>
             {
                 new PingBenchmark(numSilos: 1, startClient: false).PingConcurrentHostedClient().GetAwaiter().GetResult();
@@ -204,6 +210,10 @@ namespace Benchmarks
             {
                 ThreadPool.SetMaxThreads(1, 1);
                 new PingBenchmark().PingForever().GetAwaiter().GetResult();
+            },
+            ["FanoutForever"] = _ =>
+            {
+                new FanoutBenchmark().PingForever().GetAwaiter().GetResult();
             },
             ["GrainStorage.Memory"] = _ =>
             {

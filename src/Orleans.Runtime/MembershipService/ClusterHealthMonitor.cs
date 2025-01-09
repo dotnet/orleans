@@ -17,7 +17,7 @@ namespace Orleans.Runtime.MembershipService
     /// <summary>
     /// Responsible for ensuring that this silo monitors other silos in the cluster.
     /// </summary>
-    internal class ClusterHealthMonitor : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor.ITestAccessor
+    internal class ClusterHealthMonitor : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor.ITestAccessor, IDisposable, IAsyncDisposable
     {
         private readonly CancellationTokenSource shutdownCancellation = new CancellationTokenSource();
         private readonly ILocalSiloDetails localSiloDetails;
@@ -78,7 +78,14 @@ namespace Orleans.Runtime.MembershipService
                 if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting to process membership updates");
                 await foreach (var tableSnapshot in this.membershipService.MembershipTableUpdates.WithCancellation(this.shutdownCancellation.Token))
                 {
-                    var newMonitoredSilos = this.UpdateMonitoredSilos(tableSnapshot, this.monitoredSilos, DateTime.UtcNow);
+                    var utcNow = DateTime.UtcNow;
+
+                    var newMonitoredSilos = this.UpdateMonitoredSilos(tableSnapshot, this.monitoredSilos, utcNow);
+
+                    if (this.clusterMembershipOptions.CurrentValue.EvictWhenMaxJoinAttemptTimeExceeded)
+                    {
+                        await this.EvictStaleStateSilos(tableSnapshot, utcNow);
+                    }
 
                     foreach (var pair in this.monitoredSilos)
                     {
@@ -100,6 +107,45 @@ namespace Orleans.Runtime.MembershipService
             finally
             {
                 if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopped processing membership updates");
+            }
+        }
+
+        private async Task EvictStaleStateSilos(
+            MembershipTableSnapshot membership,
+            DateTime utcNow)
+        {
+            foreach (var member in membership.Entries)
+            {
+                if (IsCreatedOrJoining(member.Value.Status)
+                    && HasExceededMaxJoinTime(
+                        startTime: member.Value.StartTime,
+                        now: utcNow,
+                        maxJoinTime: this.clusterMembershipOptions.CurrentValue.MaxJoinAttemptTime))
+                {
+                    try
+                    {
+                        if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stale silo with a joining or created state found, calling `TryToSuspectOrKill`");
+                        await this.membershipService.TryToSuspectOrKill(member.Key);
+                    }
+                    catch(Exception exception)
+                    {
+                        log.LogError(
+                            exception,
+                            "Silo {suspectAddress} has had the status `{siloStatus}` for longer than `MaxJoinAttemptTime` but a call to `TryToSuspectOrKill` has failed",
+                            member.Value.SiloAddress,
+                            member.Value.Status.ToString());
+                    }
+                }
+            }
+
+            static bool IsCreatedOrJoining(SiloStatus status)
+            {
+                return status == SiloStatus.Created || status == SiloStatus.Joining;
+            }
+
+            static bool HasExceededMaxJoinTime(DateTime startTime, DateTime now, TimeSpan maxJoinTime)
+            {
+                return now > startTime.Add(maxJoinTime);
             }
         }
 
@@ -283,6 +329,57 @@ namespace Orleans.Runtime.MembershipService
             }
 
             return ok;
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                shutdownCancellation.Cancel();
+            }
+            catch (Exception exception)
+            {
+                log.LogError(exception, "Error cancelling shutdown token.");
+            }
+
+            foreach (var monitor in monitoredSilos.Values)
+            {
+                try
+                {
+                    monitor.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    log.LogError(exception, "Error disposing monitor for {SiloAddress}.", monitor.SiloAddress);
+                }
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                shutdownCancellation.Cancel();
+            }
+            catch (Exception exception)
+            {
+                log.LogError(exception, "Error cancelling shutdown token.");
+            }
+
+            var tasks = new List<Task>();
+            foreach (var monitor in monitoredSilos.Values)
+            {
+                try
+                {
+                    tasks.Add(monitor.DisposeAsync().AsTask());
+                }
+                catch (Exception exception)
+                {
+                    log.LogError(exception, "Error disposing monitor for {SiloAddress}.", monitor.SiloAddress);
+                }
+            }
+
+            await Task.WhenAll(tasks).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         }
     }
 }

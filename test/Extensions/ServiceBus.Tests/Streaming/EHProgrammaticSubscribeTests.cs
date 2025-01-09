@@ -8,7 +8,7 @@ using Xunit.Abstractions;
 namespace ServiceBus.Tests.Streaming
 {
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
-    public class EHProgrammaticSubscribeTest : ProgrammaticSubcribeTestsRunner, IClassFixture<EHProgrammaticSubscribeTest.Fixture>
+    public class EHProgrammaticSubscribeTest : ProgrammaticSubscribeTestsRunner, IClassFixture<EHProgrammaticSubscribeTest.Fixture>
     {
         private const string EHPath = "ehorleanstest4";
         private const string EHPath2 = "ehorleanstest3";
@@ -34,7 +34,7 @@ namespace ServiceBus.Tests.Streaming
                             }));
                             b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
                             {
-                                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+                                options.ConfigureTestDefaults();
                                 options.PersistInterval = TimeSpan.FromSeconds(10);
                             }));
                         });
@@ -49,7 +49,7 @@ namespace ServiceBus.Tests.Streaming
                             }));
                             b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
                             {
-                                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+                                options.ConfigureTestDefaults();
                                 options.PersistInterval = TimeSpan.FromSeconds(10);
                             }));
                         });

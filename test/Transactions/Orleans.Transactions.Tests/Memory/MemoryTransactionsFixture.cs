@@ -19,7 +19,6 @@ namespace Orleans.Transactions.Tests
             {
                 hostBuilder
                     .ConfigureServices(services => services.AddKeyedSingleton<IRemoteCommitService, RemoteCommitService>(TransactionTestConstants.RemoteCommitService))
-                    .ConfigureTracingForTransactionTests()
                     .AddMemoryGrainStorage(TransactionTestConstants.TransactionStore)
                     .UseTransactions();
             }

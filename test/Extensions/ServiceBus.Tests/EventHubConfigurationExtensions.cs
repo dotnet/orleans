@@ -1,5 +1,6 @@
 using Azure.Identity;
 using Orleans.Configuration;
+using Tester.AzureUtils;
 using TestExtensions;
 
 namespace ServiceBus.Tests
@@ -10,13 +11,19 @@ namespace ServiceBus.Tests
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.ConfigureEventHubConnection(TestDefaultConfiguration.EventHubFullyQualifiedNamespace, eventHubName, consumerGroup, new DefaultAzureCredential());
+                options.ConfigureEventHubConnection(TestDefaultConfiguration.EventHubFullyQualifiedNamespace, eventHubName, consumerGroup, TestDefaultConfiguration.TokenCredential);
             }
             else
             {
                 options.ConfigureEventHubConnection(TestDefaultConfiguration.EventHubConnectionString, eventHubName, consumerGroup);
             }
 
+            return options;
+        }
+
+        public static AzureTableStreamCheckpointerOptions ConfigureTestDefaults(this AzureTableStreamCheckpointerOptions options)
+        {
+            options.TableServiceClient = AzureStorageOperationOptionsExtensions.GetTableServiceClient();
             return options;
         }
     }

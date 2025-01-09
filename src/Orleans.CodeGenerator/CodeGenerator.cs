@@ -1,17 +1,17 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
+using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
+using System.Text;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using System.Collections.Immutable;
-using Orleans.CodeGenerator.Hashing;
-using System.Text;
-using static Orleans.CodeGenerator.SyntaxGeneration.SymbolExtensions;
 using Orleans.CodeGenerator.Diagnostics;
+using Orleans.CodeGenerator.Hashing;
+using Orleans.CodeGenerator.SyntaxGeneration;
+using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using static Orleans.CodeGenerator.SyntaxGeneration.SymbolExtensions;
 
 namespace Orleans.CodeGenerator
 {
@@ -32,6 +32,7 @@ namespace Orleans.CodeGenerator
         private readonly Dictionary<string, List<MemberDeclarationSyntax>> _namespacedMembers = new();
         private readonly Dictionary<InvokableMethodId, InvokableMethodDescription> _invokableMethodDescriptions = new();
         private readonly HashSet<INamedTypeSymbol> _visitedInterfaces = new(SymbolEqualityComparer.Default);
+        private readonly List<string> DisabledWarnings = new() { "CS1591" };
 
         public CodeGenerator(Compilation compilation, CodeGeneratorOptions options)
         {
@@ -144,10 +145,10 @@ namespace Orleans.CodeGenerator
                                 if (symbol.IsRecord)
                                 {
                                     // If there is a primary constructor then that will be declared before the copy constructor
-                                    // A record always generates a copy constructor and marks it as implicitly declared
+                                    // A record always generates a copy constructor and marks it as compiler generated
                                     // todo: find an alternative to this magic
                                     var potentialPrimaryConstructor = symbol.Constructors[0];
-                                    if (!potentialPrimaryConstructor.IsImplicitlyDeclared)
+                                    if (!potentialPrimaryConstructor.IsImplicitlyDeclared && !potentialPrimaryConstructor.IsCompilerGenerated())
                                     {
                                         constructorParameters = potentialPrimaryConstructor.Parameters;
                                     }
@@ -159,6 +160,23 @@ namespace Orleans.CodeGenerator
                                     {
                                         constructorParameters = annotatedConstructors[0].Parameters;
                                     }
+                                    else
+                                    {
+                                        // record structs from referenced assemblies do not return IsRecord=true
+                                        // above. See https://github.com/dotnet/roslyn/issues/69326
+                                        // So we implement the same heuristics from ShouldIncludePrimaryConstructorParameters
+                                        // to detect a primary constructor.
+                                        var properties = symbol.GetMembers().OfType<IPropertySymbol>().ToImmutableArray();
+                                        var primaryConstructor = symbol.GetMembers()
+                                            .OfType<IMethodSymbol>()
+                                            .Where(m => m.MethodKind == MethodKind.Constructor && m.Parameters.Length > 0)
+                                            // Check for a ctor where all parameters have a corresponding compiler-generated prop.
+                                            .FirstOrDefault(ctor => ctor.Parameters.All(prm =>
+                                                properties.Any(prop => prop.Name.Equals(prm.Name, StringComparison.Ordinal) && prop.IsCompilerGenerated())));
+
+                                        if (primaryConstructor != null)
+                                            constructorParameters = primaryConstructor.Parameters;
+                                    }
                                 }
                             }
 
@@ -166,7 +184,7 @@ namespace Orleans.CodeGenerator
                             {
                                 (_, GenerateFieldIds.PublicProperties) => GenerateFieldIds.PublicProperties,
                                 (GenerateFieldIds.PublicProperties, _) => GenerateFieldIds.PublicProperties,
-                                _  => GenerateFieldIds.None
+                                _ => GenerateFieldIds.None
                             };
                             var fieldIdAssignmentHelper = new FieldIdAssignmentHelper(symbol, constructorParameters, implicitMemberSelectionStrategy, LibraryTypes);
                             if (!fieldIdAssignmentHelper.IsValidForSerialization)
@@ -272,8 +290,18 @@ namespace Orleans.CodeGenerator
                             }
                         }
 
-                        // Default to true for records, false otherwise.
-                        return t.IsRecord;
+                        // Default to true for records.
+                        if (t.IsRecord)
+                            return true;
+
+                        var properties = t.GetMembers().OfType<IPropertySymbol>().ToImmutableArray();
+
+                        return t.GetMembers()
+                            .OfType<IMethodSymbol>()
+                            .Where(m => m.MethodKind == MethodKind.Constructor && m.Parameters.Length > 0)
+                            // Check for a ctor where all parameters have a corresponding compiler-generated prop.
+                            .Any(ctor => ctor.Parameters.All(prm =>
+                                properties.Any(prop => prop.Name.Equals(prm.Name, StringComparison.Ordinal) && prop.IsCompilerGenerated())));
                     }
                 }
             }
@@ -315,6 +343,30 @@ namespace Orleans.CodeGenerator
             var assemblyAttributes = ApplicationPartAttributeGenerator.GenerateSyntax(LibraryTypes, MetadataModel);
             assemblyAttributes.Add(metadataAttribute);
 
+            if (assemblyAttributes.Count > 0)
+            {
+                assemblyAttributes[0] = assemblyAttributes[0]
+                    .WithLeadingTrivia(
+                        SyntaxFactory.TriviaList(
+                            new List<SyntaxTrivia>
+                            {
+                                Trivia(
+                                   PragmaWarningDirectiveTrivia(
+                                       Token(SyntaxKind.DisableKeyword),
+                                       SeparatedList(DisabledWarnings.Select(str =>
+                                       {
+                                           var syntaxToken = SyntaxFactory.Literal(
+                                                SyntaxFactory.TriviaList(),
+                                                str,
+                                                str,
+                                                SyntaxFactory.TriviaList());
+
+                                            return (ExpressionSyntax)SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, syntaxToken);
+                                       })),
+                                       isActive: true)),
+                            }));
+            }
+
             var usings = List(new[] { UsingDirective(ParseName("global::Orleans.Serialization.Codecs")), UsingDirective(ParseName("global::Orleans.Serialization.GeneratedCodeHelpers")) });
             var namespaces = new List<MemberDeclarationSyntax>(_namespacedMembers.Count);
             foreach (var pair in _namespacedMembers)
@@ -323,6 +375,30 @@ namespace Orleans.CodeGenerator
                 var member = pair.Value;
 
                 namespaces.Add(NamespaceDeclaration(ParseName(ns)).WithMembers(List(member)).WithUsings(usings));
+            }
+
+            if (namespaces.Count > 0)
+            {
+                namespaces[0] = namespaces[0]
+                    .WithTrailingTrivia(
+                       SyntaxFactory.TriviaList(
+                           new List<SyntaxTrivia>
+                           {
+                                Trivia(
+                                   PragmaWarningDirectiveTrivia(
+                                       Token(SyntaxKind.RestoreKeyword),
+                                       SeparatedList(DisabledWarnings.Select(str =>
+                                       {
+                                           var syntaxToken = SyntaxFactory.Literal(
+                                                SyntaxFactory.TriviaList(),
+                                                str,
+                                                str,
+                                                SyntaxFactory.TriviaList());
+
+                                            return (ExpressionSyntax)SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, syntaxToken);
+                                       })),
+                                       isActive: true)),
+                           }));
             }
 
             return CompilationUnit()
@@ -514,12 +590,17 @@ namespace Orleans.CodeGenerator
             return result;
         }
 
-        internal static AttributeSyntax GetGeneratedCodeAttributeSyntax() => GeneratedCodeAttributeSyntax;
-        private static readonly AttributeSyntax GeneratedCodeAttributeSyntax =
+        internal static AttributeListSyntax GetGeneratedCodeAttributes() => GeneratedCodeAttributeSyntax;
+        private static readonly AttributeListSyntax GeneratedCodeAttributeSyntax =
+            AttributeList().AddAttributes(
                 Attribute(ParseName("global::System.CodeDom.Compiler.GeneratedCodeAttribute"))
                     .AddArgumentListArguments(
                         AttributeArgument(CodeGeneratorName.GetLiteralExpression()),
-                        AttributeArgument(typeof(CodeGenerator).Assembly.GetName().Version.ToString().GetLiteralExpression()));
+                        AttributeArgument(typeof(CodeGenerator).Assembly.GetName().Version.ToString().GetLiteralExpression())),
+                Attribute(ParseName("global::System.ComponentModel.EditorBrowsableAttribute"))
+                    .AddArgumentListArguments(
+                        AttributeArgument(ParseName("global::System.ComponentModel.EditorBrowsableState").Member("Never")))
+            );
 
         internal static AttributeSyntax GetMethodImplAttributeSyntax() => MethodImplAttributeSyntax;
         private static readonly AttributeSyntax MethodImplAttributeSyntax =
@@ -669,11 +750,18 @@ namespace Orleans.CodeGenerator
             return description;
         }
 
-        internal ProxyMethodDescription GetProxyMethodDescription(INamedTypeSymbol interfaceType, IMethodSymbol method, bool hasCollision)
+        internal ProxyMethodDescription GetProxyMethodDescription(INamedTypeSymbol interfaceType, IMethodSymbol method)
         {
             var originalMethod = method.OriginalDefinition;
             var proxyBaseInfo = GetProxyBase(interfaceType);
-            var invokableId = new InvokableMethodId(proxyBaseInfo, originalMethod);
+
+            // For extensions, we want to ensure that the containing type is always the extension.
+            // This ensures that we will always know which 'component' to get in our SetTarget method.
+            // If the type is not an extension, use the original method definition's containing type.
+            // This is the interface where the type was originally defined.
+            var containingType = proxyBaseInfo.IsExtension ? interfaceType : originalMethod.ContainingType;
+
+            var invokableId = new InvokableMethodId(proxyBaseInfo, containingType, originalMethod);
             var interfaceDescription = GetInvokableInterfaceDescription(invokableId.ProxyBase.ProxyBaseType, interfaceType);
 
             // Get or generate an invokable for the original method definition.
@@ -681,7 +769,7 @@ namespace Orleans.CodeGenerator
             {
                 if (!_invokableMethodDescriptions.TryGetValue(invokableId, out var methodDescription))
                 {
-                    methodDescription = _invokableMethodDescriptions[invokableId] = InvokableMethodDescription.Create(invokableId);
+                    methodDescription = _invokableMethodDescriptions[invokableId] = InvokableMethodDescription.Create(invokableId, containingType);
                 }
 
                 generatedInvokable = MetadataModel.GeneratedInvokables[invokableId] = InvokableGenerator.Generate(methodDescription);
@@ -701,12 +789,12 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            var proxyMethodDescription = ProxyMethodDescription.Create(interfaceDescription, generatedInvokable, method, hasCollision);
+            var proxyMethodDescription = ProxyMethodDescription.Create(interfaceDescription, generatedInvokable, method);
 
             // For backwards compatibility, generate invokers for the specific implementation types as well, where they differ.
             if (Options.GenerateCompatibilityInvokers && !SymbolEqualityComparer.Default.Equals(method.OriginalDefinition.ContainingType, interfaceType))
             {
-                var compatInvokableId = new InvokableMethodId(proxyBaseInfo, method);
+                var compatInvokableId = new InvokableMethodId(proxyBaseInfo, interfaceType, method);
                 var compatMethodDescription = InvokableMethodDescription.Create(compatInvokableId, interfaceType);
                 var compatInvokable = InvokableGenerator.Generate(compatMethodDescription);
                 AddMember(compatInvokable.GeneratedNamespace, compatInvokable.ClassDeclarationSyntax);

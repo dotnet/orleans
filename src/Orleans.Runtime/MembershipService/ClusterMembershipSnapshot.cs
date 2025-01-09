@@ -21,6 +21,8 @@ namespace Orleans.Runtime
             this.Version = version;
         }
 
+        internal static ClusterMembershipSnapshot Default => new(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, MembershipVersion.MinValue);
+
         /// <summary>
         /// Gets the cluster members.
         /// </summary>
@@ -107,13 +109,12 @@ namespace Orleans.Runtime
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append($"Version: {this.Version}. {this.Members.Count} members");
+            sb.Append($"ClusterMembershipSnapshot {{ Version = {this.Version}, Members.Count = {this.Members.Count}, Members = [");
             var first = true;
             foreach (var member in this.Members)
             {
                 if (first)
                 {
-                    sb.Append(": ");
                     first = false;
                 }
                 else
@@ -124,6 +125,7 @@ namespace Orleans.Runtime
                 sb.Append(member.Value);
             }
 
+            sb.Append("] }}");
             return sb.ToString();
         }
     }

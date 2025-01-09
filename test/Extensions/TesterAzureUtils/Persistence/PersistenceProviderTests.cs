@@ -90,21 +90,22 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
-        [InlineData(null, false)]
-        [InlineData(null, true)]
-        [InlineData(15 * 64 * 1024 - 256, false)]
-        [InlineData(15 * 32 * 1024 - 256, true)]
-        public async Task PersistenceProvider_Azure_WriteClearRead(int? stringLength, bool useJson)
+        [InlineData(null, false, false)]
+        [InlineData(null, true, false)]
+        [InlineData(15 * 64 * 1024 - 256, false, false)]
+        [InlineData(15 * 32 * 1024 - 256, true, false)]
+        public async Task PersistenceProvider_Azure_WriteClearRead(int? stringLength, bool useJson, bool useFallback)
         {
-            var testName = string.Format("{0}({1} = {2}, {3} = {4})",
+            var testName = string.Format("{0}({1} = {2}, {3} = {4}, {5} = {6})",
                 nameof(PersistenceProvider_Azure_WriteClearRead),
                 nameof(stringLength), stringLength == null ? "default" : stringLength.ToString(),
-                nameof(useJson), useJson);
+                nameof(useJson), useJson,
+                nameof(useFallback), useFallback);
 
             var grainState = TestStoreGrainState.NewRandomState(stringLength);
             EnsureEnvironmentSupportsState(grainState);
 
-            var store = await InitAzureTableGrainStorage(useJson);
+            var store = await InitAzureTableGrainStorage(useJson, useFallback);
 
             await Test_PersistenceProvider_WriteClearRead(testName, store, grainState);
         }
@@ -162,6 +163,40 @@ namespace Tester.AzureUtils.Persistence
             grainState.ETag = "*";
 
             store = await InitAzureTableGrainStorage(useJsonForSecondWrite);
+
+            await Test_PersistenceProvider_WriteRead(testName, store, grainState, grainId);
+        }
+
+        [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [InlineData(null, true, false)]
+        [InlineData(null, false, true)]
+        [InlineData(15 * 32 * 1024 - 256, true, false)]
+        [InlineData(15 * 32 * 1024 - 256, false, true)]
+        public async Task PersistenceProvider_Azure_ChangeStorageDataFormat_WhenJsonSerializerIsUsed(int? stringLength, bool useStringFormatForFirstWrite, bool useStringFormatForSecondWrite)
+        {
+            // always use JsonSerializer over OrleansSerializer since specifying 'useStringFormat = true'
+            // writes to 'StringData', the OrleansSerializer can not read from the 'StringData' column as its not a format which it expects.
+            const bool useJson = true;
+
+            var testName = string.Format("{0}({1}={2},{3}={4},{5}={6})",
+                nameof(PersistenceProvider_Azure_ChangeStorageDataFormat_WhenJsonSerializerIsUsed),
+                nameof(stringLength), stringLength == null ? "default" : stringLength.ToString(),
+                "strFormat1stW", useStringFormatForFirstWrite,
+                "strFormat2ndW", useStringFormatForSecondWrite);
+
+            var grainState = TestStoreGrainState.NewRandomState(stringLength);
+            EnsureEnvironmentSupportsState(grainState);
+
+            var grainId = LegacyGrainId.NewId();
+
+            var store = await InitAzureTableGrainStorage(useJson: useJson, useStringFormat: useStringFormatForFirstWrite);
+
+            await Test_PersistenceProvider_WriteRead(testName, store, grainState, grainId);
+
+            grainState = TestStoreGrainState.NewRandomState(stringLength);
+            grainState.ETag = "*";
+
+            store = await InitAzureTableGrainStorage(useJson: useJson, useStringFormat: useStringFormatForSecondWrite);
 
             await Test_PersistenceProvider_WriteRead(testName, store, grainState, grainId);
         }
@@ -266,8 +301,13 @@ namespace Tester.AzureUtils.Persistence
             return store;
         }
 
-        private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(bool useJson = false, TypeNameHandling? typeNameHandling = null)
+        private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(bool useJson = false, bool useFallback = true, bool useStringFormat = false, TypeNameHandling? typeNameHandling = null)
         {
+            if (useStringFormat && !useJson)
+            {
+                throw new InvalidOperationException($"Using {nameof(OrleansGrainStorageSerializer)} in conjuction with string data format makes no sense, there for stopping attempt.");
+            }
+
             var options = new AzureTableStorageOptions();
             var jsonOptions = this.providerRuntime.ServiceProvider.GetService<IOptions<OrleansJsonSerializerOptions>>();
             if (typeNameHandling != null)
@@ -276,13 +316,17 @@ namespace Tester.AzureUtils.Persistence
             }
 
             options.ConfigureTestDefaults();
+            options.UseStringFormat = useStringFormat;
 
             // TODO change test to include more serializer?
             var binarySerializer = new OrleansGrainStorageSerializer(this.providerRuntime.ServiceProvider.GetRequiredService<Serializer>());
             var jsonSerializer = new JsonGrainStorageSerializer(new OrleansJsonSerializer(jsonOptions));
-            options.GrainStorageSerializer = useJson
-                ? new GrainStorageSerializer(jsonSerializer, binarySerializer)
-                : new GrainStorageSerializer(binarySerializer, jsonSerializer);
+            if (useFallback)
+                options.GrainStorageSerializer = useJson
+                    ? new GrainStorageSerializer(jsonSerializer, binarySerializer)
+                    : new GrainStorageSerializer(binarySerializer, jsonSerializer);
+            else
+                options.GrainStorageSerializer = useJson ? jsonSerializer : binarySerializer;
 
             AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(this.providerRuntime.ServiceProvider, options, "TestStorage");
             ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this.providerRuntime.ServiceProvider);

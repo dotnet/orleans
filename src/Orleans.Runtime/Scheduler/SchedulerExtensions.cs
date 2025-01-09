@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Threading.Tasks;
 
@@ -16,6 +17,13 @@ namespace Orleans.Runtime.Scheduler
         {
             var workItem = new AsyncClosureWorkItem(taskFunc, targetContext);
             scheduler.QueueWorkItem(workItem);
+            return workItem.Task;
+        }
+
+        internal static Task QueueAction<TState>(this IGrainContext targetContext, Action<TState> action, TState state, string? name = null)
+        {
+            var workItem = new ClosureWorkItem<TState>(action, state, name, targetContext);
+            targetContext.Scheduler.QueueWorkItem(workItem);
             return workItem.Task;
         }
 

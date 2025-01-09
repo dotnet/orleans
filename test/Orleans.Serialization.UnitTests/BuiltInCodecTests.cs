@@ -41,6 +41,7 @@ namespace Orleans.Serialization.UnitTests
         Two
     }
 
+    [Trait("Category", "BVT")]
     public class CodecTestTests
     {
         [Fact]
@@ -83,7 +84,7 @@ namespace Orleans.Serialization.UnitTests
                             { } t => t,
                         };
                         typesWithCopiers.Add(typeArg);
-                    }   
+                    }
                 }
             }
 
@@ -1044,6 +1045,36 @@ namespace Orleans.Serialization.UnitTests
         protected override bool IsImmutable => true;
     }
 
+    public class BitArrayCodecTests(ITestOutputHelper output) : FieldCodecTester<BitArray, BitArrayCodec>(output)
+    {
+        protected override BitArray CreateValue() => new BitArray(Guid.NewGuid().ToByteArray());
+
+        protected override bool Equals(BitArray left, BitArray right) => ReferenceEquals(left, right) || left.Length == right.Length && Enumerable.Range(0, left.Length).All(i => left[i] == right[i]);
+
+        protected override BitArray[] TestValues =>
+        [
+            null,
+            new BitArray(0, false),
+            new BitArray(Enumerable.Range(0, Random.Next(4097)).Select(b => unchecked((byte)b)).ToArray()),
+            CreateValue(),
+        ];
+    }
+
+    public class BitArrayCopierTests(ITestOutputHelper output) : CopierTester<BitArray, BitArrayCopier>(output)
+    {
+        protected override BitArray CreateValue() => new BitArray(Guid.NewGuid().ToByteArray());
+
+        protected override bool Equals(BitArray left, BitArray right) => ReferenceEquals(left, right) || left.Length == right.Length && Enumerable.Range(0, left.Length).All(i => left[i] == right[i]);
+
+        protected override BitArray[] TestValues =>
+        [
+            null,
+            new BitArray(0, false),
+            new BitArray(Enumerable.Range(0, Random.Next(4097)).Select(b => unchecked((byte)b)).ToArray()),
+            CreateValue(),
+        ];
+    }
+
     public class ByteArrayCodecTests(ITestOutputHelper output) : FieldCodecTester<byte[], ByteArrayCodec>(output)
     {
         protected override byte[] CreateValue() => Guid.NewGuid().ToByteArray();
@@ -1083,7 +1114,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(Memory<int> left, Memory<int> right) => left.Span.SequenceEqual(right.Span);
-        protected override Memory<int>[] TestValues => [null, new Memory<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
+        protected override Memory<int>[] TestValues => [default, new Memory<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class MemoryCopierTests(ITestOutputHelper output) : CopierTester<Memory<int>, MemoryCopier<int>>(output)
@@ -1097,7 +1128,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(Memory<int> left, Memory<int> right) => left.Span.SequenceEqual(right.Span);
-        protected override Memory<int>[] TestValues => [null, new Memory<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
+        protected override Memory<int>[] TestValues => [default, new Memory<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ReadOnlyMemoryCodecTests(ITestOutputHelper output) : FieldCodecTester<ReadOnlyMemory<int>, ReadOnlyMemoryCodec<int>>(output)
@@ -1111,7 +1142,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ReadOnlyMemory<int> left, ReadOnlyMemory<int> right) => left.Span.SequenceEqual(right.Span);
-        protected override ReadOnlyMemory<int>[] TestValues => [null, new ReadOnlyMemory<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
+        protected override ReadOnlyMemory<int>[] TestValues => [default, new ReadOnlyMemory<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ReadOnlyMemoryCopierTests(ITestOutputHelper output) : CopierTester<ReadOnlyMemory<int>, ReadOnlyMemoryCopier<int>>(output)
@@ -1125,7 +1156,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ReadOnlyMemory<int> left, ReadOnlyMemory<int> right) => left.Span.SequenceEqual(right.Span);
-        protected override ReadOnlyMemory<int>[] TestValues => [null, new ReadOnlyMemory<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
+        protected override ReadOnlyMemory<int>[] TestValues => [default, new ReadOnlyMemory<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ArraySegmentCodecTests(ITestOutputHelper output) : FieldCodecTester<ArraySegment<int>, ArraySegmentCodec<int>>(output)
@@ -1139,7 +1170,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ArraySegment<int> left, ArraySegment<int> right) => left.SequenceEqual(right);
-        protected override ArraySegment<int>[] TestValues => [null, new ArraySegment<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
+        protected override ArraySegment<int>[] TestValues => [default, new ArraySegment<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ArraySegmentCopierTests(ITestOutputHelper output) : CopierTester<ArraySegment<int>, ArraySegmentCopier<int>>(output)
@@ -1153,7 +1184,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override bool Equals(ArraySegment<int> left, ArraySegment<int> right) => left.SequenceEqual(right);
-        protected override ArraySegment<int>[] TestValues => [null, new ArraySegment<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
+        protected override ArraySegment<int>[] TestValues => [default, new ArraySegment<int>([], 0, 0), CreateValue(), CreateValue(), CreateValue()];
     }
 
     public class ArrayCodecTests(ITestOutputHelper output) : FieldCodecTester<int[], ArrayCodec<int>>(output)
@@ -1182,6 +1213,63 @@ namespace Orleans.Serialization.UnitTests
         protected override ImmutableArray<int> CreateValue() => Enumerable.Range(0, Random.Next(120) + 50).Select(_ => Guid.NewGuid().GetHashCode()).ToImmutableArray();
         protected override bool Equals(ImmutableArray<int> left, ImmutableArray<int> right) => (left.IsDefault && right.IsDefault) || left.SequenceEqual(right);
         protected override ImmutableArray<int>[] TestValues => [default, [], CreateValue(), CreateValue(), CreateValue()];
+    }
+
+    public class PooledBufferCodecTests(ITestOutputHelper output) : FieldCodecTester<PooledBuffer, PooledBufferCodec>(output)
+    {
+        protected override PooledBuffer CreateValue()
+        {
+            var result = new PooledBuffer();
+            var len = 1 + Random.Next(5765);
+            var remaining = len;
+            while (remaining > 0)
+            {
+                var chunk = result.GetSpan(0);
+                var buf = chunk[..Math.Min(chunk.Length, remaining)];
+                Random.NextBytes(buf);
+                remaining -= buf.Length;
+                result.Advance(buf.Length);
+            }
+
+            return result;
+        }
+
+        protected override bool Equals(PooledBuffer left, PooledBuffer right) => left.ToArray().SequenceEqual(right.ToArray());
+        protected override PooledBuffer[] TestValues => [default, CreateValue(), CreateValue(), CreateValue()];
+        protected override PooledBuffer GetWriteCopy(PooledBuffer input)
+        {
+            var result = new PooledBuffer();
+            result.Write(input.ToArray());
+            return result;
+        }
+    }
+
+    public class PooledBufferCopierTests(ITestOutputHelper output) : CopierTester<PooledBuffer, PooledBufferCopier>(output)
+    {
+        protected override bool IsImmutable => true;
+
+        protected override bool IsPooled => true;
+
+        protected override PooledBuffer CreateValue()
+        {
+            var result = new PooledBuffer();
+            var len = Random.Next(8765);
+            var remaining = len;
+            while (remaining > 0)
+            {
+                var chunk = result.GetSpan(0);
+                var chunkLen = Math.Min(chunk.Length, remaining);
+                var buf = chunk[..chunkLen];
+                Random.NextBytes(buf);
+                remaining -= buf.Length;
+                result.Advance(buf.Length);
+            }
+
+            return result;
+        }
+
+        protected override bool Equals(PooledBuffer left, PooledBuffer right) => left.ToArray().SequenceEqual(right.ToArray());
+        protected override PooledBuffer[] TestValues => [default, CreateValue(), CreateValue(), CreateValue()];
     }
 
 #if NET7_0_OR_GREATER
@@ -1835,6 +1923,56 @@ namespace Orleans.Serialization.UnitTests
         protected override List<int>[] TestValues => [null, new List<int>(), CreateValue(), CreateValue(), CreateValue()];
     }
 
+    [GenerateSerializer]
+    public class TypeWithListBase : List<int>
+    {
+        public TypeWithListBase() : this(true) { }
+        public TypeWithListBase(bool addDefaultValue)
+        {
+            if (addDefaultValue)
+            {
+                this.Add(42);
+            }
+        }
+
+        [Id(0)]
+        public int OtherProperty { get; set; }
+
+        public override string ToString() => $"[OtherProperty: {OtherProperty}, Values: [{string.Join(", ", this)}]]";
+    }
+
+    public class ListBaseCodecTests(ITestOutputHelper output) : FieldCodecTester<TypeWithListBase, IFieldCodec<TypeWithListBase>>(output)
+    {
+        private static TypeWithListBase AddValues(TypeWithListBase value)
+        {
+            value.Add(1);
+            value.Add(2);
+            value.Add(3);
+            return value;
+        }
+
+        protected override TypeWithListBase[] TestValues => [null, new(), new(addDefaultValue: false), new() { 15 }, AddValues(new() { OtherProperty = 123 })];
+
+        protected override TypeWithListBase CreateValue() => AddValues(new() { OtherProperty = Random.Next() });
+        protected override bool Equals(TypeWithListBase left, TypeWithListBase right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.OtherProperty == right.OtherProperty;
+    }
+
+    public class ListBaseCopierTests(ITestOutputHelper output) : CopierTester<TypeWithListBase, IDeepCopier<TypeWithListBase>>(output)
+    {
+        private static TypeWithListBase AddValues(TypeWithListBase value)
+        {
+            value.Add(1);
+            value.Add(2);
+            value.Add(3);
+            return value;
+        }
+
+        protected override TypeWithListBase[] TestValues => [null, new(), new(addDefaultValue: false), new() { 15 }, AddValues(new() { OtherProperty = 123 })];
+
+        protected override TypeWithListBase CreateValue() => AddValues(new() { OtherProperty = Random.Next() });
+        protected override bool Equals(TypeWithListBase left, TypeWithListBase right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.OtherProperty == right.OtherProperty;
+    }
+
     public class ListCopierTests(ITestOutputHelper output) : CopierTester<List<int>, ListCopier<int>>(output)
     {
         protected override List<int> CreateValue()
@@ -2075,6 +2213,56 @@ namespace Orleans.Serialization.UnitTests
 
         protected override bool Equals(Collection<int> left, Collection<int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
         protected override Collection<int>[] TestValues => [null, new Collection<int>(), CreateValue(), CreateValue(), CreateValue()];
+    }
+
+    [GenerateSerializer]
+    public class TypeWithCollectionBase : Collection<int>
+    {
+        public TypeWithCollectionBase() : this(true) { }
+        public TypeWithCollectionBase(bool addDefaultValue)
+        {
+            if (addDefaultValue)
+            {
+                this.Add(42);
+            }
+        }
+
+        [Id(0)]
+        public int OtherProperty { get; set; }
+
+        public override string ToString() => $"[OtherProperty: {OtherProperty}, Values: [{string.Join(", ", this)}]]";
+    }
+
+    public class CollectionBaseCodecTests(ITestOutputHelper output) : FieldCodecTester<TypeWithCollectionBase, IFieldCodec<TypeWithCollectionBase>>(output)
+    {
+        private static TypeWithCollectionBase AddValues(TypeWithCollectionBase value)
+        {
+            value.Add(1);
+            value.Add(2);
+            value.Add(3);
+            return value;
+        }
+
+        protected override TypeWithCollectionBase[] TestValues => [null, new(), new(addDefaultValue: false), new() { 15 }, AddValues(new() { OtherProperty = 123 })];
+
+        protected override TypeWithCollectionBase CreateValue() => AddValues(new() { OtherProperty = Random.Next() });
+        protected override bool Equals(TypeWithCollectionBase left, TypeWithCollectionBase right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.OtherProperty == right.OtherProperty;
+    }
+
+    public class CollectionBaseCopierTests(ITestOutputHelper output) : CopierTester<TypeWithCollectionBase, IDeepCopier<TypeWithCollectionBase>>(output)
+    {
+        private static TypeWithCollectionBase AddValues(TypeWithCollectionBase value)
+        {
+            value.Add(1);
+            value.Add(2);
+            value.Add(3);
+            return value;
+        }
+
+        protected override TypeWithCollectionBase[] TestValues => [null, new(), new(addDefaultValue: false), new() { 15 }, AddValues(new() { OtherProperty = 123 })];
+
+        protected override TypeWithCollectionBase CreateValue() => AddValues(new() { OtherProperty = Random.Next() });
+        protected override bool Equals(TypeWithCollectionBase left, TypeWithCollectionBase right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.OtherProperty == right.OtherProperty;
     }
 
     public class ReadOnlyCollectionCodecTests(ITestOutputHelper output) : FieldCodecTester<ReadOnlyCollection<int>, ReadOnlyCollectionCodec<int>>(output)
@@ -2331,6 +2519,55 @@ namespace Orleans.Serialization.UnitTests
         protected override bool Equals(Dictionary<string, int> left, Dictionary<string, int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
     }
 
+    [GenerateSerializer]
+    public class TypeWithDictionaryBase : Dictionary<string, int>
+    {
+        public TypeWithDictionaryBase() : this(true) { }
+        public TypeWithDictionaryBase(bool addDefaultValue, IEqualityComparer<string> comparer = null) : base(comparer)
+        {
+            if (addDefaultValue)
+            {
+                this["kEY"] = 1;
+                this["key"] = 2;
+                this["Key"] = 3;
+            }
+        }
+
+        [Id(0)]
+        public int OtherProperty { get; set; }
+
+        public override string ToString() => $"[OtherProperty: {OtherProperty}, Values: [{string.Join(", ", this.Select(kvp => $"[{kvp.Key}] = '{kvp.Value}'"))}]]";
+    }
+
+    public class DictionaryBaseCodecTests(ITestOutputHelper output) : FieldCodecTester<TypeWithDictionaryBase, IFieldCodec<TypeWithDictionaryBase>>(output)
+    {
+        protected override TypeWithDictionaryBase[] TestValues =>
+        [
+            null,
+            new(),
+            new(addDefaultValue: true, StringComparer.OrdinalIgnoreCase),
+            new(addDefaultValue: false),
+            new(addDefaultValue: true, comparer: StringComparer.Ordinal),
+            new() { ["foo"] = 15 },
+            new() { ["foo"] = 15, OtherProperty = 123 }
+        ];
+
+        protected override TypeWithDictionaryBase CreateValue() => new() { OtherProperty = Random.Next() };
+        protected override bool Equals(TypeWithDictionaryBase left, TypeWithDictionaryBase right) =>
+            ReferenceEquals(left, right)
+            || left.SequenceEqual(right)
+            && left.OtherProperty == right.OtherProperty
+            && left.Comparer?.GetType() == right.Comparer?.GetType();
+    }
+
+    public class DictionaryBaseCopierTests(ITestOutputHelper output) : CopierTester<TypeWithDictionaryBase, IDeepCopier<TypeWithDictionaryBase>>(output)
+    {
+        protected override TypeWithDictionaryBase[] TestValues => [null, new(), new(addDefaultValue: false), new() { ["foo"] = 15 }, new() { ["foo"] = 15, OtherProperty = 123 }];
+
+        protected override TypeWithDictionaryBase CreateValue() => new() { OtherProperty = Random.Next() };
+        protected override bool Equals(TypeWithDictionaryBase left, TypeWithDictionaryBase right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.OtherProperty == right.OtherProperty;
+    }
+
     public class DictionaryWithComparerCodecTests(ITestOutputHelper output) : FieldCodecTester<Dictionary<string, int>, DictionaryCodec<string, int>>(output)
     {
         protected override int[] MaxSegmentSizes => [1024];
@@ -2425,7 +2662,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override Dictionary<string, int>[] TestValues => [null, new Dictionary<string, int>(), CreateValue(), CreateValue(), CreateValue()];
 
-        protected override bool Equals(Dictionary<string, int> left, Dictionary<string, int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
+        protected override bool Equals(Dictionary<string, int> left, Dictionary<string, int> right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.Comparer?.GetType() == right.Comparer?.GetType();
     }
 
     public class ConcurrentDictionaryCodecTests(ITestOutputHelper output) : FieldCodecTester<ConcurrentDictionary<string, int>, ConcurrentDictionaryCodec<string, int>>(output)
@@ -2835,6 +3072,88 @@ namespace Orleans.Serialization.UnitTests
         protected override bool Equals(HashSet<string> left, HashSet<string> right) => ReferenceEquals(left, right) || left.SetEquals(right);
     }
 
+    [GenerateSerializer]
+    public class TypeWithHashSetBase : HashSet<string>
+    {
+        public TypeWithHashSetBase() : this(true) { }
+        public TypeWithHashSetBase(bool addDefaultValue, IEqualityComparer<string> comparer = null) : base(comparer)
+        {
+            if (addDefaultValue)
+            {
+                this.Add("key");
+                this.Add("kEY");
+                this.Add("Key");
+                this.Add("KEY");
+            }
+        }
+
+        [Id(0)]
+        public int OtherProperty { get; set; }
+
+        public override string ToString() => $"[OtherProperty: {OtherProperty}, Values: [{string.Join(", ", this)}]]";
+    }
+
+    public class HashSetBaseCodecTests(ITestOutputHelper output) : FieldCodecTester<TypeWithHashSetBase, IFieldCodec<TypeWithHashSetBase>>(output)
+    {
+        private static TypeWithHashSetBase AddValues(TypeWithHashSetBase value)
+        {
+            value.Add("one");
+            value.Add("ONE");
+            value.Add("two");
+            value.Add("three");
+            return value;
+        }
+
+        protected override TypeWithHashSetBase[] TestValues =>
+        [
+            null,
+            new(),
+            new(addDefaultValue: true, StringComparer.OrdinalIgnoreCase),
+            new(addDefaultValue: false),
+            new(addDefaultValue: true, comparer: StringComparer.Ordinal),
+            new() { "foo" },
+            AddValues(new() { OtherProperty = 123 })
+        ];
+
+        protected override TypeWithHashSetBase CreateValue() => AddValues(new() { OtherProperty = Random.Next() });
+        protected override bool Equals(TypeWithHashSetBase left, TypeWithHashSetBase right) =>
+            ReferenceEquals(left, right)
+            || left.SequenceEqual(right)
+            && left.OtherProperty == right.OtherProperty
+            && left?.Comparer == right?.Comparer;
+    }
+
+    public class HashSetBaseCopierTests(ITestOutputHelper output) : CopierTester<TypeWithHashSetBase, IDeepCopier<TypeWithHashSetBase>>(output)
+    {
+        private static TypeWithHashSetBase AddValues(TypeWithHashSetBase value)
+        {
+            value.Add("one");
+            value.Add("ONE");
+            value.Add("two");
+            value.Add("three");
+            return value;
+        }
+
+        protected override TypeWithHashSetBase[] TestValues =>
+        [
+            null,
+            new(),
+            new(addDefaultValue: true, StringComparer.OrdinalIgnoreCase),
+            new(addDefaultValue: false),
+            new(addDefaultValue: true, comparer: StringComparer.Ordinal),
+            new() { "foo" },
+            AddValues(new() { OtherProperty = 123 })
+        ];
+
+        protected override TypeWithHashSetBase CreateValue() => AddValues(new() { OtherProperty = Random.Next() });
+
+        protected override bool Equals(TypeWithHashSetBase left, TypeWithHashSetBase right) =>
+            ReferenceEquals(left, right)
+            || left.SequenceEqual(right)
+            && left.OtherProperty == right.OtherProperty
+            && left?.Comparer == right?.Comparer;
+    }
+
     public class ImmutableHashSetTests(ITestOutputHelper output) : FieldCodecTester<ImmutableHashSet<string>, ImmutableHashSetCodec<string>>(output)
     {
         protected override ImmutableHashSet<string> CreateValue()
@@ -2915,6 +3234,19 @@ namespace Orleans.Serialization.UnitTests
         protected override bool Equals(Uri left, Uri right) => ReferenceEquals(left, right) || left == right;
 
         protected override bool IsImmutable => true;
+    }
+
+    public class FSharpUnitTests(ITestOutputHelper output) : FieldCodecTester<Unit, FSharpUnitCodec>(output)
+    {
+        protected override Unit CreateValue() => null;
+        protected override Unit[] TestValues => [null];
+    }
+
+    public class FSharpUnitCopierTests(ITestOutputHelper output) : CopierTester<Unit, FSharpUnitCopier>(output)
+    {
+        protected override bool IsImmutable => true;
+        protected override Unit CreateValue() => null;
+        protected override Unit[] TestValues => [null];
     }
 
     public class FSharpOptionTests(ITestOutputHelper output) : FieldCodecTester<FSharpOption<Guid>, FSharpOptionCodec<Guid>>(output)

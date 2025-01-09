@@ -1,4 +1,3 @@
-
 using System;
 using System.Collections.Generic;
 using Orleans.Runtime;
@@ -42,12 +41,6 @@ namespace Orleans.Streams
         public override bool Equals(object obj) => obj is StreamIdentity identity && this.Guid.Equals(identity.Guid) && this.Namespace == identity.Namespace;
 
         /// <inheritdoc />
-        public override int GetHashCode()
-        {
-            var hashCode = -1455462324;
-            hashCode = hashCode * -1521134295 + this.Guid.GetHashCode();
-            hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(this.Namespace);
-            return hashCode;
-        }
+        public override int GetHashCode() => HashCode.Combine(Guid, Namespace);
     }
 }

@@ -11,7 +11,7 @@ namespace Orleans.Runtime.GrainDirectory
     internal sealed class RemoteGrainDirectory : SystemTarget, IRemoteGrainDirectory
     {
         private readonly LocalGrainDirectory router;
-        private readonly GrainDirectoryPartition partition;
+        private readonly LocalGrainDirectoryPartition partition;
         private readonly ILogger logger;
 
         internal RemoteGrainDirectory(LocalGrainDirectory r, GrainType grainType, ILoggerFactory loggerFactory)

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -10,7 +11,7 @@ namespace UnitTests;
 [TestCategory("BVT"), TestCategory("GrainDirectory")]
 public class GrainDirectoryPartitionTests
 {
-    private readonly GrainDirectoryPartition _target;
+    private readonly LocalGrainDirectoryPartition _target;
     private readonly MockSiloStatusOracle _siloStatusOracle;
     private static readonly SiloAddress LocalSiloAddress =  SiloAddress.FromParsableString("127.0.0.1:11111@123");
     private static readonly SiloAddress OtherSiloAddress =  SiloAddress.FromParsableString("127.0.0.2:11111@456");
@@ -18,7 +19,7 @@ public class GrainDirectoryPartitionTests
     public GrainDirectoryPartitionTests()
     {
         _siloStatusOracle = new MockSiloStatusOracle();
-        _target = new GrainDirectoryPartition(
+        _target = new LocalGrainDirectoryPartition(
             _siloStatusOracle,
             Options.Create(new GrainDirectoryOptions()),
             new LoggerFactory());
@@ -167,6 +168,8 @@ public class GrainDirectoryPartitionTests
                 ? new Dictionary<SiloAddress, SiloStatus>(_content.Where(kvp => kvp.Value == SiloStatus.Active))
                 : new Dictionary<SiloAddress, SiloStatus>(_content);
         }
+
+        public ImmutableArray<SiloAddress> GetActiveSilos() => _content.Keys.ToImmutableArray();
 
         public void SetSiloStatus(SiloAddress siloAddress, SiloStatus status) => _content[siloAddress] = status;
 

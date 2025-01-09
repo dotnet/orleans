@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
@@ -149,7 +149,7 @@ namespace Orleans.Persistence
             const string WriteScript =
                 """
                 local etag = redis.call('HGET', KEYS[1], 'etag')
-                if (not etag and (ARGV[1] == nil or ARGV[1] == '')) or etag == ARGV[1] then
+                if ((not etag or etag == '') and (not ARGV[1] or ARGV[1] == '')) or etag == ARGV[1] then
                   redis.call('HMSET', KEYS[1], 'etag', ARGV[2], 'data', ARGV[3])
                   if ARGV[4] ~= '-1' then
                     redis.call('EXPIRE', KEYS[1], ARGV[4])
@@ -234,7 +234,7 @@ namespace Orleans.Persistence
                     const string DeleteScript =
                         """
                         local etag = redis.call('HGET', KEYS[1], 'etag')
-                        if (not etag and not ARGV[1]) or etag == ARGV[1] then
+                        if ((not etag or etag == '') and (not ARGV[1] or ARGV[1] == '')) or etag == ARGV[1] then
                           redis.call('DEL', KEYS[1])
                           return 0
                         else
@@ -249,7 +249,7 @@ namespace Orleans.Persistence
                     const string ClearScript =
                         """
                         local etag = redis.call('HGET', KEYS[1], 'etag')
-                        if (not etag and not ARGV[1]) or etag == ARGV[1] then
+                        if ((not etag or etag == '') and (not ARGV[1] or ARGV[1] == '')) or etag == ARGV[1] then
                           redis.call('HMSET', KEYS[1], 'etag', ARGV[2], 'data', '')
                           return 0
                         else

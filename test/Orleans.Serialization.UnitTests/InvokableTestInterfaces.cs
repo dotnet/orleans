@@ -90,7 +90,7 @@ namespace Orleans.Serialization.UnitTests
         ValueTask OtherMethod();
     }
 
-    [GenerateMethodSerializers(typeof(MyInvokableProxyBase))]
+    [Alias("test.IGenericProxyAliasTestGrain`3"), GenerateMethodSerializers(typeof(MyInvokableProxyBase))]
     public interface IGenericProxyAliasTestGrain<T, U, V>
     {
         [Id(777)]

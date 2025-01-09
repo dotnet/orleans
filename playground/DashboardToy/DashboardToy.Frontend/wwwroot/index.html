@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orleans Activation Rebalancing</title>
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
+    <link href="css/site.css" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/6.2.0/d3.min.js"></script>
+    <style>
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+      }
+      #callGraphContainer {
+        width: 100%;
+        height: 100%;
+      }
+      svg {
+        width: 100%;
+        height: 100%;
+      }
+      text {
+        text-anchor: middle;
+        font-family: "Helvetica Neue", Helvetica, sans-serif;
+        font-size: 16px;
+      }
+      .absolute-button {
+        position: absolute;
+        padding: 10px 20px;
+        font-size: 20px;
+        border: none;
+        color: white;
+        background-color: #007bff;
+        cursor: pointer;
+      }
+      #addGrainsButton {
+        top: 10px;
+        left: 10px;
+      }
+      #resetButton {
+        top: 10px;
+        left: 200px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="callGraphContainer">
+      <svg>
+        <g class="graph-container">
+          <g class="links"></g>
+          <g class="nodes"></g>
+        </g>
+      </svg>
+    </div>
+    <button id="addGrainsButton" class="absolute-button">Add grains</button>
+    <button id="resetButton" class="absolute-button">Reset</button>
+    <script type="text/javascript">
+      const state = { nodes: [], links: [], isUpdate: false };
+
+      const svg = d3.select("svg");
+      let width = svg.node().clientWidth;
+      let height = svg.node().clientHeight;
+
+      function mergeObjects(updated, existing) {
+        for (let key in existing) {
+          if (existing.hasOwnProperty(key) && !updated.hasOwnProperty(key)) {
+            updated[key] = existing[key];
+          }
+        }
+      }
+
+      async function loadData() {
+        try {
+          const data = await fetch("/data.json");
+          const jsonData = await data.json();
+          mergeData(jsonData);
+          renderGraph();
+        } catch (error) {
+          console.error("Error fetching or parsing data:", error);
+        }
+      }
+
+      window.onload = async function () {
+        await loadData();
+      };
+
+      setInterval(async function () {
+        state.isUpdate = true;
+        await loadData();
+      }, 5000);
+
+      function mergeData(jsonData) {
+        const newHostNodes = jsonData.hostIds.map((d, i) => ({
+          id: "host-" + i,
+          name: d.name,
+          isHost: true,
+          index: i,
+          activationCount: d.activationCount,
+        }));
+
+        const newGrainNodes = jsonData.grainIds.map((d, i) => ({
+          id: "grain-" + d.name,
+          host: d.host,
+          name: d.name,
+          key: d.key,
+          type: 'grain',
+        }));
+        const newNodes = newHostNodes.concat(newGrainNodes);
+
+        const newGrainLinks = jsonData.edges.map((d) => {
+          var source = jsonData.grainIds[d.source];
+          var target = jsonData.grainIds[d.target];
+          return {
+            id: "edge(" + source.name + "," + target.name + ")",
+            source: "grain-" + source.name,
+            target: "grain-" + target.name,
+            sourceHost: source.host,
+            targetHost: target.host,
+            weight: d.weight,
+            isHostLink: false,
+          };
+        });
+
+        const newHostLinks = jsonData.grainIds.map((d, i) => ({
+          id: "host-edge(" + d.name + "," + d.host + ")",
+          source: "grain-" + d.name,
+          target: "host-" + d.host,
+          distance: 100,
+          isHostLink: true,
+          host: d.host,
+        }));
+
+        const hostToHostLinks = [];
+        for (let i = 0; i < newHostNodes.length; i++) {
+        for (let j = 0; j < newHostNodes.length; j++) {
+          if (i == j) continue;
+          hostToHostLinks.push({
+            id:
+              "host-link(" +
+              newHostNodes[i].id +
+              "," +
+              newHostNodes[j].id +
+              ")",
+            source: newHostNodes[i].id,
+            target: newHostNodes[j].id,
+            isHostToHostLink: true,
+          });
+        }
+      }
+
+        const newLinks = newGrainLinks
+          .concat(newHostLinks)
+          .concat(hostToHostLinks);
+
+        // Merge new nodes and links into the existing state
+        const nodeMap = new Map(state.nodes.map((d) => [d.id, d]));
+        newNodes.forEach((node) => {
+          if (nodeMap.has(node.id)) {
+            mergeObjects(node, nodeMap.get(node.id));
+          } else {
+            node.x = width / 2;
+            node.y = height / 2;
+          }
+        });
+        state.nodes = Array.from(newNodes);
+        state.links = Array.from(newLinks);
+
+        state.maxEdgeValue = jsonData.maxEdgeValue;
+        state.maxActivationCount = jsonData.maxActivationCount;
+      }
+
+      function renderGraph() {
+        const graphContainer = svg.select(".graph-container");
+
+        var colorScheme = [...d3.schemeTableau10];
+        colorScheme.splice(2, 1); // Remove red since we use that for badness (inter-host links)
+        const color = d3.scaleOrdinal(colorScheme);
+        const linkColor = d3
+          .scaleSequential(d3.interpolateOrRd)
+          .domain([0, state.maxEdgeValue]);
+
+        const nodeData = graphContainer
+          .select(".nodes")
+          .selectAll("g")
+          .data(state.nodes, (d) => d.id)
+          .join(
+            (enter) => {
+              var g = enter.append("g");
+              g.append("circle");
+              g.append("text").attr("class", "label");
+              g.filter((d) => d.isHost)
+                .append("text")
+                .attr("class", "info");
+              return g;
+            },
+            (update) => update,
+            (exit) => exit.remove()
+          );
+
+        // Grain label
+        nodeData
+          .select(".label")
+          .filter((d) => false /*d.type === 'grain'*/)
+          .text((d) => (d.key.includes("hosted-") ? "client" : d.key))
+          .attr("dy", -10);
+
+        // Host label
+        nodeData
+          .select(".label")
+          .filter((d) => d.isHost)
+          .text((d) => "[" + d.index + "]")
+          .attr("font-weight", "bold")
+          .attr("dy", -5);
+
+        // Host info
+        nodeData
+          .select(".info")
+          .filter((d) => d.isHost)
+          .attr("dy", 15)
+          .text((d) => d.activationCount);
+
+        // Circle
+        nodeData
+          .select("circle")
+          .attr("r", (d) =>
+            d.isHost
+              ? 10 + (15 * d.activationCount) / state.maxActivationCount
+              : 8
+          )
+          .attr("stroke", "#222")
+          .attr("stroke-width", (d) => (d.isHost ? 2 : 1))
+          .attr("class", (d) => (d.isHost ? "host-circle" : ""))
+          .attr("fill", (d) => (d.isHost ? color(d.index) : color(d.host)));
+
+        // Links
+        const linkData = graphContainer
+          .select(".links")
+          .selectAll("line")
+          .data(state.links, (d) => d.id)
+          .join(
+            (enter) => enter.append("line"),
+            (update) => update,
+            (exit) => exit.remove()
+          )
+          .filter((d) => !d.isHostToHostLink)
+          .attr("stroke-width", (d) =>
+            d.isHostLink ? 0.25 : 1 + d.weight / state.maxEdgeValue
+          )
+          .attr("stroke", (d) =>
+            d.isHostLink
+              ? color(d.host)
+              : d.sourceHost == d.targetHost
+              ? color(d.sourceHost)
+              : "red"
+          );
+
+        if (state.simulation === undefined) {
+          state.simulation = d3
+            .forceSimulation(state.nodes)
+            .force(
+              "center",
+              d3.forceCenter(width / 2, height / 2).strength(0.05)
+            )
+            .force(
+              "link",
+              d3
+                .forceLink(state.links)
+                .id((d) => d.id)
+                .strength((d) =>
+                  d.isHostToHostLink ? 2 : d.isHostLink ? 1 : d.source.host == d.target.host ? 0.2 : 0.10 * (d.weight / state.maxEdgeValue)
+                )
+                .distance((d) =>
+                  d.isHostToHostLink ? 600 : d.isHostLink ? 150 : d.source.host == d.target.host ? 15 : 30 * (1 - (d.weight / state.maxEdgeValue))
+                )
+            )
+            .force(
+              "charge",
+              d3.forceManyBody().strength((d) => (d.isHost ? -150 : -50))
+            )
+            .alphaDecay(0.01) // Reduce alpha decay rate for gradual settling
+            .velocityDecay(0.3) // Reduce velocity decay rate for gradual settling
+            .on("tick", ticked);
+
+          svg.call(
+            d3
+              .zoom()
+              .scaleExtent([0.1, 10])
+              .on("zoom", (event) => {
+                graphContainer.attr("transform", event.transform);
+              })
+          );
+        } else {
+          state.simulation.nodes(state.nodes);
+          state.simulation.force("link").links(state.links);
+          state.simulation.on("tick", ticked);
+          state.simulation.alpha(0.02).restart();
+        }
+
+        function ticked() {
+          linkData
+            .attr("x1", (d) => d.source.x)
+            .attr("y1", (d) => d.source.y)
+            .attr("x2", (d) => d.target.x)
+            .attr("y2", (d) => d.target.y);
+
+          nodeData.attr("transform", (d) => `translate(${d.x},${d.y})`);
+        }
+
+        window.addEventListener("resize", () => {
+          width = svg.node().clientWidth;
+          height = svg.node().clientHeight;
+          state.simulation.force(
+            "center",
+            d3.forceCenter(width / 2, height / 2)
+          );
+          state.simulation.alpha(1).restart();
+        });
+      }
+
+      async function postRequest(url) {
+        try {
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+          if (!response.ok) {
+            throw new Error("Network response was not ok");
+          }
+          await loadData();
+        } catch (error) {
+          console.error("Error with the fetch operation:", error);
+        }
+      }
+
+      document
+        .getElementById("addGrainsButton")
+        .addEventListener("click", () => {
+          postRequest("/add");
+        });
+
+      document.getElementById("resetButton").addEventListener("click", () => {
+        postRequest("/reset");
+      });
+    </script>
+  </body>
+</html>

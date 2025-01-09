@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +17,7 @@ using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using Orleans.Storage;
+using static Orleans.Internal.StandardExtensions;
 
 namespace Orleans.Runtime
 {
@@ -28,22 +30,22 @@ namespace Orleans.Runtime
         private readonly ILogger invokeExceptionLogger;
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
-        private readonly List<IDisposable> disposables;
         private readonly ConcurrentDictionary<(GrainId, CorrelationId), CallbackData> callbacks;
+        private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
         private readonly SharedCallbackData sharedCallbackData;
         private readonly SharedCallbackData systemSharedCallbackData;
-        private SafeTimer callbackTimer;
+        private readonly PeriodicTimer callbackTimer;
 
         private GrainLocator grainLocator;
         private MessageCenter messageCenter;
         private List<IIncomingGrainCallFilter> grainCallFilters;
         private readonly DeepCopier _deepCopier;
-        private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
         private HostedClient hostedClient;
 
-        private HostedClient HostedClient => this.hostedClient ?? (this.hostedClient = this.ServiceProvider.GetRequiredService<HostedClient>());
+        private HostedClient HostedClient => this.hostedClient ??= this.ServiceProvider.GetRequiredService<HostedClient>();
         private readonly MessageFactory messageFactory;
         private IGrainReferenceRuntime grainReferenceRuntime;
+        private Task callbackTimerTask;
         private readonly MessagingTrace messagingTrace;
         private readonly DeepCopier<Response> responseCopier;
 
@@ -57,13 +59,15 @@ namespace Orleans.Runtime
             GrainReferenceActivator referenceActivator,
             GrainInterfaceTypeResolver interfaceIdResolver,
             GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver,
-            DeepCopier deepCopier)
+            DeepCopier deepCopier,
+            TimeProvider timeProvider,
+            InterfaceToImplementationMappingCache interfaceToImplementationMapping)
         {
-            this.interfaceToImplementationMapping = new InterfaceToImplementationMappingCache();
+            TimeProvider = timeProvider;
+            this.interfaceToImplementationMapping = interfaceToImplementationMapping;
             this._deepCopier = deepCopier;
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
-            this.disposables = new List<IDisposable>();
             this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>();
             this.messageFactory = messageFactory;
             this.ConcreteGrainFactory = new GrainFactory(this, referenceActivator, interfaceIdResolver, interfaceToTypeResolver);
@@ -73,17 +77,17 @@ namespace Orleans.Runtime
             this.messagingOptions = messagingOptions.Value;
             this.messagingTrace = messagingTrace;
             this.responseCopier = deepCopier.GetCopier<Response>();
+            var period = Max(TimeSpan.FromMilliseconds(1), Min(this.messagingOptions.ResponseTimeout, TimeSpan.FromSeconds(1)));
+            this.callbackTimer = new PeriodicTimer(period, timeProvider);
 
             this.sharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.TargetGrain, msg.Id),
+                msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
-                this.messagingOptions,
                 this.messagingOptions.ResponseTimeout);
 
             this.systemSharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.TargetGrain, msg.Id),
+                msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
-                this.messagingOptions,
                 this.messagingOptions.SystemResponseTimeout);
         }
 
@@ -99,7 +103,7 @@ namespace Orleans.Runtime
             => this.grainLocator ?? (this.grainLocator = this.ServiceProvider.GetRequiredService<GrainLocator>());
 
         private List<IIncomingGrainCallFilter> GrainCallFilters
-            => this.grainCallFilters ?? (this.grainCallFilters = new List<IIncomingGrainCallFilter>(this.ServiceProvider.GetServices<IIncomingGrainCallFilter>()));
+            => this.grainCallFilters ??= new List<IIncomingGrainCallFilter>(this.ServiceProvider.GetServices<IIncomingGrainCallFilter>());
 
         private MessageCenter MessageCenter => this.messageCenter ?? (this.messageCenter = this.ServiceProvider.GetRequiredService<MessageCenter>());
 
@@ -146,7 +150,7 @@ namespace Orleans.Runtime
                 sharedData = this.sharedCallbackData;
             }
 
-            if (message.IsExpirableMessage(this.messagingOptions.DropExpiredMessages))
+            if (this.messagingOptions.DropExpiredMessages && message.IsExpirableMessage())
             {
                 message.TimeToLive = request.GetDefaultResponseTimeout() ?? sharedData.ResponseTimeout;
             }
@@ -450,6 +454,8 @@ namespace Orleans.Runtime
 
         public string CurrentActivationIdentity => RuntimeContext.Current?.Address.ToString() ?? this.HostedClient.ToString();
 
+        public TimeProvider TimeProvider { get; }
+
         /// <inheritdoc />
         public TimeSpan GetResponseTimeout() => this.sharedCallbackData.ResponseTimeout;
 
@@ -474,33 +480,19 @@ namespace Orleans.Runtime
             }
         }
 
-        private Task OnRuntimeInitializeStop(CancellationToken tc)
+        private async Task OnRuntimeInitializeStop(CancellationToken tc)
         {
-            lock (disposables)
+            this.callbackTimer.Dispose();
+            if (this.callbackTimerTask is { } task)
             {
-                foreach (var disposable in disposables)
-                {
-                    try
-                    {
-                        disposable?.Dispose();
-                    }
-                    catch (Exception e)
-                    {
-                        this.logger.LogWarning((int)ErrorCode.IGC_DisposeError, e, $"Exception while disposing {nameof(InsideRuntimeClient)}");
-                    }
-                }
+                await task.WaitAsync(tc);
             }
-            return Task.CompletedTask;
         }
 
         private Task OnRuntimeInitializeStart(CancellationToken tc)
         {
             var stopWatch = ValueStopwatch.StartNew();
-            var timerLogger = this.loggerFactory.CreateLogger<SafeTimer>();
-            var minTicks = Math.Min(this.messagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
-            var period = TimeSpan.FromTicks(minTicks);
-            this.callbackTimer = new SafeTimer(timerLogger, this.OnCallbackExpiryTick, null, period, period);
-            this.disposables.Add(this.callbackTimer);
+            this.callbackTimerTask = Task.Run(MonitorCallbackExpiry);
 
             if (logger.IsEnabled(LogLevel.Debug))
             {
@@ -514,7 +506,7 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-        public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
+        public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
         {
             foreach (var callback in callbacks)
             {
@@ -530,14 +522,33 @@ namespace Orleans.Runtime
             lifecycle.Subscribe<InsideRuntimeClient>(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
         }
 
-        private void OnCallbackExpiryTick(object state)
+        public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
+            => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
+
+        private async Task MonitorCallbackExpiry()
         {
-            var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
-            foreach (var pair in callbacks)
+            while (await callbackTimer.WaitForNextTickAsync())
             {
-                var callback = pair.Value;
-                if (callback.IsCompleted) continue;
-                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout();
+                try
+                {
+                    var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
+                    foreach (var (_, callback) in callbacks)
+                    {
+                        if (callback.IsCompleted)
+                        {
+                            continue;
+                        }
+
+                        if (callback.IsExpired(currentStopwatchTicks))
+                        {
+                            callback.OnTimeout();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Error while processing callback expiry.");
+                }
             }
         }
     }

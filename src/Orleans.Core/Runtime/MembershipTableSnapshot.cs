@@ -15,9 +15,9 @@ namespace Orleans.Runtime
             this.Entries = entries;
         }
 
-        public static MembershipTableSnapshot Create(MembershipEntry localSiloEntry, MembershipTableData table)
+        public static MembershipTableSnapshot Create(MembershipTableData table)
         {
-            if (table is null) throw new ArgumentNullException(nameof(table));
+            ArgumentNullException.ThrowIfNull(table);
 
             var entries = ImmutableDictionary.CreateBuilder<SiloAddress, MembershipEntry>();
             if (table.Members != null)
@@ -29,24 +29,15 @@ namespace Orleans.Runtime
                 }
             }
 
-            if (entries.TryGetValue(localSiloEntry.SiloAddress, out var existing))
-            {
-                entries[localSiloEntry.SiloAddress] = existing.WithStatus(localSiloEntry.Status);
-            }
-            else
-            {
-                entries[localSiloEntry.SiloAddress] = localSiloEntry;
-            }
-
             var version = (table.Version.Version == 0 && table.Version.VersionEtag == "0")
-                ? MembershipVersion.MinValue
-                : new MembershipVersion(table.Version.Version);
+              ? MembershipVersion.MinValue
+              : new MembershipVersion(table.Version.Version);
             return new MembershipTableSnapshot(version, entries.ToImmutable());
         }
 
-        public static MembershipTableSnapshot Create(MembershipEntry localSiloEntry, MembershipTableSnapshot snapshot)
+        public static MembershipTableSnapshot Create(MembershipTableSnapshot snapshot)
         {
-            if (snapshot is null) throw new ArgumentNullException(nameof(snapshot));
+            ArgumentNullException.ThrowIfNull(snapshot);
 
             var entries = ImmutableDictionary.CreateBuilder<SiloAddress, MembershipEntry>();
             if (snapshot.Entries != null)
@@ -56,15 +47,6 @@ namespace Orleans.Runtime
                     var entry = item.Value;
                     entries.Add(entry.SiloAddress, entry);
                 }
-            }
-
-            if (entries.TryGetValue(localSiloEntry.SiloAddress, out var existing))
-            {
-                entries[localSiloEntry.SiloAddress] = existing.WithStatus(localSiloEntry.Status);
-            }
-            else
-            {
-                entries[localSiloEntry.SiloAddress] = localSiloEntry;
             }
 
             return new MembershipTableSnapshot(snapshot.Version, entries.ToImmutable());

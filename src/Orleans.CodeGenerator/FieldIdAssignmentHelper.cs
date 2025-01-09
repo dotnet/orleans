@@ -74,6 +74,18 @@ internal class FieldIdAssignmentHelper
                 {
                     _symbols[member] = (id.Value, false);
                 }
+                else if (PropertyUtility.GetMatchingPrimaryConstructorParameter(prop, _constructorParameters) is { } prm)
+                {
+                    id = CodeGenerator.GetId(_libraryTypes, prop);
+                    if (id.HasValue)
+                    {
+                        _symbols[member] = (id.Value, true);
+                    }
+                    else
+                    {
+                        _symbols[member] = ((uint)_constructorParameters.IndexOf(prm), true);
+                    }
+                }
             }
 
             if (member is IFieldSymbol field)

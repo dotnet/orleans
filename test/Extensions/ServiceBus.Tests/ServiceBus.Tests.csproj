@@ -15,5 +15,6 @@
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Streaming.AzureStorage\Orleans.Streaming.AzureStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
+    <ProjectReference Include="..\TesterAzureUtils\Tester.AzureUtils.csproj" />
   </ItemGroup>
 </Project>

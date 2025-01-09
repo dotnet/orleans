@@ -130,5 +130,44 @@ namespace DefaultCluster.Tests.General
 
             // Calls should not have thrown ForwardingFailed exceptions.
         }
+
+        [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
+        public async Task StatelessWorker_DoesNotThrow_IfMarkedWithMayInterleave()
+        {
+            var grain = GrainFactory.GetGrain<IStatelessWorkerWithMayInterleaveGrain>(0);
+            var exception = await Record.ExceptionAsync(grain.GoFast);
+
+            Assert.Null(exception);
+        }
+
+        [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
+        public async Task StatelessWorker_ShouldNotInterleaveCalls_IfMayInterleavePredicatedDoesntMatch()
+        {
+            var grain = GrainFactory.GetGrain<IStatelessWorkerWithMayInterleaveGrain>(0);
+
+            var delay = TimeSpan.FromSeconds(1);
+            await grain.SetDelay(delay);
+
+            var stopwatch = Stopwatch.StartNew();
+            await Task.WhenAll(grain.GoSlow(), grain.GoSlow(), grain.GoSlow());
+            stopwatch.Stop();
+
+            Assert.InRange(stopwatch.Elapsed.TotalSeconds, 2.85, 3.15); // theoretically it should be 3.0
+        }
+
+        [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
+        public async Task StatelessWorker_ShouldInterleaveCalls_IfMayInterleavePredicatedMatches()
+        {
+            var grain = GrainFactory.GetGrain<IStatelessWorkerWithMayInterleaveGrain>(0);
+
+            var delay = TimeSpan.FromSeconds(1);
+            await grain.SetDelay(delay);
+
+            var stopwatch = Stopwatch.StartNew();
+            await Task.WhenAll(grain.GoFast(), grain.GoFast(), grain.GoFast());
+            stopwatch.Stop();
+
+            Assert.InRange(stopwatch.Elapsed.TotalSeconds, 0.85, 1.15); // theoretically it should be 1.0
+        }
     }
 }

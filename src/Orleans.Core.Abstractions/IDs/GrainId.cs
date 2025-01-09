@@ -56,7 +56,11 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
         /// </summary>
-        public static GrainId Create(GrainType type, string key) => new GrainId(type, IdSpan.Create(key));
+        public static GrainId Create(GrainType type, string key)
+        {
+            ArgumentNullException.ThrowIfNullOrWhiteSpace(key);
+            return new GrainId(type, IdSpan.Create(key));
+        }
 
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
@@ -138,7 +142,7 @@ namespace Orleans.Runtime
         public override bool Equals(object? obj) => obj is GrainId id && Equals(id);
 
         /// <inheritdoc/>
-        public bool Equals(GrainId other) => _type.Equals(other._type) && _key.Equals(other._key);
+        public bool Equals(GrainId other) => _key.Equals(other._key) && _type.Equals(other._type);
 
         /// <inheritdoc/>
         public override int GetHashCode() => HashCode.Combine(_type, _key);

@@ -1,8 +1,7 @@
 variables:
   clusterId: '{{ "now" | date: "%s" }}'
   serviceId: '{{ "now" | date: "%s" }}'
-  secretSource: KeyVault
-  framework: net7.0
+  framework: net8.0
 
 jobs:
   server:
@@ -10,8 +9,8 @@ jobs:
       localFolder: Artifacts/DistributedTests/DistributedTests.Server/{{framework}}
     executable: DistributedTests.Server.exe
     readyStateText: Orleans Silo started.
-    framework: net7.0
-    arguments: "{{configurator}} --clusterId {{clusterId}} --serviceId {{serviceId}} --secretSource {{secretSource}} {{configuratorOptions}}"
+    framework: net8.0
+    arguments: "{{configurator}} --clusterId {{clusterId}} --serviceId {{serviceId}} --azureQueueUri {{azureQueueUri}} --azureTableUri {{azureTableUri}} {{configuratorOptions}}"
     onConfigure:
       - if (job.endpoints.Count > 0) {
           job.endpoints.RemoveRange(job.variables.instances, job.endpoints.Count - job.variables.instances);
@@ -21,8 +20,8 @@ jobs:
       localFolder: Artifacts/DistributedTests/DistributedTests.Client/{{framework}}
     executable: DistributedTests.Client.exe
     waitForExit: true
-    framework: net7.0
-    arguments: "{{command}} --clusterId {{clusterId}} --serviceId {{serviceId}} --secretSource {{secretSource}} {{commandOptions}}"
+    framework: net8.0
+    arguments: "{{command}} --clusterId {{clusterId}} --serviceId {{serviceId}} --azureQueueUri {{azureQueueUri}} --azureTableUri {{azureTableUri}} {{commandOptions}}"
     onConfigure:
       - if (job.endpoints.Count > 0) {
           job.endpoints.Reverse();
@@ -45,6 +44,22 @@ scenarios:
         blocksPerWorker: 0
         requestsPerBlock: 500
         duration: 120
+        commandOptions: "--numWorkers {{numWorkers}} --blocksPerWorker {{blocksPerWorker}} --requestsPerBlock {{requestsPerBlock}} --duration {{duration}}"
+  fanout:
+    server:
+      job: server
+      variables:
+        instances: 10
+        configurator: SimpleSilo
+    client:
+      job: client
+      variables:
+        command: fan-out
+        instances: 1
+        numWorkers: 1
+        blocksPerWorker: 0
+        requestsPerBlock: 50
+        duration: 240
         commandOptions: "--numWorkers {{numWorkers}} --blocksPerWorker {{blocksPerWorker}} --requestsPerBlock {{requestsPerBlock}} --duration {{duration}}"
   streaming:
     server:
@@ -125,10 +140,40 @@ scenarios:
         duration: 180
         commandOptions: "--numWorkers {{numWorkers}} --blocksPerWorker {{blocksPerWorker}} --requestsPerBlock {{requestsPerBlock}} --duration {{duration}}"
 
+counters:
+- provider: Microsoft.Orleans
+  values:
+  - name: app-requests
+    measurement: orleans-counter/requests-per-second
+    description: Request rate
+
+  - name: activation-count
+    measurement: orleans-counter/grain-activation-count
+    description: Total number of grains
+
+results:
+# Microsoft.Orleans counters
+- name: orleans-counter/requests-per-second
+  measurement: orleans-counter/requests-per-second
+  description: Request rate
+  format: "n0"
+  aggregate: max
+  reduce: max
+- name: orleans-counter/requests-per-second/95
+  measurement: orleans-counter/requests-per-second
+  description: Request rate
+  format: "n0"
+  aggregate: percentile95
+  reduce: max
+- name: activation-count
+  measurement: orleans-counter/grain-activation-count
+  description: Active grains
+
 profiles:
   local:
     variables:
-      secretSource: File
+      azureQueueUri: "http://127.0.0.1:10001"
+      azureTableUri: "http://127.0.0.1:10002"
     jobs:
       server:
         endpoints:

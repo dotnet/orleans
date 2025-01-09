@@ -42,7 +42,8 @@ public class ReminderTests_Cosmos_Standalone
         storageOptions.Value.ConfigureTestDefaults();
 
         IReminderTable table = new CosmosReminderTable(_loggerFactory, _fixture.Services, storageOptions, clusterOptions);
-        await table.Init();
+        using var cancellation = new CancellationTokenSource(new ReminderOptions().InitializationTimeout);
+        await table.StartAsync(cancellation.Token);
 
         await TestTableInsertRate(table, 10);
         await TestTableInsertRate(table, 500);
@@ -56,7 +57,8 @@ public class ReminderTests_Cosmos_Standalone
         var storageOptions = Options.Create(new CosmosReminderTableOptions());
         storageOptions.Value.ConfigureTestDefaults();
         IReminderTable table = new CosmosReminderTable(_loggerFactory, _fixture.Services, storageOptions, clusterOptions);
-        await table.Init();
+        using var cancellation = new CancellationTokenSource(new ReminderOptions().InitializationTimeout);
+        await table.StartAsync(cancellation.Token);
 
         ReminderEntry[] rows = (await GetAllRows(table)).ToArray();
         Assert.Empty(rows); // "The reminder table (sid={0}, did={1}) was not empty.", ServiceId, clusterId);
@@ -107,7 +109,7 @@ public class ReminderTests_Cosmos_Standalone
                 _log.LogInformation("Started {Capture}", capture);
             }
             _log.LogInformation("Started all, now waiting...");
-            await Task.WhenAll(promises).WithTimeout(TimeSpan.FromSeconds(500));
+            await Task.WhenAll(promises).WaitAsync(TimeSpan.FromSeconds(500));
         }
         catch (Exception exc)
         {

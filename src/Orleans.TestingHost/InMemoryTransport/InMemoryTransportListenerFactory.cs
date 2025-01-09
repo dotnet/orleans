@@ -194,7 +194,7 @@ internal class InMemoryTransportConnectionFactory : IConnectionFactory
             _loggerFactory.CreateLogger<InMemoryTransportConnection>(),
             _localEndpoint,
             endpoint);
-        await listener.ConnectAsync(connectionContext).WithCancellation(cancellationToken);
+        await listener.ConnectAsync(connectionContext).WaitAsync(cancellationToken);
         return connectionContext;
     }
 }

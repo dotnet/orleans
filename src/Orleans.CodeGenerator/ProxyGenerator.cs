@@ -44,8 +44,7 @@ namespace Orleans.CodeGenerator
                     SimpleBaseType(interfaceDescription.ProxyBaseType.ToTypeSyntax()),
                     SimpleBaseType(interfaceDescription.InterfaceType.ToTypeSyntax()))
                 .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(
-                    AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
+                .AddAttributeLists(CodeGenerator.GetGeneratedCodeAttributes())
                 .AddMembers(fieldDeclarations)
                 .AddMembers(ctors)
                 .AddMembers(proxyMethods);
@@ -110,26 +109,8 @@ namespace Orleans.CodeGenerator
                     declaration = declaration.WithModifiers(TokenList(Token(SyntaxKind.AsyncKeyword)));
                 }
 
-                if (methodDescription.HasCollision)
-                {
-                    declaration = declaration.WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword)));
-
-                    // Type parameter constrains are not valid on explicit interface definitions
-                    var typeParameters = SyntaxFactoryUtility.GetTypeParameterConstraints(methodDescription.MethodTypeParameters);
-                    foreach (var (name, constraints) in typeParameters)
-                    {
-                        if (constraints.Count > 0)
-                        {
-                            declaration = declaration.AddConstraintClauses(
-                                TypeParameterConstraintClause(name).AddConstraints(constraints.ToArray()));
-                        }
-                    }
-                }
-                else
-                {
-                    var explicitInterfaceSpecifier = ExplicitInterfaceSpecifier(methodDescription.Method.ContainingType.ToNameSyntax());
-                    declaration = declaration.WithExplicitInterfaceSpecifier(explicitInterfaceSpecifier);
-                }
+                var explicitInterfaceSpecifier = ExplicitInterfaceSpecifier(methodDescription.Method.ContainingType.ToNameSyntax());
+                declaration = declaration.WithExplicitInterfaceSpecifier(explicitInterfaceSpecifier);
 
                 if (methodDescription.MethodTypeParameters.Count > 0)
                 {

@@ -96,11 +96,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc/>
-        public override int GetHashCode()
-        {
-            // why 397?
-            return (EventIndex * 397) ^ SequenceNumber.GetHashCode();
-        }
+        public override int GetHashCode() => HashCode.Combine(SequenceNumber, EventIndex);
 
         /// <inheritdoc/>
         public override string ToString()

@@ -1,6 +1,8 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
@@ -8,117 +10,149 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal class AdaptiveDirectoryCacheMaintainer : TaskSchedulerAgent
+    internal sealed class AdaptiveDirectoryCacheMaintainer
     {
         private static readonly TimeSpan SLEEP_TIME_BETWEEN_REFRESHES = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromMinutes(1); // this should be something like minTTL/4
 
         private readonly AdaptiveGrainDirectoryCache cache;
         private readonly LocalGrainDirectory router;
         private readonly IInternalGrainFactory grainFactory;
+        private readonly CancellationTokenSource _shutdownCts = new();
 
         private long lastNumAccesses;       // for stats
         private long lastNumHits;           // for stats
+        private Task? _runTask;
 
         internal AdaptiveDirectoryCacheMaintainer(
             LocalGrainDirectory router,
             AdaptiveGrainDirectoryCache cache,
             IInternalGrainFactory grainFactory,
             ILoggerFactory loggerFactory)
-            : base(loggerFactory)
         {
+            Log = loggerFactory.CreateLogger<AdaptiveDirectoryCacheMaintainer>();
             this.grainFactory = grainFactory;
             this.router = router;
             this.cache = cache;
 
             lastNumAccesses = 0;
             lastNumHits = 0;
-            OnFault = FaultBehavior.RestartOnFault;
         }
 
-        protected override async Task Run()
+        private ILogger<AdaptiveDirectoryCacheMaintainer> Log { get; }
+
+        public void Start()
         {
-            while (router.Running)
+            _runTask = Run();
+        }
+
+        public async Task StopAsync()
+        {
+            _shutdownCts.Cancel();
+            if (_runTask is { } task)
             {
-                // Run through all cache entries and do the following:
-                // 1. If the entry is not expired, skip it
-                // 2. If the entry is expired and was not accessed in the last time interval -- throw it away
-                // 3. If the entry is expired and was accessed in the last time interval, put into "fetch-batch-requests" list
+                await task;
+            }
+        }
 
-                // At the end of the process, fetch batch requests for entries that need to be refreshed
+        private async Task Run()
+        {
+            // Immediately yield back to the caller
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-                // Upon receiving refreshing answers, if the entry was not changed, double its expiration timer.
-                // If it was changed, update the cache and reset the expiration timer.
-
-                // this dictionary holds a map between a silo address and the list of grains that need to be refreshed
-                var fetchInBatchList = new Dictionary<SiloAddress, List<GrainId>>();
-
-                // get the list of cached grains
-
-
-                // for debug only
-                int cnt1 = 0, cnt2 = 0, cnt3 = 0, cnt4 = 0;
-
-                // run through all cache entries
-                var enumerator = cache.GetStoredEntries();
-                while (enumerator.MoveNext())
+            var cancellationToken = _shutdownCts.Token;
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                try
                 {
-                    var pair = enumerator.Current;
-                    GrainId grain = pair.Key;
-                    var entry = pair.Value;
-
-                    SiloAddress owner = router.CalculateGrainDirectoryPartition(grain);
-                    if (owner == null) // Null means there's no other silo and we're shutting down, so skip this entry
+                    // recheck every X seconds (Consider making it a configurable parameter)
+                    await Task.Delay(SLEEP_TIME_BETWEEN_REFRESHES, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+                    if (cancellationToken.IsCancellationRequested)
                     {
-                        continue;
+                        break;
                     }
 
-                    if (entry == null)
+                    // Run through all cache entries and do the following:
+                    // 1. If the entry is not expired, skip it
+                    // 2. If the entry is expired and was not accessed in the last time interval -- throw it away
+                    // 3. If the entry is expired and was accessed in the last time interval, put into "fetch-batch-requests" list
+
+                    // At the end of the process, fetch batch requests for entries that need to be refreshed
+
+                    // Upon receiving refreshing answers, if the entry was not changed, double its expiration timer.
+                    // If it was changed, update the cache and reset the expiration timer.
+
+                    // this dictionary holds a map between a silo address and the list of grains that need to be refreshed
+                    var fetchInBatchList = new Dictionary<SiloAddress, List<GrainId>>();
+
+                    // get the list of cached grains
+
+                    // Stats for debugging.
+                    int ownedAndRemovedCount = 0, keptCount = 0, removedCount = 0, refreshedCount = 0;
+
+                    // run through all cache entries
+                    var enumerator = cache.GetStoredEntries();
+                    while (enumerator.MoveNext())
                     {
-                        // 0. If the entry was deleted in parallel, presumably due to cleanup after silo death
-                        cache.Remove(grain);            // for debug
-                        cnt3++;
-                    }
-                    else if (!entry.IsExpired())
-                    {
-                        // 1. If the entry is not expired, skip it
-                        cnt2++;                         // for debug
-                    }
-                    else if (entry.NumAccesses == 0)
-                    {
-                        // 2. If the entry is expired and was not accessed in the last time interval -- throw it away
-                        cache.Remove(grain);            // for debug
-                        cnt3++;
-                    }
-                    else
-                    {
-                        // 3. If the entry is expired and was accessed in the last time interval, put into "fetch-batch-requests" list
-                        if (!fetchInBatchList.TryGetValue(owner, out var list))
+                        var pair = enumerator.Current;
+                        GrainId grain = pair.Key;
+                        var entry = pair.Value;
+
+                        var owner = router.CalculateGrainDirectoryPartition(grain);
+                        if (owner == null) // Null means there's no other silo and we're shutting down, so skip this entry
                         {
-                            fetchInBatchList[owner] = list = new List<GrainId>();
+                            continue;
                         }
-                        list.Add(grain);
-                        // And reset the entry's access count for next time
-                        entry.NumAccesses = 0;
-                        cnt4++;                         // for debug
+
+                        if (entry == null)
+                        {
+                            // 0. If the entry was deleted in parallel, presumably due to cleanup after silo death
+                            cache.Remove(grain);
+                            removedCount++; // for debug
+                        }
+                        else if (!entry.IsExpired())
+                        {
+                            // 1. If the entry is not expired, skip it
+                            keptCount++; // for debug
+                        }
+                        else if (entry.NumAccesses == 0)
+                        {
+                            // 2. If the entry is expired and was not accessed in the last time interval -- throw it away
+                            cache.Remove(grain);
+                            removedCount++; // for debug
+                        }
+                        else
+                        {
+                            // 3. If the entry is expired and was accessed in the last time interval, put into "fetch-batch-requests" list
+                            if (!fetchInBatchList.TryGetValue(owner, out var list))
+                            {
+                                fetchInBatchList[owner] = list = new List<GrainId>();
+                            }
+
+                            list.Add(grain);
+                            // And reset the entry's access count for next time
+                            entry.NumAccesses = 0;
+                            refreshedCount++; // for debug
+                        }
                     }
+
+                    if (Log.IsEnabled(LogLevel.Trace))
+                        Log.LogTrace(
+                            "Silo {SiloAddress} self-owned (and removed) {OwnedAndRemovedCount}, kept {KeptCount}, removed {RemovedCount} and tried to refresh {RefreshedCount} grains",
+                            router.MyAddress,
+                            ownedAndRemovedCount,
+                            keptCount,
+                            removedCount,
+                            refreshedCount);
+
+                    // Send batch requests
+                    SendBatchCacheRefreshRequests(fetchInBatchList);
+
+                    ProduceStats();
                 }
-
-                if (Log.IsEnabled(LogLevel.Trace))
-                    Log.LogTrace(
-                        "Silo {SiloAddress} self-owned (and removed) {OwnedAndRemovedCount}, kept {KeptCount}, removed {RemovedCount} and tried to refresh {RefreshedCount} grains",
-                        router.MyAddress,
-                        cnt1,
-                        cnt2,
-                        cnt3,
-                        cnt4);
-
-                // send batch requests
-                SendBatchCacheRefreshRequests(fetchInBatchList);
-
-                ProduceStats();
-
-                // recheck every X seconds (Consider making it a configurable parameter)
-                await Task.Delay(SLEEP_TIME_BETWEEN_REFRESHES);
+                catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+                {
+                    Log.LogError(ex, $"Error in {nameof(AdaptiveDirectoryCacheMaintainer)}.");
+                }
             }
         }
 
@@ -129,7 +163,6 @@ namespace Orleans.Runtime.GrainDirectory
                 var cachedGrainAndETagList = BuildGrainAndETagList(kv.Value);
 
                 var silo = kv.Key;
-
 
                 DirectoryInstruments.ValidationsCacheSent.Add(1);
                 // Send all of the items in one large request
@@ -151,7 +184,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             if (Log.IsEnabled(LogLevel.Trace)) Log.LogTrace("Silo {SiloAddress} received ProcessCacheRefreshResponse. #Response entries {Count}.", router.MyAddress, refreshResponse.Count);
 
-            int cnt1 = 0, cnt2 = 0, cnt3 = 0;
+            int otherSiloCount = 0, updatedCount = 0, unchangedCount = 0;
 
             // pass through returned results and update the cache if needed
             foreach (var tuple in refreshResponse)
@@ -160,25 +193,28 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     // the server returned an updated entry
                     cache.AddOrUpdate(tuple.Address, tuple.VersionTag);
-                    cnt1++;
+                    otherSiloCount++;
                 }
-                else if (tuple.VersionTag == -1)
+                else if (tuple.Address is { IsComplete: false })
                 {
-                    // The server indicates that it does not own the grain anymore.
-                    // It could be that by now, the cache has been already updated and contains an entry received from another server (i.e., current owner for the grain).
-                    // For simplicity, we do not care about this corner case and simply remove the cache entry.
-                    cache.Remove(tuple.Address.GrainId);
-                    cnt2++;
-                }
-                else
-                {
-                    // The server returned only a (not -1) generation number, indicating that we hold the most
-                    // updated copy of the grain's activations list.
-                    // Validate that the generation number in the request and the response are equal
-                    // Contract.Assert(tuple.Item2 == refreshRequest.Find(o => o.Item1 == tuple.Item1).Item2);
-                    // refresh the entry in the cache
-                    cache.MarkAsFresh(tuple.Address.GrainId);
-                    cnt3++;
+                    if (tuple.VersionTag == -1)
+                    {
+                        // The server indicates that it does not own the grain anymore.
+                        // It could be that by now, the cache has been already updated and contains an entry received from another server (i.e., current owner for the grain).
+                        // For simplicity, we do not care about this corner case and simply remove the cache entry.
+                        cache.Remove(tuple.Address.GrainId);
+                        updatedCount++;
+                    }
+                    else
+                    {
+                        // The server returned only a (not -1) generation number, indicating that we hold the most
+                        // updated copy of the grain's activations list.
+                        // Validate that the generation number in the request and the response are equal
+                        // Contract.Assert(tuple.Item2 == refreshRequest.Find(o => o.Item1 == tuple.Item1).Item2);
+                        // refresh the entry in the cache
+                        cache.MarkAsFresh(tuple.Address.GrainId);
+                        unchangedCount++;
+                    }
                 }
             }
 
@@ -187,9 +223,9 @@ namespace Orleans.Runtime.GrainDirectory
                     "Silo {SiloAddress} processed refresh response from {OtherSilo} with {UpdatedCount} updated, {RemovedCount} removed, {UnchangedCount} unchanged grains",
                     router.MyAddress,
                     silo,
-                    cnt1,
-                    cnt2,
-                    cnt3);
+                    otherSiloCount,
+                    updatedCount,
+                    unchangedCount);
         }
 
         /// <summary>

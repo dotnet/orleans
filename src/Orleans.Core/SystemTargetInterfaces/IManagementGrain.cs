@@ -124,5 +124,61 @@ namespace Orleans.Runtime
         /// <param name="type">The type.</param>
         /// <returns>A list of all active grains of the specified type.</returns>
         ValueTask<List<GrainId>> GetActiveGrains(GrainType type);
+
+        /// <summary>
+        /// Gets estimated grain call frequency statistics from the specified hosts.
+        /// </summary>
+        /// <param name="hostsIds">The hosts to request grain call frequency counts from.</param>
+        /// <returns>A list of estimated grain call frequencies.</returns>
+        /// <remarks>
+        /// Note that this resulting collection does not necessarily contain all grain calls. It contains an estimation of the calls with the highest frequency.
+        /// </remarks>
+        Task<List<GrainCallFrequency>> GetGrainCallFrequencies(SiloAddress[] hostsIds = null);
+
+        /// <summary>
+        /// For testing only. Resets grain call frequency counts on the specified hosts.
+        /// </summary>
+        /// <param name="hostsIds">The hosts to invoke the operation on.</param>
+        /// <returns>A task representing the work performed.</returns>
+        ValueTask ResetGrainCallFrequencies(SiloAddress[] hostsIds = null);
+    }
+
+    /// <summary>
+    /// Represents an estimation of the frequency calls made from a source grain to a target grain.
+    /// </summary>
+    [GenerateSerializer]
+    [Alias("Orleans.Runtime.GrainCallFrequency")]
+    [Immutable]
+    public struct GrainCallFrequency
+    {
+        /// <summary>
+        /// The source grain.
+        /// </summary>
+        [Id(0)]
+        public GrainId SourceGrain { get; set; }
+
+        /// <summary>
+        /// The target grain.
+        /// </summary>
+        [Id(1)]
+        public GrainId TargetGrain { get; set; }
+
+        /// <summary>
+        /// The source host.
+        /// </summary>
+        [Id(2)]
+        public SiloAddress SourceHost { get; set; }
+
+        /// <summary>
+        /// The target host.
+        /// </summary>
+        [Id(3)]
+        public SiloAddress TargetHost { get; set; }
+
+        /// <summary>
+        /// The estimated number of calls made.
+        /// </summary>
+        [Id(4)]
+        public ulong CallCount { get; set; }
     }
 }

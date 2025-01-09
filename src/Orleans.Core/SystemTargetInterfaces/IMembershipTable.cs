@@ -347,8 +347,21 @@ namespace Orleans
 
         internal MembershipEntry Copy()
         {
-            var copy = (MembershipEntry)MemberwiseClone();
-            copy.SuspectTimes = SuspectTimes is null ? null : new(SuspectTimes);
+            var copy = new MembershipEntry
+            {
+                SiloAddress = SiloAddress,
+                Status = Status,
+                SuspectTimes = SuspectTimes is null ? null : new(SuspectTimes),
+                ProxyPort = ProxyPort,
+                HostName = HostName,
+                SiloName = SiloName,
+                RoleName = RoleName,
+                UpdateZone = UpdateZone,
+                FaultZone = FaultZone,
+                StartTime = StartTime,
+                IAmAliveTime = IAmAliveTime
+            };
+
             return copy;
         }
 

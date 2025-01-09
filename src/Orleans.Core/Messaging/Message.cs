@@ -74,7 +74,8 @@ namespace Orleans.Runtime
 
         public bool HasDirection => _headers.Direction != Directions.None;
 
-        public bool IsFullyAddressed => TargetSilo is not null && !TargetGrain.IsDefault;
+        public bool IsSenderFullyAddressed => SendingSilo is not null && !SendingGrain.IsDefault;
+        public bool IsTargetFullyAddressed => TargetSilo is not null && !TargetGrain.IsDefault;
 
         public bool IsExpired => _timeToExpiry is { IsDefault: false, ElapsedMilliseconds: > 0 };
 
@@ -92,6 +93,12 @@ namespace Orleans.Runtime
             set => _headers.SetFlag(MessageFlags.SystemMessage, value);
         }
 
+        /// <summary>
+        /// Indicates whether the message does not mutate application state and therefore whether it can be interleaved with other read-only messages.
+        /// </summary>
+        /// <remarks>
+        /// Defaults to <see langword="false"/>.
+        /// </remarks>
         public bool IsReadOnly
         {
             get => _headers.HasFlag(MessageFlags.ReadOnly);
@@ -108,6 +115,30 @@ namespace Orleans.Runtime
         {
             get => _headers.HasFlag(MessageFlags.Unordered);
             set => _headers.SetFlag(MessageFlags.Unordered, value);
+        }
+
+        /// <summary>
+        /// Whether the message is allowed to be sent to another activation of the target grain.
+        /// </summary>
+        /// <remarks>
+        /// Defaults to <see langword="false"/>.
+        /// </remarks>
+        public bool IsLocalOnly
+        {
+            get => _headers.HasFlag(MessageFlags.IsLocalOnly);
+            set => _headers.SetFlag(MessageFlags.IsLocalOnly, value);
+        }
+
+        /// <summary>
+        /// Whether the message is allowed to activate a grain and/or extend its lifetime.
+        /// </summary>
+        /// <remarks>
+        /// Defaults to <see langword="true"/>.
+        /// </remarks>
+        public bool IsKeepAlive
+        {
+            get => !_headers.HasFlag(MessageFlags.SuppressKeepAlive);
+            set => _headers.SetFlag(MessageFlags.SuppressKeepAlive, !value);
         }
 
         public CorrelationId Id
@@ -234,10 +265,8 @@ namespace Orleans.Runtime
             }
         }
 
-        public bool IsExpirableMessage(bool dropExpiredMessages)
+        public bool IsExpirableMessage()
         {
-            if (!dropExpiredMessages) return false;
-
             GrainId id = TargetGrain;
             if (id.IsDefault) return false;
 
@@ -339,6 +368,12 @@ grow:
             HasCacheInvalidationHeader = 1 << 7,
             HasTimeToLive = 1 << 8,
 
+            // Message cannot be forwarded to another activation.
+            IsLocalOnly = 1 << 9, 
+
+            // Message must not trigger grain activation or extend an activation's lifetime.
+            SuppressKeepAlive = 1 << 10,  
+
             // The most significant bit is reserved, possibly for use to indicate more data follows.
             Reserved = 1 << 15,
         }
@@ -385,7 +420,7 @@ grow:
             public void SetFlag(MessageFlags flag, bool value) => _fields = value switch
             {
                 true => _fields | (uint)flag,
-                _ => _fields & ~(uint)flag,
+                false => _fields & ~(uint)flag,
             };
         }
     }

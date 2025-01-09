@@ -16,6 +16,7 @@ using Orleans.Configuration.Overrides;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Providers.Azure;
 using Orleans.Runtime;
+using Orleans.Serialization.Serializers;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace Orleans.Storage
@@ -28,6 +29,7 @@ namespace Orleans.Storage
         private readonly AzureTableStorageOptions options;
         private readonly ClusterOptions clusterOptions;
         private readonly IGrainStorageSerializer storageSerializer;
+        private readonly IActivatorProvider activatorProvider;
         private readonly ILogger logger;
 
         private GrainStateTableDataManager tableDataManager;
@@ -40,6 +42,7 @@ namespace Orleans.Storage
 
         private const string BINARY_DATA_PROPERTY_NAME = "Data";
         private const string STRING_DATA_PROPERTY_NAME = "StringData";
+
         private readonly string name;
 
         /// <summary> Default constructor </summary>
@@ -54,6 +57,7 @@ namespace Orleans.Storage
             this.clusterOptions = clusterOptions.Value;
             this.name = name;
             this.storageSerializer = options.GrainStorageSerializer;
+            this.activatorProvider = services.GetRequiredService<IActivatorProvider>();
             this.logger = logger;
         }
 
@@ -79,6 +83,12 @@ namespace Orleans.Storage
                 grainState.RecordExists = loadedState != null;
                 grainState.State = loadedState ?? Activator.CreateInstance<T>();
                 grainState.ETag = entity.ETag.ToString();
+            }
+            else
+            {
+                grainState.RecordExists = false;
+                grainState.ETag = null;
+                grainState.State = this.activatorProvider.GetActivator<T>().Create();
             }
             // Else leave grainState in previous default condition
         }
@@ -159,6 +169,7 @@ namespace Orleans.Storage
                 else
                 {
                     await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                    grainState.State = this.activatorProvider.GetActivator<T>().Create();
                 }
 
                 grainState.ETag = entity.ETag.ToString(); // Update in-memory data to the new ETag
@@ -202,23 +213,29 @@ namespace Orleans.Storage
         /// </remarks>
         internal void ConvertToStorageFormat<T>(T grainState, TableEntity entity)
         {
-            int dataSize;
-            IEnumerable<ReadOnlyMemory<byte>> properties;
-            string basePropertyName;
+            var binaryData = storageSerializer.Serialize<T>(grainState);
 
-            // Convert to binary format
-            var data = this.storageSerializer.Serialize<T>(grainState);
-            basePropertyName = BINARY_DATA_PROPERTY_NAME;
+            CheckMaxDataSize(binaryData.ToMemory().Length, MAX_DATA_CHUNK_SIZE * MAX_DATA_CHUNKS_COUNT);
 
-            dataSize = data.ToMemory().Length;
-            properties = SplitBinaryData(data);
-
-            CheckMaxDataSize(dataSize, MAX_DATA_CHUNK_SIZE * MAX_DATA_CHUNKS_COUNT);
-
-            foreach (var keyValuePair in properties.Zip(GetPropertyNames(basePropertyName),
-                (property, name) => new KeyValuePair<string, object>(name, property.ToArray())))
+            if (options.UseStringFormat)
             {
-                entity[keyValuePair.Key] = keyValuePair.Value;
+                var properties = SplitStringData(binaryData.ToString().AsMemory());
+
+                foreach (var keyValuePair in properties.Zip(GetPropertyNames(STRING_DATA_PROPERTY_NAME),
+                (property, name) => new KeyValuePair<string, object>(name, property.ToString())))
+                {
+                    entity[keyValuePair.Key] = keyValuePair.Value;
+                }
+            }
+            else
+            {
+                var properties = SplitBinaryData(binaryData);
+
+                foreach (var keyValuePair in properties.Zip(GetPropertyNames(BINARY_DATA_PROPERTY_NAME),
+                (property, name) => new KeyValuePair<string, object>(name, property.ToArray())))
+                {
+                    entity[keyValuePair.Key] = keyValuePair.Value;
+                }
             }
         }
 
@@ -344,7 +361,8 @@ namespace Orleans.Storage
                 var input = binaryData.Length > 0
                     ? new BinaryData(binaryData)
                     : new BinaryData(stringData);
-                dataValue = this.storageSerializer.Deserialize<T>(input);
+                if(input.Length > 0)
+                    dataValue = this.storageSerializer.Deserialize<T>(input);
             }
             catch (Exception exc)
             {

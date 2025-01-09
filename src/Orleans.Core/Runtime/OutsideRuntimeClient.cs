@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +14,7 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
+using static Orleans.Internal.StandardExtensions;
 
 namespace Orleans
 {
@@ -28,15 +31,20 @@ namespace Orleans
         private bool disposed;
 
         private readonly MessagingTrace messagingTrace;
+        private readonly InterfaceToImplementationMappingCache _interfaceToImplementationMapping;
+        private IClusterConnectionStatusObserver[] _statusObservers;
 
         public IInternalGrainFactory InternalGrainFactory { get; private set; }
 
+        private ClientClusterManifestProvider _manifestProvider;
         private MessageFactory messageFactory;
         private readonly LocalClientDetails _localClientDetails;
         private readonly ILoggerFactory loggerFactory;
 
         private readonly SharedCallbackData sharedCallbackData;
-        private SafeTimer callbackTimer;
+        private readonly PeriodicTimer callbackTimer;
+        private Task callbackTimerTask;
+
         public GrainAddress CurrentActivationAddress
         {
             get;
@@ -60,8 +68,12 @@ namespace Orleans
             ILoggerFactory loggerFactory,
             IOptions<ClientMessagingOptions> clientMessagingOptions,
             MessagingTrace messagingTrace,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            TimeProvider timeProvider,
+            InterfaceToImplementationMappingCache interfaceToImplementationMapping)
         {
+            TimeProvider = timeProvider;
+            _interfaceToImplementationMapping = interfaceToImplementationMapping;
             this.ServiceProvider = serviceProvider;
             _localClientDetails = localClientDetails;
             this.loggerFactory = loggerFactory;
@@ -69,11 +81,15 @@ namespace Orleans
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
-
+            var period = Max(
+                TimeSpan.FromMilliseconds(1),
+                Min(
+                    this.clientMessagingOptions.ResponseTimeout,
+                    TimeSpan.FromSeconds(1)));
+            this.callbackTimer = new PeriodicTimer(period, timeProvider);
             this.sharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
-                this.clientMessagingOptions,
                 this.clientMessagingOptions.ResponseTimeout);
         }
 
@@ -81,33 +97,21 @@ namespace Orleans
         {
             try
             {
-                var connectionLostHandlers = this.ServiceProvider.GetServices<ConnectionToClusterLostHandler>();
-                foreach (var handler in connectionLostHandlers)
-                {
-                    this.ClusterConnectionLost += handler;
-                }
-
-                var gatewayCountChangedHandlers = this.ServiceProvider.GetServices<GatewayCountChangedHandler>();
-                foreach (var handler in gatewayCountChangedHandlers)
-                {
-                    this.GatewayCountChanged += handler;
-                }
+                _statusObservers = this.ServiceProvider.GetServices<IClusterConnectionStatusObserver>().ToArray();
+                _manifestProvider = ServiceProvider.GetRequiredService<ClientClusterManifestProvider>();
 
                 this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
                 this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
-
-                var copier = this.ServiceProvider.GetRequiredService<DeepCopier>();
                 this.localObjects = new InvokableObjectManager(
                     ServiceProvider.GetRequiredService<ClientGrainContext>(),
                     this,
-                    copier,
-                    this.messagingTrace,
-                    this.loggerFactory.CreateLogger<ClientGrainContext>());
+                    ServiceProvider.GetRequiredService<DeepCopier>(),
+                    messagingTrace,
+                    ServiceProvider.GetRequiredService<DeepCopier<Response>>(),
+                    _interfaceToImplementationMapping,
+                    loggerFactory.CreateLogger<ClientGrainContext>());
 
-                var timerLogger = this.loggerFactory.CreateLogger<SafeTimer>();
-                var minTicks = Math.Min(this.clientMessagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
-                var period = TimeSpan.FromTicks(minTicks);
-                this.callbackTimer = new SafeTimer(timerLogger, this.OnCallbackExpiryTick, null, period, period);
+                this.callbackTimerTask = Task.Run(MonitorCallbackExpiry);
 
                 this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
@@ -129,7 +133,9 @@ namespace Orleans
 
         public IServiceProvider ServiceProvider { get; private set; }
 
-        public async Task Start(CancellationToken cancellationToken)
+        public TimeProvider TimeProvider { get; }
+
+        public async Task StartAsync(CancellationToken cancellationToken)
         {
             ConsumeServices();
 
@@ -138,6 +144,28 @@ namespace Orleans
             await Task.Run(() => this.StartInternal(cancellationToken)).ConfigureAwait(false);
 
             logger.LogInformation((int)ErrorCode.ProxyClient_StartDone, "Started client with address {ActivationAddress} and id {ClientId}", CurrentActivationAddress.ToString(), _localClientDetails.ClientId);
+        }
+
+        public async Task StopAsync(CancellationToken cancellationToken)
+        {
+            this.callbackTimer.Dispose();
+
+            if (this.callbackTimerTask is { } task)
+            {
+                await task.WaitAsync(cancellationToken);
+            }
+
+            if (MessageCenter is { } messageCenter)
+            {
+                await messageCenter.StopAsync(cancellationToken);
+            }
+
+            if (_manifestProvider is { } provider)
+            {
+                await provider.StopAsync(cancellationToken);
+            }
+
+            ConstructorReset();
         }
 
         // used for testing to (carefully!) allow two clients in the same process
@@ -163,7 +191,7 @@ namespace Orleans
             this.InternalGrainFactory.CreateObjectReference<IClientGatewayObserver>(this.gatewayObserver);
 
             await ExecuteWithRetries(
-                async () => await this.ServiceProvider.GetRequiredService<ClientClusterManifestProvider>().StartAsync(),
+                _manifestProvider.StartAsync,
                 retryFilter,
                 cancellationToken);
 
@@ -239,11 +267,11 @@ namespace Orleans
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
             }
 
-            if (message.IsExpirableMessage(this.clientMessagingOptions.DropExpiredMessages))
+            if (this.clientMessagingOptions.DropExpiredMessages && message.IsExpirableMessage())
             {
                 // don't set expiration for system target messages.
                 var ttl = request.GetDefaultResponseTimeout() ?? this.clientMessagingOptions.ResponseTimeout;
-                message.TimeToLive = ttl; 
+                message.TimeToLive = ttl;
             }
 
             if (!oneWay)
@@ -313,18 +341,6 @@ namespace Orleans
             callbacks.TryRemove(id, out _);
         }
 
-        public void Reset()
-        {
-            Utils.SafeExecute(() =>
-                {
-                    if (MessageCenter != null)
-                    {
-                        MessageCenter.Stop();
-                    }
-                }, logger, "Client.Stop-Transport");
-            ConstructorReset();
-        }
-
         private void ConstructorReset()
         {
             Utils.SafeExecute(() => this.Dispose());
@@ -380,18 +396,15 @@ namespace Orleans
             if (this.disposing) return;
             this.disposing = true;
 
-            Utils.SafeExecute(() => this.callbackTimer?.Dispose());
+            Utils.SafeExecute(() => this.callbackTimer.Dispose());
 
             Utils.SafeExecute(() => MessageCenter?.Dispose());
-
-            this.ClusterConnectionLost = null;
-            this.GatewayCountChanged = null;
 
             GC.SuppressFinalize(this);
             disposed = true;
         }
 
-        public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
+        public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
         {
             foreach (var callback in callbacks)
             {
@@ -402,46 +415,68 @@ namespace Orleans
             }
         }
 
-        /// <inheritdoc />
-        public event ConnectionToClusterLostHandler ClusterConnectionLost;
-
-        /// <inheritdoc />
-        public event GatewayCountChangedHandler GatewayCountChanged;
+        public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
+            => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
 
         /// <inheritdoc />
         public void NotifyClusterConnectionLost()
         {
-            try
+            foreach (var observer in _statusObservers)
             {
-                this.ClusterConnectionLost?.Invoke(this, EventArgs.Empty);
-            }
-            catch (Exception ex)
-            {
-                this.logger.LogError((int)ErrorCode.ClientError, ex, "Error when sending cluster disconnection notification");
+                try
+                {
+                    observer.NotifyClusterConnectionLost();
+                }
+                catch (Exception ex)
+                {
+                    this.logger.LogError((int)ErrorCode.ClientError, ex, "Error sending cluster disconnection notification.");
+                }
             }
         }
 
         /// <inheritdoc />
         public void NotifyGatewayCountChanged(int currentNumberOfGateways, int previousNumberOfGateways)
         {
-            try
+            foreach (var observer in _statusObservers)
             {
-                this.GatewayCountChanged?.Invoke(this, new GatewayCountChangedEventArgs(currentNumberOfGateways, previousNumberOfGateways));
-            }
-            catch (Exception ex)
-            {
-                this.logger.LogError((int)ErrorCode.ClientError, ex, "Error when sending gateway count changed notification");
+                try
+                {
+                    observer.NotifyGatewayCountChanged(
+                        currentNumberOfGateways,
+                        previousNumberOfGateways,
+                        currentNumberOfGateways > 0 && previousNumberOfGateways <= 0);
+                }
+                catch (Exception ex)
+                {
+                    this.logger.LogError((int)ErrorCode.ClientError, ex, "Error sending gateway count changed notification.");
+                }
             }
         }
 
-        private void OnCallbackExpiryTick(object state)
+        private async Task MonitorCallbackExpiry()
         {
-            var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
-            foreach (var pair in callbacks)
+            while (await callbackTimer.WaitForNextTickAsync())
             {
-                var callback = pair.Value;
-                if (callback.IsCompleted) continue;
-                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout();
+                try
+                {
+                    var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
+                    foreach (var (_, callback) in callbacks)
+                    {
+                        if (callback.IsCompleted)
+                        {
+                            continue;
+                        }
+
+                        if (callback.IsExpired(currentStopwatchTicks))
+                        {
+                            callback.OnTimeout();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Error while processing callback expiry.");
+                }
             }
         }
 

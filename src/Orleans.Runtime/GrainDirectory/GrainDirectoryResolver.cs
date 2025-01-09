@@ -29,7 +29,7 @@ namespace Orleans.Runtime.GrainDirectory
             var services = serviceProvider.GetGrainDirectories();
             foreach (var svc in services)
             {
-                this.directoryPerName.Add(svc.Name, serviceProvider.GetRequiredKeyedService<IGrainDirectory>(svc.Name));
+                this.directoryPerName[svc.Name] = serviceProvider.GetRequiredKeyedService<IGrainDirectory>(svc.Name);
             }
 
             this.directoryPerName.TryGetValue(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, out var defaultDirectory);
@@ -43,7 +43,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public IGrainDirectory Resolve(GrainType grainType) => this.directoryPerType.GetOrAdd(grainType, this.getGrainDirectoryInternal);
 
-        public bool IsUsingDhtDirectory(GrainType grainType) => Resolve(grainType) == null;
+        public bool IsUsingDefaultDirectory(GrainType grainType) => Resolve(grainType) == null;
 
         private IGrainDirectory GetGrainDirectoryPerType(GrainType grainType)
         {

@@ -44,7 +44,7 @@ namespace Orleans.Runtime
         public override int GetHashCode() => this.Value.GetHashCode();
 
         /// <inheritdoc/>
-        public override string ToString() => this.Value.ToString();
+        public override string ToString() => Value != MinValue.Value ? $"{Value}" : "default";
 
         /// <summary>
         /// Compares the provided operands for equality.

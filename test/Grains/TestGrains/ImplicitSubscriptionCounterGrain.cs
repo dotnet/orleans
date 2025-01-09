@@ -83,4 +83,26 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
     }
+
+    [ImplicitStreamSubscription("FastSlowImplicitSubscriptionCounterGrain")]
+    public class FastImplicitSubscriptionCounterGrain : ImplicitSubscriptionCounterGrain, IFastImplicitSubscriptionCounterGrain
+    {
+        public FastImplicitSubscriptionCounterGrain(ILoggerFactory loggerFactory) : base(loggerFactory)
+        {
+        }
+    }
+
+    [ImplicitStreamSubscription("FastSlowImplicitSubscriptionCounterGrain")]
+    public class SlowImplicitSubscriptionCounterGrain : ImplicitSubscriptionCounterGrain, ISlowImplicitSubscriptionCounterGrain
+    {
+        public SlowImplicitSubscriptionCounterGrain(ILoggerFactory loggerFactory) : base(loggerFactory)
+        {
+        }
+
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
+        {
+            await Task.Delay(10_000);
+            await base.OnActivateAsync(cancellationToken);
+        }
+    }
 }

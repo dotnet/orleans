@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Metadata;
+using Orleans.Placement.Repartitioning;
 using Orleans.Providers;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.MembershipService;
@@ -59,8 +60,6 @@ namespace Orleans.Runtime.Management
 
         public async Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false)
         {
-            logger.LogInformation("GetDetailedHosts OnlyActive={OnlyActive}", onlyActive);
-
             await this.membershipTableManager.Refresh();
 
             var table = this.membershipTableManager.MembershipTableSnapshot;
@@ -370,6 +369,50 @@ namespace Orleans.Runtime.Management
             }
 
             return results;
+        }
+
+        public async Task<List<GrainCallFrequency>> GetGrainCallFrequencies(SiloAddress[] hostsIds = null)
+        {
+            if (hostsIds == null)
+            {
+                var hosts = await GetHosts(true);
+                hostsIds = [.. hosts.Keys];
+            }
+
+            var results = new List<GrainCallFrequency>();
+            foreach (var host in hostsIds)
+            {
+                var siloPartitioner = IActivationRepartitionerSystemTarget.GetReference(internalGrainFactory, host);
+                var frequencies = await siloPartitioner.GetGrainCallFrequencies();
+                foreach (var frequency in frequencies)
+                {
+                    results.Add(new GrainCallFrequency
+                    {
+                        SourceGrain = frequency.Item1.Source.Id,
+                        TargetGrain = frequency.Item1.Target.Id,
+                        SourceHost = frequency.Item1.Source.Silo,
+                        TargetHost = frequency.Item1.Target.Silo,
+                        CallCount = frequency.Item2
+                    });
+                }
+            }
+
+            return results;
+        }
+
+        public async ValueTask ResetGrainCallFrequencies(SiloAddress[] hostsIds = null)
+        {
+            if (hostsIds == null)
+            {
+                var hosts = await GetHosts(true);
+                hostsIds = [.. hosts.Keys];
+            }
+
+            foreach (var host in hostsIds)
+            {
+                var siloBalancer = IActivationRepartitionerSystemTarget.GetReference(internalGrainFactory, host);
+                await siloBalancer.ResetCounters();
+            }
         }
     }
 }

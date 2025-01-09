@@ -176,7 +176,7 @@ namespace Orleans.Runtime.Messaging
             //    connected to that gateway)
             // So, if the TargetGrain is a SystemTarget we always trust the value from Message.TargetSilo and forward
             // it to this address...
-            // EXCEPT if the value is equal to the current GatewayAdress: in this case we will return
+            // EXCEPT if the value is equal to the current GatewayAddress: in this case we will return
             // null and the local dispatcher will forward the Message to a local SystemTarget activation
             if (msg.TargetGrain.IsSystemTarget() && !IsTargetingLocalGateway(msg.TargetSilo))
             {
@@ -272,7 +272,7 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            // when this Gateway receives a message from client X to client addressale object Y
+            // when this Gateway receives a message from client X to client addressable object Y
             // it needs to record the original Gateway address through which this message came from (the address of the Gateway that X is connected to)
             // it will use this Gateway to re-route the REPLY from Y back to X.
             if (msg.SendingGrain.IsClient())
@@ -281,12 +281,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             msg.TargetSilo = null;
-            // Override the SendingSilo only if the sending grain is not
-            // a system target
-            if (!msg.SendingGrain.IsSystemTarget())
-            {
-                msg.SendingSilo = gatewayAddress;
-            }
+            msg.SendingSilo ??= gatewayAddress;
 
             client.Send(msg);
             return true;
@@ -464,7 +459,7 @@ namespace Orleans.Runtime.Messaging
         // (since clients are not registered in the directory and this Gateway may not be proxying for the client for whom the reply is destined).
         private class ClientsReplyRoutingCache
         {
-            // for every client: the Gateway to use to route repies back to it plus the last time that client connected via this Gateway.
+            // for every client: the Gateway to use to route replies back to it plus the last time that client connected via this Gateway.
             private readonly ConcurrentDictionary<GrainId, Tuple<SiloAddress, DateTime>> clientRoutes = new();
             private readonly TimeSpan TIME_BEFORE_ROUTE_CACHED_ENTRY_EXPIRES;
 

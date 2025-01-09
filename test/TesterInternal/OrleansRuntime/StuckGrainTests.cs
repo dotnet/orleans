@@ -58,13 +58,13 @@ namespace UnitTests.StuckGrainTests
             var task = stuckGrain.RunForever();
 
             // Should timeout
-            await Assert.ThrowsAsync<TimeoutException>(() => task.WithTimeout(TimeSpan.FromSeconds(1)));
+            await Assert.ThrowsAsync<TimeoutException>(() => task.WaitAsync(TimeSpan.FromSeconds(1)));
 
             var cleaner = this.fixture.GrainFactory.GetGrain<IStuckCleanGrain>(id);
             await cleaner.Release(id);
 
             // Should complete now
-            await task.WithTimeout(TimeSpan.FromSeconds(1));
+            await task.WaitAsync(TimeSpan.FromSeconds(1));
 
             // wait for activation collection
             await Task.Delay(TimeSpan.FromSeconds(6));
@@ -80,12 +80,12 @@ namespace UnitTests.StuckGrainTests
             var task = stuckGrain.RunForever();
 
             // Should timeout
-            await Assert.ThrowsAsync<TimeoutException>(() => task.WithTimeout(TimeSpan.FromSeconds(1)));
+            await Assert.ThrowsAsync<TimeoutException>(() => task.WaitAsync(TimeSpan.FromSeconds(1)));
 
             for (var i = 0; i < 3; i++)
             {
                 await Assert.ThrowsAsync<TimeoutException>(
-                    () => stuckGrain.NonBlockingCall().WithTimeout(TimeSpan.FromMilliseconds(500)));
+                    () => stuckGrain.NonBlockingCall().WaitAsync(TimeSpan.FromMilliseconds(500)));
             }
 
             // Wait so the first task will reach with DefaultCollectionAge timeout
@@ -110,11 +110,8 @@ namespace UnitTests.StuckGrainTests
             for (var i = 0; i < 3; i++)
             {
                 await Assert.ThrowsAsync<TimeoutException>(
-                    () => stuckGrain.NonBlockingCall().WithTimeout(TimeSpan.FromMilliseconds(500)));
+                    () => stuckGrain.NonBlockingCall().WaitAsync(TimeSpan.FromMilliseconds(500)));
             }
-
-            // Wait so the first task will reach with DefaultCollectionAge timeout
-            await Task.Delay(TimeSpan.FromSeconds(3));
 
             // No issue on this one
             await stuckGrain.NonBlockingCall();

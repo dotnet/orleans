@@ -6,6 +6,7 @@ using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
@@ -19,7 +20,7 @@ namespace Orleans.Runtime;
 internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExtension, IAsyncDisposable, IDisposable
 {
     private const long EnumeratorExpirationMilliseconds = 10_000; 
-    private readonly Dictionary<Guid, EnumeratorState> _enumerators = new();
+    private readonly Dictionary<Guid, EnumeratorState> _enumerators = [];
     private readonly IGrainContext _grainContext;
     private readonly MessagingOptions _messagingOptions;
     private readonly IDisposable _timer;
@@ -33,26 +34,23 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
         _grainContext = grainContext;
         _messagingOptions = messagingOptions.Value;
         var registry = _grainContext.GetComponent<ITimerRegistry>();
-        _timer = registry.RegisterTimer(
+        _timer = registry.RegisterGrainTimer(
             _grainContext,
-            static async state => await ((AsyncEnumerableGrainExtension)state).RemoveExpiredAsync(),
+            static async (state, cancellationToken) => await state.RemoveExpiredAsync(cancellationToken),
             this,
-            TimeSpan.FromSeconds(EnumeratorExpirationMilliseconds),
-            TimeSpan.FromSeconds(EnumeratorExpirationMilliseconds));
+            new()
+            {
+                DueTime = TimeSpan.FromSeconds(EnumeratorExpirationMilliseconds),
+                Period = TimeSpan.FromSeconds(EnumeratorExpirationMilliseconds),
+                Interleave = true,
+                KeepAlive = false
+            });
     }
 
     /// <inheritdoc/>
-    public ValueTask DisposeAsync(Guid requestId)
-    {
-        if (_enumerators.Remove(requestId, out var enumerator) && enumerator.Enumerator is { } value)
-        {
-            return value.DisposeAsync();
-        }
+    public ValueTask DisposeAsync(Guid requestId) => RemoveEnumeratorAsync(requestId);
 
-        return default;
-    }
-
-    public async ValueTask RemoveExpiredAsync()
+    private async ValueTask RemoveExpiredAsync(CancellationToken cancellationToken)
     {
         List<Guid> toRemove = default;
         foreach (var (requestId, state) in _enumerators)
@@ -60,7 +58,7 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
             if (state.LastSeenTimer.ElapsedMilliseconds > EnumeratorExpirationMilliseconds
                 && state.MoveNextTask is null or { IsCompleted: true })
             {
-                toRemove ??= new List<Guid>();
+                toRemove ??= [];
                 toRemove.Add(requestId);
             }
         }
@@ -70,20 +68,18 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
         {
             foreach (var requestId in toRemove)
             {
-                _enumerators.Remove(requestId, out var state);
-                state.MoveNextTask?.Ignore();
-                var disposeTask = state.Enumerator.DisposeAsync();
-                if (!disposeTask.IsCompletedSuccessfully)
+                var removeTask = RemoveEnumeratorAsync(requestId);
+                if (!removeTask.IsCompletedSuccessfully)
                 {
-                    tasks ??= new List<Task>();
-                    tasks.Add(disposeTask.AsTask());
+                    tasks ??= [];
+                    tasks.Add(removeTask.AsTask());
                 }
             }
         }
 
         if (tasks is { Count: > 0 })
         {
-            await Task.WhenAll(tasks);
+            await Task.WhenAll(tasks).WaitAsync(cancellationToken);
         }
     }
 
@@ -92,24 +88,22 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
     {
         request.SetTarget(_grainContext);
         var enumerable = request.InvokeImplementation();
-        var enumerator = enumerable.GetAsyncEnumerator();
         ref var entry = ref CollectionsMarshal.GetValueRefOrAddDefault(_enumerators, requestId, out bool exists);
         if (exists)
         {
-            return ThrowAlreadyExists(enumerator);
+            return ThrowAlreadyExists();
         }
 
+        var cts = new CancellationTokenSource();
+        var enumerator = enumerable.GetAsyncEnumerator(cts.Token);
         entry.Enumerator = enumerator;
         entry.LastSeenTimer.Restart();
         entry.MaxBatchSize = request.MaxBatchSize;
+        entry.CancellationTokenSource = cts;
         Debug.Assert(entry.MaxBatchSize > 0, "Max batch size must be positive.");
         return MoveNextAsync(ref entry, requestId, enumerator);
 
-        static async ValueTask<(EnumerationResult Status, object Value)> ThrowAlreadyExists(IAsyncEnumerator<T> enumerator)
-        {
-            await enumerator.DisposeAsync();
-            throw new InvalidOperationException("An enumerator with the same ID already exists.");
-        }
+        static ValueTask<(EnumerationResult Status, object Value)> ThrowAlreadyExists() => ValueTask.FromException<(EnumerationResult Status, object Value)>(new InvalidOperationException("An enumerator with the same id already exists."));
     }
 
     /// <inheritdoc/>
@@ -232,7 +226,7 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
                 }
                 else
                 {
-                    _enumerators.Remove(requestId);
+                    await RemoveEnumeratorAsync(requestId);
                     await typedEnumerator.DisposeAsync();
                     return (EnumerationResult.Completed, default);
                 }
@@ -242,25 +236,29 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
         }
         catch
         {
-            _enumerators.Remove(requestId);
+            await RemoveEnumeratorAsync(requestId);
             await typedEnumerator.DisposeAsync();
             throw;
         }
     }
 
+    private async ValueTask RemoveEnumeratorAsync(Guid requestId)
+    {
+        if (_enumerators.Remove(requestId, out var state))
+        {
+            await DisposeEnumeratorAsync(state);
+        }
+    }
+
     private async ValueTask<(EnumerationResult Status, object Value)> OnComplete<T>(Guid requestId, IAsyncEnumerator<T> enumerator)
     {
-        _enumerators.Remove(requestId, out var state);
-        state.MoveNextTask?.Ignore();
-        await enumerator.DisposeAsync();
+        await RemoveEnumeratorAsync(requestId);
         return (EnumerationResult.Completed, default);
     }
     
     private async ValueTask<(EnumerationResult Status, object Value)> OnError<T>(Guid requestId, IAsyncEnumerator<T> enumerator, Exception exception)
     {
-        _enumerators.Remove(requestId, out var state);
-        state.MoveNextTask?.Ignore();
-        await enumerator.DisposeAsync();
+        await RemoveEnumeratorAsync(requestId);
         ExceptionDispatchInfo.Throw(exception);
         return default;
     }
@@ -287,14 +285,41 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
 
             foreach (var enumerator in enumerators)
             {
-                if (enumerator.Enumerator is { } value)
-                {
-                    await value.DisposeAsync();
-                }
+                await DisposeEnumeratorAsync(enumerator);
             }
         }
 
         _timer.Dispose();
+    }
+
+    private async ValueTask DisposeEnumeratorAsync(EnumeratorState enumerator)
+    {
+        try
+        {
+            enumerator.CancellationTokenSource.Cancel();
+        }
+        catch (Exception exception)
+        {
+            var logger = _grainContext.GetComponent<ILogger>();
+            logger?.LogWarning(exception, "Error cancelling enumerator.");
+        }
+
+        try
+        {
+            if (enumerator.MoveNextTask is { } task)
+            {
+                if (enumerator.Enumerator is { } value)
+                {
+                    await task.SuppressThrowing();
+                    await value.DisposeAsync();
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            var logger = _grainContext.GetComponent<ILogger>();
+            logger?.LogWarning(exception, "Error disposing enumerator.");
+        }
     }
 
     /// <inheritdoc/>
@@ -309,5 +334,6 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
         public Task<bool> MoveNextTask;
         public CoarseStopwatch LastSeenTimer;
         public int MaxBatchSize;
+        internal CancellationTokenSource CancellationTokenSource;
     }
 }

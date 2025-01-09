@@ -12,6 +12,11 @@ namespace Orleans.Runtime
     internal interface IRuntimeClient
     {
         /// <summary>
+        /// Gets the time provider used by the system.
+        /// </summary>
+        TimeProvider TimeProvider { get; }
+
+        /// <summary>
         /// Grain Factory to get and cast grain references.
         /// </summary>
         IInternalGrainFactory InternalGrainFactory { get; }
@@ -51,7 +56,10 @@ namespace Orleans.Runtime
 
         IGrainReferenceRuntime GrainReferenceRuntime { get; }
 
-        void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo);
+        void BreakOutstandingMessagesToSilo(SiloAddress deadSilo);
+
+        // For testing purposes only.
+        int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType);
     }
 
     /// <summary>

@@ -174,7 +174,7 @@ On Linux and macOS, run `dotnet build` to build Orleans.
 
 The latest stable, production-quality release is located [here](https://github.com/dotnet/orleans/releases/latest).
 
-Nightly builds are published to [a NuGet feed](https://orleans.pkgs.visualstudio.com/orleans-public/_packaging/orleans-nightly/nuget/v3/index.json). These builds pass all functional tests, but are not thoroughly tested as the stable builds or pre-release builds published to NuGet.
+Nightly builds are published to [a NuGet feed](https://pkgs.dev.azure.com/dnceng/public/_packaging/orleans-nightly/nuget/v3/index.json). These builds pass all functional tests, but are not thoroughly tested as the stable builds or pre-release builds published to NuGet.
 
 <details>
 <summary>
@@ -189,7 +189,7 @@ To use nightly builds in your project, add the MyGet feed using either of the fo
 <ItemGroup>
   <RestoreSources>
     $(RestoreSources);
-    https://orleans.pkgs.visualstudio.com/orleans-public/_packaging/orleans-nightly/nuget/v3/index.json
+    https://pkgs.dev.azure.com/dnceng/public/_packaging/orleans-nightly/nuget/v3/index.json
   </RestoreSources>
 </ItemGroup>
 ```
@@ -203,7 +203,7 @@ or
 <configuration>
   <packageSources>
     <clear /> 
-    <add key="orleans-nightly" value="https://orleans.pkgs.visualstudio.com/orleans-public/_packaging/orleans-nightly/nuget/v3/index.json" />
+    <add key="orleans-nightly" value="https://pkgs.dev.azure.com/dnceng/public/_packaging/orleans-nightly/nuget/v3/index.json" />
     <add key="nuget" value="https://api.nuget.org/v3/index.json" />
   </packageSources>
 </configuration>

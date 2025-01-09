@@ -132,6 +132,7 @@ namespace Orleans.Streams
             {
                 this.expectedToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken);
             }
+
             return null;
         }
 

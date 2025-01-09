@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Data;
 using System.Linq.Expressions;
 
@@ -8,6 +8,8 @@ namespace Orleans.Clustering.AdoNet.Storage
 namespace Orleans.Persistence.AdoNet.Storage
 #elif REMINDERS_ADONET
 namespace Orleans.Reminders.AdoNet.Storage
+#elif STREAMING_ADONET
+namespace Orleans.Streaming.AdoNet.Storage
 #elif TESTER_SQLUTILS
 namespace Orleans.Tests.SqlUtils
 #else

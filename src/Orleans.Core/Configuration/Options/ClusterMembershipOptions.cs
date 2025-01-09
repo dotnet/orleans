@@ -125,5 +125,10 @@ namespace Orleans.Configuration
         /// Gets or sets a value indicating whether to enable probing silos indirectly, via other silos.
         /// </summary>
         public bool EnableIndirectProbes { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to enable membership eviction of silos when in a state of `Joining` or `Created` for longer than MaxJoinAttemptTime
+        /// </summary>
+        public bool EvictWhenMaxJoinAttemptTimeExceeded { get; set; } = true;
     }
 }

@@ -4,10 +4,13 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Runtime.Serialization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using MessagePack;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Orleans;
 
-[GenerateSerializer]
+[Alias("test.person.alias"), GenerateSerializer]
 public record Person([property: Id(0)] int Age, [property: Id(1)] string Name)
 {
     [Id(2)]
@@ -61,6 +64,11 @@ public class Person5_Class
 
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
 public sealed class MyJsonSerializableAttribute : Attribute
+{
+}
+
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+public sealed class MyNewtonsoftJsonSerializableAttribute : Attribute
 {
 }
 
@@ -389,6 +397,29 @@ namespace Orleans.Serialization.UnitTests
         public override int GetHashCode() => HashCode.Combine(IntProperty);
     }
 
+    [MyNewtonsoftJsonSerializable]
+    public class MyNewtonsoftJsonClass : MyNonJsonBaseClass, IEquatable<MyNewtonsoftJsonClass>
+    {
+        [JsonProperty]
+        public string SubTypeProperty { get; set; }
+
+        [JsonProperty]
+        public TestId Id { get; set; }
+
+        [JsonProperty]
+        public JArray JsonArray { get; set; } = new JArray(true, 42, "hello");
+
+        [JsonProperty]
+        public JObject JsonObject { get; set; } = new() { ["foo"] = "bar" };
+
+        public override string ToString() => $"{nameof(SubTypeProperty)}: {SubTypeProperty}, {base.ToString()}";
+        public bool Equals(MyNewtonsoftJsonClass other) => other is not null && base.Equals(other) && string.Equals(SubTypeProperty, other.SubTypeProperty, StringComparison.Ordinal) && EqualityComparer<TestId>.Default.Equals(Id, other.Id)
+            && string.Equals(JsonConvert.SerializeObject(JsonArray), JsonConvert.SerializeObject(other.JsonArray))
+            && string.Equals(JsonConvert.SerializeObject(JsonObject), JsonConvert.SerializeObject(other.JsonObject));
+        public override bool Equals(object obj) => Equals(obj as MyJsonClass);
+        public override int GetHashCode() => HashCode.Combine(base.GetHashCode(), SubTypeProperty);
+    }
+
     [MyJsonSerializable]
     public class MyJsonClass : MyNonJsonBaseClass, IEquatable<MyJsonClass>
     {
@@ -398,8 +429,16 @@ namespace Orleans.Serialization.UnitTests
         [JsonProperty]
         public TestId Id { get; set; }
 
+        [JsonProperty]
+        public JsonArray JsonArray { get; set; } = new JsonArray(true, 42, "hello");
+
+        [JsonProperty]
+        public JsonObject JsonObject { get; set; } = new() { ["foo"] = "bar" };
+
         public override string ToString() => $"{nameof(SubTypeProperty)}: {SubTypeProperty}, {base.ToString()}";
-        public bool Equals(MyJsonClass other) => other is not null && base.Equals(other) && string.Equals(SubTypeProperty, other.SubTypeProperty, StringComparison.Ordinal) && EqualityComparer<TestId>.Default.Equals(Id, other.Id);
+        public bool Equals(MyJsonClass other) => other is not null && base.Equals(other) && string.Equals(SubTypeProperty, other.SubTypeProperty, StringComparison.Ordinal) && EqualityComparer<TestId>.Default.Equals(Id, other.Id)
+            && string.Equals(System.Text.Json.JsonSerializer.Serialize(JsonArray), System.Text.Json.JsonSerializer.Serialize(other.JsonArray))
+            && string.Equals(System.Text.Json.JsonSerializer.Serialize(JsonObject), System.Text.Json.JsonSerializer.Serialize(other.JsonObject));
         public override bool Equals(object obj) => Equals(obj as MyJsonClass);
         public override int GetHashCode() => HashCode.Combine(base.GetHashCode(), SubTypeProperty);
     }
@@ -803,5 +842,122 @@ namespace Orleans.Serialization.UnitTests
         [Id(1)] public Type Type1;
         [Id(2)] public object UntypedValue;
         [Id(3)] public Type Type2;
+    }
+
+    public class MyFirstForeignLibraryType
+    {
+
+        public int Num { get; set; }
+        public string String { get; set; }
+        public DateTimeOffset DateTimeOffset { get; set; }
+
+        public override bool Equals(object obj) =>
+            obj is MyFirstForeignLibraryType type
+            && Num == type.Num
+            && string.Equals(String, type.String, StringComparison.Ordinal)
+            && DateTimeOffset.Equals(type.DateTimeOffset);
+
+        public override int GetHashCode() => HashCode.Combine(Num, String, DateTimeOffset);
+    }
+
+    public class MySecondForeignLibraryType
+    {
+        public string Name { get; set; }
+        public float Value { get; set; }
+        public DateTimeOffset Timestamp { get; set; }
+
+        public override bool Equals(object obj) =>
+            obj is MySecondForeignLibraryType type
+            && string.Equals(Name, type.Name, StringComparison.Ordinal)
+            && Value == type.Value
+            && Timestamp.Equals(type.Timestamp);
+
+        public override int GetHashCode() => HashCode.Combine(Name, Value, Timestamp);
+    }
+
+    [GenerateSerializer]
+    public struct MyFirstForeignLibraryTypeSurrogate
+    {
+        [Id(0)]
+        public int Num { get; set; }
+
+        [Id(1)]
+        public string String { get; set; }
+
+        [Id(2)]
+        public DateTimeOffset DateTimeOffset { get; set; }
+    }
+
+
+    [GenerateSerializer]
+    public struct MySecondForeignLibraryTypeSurrogate
+    {
+        [Id(0)]
+        public string Name { get; set; }
+
+        [Id(1)]
+        public float Value { get; set; }
+
+        [Id(2)]
+        public DateTimeOffset Timestamp { get; set; }
+    }
+
+    [RegisterConverter]
+    public sealed class MyCombinedForeignLibraryValueTypeSurrogateConverter :
+        IConverter<MyFirstForeignLibraryType, MyFirstForeignLibraryTypeSurrogate>,
+        IConverter<MySecondForeignLibraryType, MySecondForeignLibraryTypeSurrogate>
+    {
+        public MyFirstForeignLibraryType ConvertFromSurrogate(in MyFirstForeignLibraryTypeSurrogate surrogate)
+            => new() { Num = surrogate.Num, String = surrogate.String, DateTimeOffset = surrogate.DateTimeOffset };
+        public MyFirstForeignLibraryTypeSurrogate ConvertToSurrogate(in MyFirstForeignLibraryType value)
+            => new() { Num = value.Num, String = value.String, DateTimeOffset = value.DateTimeOffset };
+
+        public MySecondForeignLibraryType ConvertFromSurrogate(in MySecondForeignLibraryTypeSurrogate surrogate)
+            => new() { Name = surrogate.Name, Value = surrogate.Value, Timestamp = surrogate.Timestamp };
+        public MySecondForeignLibraryTypeSurrogate ConvertToSurrogate(in MySecondForeignLibraryType value)
+            => new() { Name = value.Name, Value = value.Value, Timestamp = value.Timestamp };
+    }
+
+    [MessagePackObject]
+    public sealed record MyMessagePackClass
+    {
+        [Key(0)]
+        public int IntProperty { get; init; }
+
+        [Key(1)]
+        public string StringProperty { get; init; }
+
+        [Key(2)]
+        public MyMessagePackSubClass SubClass { get; init; }
+
+        [Key(3)]
+        public IMyMessagePackUnion Union { get; init; }
+    }
+
+    [MessagePackObject]
+    public sealed record MyMessagePackSubClass
+    {
+        [Key(0)]
+        public Guid Id { get; init; }
+    }
+
+    [Union(0, typeof(MyMessagePackUnionVariant1))]
+    [Union(1, typeof(MyMessagePackUnionVariant2))]
+    public interface IMyMessagePackUnion
+    {
+    }
+
+    [MessagePackObject]
+    public sealed record MyMessagePackUnionVariant1 : IMyMessagePackUnion
+    {
+        [Key(0)]
+        public int IntProperty { get; init; }
+    }
+
+    [MessagePackObject]
+    public sealed record MyMessagePackUnionVariant2 : IMyMessagePackUnion
+    {
+        [Key(0)]
+        public string StringProperty { get; init; }
     }
 }

@@ -1,6 +1,8 @@
+#nullable enable
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -10,6 +12,7 @@ using Orleans.GrainReferences;
 using Orleans.Internal;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
@@ -22,7 +25,7 @@ namespace Orleans.Runtime
         private readonly Channel<Message> incomingMessages;
         private readonly IGrainReferenceRuntime grainReferenceRuntime;
         private readonly InvokableObjectManager invokableObjects;
-        private readonly IRuntimeClient runtimeClient;
+        private readonly InsideRuntimeClient runtimeClient;
         private readonly ILogger logger;
         private readonly IInternalGrainFactory grainFactory;
         private readonly MessageCenter siloMessageCenter;
@@ -31,10 +34,10 @@ namespace Orleans.Runtime
         private readonly ConcurrentDictionary<Type, object> _components = new();
         private readonly IServiceScope _serviceProviderScope;
         private bool disposing;
-        private Task messagePump;
+        private Task? messagePump;
 
         public HostedClient(
-            IRuntimeClient runtimeClient,
+            InsideRuntimeClient runtimeClient,
             ILocalSiloDetails siloDetails,
             ILogger<HostedClient> logger,
             IGrainReferenceRuntime grainReferenceRuntime,
@@ -42,7 +45,8 @@ namespace Orleans.Runtime
             MessageCenter messageCenter,
             MessagingTrace messagingTrace,
             DeepCopier deepCopier,
-            GrainReferenceActivator referenceActivator)
+            GrainReferenceActivator referenceActivator,
+            InterfaceToImplementationMappingCache interfaceToImplementationMappingCache)
         {
             this.incomingMessages = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
             {
@@ -59,6 +63,8 @@ namespace Orleans.Runtime
                 runtimeClient,
                 deepCopier,
                 messagingTrace,
+                runtimeClient.ServiceProvider.GetRequiredService<DeepCopier<Response>>(),
+                interfaceToImplementationMappingCache,
                 logger);
             this.siloMessageCenter = messageCenter;
             this.messagingTrace = messagingTrace;
@@ -79,7 +85,7 @@ namespace Orleans.Runtime
 
         public GrainId GrainId => this.ClientId.GrainId;
 
-        public object GrainInstance => null;
+        public object? GrainInstance => null;
 
         public ActivationId ActivationId => this.Address.ActivationId;
 
@@ -92,8 +98,6 @@ namespace Orleans.Runtime
         public IWorkItemScheduler Scheduler => throw new NotImplementedException();
 
         public bool IsExemptFromCollection => true;
-
-        public PlacementStrategy PlacementStrategy => null;
 
         /// <inheritdoc />
         public override string ToString() => $"{nameof(HostedClient)}_{this.Address}";
@@ -134,7 +138,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public TComponent GetComponent<TComponent>() where TComponent : class
+        public TComponent? GetComponent<TComponent>() where TComponent : class
         {
             if (this is TComponent component) return component;
             if (_components.TryGetValue(typeof(TComponent), out var result))
@@ -157,7 +161,7 @@ namespace Orleans.Runtime
             return default;
         }
 
-        public void SetComponent<TComponent>(TComponent instance) where TComponent : class
+        public void SetComponent<TComponent>(TComponent? instance) where TComponent : class
         {
             if (this is TComponent)
             {
@@ -292,7 +296,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public bool Equals(IGrainContext other) => ReferenceEquals(this, other);
+        public bool Equals(IGrainContext? other) => ReferenceEquals(this, other);
 
         public (TExtension, TExtensionInterface) GetOrSetExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
             where TExtension : class, TExtensionInterface
@@ -338,7 +342,7 @@ namespace Orleans.Runtime
             return false;
         }
 
-        private bool TryGetExtension<TExtensionInterface>(out TExtensionInterface result)
+        private bool TryGetExtension<TExtensionInterface>([NotNullWhen(true)] out TExtensionInterface? result)
             where TExtensionInterface : IGrainExtension
         {
             if (_extensions.TryGetValue(typeof(TExtensionInterface), out var existing))
@@ -380,8 +384,8 @@ namespace Orleans.Runtime
         }
 
         public TTarget GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
-        public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }
-        public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = null) { }
+        public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) { }
+        public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) { }
         public Task Deactivated => Task.CompletedTask;
 
         public void Rehydrate(IRehydrationContext context)
@@ -390,7 +394,7 @@ namespace Orleans.Runtime
             (context as IDisposable)?.Dispose();
         }
 
-        public void Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null)
+        public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
         {
             // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
         }

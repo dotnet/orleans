@@ -1,22 +1,25 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Monitors runtime and component health periodically, reporting complaints.
     /// </summary>
-    internal class Watchdog
+    internal class Watchdog(IOptions<ClusterMembershipOptions> clusterMembershipOptions, IEnumerable<IHealthCheckParticipant> participants, ILogger<Watchdog> logger) : IDisposable
     {
         private static readonly TimeSpan PlatformWatchdogHeartbeatPeriod = TimeSpan.FromMilliseconds(1000);
-        private readonly CancellationTokenSource _cancellation = new CancellationTokenSource();
-        private readonly TimeSpan _componentHealthCheckPeriod;
-        private readonly List<IHealthCheckParticipant> _participants;
-        private readonly ILogger _logger;
+        private readonly CancellationTokenSource _cancellation = new();
+        private readonly TimeSpan _componentHealthCheckPeriod = clusterMembershipOptions.Value.LocalHealthDegradationMonitoringPeriod;
+        private readonly List<IHealthCheckParticipant> _participants = participants.ToList();
+        private readonly ILogger _logger = logger;
         private ValueStopwatch _platformWatchdogStopwatch;
         private ValueStopwatch _componentWatchdogStopwatch;
 
@@ -27,18 +30,11 @@ namespace Orleans.Runtime
         private Thread? _platformWatchdogThread;
         private Thread? _componentWatchdogThread;
 
-        public Watchdog(TimeSpan watchdogPeriod, List<IHealthCheckParticipant> participants, ILogger<Watchdog> logger)
-        {
-            _logger = logger;
-            _componentHealthCheckPeriod = watchdogPeriod;
-            _participants = participants;
-        }
-
         public void Start()
         {
             if (_logger.IsEnabled(LogLevel.Debug))
             {
-                _logger.LogDebug("Starting Silo watchdog");
+                _logger.LogDebug("Starting silo watchdog");
             }
 
             if (_platformWatchdogThread is not null)
@@ -65,12 +61,18 @@ namespace Orleans.Runtime
                 IsBackground = true,
                 Name = "Orleans.Runtime.Watchdog.Component",
             };
+
             _componentWatchdogThread.Start();
+
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("Silo watchdog started successfully.");
+            }
         }
 
         public void Stop()
         {
-            _cancellation.Cancel();
+            Dispose();
         }
 
         protected void RunPlatformWatchdog()
@@ -88,7 +90,7 @@ namespace Orleans.Runtime
 
                 _platformWatchdogStopwatch.Restart();
                 _cumulativeGCPauseDuration = GC.GetTotalPauseDuration();
-                Thread.Sleep(PlatformWatchdogHeartbeatPeriod);
+                _cancellation.Token.WaitHandle.WaitOne(PlatformWatchdogHeartbeatPeriod);
             }
         }
 
@@ -134,7 +136,7 @@ namespace Orleans.Runtime
                 }
 
                 _componentWatchdogStopwatch.Restart();
-                Thread.Sleep(_componentHealthCheckPeriod);
+                _cancellation.Token.WaitHandle.WaitOne(_componentHealthCheckPeriod);
             }
         }
 
@@ -180,6 +182,36 @@ namespace Orleans.Runtime
             }
 
             _lastComponentHealthCheckTime = DateTime.UtcNow;
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                _cancellation.Cancel();
+            }
+            catch
+            {
+                // Ignore.
+            }
+
+            try
+            {
+                _componentWatchdogThread?.Join();
+            }
+            catch
+            {
+                // Ignore.
+            }
+
+            try
+            {
+                _platformWatchdogThread?.Join();
+            }
+            catch
+            {
+                // Ignore.
+            }
         }
     }
 }

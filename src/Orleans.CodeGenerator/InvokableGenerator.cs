@@ -92,8 +92,8 @@ namespace Orleans.CodeGenerator
 
             static Accessibility GetAccessibility(IMethodSymbol methodSymbol)
             {
+                Accessibility accessibility = methodSymbol.DeclaredAccessibility;
                 var t = methodSymbol.ContainingType;
-                Accessibility accessibility = t.DeclaredAccessibility;
                 while (t is not null)
                 {
                     if ((int)t.DeclaredAccessibility < (int)accessibility)
@@ -122,7 +122,7 @@ namespace Orleans.CodeGenerator
             var classDeclaration = ClassDeclaration(generatedClassName)
                 .AddBaseListTypes(SimpleBaseType(baseClassType.ToTypeSyntax(method.TypeParameterSubstitutions)))
                 .AddModifiers(Token(accessibilityKind), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
+                .AddAttributeLists(CodeGenerator.GetGeneratedCodeAttributes())
                 .AddMembers(fields);
 
             foreach (var alias in compoundTypeAliases)
@@ -226,8 +226,10 @@ namespace Orleans.CodeGenerator
             INamedTypeSymbol containingInterface,
             string methodId)
         {
-            var proxyBaseComponents = invokableId.ProxyBase.CompositeAliasComponents;
-            var alias = new CompoundTypeAliasComponent[1 + proxyBaseComponents.Length + 2];
+            var proxyBase = invokableId.ProxyBase;
+            var proxyBaseComponents = proxyBase.CompositeAliasComponents;
+            var extensionArgCount = proxyBase.IsExtension ? 1 : 0;
+            var alias = new CompoundTypeAliasComponent[1 + proxyBaseComponents.Length + extensionArgCount + 2];
             alias[0] = new("inv");
             for (var i = 0; i < proxyBaseComponents.Length; i++)
             {
@@ -235,7 +237,15 @@ namespace Orleans.CodeGenerator
             }
 
             alias[1 + proxyBaseComponents.Length] = new(containingInterface);
-            alias[1 + proxyBaseComponents.Length + 1] = new(methodId);
+
+            // For grain extensions, also explicitly include the method's containing type.
+            // This is to distinguish between different extension methods with the same id (eg, alias) but different containing types.
+            if (proxyBase.IsExtension)
+            {
+                alias[1 + proxyBaseComponents.Length + 1] = new(invokableId.Method.ContainingType);
+            }
+
+            alias[1 + proxyBaseComponents.Length + extensionArgCount + 1] = new(methodId);
             return alias;
         }
 

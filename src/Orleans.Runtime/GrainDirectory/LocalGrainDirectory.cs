@@ -1,17 +1,20 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
+using Orleans.Runtime.Scheduler;
 
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal sealed class LocalGrainDirectory : ILocalGrainDirectory, ISiloStatusListener
+    internal sealed class LocalGrainDirectory : ILocalGrainDirectory, ISiloStatusListener, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly AdaptiveDirectoryCacheMaintainer maintainer;
         private readonly ILogger log;
@@ -19,19 +22,19 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IInternalGrainFactory grainFactory;
         private readonly object writeLock = new object();
+        private readonly IServiceProvider _serviceProvider;
         private Action<SiloAddress, SiloStatus>? catalogOnSiloRemoved;
         private DirectoryMembership directoryMembership = DirectoryMembership.Default;
 
-        // Consider: move these constants into an apropriate place
+        // Consider: move these constants into an appropriate place
         internal const int HOP_LIMIT = 6; // forward a remote request no more than 5 times
         public static readonly TimeSpan RETRY_DELAY = TimeSpan.FromMilliseconds(200); // Pause 200ms between forwards to let the membership directory settle down
-
         internal bool Running;
 
         internal SiloAddress MyAddress { get; }
 
         internal IGrainDirectoryCache DirectoryCache { get; }
-        internal GrainDirectoryPartition DirectoryPartition { get; }
+        internal LocalGrainDirectoryPartition DirectoryPartition { get; }
 
         public RemoteGrainDirectory RemoteGrainDirectory { get; }
         public RemoteGrainDirectory CacheValidator { get; }
@@ -43,7 +46,7 @@ namespace Orleans.Runtime.GrainDirectory
             ILocalSiloDetails siloDetails,
             ISiloStatusOracle siloStatusOracle,
             IInternalGrainFactory grainFactory,
-            Factory<GrainDirectoryPartition> grainDirectoryPartitionFactory,
+            Factory<LocalGrainDirectoryPartition> grainDirectoryPartitionFactory,
             IOptions<DevelopmentClusterMembershipOptions> developmentClusterMembershipOptions,
             IOptions<GrainDirectoryOptions> grainDirectoryOptions,
             ILoggerFactory loggerFactory)
@@ -74,6 +77,10 @@ namespace Orleans.Runtime.GrainDirectory
 
             RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceType, loggerFactory);
             CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorType, loggerFactory);
+            var catalog = serviceProvider.GetRequiredService<Catalog>();
+            catalog.RegisterSystemTarget(RemoteGrainDirectory);
+            catalog.RegisterSystemTarget(CacheValidator);
+            SetSiloRemovedCatalogCallback(catalog.OnSiloStatusChange);
 
             // add myself to the list of members
             AddServer(MyAddress);
@@ -87,6 +94,7 @@ namespace Orleans.Runtime.GrainDirectory
                 return ring.Count == 0 ? 0 : ((float)100 / (float)ring.Count);
             });
             DirectoryInstruments.RegisterRingSizeObserve(() => this.directoryMembership.MembershipRingList.Count);
+            _serviceProvider = serviceProvider;
         }
 
         public void Start()
@@ -99,8 +107,10 @@ namespace Orleans.Runtime.GrainDirectory
             Running = true;
             if (maintainer != null)
             {
-                maintainer.Start();
+                CacheValidator.WorkItemGroup.QueueAction(maintainer.Start);
             }
+
+            siloStatusOracle.SubscribeToSiloStatusEvents(this);
         }
 
         // Note that this implementation stops processing directory change requests (Register, Unregister, etc.) when the Stop event is raised.
@@ -109,7 +119,7 @@ namespace Orleans.Runtime.GrainDirectory
         // The alternative would be to allow the silo to process requests after it has handed off its partition, in which case those changes
         // would receive successful responses but would not be reflected in the eventual state of the directory.
         // It's easy to change this, if we think the trade-off is better the other way.
-        public void Stop()
+        public async Task StopAsync()
         {
             // This will cause remote write requests to be forwarded to the silo that will become the new owner.
             // Requests might bounce back and forth for a while as membership stabilizes, but they will either be served by the
@@ -119,7 +129,10 @@ namespace Orleans.Runtime.GrainDirectory
             //mark Running as false will exclude myself from CalculateGrainDirectoryPartition(grainId)
             Running = false;
 
-            maintainer?.Stop();
+            if (maintainer is { } directoryCacheMaintainer)
+            {
+                await CacheValidator.QueueTask(directoryCacheMaintainer.StopAsync);
+            }
 
             DirectoryPartition.Clear();
             DirectoryCache.Clear();
@@ -452,6 +465,9 @@ namespace Orleans.Runtime.GrainDirectory
                 DirectoryInstruments.RegistrationsSingleActLocal.Add(1);
 
                 var result = DirectoryPartition.AddSingleActivation(address, previousAddress);
+
+                // update the cache so next local lookup will find this ActivationAddress in the cache and we will save full lookup.
+                DirectoryCache.AddOrUpdate(result.Address, result.VersionTag);
                 return result;
             }
             else
@@ -469,7 +485,7 @@ namespace Orleans.Runtime.GrainDirectory
                 if (!address.Equals(result.Address) || !IsValidSilo(address.SiloAddress)) return result;
 
                 // update the cache so next local lookup will find this ActivationAddress in the cache and we will save full lookup.
-                DirectoryCache.AddOrUpdate(address, result.VersionTag);
+                DirectoryCache.AddOrUpdate(result.Address, result.VersionTag);
 
                 return result;
             }
@@ -823,6 +839,10 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void AddOrUpdateCacheEntry(GrainId grainId, SiloAddress siloAddress) => this.DirectoryCache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
         public bool TryCachedLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address) => (address = GetLocalCacheData(grainId)) is not null;
+        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+        {
+            lifecycle.Subscribe<LocalGrainDirectory>(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => Start()), (ct) => Task.Run(() => StopAsync()));
+        }
 
         private class DirectoryMembership
         {

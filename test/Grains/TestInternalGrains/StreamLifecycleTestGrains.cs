@@ -59,10 +59,7 @@ namespace UnitTests.Grains
             return A.Equals(item.A) && B.Equals(item.B);
         }
 
-        public override int GetHashCode()
-        {
-            return (B * 397) ^ (A != null ? A.GetHashCode() : 0);
-        }
+        public override int GetHashCode() => HashCode.Combine(A, B);
     }
 
     public class AsyncObserverArg : GenericArg

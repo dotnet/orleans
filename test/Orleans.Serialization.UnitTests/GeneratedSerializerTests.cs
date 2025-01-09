@@ -6,12 +6,18 @@ using Orleans.Serialization.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using System;
-using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO.Pipelines;
 using Xunit;
 using System.Linq;
+using UnitTests.SerializerExternalModels;
+using Orleans;
+
+[assembly: GenerateCodeForDeclaringAssembly(typeof(Person2ExternalStruct))]
+#if NET6_0_OR_GREATER
+[assembly: GenerateCodeForDeclaringAssembly(typeof(Person2External))]
+#endif
 
 namespace Orleans.Serialization.UnitTests;
 
@@ -126,6 +132,116 @@ public class GeneratedSerializerTests : IDisposable
         Assert.Equal(original.FavouriteColor, result.FavouriteColor);
         Assert.Equal(original.StarSign, result.StarSign);
     }
+
+    [Fact]
+    public void GeneratedLibExternalRecordStructWithPCtorSerializersRoundTripThroughCodec()
+    {
+        var original = new Person2ExternalStruct(2, "harry")
+        {
+            FavouriteColor = "redborine",
+            StarSign = "Aquaricorn"
+        };
+
+        var result = RoundTripThroughCodec(original);
+
+        Assert.Equal(original.Age, result.Age);
+        Assert.Equal(original.Name, result.Name);
+        Assert.Equal(original.FavouriteColor, result.FavouriteColor);
+        Assert.Equal(original.StarSign, result.StarSign);
+    }
+
+#if NET6_0_OR_GREATER
+    [Fact]
+    public void GeneratedLibExternalRecordWithPCtorSerializersRoundTripThroughCodec()
+    {
+        var original = new Person2External(2, "harry")
+        {
+            FavouriteColor = "redborine",
+            StarSign = "Aquaricorn"
+        };
+
+        var result = RoundTripThroughCodec(original);
+
+        Assert.Equal(original.Age, result.Age);
+        Assert.Equal(original.Name, result.Name);
+        Assert.Equal(original.FavouriteColor, result.FavouriteColor);
+        Assert.Equal(original.StarSign, result.StarSign);
+    }
+
+    [Fact]
+    public void GeneratedLibExternalGenericRecordStructWithPCtorSerializersRoundTripThroughCodec()
+    {
+        var originalInner = new Person2External(2, "harry")
+        {
+            FavouriteColor = "redborine",
+            StarSign = "Aquaricorn"
+        };
+
+        var original = new GenericPersonExternalStruct<Person2External>(originalInner, "harry")
+        {
+            BodyParam = originalInner,
+            StarSign = "Aquaricorn"
+        };
+
+        var result = RoundTripThroughCodec(original);
+
+        Assert.Equal(original.CtorParam, result.CtorParam);
+        Assert.Equal(original.Name, result.Name);
+        Assert.Equal(original.BodyParam, result.BodyParam);
+        Assert.Equal(original.StarSign, result.StarSign);
+        Assert.Same(result.CtorParam, result.BodyParam);
+    }
+
+    [Fact]
+    public void GeneratedReadonlyLibExternalGenericRecordStructWithPCtorSerializersRoundTripThroughCodec()
+    {
+        var originalInner = new Person2External(2, "harry")
+        {
+            FavouriteColor = "redborine",
+            StarSign = "Aquaricorn"
+        };
+
+        var original = new ReadonlyGenericPersonExternalStruct<Person2External>(originalInner, "harry")
+        {
+            BodyParam = originalInner,
+            StarSign = "Aquaricorn"
+        };
+
+        var result = RoundTripThroughCodec(original);
+
+        Assert.Equal(original.CtorParam, result.CtorParam);
+        Assert.Equal(original.Name, result.Name);
+        Assert.Equal(original.BodyParam, result.BodyParam);
+        Assert.Equal(original.StarSign, result.StarSign);
+        Assert.Same(result.CtorParam, result.BodyParam);
+    }
+#endif
+
+#if NET9_0_OR_GREATER
+    [Fact]
+    public void GeneratedLibExternalGenericRecordWithPCtorSerializersRoundTripThroughCodec()
+    {
+        var originalInner = new Person2External(2, "harry")
+        {
+            FavouriteColor = "redborine",
+            StarSign = "Aquaricorn"
+        };
+
+        var original = new GenericPersonExternal<Person2External>(originalInner, "harry")
+        {
+            BodyParam = originalInner,
+            StarSign = "Aquaricorn"
+        };
+
+        var result = RoundTripThroughCodec(original);
+
+        Assert.Equal(original.CtorParam, result.CtorParam);
+        Assert.Equal(original.Name, result.Name);
+        Assert.Equal(original.BodyParam, result.BodyParam);
+        Assert.Equal(original.StarSign, result.StarSign);
+        Assert.Same(result.CtorParam, result.BodyParam);
+    }
+#endif
 
 #if NET6_0_OR_GREATER
     [Fact]
@@ -545,6 +661,18 @@ public class GeneratedSerializerTests : IDisposable
         Assert.Contains("[#3 TagDelimited Id: 2 SchemaType: Encoded RuntimeType: MyValue", formattedBitStream); // UntypedValue
         Assert.Contains("[#5 TagDelimited Id: 3 SchemaType: Expected]", formattedBitStream); // Type2
         Assert.Contains("[#7 VarInt Id: 2 SchemaType: Expected] Value: 2", formattedBitStream); // type reference from Type2 field pointing to the encoded field type of UntypedValue
+    }
+
+    [Fact]
+    public void TypeDerivedFromList()
+    {
+        var original = new SerializableClassWithCompiledBase { IntProperty = 30 };
+        original.Add(1);
+        original.Add(200);
+        var result = RoundTripThroughCodec(original);
+
+        Assert.Equal(original.IntProperty, result.IntProperty);
+        Assert.True(original.SequenceEqual(result));
     }
 
     [Fact]

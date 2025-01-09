@@ -8,6 +8,7 @@ using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -257,7 +258,11 @@ namespace Orleans.Hosting.Kubernetes
                                     }
                                     catch (Exception exception)
                                     {
-                                        _logger.LogError(exception, "Error deleting pod {PodName} in namespace {PodNamespace} corresponding to defunct silo {SiloAddress}", change.Name, _podNamespace, change.SiloAddress);
+                                        // Ignore NotFound errors, as the pod may have already been deleted by other means
+                                        if (exception is not HttpOperationException { Response.StatusCode: HttpStatusCode.NotFound })
+                                        {
+                                            _logger.LogError(exception, "Error deleting pod {PodName} in namespace {PodNamespace} corresponding to defunct silo {SiloAddress}", change.Name, _podNamespace, change.SiloAddress);
+                                        }
                                     }
                                 }
                             }
@@ -347,7 +352,7 @@ namespace Orleans.Hosting.Kubernetes
                         await Task.Delay(5000);
                     }
                 }
-                catch (Exception exception)
+                catch (Exception exception) when (!(_shutdownToken.IsCancellationRequested && exception is OperationCanceledException))
                 {
                     _logger.LogError(exception, "Error monitoring Kubernetes pods");
                     if (!_shutdownToken.IsCancellationRequested)

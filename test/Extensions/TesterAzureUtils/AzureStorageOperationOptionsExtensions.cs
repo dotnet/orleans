@@ -1,3 +1,5 @@
+using Azure.Core.Diagnostics;
+using Azure.Data.Tables;
 using Azure.Identity;
 using TestExtensions;
 
@@ -5,58 +7,39 @@ namespace Tester.AzureUtils
 {
     public static class AzureStorageOperationOptionsExtensions
     {
+        public static DefaultAzureCredential Credential = new DefaultAzureCredential();
+
         public static Orleans.Clustering.AzureStorage.AzureStorageOperationOptions ConfigureTestDefaults(this Orleans.Clustering.AzureStorage.AzureStorageOperationOptions options)
         {
-            if (TestDefaultConfiguration.UseAadAuthentication)
-            {
-                options.TableServiceClient = new(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
-            }
-            else
-            {
-                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
-            }
+            options.TableServiceClient = GetTableServiceClient();
 
             return options;
         }
 
+        public static TableServiceClient GetTableServiceClient()
+        {
+            return TestDefaultConfiguration.UseAadAuthentication
+                ? new(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential)
+                : new(TestDefaultConfiguration.DataConnectionString);
+        }
+
         public static Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions ConfigureTestDefaults(this Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions options)
         {
-            if (TestDefaultConfiguration.UseAadAuthentication)
-            {
-                options.TableServiceClient = new(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
-            }
-            else
-            {
-                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
-            }
+            options.TableServiceClient = GetTableServiceClient();
 
             return options;
         }
 
         public static Orleans.Persistence.AzureStorage.AzureStorageOperationOptions ConfigureTestDefaults(this Orleans.Persistence.AzureStorage.AzureStorageOperationOptions options)
         {
-            if (TestDefaultConfiguration.UseAadAuthentication)
-            {
-                options.TableServiceClient = new(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
-            }
-            else
-            {
-                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
-            }
+            options.TableServiceClient = GetTableServiceClient();
 
             return options;
         }
 
         public static Orleans.Reminders.AzureStorage.AzureStorageOperationOptions ConfigureTestDefaults(this Orleans.Reminders.AzureStorage.AzureStorageOperationOptions options)
         {
-            if (TestDefaultConfiguration.UseAadAuthentication)
-            {
-                options.TableServiceClient = new(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
-            }
-            else
-            {
-                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
-            }
+            options.TableServiceClient = GetTableServiceClient();
 
             return options;
         }
@@ -65,7 +48,7 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.BlobServiceClient = new(TestDefaultConfiguration.DataBlobUri, new DefaultAzureCredential());
+                options.BlobServiceClient = new(TestDefaultConfiguration.DataBlobUri, TestDefaultConfiguration.TokenCredential);
             }
             else
             {
@@ -79,7 +62,7 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.QueueServiceClient = new(TestDefaultConfiguration.DataQueueUri, new DefaultAzureCredential());
+                options.QueueServiceClient = new(TestDefaultConfiguration.DataQueueUri, TestDefaultConfiguration.TokenCredential);
             }
             else
             {
@@ -93,7 +76,7 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.BlobServiceClient = new(TestDefaultConfiguration.DataBlobUri, new DefaultAzureCredential());
+                options.BlobServiceClient = new(TestDefaultConfiguration.DataBlobUri, TestDefaultConfiguration.TokenCredential);
             }
             else
             {

@@ -40,7 +40,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 
             var implicitConsumer = this.fixture.HostedCluster.GrainFactory.GetGrain<IImplicitSubscribeGrain>(streamId.Guid);
 
-            await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.CheckCounters(new List<ITypedProducerGrain> { producer },
+            await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubscribeTestsRunner.CheckCounters(new List<ITypedProducerGrain> { producer },
                     implicitConsumer, lastTry, this.fixture.Logger), _timeout);
 
             //clean up test
@@ -70,7 +70,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             }
 
             var implicitConsumer = this.fixture.HostedCluster.GrainFactory.GetGrain<IImplicitSubscribeGrain>(streamId.Guid);
-            await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },
+            await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubscribeTestsRunner.CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },
                 implicitConsumer, lastTry, this.fixture.Logger), _timeout);
 
             //clean up test
@@ -102,7 +102,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 
             var implicitConsumer =
                 this.fixture.HostedCluster.GrainFactory.GetGrain<IImplicitSubscribeGrain>(streamId.Guid);
-            await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },
+            await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubscribeTestsRunner.CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },
                 implicitConsumer, lastTry, this.fixture.Logger), _timeout);
 
             //clean up test

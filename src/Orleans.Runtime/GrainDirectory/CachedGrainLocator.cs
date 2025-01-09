@@ -137,7 +137,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 this.shutdownToken.Cancel();
                 if (listenToClusterChangeTask != default && !ct.IsCancellationRequested)
-                    await listenToClusterChangeTask.WithCancellation(ct);
+                    await listenToClusterChangeTask.WaitAsync(ct);
             };
             lifecycle.Subscribe(nameof(CachedGrainLocator), ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
         }
@@ -167,7 +167,7 @@ namespace Orleans.Runtime.GrainDirectory
                     {
                         tasks.Add(directory.UnregisterSilos(deadSilos));
                     }
-                    await Task.WhenAll(tasks).WithCancellation(this.shutdownToken.Token);
+                    await Task.WhenAll(tasks).WaitAsync(this.shutdownToken.Token);
                 }
 
                 ((ITestAccessor)this).LastMembershipVersion = snapshot.Version;

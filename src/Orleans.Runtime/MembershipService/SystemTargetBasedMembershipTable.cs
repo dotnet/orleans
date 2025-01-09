@@ -4,12 +4,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Concurrency;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Internal;
-using Orleans.Providers;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime.MembershipService
@@ -68,7 +65,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 try
                 {
-                    await membershipTableSystemTarget.ReadAll().WithTimeout(timespan, $"MembershipGrain trying to read all content of the membership table, failed due to timeout {timespan}");
+                    await membershipTableSystemTarget.ReadAll().WaitAsync(timespan);
                     logger.LogInformation((int)ErrorCode.MembershipTableGrainInit2, "Connected to membership table provider.");
                     return;
                 }
@@ -105,14 +102,11 @@ namespace Orleans.Runtime.MembershipService
 
         public Task UpdateIAmAlive(MembershipEntry entry) => this.grain.UpdateIAmAlive(entry);
 
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
-        {
-            throw new NotImplementedException();
-        }
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => this.grain.CleanupDefunctSiloEntries(beforeDate);
     }
 
     [Reentrant]
-    internal class MembershipTableSystemTarget : SystemTarget, IMembershipTableSystemTarget
+    internal sealed class MembershipTableSystemTarget : SystemTarget, IMembershipTableSystemTarget, ILifecycleParticipant<ISiloLifecycle>
     {
         private InMemoryMembershipTable table;
         private readonly ILogger logger;
@@ -120,12 +114,14 @@ namespace Orleans.Runtime.MembershipService
         public MembershipTableSystemTarget(
             ILocalSiloDetails localSiloDetails,
             ILoggerFactory loggerFactory,
-            DeepCopier deepCopier)
+            DeepCopier deepCopier,
+            Catalog catalog)
             : base(CreateId(localSiloDetails), localSiloDetails.SiloAddress, loggerFactory)
         {
             logger = loggerFactory.CreateLogger<MembershipTableSystemTarget>();
             table = new InMemoryMembershipTable(deepCopier);
             logger.LogInformation((int)ErrorCode.MembershipGrainBasedTable1, "GrainBasedMembershipTable Activated.");
+            catalog.RegisterSystemTarget(this);
         }
 
         private static SystemTargetGrainId CreateId(ILocalSiloDetails localSiloDetails)
@@ -197,7 +193,13 @@ namespace Orleans.Runtime.MembershipService
 
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
-            throw new NotImplementedException();
+            table.CleanupDefunctSiloEntries(beforeDate);
+            return Task.CompletedTask;
+        }
+
+        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+        {
+            // Do nothing, just ensure that this instance is created so that it can register itself in the catalog.
         }
     }
 }
