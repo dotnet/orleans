@@ -5,9 +5,9 @@ using Orleans.Storage;
 
 namespace Orleans.Persistence.Migration
 {
-    public class AzureStorageOfflineMigrator
+    public class DataMigrator
     {
-        private readonly ILogger<AzureStorageOfflineMigrator> _logger;
+        private readonly ILogger<DataMigrator> _logger;
         private readonly Options _options;
 
         private readonly IGrainStorage _oldStorage;
@@ -15,8 +15,8 @@ namespace Orleans.Persistence.Migration
 
         readonly MigrationAzureTableReminderStorage _reminderMigrationStorage;
 
-        public AzureStorageOfflineMigrator(
-            ILogger<AzureStorageOfflineMigrator> logger,
+        public DataMigrator(
+            ILogger<DataMigrator> logger,
             IGrainStorage oldStorage,
             IGrainStorage newStorage,
             IReminderTable reminderTable,
@@ -39,14 +39,14 @@ namespace Orleans.Persistence.Migration
         /// </summary>
         public async Task<MigrationStats> MigrateGrainsAsync(CancellationToken cancellationToken)
         {
-            _logger.Debug("Starting offline grains migration");
+            _logger.Info("Starting grains migration");
 
             var migrationStats = new MigrationStats();
             await foreach (var storageEntry in _oldStorage.GetAll(cancellationToken))
             {
-                if (!_options.DontSkipMigrateEntries && storageEntry.MigrationEntryClient.IsMigratedEntry)
+                if (!_options.DontSkipMigrateEntries && storageEntry.MigrationEntryClient.EntryMigrationTime is not null)
                 {
-                    _logger.Debug("Entry {entryName} is already migrated", storageEntry.Name);
+                    _logger.Info("Entry {entryName} is already migrated", storageEntry.Name);
                     migrationStats.SkippedEntries++;
                     continue;
                 }
@@ -62,7 +62,7 @@ namespace Orleans.Persistence.Migration
                     }
                     catch (InconsistentStateException ex) when (ex.InnerException is Azure.RequestFailedException reqExc && reqExc.Message.StartsWith("The specified blob already exists"))
                     {
-                        _logger.Debug("Migrated blob already exists, but was not skipped: {entryName};", storageEntry.GrainReference?.GrainIdentity?.PrimaryKey);
+                        _logger.Info("Migrated blob already exists, but was not skipped: {entryName};", storageEntry.Name);
                         // ignore: we have already migrated this entry to new storage.
                     }
                     
@@ -76,7 +76,7 @@ namespace Orleans.Persistence.Migration
                 }
             }
 
-            _logger.Debug("Finished offline grains migration");
+            _logger.Info("Finished grains migration");
             return migrationStats;
         }
 
@@ -87,37 +87,54 @@ namespace Orleans.Persistence.Migration
                 throw new InvalidOperationException("Migration reminder storage is not available. Use 'UseMigrationAzureTableReminderStorage()' to register Reminder's migration component.");
             }
 
-            _logger.Debug("Starting offline reminders migration");
+            _logger.Info("Starting reminders migration");
             var migrationStats = new MigrationStats();
 
             uint currentPointer = startingGrainRefHashCode;
             while (true)
             {
-                var entries = await _reminderMigrationStorage.DefaultReminderTable.ReadRows(currentPointer, currentPointer + _options.RemindersMigrationBatchSize);
-                _logger.Debug($"Fetched batch: {entries.Reminders.Count} reminders");
-                if (entries.Reminders.Count == 0)
+                try
                 {
-                    break;
-                }
+                    var entries = await _reminderMigrationStorage.DefaultReminderTable.ReadRows(currentPointer, currentPointer + _options.RemindersMigrationBatchSize);
+                    _logger.Info($"Fetched batch: {entries.Reminders.Count} reminders");
+                    if (entries.Reminders.Count == 0)
+                    {
+                        break;
+                    }
 
-                foreach (var entry in entries.Reminders)
+                    foreach (var entry in entries.Reminders)
+                    {
+                        try
+                        {
+                            await _reminderMigrationStorage.MigrationReminderTable.UpsertRow(entry);
+                            migrationStats.MigratedEntries++;
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, $"Exception occurred during reminder '{entry.ReminderName}' migration");
+                            migrationStats.FailedEntries++;
+                        }
+                        
+                    }
+
+                    currentPointer += _options.RemindersMigrationBatchSize;
+                }
+                catch (Exception ex)
                 {
-                    await _reminderMigrationStorage.MigrationReminderTable.UpsertRow(entry);
-                    migrationStats.MigratedEntries++;
+                    _logger.LogError(ex, "Exception occurred during reminders batch processing");
+                    migrationStats.FailedEntries += _options.RemindersMigrationBatchSize;
                 }
-
-                currentPointer += _options.RemindersMigrationBatchSize;
             }
 
-            _logger.Debug("Finished offline reminders migration");
+            _logger.Info("Finished reminders migration");
             return migrationStats;
         }
 
         public class MigrationStats
         {
-            public int SkippedEntries { get; internal set; }
-            public int MigratedEntries { get; internal set; }
-            public int FailedEntries { get; internal set; }
+            public uint SkippedEntries { get; internal set; }
+            public uint MigratedEntries { get; internal set; }
+            public uint FailedEntries { get; internal set; }
         }
 
         public class Options

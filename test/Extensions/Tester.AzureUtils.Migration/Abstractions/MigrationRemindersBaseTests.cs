@@ -124,14 +124,14 @@ namespace Tester.AzureUtils.Migration.Abstractions
 
             var res = await ReminderTable.UpsertRow(reminderEntry);
 
-            var stats = await OfflineMigrator.MigrateRemindersAsync(
+            var stats = await DataMigrator.MigrateRemindersAsync(
                 CancellationToken.None,
                 startingGrainRefHashCode: grainReference.GrainIdentity.GetUniformHashCode() - 1);
 
             Assert.NotNull(stats);
             Assert.True(stats.MigratedEntries > 0);
-            Assert.Equal(0, stats.FailedEntries);
-            Assert.Equal(0, stats.SkippedEntries);
+            Assert.Equal((uint)0, stats.FailedEntries);
+            Assert.Equal((uint)0, stats.SkippedEntries);
         }
 
         private static string GenerateReminderName() => "Reminder" + Guid.NewGuid().ToString().Replace("-", "");

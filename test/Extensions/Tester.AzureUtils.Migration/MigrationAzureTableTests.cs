@@ -59,7 +59,7 @@ namespace Tester.AzureUtils.Migration
                             migrationOptions.TableName = DestinationTableName;
                         }
                     )
-                    .AddOfflineMigrator(SourceStorageName, DestinationStorageName);
+                    .AddDataMigrator(SourceStorageName, DestinationStorageName);
             }
         }   
 

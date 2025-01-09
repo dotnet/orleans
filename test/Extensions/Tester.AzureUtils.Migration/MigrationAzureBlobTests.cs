@@ -41,7 +41,7 @@ namespace Tester.AzureUtils.Migration
                         options.ConfigureTestDefaults();
                         options.ContainerName = $"destination{Guid}";
                     })
-                    .AddOfflineMigrator(SourceStorageName, DestinationStorageName);
+                    .AddDataMigrator(SourceStorageName, DestinationStorageName);
             }
         }   
 

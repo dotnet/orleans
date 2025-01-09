@@ -7,6 +7,8 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using Microsoft.Extensions.DependencyInjection;
+using FluentAssertions;
+
 
 #if NET7_0_OR_GREATER
 using Orleans.Persistence.Migration;
@@ -107,15 +109,27 @@ namespace Tester.AzureUtils.Migration.Abstractions
         {
             var originalEntries = await GenerateGrainsAndSaveAsync(n: 5);
 
-            var stats = await OfflineMigrator.MigrateGrainsAsync(CancellationToken.None);
+            var stats = await DataMigrator.MigrateGrainsAsync(CancellationToken.None);
             Assert.True(stats.MigratedEntries >= 5);
-            Assert.Equal(0, stats.SkippedEntries);
-            Assert.Equal(0, stats.FailedEntries);
+            Assert.Equal((uint)0, stats.SkippedEntries);
+            Assert.Equal((uint)0, stats.FailedEntries);
 
-            var stats2 = await OfflineMigrator.MigrateGrainsAsync(CancellationToken.None);
-            Assert.Equal(0, stats2.MigratedEntries);
+            var stats2 = await DataMigrator.MigrateGrainsAsync(CancellationToken.None);
+            Assert.Equal((uint)0, stats2.MigratedEntries);
             Assert.True(stats2.SkippedEntries >= 5);
-            Assert.Equal(0, stats2.FailedEntries);
+            Assert.Equal((uint)0, stats2.FailedEntries);
+
+            // ensure all of the source storage entries have a metadata of "migrationTime" on them
+            // in debug purposes and for future reruns
+            var currentTime = DateTime.UtcNow;
+
+            await foreach (var storageEntry in SourceStorage.GetAll(CancellationToken.None))
+            {
+                // entry migration time has to exist on every entry
+                // and be somewhat around the current time (same date for simplicity)
+                Assert.True(storageEntry.MigrationEntryClient.EntryMigrationTime.HasValue);
+                Assert.True(storageEntry.MigrationEntryClient.EntryMigrationTime!.Value.Date == currentTime.Date);
+            }
         }
 #endif
 

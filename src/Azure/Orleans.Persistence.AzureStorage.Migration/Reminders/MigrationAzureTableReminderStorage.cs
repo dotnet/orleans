@@ -32,11 +32,7 @@ namespace Orleans.Persistence.AzureStorage.Migration.Reminders
             MigrationReminderTable = new MigrationAzureBasedReminderTable(grainReferenceConverter, grainReferenceExtractor, loggerFactory, clusterOptions, migratedStorageOptions);
         }
 
-        public async Task Init()
-        {
-            await MigrationReminderTable.Init();
-            await DefaultReminderTable.Init();
-        }
+        public Task Init() => Task.WhenAll(MigrationReminderTable.Init(), DefaultReminderTable.Init());
 
         public async Task<string> UpsertRow(ReminderEntry entry)
         {

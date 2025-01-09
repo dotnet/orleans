@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans.Runtime;
+using Orleans.Serialization.WireProtocol;
 using Orleans.Storage;
 
 namespace Orleans.Persistence.Migration
@@ -34,10 +35,14 @@ namespace Orleans.Persistence.Migration
         private readonly IGrainStorage _sourceStorage;
         private readonly IGrainStorage _destinationStorage;
 
-        public MigrationGrainStorage(IGrainStorage sourceStorage, IGrainStorage destinationStorage)
+        private readonly bool _writeToDestinationOnly;
+
+        public MigrationGrainStorage(IGrainStorage sourceStorage, IGrainStorage destinationStorage, bool writeToDestinationOnly)
         {
-            this._sourceStorage = sourceStorage;
-            this._destinationStorage = destinationStorage;
+            _sourceStorage = sourceStorage;
+            _destinationStorage = destinationStorage;
+
+            _writeToDestinationOnly = writeToDestinationOnly;
         }
 
         public async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
@@ -68,13 +73,22 @@ namespace Orleans.Persistence.Migration
             var etag = new MigrationEtag();
             if (grainState.RecordExists)
             {
-                var eTag = MigrationEtag.ParseFromJson(grainState.ETag);
-                grainState.ETag = eTag.DestinationETag;
+                etag = MigrationEtag.ParseFromJson(grainState.ETag);
             }
+
             try
             {
+                // destination storage
+                grainState.ETag = grainState.RecordExists ? etag.DestinationETag : default;
                 await _destinationStorage.WriteStateAsync(grainType, grainReference, grainState);
                 etag.DestinationETag = grainState.ETag;
+
+                if (!_writeToDestinationOnly) // enabled writing to source storage as well
+                {
+                    grainState.ETag = grainState.RecordExists ? etag.SourceETag : default;
+                    await _sourceStorage.WriteStateAsync(grainType, grainReference, grainState);
+                    etag.SourceETag = grainState.ETag;
+                }
             }
             finally
             {
@@ -89,16 +103,28 @@ namespace Orleans.Persistence.Migration
             var options = serviceProvider
                 .GetRequiredService<IOptionsMonitor<MigrationGrainStorageOptions>>()
                 .Get(name);
+
             var source = serviceProvider.GetRequiredServiceByName<IGrainStorage>(options.SourceStorageName);
             var destination = serviceProvider.GetRequiredServiceByName<IGrainStorage>(options.DestinationStorageName);
-            return new MigrationGrainStorage(source, destination);
+
+            return new MigrationGrainStorage(source, destination, options.WriteToDestinationOnly);
         }
     }
 
+    /// <summary>
+    /// Configuration to control migration grain storage behavior
+    /// </summary>
     public class MigrationGrainStorageOptions
     {
         public string SourceStorageName { get; set; }
 
         public string DestinationStorageName { get; set; }
+
+        /// <summary>
+        /// When true, will only write to the destination storage (not to source storage).
+        /// False by default (writes to both source and destination). <br/>
+        /// Should be enabled in later stages of migration (when the source storage is already a fallback option).
+        /// </summary>
+        public bool WriteToDestinationOnly { get; set; } = false;
     }
 }
