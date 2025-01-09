@@ -6,7 +6,6 @@ using Xunit;
 using Azure.Data.Tables;
 using TestExtensions;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.TestingHost;
 using Orleans.Reminders.AzureStorage.Storage.Reminders;
 using Orleans.Runtime.ReminderService;
 
@@ -58,7 +57,8 @@ namespace Tester.AzureUtils.Migration.Abstractions
                 Period = TimeSpan.FromMinutes(1)
             };
 
-            var res = await ReminderTable.UpsertRow(reminderEntry);
+            var reminderTable = await GetAndInitReminderTableAsync();
+            var res = await reminderTable.UpsertRow(reminderEntry);
 
             var migratedTableClient = GetMigratedTableClient();
             var migratedFetchedEntry = migratedTableClient.Query<ReminderTableEntry>(x => x.RowKey == migrationEntryRowKey).FirstOrDefault();
@@ -94,15 +94,16 @@ namespace Tester.AzureUtils.Migration.Abstractions
                 Period = TimeSpan.FromMinutes(1)
             };
 
-            var res = await ReminderTable.UpsertRow(reminderEntry);
-            var readEntry = await ReminderTable.ReadRow(grainReference, reminderName);
+            var reminderTable = await GetAndInitReminderTableAsync();
+            var res = await reminderTable.UpsertRow(reminderEntry);
+            var readEntry = await reminderTable.ReadRow(grainReference, reminderName);
             Assert.NotNull(readEntry);
             Assert.Equal(grainReference.GrainIdentity.PrimaryKey, readEntry.GrainRef.GrainIdentity.PrimaryKey);
             Assert.Equal(reminderName, readEntry.ReminderName);
         }
 
         [Fact]
-        public async Task OfflineMigrator_ProperlyMigratesData()
+        public async Task DataMigrator_ProperlyMigratesData()
         {
             var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(100);
             var grainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
@@ -122,7 +123,8 @@ namespace Tester.AzureUtils.Migration.Abstractions
                 Period = TimeSpan.FromMinutes(1)
             };
 
-            var res = await ReminderTable.UpsertRow(reminderEntry);
+            var reminderTable = await GetAndInitReminderTableAsync();
+            var res = await reminderTable.UpsertRow(reminderEntry);
 
             var stats = await DataMigrator.MigrateRemindersAsync(
                 CancellationToken.None,

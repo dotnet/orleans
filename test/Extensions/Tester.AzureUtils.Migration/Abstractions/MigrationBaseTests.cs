@@ -93,20 +93,19 @@ namespace Tester.AzureUtils.Migration.Abstractions
             }
         }
 
-        private IReminderTable? reminderTable;
-        protected IReminderTable ReminderTable
+#if NET7_0_OR_GREATER
+        private IReminderMigrationTable? reminderTable;
+        protected async Task<IReminderMigrationTable> GetAndInitReminderTableAsync()
         {
-            get
+            if (reminderTable == null)
             {
-                if (reminderTable == null)
-                {
-                    reminderTable = ServiceProvider.GetRequiredService<IReminderTable>();
-                }
-                return reminderTable;
+                reminderTable = ServiceProvider.GetRequiredService<IReminderMigrationTable>();
+                await reminderTable.Init();
             }
+
+            return reminderTable;
         }
 
-#if NET7_0_OR_GREATER
         private DataMigrator? dataMigrator;
         protected DataMigrator DataMigrator
         {

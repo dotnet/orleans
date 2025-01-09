@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <PackageReference Include="System.Memory.Data" Version="7.0.0" />
+    <PackageReference Include="Azure.Core" Version="$(AzureCoreVersion)" />
   </ItemGroup>
 
 </Project>

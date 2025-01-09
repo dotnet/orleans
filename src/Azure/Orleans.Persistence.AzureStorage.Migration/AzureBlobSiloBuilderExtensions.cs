@@ -128,7 +128,7 @@ namespace Orleans.Hosting
                     sp.GetService<ILogger<DataMigrator>>(),
                     sp.GetRequiredServiceByName<IGrainStorage>(oldStorageName),
                     sp.GetRequiredServiceByName<IGrainStorage>(newStorageName),
-                    sp.GetService<IReminderTable>(),
+                    sp.GetService<IReminderMigrationTable>(),
                     options);
             });
         }
@@ -173,7 +173,7 @@ namespace Orleans.Hosting
             Action<AzureTableReminderStorageOptions> configureStorageOptions,
             Action<AzureTableMigrationReminderStorageOptions> configureMigratedStorageOptions)
         {
-            services.AddSingleton<IReminderTable, MigrationAzureTableReminderStorage>();
+            services.AddSingleton<IReminderMigrationTable, MigrationAzureTableReminderStorage>();
             services.Configure<AzureTableReminderStorageOptions>(configureStorageOptions);
             services.Configure<AzureTableMigrationReminderStorageOptions>(configureMigratedStorageOptions);
             services.ConfigureFormatter<AzureTableReminderStorageOptions>();

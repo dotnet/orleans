@@ -15,10 +15,10 @@ namespace Orleans.Persistence.AzureStorage.Migration.Reminders
     /// Simple storage provider for writing grain state data to Azure blob storage in JSON format.
     /// Implementation impacts management of migrated and current data.
     /// </summary>
-    public class MigrationAzureTableReminderStorage : IReminderTable
+    public class MigrationAzureTableReminderStorage : IReminderMigrationTable
     {
-        internal IReminderTable DefaultReminderTable { get; }
-        internal IReminderTable MigrationReminderTable { get; }
+        public IReminderTable SourceReminderTable { get; }
+        public IReminderTable DestinationReminderTable { get; }
 
         public MigrationAzureTableReminderStorage(
             IGrainReferenceConverter grainReferenceConverter,
@@ -28,28 +28,32 @@ namespace Orleans.Persistence.AzureStorage.Migration.Reminders
             IOptions<AzureTableReminderStorageOptions> oldStorageOptions,
             IOptions<AzureTableMigrationReminderStorageOptions> migratedStorageOptions)
         {
-            DefaultReminderTable = new AzureBasedReminderTable(grainReferenceConverter, loggerFactory, clusterOptions, oldStorageOptions);
-            MigrationReminderTable = new MigrationAzureBasedReminderTable(grainReferenceConverter, grainReferenceExtractor, loggerFactory, clusterOptions, migratedStorageOptions);
+            SourceReminderTable = new AzureBasedReminderTable(grainReferenceConverter, loggerFactory, clusterOptions, oldStorageOptions);
+            DestinationReminderTable = new MigrationAzureBasedReminderTable(grainReferenceConverter, grainReferenceExtractor, loggerFactory, clusterOptions, migratedStorageOptions);
         }
 
-        public Task Init() => Task.WhenAll(MigrationReminderTable.Init(), DefaultReminderTable.Init());
+        public async Task Init()
+        {
+            await SourceReminderTable.Init();
+            await DestinationReminderTable.Init();
+        }
 
         public async Task<string> UpsertRow(ReminderEntry entry)
         {
-            await MigrationReminderTable.UpsertRow(entry);
-            return await DefaultReminderTable.UpsertRow(entry);
+            await DestinationReminderTable.UpsertRow(entry);
+            return await SourceReminderTable.UpsertRow(entry);
         }
 
         public async Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag)
         {
-            await MigrationReminderTable.RemoveRow(grainRef, reminderName, eTag);
-            return await DefaultReminderTable.RemoveRow(grainRef, reminderName, eTag);
+            await DestinationReminderTable.RemoveRow(grainRef, reminderName, eTag);
+            return await SourceReminderTable.RemoveRow(grainRef, reminderName, eTag);
         }
 
-        public Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName) => DefaultReminderTable.ReadRow(grainRef, reminderName);
-        public Task<ReminderTableData> ReadRows(GrainReference key) => DefaultReminderTable.ReadRows(key);
-        public Task<ReminderTableData> ReadRows(uint begin, uint end) => DefaultReminderTable.ReadRows(begin, end);
-        public Task TestOnlyClearTable() => DefaultReminderTable.TestOnlyClearTable();
+        public Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName) => SourceReminderTable.ReadRow(grainRef, reminderName);
+        public Task<ReminderTableData> ReadRows(GrainReference key) => SourceReminderTable.ReadRows(key);
+        public Task<ReminderTableData> ReadRows(uint begin, uint end) => SourceReminderTable.ReadRows(begin, end);
+        public Task TestOnlyClearTable() => SourceReminderTable.TestOnlyClearTable();
 
         private class MigrationAzureBasedReminderTable : AzureBasedReminderTable
         {

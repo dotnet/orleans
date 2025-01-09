@@ -1,5 +1,5 @@
+using Azure;
 using Microsoft.Extensions.Logging;
-using Orleans.Persistence.AzureStorage.Migration.Reminders;
 using Orleans.Runtime;
 using Orleans.Storage;
 
@@ -13,13 +13,13 @@ namespace Orleans.Persistence.Migration
         private readonly IGrainStorage _oldStorage;
         private readonly IGrainStorage _newStorage;
 
-        readonly MigrationAzureTableReminderStorage _reminderMigrationStorage;
+        readonly IReminderMigrationTable _reminderMigrationStorage;
 
         public DataMigrator(
             ILogger<DataMigrator> logger,
             IGrainStorage oldStorage,
             IGrainStorage newStorage,
-            IReminderTable reminderTable,
+            IReminderMigrationTable reminderMigrationTable,
             Options options)
         {
             _logger = logger;
@@ -28,9 +28,7 @@ namespace Orleans.Persistence.Migration
             _oldStorage = oldStorage;
             _newStorage = newStorage;
 
-            _reminderMigrationStorage = reminderTable is MigrationAzureTableReminderStorage migrationAzureTableReminderStorage
-                ? migrationAzureTableReminderStorage
-                : null;
+            _reminderMigrationStorage = reminderMigrationTable;
         }
 
         /// <summary>
@@ -60,7 +58,8 @@ namespace Orleans.Persistence.Migration
                     {
                         await _newStorage.WriteStateAsync(storageEntry.Name, storageEntry.GrainReference, storageEntry.GrainState);
                     }
-                    catch (InconsistentStateException ex) when (ex.InnerException is Azure.RequestFailedException reqExc && reqExc.Message.StartsWith("The specified blob already exists"))
+                    // guarding against any exception which can happen against different storages (i.e. storage/cosmos/etc) here
+                    catch (InconsistentStateException ex) when (ex.InnerException is RequestFailedException reqExc && reqExc.Message.StartsWith("The specified blob already exists"))
                     {
                         _logger.Info("Migrated blob already exists, but was not skipped: {entryName};", storageEntry.Name);
                         // ignore: we have already migrated this entry to new storage.
@@ -95,7 +94,7 @@ namespace Orleans.Persistence.Migration
             {
                 try
                 {
-                    var entries = await _reminderMigrationStorage.DefaultReminderTable.ReadRows(currentPointer, currentPointer + _options.RemindersMigrationBatchSize);
+                    var entries = await _reminderMigrationStorage.SourceReminderTable.ReadRows(currentPointer, currentPointer + _options.RemindersMigrationBatchSize);
                     _logger.Info($"Fetched batch: {entries.Reminders.Count} reminders");
                     if (entries.Reminders.Count == 0)
                     {
@@ -106,7 +105,7 @@ namespace Orleans.Persistence.Migration
                     {
                         try
                         {
-                            await _reminderMigrationStorage.MigrationReminderTable.UpsertRow(entry);
+                            await _reminderMigrationStorage.DestinationReminderTable.UpsertRow(entry);
                             migrationStats.MigratedEntries++;
                         }
                         catch (Exception ex)
