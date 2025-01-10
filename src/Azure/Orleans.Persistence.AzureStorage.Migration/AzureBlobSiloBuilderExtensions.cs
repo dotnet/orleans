@@ -108,32 +108,6 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure a component to migrate inner data in storages
-        /// </summary>
-        public static ISiloBuilder AddDataMigrator(this ISiloBuilder builder, string oldStorage, string newStorage, DataMigrator.Options options = null)
-            => builder.ConfigureServices(services => services.AddDataMigrator(oldStorage, newStorage, options));
-
-        /// <summary>
-        /// Configure a component to migrate inner data in storages
-        /// </summary>
-        public static IServiceCollection AddDataMigrator(
-            this IServiceCollection services,
-            string oldStorageName,
-            string newStorageName,
-            DataMigrator.Options options = null)
-        {
-            return services.AddSingleton(sp =>
-            {
-                return new DataMigrator(
-                    sp.GetService<ILogger<DataMigrator>>(),
-                    sp.GetRequiredServiceByName<IGrainStorage>(oldStorageName),
-                    sp.GetRequiredServiceByName<IGrainStorage>(newStorageName),
-                    sp.GetService<IReminderMigrationTable>(),
-                    options);
-            });
-        }
-
-        /// <summary>
         /// Configure silo to use azure blob storage for grain storage.
         /// </summary>
         public static IServiceCollection AddMigrationAzureBlobGrainStorage(this IServiceCollection services, string name,

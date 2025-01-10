@@ -1,4 +1,4 @@
-#if NET70
+#if NET7_0_OR_GREATER
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.Persistence.Migration;

@@ -1,4 +1,7 @@
+#if NET8_0_OR_GREATER
 using Orleans.Hosting;
+using Orleans.Persistence.Cosmos.Migration;
+using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
 using Tester.AzureUtils.Migration.Abstractions;
 using Xunit;
@@ -9,9 +12,6 @@ namespace Tester.AzureUtils.Migration
     public class MigrationAzureCosmosTests : MigrationCosmosTests, IClassFixture<MigrationAzureCosmosTests.Fixture>
     {
         public static Guid Guid = Guid.NewGuid();
-
-        //public static string OldTableName => $"source{Guid.ToString().Replace("-", "")}";
-        //public static string DestinationTableName => $"destination{Guid.ToString().Replace("-", "")}";
 
         public MigrationAzureCosmosTests(Fixture fixture) : base(fixture)
         {
@@ -29,39 +29,26 @@ namespace Tester.AzureUtils.Migration
         {
             public void Configure(ISiloBuilder siloBuilder)
             {
-                // siloBuilder
-                    //// needed for the OfflineMigrator
-                    //.AddMigrationGrainStorageAsDefault(options =>
-                    //{
-                    //    options.SourceStorageName = SourceStorageName;
-                    //    options.DestinationStorageName = DestinationStorageName;
-                    //})
-                    //.AddAzureBlobGrainStorage(SourceStorageName, options =>
-                    //{
-                    //    options.ConfigureTestDefaults();
-                    //    options.ContainerName = $"source{Guid}";
-                    //})
-                    //.AddMigrationAzureBlobGrainStorage(DestinationStorageName, options =>
-                    //{
-                    //    options.ConfigureTestDefaults();
-                    //    options.ContainerName = $"destination{Guid}";
-                    //})
-                    //// -------------------------------------
-                    //.AddMigrationTools()
-                    //.UseMigrationAzureTableReminderStorage(
-                    //    oldStorageOptions =>
-                    //    {
-                    //        oldStorageOptions.ConfigureTestDefaults();
-                    //        oldStorageOptions.TableName = OldTableName;
-                    //    },
-                    //    migrationOptions =>
-                    //    {
-                    //        migrationOptions.ConfigureTestDefaults();
-                    //        migrationOptions.TableName = DestinationTableName;
-                    //    }
-                    //)
-                    //.AddDataMigrator(SourceStorageName, DestinationStorageName);
+                siloBuilder
+                    .AddMigrationTools()
+                    .AddMigrationGrainStorageAsDefault(options =>
+                    {
+                        options.SourceStorageName = SourceStorageName;
+                        options.DestinationStorageName = DestinationStorageName;
+                    })
+                    .AddCosmosGrainStorage(SourceStorageName, options =>
+                    {
+                        options.ContainerName = $"source{Guid}";
+                        options.ConfigureCosmosClient(""); // TODO secret here!
+                    })
+                    .AddMigrationAzureCosmosGrainStorage(DestinationStorageName, options =>
+                    {
+                        options.ContainerName = $"destination{Guid}";
+                        options.ConfigureCosmosClient(""); // TODO secret here!
+                    })
+                    .AddDataMigrator(SourceStorageName, DestinationStorageName);
             }
         }
     }
 }
+#endif

@@ -1,3 +1,4 @@
+#if NET7_0_OR_GREATER
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
@@ -8,18 +9,15 @@ using TestExtensions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Reminders.AzureStorage.Storage.Reminders;
 using Orleans.Runtime.ReminderService;
-
-#if NET7_0_OR_GREATER
-using Orleans.Persistence.AzureStorage.Migration.Reminders.Storage;
 using Orleans.Persistence.Migration;
-
+using Orleans.Persistence.AzureStorage.Migration.Reminders.Storage;
 
 namespace Tester.AzureUtils.Migration.Abstractions
 {
     public abstract class MigrationRemindersBaseTests : MigrationBaseTests
     {
-        private MigratedReminderTableEntryBuilder? migrationEntryBuilder;
-        protected MigratedReminderTableEntryBuilder MigrationEntryBuilder
+        private IReminderTableEntryBuilder? migrationEntryBuilder;
+        protected IReminderTableEntryBuilder MigrationEntryBuilder
         {
             get
             {

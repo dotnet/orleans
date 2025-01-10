@@ -1,4 +1,4 @@
-﻿// <copyright file="CosmosStorageFactory.cs" company="Microsoft">
+// <copyright file="CosmosStorageFactory.cs" company="Microsoft">
 // Copyright (c) Microsoft. All rights reserved.
 // </copyright>
 
