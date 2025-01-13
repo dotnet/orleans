@@ -24,6 +24,7 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <ProjectReference Include="..\..\Grains\TestGrainsNet8\TestGrainsNet8.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Persistence.Migration\Orleans.Persistence.Migration.csproj" />
     <ProjectReference Include="..\..\..\src\Azure\Orleans.Persistence.Cosmos.Migration\Orleans.Persistence.Cosmos.Migration.csproj" />
     <ProjectReference Include="..\..\..\src\Azure\Orleans.Persistence.AzureStorage.Migration\Orleans.Persistence.AzureStorage.Migration.csproj" />

@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <NoWarn>$(NoWarn);1591;1591;618</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Misc\TestInterfaces\TestInterfaces.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Misc\TestFSharpInterfaces\TestFSharpInterfaces.fsproj" />
+    <ProjectReference Include="..\..\..\src\Azure\Orleans.Persistence.Cosmos.Migration\Orleans.Persistence.Cosmos.Migration.csproj" />
+  </ItemGroup>
+</Project>

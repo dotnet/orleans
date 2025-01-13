@@ -11,6 +11,10 @@ using Orleans.Configuration;
 using Orleans.Persistence.Migration;
 #endif
 
+#if NET8_0_OR_GREATER
+using Orleans.Persistence.Cosmos;
+#endif
+
 namespace Tester.AzureUtils.Migration.Abstractions
 {
     public abstract class MigrationBaseTests
@@ -117,5 +121,19 @@ namespace Tester.AzureUtils.Migration.Abstractions
         }
 #endif
 
+#if NET8_0_OR_GREATER
+        private IDocumentIdProvider? cosmosDocumentIdProvider;
+        protected IDocumentIdProvider DocumentIdProvider
+        {
+            get
+            {
+                if (this.cosmosDocumentIdProvider == null)
+                {
+                    this.cosmosDocumentIdProvider = ServiceProvider.GetServiceByName<IDocumentIdProvider>(DestinationStorageName) ?? ServiceProvider.GetRequiredService<IDocumentIdProvider>();
+                }
+                return this.cosmosDocumentIdProvider;
+            }
+        }
+#endif
     }
 }

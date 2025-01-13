@@ -24,9 +24,7 @@ namespace Tester.AzureUtils.Migration.Grains
     /// <summary>
     /// A simple grain that allows to set two arguments and then multiply them.
     /// </summary>
-#if NET8_0_OR_GREATER
-    [Orleans.Persistence.Cosmos.GrainType("Tester.AzureUtils.Migration.Grains.MigrationTestGrain")]
-#endif
+    [Orleans.Persistence.Cosmos.GrainType("migrationtestgrain")]
     public class MigrationTestGrain : Grain<MigrationTestGrain_State>, ISimplePersistentMigrationGrain
     {
         private ILogger logger;

@@ -1,59 +1,92 @@
+#if NET8_0_OR_GREATER
 using Orleans;
-using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.Storage;
-using Orleans.TestingHost;
-using UnitTests.GrainInterfaces;
-using UnitTests.Grains;
 using Xunit;
-using Microsoft.Extensions.DependencyInjection;
-using FluentAssertions;
-
-
-#if NET7_0_OR_GREATER
-using Orleans.Persistence.Migration;
-#endif
+using Tester.AzureUtils.Migration.Grains;
+using Microsoft.Azure.Cosmos;
+using TestExtensions;
+using Tester.AzureUtils.Migration.Helpers;
 
 namespace Tester.AzureUtils.Migration.Abstractions
 {
-    public abstract class MigrationGrainsReadonlyOriginalStorageTests : MigrationGrainsTests
+    public abstract class MigrationGrainsReadonlyOriginalStorageTests : MigrationBaseTests
     {
+        readonly CosmosClient _cosmosClient;
+
         protected MigrationGrainsReadonlyOriginalStorageTests(BaseAzureTestClusterFixture fixture)
             : base(fixture)
         {
+            _cosmosClient = new CosmosClient(TestDefaultConfiguration.CosmosConnectionString);
         }
 
         [Fact]
-        public async Task ReadFromSourceThenWriteToTargetTest_OnlyWritesToDestinationStorage()
+        public async Task ReadFromSourceTest()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(1300);
-            var oldGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
-            var newState = new SimplePersistentGrain_State { A = 20, B = 30 };
-            var stateName = typeof(SimplePersistentGrain).FullName;
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(100);
+            var grainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
+            var stateName = typeof(MigrationTestGrain).FullName;
 
             // Write directly to source storage
+            await SourceStorage.WriteStateAsync(stateName, (GrainReference)grain, grainState);
+
+            Assert.Equal(grainState.State.A, await grain.GetA());
+            Assert.Equal(grainState.State.A * grainState.State.B, await grain.GetAxB());
+        }
+
+        [Fact]
+        public async Task UpdatesOnlyDestinationStorage()
+        {
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(300);
+            var oldGrainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
+            var newState = new MigrationTestGrain_State { A = 20, B = 30 };
+            var stateName = typeof(MigrationTestGrain).FullName;
+
             await SourceStorage.WriteStateAsync(stateName, (GrainReference)grain, oldGrainState);
 
-            // Grain should read from source but write to destination
-            Assert.Equal(oldGrainState.State.A, await grain.GetA());
-            Assert.Equal(oldGrainState.State.A * oldGrainState.State.B, await grain.GetAxB());
+            // should write to only destination storage
+            await grain.SetA(33);
+            await grain.SetB(806);
+
+            // lets fetch data through cosmosClient
+            var cosmosGrainState = await _cosmosClient.GetGrainStateFromCosmosAsync(DocumentIdProvider, stateName!, (GrainReference)grain, oldGrainState);
+            Assert.Equal(33, cosmosGrainState.A);
+            Assert.Equal(806, cosmosGrainState.B);
+
+            // and data in azure table storage should be available (due to previous writeStateAsync call)
+            await SourceStorage.ReadStateAsync(stateName, (GrainReference)grain, oldGrainState);
+            Assert.Equal(cosmosGrainState.A, oldGrainState.State.A);
+            Assert.Equal(cosmosGrainState.B, oldGrainState.State.B);
+
+            // update grain to a new state. Should happen only in destination storage!
             await grain.SetA(newState.A);
             await grain.SetB(newState.B);
 
-            var newGrainState = new GrainState<SimplePersistentGrain_State>();
-            await DestinationStorage.ReadStateAsync(stateName, (GrainReference)grain, newGrainState);
+            // verify updated state only in destination storage
+            cosmosGrainState = await _cosmosClient.GetGrainStateFromCosmosAsync(DocumentIdProvider, stateName!, (GrainReference)grain, oldGrainState);
+            Assert.Equal(20, cosmosGrainState.A);
+            Assert.Equal(30, cosmosGrainState.B);
 
-            Assert.Equal(newGrainState.State.A, await grain.GetA());
-            Assert.Equal(newGrainState.State.A * newGrainState.State.B, await grain.GetAxB());
+            // old storage should not be updated
+            await SourceStorage.ReadStateAsync(stateName, (GrainReference)grain, oldGrainState);
+            Assert.Equal(33, oldGrainState.State.A);
+            Assert.Equal(806, oldGrainState.State.B);
 
-            // but original storage should not have an updated state at this point!
-            var originalStorageState = new GrainState<SimplePersistentGrain_State>();
-            await SourceStorage.ReadStateAsync(stateName, (GrainReference)grain, originalStorageState);
-
-            Assert.Equal(originalStorageState.State.A, oldGrainState.State.A);
-            Assert.Equal(originalStorageState.State.B, oldGrainState.State.B);
+            // lets make a final check - getting grain state via grain API should return same data
+            Assert.Equal(cosmosGrainState.A, await grain.GetA());
+            Assert.Equal(cosmosGrainState.A * cosmosGrainState.B, await grain.GetAxB());
         }
 
+        //[Fact]
+        //public async Task DataMigrator_MovesDataToDestinationStorage()
+        //{
+        //    var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(500);
+        //    var oldGrainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
+        //    var stateName = typeof(MigrationTestGrain).FullName;
 
+        //    await SourceStorage.WriteStateAsync(stateName, (GrainReference)grain, oldGrainState);
+
+        //    await DataMigrator.MigrateGrainsAsync(CancellationToken.None);
+        //}
     }
 }
+#endif

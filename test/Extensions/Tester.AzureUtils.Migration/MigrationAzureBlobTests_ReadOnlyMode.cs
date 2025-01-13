@@ -1,16 +1,24 @@
-#if NET7_0_OR_GREATER
+#if NET8_0_OR_GREATER
 using Orleans.Hosting;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
 using Tester.AzureUtils.Migration.Abstractions;
+using TestExtensions;
 using Xunit;
 
 namespace Tester.AzureUtils.Migration
 {
     [TestCategory("Functionals"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureBlobStorage")]
-    public class MigrationAzureBlobWithOriginalStorageReadonlyModeTests : MigrationGrainsReadonlyOriginalStorageTests, IClassFixture<MigrationAzureBlobWithOriginalStorageReadonlyModeTests.Fixture>
+    public class MigrationReadonlyAzureStorageTableToCosmosDbTests : MigrationGrainsReadonlyOriginalStorageTests, IClassFixture<MigrationReadonlyAzureStorageTableToCosmosDbTests.Fixture>
     {
-        public static Guid Guid = Guid.NewGuid();
+        public const string OrleansDatabase = "Orleans";
+        public const string OrleansContainer = "destinationtest";
+
+        public static string RandomIdentifier = Guid.NewGuid().ToString().Replace("-", "");
+
+        public MigrationReadonlyAzureStorageTableToCosmosDbTests(Fixture fixture) : base(fixture)
+        {
+        }
 
         public class Fixture : BaseAzureTestClusterFixture
         {
@@ -31,25 +39,22 @@ namespace Tester.AzureUtils.Migration
                         options.SourceStorageName = SourceStorageName;
                         options.DestinationStorageName = DestinationStorageName;
 
-                        // the latter steps of migration, where original storage is only in readonly mode
-                        options.WriteToDestinationOnly = true;
+                        options.WriteToDestinationOnly = true; // original storage will not be touched!
                     })
-                    .AddAzureBlobGrainStorage(SourceStorageName, options =>
+                    .AddAzureTableGrainStorage(SourceStorageName, options =>
                     {
                         options.ConfigureTestDefaults();
-                        options.ContainerName = $"source{Guid}";
+                        options.TableName = $"source{RandomIdentifier}";
                     })
-                    .AddMigrationAzureBlobGrainStorage(DestinationStorageName, options =>
+                    .AddCosmosGrainStorage(DestinationStorageName, options =>
                     {
-                        options.ConfigureTestDefaults();
-                        options.ContainerName = $"destination{Guid}";
+                        // options.ContainerName = $"destination{RandomIdentifier}";
+                        options.ContainerName = $"destinationtest";
+                        options.DatabaseName = "Orleans";
+                        options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosConnectionString);
                     })
                     .AddDataMigrator(SourceStorageName, DestinationStorageName);
             }
-        }   
-
-        public MigrationAzureBlobWithOriginalStorageReadonlyModeTests(Fixture fixture) : base(fixture)
-        {
         }
     }
 }

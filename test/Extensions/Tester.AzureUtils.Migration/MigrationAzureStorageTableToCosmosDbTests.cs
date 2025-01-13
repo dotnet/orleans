@@ -7,13 +7,26 @@ using Orleans.TestingHost;
 using Tester.AzureUtils.Migration.Abstractions;
 using Tester.AzureUtils.Migration.Grains;
 using TestExtensions;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
+using Microsoft.Extensions.Logging;
+using Orleans.Serialization;
+using Orleans.Runtime;
+using Orleans.Metadata;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using Orleans;
 
 namespace Tester.AzureUtils.Migration
 {
     [TestCategory("Functionals"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureTableStorage")]
     public class MigrationAzureStorageTableToCosmosDbTests : MigrationTableStorageToCosmosTests, IClassFixture<MigrationAzureStorageTableToCosmosDbTests.Fixture>
     {
+        public const string OrleansDatabase = "Orleans";
+        public const string OrleansContainer = "destinationtest";
+
         public static string RandomIdentifier = Guid.NewGuid().ToString().Replace("-", "");
 
         public MigrationAzureStorageTableToCosmosDbTests(Fixture fixture) : base(fixture)
@@ -46,16 +59,12 @@ namespace Tester.AzureUtils.Migration
                     })
                     .AddCosmosGrainStorage(DestinationStorageName, options =>
                     {
-                        options.ContainerName = $"source{RandomIdentifier}";
+                        // options.ContainerName = $"destination{RandomIdentifier}";
+                        options.ContainerName = $"destinationtest";
+                        options.DatabaseName = "Orleans";
                         options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosConnectionString);
                     })
                     .AddDataMigrator(SourceStorageName, DestinationStorageName);
-
-                siloBuilder
-                    .ConfigureApplicationParts(parts =>
-                    {
-                        parts.AddApplicationPart(new AssemblyPart(typeof(MigrationTestGrain).Assembly));
-                    });
             }
         }
     }

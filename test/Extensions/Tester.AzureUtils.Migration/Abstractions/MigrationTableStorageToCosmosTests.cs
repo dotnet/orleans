@@ -1,17 +1,24 @@
+#if NET8_0_OR_GREATER
+using System.Globalization;
+using Microsoft.Azure.Cosmos;
+using Newtonsoft.Json.Linq;
 using Orleans;
 using Orleans.Runtime;
 using Tester.AzureUtils.Migration.Grains;
-using UnitTests.GrainInterfaces;
-using UnitTests.Grains;
+using Tester.AzureUtils.Migration.Helpers;
+using TestExtensions;
 using Xunit;
 
 namespace Tester.AzureUtils.Migration.Abstractions
 {
     public abstract class MigrationTableStorageToCosmosTests : MigrationBaseTests
     {
+        readonly CosmosClient _cosmosClient;
+
         protected MigrationTableStorageToCosmosTests(BaseAzureTestClusterFixture fixture)
             : base(fixture)
         {
+            _cosmosClient = new CosmosClient(TestDefaultConfiguration.CosmosConnectionString);
         }
 
         [Fact]
@@ -29,30 +36,44 @@ namespace Tester.AzureUtils.Migration.Abstractions
         }
 
         [Fact]
-        public async Task ReadFromSourceThenWriteToTargetTest()
+        public async Task UpdatesStatesInBothStorages()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(300);
-            var oldGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
-            var newState = new SimplePersistentGrain_State { A = 20, B = 30 };
-            var stateName = typeof(SimplePersistentGrain).FullName;
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(300);
+            var oldGrainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
+            var newState = new MigrationTestGrain_State { A = 20, B = 30 };
+            var stateName = typeof(MigrationTestGrain).FullName;
 
+            // should write to both storages at this point
             await grain.SetA(33);
             await grain.SetB(806);
 
-            // Write directly to source storage
-            await SourceStorage.WriteStateAsync(stateName, (GrainReference)grain, oldGrainState);
+            // lets fetch data through cosmosClient
+            var cosmosGrainState = await _cosmosClient.GetGrainStateFromCosmosAsync(DocumentIdProvider, stateName!, (GrainReference)grain, oldGrainState);
+            Assert.Equal(33, cosmosGrainState.A);
+            Assert.Equal(806, cosmosGrainState.B);
 
-            // Grain should read from source but write to destination
-            Assert.Equal(oldGrainState.State.A, await grain.GetA());
-            Assert.Equal(oldGrainState.State.A * oldGrainState.State.B, await grain.GetAxB());
+            // and data in azure table storage should be in sync
+            await SourceStorage.ReadStateAsync(stateName, (GrainReference)grain, oldGrainState);
+            Assert.Equal(cosmosGrainState.A, oldGrainState.State.A);
+            Assert.Equal(cosmosGrainState.B, oldGrainState.State.B);
+
+            // update grain to a new state. Should happen in both storages again
             await grain.SetA(newState.A);
             await grain.SetB(newState.B);
 
-            var newGrainState = new GrainState<SimplePersistentGrain_State>();
-            await DestinationStorage.ReadStateAsync(stateName, (GrainReference)grain, newGrainState);
+            // verify updated state in both storages
+            cosmosGrainState = await _cosmosClient.GetGrainStateFromCosmosAsync(DocumentIdProvider, stateName!, (GrainReference)grain, oldGrainState);
+            Assert.Equal(20, cosmosGrainState.A);
+            Assert.Equal(30, cosmosGrainState.B);
 
-            Assert.Equal(newGrainState.State.A, await grain.GetA());
-            Assert.Equal(newGrainState.State.A * newGrainState.State.B, await grain.GetAxB());
+            await SourceStorage.ReadStateAsync(stateName, (GrainReference)grain, oldGrainState);
+            Assert.Equal(cosmosGrainState.A, oldGrainState.State.A);
+            Assert.Equal(cosmosGrainState.B, oldGrainState.State.B);
+
+            // lets make a final check - getting grain state via grain API should return same data
+            Assert.Equal(cosmosGrainState.A, await grain.GetA());
+            Assert.Equal(cosmosGrainState.A * cosmosGrainState.B, await grain.GetAxB());
         }
     }
 }
+#endif
