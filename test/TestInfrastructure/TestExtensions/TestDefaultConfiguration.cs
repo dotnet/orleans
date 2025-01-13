@@ -39,6 +39,7 @@ namespace TestExtensions
         public static Uri DataBlobUri => new Uri(defaultConfiguration[nameof(DataBlobUri)]);
         public static Uri DataQueueUri => new Uri(defaultConfiguration[nameof(DataQueueUri)]);
         public static string DataConnectionString => defaultConfiguration[nameof(DataConnectionString)];
+        public static string CosmosConnectionString => defaultConfiguration[nameof(CosmosConnectionString)];
         public static string EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
         public static string EventHubFullyQualifiedNamespace => defaultConfiguration[nameof(EventHubFullyQualifiedNamespace)];
         public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];

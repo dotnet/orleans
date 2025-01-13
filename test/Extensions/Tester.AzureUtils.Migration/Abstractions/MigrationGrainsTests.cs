@@ -16,9 +16,9 @@ using Orleans.Persistence.Migration;
 
 namespace Tester.AzureUtils.Migration.Abstractions
 {
-    public abstract class MigrationGrainsBaseTests : MigrationBaseTests
+    public abstract class MigrationGrainsTests : MigrationBaseTests
     {
-        protected MigrationGrainsBaseTests(BaseAzureTestClusterFixture fixture)
+        protected MigrationGrainsTests(BaseAzureTestClusterFixture fixture)
             : base(fixture)
         {
         }
@@ -180,7 +180,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             return storageEntries;
         }
 
-        struct StorageEntryRef
+        protected struct StorageEntryRef
         {
             public GrainReference GrainReference;
 

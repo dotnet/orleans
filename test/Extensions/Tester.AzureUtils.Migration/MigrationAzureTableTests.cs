@@ -9,7 +9,7 @@ using Xunit;
 namespace Tester.AzureUtils.Migration
 {
     [TestCategory("Functionals"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureTableStorage")]
-    public class MigrationAzureTableTests : MigrationRemindersBaseTests, IClassFixture<MigrationAzureTableTests.Fixture>
+    public class MigrationAzureTableTests : MigrationRemindersTests, IClassFixture<MigrationAzureTableTests.Fixture>
     {
         public static Guid Guid = Guid.NewGuid();
 

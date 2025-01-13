@@ -1,4 +1,4 @@
-#if NET70
+#if NET7_0_OR_GREATER
 using Orleans.Hosting;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
@@ -8,7 +8,7 @@ using Xunit;
 namespace Tester.AzureUtils.Migration
 {
     [TestCategory("Functionals"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureBlobStorage")]
-    public class MigrationAzureBlobTests : MigrationGrainsBaseTests, IClassFixture<MigrationAzureBlobTests.Fixture>
+    public class MigrationAzureBlobTests : MigrationGrainsTests, IClassFixture<MigrationAzureBlobTests.Fixture>
     {
         public static Guid Guid = Guid.NewGuid();
 

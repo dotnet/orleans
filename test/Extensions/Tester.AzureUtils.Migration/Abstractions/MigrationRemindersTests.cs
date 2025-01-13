@@ -14,7 +14,7 @@ using Orleans.Persistence.AzureStorage.Migration.Reminders.Storage;
 
 namespace Tester.AzureUtils.Migration.Abstractions
 {
-    public abstract class MigrationRemindersBaseTests : MigrationBaseTests
+    public abstract class MigrationRemindersTests : MigrationBaseTests
     {
         private IReminderTableEntryBuilder? migrationEntryBuilder;
         protected IReminderTableEntryBuilder MigrationEntryBuilder
@@ -29,7 +29,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             }
         }
 
-        protected MigrationRemindersBaseTests(BaseAzureTestClusterFixture fixture)
+        protected MigrationRemindersTests(BaseAzureTestClusterFixture fixture)
             : base(fixture)
         {
         }

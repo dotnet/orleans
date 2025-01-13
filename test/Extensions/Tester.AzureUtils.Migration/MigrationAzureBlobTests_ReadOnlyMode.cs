@@ -1,6 +1,5 @@
-#if NET8_0_OR_GREATER
+#if NET7_0_OR_GREATER
 using Orleans.Hosting;
-using Orleans.Persistence.Cosmos.Migration;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
 using Tester.AzureUtils.Migration.Abstractions;
@@ -8,14 +7,10 @@ using Xunit;
 
 namespace Tester.AzureUtils.Migration
 {
-    [TestCategory("Functionals"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureTableStorage")]
-    public class MigrationAzureCosmosTests : MigrationCosmosTests, IClassFixture<MigrationAzureCosmosTests.Fixture>
+    [TestCategory("Functionals"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureBlobStorage")]
+    public class MigrationAzureBlobWithOriginalStorageReadonlyModeTests : MigrationGrainsReadonlyOriginalStorageTests, IClassFixture<MigrationAzureBlobWithOriginalStorageReadonlyModeTests.Fixture>
     {
         public static Guid Guid = Guid.NewGuid();
-
-        public MigrationAzureCosmosTests(Fixture fixture) : base(fixture)
-        {
-        }
 
         public class Fixture : BaseAzureTestClusterFixture
         {
@@ -35,19 +30,26 @@ namespace Tester.AzureUtils.Migration
                     {
                         options.SourceStorageName = SourceStorageName;
                         options.DestinationStorageName = DestinationStorageName;
+
+                        // the latter steps of migration, where original storage is only in readonly mode
+                        options.WriteToDestinationOnly = true;
                     })
-                    .AddCosmosGrainStorage(SourceStorageName, options =>
+                    .AddAzureBlobGrainStorage(SourceStorageName, options =>
                     {
+                        options.ConfigureTestDefaults();
                         options.ContainerName = $"source{Guid}";
-                        options.ConfigureCosmosClient(""); // TODO secret here!
                     })
-                    .AddMigrationAzureCosmosGrainStorage(DestinationStorageName, options =>
+                    .AddMigrationAzureBlobGrainStorage(DestinationStorageName, options =>
                     {
+                        options.ConfigureTestDefaults();
                         options.ContainerName = $"destination{Guid}";
-                        options.ConfigureCosmosClient(""); // TODO secret here!
                     })
                     .AddDataMigrator(SourceStorageName, DestinationStorageName);
             }
+        }   
+
+        public MigrationAzureBlobWithOriginalStorageReadonlyModeTests(Fixture fixture) : base(fixture)
+        {
         }
     }
 }
