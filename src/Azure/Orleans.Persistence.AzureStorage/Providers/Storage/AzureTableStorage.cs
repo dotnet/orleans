@@ -1,14 +1,20 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Data.Tables;
+using Azure.Storage.Blobs.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -16,6 +22,7 @@ using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
 using Orleans.Persistence.AzureStorage;
+using Orleans.Persistence.AzureStorage.Providers.Storage;
 using Orleans.Providers.Azure;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -34,6 +41,7 @@ namespace Orleans.Storage
         private readonly SerializationManager serializationManager;
         private readonly IGrainFactory grainFactory;
         private readonly ITypeResolver typeResolver;
+        private readonly IGrainReferenceRuntime grainReferenceRuntime;
         private readonly ILogger logger;
 
         private GrainStateTableDataManager tableDataManager;
@@ -57,6 +65,7 @@ namespace Orleans.Storage
             SerializationManager serializationManager,
             IGrainFactory grainFactory,
             ITypeResolver typeResolver,
+            IGrainReferenceRuntime grainReferenceRuntime,
             ILogger<AzureTableGrainStorage> logger)
         {
             this.options = options;
@@ -65,6 +74,7 @@ namespace Orleans.Storage
             this.serializationManager = serializationManager;
             this.grainFactory = grainFactory;
             this.typeResolver = typeResolver;
+            this.grainReferenceRuntime = grainReferenceRuntime;
             this.logger = logger;
         }
 
@@ -159,6 +169,33 @@ namespace Orleans.Storage
                 logger.Error((int)AzureProviderErrorCode.AzureTableProvider_DeleteError, string.Format("Error {0}: GrainType={1} Grainid={2} ETag={3} from Table={4} Exception={5}",
                     operation, grainType, grainReference, grainState.ETag, this.options.TableName, exc.Message), exc);
                 throw;
+            }
+        }
+
+        public async IAsyncEnumerable<StorageEntry> GetAll([EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            var entries = this.tableDataManager.ReadAllAsync(cancellationToken);
+            await foreach (var entry in entries.WithCancellation(cancellationToken))
+            {
+                var pkParts = entry.PartitionKey.Split('_');
+                if (pkParts.Length != 2)
+                {
+                    // throw?
+                }
+
+                var grainReferenceKey = pkParts[1];
+                var grainReference = GrainReference.FromKeyString(grainReferenceKey, this.grainReferenceRuntime);
+                var grainState = new GrainState<object>();
+                if (entry is not null)
+                {
+                    var loadedState = ConvertFromStorageFormat(entry, grainState.Type);
+                    grainState.RecordExists = loadedState != null;
+                    grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
+                    grainState.ETag = entry.ETag.ToString();
+                }
+
+                var tableEntryClient = new AzureStorageTableEntryClient(tableDataManager.TableManager, entry);
+                yield return new StorageEntry(entry.RowKey, grainReference, grainState, tableEntryClient);
             }
         }
 
@@ -396,6 +433,8 @@ namespace Orleans.Storage
             private readonly AzureTableDataManager<TableEntity> tableManager;
             private readonly ILogger logger;
 
+            internal AzureTableDataManager<TableEntity> TableManager => tableManager;
+
             public GrainStateTableDataManager(AzureStorageOperationOptions options, ILogger logger)
             {
                 this.logger = logger;
@@ -406,6 +445,12 @@ namespace Orleans.Storage
             public Task InitTableAsync()
             {
                 return tableManager.InitTableAsync();
+            }
+
+            public IAsyncEnumerable<TableEntity> ReadAllAsync(CancellationToken cancellationToken)
+            {
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_Storage_ReadingAll, "Reading All entries from Table={0}", TableName);
+                return tableManager.ReadTableEntries(cancellationToken);
             }
 
             public async Task<TableEntity> Read(string partitionKey, string rowKey)
@@ -496,11 +541,6 @@ namespace Orleans.Storage
         public void Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableGrainStorage>(this.name), this.options.InitStage, Init, Close);
-        }
-
-        public IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken)
-        {
-            throw new NotImplementedException();
         }
     }
 

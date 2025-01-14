@@ -76,17 +76,16 @@ namespace Tester.AzureUtils.Migration.Abstractions
             Assert.Equal(cosmosGrainState.A * cosmosGrainState.B, await grain.GetAxB());
         }
 
-        //[Fact]
-        //public async Task DataMigrator_MovesDataToDestinationStorage()
-        //{
-        //    var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(500);
-        //    var oldGrainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
-        //    var stateName = typeof(MigrationTestGrain).FullName;
+        [Fact]
+        public async Task DataMigrator_MovesDataToDestinationStorage()
+        {
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(500);
+            var oldGrainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
+            var stateName = typeof(MigrationTestGrain).FullName;
 
-        //    await SourceStorage.WriteStateAsync(stateName, (GrainReference)grain, oldGrainState);
-
-        //    await DataMigrator.MigrateGrainsAsync(CancellationToken.None);
-        //}
+            await SourceStorage.WriteStateAsync(stateName, (GrainReference)grain, oldGrainState);
+            await DataMigrator.MigrateGrainsAsync(CancellationToken.None);
+        }
     }
 }
 #endif
