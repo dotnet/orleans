@@ -38,7 +38,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task UpdatesStatesInBothStorages()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(300);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(50000);
             var oldGrainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
             var newState = new MigrationTestGrain_State { A = 20, B = 30 };
             var stateName = typeof(MigrationTestGrain).FullName;
