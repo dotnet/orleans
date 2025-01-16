@@ -180,7 +180,9 @@ namespace Orleans.Storage
                 var pkParts = entry.PartitionKey.Split('_');
                 if (pkParts.Length != 2)
                 {
-                    // throw?
+                    // a broken record - log and continue
+                    logger.Error((int)AzureProviderErrorCode.AzureTableProvider_Storage_ReadingAll, $"Error on parsing table storage record. PartitionKey='{entry.PartitionKey}'");
+                    continue;
                 }
 
                 var grainReferenceKey = pkParts[1];
