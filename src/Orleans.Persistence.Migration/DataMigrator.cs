@@ -73,7 +73,12 @@ namespace Orleans.Persistence.Migration
                         _logger.Info("Migrated blob already exists, but was not skipped: {entryName};", storageEntry.Name);
                         // ignore: we have already migrated this entry to new storage.
                     }
-                    
+                    catch (InconsistentStateException ex) when (ex.Message.Contains("Resource with specified id or name already exists"))
+                    {
+                        _logger.Info("Migrated cosmosDb doc already exists, but was not skipped: {entryName};", storageEntry.Name);
+                        // ignore: we have already migrated this entry to new storage.
+                    }
+
                     await storageEntry.MigrationEntryClient.MarkMigratedAsync(cancellationToken);
                     migrationStats.MigratedEntries++;
                 }

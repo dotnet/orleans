@@ -84,11 +84,22 @@ namespace Tester.AzureUtils.Migration.Abstractions
             var stateName = typeof(MigrationTestGrain).FullName;
 
             await SourceStorage.WriteStateAsync(stateName, (GrainReference)grain, oldGrainState);
+
             await DataMigrator.MigrateGrainsAsync(CancellationToken.None);
 
+            // ensure cosmos db state is updated
             var cosmosGrainState = await _cosmosClient.GetGrainStateFromCosmosAsync(DocumentIdProvider, stateName!, (GrainReference)grain);
             Assert.Equal(oldGrainState.State.A, cosmosGrainState.A);
             Assert.Equal(oldGrainState.State.B, cosmosGrainState.B);
+
+            // rerun data migrator should not invoke anything -> all data is migrated already
+            var statsRun2 = await DataMigrator.MigrateGrainsAsync(CancellationToken.None);
+            Assert.True(statsRun2.SkippedEntries != 0); // it should skip entries (at least one - the one that we migrated on 1st DataMigrator.MigrateGrainsAsync() run)
+
+            // ensure state one more time
+            var cosmosGrainState2 = await _cosmosClient.GetGrainStateFromCosmosAsync(DocumentIdProvider, stateName!, (GrainReference)grain);
+            Assert.Equal(oldGrainState.State.A, cosmosGrainState2.A);
+            Assert.Equal(oldGrainState.State.B, cosmosGrainState2.B);
         }
     }
 }
