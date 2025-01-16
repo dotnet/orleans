@@ -48,7 +48,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             await grain.SetB(806);
 
             // lets fetch data through cosmosClient
-            var cosmosGrainState = await _cosmosClient.GetGrainStateFromCosmosAsync(DocumentIdProvider, stateName!, (GrainReference)grain, oldGrainState);
+            var cosmosGrainState = await _cosmosClient.GetGrainStateFromCosmosAsync(DocumentIdProvider, stateName!, (GrainReference)grain);
             Assert.Equal(33, cosmosGrainState.A);
             Assert.Equal(806, cosmosGrainState.B);
 
@@ -62,7 +62,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             await grain.SetB(newState.B);
 
             // verify updated state only in destination storage
-            cosmosGrainState = await _cosmosClient.GetGrainStateFromCosmosAsync(DocumentIdProvider, stateName!, (GrainReference)grain, oldGrainState);
+            cosmosGrainState = await _cosmosClient.GetGrainStateFromCosmosAsync(DocumentIdProvider, stateName!, (GrainReference)grain);
             Assert.Equal(20, cosmosGrainState.A);
             Assert.Equal(30, cosmosGrainState.B);
 
@@ -85,6 +85,10 @@ namespace Tester.AzureUtils.Migration.Abstractions
 
             await SourceStorage.WriteStateAsync(stateName, (GrainReference)grain, oldGrainState);
             await DataMigrator.MigrateGrainsAsync(CancellationToken.None);
+
+            var cosmosGrainState = await _cosmosClient.GetGrainStateFromCosmosAsync(DocumentIdProvider, stateName!, (GrainReference)grain);
+            Assert.Equal(oldGrainState.State.A, cosmosGrainState.A);
+            Assert.Equal(oldGrainState.State.B, cosmosGrainState.B);
         }
     }
 }

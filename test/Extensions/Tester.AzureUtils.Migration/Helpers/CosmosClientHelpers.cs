@@ -20,7 +20,8 @@ namespace Tester.AzureUtils.Migration.Helpers
         public static async Task<MigrationTestGrain_State> GetGrainStateFromCosmosAsync(
             this CosmosClient cosmosClient,
             IDocumentIdProvider documentIdProvider,
-            string stateName, GrainReference grain, IGrainState grainState)
+            string stateName,
+            GrainReference grain)
         {
             var database = cosmosClient.GetDatabase(MigrationAzureStorageTableToCosmosDbTests.OrleansDatabase);
             var container = database.Client.GetContainer(database.Id, MigrationAzureStorageTableToCosmosDbTests.OrleansContainer);

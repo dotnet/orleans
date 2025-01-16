@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,7 +13,8 @@ using Orleans.Storage;
 namespace Orleans.Persistence.Cosmos.Migration
 {
     /// <summary>
-    /// Simple storage provider for writing grain state data to Azure blob storage in JSON format.
+    /// Is a wrapper over <see cref="CosmosGrainStorage"/>.
+    /// Also contains the logic to migrate grain state from one storage to another.
     /// </summary>
     internal class MigrationAzureCosmosGrainStorage : IMigrationGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
@@ -64,21 +63,28 @@ namespace Orleans.Persistence.Cosmos.Migration
 
         private GrainStateTypeInfo GetGrainStateTypeInfo(GrainReference grainReference, IGrainState grainState)
         {
-            var type = grainReferenceExtractor.ExtractType(grainReference);
+            // grainState.Type does not have a proper type -> we need to separately call extractor to find out a proper type
+            var grainClass = grainReferenceExtractor.ExtractType(grainReference);
 
+            var grainTypeAttr = grainClass.GetCustomAttribute<GrainTypeAttribute>();
+            if (grainTypeAttr is null)
+            {
+                throw new InvalidOperationException($"All grain classes must specify a grain type name using the [GrainType(type)] attribute. Grain class '{grainClass}' does not.");
+            }
+            var grainTypeName = grainTypeAttr.GrainType;
             var grainStateType = grainState.Type;
-            var readStateFunc  = CosmosGrainStorage.ReadStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(this.cosmosGrainStorage);
+            var grainKeyFormatter = GrainStateTypeInfo.GetGrainKeyFormatter(grainClass);
+
+            var readStateFunc = CosmosGrainStorage.ReadStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(this.cosmosGrainStorage);
             var writeStateFunc = CosmosGrainStorage.WriteStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(this.cosmosGrainStorage);
             var clearStateFunc = CosmosGrainStorage.ClearStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(this.cosmosGrainStorage);
 
-            return null;
-
-            //return new GrainStateTypeInfo(
-            //    grainTypeName: ,
-            //    grainKeyFormatter: GrainStateTypeInfo.GetGrainKeyFormatter(grainIdType.Value),
-            //    readStateFunc,
-            //    writeStateFunc,
-            //    clearStateFunc);
+            return new GrainStateTypeInfo(
+                grainTypeName,
+                grainKeyFormatter,
+                readStateFunc,
+                writeStateFunc,
+                clearStateFunc);
         }
     }
 
