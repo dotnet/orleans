@@ -7,6 +7,8 @@ namespace Orleans.Persistence.Migration
     public interface IGrainReferenceExtractor
     {
         (GrainType grainType, GrainInterfaceType grainInterfaceType, IdSpan key) Extract(GrainReference grainReference);
+
+        Type ExtractType(GrainReference grainReference);
     }
 
     public static class GrainReferenceExtractorExtension
@@ -32,6 +34,14 @@ namespace Orleans.Persistence.Migration
             _grainTypeManager = grainTypeManager;
             _grainTypeResolver = grainTypeResolver;
             _grainInterfaceTypeResolver = grainInterfaceTypeResolver;
+        }
+
+        public Type ExtractType(GrainReference grainReference)
+        {
+            var typeCode = grainReference.GrainIdentity.TypeCode;
+            _grainTypeManager.GetTypeInfo(typeCode, out var grainClass, out _, grainReference.GenericArguments);
+            Type grainType = LookupType(grainClass) ?? throw new ArgumentException("Grain type not found");
+            return grainType;
         }
 
         public (GrainType grainType, GrainInterfaceType grainInterfaceType, IdSpan key) Extract(GrainReference grainReference)

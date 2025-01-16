@@ -18,9 +18,9 @@ namespace Orleans.Persistence.Cosmos;
 /// </summary>
 internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
 {
-    private static readonly MethodInfo ReadStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(ReadStateAsyncCore), 1, BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(string), typeof(GrainId), typeof(IGrainState) }, null)!;
-    private static readonly MethodInfo WriteStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(WriteStateAsyncCore), 1, BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(string), typeof(GrainId), typeof(IGrainState) }, null)!;
-    private static readonly MethodInfo ClearStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(ClearStateAsyncCore), 1, BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(string), typeof(GrainId), typeof(IGrainState) }, null)!;
+    internal static readonly MethodInfo ReadStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(ReadStateAsyncCore), 1, BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(string), typeof(GrainId), typeof(IGrainState) }, null)!;
+    internal static readonly MethodInfo WriteStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(WriteStateAsyncCore), 1, BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(string), typeof(GrainId), typeof(IGrainState) }, null)!;
+    internal static readonly MethodInfo ClearStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(ClearStateAsyncCore), 1, BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(string), typeof(GrainId), typeof(IGrainState) }, null)!;
 
     private readonly IDocumentIdProvider idProvider;
     private readonly ConcurrentDictionary<(ulong grainTypeCode, Type stateType), GrainStateTypeInfo> grainStateTypeInfo = new ();
@@ -64,22 +64,31 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
     public Task ReadStateAsync(string stateName, GrainReference grainReference, IGrainState grainState)
     {
         var grainTypeData = this.GetGrainStateTypeInfo(grainReference, grainState);
-        return grainTypeData.ReadStateAsync(stateName, grainReference, grainState);
+        return ReadStateAsync(grainTypeData, stateName, grainReference, grainState);
     }
+
+    internal Task ReadStateAsync(GrainStateTypeInfo grainTypeData, string stateName, GrainReference grainReference, IGrainState grainState)
+        => grainTypeData.ReadStateAsync(stateName, grainReference, grainState);
 
     /// <inheritdoc/>
     public Task WriteStateAsync(string stateName, GrainReference grainReference, IGrainState grainState)
     {
         var grainTypeData = this.GetGrainStateTypeInfo(grainReference, grainState);
-        return grainTypeData.WriteStateAsync(stateName, grainReference, grainState);
+        return WriteStateAsync(grainTypeData, stateName, grainReference, grainState);
     }
+
+    internal Task WriteStateAsync(GrainStateTypeInfo grainTypeData, string stateName, GrainReference grainReference, IGrainState grainState)
+        => grainTypeData.WriteStateAsync(stateName, grainReference, grainState);
 
     /// <inheritdoc/>
     public Task ClearStateAsync(string stateName, GrainReference grainReference, IGrainState grainState)
     {
         var grainTypeData = this.GetGrainStateTypeInfo(grainReference, grainState);
-        return grainTypeData.ClearStateAsync(stateName, grainReference, grainState);
+        return ClearStateAsync(grainTypeData, stateName, grainReference, grainState);
     }
+
+    internal Task ClearStateAsync(GrainStateTypeInfo grainTypeData, string stateName, GrainReference grainReference, IGrainState grainState)
+        => grainTypeData.ClearStateAsync(stateName, grainReference, grainState);
 
     /// <inheritdoc/>
     public void Participate(ISiloLifecycle lifecycle)
@@ -329,7 +338,7 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
 
             // Work out how to format the grain id.
             var grainTypeName = grainTypeAttr.GrainType;
-            var grainKeyFormatter = GetGrainKeyFormatter(grainClass);
+            var grainKeyFormatter = GrainStateTypeInfo.GetGrainKeyFormatter(grainClass);
 
             // Create methods for reading/writing/clearing the state based on the grain state type.
             var readStateAsync = ReadStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(this);
@@ -340,75 +349,6 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
         }
 
         return grainStateTypeInfo;
-
-        static Func<GrainReference, string> GetGrainKeyFormatter(Type grainClass)
-        {
-            Func<GrainReference, string> grainKeyFormatter = null!;
-            if (typeof(IGrainWithStringKey).IsAssignableFrom(grainClass))
-            {
-                grainKeyFormatter = static (grainReference) => grainReference.GetPrimaryKeyString();
-            }
-
-            if (typeof(IGrainWithGuidKey).IsAssignableFrom(grainClass))
-            {
-                if (grainKeyFormatter is not null)
-                {
-                    ThrowMultipleKeyInterfaces(grainClass);
-                }
-
-                grainKeyFormatter = static (grainReference) => grainReference.GetPrimaryKey(out _).ToString("N");
-            }
-
-            if (typeof(IGrainWithIntegerKey).IsAssignableFrom(grainClass))
-            {
-                if (grainKeyFormatter is not null)
-                {
-                    ThrowMultipleKeyInterfaces(grainClass);
-                }
-
-                grainKeyFormatter = static (grainReference) => grainReference.GetPrimaryKeyLong(out _).ToString("X", CultureInfo.InvariantCulture);
-            }
-
-            if (typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(grainClass))
-            {
-                if (grainKeyFormatter is not null)
-                {
-                    ThrowMultipleKeyInterfaces(grainClass);
-                }
-
-                grainKeyFormatter = static (grainReference) =>
-                {
-                    var pk = grainReference.GetPrimaryKey(out var ext).ToString("N");
-                    return $"{pk}+{ext}";
-                };
-            }
-
-            if (typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(grainClass))
-            {
-                if (grainKeyFormatter is not null)
-                {
-                    ThrowMultipleKeyInterfaces(grainClass);
-                }
-
-                grainKeyFormatter = static (grainReference) =>
-                {
-                    var pk = grainReference.GetPrimaryKeyLong(out var ext).ToString("X", CultureInfo.InvariantCulture);
-                    return $"{pk}+{ext}";
-                };
-            }
-
-            if (grainKeyFormatter is null)
-            {
-                throw new InvalidOperationException($"Grain class '{grainClass}' must inherit a grain key interface ({nameof(IGrainWithGuidKey)}, {nameof(IGrainWithIntegerKey)}, {nameof(IGrainWithStringKey)}, {nameof(IGrainWithGuidCompoundKey)}, or {nameof(IGrainWithIntegerCompoundKey)}).");
-            }
-
-            return grainKeyFormatter;
-
-            static void ThrowMultipleKeyInterfaces(Type grainClass)
-            {
-                throw new InvalidOperationException($"Grain type '{grainClass}' inherits multiple grain key interfaces which is not supported by this provider.");
-            }
-        }
     }
 
     private async Task Init(CancellationToken ct)
@@ -426,52 +366,4 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
     }
 
     public IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
-
-    private readonly struct GrainId
-    {
-        public GrainId(string type, string key)
-        {
-            this.Type = type;
-            this.Key = key;
-        }
-
-        public string Type { get; }
-
-        public string Key { get; }
-
-        public override string ToString() => $"{this.Type}/{this.Key}";
-    }
-
-    private sealed class GrainStateTypeInfo
-    {
-        private readonly Func<string, GrainId, IGrainState, Task> readStateFunc;
-        private readonly Func<string, GrainId, IGrainState, Task> writeStateFunc;
-        private readonly Func<string, GrainId, IGrainState, Task> clearStateFunc;
-
-        public GrainStateTypeInfo(
-            string grainTypeName,
-            Func<GrainReference, string> grainKeyFormatter,
-            Func<string, GrainId, IGrainState, Task> readStateFunc,
-            Func<string, GrainId, IGrainState, Task> writeStateFunc,
-            Func<string, GrainId, IGrainState, Task> clearStateFunc)
-        {
-            this.readStateFunc = readStateFunc;
-            this.writeStateFunc = writeStateFunc;
-            this.clearStateFunc = clearStateFunc;
-            this.GrainTypeName = grainTypeName;
-            this.GrainKeyFormatter = grainKeyFormatter;
-        }
-
-        public string GrainTypeName { get; }
-
-        public Func<GrainReference, string> GrainKeyFormatter { get; }
-
-        public GrainId GetGrainId(GrainReference grainReference) => new (this.GrainTypeName, this.GrainKeyFormatter(grainReference));
-
-        public Task ReadStateAsync(string stateName, GrainReference grainReference, IGrainState grainState) => this.readStateFunc(stateName, this.GetGrainId(grainReference), grainState);
-
-        public Task WriteStateAsync(string stateName, GrainReference grainReference, IGrainState grainState) => this.writeStateFunc(stateName, this.GetGrainId(grainReference), grainState);
-
-        public Task ClearStateAsync(string stateName, GrainReference grainReference, IGrainState grainState) => this.clearStateFunc(stateName, this.GetGrainId(grainReference), grainState);
-    }
 }

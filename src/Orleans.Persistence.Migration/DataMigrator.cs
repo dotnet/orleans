@@ -56,7 +56,16 @@ namespace Orleans.Persistence.Migration
 
                     try
                     {
-                        await _newStorage.WriteStateAsync(storageEntry.Name, storageEntry.GrainReference, storageEntry.GrainState);
+                        if (_newStorage is IMigrationGrainStorage migrationGrainStorage)
+                        {
+                            // sometimes the storage does not allow direct writing (i.e. CosmosDB with it's GrainActivationContext dependency)
+                            // meaning we should use a special method to write a grain state
+                            await migrationGrainStorage.MigrateGrainStateAsync(storageEntry.Name, storageEntry.GrainReference, storageEntry.GrainState);
+                        }
+                        else
+                        {
+                            await _newStorage.WriteStateAsync(storageEntry.Name, storageEntry.GrainReference, storageEntry.GrainState);
+                        }
                     }
                     // guarding against any exception which can happen against different storages (i.e. storage/cosmos/etc) here
                     catch (InconsistentStateException ex) when (ex.InnerException is RequestFailedException reqExc && reqExc.Message.StartsWith("The specified blob already exists"))

@@ -17,5 +17,8 @@
     <PackageReference Include="Microsoft.Azure.Cosmos" Version="$(AzureCosmosDbVersion)" />
     <PackageReference Include="Microsoft.Azure.Cosmos.Encryption" Version="$(AzureCosmosDbEncryptionVersion)" />
   </ItemGroup>
-  
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Persistence.Cosmos.Migration"/>
+  </ItemGroup>
 </Project>
