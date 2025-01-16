@@ -33,6 +33,7 @@ namespace Orleans.Persistence.Cosmos.Migration
             configureOptions?.Invoke(services.AddOptions<CosmosGrainStorageOptions>(name));
             services.AddTransient<IConfigurationValidator>(sp => new CosmosOptionsValidator<CosmosGrainStorageOptions>(sp.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>().Get(name), name));
             services.ConfigureNamedOptionForLogging<CosmosGrainStorageOptions>(name);
+            services.TryAddSingleton<IDocumentIdProvider, DefaultDocumentIdProvider>();
 
             if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
             {

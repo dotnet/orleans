@@ -1,5 +1,6 @@
 #if NET8_0_OR_GREATER
 using Orleans.Hosting;
+using Orleans.Persistence.Cosmos.Migration;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
 using Tester.AzureUtils.Migration.Abstractions;
@@ -46,7 +47,7 @@ namespace Tester.AzureUtils.Migration
                         options.ConfigureTestDefaults();
                         options.TableName = $"source{RandomIdentifier}";
                     })
-                    .AddCosmosGrainStorage(DestinationStorageName, options =>
+                    .AddMigrationAzureCosmosGrainStorage(DestinationStorageName, options =>
                     {
                         // options.ContainerName = $"destination{RandomIdentifier}";
                         options.ContainerName = $"destinationtest";

@@ -57,7 +57,7 @@ namespace Tester.AzureUtils.Migration
                         options.ConfigureTestDefaults();
                         options.TableName = $"source{RandomIdentifier}";
                     })
-                    .AddCosmosGrainStorage(DestinationStorageName, options =>
+                    .AddMigrationAzureCosmosGrainStorage(DestinationStorageName, options =>
                     {
                         // options.ContainerName = $"destination{RandomIdentifier}";
                         options.ContainerName = $"destinationtest";

@@ -17,7 +17,7 @@ namespace Orleans.Persistence.Cosmos.Migration
     /// <summary>
     /// Simple storage provider for writing grain state data to Azure blob storage in JSON format.
     /// </summary>
-    public class MigrationAzureCosmosGrainStorage : IMigrationGrainStorage, ILifecycleParticipant<ISiloLifecycle>
+    internal class MigrationAzureCosmosGrainStorage : IMigrationGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
         private ILogger logger;
         private readonly string name;
@@ -25,23 +25,22 @@ namespace Orleans.Persistence.Cosmos.Migration
 
         private readonly IGrainReferenceExtractor grainReferenceExtractor;
         private IGrainStorageSerializer grainStorageSerializer;
-        private readonly IServiceProvider services;
 
         private readonly CosmosGrainStorage cosmosGrainStorage;
 
         public MigrationAzureCosmosGrainStorage(
             string name,
+            CosmosGrainStorage cosmosGrainStorage,
             CosmosGrainStorageOptions options,
             IGrainStorageSerializer grainStorageSerializer,
             IGrainReferenceExtractor grainReferenceExtractor,
-            IServiceProvider services,
             ILogger<MigrationAzureCosmosGrainStorage> logger)
         {
             this.name = name;
+            this.cosmosGrainStorage = cosmosGrainStorage;
             this.options = options;
             this.grainStorageSerializer = grainStorageSerializer;
             this.grainReferenceExtractor = grainReferenceExtractor;
-            this.services = services;
             this.logger = logger;
         }
 
@@ -85,10 +84,18 @@ namespace Orleans.Persistence.Cosmos.Migration
 
     public static class MigrationAzureCosmosGrainStorageFactory
     {
-        public static IGrainStorage Create(IServiceProvider services, string name)
+        public static IMigrationGrainStorage Create(IServiceProvider services, string name)
         {
+            var cosmosGrainStorage = (CosmosGrainStorage)CosmosStorageFactory.Create(services, name);
             var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>();
-            return ActivatorUtilities.CreateInstance<MigrationAzureCosmosGrainStorage>(services, name, optionsMonitor.Get(name));
+
+            return new MigrationAzureCosmosGrainStorage(
+                name,
+                cosmosGrainStorage,
+                optionsMonitor.Get(name),
+                services.GetRequiredService<IGrainStorageSerializer>(),
+                services.GetRequiredService<IGrainReferenceExtractor>(),
+                services.GetRequiredService<ILoggerFactory>().CreateLogger<MigrationAzureCosmosGrainStorage>());
         }
     }
 }
