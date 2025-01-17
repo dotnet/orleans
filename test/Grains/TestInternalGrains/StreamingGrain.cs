@@ -229,6 +229,8 @@ namespace UnitTests.Grains
             if (_cleanedUpFlag.IsSet)
                 return false;
 
+            data += $", random#{Guid.NewGuid()}";
+
             StreamItem item = new StreamItem(data, _streamId);
             await _observer.OnNextAsync(item);
             _itemsProduced++;

@@ -3,12 +3,15 @@ using Amazon.SQS;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Text;
 using System.Threading.Tasks;
 using Amazon.SQS.Model;
 using Microsoft.Extensions.Logging;
 using Orleans.Streaming.SQS;
 using SQSMessage = Amazon.SQS.Model.Message;
 using Orleans;
+using Orleans.Configuration;
 
 namespace OrleansAWSUtils.Storage
 {
@@ -23,13 +26,20 @@ namespace OrleansAWSUtils.Storage
         public const int MAX_NUMBER_OF_MESSAGE_TO_PEEK = 10;
         private const string AccessKeyPropertyName = "AccessKey";
         private const string SecretKeyPropertyName = "SecretKey";
+        private const string SessionTokenPropertyName = "SessionToken";
         private const string ServicePropertyName = "Service";
+        private readonly SqsOptions sqsOptions;
         private readonly ILogger Logger;
         private string accessKey;
         private string secretKey;
+        private string sessionToken;
         private string service;
         private string queueUrl;
         private AmazonSQSClient sqsClient;
+
+        private List<string> receiveAttributes;
+        private List<string> receiveMessageAttributes;
+
 
         /// <summary>
         /// The queue Name
@@ -41,19 +51,26 @@ namespace OrleansAWSUtils.Storage
         /// </summary>
         /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="queueName">The name of the queue</param>
-        /// <param name="connectionString">The connection string</param>
+        /// <param name="sqsOptions">The options for the SQS connection</param>
         /// <param name="serviceId">The service ID</param>
-        public SQSStorage(ILoggerFactory loggerFactory, string queueName, string connectionString, string serviceId = "")
+        public SQSStorage(ILoggerFactory loggerFactory, string queueName, SqsOptions sqsOptions, string serviceId = "")
         {
-            QueueName = string.IsNullOrWhiteSpace(serviceId) ? queueName : $"{serviceId}-{queueName}";
-            ParseDataConnectionString(connectionString);
+            if (sqsOptions is null) throw new ArgumentNullException(nameof(sqsOptions));
+            this.sqsOptions = sqsOptions;
+            QueueName = ConstructQueueName(queueName, sqsOptions, serviceId);
+            ParseDataConnectionString(sqsOptions.ConnectionString);
             Logger = loggerFactory.CreateLogger<SQSStorage>();
             CreateClient();
+
+            receiveAttributes = [..sqsOptions.ReceiveAttributes];
+            receiveMessageAttributes = [.. sqsOptions.ReceiveMessageAttributes];
         }
 
         private void ParseDataConnectionString(string dataConnectionString)
         {
-            var parameters = dataConnectionString.Split(';', StringSplitOptions.RemoveEmptyEntries);
+            if(string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
+
+            var parameters = dataConnectionString.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
 
             var serviceConfig = parameters.FirstOrDefault(p => p.Contains(ServicePropertyName));
             if (!string.IsNullOrWhiteSpace(serviceConfig))
@@ -78,6 +95,14 @@ namespace OrleansAWSUtils.Storage
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     accessKey = value[1];
             }
+
+            var sessionTokenConfig = parameters.Where(p => p.Contains(SessionTokenPropertyName)).FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(sessionTokenConfig))
+            {
+                var value = sessionTokenConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
+                    sessionToken = value[1];
+            }
         }
 
         private void CreateClient()
@@ -88,6 +113,12 @@ namespace OrleansAWSUtils.Storage
                 // Local SQS instance (for testing)
                 var credentials = new BasicAWSCredentials("dummy", "dummyKey");
                 sqsClient = new AmazonSQSClient(credentials, new AmazonSQSConfig { ServiceURL = service });
+            }
+            else if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey) && !string.IsNullOrEmpty(sessionToken))
+            {
+                // AWS SQS instance (auth via explicit credentials)
+                var credentials = new SessionAWSCredentials(accessKey, secretKey, sessionToken);
+                sqsClient = new AmazonSQSClient(credentials, new AmazonSQSConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
             }
             else if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey))
             {
@@ -128,7 +159,44 @@ namespace OrleansAWSUtils.Storage
             {
                 if (string.IsNullOrWhiteSpace(await GetQueueUrl()))
                 {
-                    var response = await sqsClient.CreateQueueAsync(QueueName);
+                    var createQueueRequest = new CreateQueueRequest(QueueName);
+
+                    if (sqsOptions.FifoQueue)
+                    {
+                        // The stream must have these attributes to be a valid FIFO queue.
+                        createQueueRequest.Attributes = new()
+                        {
+                            { QueueAttributeName.FifoQueue, "true" },
+                            { QueueAttributeName.FifoThroughputLimit, "perMessageGroupId" },
+                            { QueueAttributeName.DeduplicationScope, "messageGroup" },
+                            { QueueAttributeName.ContentBasedDeduplication, "true" },
+                        };
+
+                        // We require to bring down the AWS set SequenceNumber when on a FIFO queue
+                        // in order to populate the SQSFIFOSequenceToken from it.
+
+                        if (!receiveMessageAttributes.Contains(MessageSystemAttributeName.SequenceNumber))
+                            receiveMessageAttributes.Add(MessageSystemAttributeName.SequenceNumber);
+                        if (!receiveMessageAttributes.Contains(MessageSystemAttributeName.MessageGroupId))
+                            receiveMessageAttributes.Add(MessageSystemAttributeName.MessageGroupId);
+
+                        // FIFO Queue does not support Long Polling
+                        sqsOptions.ReceiveWaitTimeSeconds = null;
+                    }
+
+                    if (sqsOptions.ReceiveWaitTimeSeconds.HasValue)
+                    {
+                        createQueueRequest.Attributes.Add(QueueAttributeName.ReceiveMessageWaitTimeSeconds,
+                            sqsOptions.ReceiveWaitTimeSeconds.Value.ToString());
+                    }
+
+                    if (sqsOptions.VisibilityTimeoutSeconds.HasValue)
+                    {
+                        createQueueRequest.Attributes.Add(QueueAttributeName.VisibilityTimeout,
+                            sqsOptions.VisibilityTimeoutSeconds.Value.ToString());
+                    }
+
+                    var response = await sqsClient.CreateQueueAsync(createQueueRequest);
                     queueUrl = response.QueueUrl;
                 }
             }
@@ -169,7 +237,11 @@ namespace OrleansAWSUtils.Storage
                     throw new InvalidOperationException("Queue not initialized");
 
                 message.QueueUrl = queueUrl;
-                await sqsClient.SendMessageAsync(message);
+                var response = await sqsClient.SendMessageAsync(message);
+                if (response.HttpStatusCode != HttpStatusCode.OK)
+                {
+                    throw new Exception("Failed to send message into SQS. ");
+                }
             }
             catch (Exception exc)
             {
@@ -192,7 +264,18 @@ namespace OrleansAWSUtils.Storage
                 if (count < 1)
                     throw new ArgumentOutOfRangeException(nameof(count));
 
-                var request = new ReceiveMessageRequest { QueueUrl = queueUrl, MaxNumberOfMessages = count <= MAX_NUMBER_OF_MESSAGE_TO_PEEK ? count : MAX_NUMBER_OF_MESSAGE_TO_PEEK };
+
+                var request = new ReceiveMessageRequest
+                {
+                    QueueUrl = queueUrl,
+                    MaxNumberOfMessages = count <= MAX_NUMBER_OF_MESSAGE_TO_PEEK ? count : MAX_NUMBER_OF_MESSAGE_TO_PEEK,
+                    AttributeNames = receiveAttributes,
+                    MessageAttributeNames = receiveMessageAttributes,
+                };
+
+                if (sqsOptions.ReceiveWaitTimeSeconds.HasValue)
+                    request.WaitTimeSeconds = sqsOptions.ReceiveWaitTimeSeconds.Value;
+
                 var response = await sqsClient.ReceiveMessageAsync(request);
                 return response.Messages;
             }
@@ -221,7 +304,7 @@ namespace OrleansAWSUtils.Storage
                 if (string.IsNullOrWhiteSpace(queueUrl))
                     throw new InvalidOperationException("Queue not initialized");
 
-                await sqsClient.DeleteMessageAsync(
+                var result = await sqsClient.DeleteMessageAsync(
                     new DeleteMessageRequest { QueueUrl = queueUrl, ReceiptHandle = message.ReceiptHandle });
             }
             catch (Exception exc)
@@ -230,10 +313,71 @@ namespace OrleansAWSUtils.Storage
             }
         }
 
+        public async Task DeleteMessages(IEnumerable<SQSMessage> messages)
+        {
+            try
+            {
+                foreach (var message in messages)
+                {
+                    ValidateMessageForDeletion(message);
+                }
+
+                foreach (var batch in messages.Chunk(MAX_NUMBER_OF_MESSAGE_TO_PEEK))
+                {
+                    var deleteRequest = new DeleteMessageBatchRequest
+                    {
+                        QueueUrl = queueUrl,
+                        Entries = batch
+                            .Select((m, i) =>
+                                new DeleteMessageBatchRequestEntry(i.ToString(), m.ReceiptHandle))
+                            .ToList()
+                    };
+
+                    var result = await sqsClient.DeleteMessageBatchAsync(deleteRequest);
+                    foreach (var failed in result.Failed)
+                    {
+                        Logger.LogWarning("Failed to delete message {MessageId} from SQS queue {QueueName}. Error code: {ErrorCode}. Error message: {ErrorMessage}",
+                                failed.Id, QueueName, failed.Code, failed.Message);
+                    }
+                }
+            }
+            catch (Exception exc)
+            {
+                ReportErrorAndRethrow(exc, "GetMessages", ErrorCode.StreamProviderManagerBase);
+            }
+        }
+
+        private void ValidateMessageForDeletion(SQSMessage message)
+        {
+            if (message == null)
+                throw new ArgumentNullException(nameof(message));
+
+            if (string.IsNullOrWhiteSpace(message.ReceiptHandle))
+                throw new ArgumentNullException(nameof(message.ReceiptHandle));
+
+            if (string.IsNullOrWhiteSpace(queueUrl))
+                throw new InvalidOperationException("Queue not initialized");
+        }
+
         private void ReportErrorAndRethrow(Exception exc, string operation, ErrorCode errorCode)
         {
             Logger.LogError((int)errorCode, exc, "Error doing {Operation} for SQS queue {QueueName}", operation, QueueName);
             throw new AggregateException($"Error doing {operation} for SQS queue {QueueName}", exc);
+        }
+
+        private static string ConstructQueueName(string queueName, SqsOptions sqsOptions, string serviceId)
+        {
+            var queueNameBuilder = new StringBuilder();
+            if (!string.IsNullOrEmpty(serviceId))
+            {
+                queueNameBuilder.Append(serviceId);
+                queueNameBuilder.Append("-");
+            }
+
+            queueNameBuilder.Append(queueName);
+            if (sqsOptions.FifoQueue)
+                queueNameBuilder.Append(".fifo");
+            return queueNameBuilder.ToString();
         }
     }
 }
