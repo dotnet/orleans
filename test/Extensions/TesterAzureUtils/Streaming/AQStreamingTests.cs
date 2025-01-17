@@ -22,23 +22,30 @@ namespace Tester.AzureUtils.Streaming
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
-            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
-            builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
-        }
-
-        private class MyClientBuilderConfigurator : IClientBuilderConfigurator
-        {
-            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            builder.ConfigureHostConfiguration(cb =>
             {
-                clientBuilder
-                    .AddAzureQueueStreams(AzureQueueStreamProviderName, b=>
-                    b.ConfigureAzureQueue(ob=>ob.Configure<IOptions<ClusterOptions>>(
-                        (options, dep) =>
-                        {
-                            options.ConfigureTestDefaults();
-                            options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
-                        })));
-            }
+                Dictionary<string, string> queueConfig = [];
+                void ConfigureStreaming(string option, string value)
+                {
+                    var prefix = $"Orleans:Streaming:{AzureQueueStreamProviderName}:";
+                    queueConfig[$"{prefix}{option}"] = value;
+                }
+
+                ConfigureStreaming("ProviderType", "AzureQueueStorage");
+                ConfigureStreaming("ConnectionString", TestDefaultConfiguration.UseAadAuthentication
+                    ? TestDefaultConfiguration.DataBlobUri.AbsoluteUri
+                    : TestDefaultConfiguration.DataConnectionString);
+
+                var names = AzureQueueUtilities.GenerateQueueNames(builder.Options.ClusterId, queueCount);
+                for (var i = 0; i < names.Count; i++)
+                {
+                    ConfigureStreaming($"QueueNames:{i}", names[i]);
+                }
+
+                cb.AddInMemoryCollection(queueConfig);
+            });
+
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
 
         private class SiloBuilderConfigurator : ISiloConfigurator
@@ -56,14 +63,7 @@ namespace Tester.AzureUtils.Streaming
                             options.ConfigureTestDefaults();
                             options.DeleteStateOnClear = true;
                         }))
-                    .AddMemoryGrainStorage("MemoryStore")
-                    .AddAzureQueueStreams(AzureQueueStreamProviderName, c=>
-                        c.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
-                            (options, dep) =>
-                            {
-                                options.ConfigureTestDefaults();
-                                options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
-                        })));
+                    .AddMemoryGrainStorage("MemoryStore");
             }
         }
 
@@ -129,7 +129,7 @@ namespace Tester.AzureUtils.Streaming
             await runner.StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients();
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5648"), TestCategory("Functional")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5648"), TestCategory("Functional")]
         public async Task AQ_07_ManyDifferent_ManyProducerClientsManyConsumerGrains()
         {
             await runner.StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains();
