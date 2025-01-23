@@ -26,9 +26,9 @@ jobs:
           8.0.x
     - name: Build
       run: dotnet build
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
-        name: build_output
+        name: build_log_${{ matrix.os }}
         retention-days: 1
         path: |
           **/*.binlog
@@ -61,9 +61,9 @@ jobs:
         ORLEANSREDISCONNECTIONSTRING: "localhost:6379,ssl=False,abortConnect=False"
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: test_output
+        name: test_output_${{ github.job }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -88,9 +88,9 @@ jobs:
         CASSANDRAVERSION: ${{ matrix.dbversion }}
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: test_output
+        name: test_output_${{ github.job }}_${{ matrix.dbversion }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -128,9 +128,9 @@ jobs:
         ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: test_output
+        name: test_output_${{ github.job }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -163,9 +163,9 @@ jobs:
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: test_output
+        name: test_output_${{ github.job }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -200,9 +200,9 @@ jobs:
         ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;"
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: test_output
+        name: test_output_${{ github.job }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -239,9 +239,9 @@ jobs:
         ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: test_output
+        name: test_output_${{ github.job }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -285,9 +285,9 @@ jobs:
         ORLEANSCOSMOSDBACCOUNTKEY: "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=="
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: test_output
+        name: test_output_${{ github.job }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -321,9 +321,9 @@ jobs:
         ORLEANSCONSULCONNECTIONSTRING: "http://localhost:8500"
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: test_output
+        name: test_output_${{ github.job }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -354,9 +354,9 @@ jobs:
         ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: test_output
+        name: test_output_${{ github.job }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -395,9 +395,9 @@ jobs:
         ORLEANSDYNAMODBSECRETKEY: "pass"
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: test_output
+        name: test_output_${{ github.job }}
         retention-days: 1
         path: |
           **/TestResults/*
