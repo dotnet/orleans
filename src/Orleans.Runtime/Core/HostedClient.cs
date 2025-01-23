@@ -242,7 +242,7 @@ namespace Orleans.Runtime
                     {
                         if (this.logger.IsEnabled(LogLevel.Debug))
                         {
-                            this.logger.LogDebug($"{nameof(Runtime.HostedClient)} completed processing all messages. Shutting down.");
+                            Log.CompletedProcessingMessages(this.logger);
                         }
                         break;
                     }
@@ -257,16 +257,28 @@ namespace Orleans.Runtime
                                 this.invokableObjects.Dispatch(message);
                                 break;
                             default:
-                                this.logger.LogError((int)ErrorCode.Runtime_Error_100327, "Message not supported: {Message}", message);
+                                Log.MessageNotSupported(this.logger, message);
                                 break;
                         }
                     }
                 }
                 catch (Exception exception)
                 {
-                    this.logger.LogError((int)ErrorCode.Runtime_Error_100326, exception, "RunClientMessagePump has thrown an exception. Continuing.");
+                    Log.RunClientMessagePumpException(this.logger, exception);
                 }
             }
+        }
+
+        private static partial class Log
+        {
+            [LoggerMessage(1, LogLevel.Debug, "{HostedClient} completed processing all messages. Shutting down.")]
+            public static partial void CompletedProcessingMessages(ILogger logger);
+
+            [LoggerMessage(2, LogLevel.Error, "Message not supported: {Message}")]
+            public static partial void MessageNotSupported(ILogger logger, Message message);
+
+            [LoggerMessage(3, LogLevel.Error, "RunClientMessagePump has thrown an exception. Continuing.")]
+            public static partial void RunClientMessagePumpException(ILogger logger, Exception exception);
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)

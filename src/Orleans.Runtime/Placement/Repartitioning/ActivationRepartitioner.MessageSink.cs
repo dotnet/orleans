@@ -19,15 +19,21 @@ internal partial class ActivationRepartitioner : IMessageStatisticsSink
     private readonly BlockedBloomFilter? _anchoredFilter;
     private Task? _processPendingEdgesTask;
 
+    private static partial class Log
+    {
+        [LoggerMessage(1, LogLevel.Trace, "{Service} has started.")]
+        public static partial void ServiceStarted(ILogger logger, string service);
+
+        [LoggerMessage(2, LogLevel.Trace, "{Service} has stopped.")]
+        public static partial void ServiceStopped(ILogger logger, string service);
+    }
+
     public void StartProcessingEdges()
     {
         using var _ = new ExecutionContextSuppressor();
         _processPendingEdgesTask = ProcessPendingEdges(_shutdownCts.Token);
 
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace("{Service} has started.", nameof(ActivationRepartitioner));
-        }
+        Log.ServiceStarted(_logger, nameof(ActivationRepartitioner));
     }
 
     public async Task StopProcessingEdgesAsync(CancellationToken cancellationToken)
@@ -41,10 +47,7 @@ internal partial class ActivationRepartitioner : IMessageStatisticsSink
         _pendingMessageEvent.Signal();
         await _processPendingEdgesTask.WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
 
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace("{Service} has stopped.", nameof(ActivationRepartitioner));
-        }
+        Log.ServiceStopped(_logger, nameof(ActivationRepartitioner));
     }
 
     private async Task ProcessPendingEdges(CancellationToken cancellationToken)
