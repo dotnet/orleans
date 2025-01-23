@@ -9,7 +9,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.Diagnostics;
 using Orleans.CodeGenerator.Hashing;
-using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using static Orleans.CodeGenerator.SyntaxGeneration.SymbolExtensions;
