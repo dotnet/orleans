@@ -65,7 +65,7 @@ namespace Orleans.Runtime.MembershipService
                     initialEntries);
             this.updates = new AsyncEnumerable<MembershipTableSnapshot>(
                 initialValue: this.snapshot,
-                updateValidator: (previous, proposed) => proposed.Version > previous.Version,
+                updateValidator: (previous, proposed) => proposed.IsSuccessorTo(previous),
                 onPublished: update => Interlocked.Exchange(ref this.snapshot, update));
 
             this.membershipUpdateTimer = timerFactory.Create(
@@ -122,7 +122,7 @@ namespace Orleans.Runtime.MembershipService
                 }
             }
 
-            this.updates.TryPublish(snapshot);
+            this.updates.TryPublish(MembershipTableSnapshot.Update, snapshot);
         }
 
         private async Task<bool> RefreshInternal(bool requireCleanup)
@@ -479,8 +479,7 @@ namespace Orleans.Runtime.MembershipService
             if (table is null) throw new ArgumentNullException(nameof(table));
             if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug($"{nameof(ProcessTableUpdate)} (called from {{Caller}}) membership table {{Table}}", caller, table.ToString());
 
-            var updated = MembershipTableSnapshot.Create(table);
-            if (this.updates.TryPublish(updated))
+            if (this.updates.TryPublish(MembershipTableSnapshot.Update, table))
             {
                 this.LogMissedIAmAlives(table);
 
@@ -504,9 +503,9 @@ namespace Orleans.Runtime.MembershipService
                 if (entry.Status != SiloStatus.Active) continue;
 
                 var now = GetDateTimeUtcNow();
-                var missedSince = entry.HasMissedIAmAlivesSince(this.clusterMembershipOptions, now);
-                if (missedSince != null)
+                if (entry.HasMissedIAmAlives(this.clusterMembershipOptions, now))
                 {
+                    var missedSince = entry.EffectiveIAmAliveTime;
                     log.LogWarning(
                         (int)ErrorCode.MembershipMissedIAmAliveTableUpdate,
                         "Noticed that silo {SiloAddress} has not updated it's IAmAliveTime table column recently."
@@ -618,7 +617,7 @@ namespace Orleans.Runtime.MembershipService
                 var entry = item.Value;
                 if (entry.SiloAddress.IsSameLogicalSilo(this.myAddress)) continue;
                 if (!IsFunctionalForMembership(entry.Status)) continue;
-                if (entry.HasMissedIAmAlivesSince(this.clusterMembershipOptions, now) != default) continue;
+                if (entry.HasMissedIAmAlives(this.clusterMembershipOptions, now)) continue;
 
                 gossipPartners.Add(entry.SiloAddress);
 
@@ -689,7 +688,7 @@ namespace Orleans.Runtime.MembershipService
             return await DeclareDead(entry, eTag, table.Version, GetDateTimeUtcNow());
         }
 
-        public async Task<bool> TryToSuspectOrKill(SiloAddress silo)
+        public async Task<bool> TryToSuspectOrKill(SiloAddress silo, SiloAddress indirectProbingSilo = null)
         {
             var table = await membershipTableProvider.ReadAll();
             var now = GetDateTimeUtcNow();
@@ -765,11 +764,20 @@ namespace Orleans.Runtime.MembershipService
             // Try to add our vote to the list and tally the fresh votes again.
             var prevList = entry.SuspectTimes?.ToList() ?? new List<Tuple<SiloAddress, DateTime>>();
             entry.AddOrUpdateSuspector(myAddress, now, clusterMembershipOptions.NumVotesForDeathDeclaration);
+
+            // Include the indirect probe silo's vote as well, if it exists.
+            if (indirectProbingSilo is not null)
+            {
+                entry.AddOrUpdateSuspector(indirectProbingSilo, now, clusterMembershipOptions.NumVotesForDeathDeclaration);
+            }
+
             freshVotes = entry.GetFreshVotes(now, this.clusterMembershipOptions.DeathVoteExpirationTimeout);
 
             // Determine if there are enough votes to evict the silo.
             // Handle the corner case when the number of active silos is very small (then my only vote is enough)
-            int activeSilos = table.GetSiloStatuses(status => status == SiloStatus.Active, true, myAddress).Count;
+            int activeSilos = table.Members.Count(kv =>
+                kv.Item1.Status == SiloStatus.Active &&
+                !kv.Item1.HasMissedIAmAlives(clusterMembershipOptions, now));
             if (freshVotes.Count >= clusterMembershipOptions.NumVotesForDeathDeclaration || freshVotes.Count >= (activeSilos + 1) / 2)
             {
                 // Find the local silo's vote index

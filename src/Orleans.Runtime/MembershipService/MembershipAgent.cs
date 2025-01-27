@@ -133,12 +133,24 @@ namespace Orleans.Runtime.MembershipService
                 try
                 {
                     var activeSilos = new List<SiloAddress>();
-                    foreach (var item in this.tableManager.MembershipTableSnapshot.Entries)
+
+                    // Account for a misconfigured local clock by snapping the time used for
+                    // calculations to the latest IAmAliveTime.
+                    var entries = tableManager.MembershipTableSnapshot.Entries.Values.ToList();
+                    DateTimeOffset maxTime = now;
+                    foreach (var entry in entries)
                     {
-                        var entry = item.Value;
+                        if (entry.EffectiveIAmAliveTime > maxTime)
+                        {
+                            maxTime = entry.EffectiveIAmAliveTime;
+                        }
+                    }
+
+                    foreach (var entry in entries)
+                    {
                         if (entry.Status != SiloStatus.Active) continue;
                         if (entry.SiloAddress.IsSameLogicalSilo(this.localSilo.SiloAddress)) continue;
-                        if (entry.HasMissedIAmAlivesSince(this.clusterMembershipOptions, now) != default) continue;
+                        if (entry.HasMissedIAmAlives(this.clusterMembershipOptions, maxTime)) continue;
 
                         activeSilos.Add(entry.SiloAddress);
                     }
