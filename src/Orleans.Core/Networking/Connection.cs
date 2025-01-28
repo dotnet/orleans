@@ -150,6 +150,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             _initializationTcs.TrySetException(exception ?? new ConnectionAbortedException("Connection initialization failed"));
+            _initializationTcs.Task.Ignore();
 
             if (this.Log.IsEnabled(LogLevel.Information))
             {

@@ -110,7 +110,11 @@ namespace Orleans.TestingHost
         {
             var settings = new JsonSerializerSettings
             {
+#pragma warning disable CA2326
+                // Safe to use here since it's only used to serialize the test config
                 TypeNameHandling = TypeNameHandling.Auto,
+#pragma warning restore CA2326
+
                 Formatting = Formatting.None,
             };
 
