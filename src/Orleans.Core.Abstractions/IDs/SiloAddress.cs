@@ -11,7 +11,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Orleans.Serialization.Configuration;
 
 #nullable enable
 namespace Orleans.Runtime
