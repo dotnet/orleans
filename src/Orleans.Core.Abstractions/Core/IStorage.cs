@@ -69,7 +69,7 @@ namespace Orleans.Core
         Task ClearStateAsync(CancellationToken cancellationToken) => ClearStateAsync();
 
         /// <summary>
-        /// (Optional) Writes grain state to storage.
+        /// Writes grain state to storage.
         /// </summary>
         /// <param name="cancellationToken"></param>
         /// <remarks>
