@@ -56,7 +56,7 @@ namespace Orleans.Core
         Task ReadStateAsync();
 
         /// <summary>
-        /// (Optional) Clears the grain state.
+        /// Clears the grain state.
         /// </summary>
         /// <param name="cancellationToken"></param>
         /// <remarks>
