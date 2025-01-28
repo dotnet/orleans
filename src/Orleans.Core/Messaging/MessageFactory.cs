@@ -1,8 +1,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO.Hashing;
-using System.Numerics;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
@@ -11,7 +10,6 @@ namespace Orleans.Runtime
 {
     internal class MessageFactory
     {
-        [ThreadStatic]
         private static ulong _nextId;
 
         // The nonce reduces the chance of an id collision for a given grain to effectively zero. Id collisions are only relevant in scenarios
@@ -51,12 +49,7 @@ namespace Orleans.Runtime
 
         private CorrelationId GetNextCorrelationId()
         {
-            // To avoid cross-thread coordination, combine a thread-local counter with the managed thread id. The values are XOR'd together with a
-            // 64-bit nonce. Rotating the thread id reduces the chance of collision further by putting the significant bits at the high end, where
-            // they are less likely to collide with the per-thread counter, which could become relevant if the counter exceeded 2^32.
-            var managedThreadId = Environment.CurrentManagedThreadId;
-            var tid = (ulong)(managedThreadId << 16 | managedThreadId >> 16) << 32;
-            var id = _seed ^ tid ^ ++_nextId;
+            var id = _seed ^ Interlocked.Increment(ref _nextId);
             return new CorrelationId(unchecked((long)id));
         }
 
