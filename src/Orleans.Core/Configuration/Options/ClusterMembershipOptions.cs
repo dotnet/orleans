@@ -68,11 +68,12 @@ namespace Orleans.Configuration
         /// </summary>
         /// <remarks>
         /// This determines how many hosts each host will monitor by default.
-        /// A low value, such as the default value of three, is generally sufficient and allows for prompt removal of another silo in the event that it stops functioning.
+        /// A low value, such as 3, is generally sufficient and allows for prompt removal of another silo in the event that it stops functioning.
+        /// Monitoring is not expensive, however, and a higher value improves recovery during sudden changes in cluster size.
         /// When a silo becomes suspicious of another silo, additional silos may begin to probe that silo to speed up the detection of non-functioning silos.
         /// </remarks>
-        /// <value>Each silo will actively monitor up to three other silos by default.</value>
-        public int NumProbedSilos { get; set; } = 3;
+        /// <value>Each silo will actively monitor up to 10 other silos by default.</value>
+        public int NumProbedSilos { get; set; } = 10;
 
         /// <summary>
         /// Gets or sets the number of missed probe requests from a silo that lead to suspecting this silo as down.
