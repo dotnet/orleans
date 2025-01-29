@@ -295,15 +295,7 @@ namespace Orleans.Runtime.MembershipService
             }
             else if (probeResult.Status == ProbeResultStatus.Failed)
             {
-                if (this.clusterMembershipOptions.CurrentValue.NumVotesForDeathDeclaration <= 2)
-                {
-                    // Since both this silo and another silo were unable to probe the target silo, we declare it dead.
-                    await this.membershipService.TryKill(monitor.SiloAddress).ConfigureAwait(false);
-                }
-                else
-                {
-                    await this.membershipService.TryToSuspectOrKill(monitor.SiloAddress).ConfigureAwait(false);
-                }
+                await this.membershipService.TryToSuspectOrKill(monitor.SiloAddress, probeResult.Intermediary).ConfigureAwait(false);
             }
         }
 
