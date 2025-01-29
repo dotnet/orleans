@@ -688,7 +688,7 @@ namespace Orleans.Runtime.MembershipService
             return await DeclareDead(entry, eTag, table.Version, GetDateTimeUtcNow());
         }
 
-        public async Task<bool> TryToSuspectOrKill(SiloAddress silo)
+        public async Task<bool> TryToSuspectOrKill(SiloAddress silo, SiloAddress indirectProbingSilo = null)
         {
             var table = await membershipTableProvider.ReadAll();
             var now = GetDateTimeUtcNow();
@@ -764,6 +764,13 @@ namespace Orleans.Runtime.MembershipService
             // Try to add our vote to the list and tally the fresh votes again.
             var prevList = entry.SuspectTimes?.ToList() ?? new List<Tuple<SiloAddress, DateTime>>();
             entry.AddOrUpdateSuspector(myAddress, now, clusterMembershipOptions.NumVotesForDeathDeclaration);
+
+            // Include the indirect probe silo's vote as well, if it exists.
+            if (indirectProbingSilo is not null)
+            {
+                entry.AddOrUpdateSuspector(indirectProbingSilo, now, clusterMembershipOptions.NumVotesForDeathDeclaration);
+            }
+
             freshVotes = entry.GetFreshVotes(now, this.clusterMembershipOptions.DeathVoteExpirationTimeout);
 
             // Determine if there are enough votes to evict the silo.
