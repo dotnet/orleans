@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -28,7 +29,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly IAsyncTimer _pingTimer;
         private ValueStopwatch _elapsedSinceLastSuccessfulResponse;
         private readonly Func<SiloHealthMonitor, ProbeResult, Task> _onProbeResult;
-        private Task _runTask;
+        private Task? _runTask;
 
         /// <summary>
         /// The id of the next probe.
@@ -152,8 +153,8 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task Run()
         {
-            ClusterMembershipSnapshot activeMembersSnapshot = default;
-            SiloAddress[] otherNodes = default;
+            ClusterMembershipSnapshot? activeMembersSnapshot = default;
+            SiloAddress[]? otherNodes = default;
             TimeSpan? overrideDelay = RandomTimeSpan.Next(_clusterMembershipOptions.CurrentValue.ProbeTimeout);
             while (await _pingTimer.NextTick(overrideDelay))
             {
@@ -164,7 +165,7 @@ namespace Orleans.Runtime.MembershipService
                 {
                     // Discover the other active nodes in the cluster, if there are any.
                     var membershipSnapshot = _membershipService.CurrentSnapshot;
-                    if (otherNodes is null || !object.ReferenceEquals(activeMembersSnapshot, membershipSnapshot))
+                    if (otherNodes is null || !ReferenceEquals(activeMembersSnapshot, membershipSnapshot))
                     {
                         activeMembersSnapshot = membershipSnapshot;
                         otherNodes = membershipSnapshot.Members.Values
@@ -175,7 +176,7 @@ namespace Orleans.Runtime.MembershipService
 
                     var isDirectProbe = !_clusterMembershipOptions.CurrentValue.EnableIndirectProbes || _failedProbes < _clusterMembershipOptions.CurrentValue.NumMissedProbesLimit - 1 || otherNodes.Length == 0;
                     var timeout = GetTimeout(isDirectProbe);
-                    var cancellation = new CancellationTokenSource(timeout);
+                    using var cancellation = new CancellationTokenSource(timeout);
 
                     if (isDirectProbe)
                     {
@@ -196,7 +197,7 @@ namespace Orleans.Runtime.MembershipService
                         // Note that all recused silos will be included in the consideration set the next time cluster membership changes.
                         if (probeResult.Status != ProbeResultStatus.Succeeded && probeResult.IntermediaryHealthDegradationScore > 0)
                         {
-                            _log.LogInformation("Recusing unhealthy intermediary {Intermediary} and trying again with remaining nodes", intermediary);
+                            _log.LogInformation("Recusing unhealthy intermediary '{Intermediary}' and trying again with remaining nodes", intermediary);
                             otherNodes = otherNodes.Where(node => !node.Equals(intermediary)).ToArray();
                             overrideDelay = TimeSpan.FromMilliseconds(250);
                         }
@@ -249,7 +250,7 @@ namespace Orleans.Runtime.MembershipService
 
             var roundTripTimer = ValueStopwatch.StartNew();
             ProbeResult probeResult;
-            Exception failureException;
+            Exception? failureException;
             try
             {
                 await _prober.Probe(SiloAddress, id, cancellation).WaitAsync(cancellation);
@@ -347,7 +348,7 @@ namespace Orleans.Runtime.MembershipService
                     MessagingInstruments.OnPingReplyReceived(SiloAddress);
 
                     _failedProbes = 0;
-                    probeResult = ProbeResult.CreateIndirect(0, ProbeResultStatus.Succeeded, indirectResult);
+                    probeResult = ProbeResult.CreateIndirect(0, ProbeResultStatus.Succeeded, indirectResult, intermediary);
                 }
                 else
                 {
@@ -360,7 +361,7 @@ namespace Orleans.Runtime.MembershipService
                             id,
                             SiloAddress,
                             indirectResult.IntermediaryHealthScore);
-                        probeResult = ProbeResult.CreateIndirect(_failedProbes, ProbeResultStatus.Unknown, indirectResult);
+                        probeResult = ProbeResult.CreateIndirect(_failedProbes, ProbeResultStatus.Unknown, indirectResult, intermediary);
                     }
                     else
                     {
@@ -375,7 +376,7 @@ namespace Orleans.Runtime.MembershipService
                             indirectResult.IntermediaryHealthScore);
 
                         var missed = ++_failedProbes;
-                        probeResult = ProbeResult.CreateIndirect(missed, ProbeResultStatus.Failed, indirectResult);
+                        probeResult = ProbeResult.CreateIndirect(missed, ProbeResultStatus.Failed, indirectResult, intermediary);
                     }
                 }
             }
@@ -383,7 +384,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 MessagingInstruments.OnPingReplyMissed(SiloAddress);
                 _log.LogWarning(exception, "Indirect probe request failed.");
-                probeResult = ProbeResult.CreateIndirect(_failedProbes, ProbeResultStatus.Unknown, default);
+                probeResult = ProbeResult.CreateIndirect(_failedProbes, ProbeResultStatus.Unknown, default, intermediary);
             }
 
             return probeResult;
@@ -398,19 +399,20 @@ namespace Orleans.Runtime.MembershipService
         [StructLayout(LayoutKind.Auto)]
         public readonly struct ProbeResult
         {
-            private ProbeResult(int failedProbeCount, ProbeResultStatus status, bool isDirectProbe, int intermediaryHealthDegradationScore)
+            private ProbeResult(int failedProbeCount, ProbeResultStatus status, bool isDirectProbe, int intermediaryHealthDegradationScore, SiloAddress? intermediary)
             {
                 FailedProbeCount = failedProbeCount;
                 Status = status;
                 IsDirectProbe = isDirectProbe;
                 IntermediaryHealthDegradationScore = intermediaryHealthDegradationScore;
+                Intermediary = intermediary;
             }
 
             public static ProbeResult CreateDirect(int failedProbeCount, ProbeResultStatus status)
-                => new(failedProbeCount, status, isDirectProbe: true, 0);
+                => new(failedProbeCount, status, isDirectProbe: true, 0, null);
 
-            public static ProbeResult CreateIndirect(int failedProbeCount, ProbeResultStatus status, IndirectProbeResponse indirectProbeResponse)
-                => new(failedProbeCount, status, isDirectProbe: false, indirectProbeResponse.IntermediaryHealthScore);
+            public static ProbeResult CreateIndirect(int failedProbeCount, ProbeResultStatus status, IndirectProbeResponse indirectProbeResponse, SiloAddress? intermediary)
+                => new(failedProbeCount, status, isDirectProbe: false, indirectProbeResponse.IntermediaryHealthScore, intermediary);
 
             public int FailedProbeCount { get; }
 
@@ -419,6 +421,8 @@ namespace Orleans.Runtime.MembershipService
             public bool IsDirectProbe { get; }
 
             public int IntermediaryHealthDegradationScore { get; }
+
+            public SiloAddress? Intermediary { get; }
         }
 
         public enum ProbeResultStatus

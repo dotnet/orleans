@@ -199,7 +199,7 @@ namespace Orleans.Runtime.MembershipService
                 if (candidate.IsSameLogicalSilo(this.localSiloDetails.SiloAddress)) continue;
 
                 bool isSuspected = candidateEntry.GetFreshVotes(now, this.clusterMembershipOptions.CurrentValue.DeathVoteExpirationTimeout).Count > 0;
-                if (isSuspected)
+                if (isSuspected || candidateEntry.HasMissedIAmAlives(options: this.clusterMembershipOptions.CurrentValue, now))
                 {
                     additionalSilos.Add(candidate);
                 }
@@ -295,15 +295,7 @@ namespace Orleans.Runtime.MembershipService
             }
             else if (probeResult.Status == ProbeResultStatus.Failed)
             {
-                if (this.clusterMembershipOptions.CurrentValue.NumVotesForDeathDeclaration <= 2)
-                {
-                    // Since both this silo and another silo were unable to probe the target silo, we declare it dead.
-                    await this.membershipService.TryKill(monitor.SiloAddress).ConfigureAwait(false);
-                }
-                else
-                {
-                    await this.membershipService.TryToSuspectOrKill(monitor.SiloAddress).ConfigureAwait(false);
-                }
+                await this.membershipService.TryToSuspectOrKill(monitor.SiloAddress, probeResult.Intermediary).ConfigureAwait(false);
             }
         }
 
