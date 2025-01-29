@@ -199,7 +199,7 @@ namespace Orleans.Runtime.MembershipService
                 if (candidate.IsSameLogicalSilo(this.localSiloDetails.SiloAddress)) continue;
 
                 bool isSuspected = candidateEntry.GetFreshVotes(now, this.clusterMembershipOptions.CurrentValue.DeathVoteExpirationTimeout).Count > 0;
-                if (isSuspected)
+                if (isSuspected || candidateEntry.HasMissedIAmAlives(options: this.clusterMembershipOptions.CurrentValue, now))
                 {
                     additionalSilos.Add(candidate);
                 }
