@@ -69,6 +69,11 @@ namespace Orleans.Metadata
         public const string PlacementStrategy = "placement-strategy";
 
         /// <summary>
+        /// The name of the placement strategy for grains of this type.
+        /// </summary>
+        public const string PlacementFilter = "placement-filter";
+
+        /// <summary>
         /// The directory policy for grains of this type.
         /// </summary>
         public const string GrainDirectory = "directory-policy";
