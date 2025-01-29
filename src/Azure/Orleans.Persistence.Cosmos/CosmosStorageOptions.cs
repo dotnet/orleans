@@ -17,7 +17,7 @@ public class CosmosGrainStorageOptions : CosmosOptions
     public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
 
     /// <summary>
-    /// Gets or sets a value indicating whether state should be deleted when <see cref="IStorage.ClearStateAsync"/> is called.
+    /// Gets or sets a value indicating whether state should be deleted when <see cref="IStorage.ClearStateAsync()"/> is called.
     /// </summary>
     public bool DeleteStateOnClear { get; set; }
 
