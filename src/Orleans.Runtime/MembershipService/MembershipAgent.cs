@@ -138,7 +138,7 @@ namespace Orleans.Runtime.MembershipService
                         var entry = item.Value;
                         if (entry.Status != SiloStatus.Active) continue;
                         if (entry.SiloAddress.IsSameLogicalSilo(this.localSilo.SiloAddress)) continue;
-                        if (entry.HasMissedIAmAlivesSince(this.clusterMembershipOptions, now) != default) continue;
+                        if (entry.HasMissedIAmAlives(this.clusterMembershipOptions, now) != default) continue;
 
                         activeSilos.Add(entry.SiloAddress);
                     }
