@@ -503,9 +503,9 @@ namespace Orleans.Runtime.MembershipService
                 if (entry.Status != SiloStatus.Active) continue;
 
                 var now = GetDateTimeUtcNow();
-                var missedSince = entry.HasMissedIAmAlivesSince(this.clusterMembershipOptions, now);
-                if (missedSince != null)
+                if (entry.HasMissedIAmAlives(this.clusterMembershipOptions, now))
                 {
+                    var missedSince = entry.EffectiveIAmAliveTime;
                     log.LogWarning(
                         (int)ErrorCode.MembershipMissedIAmAliveTableUpdate,
                         "Noticed that silo {SiloAddress} has not updated it's IAmAliveTime table column recently."
@@ -617,7 +617,7 @@ namespace Orleans.Runtime.MembershipService
                 var entry = item.Value;
                 if (entry.SiloAddress.IsSameLogicalSilo(this.myAddress)) continue;
                 if (!IsFunctionalForMembership(entry.Status)) continue;
-                if (entry.HasMissedIAmAlivesSince(this.clusterMembershipOptions, now) != default) continue;
+                if (entry.HasMissedIAmAlives(this.clusterMembershipOptions, now)) continue;
 
                 gossipPartners.Add(entry.SiloAddress);
 
