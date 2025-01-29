@@ -745,14 +745,14 @@ namespace Orleans.Runtime.MembershipService
             // Get all valid (non-expired) votes
             var freshVotes = entry.GetFreshVotes(now, this.clusterMembershipOptions.DeathVoteExpirationTimeout);
 
-            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Current number of fresh voters for {SiloAddress} is {FreshVotes}", silo, freshVotes.Count.ToString());
+            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Current number of fresh voters for '{SiloAddress}' is '{FreshVotes}'.", silo, freshVotes.Count.ToString());
 
             if (freshVotes.Count >= this.clusterMembershipOptions.NumVotesForDeathDeclaration)
             {
                 // this should not happen ...
                 log.LogError(
                     (int)ErrorCode.Runtime_Error_100053,
-                    "Silo {SiloAddress} is suspected by {SuspectorCount} which is more or equal than {NumVotesForDeathDeclaration}, but is not marked as dead. This is a bug!!!",
+                    "Silo '{SiloAddress}' is suspected by '{SuspecterCount}' which is greater than or equal to '{NumVotesForDeathDeclaration}', but is not marked as dead. This is a bug!",
                     entry.SiloAddress,
                     freshVotes.Count.ToString(),
                     this.clusterMembershipOptions.NumVotesForDeathDeclaration.ToString());
@@ -775,8 +775,11 @@ namespace Orleans.Runtime.MembershipService
 
             // Determine if there are enough votes to evict the silo.
             // Handle the corner case when the number of active silos is very small (then my only vote is enough)
-            int activeSilos = table.GetSiloStatuses(status => status == SiloStatus.Active, true, myAddress).Count;
-            if (freshVotes.Count >= clusterMembershipOptions.NumVotesForDeathDeclaration || freshVotes.Count >= (activeSilos + 1) / 2)
+            int activeNonStaleSilos = table.Members.Count(kv =>
+                kv.Item1.Status == SiloStatus.Active &&
+                !kv.Item1.HasMissedIAmAlives(clusterMembershipOptions, now));
+            var numVotesRequiredToEvict = Math.Min(clusterMembershipOptions.NumVotesForDeathDeclaration, (activeNonStaleSilos + 1) / 2);
+            if (freshVotes.Count >= numVotesRequiredToEvict)
             {
                 // Find the local silo's vote index
                 int myVoteIndex = freshVotes.FindIndex(voter => myAddress.Equals(voter.Item1));
@@ -784,12 +787,11 @@ namespace Orleans.Runtime.MembershipService
                 // Kick this silo off
                 log.LogInformation(
                     (int)ErrorCode.MembershipMarkingAsDead,
-                    "Going to mark silo {SiloAddress} as DEAD in the table #1. This silo is the last voter: #FreshVotes={FreshVotes}, MyVoteIndex = {MyVoteIndex}, NumVotesForDeathDeclaration={NumVotesForDeathDeclaration} , #ActiveSilos={ActiveSiloCount}, suspect list={SuspectingSilos}",
+                    "Evicting '{SiloAddress}'. Fresh vote count: '{FreshVotes}', votes required to evict: '{NumVotesRequiredToEvict}', non-stale silo count: '{NonStaleSiloCount}', suspecters: '{SuspectingSilos}'",
                     entry.SiloAddress,
                     freshVotes.Count,
-                    myVoteIndex,
                     this.clusterMembershipOptions.NumVotesForDeathDeclaration,
-                    activeSilos,
+                    activeNonStaleSilos,
                     PrintSuspectList(entry.SuspectTimes));
 
                 return await DeclareDead(entry, eTag, table.Version, now);
@@ -797,7 +799,7 @@ namespace Orleans.Runtime.MembershipService
 
             log.LogInformation(
                 (int)ErrorCode.MembershipVotingForKill,
-                "Putting my vote to mark silo {SiloAddress} as DEAD #2. Previous suspect list is {PreviousSuspectors}, trying to update to {Suspectors}, ETag={ETag}, FreshVotes is {FreshVotes}",
+                "Voting to evict '{SiloAddress}'. Previous suspect list is '{PreviousSuspecters}', trying to update to '{Suspecters}', ETag: '{ETag}', Fresh vote count: '{FreshVotes}'",
                 entry.SiloAddress, 
                 PrintSuspectList(prevList), 
                 PrintSuspectList(entry.SuspectTimes),
