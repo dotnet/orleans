@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using System.Data;
 using System.Globalization;
+using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Providers.Streams.Common;
@@ -13,15 +15,14 @@ using Xunit.Abstractions;
 using OrleansAWSUtils.Storage;
 using Orleans.Configuration;
 using Orleans.Serialization;
-using Orleans.Serialization.Session;
 using Orleans.Streaming.SQS.Streams;
-using Microsoft.Extensions.DependencyInjection;
+using Message = Amazon.SQS.Model.Message;
 
 namespace AWSUtils.Tests.Streaming
 {
     [TestCategory("AWS"), TestCategory("SQS")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
-    public class SQSAdapterTests : IAsyncLifetime
+    public class SQSDataAdapterTests : IAsyncLifetime
     {
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
@@ -31,7 +32,7 @@ namespace AWSUtils.Tests.Streaming
         public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSAdapterTests";
         private readonly TimeSpan QueuePollRate = TimeSpan.FromSeconds(1);
 
-        public SQSAdapterTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
+        public SQSDataAdapterTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             if (!AWSTestConstants.IsSqsAvailable)
             {
@@ -63,9 +64,10 @@ namespace AWSUtils.Tests.Streaming
             var options = new SqsOptions
             {
                 ConnectionString = AWSTestConstants.SqsConnectionString,
+                ReceiveMessageAttributes = new[] { "StreamId" }.ToList()
             };
             var clusterOptions = new ClusterOptions { ServiceId = this.clusterId };
-            var dataAdapter = new SQSDataAdapter(fixture.Serializer);
+            var dataAdapter = new StringOrIntSqlDataAdapter(fixture.Serializer);
             var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), Options.Create(clusterOptions), dataAdapter, NullLoggerFactory.Instance);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);
@@ -206,6 +208,50 @@ namespace AWSUtils.Tests.Streaming
             const string DeploymentIdFormat = "cluster-{0}";
             string now = DateTime.UtcNow.ToString("yyyy-MM-dd-hh-mm-ss-ffff");
             return string.Format(DeploymentIdFormat, now);
+        }
+
+        private class StringOrIntSqlDataAdapter : SQSDataAdapter
+        {
+            public StringOrIntSqlDataAdapter(Serializer serializer) : base(serializer)
+            {
+            }
+
+            public override IBatchContainer GetBatchContainer(Message sqsMessage, ref long sequenceNumber)
+            {
+                // Example extracts the StreamId as an attribute instead of it being serialized in the body.
+                if (!sqsMessage.MessageAttributes.TryGetValue("StreamId", out var streamIdStr))
+                    throw new DataException("SQS Message did not contain a StreamId attribute.");
+                var streamId = StreamId.Parse(Encoding.UTF8.GetBytes(streamIdStr.StringValue));
+
+                // Contrived example sends strings as quoted, and longs as unquoted.
+                var events = sqsMessage.Body.Split(Environment.NewLine)
+                    .Select(x => (object)(x.StartsWith('"') ? x.Trim('"') : int.Parse(x)))
+                    .ToList();
+
+                return new SQSBatchContainer(
+                    streamId,
+                    events,
+                    new Dictionary<string, object>(),
+                    new EventSequenceTokenV2(Interlocked.Increment(ref sequenceNumber))
+                );
+            }
+
+            public override Message ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+            {
+                // Contrived example sends strings as quoted, and longs as unquoted.
+                var serializedData = string.Join(Environment.NewLine,
+                    events.Select(x => x is string ? $"\"{x}\"" : x.ToString()));
+
+                // Example includes the StreamId as an attribute.
+                return new Message
+                {
+                    Attributes = new()
+                    {
+                        { "StreamId", streamId.ToString() }
+                    },
+                    Body = serializedData
+                };
+            }
         }
     }
 }
