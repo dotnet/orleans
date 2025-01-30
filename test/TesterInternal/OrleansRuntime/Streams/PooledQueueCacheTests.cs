@@ -182,6 +182,18 @@ namespace UnitTests.OrleansRuntime.Streams
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void AvoidCacheMissAfterResumeNotEmptyCache()
+        {
+            AvoidCacheMiss(false, true);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void AvoidCacheMissAfterResumeEmptyCache()
+        {
+            AvoidCacheMiss(true, true);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void AvoidCacheMissMultipleStreamsActive()
         {
             var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
@@ -234,7 +246,7 @@ namespace UnitTests.OrleansRuntime.Streams
             }
         }
 
-        private void AvoidCacheMiss(bool emptyCache)
+        private void AvoidCacheMiss(bool emptyCache, bool resume = false)
         {
             var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
             var dataAdapter = new TestCacheDataAdapter();
@@ -272,6 +284,13 @@ namespace UnitTests.OrleansRuntime.Streams
 
             // Enqueue another message for stream
             var lastSequenceNumber = EnqueueMessage(stream);
+
+            if (resume)
+            {
+                // Simulate the fact that we did a new handshake
+                cursor = cache.GetCursor(stream, new EventSequenceTokenV2(firstSequenceNumber));
+                Assert.True(cache.TryGetNextMessage(cursor, out _)); // Should basically be skipped
+            }
 
             // Should be able to consume the event just pushed
             Assert.True(cache.TryGetNextMessage(cursor, out var lastContainer));
