@@ -203,8 +203,10 @@ namespace Orleans.Providers.Streams.Common
                 // Check if we missed an event since we last purged the cache
                 if (this.lastPurgedToken.TryGetValue(cursor.StreamId, out var entry) && sequenceToken.CompareTo(entry.Token) >= 0)
                 {
-                    // If the token is more recent than the last purged token, then we didn't lose anything. Start from the oldest message in cache
-                    cursor.State = CursorStates.Set;
+                    // If the token is more recent than the last purged token, then we didn't lose anything. Start from the oldest message in cache.
+                    // We use the state "Recovering" instead of "Set" to avoid to skip a message, since we are not pointing to the latest
+                    // processed message, but the next message to process.
+                    cursor.State = CursorStates.Recovering;
                     cursor.CurrentBlock = oldestBlock;
                     cursor.Index = oldestBlock.Value.OldestMessageIndex;
                     cursor.SequenceToken = oldestBlock.Value.GetOldestSequenceToken(cacheDataAdapter);
@@ -265,7 +267,7 @@ namespace Orleans.Providers.Streams.Common
         /// <returns></returns>
         public bool TryGetNextMessage(object cursorObj, out IBatchContainer message)
         {
-            message = null;
+             message = null;
 
             if (cursorObj == null)
             {
@@ -278,13 +280,26 @@ namespace Orleans.Providers.Streams.Common
                 throw new ArgumentOutOfRangeException(nameof(cursorObj), "Cursor is bad");
             }
 
-            if (cursor.State != CursorStates.Set)
+            // Try to set the cursor if not set yet
+            if (cursor.State is CursorStates.Unset or CursorStates.Idle)
             {
                 SetCursor(cursor, cursor.SequenceToken);
-                if (cursor.State != CursorStates.Set)
-                {
-                    return false;
-                }
+            }
+
+            // A previous SetCursor call might have set the state to "recovering".
+            // (which mean we avoided a CacheMissException
+            // Consider it to be set now
+            if (cursor.State is CursorStates.Recovering)
+            {
+                cursor.State = CursorStates.Set;
+                return true;
+            }
+
+            // If the state is still idle then we have nothing to
+            // process
+            if (cursor.State is not CursorStates.Set)
+            {
+                return false;
             }
 
             // has this message been purged
@@ -386,6 +401,7 @@ namespace Orleans.Providers.Streams.Common
             Unset, // Not yet set, or points to some data in the future.
             Set, // Points to a message in the cache
             Idle, // Has iterated over all relevant events in the cache and is waiting for more data on the stream.
+            Recovering, // Points to a message in the cache, but should skip the next MoveNext()
         }
 
         private class Cursor
