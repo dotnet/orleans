@@ -208,7 +208,6 @@ jobs:
           **/TestResults/*
           **/logs/*
   test-azure-storage:
-    if: ${{ false }}
     name: Azure Storage provider tests
     runs-on: ubuntu-latest
     strategy:
@@ -231,7 +230,7 @@ jobs:
         dotnet-version: |
           8.0.x
     - name: Test
-      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&Category=${{ matrix.suite }}" --framework ${{ matrix.framework }} --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test --filter "Category=${{ matrix.provider }}&Category=${{ matrix.suite }}" --framework ${{ matrix.framework }} --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
@@ -241,7 +240,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test_output_${{ github.job }}
+        name: test_output_${{ github.job }}_${{ matrix.suite }}
         retention-days: 1
         path: |
           **/TestResults/*
