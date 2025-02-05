@@ -28,7 +28,7 @@ namespace Orleans.Persistence.Cosmos.Migration
         /// Configure silo to use Cosmos for grain storage.
         /// </summary>
         public static IServiceCollection AddMigrationAzureCosmosGrainStorage(this IServiceCollection services, string name,
-            Action<OptionsBuilder<CosmosGrainStorageOptions>> configureOptions = null)
+            Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<CosmosGrainStorageOptions>(name));
             services.AddTransient<IConfigurationValidator>(sp => new CosmosOptionsValidator<CosmosGrainStorageOptions>(sp.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>().Get(name), name));

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Persistence.Cosmos.TypeInfo;
 using Orleans.Persistence.Migration;
 using Orleans.Runtime;
 using Orleans.Storage;
@@ -20,26 +21,19 @@ namespace Orleans.Persistence.Cosmos.Migration
     {
         private ILogger logger;
         private readonly string name;
-        private CosmosGrainStorageOptions options;
 
-        private readonly IGrainReferenceExtractor grainReferenceExtractor;
-        private IGrainStorageSerializer grainStorageSerializer;
-
+        private readonly IGrainStateTypeInfoProvider grainStateTypeInfoProvider;
         private readonly CosmosGrainStorage cosmosGrainStorage;
 
         public MigrationAzureCosmosGrainStorage(
             string name,
             CosmosGrainStorage cosmosGrainStorage,
-            CosmosGrainStorageOptions options,
-            IGrainStorageSerializer grainStorageSerializer,
-            IGrainReferenceExtractor grainReferenceExtractor,
+            IGrainStateTypeInfoProvider grainStateTypeInfoProvider,
             ILogger<MigrationAzureCosmosGrainStorage> logger)
         {
             this.name = name;
             this.cosmosGrainStorage = cosmosGrainStorage;
-            this.options = options;
-            this.grainStorageSerializer = grainStorageSerializer;
-            this.grainReferenceExtractor = grainReferenceExtractor;
+            this.grainStateTypeInfoProvider = grainStateTypeInfoProvider;
             this.logger = logger;
         }
 
@@ -57,34 +51,8 @@ namespace Orleans.Persistence.Cosmos.Migration
 
         public Task MigrateGrainStateAsync(string stateName, GrainReference grainReference, IGrainState grainState)
         {
-            var grainTypeData = GetGrainStateTypeInfo(grainReference, grainState);
-            return cosmosGrainStorage.WriteStateAsync(grainTypeData, stateName, grainReference, grainState);
-        }
-
-        private GrainStateTypeInfo GetGrainStateTypeInfo(GrainReference grainReference, IGrainState grainState)
-        {
-            // grainState.Type does not have a proper type -> we need to separately call extractor to find out a proper type
-            var grainClass = grainReferenceExtractor.ExtractType(grainReference);
-
-            var grainTypeAttr = grainClass.GetCustomAttribute<GrainTypeAttribute>();
-            if (grainTypeAttr is null)
-            {
-                throw new InvalidOperationException($"All grain classes must specify a grain type name using the [GrainType(type)] attribute. Grain class '{grainClass}' does not.");
-            }
-            var grainTypeName = grainTypeAttr.GrainType;
-            var grainStateType = grainState.Type;
-            var grainKeyFormatter = GrainStateTypeInfo.GetGrainKeyFormatter(grainClass);
-
-            var readStateFunc = CosmosGrainStorage.ReadStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(this.cosmosGrainStorage);
-            var writeStateFunc = CosmosGrainStorage.WriteStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(this.cosmosGrainStorage);
-            var clearStateFunc = CosmosGrainStorage.ClearStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(this.cosmosGrainStorage);
-
-            return new GrainStateTypeInfo(
-                grainTypeName,
-                grainKeyFormatter,
-                readStateFunc,
-                writeStateFunc,
-                clearStateFunc);
+            var grainTypeData = this.grainStateTypeInfoProvider.GetGrainStateTypeInfo(cosmosGrainStorage, grainReference, grainState);
+            return grainTypeData.WriteStateAsync(stateName, grainReference, grainState);
         }
     }
 
@@ -92,15 +60,16 @@ namespace Orleans.Persistence.Cosmos.Migration
     {
         public static IMigrationGrainStorage Create(IServiceProvider services, string name)
         {
-            var cosmosGrainStorage = (CosmosGrainStorage)CosmosStorageFactory.Create(services, name);
-            var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>();
+            var referenceExtractorGrainStateTypeInfoProvider = new ReferenceExtractorGrainStateTypeInfoProvider(
+                services.GetRequiredService<IGrainReferenceExtractor>());
+
+            // pass in custom grain state type info provider, which will do the reference extraction for grain-reference type
+            var cosmosGrainStorage = (CosmosGrainStorage)CosmosStorageFactory.Create(services, name, referenceExtractorGrainStateTypeInfoProvider);
 
             return new MigrationAzureCosmosGrainStorage(
                 name,
                 cosmosGrainStorage,
-                optionsMonitor.Get(name),
-                services.GetRequiredService<IGrainStorageSerializer>(),
-                services.GetRequiredService<IGrainReferenceExtractor>(),
+                referenceExtractorGrainStateTypeInfoProvider,
                 services.GetRequiredService<ILoggerFactory>().CreateLogger<MigrationAzureCosmosGrainStorage>());
         }
     }

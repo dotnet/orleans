@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Persistence.Cosmos.TypeInfo;
 using Orleans.Storage;
 
 namespace Orleans.Persistence.Cosmos;
@@ -18,13 +19,14 @@ namespace Orleans.Persistence.Cosmos;
 /// </summary>
 internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
 {
+    // for access from GrainStateTypeInfoProvider implementations
     internal static readonly MethodInfo ReadStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(ReadStateAsyncCore), 1, BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(string), typeof(GrainId), typeof(IGrainState) }, null)!;
     internal static readonly MethodInfo WriteStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(WriteStateAsyncCore), 1, BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(string), typeof(GrainId), typeof(IGrainState) }, null)!;
     internal static readonly MethodInfo ClearStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(ClearStateAsyncCore), 1, BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(string), typeof(GrainId), typeof(IGrainState) }, null)!;
 
+    private readonly IGrainStateTypeInfoProvider grainStateTypeInfoProvider;
+
     private readonly IDocumentIdProvider idProvider;
-    private readonly ConcurrentDictionary<(ulong grainTypeCode, Type stateType), GrainStateTypeInfo> grainStateTypeInfo = new ();
-    private readonly IGrainActivationContextAccessor contextAccessor;
     private readonly CosmosGrainStorageOptions options;
     private readonly string name;
     private readonly IServiceProvider serviceProvider;
@@ -39,56 +41,47 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
     /// <param name="options">The options.</param>
     /// <param name="serviceProvider">The service provider.</param>
     /// <param name="idProvider">The partition key provider.</param>
-    /// <param name="contextAccessor">The grain activation context accessor.</param>
+    /// <param name="grainStateTypeInfoProvider">Provides grain state type info via activation context</param>
     public CosmosGrainStorage(
         string name,
         CosmosGrainStorageOptions options,
         IServiceProvider serviceProvider,
         IDocumentIdProvider idProvider,
-        IGrainActivationContextAccessor contextAccessor)
+        IGrainStateTypeInfoProvider grainStateTypeInfoProvider)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(serviceProvider);
         ArgumentNullException.ThrowIfNull(idProvider);
-        ArgumentNullException.ThrowIfNull(contextAccessor);
+        ArgumentNullException.ThrowIfNull(grainStateTypeInfoProvider);
 
         this.name = name;
         this.options = options;
         this.serviceProvider = serviceProvider;
         this.idProvider = idProvider;
-        this.contextAccessor = contextAccessor;
+        this.grainStateTypeInfoProvider = grainStateTypeInfoProvider;
     }
 
     /// <inheritdoc/>
     public Task ReadStateAsync(string stateName, GrainReference grainReference, IGrainState grainState)
     {
-        var grainTypeData = this.GetGrainStateTypeInfo(grainReference, grainState);
-        return ReadStateAsync(grainTypeData, stateName, grainReference, grainState);
+        var grainTypeData = grainStateTypeInfoProvider.GetGrainStateTypeInfo(this, grainReference, grainState);
+        return grainTypeData.ReadStateAsync(stateName, grainReference, grainState);
     }
-
-    internal Task ReadStateAsync(GrainStateTypeInfo grainTypeData, string stateName, GrainReference grainReference, IGrainState grainState)
-        => grainTypeData.ReadStateAsync(stateName, grainReference, grainState);
 
     /// <inheritdoc/>
     public Task WriteStateAsync(string stateName, GrainReference grainReference, IGrainState grainState)
     {
-        var grainTypeData = this.GetGrainStateTypeInfo(grainReference, grainState);
-        return WriteStateAsync(grainTypeData, stateName, grainReference, grainState);
+        var grainTypeData = grainStateTypeInfoProvider.GetGrainStateTypeInfo(this, grainReference, grainState);
+        return grainTypeData.WriteStateAsync(stateName, grainReference, grainState);
     }
-
-    internal Task WriteStateAsync(GrainStateTypeInfo grainTypeData, string stateName, GrainReference grainReference, IGrainState grainState)
-        => grainTypeData.WriteStateAsync(stateName, grainReference, grainState);
 
     /// <inheritdoc/>
     public Task ClearStateAsync(string stateName, GrainReference grainReference, IGrainState grainState)
     {
-        var grainTypeData = this.GetGrainStateTypeInfo(grainReference, grainState);
-        return ClearStateAsync(grainTypeData, stateName, grainReference, grainState);
+        var grainTypeData = grainStateTypeInfoProvider.GetGrainStateTypeInfo(this, grainReference, grainState);
+        return grainTypeData.ClearStateAsync(stateName, grainReference, grainState);
     }
-
-    internal Task ClearStateAsync(GrainStateTypeInfo grainTypeData, string stateName, GrainReference grainReference, IGrainState grainState)
-        => grainTypeData.ClearStateAsync(stateName, grainReference, grainState);
 
     /// <inheritdoc/>
     public void Participate(ISiloLifecycle lifecycle)
@@ -309,46 +302,6 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
         {
             throw CreateOrleansException(ex, grainId);
         }
-    }
-
-    private GrainStateTypeInfo GetGrainStateTypeInfo(GrainReference grainReference, IGrainState grainState)
-    {
-        var keyInfo = grainReference.ToKeyInfo();
-        var (_, _, typeCode, _) = keyInfo.Key;
-        if (!string.IsNullOrEmpty((string?)keyInfo.GenericArgument))
-        {
-            throw new InvalidOperationException($"Generic grain types are not supported by this provider. Grain: '{grainReference}'.");
-        }
-
-        var grainStateType = grainState.Type;
-        if (!this.grainStateTypeInfo.TryGetValue((typeCode, grainStateType), out var grainStateTypeInfo))
-        {
-            var grainContext = this.contextAccessor.GrainActivationContext;
-            if (grainContext is null)
-            {
-                throw new InvalidOperationException($"'{nameof(IGrainActivationContextAccessor)}.{nameof(IGrainActivationContextAccessor.GrainActivationContext)}' is not initialized. This likely indicates a concurrency issue, such as attempting to access storage from a non-grain thread.");
-            }
-
-            var grainClass = grainContext.GrainType;
-            var grainTypeAttr = grainClass.GetCustomAttribute<GrainTypeAttribute>();
-            if (grainTypeAttr is null)
-            {
-                throw new InvalidOperationException($"All grain classes must specify a grain type name using the [GrainType(type)] attribute. Grain class '{grainClass}' does not.");
-            }
-
-            // Work out how to format the grain id.
-            var grainTypeName = grainTypeAttr.GrainType;
-            var grainKeyFormatter = GrainStateTypeInfo.GetGrainKeyFormatter(grainClass);
-
-            // Create methods for reading/writing/clearing the state based on the grain state type.
-            var readStateAsync = ReadStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(this);
-            var writeStateAsync = WriteStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(this);
-            var clearStateAsync = ClearStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(this);
-
-            grainStateTypeInfo = this.grainStateTypeInfo[(typeCode, grainStateType)] = new (grainTypeName, grainKeyFormatter, readStateAsync, writeStateAsync, clearStateAsync);
-        }
-
-        return grainStateTypeInfo;
     }
 
     private async Task Init(CancellationToken ct)

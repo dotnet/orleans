@@ -19,6 +19,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Orleans.Persistence.Cosmos.Migration"/>
+    <InternalsVisibleTo Include="Orleans.Persistence.Cosmos.Migration" />
   </ItemGroup>
 </Project>

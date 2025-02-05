@@ -1,11 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Orleans.Persistence.Cosmos
+namespace Orleans.Persistence.Cosmos.TypeInfo
 {
     internal sealed class GrainStateTypeInfo
     {
