@@ -10,8 +10,8 @@ using org.apache.zookeeper.data;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
+using System.Threading;
 
 namespace Orleans.Runtime.Membership
 {
@@ -37,34 +37,29 @@ namespace Orleans.Runtime.Membership
     /// </remarks>
     public class ZooKeeperBasedMembershipTable : IMembershipTable
     {
-        private ILogger logger;
+        private ILogger _logger;
+        private readonly ZooKeeperClusteringSiloOptions _options;
+        private const int ZOOKEEPER_CONNECTION_TIMEOUT = 5000;
 
-        private const int ZOOKEEPER_CONNECTION_TIMEOUT = 2000;
-
-        private ZooKeeperWatcher watcher;
-
-        /// <summary>
-        /// The deployment connection string. for eg. "192.168.1.1,192.168.1.2/ClusterId"
-        /// </summary>
-        private string deploymentConnectionString;
         /// <summary>
         /// the node name for this deployment. for eg. /ClusterId
         /// </summary>
-        private string clusterPath;
+        private readonly string _clusterPath;
         /// <summary>
         /// The root connection string. for eg. "192.168.1.1,192.168.1.2"
         /// </summary>
-        private string rootConnectionString;
-        
+        private readonly string _rootConnectionString;
+
         public ZooKeeperBasedMembershipTable(
-            ILogger<ZooKeeperBasedMembershipTable> logger, 
-            IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions, 
+            ILogger<ZooKeeperBasedMembershipTable> logger,
+            IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
-            this.logger = logger;
-            var options = membershipTableOptions.Value;
-            watcher = new ZooKeeperWatcher(logger);
-            InitConfig(options.ConnectionString, clusterOptions.Value.ClusterId);
+            _logger = logger;
+            _options = membershipTableOptions.Value;
+
+            _clusterPath = $"/{clusterOptions.Value.ClusterId}";
+            _rootConnectionString = _options.ConnectionString;
         }
 
         /// <summary>
@@ -78,28 +73,22 @@ namespace Orleans.Runtime.Membership
             // try to insert an initial path if it is not already there,
             // so we always have the path, before this silo starts working.
             // note that when a zookeeper connection adds /ClusterId to the connection string, the nodes are relative
-            await UsingZookeeper(rootConnectionString, async zk =>
+            await ZooKeeper.Using(_rootConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, new ZooKeeperWatcher(_logger), async zk =>
             {
                 try
                 {
-                    await zk.createAsync(this.clusterPath, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-                    await zk.sync(this.clusterPath);
+                    await zk.createAsync(_clusterPath, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                    await zk.sync(_clusterPath);
                     //if we got here we know that we've just created the deployment path with version=0
-                    this.logger.Info("Created new deployment path: " + this.clusterPath);
+                    _logger.Info($"Created new deployment path: {_clusterPath}");
                 }
                 catch (KeeperException.NodeExistsException)
                 {
-                    this.logger.Debug("Deployment path already exists: " + this.clusterPath);
+                    _logger.Debug($"Deployment path already exists: {_clusterPath}");
                 }
             });
         }
 
-        private void InitConfig(string dataConnectionString, string clusterId)
-        {
-            this.clusterPath = "/" + clusterId;
-            deploymentConnectionString = dataConnectionString + this.clusterPath;
-            rootConnectionString = dataConnectionString;
-        }
 
         /// <summary>
         /// Atomically reads the Membership Table information about a given silo.
@@ -109,27 +98,27 @@ namespace Orleans.Runtime.Membership
         /// <param name="siloAddress">The address of the silo whose membership information needs to be read.</param>
         /// <returns>The membership information for a given silo: MembershipTableData consisting one MembershipEntry entry and
         /// TableVersion, read atomically.</returns>
-        public Task<MembershipTableData> ReadRow(SiloAddress siloAddress)
+        public async Task<MembershipTableData> ReadRow(SiloAddress siloAddress)
         {
-            return UsingZookeeper(async zk =>
+            return await ZooKeeper.Using(_rootConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, new ZooKeeperWatcher(_logger), async zk =>
             {
-                var getRowTask = GetRow(zk, siloAddress);
-                var getTableNodeTask = zk.getDataAsync("/");//get the current table version
+                var getRow = await GetRow(zk, siloAddress);
+                var getTableNode = await zk.getDataAsync(_clusterPath); //get the current table version
 
-                List<Tuple<MembershipEntry, string>> rows = new List<Tuple<MembershipEntry, string>>(1);
+                var rows = new List<Tuple<MembershipEntry, string>>(1);
                 try
                 {
-                    await Task.WhenAll(getRowTask, getTableNodeTask);
-                    rows.Add(await getRowTask);
+                    rows.Add(getRow.ToTuple());
                 }
                 catch (KeeperException.NoNodeException)
                 {
                     //that's ok because orleans expects an empty list in case of a missing row
                 }
 
-                var tableVersion = ConvertToTableVersion((await getTableNodeTask).Stat);
+                var tableVersion = ConvertToTableVersion(getTableNode.Stat);
+
                 return new MembershipTableData(rows, tableVersion);
-            }, this.deploymentConnectionString, this.watcher, true);
+            });
         }
 
         /// <summary>
@@ -139,28 +128,25 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         /// <returns>The membership information for a given table: MembershipTableData consisting multiple MembershipEntry entries and
         /// TableVersion, all read atomically.</returns>
-        public Task<MembershipTableData> ReadAll()
+        public async Task<MembershipTableData> ReadAll()
         {
-            return ReadAll(this.deploymentConnectionString, this.watcher);
-        }
-
-        internal static Task<MembershipTableData> ReadAll(string deploymentConnectionString, ZooKeeperWatcher watcher)
-        {
-            return UsingZookeeper(async zk =>
+            return await ZooKeeper.Using(_rootConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, new ZooKeeperWatcher(_logger), async zk =>
             {
-                var childrenResult = await zk.getChildrenAsync("/");//get all the child nodes (without the data)
+                var childrenResult = await zk.getChildrenAsync(_clusterPath);//get all the child nodes (without the data)
 
-                var childrenTasks = //get the data from each child node
-                    childrenResult.Children.Select(child => GetRow(zk, SiloAddress.FromParsableString(child))).ToList();
-
-                var childrenTaskResults = await Task.WhenAll(childrenTasks);
+                var childrenList = new List<Tuple<MembershipEntry, string>>(childrenResult.Children.Count);
+                //get the data from each child node
+                foreach (var child in childrenResult.Children)
+                {
+                    var childData = await GetRow(zk, SiloAddress.FromParsableString(child));
+                    childrenList.Add(childData.ToTuple());
+                }
 
                 var tableVersion = ConvertToTableVersion(childrenResult.Stat);//this is the current table version
 
-                return new MembershipTableData(childrenTaskResults.ToList(), tableVersion);
-            }, deploymentConnectionString, watcher, true);
+                return new MembershipTableData(childrenList, tableVersion);
+            });
         }
-
         /// <summary>
         /// Atomically tries to insert (add) a new MembershipEntry for one silo and also update the TableVersion.
         /// If operation succeeds, the following changes would be made to the table:
@@ -176,7 +162,7 @@ namespace Orleans.Runtime.Membership
         /// <param name="entry">MembershipEntry to be inserted.</param>
         /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>
         /// <returns>True if the insert operation succeeded and false otherwise.</returns>
-        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
+        public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
         {
             string rowPath = ConvertToRowPath(entry.SiloAddress);
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
@@ -185,10 +171,11 @@ namespace Orleans.Runtime.Membership
 
             int expectedTableVersion = int.Parse(tableVersion.VersionEtag, CultureInfo.InvariantCulture);
 
-            return TryTransaction(t => t
-                .setData("/", null, expectedTableVersion)//increments the version of node "/"
-                .create(rowPath, newRowData, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)
-                .create(rowIAmAlivePath, newRowIAmAliveData, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT));
+            return await ZooKeeper.Using(_rootConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, new ZooKeeperWatcher(_logger), async zk
+                => await zk.TryTransaction(tx
+                    => tx.setData(_clusterPath, null, expectedTableVersion)//increments the version of node "/"
+                        .create(rowPath, newRowData, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)
+                        .create(rowIAmAlivePath, newRowIAmAliveData, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)));
         }
 
         /// <summary>
@@ -208,7 +195,7 @@ namespace Orleans.Runtime.Membership
         /// <param name="etag">The etag  for the given MembershipEntry.</param>
         /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>
         /// <returns>True if the update operation succeeded and false otherwise.</returns>
-        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
+        public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
         {
             string rowPath = ConvertToRowPath(entry.SiloAddress);
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
@@ -218,10 +205,11 @@ namespace Orleans.Runtime.Membership
             int expectedTableVersion = int.Parse(tableVersion.VersionEtag, CultureInfo.InvariantCulture);
             int expectedRowVersion = int.Parse(etag, CultureInfo.InvariantCulture);
 
-            return TryTransaction(t => t
-                .setData("/", null, expectedTableVersion)//increments the version of node "/"
-                .setData(rowPath, newRowData, expectedRowVersion)//increments the version of node "/IP:Port@Gen"
-                .setData(rowIAmAlivePath, newRowIAmAliveData));
+            return await ZooKeeper.Using(_rootConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, new ZooKeeperWatcher(_logger), async zk
+                => await zk.TryTransaction(tx
+                    => tx.setData(_clusterPath, null, expectedTableVersion)//increments the version of node "/"
+                        .setData(rowPath, newRowData, expectedRowVersion)//increments the version of node "/IP:Port@Gen"
+                        .setData(rowIAmAlivePath, newRowIAmAliveData)));
         }
 
         /// <summary>
@@ -236,44 +224,57 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         /// <param name="entry">The target MembershipEntry tp update</param>
         /// <returns>Task representing the successful execution of this operation. </returns>
-        public Task UpdateIAmAlive(MembershipEntry entry)
+        public async Task UpdateIAmAlive(MembershipEntry entry)
         {
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
             byte[] newRowIAmAliveData = Serialize(entry.IAmAliveTime);
+
             //update the data for IAmAlive unconditionally
-            return UsingZookeeper(zk => zk.setDataAsync(rowIAmAlivePath, newRowIAmAliveData), this.deploymentConnectionString, this.watcher);
+            await ZooKeeper.Using(_rootConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, new ZooKeeperWatcher(_logger), async zk
+                => await zk.setDataAsync(rowIAmAlivePath, newRowIAmAliveData));
         }
 
         /// <summary>
         /// Deletes all table entries of the given clusterId
         /// </summary>
-        public Task DeleteMembershipTableEntries(string clusterId)
+        public async Task DeleteMembershipTableEntries(string clusterId)
         {
-            string pathToDelete = "/" + clusterId;
-            return UsingZookeeper(rootConnectionString, async zk =>
+            string pathToDelete = $"/{clusterId}";
+
+            await ZooKeeper.Using(_rootConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, new ZooKeeperWatcher(_logger), async zk =>
             {
                 await ZKUtil.deleteRecursiveAsync(zk, pathToDelete);
                 await zk.sync(pathToDelete);
             });
         }
 
-        private async Task<bool> TryTransaction(Func<Transaction, Transaction> transactionFunc)
+        public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
-            try
+            _logger.LogInformation("Deleting defunct silo entries from {deletePath} before {beforeDate}", $"{_rootConnectionString}{_clusterPath}", beforeDate);
+
+            await ZooKeeper.Using(_rootConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, new ZooKeeperWatcher(_logger), async zk =>
             {
-                await UsingZookeeper(zk => transactionFunc(zk.transaction()).commitAsync(), this.deploymentConnectionString, this.watcher);
-                return true;
-            }
-            catch (KeeperException e)
-            {
-                //these exceptions are thrown when the transaction fails to commit due to semantical reasons
-                if (e is KeeperException.NodeExistsException || e is KeeperException.NoNodeException ||
-                    e is KeeperException.BadVersionException)
+                var childrenResult = await zk.getChildrenAsync(_clusterPath);
+                var deleteTasks = new List<Task>();
+                _logger.LogInformation("Deleting defunct silo entry children: {children}", string.Join(", ", childrenResult.Children));
+
+                foreach (var child in childrenResult.Children)
                 {
-                    return false;
+                    var rowPath = $"{_clusterPath}/{child}";
+                    var rowData = await GetRow(zk, SiloAddress.FromParsableString(child));
+
+                    var membershipEntry = rowData.membershipEntry;
+
+                    _logger.LogInformation("{child} status: {status} last: {alive}", child, membershipEntry.Status, membershipEntry.IAmAliveTime);
+                    if (membershipEntry.Status == SiloStatus.Dead && membershipEntry.IAmAliveTime < beforeDate)
+                    {
+                        _logger.LogInformation("Deleting defunct silo entry {address} status: {status} last: {alive}.", membershipEntry.SiloAddress, membershipEntry.Status, membershipEntry.IAmAliveTime);
+                        deleteTasks.Add(ZKUtil.deleteRecursiveAsync(zk, rowPath));
+                    }
                 }
-                throw;
-            }
+
+                await Task.WhenAll(deleteTasks);
+            });
         }
 
         /// <summary>
@@ -281,43 +282,26 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         /// <param name="zk">The zookeeper instance used for the read</param>
         /// <param name="siloAddress">The silo address.</param>
-        private static async Task<Tuple<MembershipEntry, string>> GetRow(ZooKeeper zk, SiloAddress siloAddress)
+        private async Task<(MembershipEntry membershipEntry, string version)> GetRow(ZooKeeper zk, SiloAddress siloAddress)
         {
             string rowPath = ConvertToRowPath(siloAddress);
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(siloAddress);
 
-            var rowDataTask = zk.getDataAsync(rowPath);
-            var rowIAmAliveDataTask = zk.getDataAsync(rowIAmAlivePath);
+            var rowData = await zk.getDataAsync(rowPath);
+            var rowIAmAliveData = await zk.getDataAsync(rowIAmAlivePath);
 
-            await Task.WhenAll(rowDataTask, rowIAmAliveDataTask);
+            var me = Deserialize<MembershipEntry>(rowData.Data);
+            me.IAmAliveTime = Deserialize<DateTime>(rowIAmAliveData.Data);
 
-            MembershipEntry me = Deserialize<MembershipEntry>((await rowDataTask).Data);
-            me.IAmAliveTime = Deserialize<DateTime>((await rowIAmAliveDataTask).Data);
-
-            int rowVersion = (await rowDataTask).Stat.getVersion();
-
-            return new Tuple<MembershipEntry, string>(me, rowVersion.ToString(CultureInfo.InvariantCulture));
+            int rowVersion = rowData.Stat.getVersion();
+            return (membershipEntry: me, version: rowVersion.ToString(CultureInfo.InvariantCulture));
         }
 
-        private static Task<T> UsingZookeeper<T>(Func<ZooKeeper, Task<T>> zkMethod, string deploymentConnectionString, ZooKeeperWatcher watcher, bool canBeReadOnly = false)
-        {
-            return ZooKeeper.Using(deploymentConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, watcher, zkMethod, canBeReadOnly);
-        }
+        private string ConvertToRowPath(SiloAddress siloAddress)
+            => $"{_clusterPath}/{siloAddress.ToParsableString()}";
 
-        private Task UsingZookeeper(string connectString, Func<ZooKeeper, Task> zkMethod)
-        {
-            return ZooKeeper.Using(connectString, ZOOKEEPER_CONNECTION_TIMEOUT, watcher, zkMethod);
-        }
-
-        private static string ConvertToRowPath(SiloAddress siloAddress)
-        {
-            return "/" + siloAddress.ToParsableString();
-        }
-
-        private static string ConvertToRowIAmAlivePath(SiloAddress siloAddress)
-        {
-            return ConvertToRowPath(siloAddress) + "/IAmAlive";
-        }
+        private string ConvertToRowIAmAlivePath(SiloAddress siloAddress)
+            => $"{ConvertToRowPath(siloAddress)}/IAmAlive";
 
         private static TableVersion ConvertToTableVersion(Stat stat)
         {
@@ -326,42 +310,28 @@ namespace Orleans.Runtime.Membership
         }
 
         private static byte[] Serialize(object obj)
-        {
-            return
-                Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(obj, Formatting.None,
-                    MembershipSerializerSettings.Instance));
-        }
+            => Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(obj, Formatting.None, MembershipSerializerSettings.Instance));
 
         private static T Deserialize<T>(byte[] data)
-        {
-            return JsonConvert.DeserializeObject<T>(Encoding.UTF8.GetString(data), MembershipSerializerSettings.Instance);
-        }
-
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
-        {
-            throw new NotImplementedException();
-        }
+            => JsonConvert.DeserializeObject<T>(Encoding.UTF8.GetString(data), MembershipSerializerSettings.Instance);
     }
 
-    /// <summary>
-    /// the state of every ZooKeeper client and its push notifications are published using watchers.
-    /// in orleans the watcher is only for debugging purposes
-    /// </summary>
-    internal class ZooKeeperWatcher : Watcher
+    public static class ZKExtensions
     {
-        private readonly ILogger logger;
-        public ZooKeeperWatcher(ILogger logger)
+        public static async Task<bool> TryTransaction(this ZooKeeper zk, Func<Transaction, Transaction> transactionFunc)
         {
-            this.logger = logger;
-        }
-
-        public override Task process(WatchedEvent @event)
-        {
-            if (logger.IsEnabled(LogLevel.Debug))
+            try
             {
-                logger.Debug(@event.ToString());
+                var trx = transactionFunc(zk.transaction());
+                await trx.commitAsync();
+
+                return true;
             }
-            return Task.CompletedTask;
+            catch (KeeperException e)
+                when (e is KeeperException.NodeExistsException || e is KeeperException.NoNodeException || e is KeeperException.BadVersionException)
+            {
+                return false;
+            }
         }
     }
 }

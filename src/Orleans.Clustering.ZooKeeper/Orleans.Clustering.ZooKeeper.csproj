@@ -13,6 +13,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="System.Threading.Tasks" Version="4.3.0" />
     <PackageReference Include="ZooKeeperNetEx" Version="$(ZooKeeperNetExVersion)" />
   </ItemGroup>
 
