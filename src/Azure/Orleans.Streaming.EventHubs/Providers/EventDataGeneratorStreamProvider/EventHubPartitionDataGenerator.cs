@@ -53,7 +53,7 @@ namespace Orleans.Streaming.EventHubs.Testing
                 var eventData = EventHubBatchContainer.ToEventData(
                     this.serializer,
                     this.StreamId,
-                    this.GenerateEvent(this.SequenceNumberCounter.Value),
+                    GenerateEvent(this.SequenceNumberCounter.Value),
                     RequestContextExtensions.Export(this.deepCopier));
 
                var wrapper = new WrappedEventData(
@@ -73,13 +73,13 @@ namespace Orleans.Streaming.EventHubs.Testing
             return eventDataList.Count > 0;
         }
 
-        private IEnumerable<int> GenerateEvent(int sequenceNumber)
+        private static IEnumerable<int> GenerateEvent(int sequenceNumber)
         {
             var events = new List<int>();
             events.Add(sequenceNumber);
             return events;
         }
-        
+
         public static Func<StreamId, IStreamDataGenerator<EventData>> CreateFactory(IServiceProvider services)
         {
             return (streamId) => ActivatorUtilities.CreateInstance<SimpleStreamEventDataGenerator>(services, streamId);

@@ -44,10 +44,10 @@ namespace Tester.EventSourcingTests
         }
 
         private static readonly string[] keys = { "a", "b", "c", "d", "e", "f", "g", "h" };
-        private string RandomKey() { return keys[Random.Shared.Next(keys.Length)]; }
+        private static string RandomKey() { return keys[Random.Shared.Next(keys.Length)]; }
 
 
-        private async Task ConcurrentIncrementsRunner(ICountersGrain grain, int count, bool wait_for_confirmation_on_each)
+        private static async Task ConcurrentIncrementsRunner(ICountersGrain grain, int count, bool wait_for_confirmation_on_each)
         {
             // increment (count) times, on random keys, concurrently
             var tasks = new List<Task>();

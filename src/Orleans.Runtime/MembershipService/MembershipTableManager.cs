@@ -279,14 +279,14 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private Task<bool> MembershipExecuteWithRetries(
+        private static Task<bool> MembershipExecuteWithRetries(
             Func<int, Task<bool>> taskFunction,
             TimeSpan timeout)
         {
             return MembershipExecuteWithRetries(taskFunction, timeout, (result, i) => result == false);
         }
 
-        private Task<T> MembershipExecuteWithRetries<T>(
+        private static Task<T> MembershipExecuteWithRetries<T>(
             Func<int, Task<T>> taskFunction,
             TimeSpan timeout,
             Func<T, int, bool> retryValueFilter)
@@ -295,8 +295,8 @@ namespace Orleans.Runtime.MembershipService
                     taskFunction,
                     NUM_CONDITIONAL_WRITE_CONTENTION_ATTEMPTS,
                     NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS,
-                    retryValueFilter,   // if failed to Update on contention - retry   
-                    (exc, i) => true,            // Retry on errors.          
+                    retryValueFilter,   // if failed to Update on contention - retry
+                    (exc, i) => true,            // Retry on errors.
                     timeout,
                     new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP), // how long to wait between successful retries
                     new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP)  // how long to wait between error retries

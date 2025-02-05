@@ -89,7 +89,7 @@ namespace Orleans.Transactions.AzureStorage
 
         private void SetStateInternal(string stringData)
         {
-            this.CheckMaxDataSize((stringData ?? string.Empty).Length * 2, MAX_DATA_CHUNK_SIZE * MAX_DATA_CHUNKS_COUNT);
+            CheckMaxDataSize((stringData ?? string.Empty).Length * 2, MAX_DATA_CHUNK_SIZE * MAX_DATA_CHUNKS_COUNT);
 
             foreach (var key in StringDataPropertyNames)
             {
@@ -146,7 +146,7 @@ namespace Orleans.Transactions.AzureStorage
             return result;
         }
 
-        private void CheckMaxDataSize(int dataSize, int maxDataSize)
+        private static void CheckMaxDataSize(int dataSize, int maxDataSize)
         {
             if (dataSize > maxDataSize)
             {

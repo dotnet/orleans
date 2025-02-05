@@ -59,7 +59,7 @@ namespace Orleans.Serialization.Codecs
             return _fieldCodec.ReadValue(ref reader, field);
         }
 
-        private void ThrowInvalidReference(uint reference) => throw new ReferenceNotFoundException(typeof(T?), reference);
+        private static void ThrowInvalidReference(uint reference) => throw new ReferenceNotFoundException(typeof(T?), reference);
     }
 
     /// <summary>

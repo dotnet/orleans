@@ -103,7 +103,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized queue is missing its length field.");
+        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized queue is missing its length field.");
     }
 
     /// <summary>

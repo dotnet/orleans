@@ -123,7 +123,7 @@ internal class FieldIdAssignmentHelper
         return true;
     }
 
-    private (string, uint) GetCanonicalNameAndFieldId(ITypeSymbol typeSymbol, string name)
+    private static (string, uint) GetCanonicalNameAndFieldId(ITypeSymbol typeSymbol, string name)
     {
         name = PropertyUtility.GetCanonicalName(name);
 

@@ -176,7 +176,7 @@ namespace AWSUtils.Tests.StorageTests
             Assert.Equal(initialState.Grain, convertedState.Grain);  // "Grain"
         }
 
-        private async Task<DynamoDBGrainStorage> InitDynamoDBTableStorageProvider(IProviderRuntime runtime, string storageName)
+        private static async Task<DynamoDBGrainStorage> InitDynamoDBTableStorageProvider(IProviderRuntime runtime, string storageName)
         {
             var options = new DynamoDBStorageOptions();
             options.Service = AWSTestConstants.DynamoDbService;

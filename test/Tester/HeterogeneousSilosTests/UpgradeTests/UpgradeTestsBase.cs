@@ -61,7 +61,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             assemblyGrainsV2 = GetVersionTestDirectory(testDirectory, GrainsV2ProjectName);
         }
 
-        private FileInfo GetVersionTestDirectory(DirectoryInfo testDirectory, string directoryName)
+        private static FileInfo GetVersionTestDirectory(DirectoryInfo testDirectory, string directoryName)
         {
             var projectDirectory = Path.Combine(testDirectory.FullName, VersionsProjectDirectory, directoryName, BinDirectory);
 
