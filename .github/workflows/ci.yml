@@ -208,7 +208,6 @@ jobs:
           **/TestResults/*
           **/logs/*
   test-azure-storage:
-    if: ${{ false }}
     name: Azure Storage provider tests
     runs-on: ubuntu-latest
     strategy:
