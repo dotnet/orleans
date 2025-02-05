@@ -315,7 +315,6 @@ namespace Orleans.Runtime
         }
 
         public async Task DeleteActivations(List<GrainAddress> addresses, DeactivationReasonCode reasonCode, string reasonText)
-        public async Task DeleteActivations(List<GrainAddress> addresses, DeactivationReasonCode reasonCode, string reasonText)
         {
             var tasks = new List<Task>(addresses.Count);
             var deactivationReason = new DeactivationReason(reasonCode, reasonText);
