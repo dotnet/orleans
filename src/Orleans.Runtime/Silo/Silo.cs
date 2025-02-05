@@ -149,7 +149,7 @@ namespace Orleans.Runtime
             this.siloLifecycle = this.Services.GetRequiredService<ISiloLifecycleSubject>();
             // register all lifecycle participants
             IEnumerable<ILifecycleParticipant<ISiloLifecycle>> lifecycleParticipants = this.Services.GetServices<ILifecycleParticipant<ISiloLifecycle>>();
-            foreach(ILifecycleParticipant<ISiloLifecycle> participant in lifecycleParticipants)
+            foreach (ILifecycleParticipant<ISiloLifecycle> participant in lifecycleParticipants)
             {
                 participant?.Participate(this.siloLifecycle);
             }
@@ -338,7 +338,7 @@ namespace Orleans.Runtime
                 throw;
             }
 
-            logger.LogInformation("Grain Service {GrainServiceType} started successfully.",service.GetType().FullName);
+            logger.LogInformation("Grain Service {GrainServiceType} started successfully.", service.GetType().FullName);
         }
 
         /// <summary>
@@ -604,4 +604,3 @@ namespace Orleans.Runtime
         }
     }
 }
-

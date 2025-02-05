@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 #nullable enable
@@ -177,6 +178,15 @@ namespace Orleans.Runtime
                 if (logger != null)
                     LogIgnoredException(logger, exc, caller);
             }
+        }
+
+        public static async Task SafeExecuteAsync(Task task)
+        {
+            try
+            {
+                await task;
+            }
+            catch { }
         }
 
         internal static void LogIgnoredException(ILogger logger, Exception exc, string? caller)

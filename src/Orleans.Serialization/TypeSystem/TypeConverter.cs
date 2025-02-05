@@ -173,7 +173,7 @@ namespace Orleans.Serialization.TypeSystem
                     return;
                 }
 
-                if (genericArgument.IsConstructedGenericType && genericArgument.GenericTypeArguments.Any(arg => arg.IsGenericParameter))
+                if (genericArgument.IsConstructedGenericType && Array.Exists(genericArgument.GenericTypeArguments, arg => arg.IsGenericParameter))
                 {
                     genericArgument = genericArgument.GetGenericTypeDefinition();
                 }

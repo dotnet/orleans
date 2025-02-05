@@ -181,7 +181,7 @@ namespace Orleans.Runtime.Host
 
         private void Initialize()
         {
-            assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(
+            assembly = Array.Find(AppDomain.CurrentDomain.GetAssemblies(),
                 a => a.FullName.StartsWith("Microsoft.WindowsAzure.ServiceRuntime", StringComparison.Ordinal));
 
             // If we are runing within a worker role Microsoft.WindowsAzure.ServiceRuntime should already be loaded
