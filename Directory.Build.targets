@@ -10,16 +10,16 @@
     <!-- Enable code generator -->
     <ProjectReference
       Include="$(SourceRoot)src/Orleans.CodeGenerator/Orleans.CodeGenerator.csproj"
-      ReferenceOutputAssembly="false"
       OutputItemType="Analyzer"
+      PrivateAssets="None"
       Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' "/>
     <ProjectReference
       Include="$(SourceRoot)src/Orleans.Analyzers/Orleans.Analyzers.csproj"
-      ReferenceOutputAssembly="false"
       AssetTargetFallback="netstandard2.0"
       UndefineProperties="TargetFramework"
       SkipGetTargetFrameworkProperties="true"
       OutputItemType="Analyzer"
+      PrivateAssets="None"
       Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' "/>
   </ItemGroup>
 

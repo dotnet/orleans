@@ -75,7 +75,7 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
             }
             else
             {
-                grainState.State = ActivatorUtilities.CreateInstance<T>(_serviceProvider);
+                grainState.State = Activator.CreateInstance<T>();
                 grainState.RecordExists = false;
             }
 
@@ -86,7 +86,7 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
             if (dce.StatusCode == HttpStatusCode.NotFound)
             {
                 // State is new, just activate a default and return
-                grainState.State = ActivatorUtilities.CreateInstance<T>(_serviceProvider);
+                grainState.State = Activator.CreateInstance<T>();
                 grainState.RecordExists = false;
                 return;
             }
