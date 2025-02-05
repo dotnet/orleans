@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Net;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -306,6 +307,8 @@ namespace Orleans
         [Id(10)]
         public DateTime IAmAliveTime { get; set; }
 
+        internal DateTimeOffset EffectiveIAmAliveTime => StartTime > IAmAliveTime ? StartTime : IAmAliveTime;
+
         public void AddOrUpdateSuspector(SiloAddress localSilo, DateTime voteTime, int maxVotes)
         {
             var allVotes = SuspectTimes ??= new List<Tuple<SiloAddress, DateTime>>();
@@ -369,6 +372,13 @@ namespace Orleans
         {
             var updated = this.Copy();
             updated.Status = status;
+            return updated;
+        }
+
+        internal MembershipEntry WithIAmAliveTime(DateTime iAmAliveTime)
+        {
+            var updated = this.Copy();
+            updated.IAmAliveTime = iAmAliveTime;
             return updated;
         }
 

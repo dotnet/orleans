@@ -65,7 +65,7 @@ namespace Orleans.Runtime.MembershipService
                     initialEntries);
             this.updates = new AsyncEnumerable<MembershipTableSnapshot>(
                 initialValue: this.snapshot,
-                updateValidator: (previous, proposed) => proposed.Version > previous.Version,
+                updateValidator: (previous, proposed) => proposed.IsSuccessorTo(previous),
                 onPublished: update => Interlocked.Exchange(ref this.snapshot, update));
 
             this.membershipUpdateTimer = timerFactory.Create(
@@ -122,7 +122,7 @@ namespace Orleans.Runtime.MembershipService
                 }
             }
 
-            this.updates.TryPublish(snapshot);
+            this.updates.TryPublish(MembershipTableSnapshot.Update, snapshot);
         }
 
         private async Task<bool> RefreshInternal(bool requireCleanup)
@@ -479,8 +479,7 @@ namespace Orleans.Runtime.MembershipService
             if (table is null) throw new ArgumentNullException(nameof(table));
             if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug($"{nameof(ProcessTableUpdate)} (called from {{Caller}}) membership table {{Table}}", caller, table.ToString());
 
-            var updated = MembershipTableSnapshot.Create(table);
-            if (this.updates.TryPublish(updated))
+            if (this.updates.TryPublish(MembershipTableSnapshot.Update, table))
             {
                 this.LogMissedIAmAlives(table);
 
