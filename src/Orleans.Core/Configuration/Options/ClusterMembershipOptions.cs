@@ -11,7 +11,7 @@ namespace Orleans.Configuration
         /// Gets or sets the number of missed "I am alive" updates in the table from a silo that causes warning to be logged.
         /// </summary>
         /// <seealso cref="IAmAliveTablePublishTimeout"/>
-        public int NumMissedTableIAmAliveLimit { get; set; } = 2;
+        public int NumMissedTableIAmAliveLimit { get; set; } = 3;
 
         /// <summary>
         /// Gets or sets a value indicating whether to disable silo liveness protocol (should be used only for testing).
@@ -49,7 +49,7 @@ namespace Orleans.Configuration
         /// is used to skip hosts in the membership table when performing an initial connectivity check upon startup.
         /// </remarks>
         /// <value>Publish an update every 5 minutes by default.</value>
-        public TimeSpan IAmAliveTablePublishTimeout { get; set; } = TimeSpan.FromMinutes(5);
+        public TimeSpan IAmAliveTablePublishTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
         /// <summary>
         /// Gets or sets the maximum amount of time to attempt to join a cluster before giving up.
@@ -103,7 +103,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// /// Gets the period after which a silo is ignored for initial connectivity validation if it has not updated its heartbeat in the silo membership table.
         /// </summary>
-        internal TimeSpan AllowedIAmAliveMissPeriod => this.IAmAliveTablePublishTimeout.Multiply(this.NumMissedTableIAmAliveLimit);
+        internal TimeSpan AllowedIAmAliveMissPeriod => IAmAliveTablePublishTimeout.Multiply(NumMissedTableIAmAliveLimit);
 
         /// <summary>
         /// Gets the amount of time to wait for the cluster membership system to terminate during shutdown.
