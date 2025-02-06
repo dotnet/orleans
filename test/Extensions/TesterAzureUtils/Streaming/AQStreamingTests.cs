@@ -33,7 +33,7 @@ namespace Tester.AzureUtils.Streaming
 
                 ConfigureStreaming("ProviderType", "AzureQueueStorage");
                 ConfigureStreaming("ConnectionString", TestDefaultConfiguration.UseAadAuthentication
-                    ? TestDefaultConfiguration.DataBlobUri.AbsoluteUri
+                    ? TestDefaultConfiguration.DataQueueUri.AbsoluteUri
                     : TestDefaultConfiguration.DataConnectionString);
 
                 var names = AzureQueueUtilities.GenerateQueueNames(builder.Options.ClusterId, queueCount);
