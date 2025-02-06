@@ -441,7 +441,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exception)
                 {
-                    this.logger.LogError(exception, "Error while collecting activations.");
+                    LogErrorWhileCollectingActivations(exception);
                 }
             }
         }
@@ -549,6 +549,12 @@ namespace Orleans.Runtime
         }
 
         [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error while collecting activations."
+        )]
+        private partial void LogErrorWhileCollectingActivations(Exception exception);
+
+        [LoggerMessage(
             EventId = (int)ErrorCode.Catalog_BeforeCollection,
             Level = LogLevel.Debug,
             Message = "Before collection #{CollectionNumber}: memory: {MemoryBefore}MB, #activations: {ActivationCount}, collector: {CollectorStatus}"
@@ -562,7 +568,6 @@ namespace Orleans.Runtime
         )]
         private partial void LogAfterCollection(int collectionNumber, long memoryAfter, int activationCount, int collectedCount, ActivationCollector collectorStatus, TimeSpan collectionTime);
 
-        // Log DeactivateActivationsFromCollector
         [LoggerMessage(
             EventId = (int)ErrorCode.Catalog_ShutdownActivations_1,
             Level = LogLevel.Information,
