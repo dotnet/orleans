@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime;
+using Orleans.Streaming;
 using Orleans.Streams.Filtering;
 
 namespace Orleans.Streams
@@ -424,6 +425,8 @@ namespace Orleans.Streams
             }
 
             var now = DateTime.UtcNow;
+            System.Diagnostics.TagList? tags = null;
+
             // Try to cleanup the pubsub cache at the cadence of 10 times in the configurable StreamInactivityPeriod.
             if ((now - lastTimeCleanedPubSubCache) >= this.options.StreamInactivityPeriod.Divide(StreamInactivityCheckFrequency))
             {
@@ -465,7 +468,13 @@ namespace Orleans.Streams
 
             queueCache?.AddToCache(multiBatch);
             numMessages += multiBatch.Count;
-            StreamInstruments.PersistentStreamReadMessages.Add(multiBatch.Count);
+
+            if (StreamInstruments.PersistentStreamReadMessages.Enabled)
+            {
+                tags = StreamInstrumentsTagUtils.InitializeTags(myQueueId, streamProviderName);
+                StreamInstruments.PersistentStreamReadMessages.Add(multiBatch.Count, tags.Value);
+            }
+
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.LogTrace(
                     (int)ErrorCode.PersistentStreamPullingAgent_11,
@@ -556,6 +565,7 @@ namespace Orleans.Streams
 
         private async Task RunConsumerCursor(StreamConsumerData consumerData)
         {
+            System.Diagnostics.TagList? tags = null;
             try
             {
                 // double check in case of interleaving
@@ -590,7 +600,13 @@ namespace Orleans.Streams
 
                     try
                     {
-                        StreamInstruments.PersistentStreamSentMessages.Add(1);
+                        if (StreamInstruments.PersistentStreamSentMessages.Enabled)
+                        {
+                            tags ??= StreamInstrumentsTagUtils.InitializeTags(
+                                consumerData.StreamId, consumerData.SubscriptionId);
+                            StreamInstruments.PersistentStreamSentMessages.Add(1, tags.Value);
+                        }
+
                         if (batch != null)
                         {
                             StreamHandshakeToken newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
