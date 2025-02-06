@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure;
@@ -35,6 +38,7 @@ namespace Orleans.Storage
         private SerializationManager serializationManager;
         private IGrainFactory grainFactory;
         private ITypeResolver typeResolver;
+        private readonly IGrainReferenceRuntime grainReferenceRuntime;
 
         /// <summary> Default constructor </summary>
         public AzureBlobGrainStorage(
@@ -43,6 +47,7 @@ namespace Orleans.Storage
             SerializationManager serializationManager,
             IGrainFactory grainFactory,
             ITypeResolver typeResolver,
+            IGrainReferenceRuntime grainReferenceRuntime,
             ILogger<AzureBlobGrainStorage> logger)
         {
             this.name = name;
@@ -50,6 +55,7 @@ namespace Orleans.Storage
             this.serializationManager = serializationManager;
             this.grainFactory = grainFactory;
             this.typeResolver = typeResolver;
+            this.grainReferenceRuntime = grainReferenceRuntime;
             this.logger = logger;
         }
 
@@ -304,6 +310,23 @@ namespace Orleans.Storage
             }
 
             return result;
+        }
+
+        public async IAsyncEnumerable<StorageEntry> GetAll([EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            var regex = new Regex("(?<name>[^-]+)-(?<reference>[^-]+).json");
+            await foreach (var item in this.container.GetBlobsAsync(cancellationToken: cancellationToken))
+            {
+                var match = regex.Match(item.Name);
+                if (match.Success)
+                {
+                    var name = match.Groups["name"].Value;
+                    var reference = GrainReference.FromKeyString(match.Groups["reference"].Value, this.grainReferenceRuntime);
+                    var state = new GrainState<object>();
+                    await ReadStateAsync(name, reference, state);
+                    yield return new StorageEntry(name, reference, state);
+                }
+            }
         }
     }
 
