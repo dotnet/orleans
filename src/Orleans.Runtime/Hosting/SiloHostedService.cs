@@ -17,7 +17,7 @@ namespace Orleans.Hosting
             IEnumerable<IConfigurationValidator> configurationValidators,
             ILogger<SiloHostedService> logger)
         {
-            this.ValidateSystemConfiguration(configurationValidators);
+            ValidateSystemConfiguration(configurationValidators);
             this.silo = silo;
             this.logger = logger;
         }
@@ -36,7 +36,7 @@ namespace Orleans.Hosting
             this.logger.LogInformation("Orleans Silo stopped.");
         }
 
-        private void ValidateSystemConfiguration(IEnumerable<IConfigurationValidator> configurationValidators)
+        private static void ValidateSystemConfiguration(IEnumerable<IConfigurationValidator> configurationValidators)
         {
             foreach (var validator in configurationValidators)
             {

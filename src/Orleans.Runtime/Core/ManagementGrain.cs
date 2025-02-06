@@ -338,7 +338,7 @@ namespace Orleans.Runtime.Management
         /// <param name="siloAddresses">List of silos to perform the action for</param>
         /// <param name="perSiloAction">The action function to be performed for each silo</param>
         /// <returns>Array containing one Task for each silo the action was performed for</returns>
-        private List<Task> PerformPerSiloAction(SiloAddress[] siloAddresses, Func<SiloAddress, Task> perSiloAction)
+        private static List<Task> PerformPerSiloAction(SiloAddress[] siloAddresses, Func<SiloAddress, Task> perSiloAction)
         {
             var requestsToSilos = new List<Task>();
             foreach (SiloAddress siloAddress in siloAddresses)

@@ -105,7 +105,7 @@ namespace Benchmarks.Comparison
             var instance = Serializer.Deserialize(Input, Session);
             return SumResult(instance);
         }
-        
+
         [Benchmark]
         public int Utf8Json() => SumResult(Utf8JsonNS.JsonSerializer.Deserialize<IntClass>(Utf8JsonInput, Utf8JsonResolver));
 

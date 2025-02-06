@@ -118,7 +118,7 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        private async Task<bool> CheckCounters(List<ISampleStreaming_ConsumerGrain> consumers, int totalEventCount, bool assertIsTrue)
+        private static async Task<bool> CheckCounters(List<ISampleStreaming_ConsumerGrain> consumers, int totalEventCount, bool assertIsTrue)
         {
             List<Task<int>> becomeConsumersTasks = consumers
                 .Select((consumer, i) => consumer.GetNumberConsumed())

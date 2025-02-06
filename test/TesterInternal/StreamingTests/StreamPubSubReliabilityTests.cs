@@ -116,7 +116,7 @@ namespace UnitTests.StreamingTests
             await producer.SendItem(1);
 
             int received1 = 0;
-            var cts = new CancellationTokenSource(1000);
+            using var cts = new CancellationTokenSource(1000);
             do
             {
                 received1 = await consumer.GetReceivedCount();

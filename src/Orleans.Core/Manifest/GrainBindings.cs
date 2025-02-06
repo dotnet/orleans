@@ -123,7 +123,7 @@ namespace Orleans.Metadata
             }
         }
 
-        private Cache BuildCache(ClusterManifest clusterManifest)
+        private static Cache BuildCache(ClusterManifest clusterManifest)
         {
             var result = new Dictionary<GrainType, GrainBindings>();
 

@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Orleans.CodeGenerator.Hashing;
+using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
 namespace Orleans.CodeGenerator;
@@ -37,7 +38,7 @@ internal class FieldIdAssignmentHelper
 
     public bool TryGetSymbolKey(ISymbol symbol, out (uint, bool) key) => _symbols.TryGetValue(symbol, out key);
 
-    private bool HasMemberWithIdAnnotation() => _memberSymbols.Any(member => member.HasAnyAttribute(_libraryTypes.IdAttributeTypes));
+    private bool HasMemberWithIdAnnotation() => Array.Exists(_memberSymbols, member => member.HasAnyAttribute(_libraryTypes.IdAttributeTypes));
 
     private IEnumerable<ISymbol> GetMembers(INamedTypeSymbol symbol)
     {
@@ -122,7 +123,7 @@ internal class FieldIdAssignmentHelper
         return true;
     }
 
-    private (string, uint) GetCanonicalNameAndFieldId(ITypeSymbol typeSymbol, string name)
+    private static (string, uint) GetCanonicalNameAndFieldId(ITypeSymbol typeSymbol, string name)
     {
         name = PropertyUtility.GetCanonicalName(name);
 

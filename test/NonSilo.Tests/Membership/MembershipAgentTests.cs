@@ -70,7 +70,7 @@ namespace NonSilo.Tests.Membership
                 });
 
             this.membershipTable = new InMemoryMembershipTable(new TableVersion(1, "1"));
-            this.clusterMembershipOptions = Options.Create(new ClusterMembershipOptions());
+            this.clusterMembershipOptions = Options.Create(new ClusterMembershipOptions() { MaxJoinAttemptTime = TimeSpan.FromSeconds(45) });
             this.manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
@@ -192,7 +192,7 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(SiloStatus.Joining, levels[ServiceLifecycleStage.AfterRuntimeGrainServices + 1]);
             Assert.Equal(SiloStatus.Active, levels[ServiceLifecycleStage.BecomeActive + 1]);
 
-            var cancellation = new CancellationTokenSource();
+            using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();
             await StopLifecycle(cancellation.Token);
 
@@ -318,7 +318,7 @@ namespace NonSilo.Tests.Membership
             this.remoteSiloProber.Probe(default, default).ReturnsForAnyArgs(Task.FromException(new Exception("no")));
 
             var dateTimeIndex = 0;
-            var dateTimes = new DateTime[] { DateTime.UtcNow, DateTime.UtcNow.AddMinutes(8) };
+            var dateTimes = new DateTime[] { DateTime.UtcNow, DateTime.UtcNow.AddMinutes(1) };
             var membershipAgentTestAccessor = ((MembershipAgent.ITestAccessor)this.agent).GetDateTime = () => dateTimes[dateTimeIndex++];
 
             var clusterHealthMonitorTestAccessor = (ClusterHealthMonitor.ITestAccessor)this.clusterHealthMonitor;
@@ -350,7 +350,7 @@ namespace NonSilo.Tests.Membership
         private static async Task Until(Func<bool> condition)
         {
             var maxTimeout = 40_000;
-            while (!condition() && (maxTimeout -= 10) > 0) await Task.Delay(10);
+            while (!condition() && (maxTimeout -= 10) >= 0) await Task.Delay(10);
             Assert.True(maxTimeout > 0);
         }
 

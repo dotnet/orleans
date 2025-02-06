@@ -94,7 +94,7 @@ namespace Orleans.Hosting.Kubernetes
             }
         }
 
-        private string? ReadNamespaceFromServiceAccount()
+        private static string? ReadNamespaceFromServiceAccount()
         {
             // Read the namespace from the pod's service account.
             var serviceAccountNamespacePath = Path.Combine($"{Path.DirectorySeparatorChar}var", "run", "secrets", "kubernetes.io", "serviceaccount", "namespace");

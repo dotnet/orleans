@@ -104,7 +104,7 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<
         return result;
     }
 
-    private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
+    private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
         $"Declared length of {typeof(Collection<T>)}, {length}, is greater than total length of input.");
 
     private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");

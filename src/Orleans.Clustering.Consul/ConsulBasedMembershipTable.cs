@@ -1,14 +1,14 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Consul;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.Host;
-using System.Collections.Generic;
-using System.Text;
-using System.Globalization;
 
 namespace Orleans.Runtime.Membership
 {
@@ -80,7 +80,7 @@ namespace Orleans.Runtime.Membership
                         && !siloKV.Key.EndsWith(ConsulSiloRegistrationAssembler.VersionSuffix, StringComparison.OrdinalIgnoreCase))
                 .Select(siloKV =>
                 {
-                    var iAmAliveKV = deploymentKVAddresses.Response.Where(kv => kv.Key.Equals(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKV.Key), StringComparison.OrdinalIgnoreCase)).SingleOrDefault();
+                    var iAmAliveKV = deploymentKVAddresses.Response.SingleOrDefault(kv => kv.Key.Equals(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKV.Key), StringComparison.OrdinalIgnoreCase));
                     return ConsulSiloRegistrationAssembler.FromKVPairs(clusterId, siloKV, iAmAliveKV);
                 }).ToArray();
 
@@ -223,7 +223,7 @@ namespace Orleans.Runtime.Membership
                     && !siloKV.Key.EndsWith(ConsulSiloRegistrationAssembler.VersionSuffix, StringComparison.OrdinalIgnoreCase))
                 .Select(siloKV =>
                 {
-                    var iAmAliveKV = allKVs.Response.Where(kv => kv.Key.Equals(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKV.Key), StringComparison.OrdinalIgnoreCase)).SingleOrDefault();
+                    var iAmAliveKV = allKVs.Response.SingleOrDefault(kv => kv.Key.Equals(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKV.Key), StringComparison.OrdinalIgnoreCase));
                     return new
                     {
                         RegistrationKey = siloKV.Key,
@@ -233,7 +233,7 @@ namespace Orleans.Runtime.Membership
 
             foreach (var entry in allRegistrations)
             {
-                if (entry.Registration.IAmAliveTime < beforeDate)
+                if (entry.Registration.IAmAliveTime < beforeDate && entry.Registration.Status != SiloStatus.Active)
                 {
                     await _consulClient.KV.DeleteTree(entry.RegistrationKey);
                 }

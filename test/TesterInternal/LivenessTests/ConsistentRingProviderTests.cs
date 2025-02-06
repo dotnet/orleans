@@ -91,7 +91,7 @@ namespace UnitTests.LivenessTests
                 queueHistogram.Values.Min(list => list.Sum()), queueHistogram.Values.Max(list => list.Sum()));
         }
 
-        private Dictionary<SiloAddress, List<int>> GetQueueHistogram(List<(SiloAddress Key, List<IRingRangeInternal> Value)> siloRanges, int totalNumQueues)
+        private static Dictionary<SiloAddress, List<int>> GetQueueHistogram(List<(SiloAddress Key, List<IRingRangeInternal> Value)> siloRanges, int totalNumQueues)
         {
             var options = new HashRingStreamQueueMapperOptions();
             options.TotalQueueCount = totalNumQueues;

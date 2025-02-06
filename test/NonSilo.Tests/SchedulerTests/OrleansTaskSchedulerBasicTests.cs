@@ -368,13 +368,13 @@ namespace UnitTests.SchedulerTests
             Assert.Null(RequestContext.Get(key));
         }
 
-        private async Task AsyncCheckClearRequestContext(string key)
+        private static async Task AsyncCheckClearRequestContext(string key)
         {
             Assert.Null(RequestContext.Get(key));
             await Task.Delay(TimeSpan.Zero);
         }
 
-        private Task NonAsyncCheckClearRequestContext(string key)
+        private static Task NonAsyncCheckClearRequestContext(string key)
         {
             Assert.Null(RequestContext.Get(key));
             return Task.CompletedTask;

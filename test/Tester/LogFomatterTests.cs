@@ -382,7 +382,7 @@ namespace Tester
             Assert.Equal(expected.ToString(), actual.ToString());
         }
 
-        private TestLoggerFactory BuildOptionsExpectedResult()
+        private static TestLoggerFactory BuildOptionsExpectedResult()
         {
             var services = new ServiceCollection();
             var testOptions = new TestOptions
@@ -396,7 +396,7 @@ namespace Tester
             return expected;
         }
 
-        private TestLoggerFactory BuildNamedOptionsExpectedResult()
+        private static TestLoggerFactory BuildNamedOptionsExpectedResult()
         {
             var services = new ServiceCollection();
             IOptionFormatter[] formatters = Enumerable

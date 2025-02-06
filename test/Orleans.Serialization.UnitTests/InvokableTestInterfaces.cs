@@ -28,7 +28,7 @@ namespace Orleans.Serialization.UnitTests
             CopyContextPool = copyContextPool;
             CodecProvider = codecProvider;
         }
-        
+
         protected TInvokable GetInvokable<TInvokable>() where TInvokable : class, IInvokable, new() => InvokablePool.Get<TInvokable>();
 
         protected ValueTask<T> InvokeAsync<T>(IInvokable body)

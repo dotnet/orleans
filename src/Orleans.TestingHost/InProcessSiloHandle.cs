@@ -59,7 +59,7 @@ namespace Orleans.TestingHost
         /// <inheritdoc />
         public override async Task StopSiloAsync(bool stopGracefully)
         {
-            var cancellation = new CancellationTokenSource();
+            using var cancellation = new CancellationTokenSource();
             var ct = cancellation.Token;
 
             if (!stopGracefully)
@@ -125,7 +125,7 @@ namespace Orleans.TestingHost
             }
         }
 
-        private void WriteLog(object value)
+        private static void WriteLog(object value)
         {
             Console.WriteLine(value?.ToString());
         }
