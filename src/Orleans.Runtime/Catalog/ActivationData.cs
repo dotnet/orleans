@@ -26,7 +26,7 @@ namespace Orleans.Runtime;
 /// MUST lock this object for any concurrent access
 /// Consider: compartmentalize by usage, e.g., using separate interfaces for data for catalog, etc.
 /// </summary>
-internal sealed class ActivationData :
+internal sealed partial class ActivationData :
     IGrainContext,
     ICollectibleGrainContext,
     IGrainExtensionBinder,
@@ -364,24 +364,13 @@ internal sealed class ActivationData :
 
         if (maxRequestsHardLimit > 0 && count > maxRequestsHardLimit) // Hard limit
         {
-            _shared.Logger.LogWarning(
-                (int)ErrorCode.Catalog_Reject_ActivationTooManyRequests,
-                "Overload - {Count} enqueued requests for activation {Activation}, exceeding hard limit rejection threshold of {HardLimit}",
-                count,
-                this,
-                maxRequestsHardLimit);
-
+            LogRejectActivationTooManyRequests(_shared.Logger, count, this, maxRequestsHardLimit);
             return new LimitExceededException(limitName, count, maxRequestsHardLimit, ToString());
         }
 
         if (maxRequestsSoftLimit > 0 && count > maxRequestsSoftLimit) // Soft limit
         {
-            _shared.Logger.LogWarning(
-                (int)ErrorCode.Catalog_Warn_ActivationTooManyRequests,
-                "Hot - {Count} enqueued requests for activation {Activation}, exceeding soft limit warning threshold of {SoftLimit}",
-                count,
-                this,
-                maxRequestsSoftLimit);
+            LogWarnActivationTooManyRequests(_shared.Logger, count, this, maxRequestsSoftLimit);
             return null;
         }
 
@@ -480,7 +469,7 @@ internal sealed class ActivationData :
                     {
                         if (exception is not ObjectDisposedException)
                         {
-                            _shared.Logger.LogWarning(exception, "Error while cancelling on-going operation '{Operation}'.", cmd);
+                            LogErrorCancellingOperation(_shared.Logger, exception, cmd);
                         }
                     }
                 }
@@ -535,14 +524,11 @@ internal sealed class ActivationData :
                 StartMigratingCore(requestContext, newLocation);
             }
 
-            if (_shared.Logger.IsEnabled(LogLevel.Debug))
-            {
-                _shared.Logger.LogDebug("Migrating {GrainId} to {SiloAddress}", GrainId, newLocation);
-            }
+            LogDebugMigrating(_shared.Logger, GrainId, newLocation);
         }
         catch (Exception exception)
         {
-            _shared.Logger.LogError(exception, "Error while selecting a migration destination for {GrainId}", GrainId);
+            LogErrorSelectingMigrationDestination(_shared.Logger, GrainId, exception);
             return;
         }
     }
@@ -572,16 +558,13 @@ internal sealed class ActivationData :
             // No more appropriate silo was selected for this grain. The migration attempt will be aborted.
             // This could be because this is the only (compatible) silo for the grain or because the placement director chose this
             // silo for some other reason.
-            if (_shared.Logger.IsEnabled(LogLevel.Debug))
+            if (newLocation is null)
             {
-                if (newLocation is null)
-                {
-                    _shared.Logger.LogDebug("Placement strategy {PlacementStrategy} failed to select a destination for migration of {GrainId}", PlacementStrategy, GrainId);
-                }
-                else
-                {
-                    _shared.Logger.LogDebug("Placement strategy {PlacementStrategy} selected the current silo as the destination for migration of {GrainId}", PlacementStrategy, GrainId);
-                }
+                LogDebugPlacementStrategyFailedToSelectDestination(_shared.Logger, PlacementStrategy, GrainId);
+            }
+            else
+            {
+                LogDebugPlacementStrategySelectedCurrentSilo(_shared.Logger, PlacementStrategy, GrainId);
             }
 
             // Will not migrate.
@@ -2233,4 +2216,49 @@ internal sealed class ActivationData :
 
         public override void Execute() => activation.StartMigratingAsync(requestContext, cts).Ignore();
     }
+
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Catalog_Reject_ActivationTooManyRequests,
+        Level = LogLevel.Warning,
+        Message = "Overload - {Count} enqueued requests for activation {Activation}, exceeding hard limit rejection threshold of {HardLimit}"
+    )]
+    private static partial void LogRejectActivationTooManyRequests(ILogger logger, int count, ActivationData activation, int hardLimit);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Catalog_Warn_ActivationTooManyRequests,
+        Level = LogLevel.Warning,
+        Message = "Hot - {Count} enqueued requests for activation {Activation}, exceeding soft limit warning threshold of {SoftLimit}"
+    )]
+    private static partial void LogWarnActivationTooManyRequests(ILogger logger, int count, ActivationData activation, int softLimit);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Error while cancelling on-going operation '{Operation}'."
+    )]
+    private static partial void LogErrorCancellingOperation(ILogger logger, Exception exception, object operation);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Migrating {GrainId} to {SiloAddress}"
+    )]
+    private static partial void LogDebugMigrating(ILogger logger, GrainId grainId, SiloAddress siloAddress);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error while selecting a migration destination for {GrainId}"
+    )]
+    private static partial void LogErrorSelectingMigrationDestination(ILogger logger, GrainId grainId, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Placement strategy {PlacementStrategy} failed to select a destination for migration of {GrainId}"
+    )]
+    private static partial void LogDebugPlacementStrategyFailedToSelectDestination(ILogger logger, PlacementStrategy placementStrategy, GrainId grainId);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Placement strategy {PlacementStrategy} selected the current silo as the destination for migration of {GrainId}"
+    )]
+    private static partial void LogDebugPlacementStrategySelectedCurrentSilo(ILogger logger, PlacementStrategy placementStrategy, GrainId grainId);
 }
