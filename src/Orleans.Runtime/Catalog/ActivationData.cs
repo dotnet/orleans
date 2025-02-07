@@ -2166,9 +2166,8 @@ internal sealed partial class ActivationData : IGrainContext, ICollectibleGrainC
     )]
     private static partial void LogDehydratedActivation(ILogger logger);
 
-    // LogRejectAllQueuedMessages
     [LoggerMessage(
-        EventId = (int)ErrorCode.Catalog_RejectAllQueuedMessages,
+        EventId = (int)ErrorCode.Catalog_RerouteAllQueuedMessages,
         Level = LogLevel.Debug,
         Message = "Rejecting {Count} messages from invalid activation {Activation}."
     )]
