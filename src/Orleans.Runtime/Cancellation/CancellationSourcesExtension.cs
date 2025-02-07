@@ -133,12 +133,12 @@ namespace Orleans.Runtime
             }
         }
 
-
         [LoggerMessage(
             EventId = (int)ErrorCode.CancellationTokenCancelFailed,
             Level = LogLevel.Warning,
-            Message = "Received a cancel call for token with id {TokenId}, but the token was not found"
+            Message = "Received a cancel call for token with id '{TokenId}', but the token was not found."
         )]
+
         private partial void LogCancellationFailed(Guid tokenId);
     }
 }
