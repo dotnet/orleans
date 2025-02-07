@@ -13,7 +13,6 @@ namespace Orleans.Runtime.ReminderService
 {
     internal sealed class ReminderRegistry : GrainServiceClient<IReminderService>, IReminderRegistry
     {
-        private const uint MaxSupportedTimeout = 0xfffffffe;
         private IServiceProvider? serviceProvider;
         private readonly ReminderOptions options;
 
@@ -29,14 +28,10 @@ namespace Orleans.Runtime.ReminderService
             // http://referencesource.microsoft.com/#mscorlib/system/threading/timer.cs,c454f2afe745d4d3,references
             if (dueTime.Ticks < 0 && dueTime != Timeout.InfiniteTimeSpan)
                 throw new ArgumentOutOfRangeException(nameof(dueTime), "Cannot use negative dueTime to create a reminder");
-            if (dueTime.Ticks > MaxSupportedTimeout * TimeSpan.TicksPerMillisecond)
-                throw new ArgumentOutOfRangeException(nameof(dueTime), $"Cannot use value larger than {MaxSupportedTimeout}ms for dueTime when creating a reminder");
-
+           
             if (period.Ticks < 0 && period != Timeout.InfiniteTimeSpan)
                 throw new ArgumentOutOfRangeException(nameof(period), "Cannot use negative period to create a reminder");
-            if (period.Ticks > MaxSupportedTimeout * TimeSpan.TicksPerMillisecond)
-                throw new ArgumentOutOfRangeException(nameof(period), $"Cannot use value larger than {MaxSupportedTimeout}ms for period when creating a reminder");
-
+          
             var minReminderPeriod = options.MinimumReminderPeriod;
             if (period < minReminderPeriod)
                 throw new ArgumentException($"Cannot register reminder {reminderName} as requested period ({period}) is less than minimum allowed reminder period ({minReminderPeriod})");
