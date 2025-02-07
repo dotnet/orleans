@@ -1147,7 +1147,7 @@ internal sealed partial class ActivationData :
                 }
                 catch (Exception exception)
                 {
-                    _shared.Logger?.LogError(exception, "Error invoking MayInterleave predicate on grain {Grain} for message {Message}", this, incoming);
+                    LogErrorInvokingMayInterleavePredicate(_shared.Logger, exception, this, incoming);
                     throw;
                 }
             }
@@ -1202,7 +1202,7 @@ internal sealed partial class ActivationData :
                 }
                 catch (Exception exception)
                 {
-                    _shared.Logger.LogError(exception, "Error in ProcessOperationsAsync for grain activation '{Activation}'.", this);
+                    LogErrorInProcessOperationsAsync(_shared.Logger, exception, this);
                 }
                 finally
                 {
@@ -1216,27 +1216,20 @@ internal sealed partial class ActivationData :
     {
         try
         {
-            if (_shared.Logger.IsEnabled(LogLevel.Debug))
-            {
-                _shared.Logger.LogDebug("Rehydrating grain '{GrainContext}' from previous activation.", this);
-            }
+            LogRehydratingGrain(_shared.Logger, this);
 
             lock (this)
             {
                 if (State != ActivationState.Creating)
                 {
-                    _shared.Logger.LogWarning("Ignoring attempt to rehydrate grain '{GrainContext}' in the '{State}' state.", this, State);
+                    LogIgnoringRehydrateAttempt(_shared.Logger, this, State);
                     return;
                 }
 
                 if (context.TryGetValue(GrainAddressMigrationContextKey, out GrainAddress? previousRegistration) && previousRegistration is not null)
                 {
-                    // Propagate the previous registration, so that the new activation can atomically replace it with its new address.
                     PreviousRegistration = previousRegistration;
-                    if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                    {
-                        _shared.Logger.LogDebug("Previous activation address was {PreviousRegistration}", previousRegistration);
-                    }
+                    LogPreviousActivationAddress(_shared.Logger, previousRegistration);
                 }
 
                 if (_lifecycle is { } lifecycle)
@@ -1250,23 +1243,17 @@ internal sealed partial class ActivationData :
                 (GrainInstance as IGrainMigrationParticipant)?.OnRehydrate(context);
             }
 
-            if (_shared.Logger.IsEnabled(LogLevel.Debug))
-            {
-                _shared.Logger.LogDebug("Rehydrated grain from previous activation");
-            }
+            LogRehydratedGrain(_shared.Logger);
         }
         catch (Exception exception)
         {
-            _shared.Logger.LogError(exception, "Error while rehydrating activation");
+            LogErrorRehydratingActivation(_shared.Logger, exception);
         }
     }
 
     private void OnDehydrate(IDehydrationContext context)
     {
-        if (_shared.Logger.IsEnabled(LogLevel.Debug))
-        {
-            _shared.Logger.LogDebug("Dehydrating grain activation");
-        }
+        LogDehydratingActivation(_shared.Logger);
 
         lock (this)
         {
@@ -1289,10 +1276,7 @@ internal sealed partial class ActivationData :
             }
         }
 
-        if (_shared.Logger.IsEnabled(LogLevel.Debug))
-        {
-            _shared.Logger.LogDebug("Dehydrated grain activation");
-        }
+        LogDehydratedActivation(_shared.Logger);
     }
 
     /// <summary>
@@ -1443,12 +1427,7 @@ internal sealed partial class ActivationData :
             List<Message> msgs = DequeueAllWaitingRequests();
             if (msgs == null || msgs.Count <= 0) return;
 
-            if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                _shared.Logger.LogDebug(
-                    (int)ErrorCode.Catalog_RerouteAllQueuedMessages,
-                    "RejectAllQueuedMessages: {Count} messages from invalid activation {Activation}.",
-                    msgs.Count,
-                    this);
+            LogRejectAllQueuedMessages(_shared.Logger, msgs.Count, this);
             _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
             _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(
                 msgs,
@@ -2217,7 +2196,6 @@ internal sealed partial class ActivationData :
         public override void Execute() => activation.StartMigratingAsync(requestContext, cts).Ignore();
     }
 
-
     [LoggerMessage(
         EventId = (int)ErrorCode.Catalog_Reject_ActivationTooManyRequests,
         Level = LogLevel.Warning,
@@ -2261,4 +2239,66 @@ internal sealed partial class ActivationData :
         Message = "Placement strategy {PlacementStrategy} selected the current silo as the destination for migration of {GrainId}"
     )]
     private static partial void LogDebugPlacementStrategySelectedCurrentSilo(ILogger logger, PlacementStrategy placementStrategy, GrainId grainId);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error invoking MayInterleave predicate on grain {Grain} for message {Message}"
+    )]
+    private static partial void LogErrorInvokingMayInterleavePredicate(ILogger logger, Exception exception, ActivationData grain, Message message);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error in ProcessOperationsAsync for grain activation '{Activation}'."
+    )]
+    private static partial void LogErrorInProcessOperationsAsync(ILogger logger, Exception exception, ActivationData activation);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Rehydrating grain '{GrainContext}' from previous activation."
+    )]
+    private static partial void LogRehydratingGrain(ILogger logger, ActivationData grainContext);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Ignoring attempt to rehydrate grain '{GrainContext}' in the '{State}' state."
+    )]
+    private static partial void LogIgnoringRehydrateAttempt(ILogger logger, ActivationData grainContext, ActivationState state);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Previous activation address was {PreviousRegistration}"
+    )]
+    private static partial void LogPreviousActivationAddress(ILogger logger, GrainAddress previousRegistration);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Rehydrated grain from previous activation"
+    )]
+    private static partial void LogRehydratedGrain(ILogger logger);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error while rehydrating activation"
+    )]
+    private static partial void LogErrorRehydratingActivation(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Dehydrating grain activation"
+    )]
+    private static partial void LogDehydratingActivation(ILogger logger);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Dehydrated grain activation"
+    )]
+    private static partial void LogDehydratedActivation(ILogger logger);
+
+    // LogRejectAllQueuedMessages
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Catalog_RejectAllQueuedMessages,
+        Level = LogLevel.Debug,
+        Message = "Rejecting {Count} messages from invalid activation {Activation}."
+    )]
+    private static partial void LogRejectAllQueuedMessages(ILogger logger, int count, ActivationData activation);
 }
