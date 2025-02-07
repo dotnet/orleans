@@ -497,8 +497,19 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             DisableDefaults = true,
         });
 
+        foreach (var hostDelegate in Options.ClientHostConfigurationDelegates)
+        {
+            hostDelegate(hostBuilder);
+        }
+
         hostBuilder.UseOrleansClient(clientBuilder =>
         {
+            clientBuilder.Configure<ClusterOptions>(o =>
+            {
+                o.ClusterId = Options.ClusterId;
+                o.ServiceId = Options.ServiceId;
+            });
+
             if (Options.UseTestClusterMembership)
             {
                 clientBuilder.Services.AddSingleton<IGatewayListProvider>(_membershipTable);
@@ -508,11 +519,6 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         });
 
         TryConfigureFileLogging(Options, hostBuilder.Services, "TestClusterClient");
-
-        foreach (var hostDelegate in Options.ClientHostConfigurationDelegates)
-        {
-            hostDelegate(hostBuilder);
-        }
 
         ClientHost = hostBuilder.Build();
         await ClientHost.StartAsync();
@@ -557,8 +563,19 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 services.Configure<SiloMessagingOptions>(op => op.ResponseTimeout = TimeSpan.FromMilliseconds(1000000));
             }
 
+            foreach (var hostDelegate in Options.SiloHostConfigurationDelegates)
+            {
+                hostDelegate(siloOptions, appBuilder);
+            }
+
             appBuilder.UseOrleans(siloBuilder =>
             {
+                siloBuilder.Configure<ClusterOptions>(o =>
+                {
+                    o.ClusterId = Options.ClusterId;
+                    o.ServiceId = Options.ServiceId;
+                });
+
                 siloBuilder.Configure<SiloOptions>(o =>
                 {
                     o.SiloName = siloOptions.SiloName;
@@ -589,11 +606,6 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                     services.AddFromExisting<IEnvironmentStatisticsProvider, TestHooksEnvironmentStatisticsProvider>();
                 }
             });
-
-            foreach (var hostDelegate in Options.SiloHostConfigurationDelegates)
-            {
-                hostDelegate(siloOptions, appBuilder);
-            }
 
             var host = appBuilder.Build();
             InitializeTestHooksSystemTarget(host);
