@@ -105,6 +105,11 @@ namespace Tester.AzureUtils.Streaming
 
             public async Task DisposeAsync()
             {
+                if (Cluster is null)
+                {
+                    return;
+                }
+
                 try
                 {
                     TestUtils.CheckForAzureStorage();
