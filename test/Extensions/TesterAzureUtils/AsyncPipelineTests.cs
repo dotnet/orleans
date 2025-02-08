@@ -162,14 +162,14 @@ namespace UnitTests.AsyncPrimitivesTests
 
             Assert.True(capacityReached.IsSet, "Pipeline capacity not reached; the delay length probably is too short to be useful.");
             Assert.True(
-                actualSec >= minTimeSec, 
+                actualSec >= minTimeSec,
                 string.Format("The unit test completed too early ({0} sec < {1} sec).", actualSec, minTimeSec));
             Assert.True(
-                actualSec <= maxTimeSec, 
+                actualSec <= maxTimeSec,
                 string.Format("The unit test completed too late ({0} sec > {1} sec).", actualSec, maxTimeSec));
         }
 
-        private void CheckPipelineState(int size, int capacity, InterlockedFlag capacityReached)
+        private static void CheckPipelineState(int size, int capacity, InterlockedFlag capacityReached)
         {
             Assert.True(size >= 0);
             Assert.True(capacity > 0);

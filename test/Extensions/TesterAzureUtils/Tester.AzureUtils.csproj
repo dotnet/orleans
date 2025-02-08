@@ -10,6 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Storage.Queues" />
     <PackageReference Include="Azure.Data.Tables" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Azure.Identity" />

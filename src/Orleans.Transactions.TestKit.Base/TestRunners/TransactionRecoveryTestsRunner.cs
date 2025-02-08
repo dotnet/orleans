@@ -114,7 +114,7 @@ namespace Orleans.Transactions.TestKit
             await ValidateResults(txGrains, transactionGroups);
         }
 
-        private Task WakeupGrains(List<ITransactionalBitArrayGrain> grains)
+        private static Task WakeupGrains(List<ITransactionalBitArrayGrain> grains)
         {
             var tasks =  new List<Task>();
             foreach (var grain in grains)

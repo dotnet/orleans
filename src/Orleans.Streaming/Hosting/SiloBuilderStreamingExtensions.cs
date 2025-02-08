@@ -5,7 +5,7 @@ using Orleans.Streams.Filtering;
 namespace Orleans.Hosting
 {
     /// <summary>
-    /// Extension methods for confiiguring streaming on silos.
+    /// Extension methods for configuring streaming on silos.
     /// </summary>
     public static class SiloBuilderStreamingExtensions
     {

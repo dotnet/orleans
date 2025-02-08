@@ -84,7 +84,7 @@ public partial class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
                     {
                         ++suffix;
                         newAlias = $"{prefix}{suffix}";
-                    } while (bags.Any(x => x.Value.Equals(newAlias, StringComparison.Ordinal)));
+                    } while (bags.Exists(x => x.Value.Equals(newAlias, StringComparison.Ordinal)));
 
                     var builder = ImmutableDictionary.CreateBuilder<string, string>();
 

@@ -419,7 +419,7 @@ namespace Orleans.Transactions.State
             }
         }
 
-        private bool HasConflict(bool isRead, DateTime priority, Guid transactionId, LockGroup group, out bool resolvable)
+        private static bool HasConflict(bool isRead, DateTime priority, Guid transactionId, LockGroup group, out bool resolvable)
         {
             bool foundResolvableConflicts = false;
 
@@ -450,7 +450,7 @@ namespace Orleans.Transactions.State
             return foundResolvableConflicts;
         }
 
-        private IEnumerable<Guid> Conflicts(Guid transactionId, LockGroup group)
+        private static IEnumerable<Guid> Conflicts(Guid transactionId, LockGroup group)
         {
             foreach (var kvp in group)
             {

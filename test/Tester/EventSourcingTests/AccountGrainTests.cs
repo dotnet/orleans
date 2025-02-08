@@ -13,7 +13,7 @@ namespace Tester.EventSourcingTests
             this.fixture = fixture;
         }
 
-        private async Task TestSequence(IAccountGrain account, bool hasLogStored)
+        private static async Task TestSequence(IAccountGrain account, bool hasLogStored)
         {
             Assert.Equal(0u, await account.Balance());
 
