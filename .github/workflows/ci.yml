@@ -25,7 +25,7 @@ jobs:
         dotnet-version: |
           8.0.x
     - name: Build
-      run: dotnet build
+      run: dotnet build -bl
     - uses: actions/upload-artifact@v4
       with:
         name: build_log_${{ matrix.os }}
@@ -56,7 +56,13 @@ jobs:
         dotnet-version: |
           8.0.x
     - name: Test
-      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test
+        --framework net8.0
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --blame-hang-timeout 10m
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}.trx"
+        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
+        -- -parallel none -noshadow
       env:
         ORLEANSREDISCONNECTIONSTRING: "localhost:6379,ssl=False,abortConnect=False"
     - name: Archive Test Results
@@ -83,7 +89,13 @@ jobs:
         dotnet-version: |
           8.0.x
     - name: Test
-      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Clustering)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test
+        --framework net8.0
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Clustering)"
+        --blame-hang-timeout 10m
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.dbversion }}.trx"
+        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
+        -- -parallel none -noshadow
       env:
         CASSANDRAVERSION: ${{ matrix.dbversion }}
     - name: Archive Test Results
@@ -122,7 +134,13 @@ jobs:
         dotnet-version: |
           8.0.x
     - name: Test
-      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test
+        --framework net8.0
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --blame-hang-timeout 10m
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}.trx"
+        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
+        -- -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
         ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
@@ -157,7 +175,13 @@ jobs:
         dotnet-version: |
           8.0.x
     - name: Test
-      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test
+        --framework net8.0
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --blame-hang-timeout 10m
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}.trx"
+        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
+        -- -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
@@ -194,7 +218,13 @@ jobs:
         dotnet-version: |
           8.0.x
     - name: Test
-      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test
+        --framework net8.0
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --blame-hang-timeout 10m
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}.trx"
+        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
+        -- -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;"
@@ -230,7 +260,13 @@ jobs:
         dotnet-version: |
           8.0.x
     - name: Test
-      run: dotnet test --filter "Category=${{ matrix.provider }}&Category=${{ matrix.suite }}" --framework ${{ matrix.framework }} --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test
+        --filter "Category=${{ matrix.provider }}&Category=${{ matrix.suite }}"
+        --framework ${{ matrix.framework }}
+        --blame-hang-timeout 10m
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.suite }}.trx"
+        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
+        -- -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
@@ -276,7 +312,14 @@ jobs:
         $IPAddress = "127.0.0.1" #(Get-NetIPAddress -AddressFamily IPV4 -AddressState Preferred -PrefixOrigin Manual | Select-Object IPAddress -First 1).IPAddress ?? "127.0.0.1"
         Add-Content -Path $env:GITHUB_ENV -Value "ORLEANSCOSMOSDBACCOUNTENDPOINT=https://$($IPAddress):8081/"
     - name: Test
-      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --framework ${{ matrix.framework }} --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test
+        --framework net8.0
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --framework ${{ matrix.framework }}
+        --blame-hang-timeout 10m
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}.trx"
+        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
+        -- -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         #ORLEANSCOSMOSDBACCOUNTENDPOINT: "https://127.0.0.1:8081/"
@@ -312,7 +355,13 @@ jobs:
         dotnet-version: |
           8.0.x
     - name: Test
-      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test
+        --framework net8.0
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --blame-hang-timeout 10m
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}.trx"
+        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
+        -- -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
@@ -348,7 +397,13 @@ jobs:
         dotnet-version: |
           8.0.x
     - name: Test
-      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test
+        --framework net8.0
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --blame-hang-timeout 10m
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}.trx"
+        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
+        -- -parallel none -noshadow
       env:
         ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
     - name: Archive Test Results
@@ -385,13 +440,51 @@ jobs:
         dotnet-version: |
           8.0.x
     - name: Test
-      run: dotnet test --framework net8.0 --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      run: dotnet test
+        --framework net8.0
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --blame-hang-timeout 10m
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}.trx"
+        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
+        -- -parallel none -noshadow
       env:
         ORLEANSDYNAMODBSERVICE: "http://127.0.0.1:8000"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSDYNAMODBACCESSKEY: "root"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSDYNAMODBSECRETKEY: "pass"
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test_output_${{ github.job }}
+        retention-days: 1
+        path: |
+          **/TestResults/*
+          **/logs/*
+  test:
+    name: ${{ matrix.suite }} tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        suite: [BVT, SlowBVT, Functional]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: |
+          8.0.x
+    - name: Build
+      run: dotnet build
+    - name: Test
+      run: dotnet test
+        --framework net8.0
+        --filter "Category=${{ matrix.suite }}"
+        --blame-hang-timeout 10m
+        --logger "trx;LogFileName=test_results_${{ matrix.suite }}.trx"
+        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
+        -- -parallel none -noshadow
     - name: Archive Test Results
       if: always()
       uses: actions/upload-artifact@v4
