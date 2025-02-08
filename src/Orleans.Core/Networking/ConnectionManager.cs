@@ -298,7 +298,7 @@ namespace Orleans.Runtime.Messaging
 
                     if (closeTasks.Count > 0)
                     {
-                        await Task.WhenAny(Task.WhenAll(closeTasks), ct.WhenCancelled());
+                        await Task.WhenAll(closeTasks).WaitAsync(ct).SuppressThrowing();
                         if (ct.IsCancellationRequested) break;
                     }
                     else if (!pendingConnections) break;

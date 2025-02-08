@@ -542,7 +542,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                     if (_runTask is Task task)
                     {
-                        await Task.WhenAny(ct.WhenCancelled(), task);
+                        await task.WaitAsync(ct).SuppressThrowing();
                     }
                 });
         }

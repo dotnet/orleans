@@ -490,7 +490,7 @@ namespace Orleans.Runtime
                 }
 
                 // Wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop.
-                await Task.WhenAny(Task.Delay(waitForMessageToBeQueuedForOutbound), ct.WhenCancelled());
+                await Task.Delay(waitForMessageToBeQueuedForOutbound, ct).SuppressThrowing();
             }
             catch (Exception exc)
             {
