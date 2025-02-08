@@ -684,7 +684,7 @@ internal sealed partial class ActivationData : IGrainContext, ICollectibleGrainC
                 }
 
                 var executionTime = _busyDuration.Elapsed;
-                if (executionTime >= slowRunningRequestDuration)
+                if (executionTime >= slowRunningRequestDuration && !message.IsLocalOnly)
                 {
                     GetStatusList(ref diagnostics);
                     if (timeSinceQueued.HasValue)
@@ -705,7 +705,10 @@ internal sealed partial class ActivationData : IGrainContext, ICollectibleGrainC
             {
                 var message = running.Key;
                 var runDuration = running.Value;
-                if (ReferenceEquals(message, _blockingRequest)) continue;
+                if (ReferenceEquals(message, _blockingRequest) || message.IsLocalOnly)
+                {
+                    continue;
+                }
 
                 // Check how long they've been executing.
                 var executionTime = runDuration.Elapsed;
@@ -727,6 +730,11 @@ internal sealed partial class ActivationData : IGrainContext, ICollectibleGrainC
             foreach (var pair in _waitingRequests)
             {
                 var message = pair.Message;
+                if (message.IsLocalOnly)
+                {
+                    continue;
+                }
+
                 var queuedTime = pair.QueuedTime.Elapsed;
                 if (queuedTime >= longQueueTimeDuration)
                 {

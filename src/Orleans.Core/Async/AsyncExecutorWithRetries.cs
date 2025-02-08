@@ -84,7 +84,8 @@ namespace Orleans.Internal
             int maxNumErrorTries,
             Func<Exception, int, bool> retryExceptionFilter,
             TimeSpan maxExecutionTime,
-            IBackoffProvider onErrorBackOff)
+            IBackoffProvider onErrorBackOff,
+            CancellationToken cancellationToken = default)
         {
             return ExecuteWithRetries<T>(
                 function,
@@ -94,7 +95,8 @@ namespace Orleans.Internal
                 retryExceptionFilter,
                 maxExecutionTime,
                 null,
-                onErrorBackOff);
+                onErrorBackOff,
+                cancellationToken);
         }
 
         /// <summary>
@@ -140,7 +142,8 @@ namespace Orleans.Internal
             Func<Exception, int, bool> retryExceptionFilter,
             TimeSpan maxExecutionTime = default,
             IBackoffProvider onSuccessBackOff = null,
-            IBackoffProvider onErrorBackOff = null)
+            IBackoffProvider onErrorBackOff = null,
+            CancellationToken cancellationToken = default)
         {
             return ExecuteWithRetriesHelper<T>(
                 function,
@@ -151,7 +154,8 @@ namespace Orleans.Internal
                 retryValueFilter,
                 retryExceptionFilter,
                 onSuccessBackOff,
-                onErrorBackOff);
+                onErrorBackOff,
+                cancellationToken);
         }
 
         /// <summary>
@@ -201,7 +205,8 @@ namespace Orleans.Internal
             Func<T, int, bool> retryValueFilter = null,
             Func<Exception, int, bool> retryExceptionFilter = null,
             IBackoffProvider onSuccessBackOff = null,
-            IBackoffProvider onErrorBackOff = null)
+            IBackoffProvider onErrorBackOff = null,
+            CancellationToken cancellationToken = default)
         {
             T result = default;
             ExceptionDispatchInfo lastExceptionInfo = null;
@@ -211,6 +216,7 @@ namespace Orleans.Internal
             do
             {
                 retry = false;
+                cancellationToken.ThrowIfCancellationRequested();
 
                 if (maxExecutionTime != Timeout.InfiniteTimeSpan && maxExecutionTime != default)
                 {
@@ -241,13 +247,13 @@ namespace Orleans.Internal
                             retry = retryValueFilter(result, counter);
                     }
 
-                    if (retry)
+                    if (retry && !cancellationToken.IsCancellationRequested)
                     {
                         TimeSpan? delay = onSuccessBackOff?.Next(counter);
 
                         if (delay.HasValue)
                         {
-                            await Task.Delay(delay.Value);
+                            await Task.Delay(delay.Value, cancellationToken);
                         }
                     }
                 }
@@ -261,7 +267,7 @@ namespace Orleans.Internal
                             retry = retryExceptionFilter(exc, counter);
                     }
 
-                    if (!retry)
+                    if (!retry || cancellationToken.IsCancellationRequested)
                     {
                         throw;
                     }
@@ -272,7 +278,7 @@ namespace Orleans.Internal
 
                     if (delay.HasValue)
                     {
-                        await Task.Delay(delay.Value);
+                        await Task.Delay(delay.Value, cancellationToken);
                     }
                 }
             } while (retry);
