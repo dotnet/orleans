@@ -1506,10 +1506,7 @@ internal sealed partial class ActivationData :
                 {
                     while (true)
                     {
-                        if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                        {
-                            _shared.Logger.LogDebug("Registering grain '{Grain}' in activation directory. Previous known registration is '{PreviousRegistration}'.", this, previousRegistration);
-                        }
+                        LogRegisteringGrain(_shared.Logger, this, previousRegistration);
 
                         var result = await _shared.InternalRuntime.GrainLocator.Register(Address, previousRegistration).WaitAsync(cancellationToken);
                         if (Address.Matches(result))
@@ -1524,17 +1521,7 @@ internal sealed partial class ActivationData :
                             // since the catalog only allows one activation of a given grain at a time.
                             // This could occur if the previous activation failed to unregister itself from the grain directory.
                             previousRegistration = result;
-
-                            if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                            {
-                                _shared.Logger.LogDebug(
-                                    "The grain directory has an existing entry pointing to a different activation of this grain, '{GrainId}', on this silo: '{PreviousRegistration}'."
-                                    + " This may indicate that the previous activation was deactivated but the directory was not successfully updated."
-                                    + " The directory will be updated to point to this activation.",
-                                    GrainId,
-                                    result);
-                            }
-
+                            LogAttemptToRegisterWithPreviousActivation(_shared.Logger, GrainId, result);
                             continue;
                         }
                         else
@@ -2300,4 +2287,18 @@ internal sealed partial class ActivationData :
         Message = "Rejecting {Count} messages from invalid activation {Activation}."
     )]
     private static partial void LogRejectAllQueuedMessages(ILogger logger, int count, ActivationData activation);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Registering grain '{Grain}' in activation directory. Previous known registration is '{PreviousRegistration}'.")]
+    private static partial void LogRegisteringGrain(ILogger logger, ActivationData grain, GrainAddress? previousRegistration);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "The grain directory has an existing entry pointing to a different activation of this grain, '{GrainId}', on this silo: '{PreviousRegistration}'."
+            + " This may indicate that the previous activation was deactivated but the directory was not successfully updated."
+            + " The directory will be updated to point to this activation."
+    )]
+    private static partial void LogAttemptToRegisterWithPreviousActivation(ILogger logger, GrainId grainId, GrainAddress previousRegistration);
+
 }
