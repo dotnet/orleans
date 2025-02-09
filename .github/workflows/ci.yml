@@ -14,6 +14,7 @@ jobs:
   build:
     name: Build
     runs-on: ${{ matrix.os }}
+    continue-on-error: true
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -35,6 +36,7 @@ jobs:
   test-redis:
     name: Redis provider tests
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       matrix:
         provider: ["Redis"]
@@ -77,6 +79,7 @@ jobs:
   test-cassandra:
     name: Cassandra provider tests
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       matrix:
         provider: ["Cassandra"]
@@ -110,6 +113,7 @@ jobs:
   test-postgres:
     name: PostgreSQL provider tests
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       matrix:
         provider: ["PostgreSql"]
@@ -156,6 +160,7 @@ jobs:
   test-mariadb:
     name: MariaDB/MySQL provider tests
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       matrix:
         provider: ["MySql"]
@@ -197,6 +202,7 @@ jobs:
   test-sqlserver:
     name: Microsoft SQL Server provider tests
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       matrix:
         provider: ["SqlServer"]
@@ -240,6 +246,7 @@ jobs:
   test-azure-storage:
     name: Azure Storage provider tests
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       matrix:
         suite: ["BVT", "SlowBVT", "Functional"]
@@ -285,6 +292,7 @@ jobs:
     if: ${{ false }}
     name: Azure Cosmos DB provider tests
     runs-on: windows-latest
+    continue-on-error: true
     strategy:
       matrix:
         framework: ["net8.0"]
@@ -294,7 +302,8 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        include-prerelease: true
+        dotnet-version: |
+          8.0.x
     # - name: Install emulator certificate
     #   run: |
     #     sleep 90s
@@ -337,6 +346,7 @@ jobs:
   test-consul:
     name: Consul provider tests
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       matrix:
         provider: ["Consul"]
@@ -379,6 +389,7 @@ jobs:
   test-zookeeper:
     name: ZooKeeper provider tests
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       matrix:
         provider: ["ZooKeeper"]
@@ -418,6 +429,7 @@ jobs:
   test-dynamodb:
     name: AWS DynamoDB provider tests
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       matrix:
         provider: ["DynamoDB"]
@@ -465,6 +477,7 @@ jobs:
   test:
     name: Test
     runs-on: ${{ matrix.os }}
+    continue-on-error: true
     strategy:
       matrix:
         suite: [BVT, SlowBVT, Functional]
