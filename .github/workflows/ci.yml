@@ -463,7 +463,7 @@ jobs:
           **/TestResults/*
           **/logs/*
   test:
-    name: ${{ matrix.suite }} tests
+    name: Test
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
