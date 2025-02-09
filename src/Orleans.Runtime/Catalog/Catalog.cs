@@ -331,7 +331,7 @@ namespace Orleans.Runtime
         }
 
         // TODO move this logic in the LocalGrainDirectory
-        internal void OnSiloStatusChange(SiloAddress updatedSilo, SiloStatus status)
+        internal void OnSiloStatusChange(ILocalGrainDirectory directory, SiloAddress updatedSilo, SiloStatus status)
         {
             // ignore joining events and also events on myself.
             if (updatedSilo.Equals(LocalSilo)) return;
@@ -350,7 +350,6 @@ namespace Orleans.Runtime
             try
             {
                 // scan all activations in activation directory and deactivate the ones that the removed silo is their primary partition owner.
-                var directory = serviceProvider.GetRequiredService<ILocalGrainDirectory>();
                 lock (activations)
                 {
                     foreach (var activation in activations)
