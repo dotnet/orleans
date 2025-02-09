@@ -18,6 +18,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        framework: [net8.0]
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET
@@ -26,10 +27,10 @@ jobs:
         dotnet-version: |
           8.0.x
     - name: Build
-      run: dotnet build -bl
+      run: dotnet build --framework ${{ matrix.framework }} -bl
     - uses: actions/upload-artifact@v4
       with:
-        name: build_log_${{ matrix.os }}
+        name: build_log_${{ matrix.os }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/*.binlog
@@ -40,6 +41,7 @@ jobs:
     strategy:
       matrix:
         provider: ["Redis"]
+        framework: [net8.0]
     services:
       redis:
         image: redis
@@ -59,10 +61,10 @@ jobs:
           8.0.x
     - name: Test
       run: dotnet test
-        --framework net8.0
+        --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}.trx"
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
         -- -parallel none -noshadow
       env:
@@ -71,7 +73,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test_output_${{ github.job }}
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -84,6 +86,7 @@ jobs:
       matrix:
         provider: ["Cassandra"]
         dbversion: ["3.11", "4.0", "4.1", "5.0"]
+        framework: [net8.0]
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET
@@ -93,10 +96,10 @@ jobs:
           8.0.x
     - name: Test
       run: dotnet test
-        --framework net8.0
+        --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Clustering)"
         --blame-hang-timeout 10m
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.dbversion }}.trx"
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.dbversion }}_${{ matrix.framework }}.trx"
         --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
         -- -parallel none -noshadow
       env:
@@ -105,7 +108,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test_output_${{ github.job }}_${{ matrix.dbversion }}
+        name: test_output_${{ github.job }}_${{ matrix.dbversion }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -117,6 +120,7 @@ jobs:
     strategy:
       matrix:
         provider: ["PostgreSql"]
+        framework: [net8.0]
     services:
       postgres:
         image: postgres
@@ -139,10 +143,10 @@ jobs:
           8.0.x
     - name: Test
       run: dotnet test
-        --framework net8.0
+        --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}.trx"
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
         -- -parallel none -noshadow
       env:
@@ -152,7 +156,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test_output_${{ github.job }}
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -164,6 +168,7 @@ jobs:
     strategy:
       matrix:
         provider: ["MySql"]
+        framework: [net8.0]
     services:
       mariadb:
         image: mariadb:10.6
@@ -181,10 +186,10 @@ jobs:
           8.0.x
     - name: Test
       run: dotnet test
-        --framework net8.0
+        --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}.trx"
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
         -- -parallel none -noshadow
       env:
@@ -194,7 +199,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test_output_${{ github.job }}
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -206,6 +211,7 @@ jobs:
     strategy:
       matrix:
         provider: ["SqlServer"]
+        framework: [net8.0]
     services:
       mssql:
         image: mcr.microsoft.com/mssql/server:latest
@@ -225,10 +231,10 @@ jobs:
           8.0.x
     - name: Test
       run: dotnet test
-        --framework net8.0
+        --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}.trx"
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
         -- -parallel none -noshadow
       env:
@@ -238,7 +244,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test_output_${{ github.job }}
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -249,7 +255,6 @@ jobs:
     continue-on-error: true
     strategy:
       matrix:
-        suite: ["BVT", "SlowBVT", "Functional"]
         framework: ["net8.0"]
         provider: ["AzureStorage"]
     services:
@@ -268,10 +273,10 @@ jobs:
           8.0.x
     - name: Test
       run: dotnet test
-        --filter "Category=${{ matrix.provider }}&Category=${{ matrix.suite }}"
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --framework ${{ matrix.framework }}
         --blame-hang-timeout 10m
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.suite }}.trx"
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
         -- -parallel none -noshadow
       env:
@@ -283,7 +288,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test_output_${{ github.job }}_${{ matrix.suite }}
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -322,11 +327,10 @@ jobs:
         Add-Content -Path $env:GITHUB_ENV -Value "ORLEANSCOSMOSDBACCOUNTENDPOINT=https://$($IPAddress):8081/"
     - name: Test
       run: dotnet test
-        --framework net8.0
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --framework ${{ matrix.framework }}
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}.trx"
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
         -- -parallel none -noshadow
       env:
@@ -338,7 +342,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test_output_${{ github.job }}
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -350,6 +354,7 @@ jobs:
     strategy:
       matrix:
         provider: ["Consul"]
+        framework: [net8.0]
     services:
       consul:
         image: hashicorp/consul
@@ -366,10 +371,10 @@ jobs:
           8.0.x
     - name: Test
       run: dotnet test
-        --framework net8.0
+        --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}.trx"
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
         -- -parallel none -noshadow
       env:
@@ -381,7 +386,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test_output_${{ github.job }}
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -393,6 +398,7 @@ jobs:
     strategy:
       matrix:
         provider: ["ZooKeeper"]
+        framework: [net8.0]
     services:
       consul:
         image: bitnami/zookeeper
@@ -409,10 +415,10 @@ jobs:
           8.0.x
     - name: Test
       run: dotnet test
-        --framework net8.0
+        --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}.trx"
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
         -- -parallel none -noshadow
       env:
@@ -421,7 +427,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test_output_${{ github.job }}
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -433,6 +439,7 @@ jobs:
     strategy:
       matrix:
         provider: ["DynamoDB"]
+        framework: [net8.0]
     services:
       dynamodb:
         image: amazon/dynamodb-local:latest
@@ -453,10 +460,10 @@ jobs:
           8.0.x
     - name: Test
       run: dotnet test
-        --framework net8.0
+        --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}.trx"
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
         -- -parallel none -noshadow
       env:
@@ -469,7 +476,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test_output_${{ github.job }}
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -482,6 +489,7 @@ jobs:
       matrix:
         suite: [BVT, SlowBVT, Functional]
         os: [ubuntu-latest, windows-latest, macos-latest]
+        framework: [net8.0]
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET
@@ -493,17 +501,17 @@ jobs:
       run: dotnet build
     - name: Test
       run: dotnet test
-        --framework net8.0
+        --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.suite }}"
         --blame-hang-timeout 10m
-        --logger "trx;LogFileName=test_results_${{ matrix.suite }}.trx"
+        --logger "trx;LogFileName=test_results_${{ matrix.suite }}_${{ matrix.framework }}.trx"
         --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
         -- -parallel none -noshadow
     - name: Archive Test Results
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test_output_${{ github.job }}_${{ matrix.suite }}_${{ matrix.os }}
+        name: test_output_${{ github.job }}_${{ matrix.suite }}_${{ matrix.os }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*
