@@ -18,7 +18,6 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        framework: [net8.0]
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET
@@ -27,10 +26,10 @@ jobs:
         dotnet-version: |
           8.0.x
     - name: Build
-      run: dotnet build --framework ${{ matrix.framework }} -bl
+      run: dotnet build -bl
     - uses: actions/upload-artifact@v4
       with:
-        name: build_log_${{ matrix.os }}_${{ matrix.framework }}
+        name: build_log_${{ matrix.os }}
         retention-days: 1
         path: |
           **/*.binlog
