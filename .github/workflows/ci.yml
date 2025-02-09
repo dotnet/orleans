@@ -16,7 +16,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET
@@ -464,10 +464,11 @@ jobs:
           **/logs/*
   test:
     name: ${{ matrix.suite }} tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         suite: [BVT, SlowBVT, Functional]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET
@@ -489,7 +490,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test_output_${{ github.job }}
+        name: test_output_${{ github.job }}_${{ matrix.suite }}_${{ matrix.os }}
         retention-days: 1
         path: |
           **/TestResults/*
