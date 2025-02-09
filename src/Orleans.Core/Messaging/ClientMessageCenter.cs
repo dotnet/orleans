@@ -99,16 +99,14 @@ namespace Orleans.Messaging
 
         private async Task EstablishInitialConnection(CancellationToken cancellationToken)
         {
-            var cancellationTask = cancellationToken.WhenCancelled();
             var liveGateways = gatewayManager.GetLiveGateways();
 
             if (liveGateways.Count == 0)
             {
-                throw new ConnectionFailedException("There are no available gateways");
+                throw new ConnectionFailedException("There are no available gateways.");
             }
 
-            var pendingTasks = new List<Task>(liveGateways.Count + 1);
-            pendingTasks.Add(cancellationTask);
+            var pendingTasks = new List<Task>(liveGateways.Count);
             foreach (var gateway in liveGateways)
             {
                 pendingTasks.Add(connectionManager.GetConnection(gateway).AsTask());
@@ -116,13 +114,10 @@ namespace Orleans.Messaging
 
             try
             {
-                // There will always be one task to represent cancellation.
-                while (pendingTasks.Count > 1)
+                while (pendingTasks.Count > 0)
                 {
-                    var completedTask = await Task.WhenAny(pendingTasks);
+                    var completedTask = await Task.WhenAny(pendingTasks).WaitAsync(cancellationToken);
                     pendingTasks.Remove(completedTask);
-
-                    cancellationToken.ThrowIfCancellationRequested();
 
                     // If at least one gateway connection has been established, break out of the loop and continue startup.
                     if (completedTask.IsCompletedSuccessfully)
@@ -131,9 +126,13 @@ namespace Orleans.Messaging
                     }
 
                     // If there are no more gateways, observe the most recent exception and bail out.
-                    if (pendingTasks.Count == 1)
+                    if (pendingTasks.Count == 0)
                     {
                         await completedTask;
+                    }
+                    else
+                    {
+                        completedTask.Ignore();
                     }
                 }
             }

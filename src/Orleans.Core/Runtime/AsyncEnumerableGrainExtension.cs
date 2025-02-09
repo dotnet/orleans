@@ -215,8 +215,8 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
             using var cancellation = new CancellationTokenSource(_messagingOptions.ResponseTimeout / 2);
 
             // Wait for either the MoveNextAsync task to complete or the cancellation token to be cancelled.
-            var completedTask = await Task.WhenAny(moveNextTask, cancellation.Token.WhenCancelled());
-            if (completedTask == moveNextTask)
+            await moveNextTask.WaitAsync(cancellation.Token).SuppressThrowing();
+            if (moveNextTask is {IsCompletedSuccessfully: true })
             {
                 OnMoveNext(requestId);
                 var hasValue = moveNextTask.GetAwaiter().GetResult();
