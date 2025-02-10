@@ -107,6 +107,14 @@ namespace Orleans.Streams
             {
                 if (!this.expectedToken.Equals(handshakeToken))
                     return this.expectedToken;
+
+                // Check if this even already has been delivered
+                if (IsRewindable)
+                {
+                    var currentToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken);
+                    if (this.expectedToken.Equals(currentToken))
+                        return this.expectedToken;
+                }
             }
 
             if (batch is IBatchContainerBatch)
@@ -142,6 +150,13 @@ namespace Orleans.Streams
             {
                 if (!this.expectedToken.Equals(handshakeToken))
                     return this.expectedToken;
+
+                // Check if this even already has been delivered
+                if (IsRewindable)
+                {
+                    if (this.expectedToken.Equals(currentToken))
+                        return this.expectedToken;
+                }
             }
 
             T typedItem;
