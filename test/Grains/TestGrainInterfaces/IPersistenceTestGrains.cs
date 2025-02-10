@@ -185,7 +185,7 @@ namespace UnitTests.GrainInterfaces
         Task Task_Delay(bool doStart);
     }
 
-    public interface INonReentrentStressGrainWithoutState : IGrainWithGuidKey
+    public interface INonReentrantStressGrainWithoutState : IGrainWithGuidKey
     {
         Task Test1();
         Task Task_Delay(bool doStart);
