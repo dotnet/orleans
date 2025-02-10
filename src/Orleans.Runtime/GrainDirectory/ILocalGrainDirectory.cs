@@ -108,6 +108,6 @@ namespace Orleans.Runtime.GrainDirectory
         /// Sets the callback to <see cref="Catalog"/> which is called when a silo is removed from membership.
         /// </summary>
         /// <param name="catalogOnSiloRemoved">The callback.</param>
-        void SetSiloRemovedCatalogCallback(Action<SiloAddress, SiloStatus> catalogOnSiloRemoved);
+        void SetSiloRemovedCatalogCallback(Action<ILocalGrainDirectory, SiloAddress, SiloStatus> catalogOnSiloRemoved);
     }
 }
