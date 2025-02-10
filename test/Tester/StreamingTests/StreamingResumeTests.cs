@@ -8,9 +8,9 @@ namespace Tester.StreamingTests
     public abstract class StreamingResumeTests : TestClusterPerTest
     {
         protected static readonly TimeSpan StreamInactivityPeriod = TimeSpan.FromSeconds(5);
-        protected static readonly TimeSpan MetadataMinTimeInCache = StreamInactivityPeriod* 100;
-        protected static readonly TimeSpan DataMaxAgeInCache = StreamInactivityPeriod* 5;
-        protected static readonly TimeSpan DataMinTimeInCache = StreamInactivityPeriod* 4;
+        protected static readonly TimeSpan MetadataMinTimeInCache = StreamInactivityPeriod * 100;
+        protected static readonly TimeSpan DataMaxAgeInCache = StreamInactivityPeriod * 5;
+        protected static readonly TimeSpan DataMinTimeInCache = StreamInactivityPeriod * 4;
 
         protected const string StreamProviderName = "StreamingCacheMissTests";
 
