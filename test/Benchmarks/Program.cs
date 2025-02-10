@@ -215,6 +215,10 @@ namespace Benchmarks
             {
                 new FanoutBenchmark().PingForever().GetAwaiter().GetResult();
             },
+            ["StatelessWorker"] = _ =>
+            {
+                BenchmarkRunner.Run<StatelessWorkerBenchmark>();
+            },
             ["GrainStorage.Memory"] = _ =>
             {
                 RunBenchmark(
@@ -295,6 +299,7 @@ namespace Benchmarks
                 return;
             }
 
+            //_benchmarks["StatelessWorker_Monotonic"]([]);
             _benchmarks[args[0]](slicedArgs);
         }
 

@@ -8,392 +8,436 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace Orleans.Runtime
-{
-    internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IActivationLifecycleObserver
-    {
-        private readonly GrainAddress _address;
-        private readonly GrainTypeSharedContext _shared;
-        private readonly IGrainContextActivator _innerActivator;
-        private readonly int _maxWorkers;
-        private readonly List<ActivationData> _workers = new();
-        private readonly ConcurrentQueue<(WorkItemType Type, object State)> _workItems = new();
-        private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = false };
+namespace Orleans.Runtime;
 
-        /// <summary>
-        /// The <see cref="Task"/> representing the <see cref="RunMessageLoop"/> invocation.
-        /// This is written once but never otherwise accessed. The purpose of retaining this field is for
-        /// debugging, where being able to identify the message loop task corresponding to an activation can
-        /// be useful.
-        /// </summary>
+internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IActivationLifecycleObserver
+{
+    private readonly GrainAddress _address;
+    private readonly GrainTypeSharedContext _shared;
+    private readonly IGrainContextActivator _innerActivator;
+    private readonly int _maxWorkers;
+    private readonly List<ActivationData> _workers = new();
+    private readonly ConcurrentQueue<(WorkItemType Type, object State)> _workItems = new();
+    private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = false };
+
+    /// <summary>
+    /// The <see cref="Task"/> representing the <see cref="RunMessageLoop"/> invocation.
+    /// This is written once but never otherwise accessed. The purpose of retaining this field is for
+    /// debugging, where being able to identify the message loop task corresponding to an activation can
+    /// be useful.
+    /// </summary>
 #pragma warning disable IDE0052 // Remove unread private members
-        private readonly Task _messageLoopTask;
-        private readonly Task _workerAdjustmentTask;
+    private readonly Task _messageLoopTask;
+    private readonly Task? _workerAdjustmentTask;
 #pragma warning restore IDE0052 // Remove unread private members
 
-        private GrainReference? _grainReference;
+    private GrainReference? _grainReference;
 
-        // Hill Climbing Variables
-        private int _queueLength = 0;
-        private const int MovingAverageWindow = 5;
-        private const int MinQueueLength = 10;
-        private const int MinWaitingCount = 1;
-        private const int WorkerRemovalBackoffMs = 1000;
-        private const int WorkerRemovalPeriodMs = 500;
-        private PeriodicTimer? _monitorTimer;
-        private DateTime _lastWorkerRemovalTime = DateTime.MinValue;
+    public StatelessWorkerGrainContext(
+        GrainAddress address,
+        GrainTypeSharedContext sharedContext,
+        IGrainContextActivator innerActivator)
+    {
+        _address = address;
+        _shared = sharedContext;
+        _innerActivator = innerActivator;
 
-        public StatelessWorkerGrainContext(
-            GrainAddress address,
-            GrainTypeSharedContext sharedContext,
-            IGrainContextActivator innerActivator)
+        var strategy = (StatelessWorkerPlacement)_shared.PlacementStrategy;
+
+        _maxWorkers = strategy.MaxLocal;
+        _messageLoopTask = Task.Run(RunMessageLoop);
+
+        if (strategy.OperatingMode == StatelessWorkerOperatingMode.Adaptive)
         {
-            _address = address;
-            _shared = sharedContext;
-            _innerActivator = innerActivator;
-            _maxWorkers = ((StatelessWorkerPlacement)_shared.PlacementStrategy).MaxLocal;
-            _messageLoopTask = Task.Run(RunMessageLoop);
             _workerAdjustmentTask = PeriodicallyRemoveWorkers();
         }
+    }
 
-        public GrainReference GrainReference => _grainReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
+    public GrainReference GrainReference => _grainReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
 
-        public GrainId GrainId => _address.GrainId;
+    public GrainId GrainId => _address.GrainId;
 
-        public object? GrainInstance => null;
+    public object? GrainInstance => null;
 
-        public ActivationId ActivationId => _address.ActivationId;
+    public ActivationId ActivationId => _address.ActivationId;
 
-        public GrainAddress Address => _address;
+    public GrainAddress Address => _address;
 
-        public IServiceProvider ActivationServices => throw new NotImplementedException();
+    public IServiceProvider ActivationServices => throw new NotImplementedException();
 
-        public IGrainLifecycle ObservableLifecycle => throw new NotImplementedException();
+    public IGrainLifecycle ObservableLifecycle => throw new NotImplementedException();
 
-        public IWorkItemScheduler Scheduler => throw new NotImplementedException();
+    public IWorkItemScheduler Scheduler => throw new NotImplementedException();
 
-        public PlacementStrategy PlacementStrategy => _shared.PlacementStrategy;
+    public PlacementStrategy PlacementStrategy => _shared.PlacementStrategy;
 
-        public Task Deactivated
+    public Task Deactivated
+    {
+        get
         {
-            get
-            {
-                var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                EnqueueWorkItem(WorkItemType.DeactivatedTask, new DeactivatedTaskWorkItemState(completion));
-                return completion.Task;
-            }
-        }
-
-        public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
-        {
-        }
-
-        public void ReceiveMessage(object message)
-        {
-            _queueLength++;
-            EnqueueWorkItem(WorkItemType.Message, message);
-        }
-
-        public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken)
-        {
-            EnqueueWorkItem(WorkItemType.Deactivate, new DeactivateWorkItemState(deactivationReason, cancellationToken));
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            _monitorTimer?.Dispose();
             var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            EnqueueWorkItem(WorkItemType.DisposeAsync, new DisposeAsyncWorkItemState(completion));
-            await completion.Task;
+            EnqueueWorkItem(WorkItemType.DeactivatedTask, new DeactivatedTaskWorkItemState(completion));
+            return completion.Task;
+        }
+    }
+
+    public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
+    {
+    }
+
+    public void ReceiveMessage(object message)
+    {
+        EnqueueWorkItem(WorkItemType.Message, message);
+    }
+
+    public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken)
+    {
+        EnqueueWorkItem(WorkItemType.Deactivate, new DeactivateWorkItemState(deactivationReason, cancellationToken));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _monitorTimer?.Dispose();
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        EnqueueWorkItem(WorkItemType.DisposeAsync, new DisposeAsyncWorkItemState(completion));
+        await completion.Task;
+    }
+
+    private void EnqueueWorkItem(WorkItemType type, object state)
+    {
+        _workItems.Enqueue(new(type, state));
+        Interlocked.Increment(ref _queueLength);
+        _workSignal.Signal();
+    }
+
+    public bool Equals([AllowNull] IGrainContext other) => other is not null && ActivationId.Equals(other.ActivationId);
+
+    public TComponent? GetComponent<TComponent>() where TComponent : class => this switch
+    {
+        TComponent contextResult => contextResult,
+        _ => _shared.GetComponent<TComponent>()
+    };
+
+    public void SetComponent<TComponent>(TComponent? instance) where TComponent : class
+    {
+        if (typeof(TComponent) != typeof(GrainCanInterleave))
+        {
+            throw new ArgumentException($"Cannot set a component of type '{typeof(TComponent)}' on a {nameof(StatelessWorkerGrainContext)}");
         }
 
-        private void EnqueueWorkItem(WorkItemType type, object state)
-        {
-            _workItems.Enqueue(new(type, state));
-            _workSignal.Signal();
-        }
+        _shared.SetComponent(instance);
+    }
 
-        public bool Equals([AllowNull] IGrainContext other) => other is not null && ActivationId.Equals(other.ActivationId);
+    public TTarget GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
 
-        public TComponent? GetComponent<TComponent>() where TComponent : class => this switch
-        {
-            TComponent contextResult => contextResult,
-            _ => _shared.GetComponent<TComponent>()
-        };
-
-        public void SetComponent<TComponent>(TComponent? instance) where TComponent : class
-        {
-            if (typeof(TComponent) != typeof(GrainCanInterleave))
-            {
-                throw new ArgumentException($"Cannot set a component of type '{typeof(TComponent)}' on a {nameof(StatelessWorkerGrainContext)}");
-            }
-
-            _shared.SetComponent(instance);
-        }
-
-        public TTarget GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
-
-        private async Task RunMessageLoop()
-        {
-            while (true)
-            {
-                try
-                {
-                    while (_workItems.TryDequeue(out var workItem))
-                    {
-                        switch (workItem.Type)
-                        {
-                            case WorkItemType.Message:
-                                ReceiveMessageInternal(workItem.State);
-                                _queueLength--;
-                                break;
-                            case WorkItemType.Deactivate:
-                                {
-                                    var state = (DeactivateWorkItemState)workItem.State;
-                                    DeactivateInternal(state.DeactivationReason, state.CancellationToken);
-                                    break;
-                                }
-                            case WorkItemType.DeactivatedTask:
-                                {
-                                    var state = (DeactivatedTaskWorkItemState)workItem.State;
-                                    _ = DeactivatedTaskInternal(state.Completion);
-                                    break;
-                                }
-                            case WorkItemType.DisposeAsync:
-                                {
-                                    var state = (DisposeAsyncWorkItemState)workItem.State;
-                                    _ = DisposeAsyncInternal(state.Completion);
-                                    break;
-                                }
-                            case WorkItemType.OnDestroyActivation:
-                                {
-                                    var grainContext = (ActivationData)workItem.State;
-                                    _workers.Remove(grainContext);
-                                    if (_workers.Count == 0)
-                                    {
-                                        // When the last worker is destroyed, we can consider the stateless worker grain
-                                        // activation to be destroyed as well
-                                        _shared.InternalRuntime.Catalog.UnregisterMessageTarget(this);
-                                    }
-                                    break;
-                                }
-                            default: throw new NotSupportedException($"Work item of type {workItem.Type} is not supported");
-                        }
-                    }
-
-                    await _workSignal.WaitAsync();
-                }
-                catch (Exception exception)
-                {
-                    _shared.Logger.LogError(exception, "Error in stateless worker message loop");
-                }
-            }
-        }
-
-        private void ReceiveMessageInternal(object message)
+    private async Task RunMessageLoop()
+    {
+        while (true)
         {
             try
             {
-                ActivationData? worker = null;
-                ActivationData? minimumWaitingCountWorker = null;
-                var minimumWaitingCount = int.MaxValue;
-
-                // Make sure there is at least one worker
-                if (_workers.Count == 0)
+                while (_workItems.TryDequeue(out var workItem))
                 {
-                    worker = CreateWorker(message);
-                }
-                else
-                {
-                    // Check to see if we have any inactive workers, prioritizing
-                    // them in the order they were created to minimize the number
-                    // of workers spawned
-                    for (var i = 0; i < _workers.Count; i++)
+                    switch (workItem.Type)
                     {
-                        if (_workers[i].IsInactive)
-                        {
-                            worker = _workers[i];
+                        case WorkItemType.Message:
+                            ReceiveMessageInternal(workItem.State);
                             break;
-                        }
-                        else
-                        {
-                            // Track the worker with the lowest value for WaitingCount,
-                            // this is used if all workers are busy
-                            if (_workers[i].WaitingCount < minimumWaitingCount)
+                        case WorkItemType.Deactivate:
                             {
-                                minimumWaitingCount = _workers[i].WaitingCount;
-                                minimumWaitingCountWorker = _workers[i];
+                                var state = (DeactivateWorkItemState)workItem.State;
+                                DeactivateInternal(state.DeactivationReason, state.CancellationToken);
+                                break;
                             }
-                        }
-                    }
-
-                    if (worker is null)
-                    {
-                        if (_workers.Count >= _maxWorkers)
-                        {
-                            // Pick the one with the lowest waiting count
-                            worker = minimumWaitingCountWorker;
-                        }
-
-                        // If there are no workers, make one.
-                        worker ??= CreateWorker(message);
+                        case WorkItemType.DeactivatedTask:
+                            {
+                                var state = (DeactivatedTaskWorkItemState)workItem.State;
+                                _ = DeactivatedTaskInternal(state.Completion);
+                                break;
+                            }
+                        case WorkItemType.DisposeAsync:
+                            {
+                                var state = (DisposeAsyncWorkItemState)workItem.State;
+                                _ = DisposeAsyncInternal(state.Completion);
+                                break;
+                            }
+                        case WorkItemType.OnDestroyActivation:
+                            {
+                                var grainContext = (ActivationData)workItem.State;
+                                _workers.Remove(grainContext);
+                                if (_workers.Count == 0)
+                                {
+                                    // When the last worker is destroyed, we can consider the stateless worker grain
+                                    // activation to be destroyed as well
+                                    _shared.InternalRuntime.Catalog.UnregisterMessageTarget(this);
+                                }
+                                break;
+                            }
+                        default: throw new NotSupportedException($"Work item of type {workItem.Type} is not supported");
                     }
                 }
 
-                worker.ReceiveMessage(message);
+                Interlocked.Decrement(ref _queueLength);
+                await _workSignal.WaitAsync();
             }
-            catch (Exception exception) when (message is Message msg)
+            catch (Exception exception)
             {
-                _shared.InternalRuntime.MessageCenter.RejectMessage(
-                    msg,
-                    Message.RejectionTypes.Transient,
-                    exception,
-                    "Exception while creating grain context");
+                _shared.Logger.LogError(exception, "Error in stateless worker message loop");
             }
         }
+    }
 
-        private async Task PeriodicallyRemoveWorkers()
+    private void ReceiveMessageInternal(object message)
+    {
+        try
         {
-            _monitorTimer = new(TimeSpan.FromMilliseconds(WorkerRemovalPeriodMs));
+            ActivationData? worker = null;
+            ActivationData? minimumWaitingCountWorker = null;
+            var minimumWaitingCount = int.MaxValue;
 
-            try
+            // Make sure there is at least one worker
+            if (_workers.Count == 0)
             {
-                while (await _monitorTimer.WaitForNextTickAsync())
+                worker = CreateWorker(message);
+            }
+            else
+            {
+                // Check to see if we have any inactive workers, prioritizing
+                // them in the order they were created to minimize the number
+                // of workers spawned
+                for (var i = 0; i < _workers.Count; i++)
                 {
-                    var avgWaitingCount = _workers.Count > 0 ? _workers.Average(w => w.WaitingCount) : 0;
-
-                    if (_queueLength < MinQueueLength &&
-                        avgWaitingCount < MinWaitingCount &&
-                        (DateTime.Now - _lastWorkerRemovalTime).TotalMilliseconds > WorkerRemovalBackoffMs)
+                    if (_workers[i].IsInactive)
                     {
-                        // Find inactive workers and mark them for deactivation
-                        foreach (var worker in _workers)
+                        worker = _workers[i];
+                        break;
+                    }
+                    else
+                    {
+                        // Track the worker with the lowest value for WaitingCount,
+                        // this is used if all workers are busy
+                        if (_workers[i].WaitingCount < minimumWaitingCount)
                         {
-                            if (worker.IsInactive)
+                            minimumWaitingCount = _workers[i].WaitingCount;
+                            minimumWaitingCountWorker = _workers[i];
+                        }
+                    }
+                }
+
+                if (worker is null)
+                {
+                    if (_workers.Count >= _maxWorkers)
+                    {
+                        // Pick the one with the lowest waiting count
+                        worker = minimumWaitingCountWorker;
+                    }
+
+                    // If there are no workers, make one.
+                    worker ??= CreateWorker(message);
+                }
+            }
+
+            worker.ReceiveMessage(message);
+        }
+        catch (Exception exception) when (message is Message msg)
+        {
+            _shared.InternalRuntime.MessageCenter.RejectMessage(
+                msg,
+                Message.RejectionTypes.Transient,
+                exception,
+                "Exception while creating grain context");
+        }
+    }
+
+    // PID Variables
+    private readonly double _kp = 0.433;
+    private readonly double _ki = 0.468;
+    private readonly double _kd = 0.480;
+    private double _previousError = 0; 
+    private double _integralTerm = 0;
+
+    private ulong _queueLength = 0;
+    private const int WorkerRemovalBackoffMs = 1000;
+    private const int WorkerRemovalPeriodMs = 500;
+    private PeriodicTimer? _monitorTimer;
+    private DateTime _lastWorkerRemovalTime = DateTime.MinValue;
+
+    private async Task PeriodicallyRemoveWorkers()
+    {
+        _monitorTimer = new(TimeSpan.FromMilliseconds(WorkerRemovalPeriodMs));
+
+        try
+        {
+            while (await _monitorTimer.WaitForNextTickAsync())
+            {
+                double averageWaitingCount = _workers.Count > 0 ? _workers.Average(w => w.WaitingCount) : 0;
+
+                const double TargetWaitingCount = 0; // Out target is a zero waiting count.
+                double error = TargetWaitingCount - averageWaitingCount;
+
+                _integralTerm += error;
+                double derivativeTerm = error - _previousError;
+                _previousError = error;
+
+                double controlSignal = _kp * error + _ki * _integralTerm + _kd * derivativeTerm;
+
+                // Check if it's time to remove workers (respecting the backoff period).
+                if ((DateTime.Now - _lastWorkerRemovalTime).TotalMilliseconds > WorkerRemovalBackoffMs)
+                {
+                    // If the control signal is negative, it indicates excess workers.
+                    if (controlSignal < 0)
+                    {
+                        var inactiveWorkers = _workers.Where(w => w.IsInactive).ToList();
+                        if (inactiveWorkers.Count > 0)
+                        {
+                            var worker = inactiveWorkers[Random.Shared.Next(inactiveWorkers.Count)];
+                            var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
+
+                            worker.Deactivate(new(DeactivationReasonCode.RuntimeRequested,
+                                $"Worker deactivated due to PID control: QueueLength {_queueLength}, Avg Waiting Count {averageWaitingCount}, Control Signal {controlSignal:F3}"),
+                                cancellation.Token);
+
+                            _lastWorkerRemovalTime = DateTime.UtcNow;
+                        }
+                    }
+
+                    /*
+                     if (controlSignal < 0)
+                        {
+                            // Use IEnumerable<Worker> directly without materializing the list.
+                            var inactiveWorkers = _workers.Where(w => w.IsInactive);
+
+                            // Get the count of inactive workers without materializing the list.
+                            int inactiveCount = inactiveWorkers.Count();
+
+                            if (inactiveCount > 0)
                             {
-                                using var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
+                                // Select a random inactive worker without materializing the list.
+                                var worker = inactiveWorkers.ElementAt(Random.Shared.Next(inactiveCount));
+
+                                var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
+
                                 worker.Deactivate(new(DeactivationReasonCode.RuntimeRequested,
-                                    $"Worker deactivated due to heuristics: QueueLength {_queueLength}, Avg Waiting Count {avgWaitingCount}"),
+                                    $"Worker deactivated due to PID control: QueueLength {_queueLength}, Avg Waiting Count {averageWaitingCount}, Control Signal {controlSignal:F3}"),
                                     cancellation.Token);
 
                                 _lastWorkerRemovalTime = DateTime.UtcNow;
-                                break; // Deactivate only one worker at a time
                             }
                         }
-                    }
+                     */
                 }
             }
-            catch (OperationCanceledException)
-            {
-                // Ignore
-            }
         }
-
-        private ActivationData CreateWorker(object? message)
+        catch (OperationCanceledException)
         {
-            var address = GrainAddress.GetAddress(_address.SiloAddress, _address.GrainId, ActivationId.NewId());
-            var newWorker = (ActivationData)_innerActivator.CreateContext(address);
-
-            // Observe the create/destroy lifecycle of the activation
-            newWorker.SetComponent<IActivationLifecycleObserver>(this);
-
-            // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
-            var requestContext = (message as Message)?.RequestContextData ?? new Dictionary<string, object>();
-            using var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
-            newWorker.Activate(requestContext, cancellation.Token);
-
-            _workers.Add(newWorker);
-            return newWorker;
+            // Ignore
         }
+    }
 
-        private void DeactivateInternal(DeactivationReason reason, CancellationToken cancellationToken)
+    private ActivationData CreateWorker(object? message)
+    {
+        var address = GrainAddress.GetAddress(_address.SiloAddress, _address.GrainId, ActivationId.NewId());
+        var newWorker = (ActivationData)_innerActivator.CreateContext(address);
+
+        // Observe the create/destroy lifecycle of the activation
+        newWorker.SetComponent<IActivationLifecycleObserver>(this);
+
+        // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
+        var requestContext = (message as Message)?.RequestContextData ?? [];
+        var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
+        newWorker.Activate(requestContext, cancellation.Token);
+
+        _workers.Add(newWorker);
+        return newWorker;
+    }
+
+    private void DeactivateInternal(DeactivationReason reason, CancellationToken cancellationToken)
+    {
+        foreach (var worker in _workers)
         {
+            worker.Deactivate(reason, cancellationToken);
+        }
+    }
+
+    private async Task DeactivatedTaskInternal(TaskCompletionSource<bool> completion)
+    {
+        try
+        {
+            var tasks = new List<Task>(_workers.Count);
             foreach (var worker in _workers)
             {
-                worker.Deactivate(reason, cancellationToken);
+                tasks.Add(worker.Deactivated);
             }
-        }
 
-        private async Task DeactivatedTaskInternal(TaskCompletionSource<bool> completion)
+            await Task.WhenAll(tasks);
+            completion.TrySetResult(true);
+        }
+        catch (Exception exception)
         {
-            try
-            {
-                var tasks = new List<Task>(_workers.Count);
-                foreach (var worker in _workers)
-                {
-                    tasks.Add(worker.Deactivated);
-                }
-
-                await Task.WhenAll(tasks);
-                completion.TrySetResult(true);
-            }
-            catch (Exception exception)
-            {
-                completion.TrySetException(exception);
-            }
+            completion.TrySetException(exception);
         }
-
-        private async Task DisposeAsyncInternal(TaskCompletionSource<bool> completion)
-        {
-            try
-            {
-                var tasks = new List<Task>(_workers.Count);
-                foreach (var worker in _workers)
-                {
-                    try
-                    {
-                        if (worker is IAsyncDisposable disposable)
-                        {
-                            tasks.Add(disposable.DisposeAsync().AsTask());
-                        }
-                    }
-                    catch (Exception exception)
-                    {
-                        tasks.Add(Task.FromException(exception));
-                    }
-                }
-
-                await Task.WhenAll(tasks);
-                completion.TrySetResult(true);
-            }
-            catch (Exception exception)
-            {
-                completion.TrySetException(exception);
-            }
-        }
-
-        public void OnCreateActivation(IGrainContext grainContext)
-        {
-        }
-
-        public void OnDestroyActivation(IGrainContext grainContext)
-        {
-            EnqueueWorkItem(WorkItemType.OnDestroyActivation, grainContext);
-        }
-
-        public void Rehydrate(IRehydrationContext context)
-        {
-            // Migration is not supported, but we need to dispose of the context if it's provided
-            (context as IDisposable)?.Dispose();
-        }
-
-        public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
-        {
-            // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
-        }
-
-        private enum WorkItemType
-        {
-            Message,
-            Deactivate,
-            DeactivatedTask,
-            DisposeAsync,
-            OnDestroyActivation,
-        }
-
-        private record ActivateWorkItemState(Dictionary<string, object>? RequestContext, CancellationToken CancellationToken);
-        private record DeactivateWorkItemState(DeactivationReason DeactivationReason, CancellationToken CancellationToken);
-        private record DeactivatedTaskWorkItemState(TaskCompletionSource<bool> Completion);
-        private record DisposeAsyncWorkItemState(TaskCompletionSource<bool> Completion);
     }
+
+    private async Task DisposeAsyncInternal(TaskCompletionSource<bool> completion)
+    {
+        try
+        {
+            var tasks = new List<Task>(_workers.Count);
+            foreach (var worker in _workers)
+            {
+                try
+                {
+                    if (worker is IAsyncDisposable disposable)
+                    {
+                        tasks.Add(disposable.DisposeAsync().AsTask());
+                    }
+                }
+                catch (Exception exception)
+                {
+                    tasks.Add(Task.FromException(exception));
+                }
+            }
+
+            await Task.WhenAll(tasks);
+            completion.TrySetResult(true);
+        }
+        catch (Exception exception)
+        {
+            completion.TrySetException(exception);
+        }
+    }
+
+    public void OnCreateActivation(IGrainContext grainContext)
+    {
+    }
+
+    public void OnDestroyActivation(IGrainContext grainContext)
+    {
+        EnqueueWorkItem(WorkItemType.OnDestroyActivation, grainContext);
+    }
+
+    public void Rehydrate(IRehydrationContext context)
+    {
+        // Migration is not supported, but we need to dispose of the context if it's provided
+        (context as IDisposable)?.Dispose();
+    }
+
+    public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
+    {
+        // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
+    }
+
+    private enum WorkItemType
+    {
+        Message,
+        Deactivate,
+        DeactivatedTask,
+        DisposeAsync,
+        OnDestroyActivation,
+    }
+
+    private record ActivateWorkItemState(Dictionary<string, object>? RequestContext, CancellationToken CancellationToken);
+    private record DeactivateWorkItemState(DeactivationReason DeactivationReason, CancellationToken CancellationToken);
+    private record DeactivatedTaskWorkItemState(TaskCompletionSource<bool> Completion);
+    private record DisposeAsyncWorkItemState(TaskCompletionSource<bool> Completion);
 }

@@ -60,8 +60,19 @@ namespace Orleans.Concurrency
         /// <param name="maxLocalWorkers">
         /// The maximum local workers.
         /// </param>
+        public StatelessWorkerAttribute(int maxLocalWorkers, StatelessWorkerOperatingMode mode)
+            : base(new StatelessWorkerPlacement(maxLocalWorkers, mode))
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StatelessWorkerAttribute"/> class.
+        /// </summary>
+        /// <param name="maxLocalWorkers">
+        /// The maximum local workers.
+        /// </param>
         public StatelessWorkerAttribute(int maxLocalWorkers)
-            : base(new StatelessWorkerPlacement(maxLocalWorkers))
+            : base(new StatelessWorkerPlacement(maxLocalWorkers, StatelessWorkerOperatingMode.Monotonic))
         {
         }
 

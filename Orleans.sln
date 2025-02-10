@@ -258,6 +258,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChaoticCluster.ServiceDefau
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestSerializerExternalModels", "test\Misc\TestSerializerExternalModels\TestSerializerExternalModels.csproj", "{5D587DDE-036D-4694-A314-8DDF270AC031}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApp1", "test\ConsoleApp1\ConsoleApp1.csproj", "{7E05E7BF-03FF-4174-A126-BC69C0A44BC0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -672,6 +674,10 @@ Global
 		{5D587DDE-036D-4694-A314-8DDF270AC031}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5D587DDE-036D-4694-A314-8DDF270AC031}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5D587DDE-036D-4694-A314-8DDF270AC031}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7E05E7BF-03FF-4174-A126-BC69C0A44BC0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7E05E7BF-03FF-4174-A126-BC69C0A44BC0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7E05E7BF-03FF-4174-A126-BC69C0A44BC0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7E05E7BF-03FF-4174-A126-BC69C0A44BC0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -796,6 +802,7 @@ Global
 		{76A549FA-69F1-4967-82B6-161A8B52C86B} = {2579A7F6-EBE8-485A-BB20-A5D19DB5612B}
 		{4004A79F-B6BB-4472-891B-AD1348AE3E93} = {2579A7F6-EBE8-485A-BB20-A5D19DB5612B}
 		{5D587DDE-036D-4694-A314-8DDF270AC031} = {70BCC54E-1618-4742-A079-07588065E361}
+		{7E05E7BF-03FF-4174-A126-BC69C0A44BC0} = {A6573187-FD0D-4DF7-91D1-03E07E470C0A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}
