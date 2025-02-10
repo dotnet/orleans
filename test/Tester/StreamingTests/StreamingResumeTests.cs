@@ -55,7 +55,7 @@ namespace Tester.StreamingTests
                 }
                 // Wait a bit more for the cache to flush some events
                 await Task.Delay(StreamInactivityPeriod.Multiply(3));
-                for (var i = 0; i< 5; i++)
+                for (var i = 0; i < 5; i++)
                 {
                     var otherStream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), Guid.NewGuid());
                     await otherStream.OnNextAsync(interestingData);
