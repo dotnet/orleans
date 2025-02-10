@@ -1,9 +1,14 @@
 #if NET8_0_OR_GREATER
+using Azure;
+using Azure.Core;
+using Azure.Identity;
+using Microsoft.Azure.Cosmos;
 using Orleans.Hosting;
 using Orleans.Persistence.Cosmos.Migration;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
 using Tester.AzureUtils.Migration.Abstractions;
+using Tester.AzureUtils.Migration.Helpers;
 using TestExtensions;
 using Xunit;
 
@@ -49,10 +54,11 @@ namespace Tester.AzureUtils.Migration
                     })
                     .AddMigrationAzureCosmosGrainStorage(DestinationStorageName, options =>
                     {
+                        options.ConfigureCosmosStorageOptions();
+
                         // options.ContainerName = $"destination{RandomIdentifier}";
                         options.ContainerName = $"destinationtest";
                         options.DatabaseName = "Orleans";
-                        options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosConnectionString);
                     })
                     .AddDataMigrator(SourceStorageName, DestinationStorageName);
             }

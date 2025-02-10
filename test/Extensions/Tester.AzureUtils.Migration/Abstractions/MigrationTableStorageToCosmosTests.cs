@@ -18,7 +18,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         protected MigrationTableStorageToCosmosTests(BaseAzureTestClusterFixture fixture)
             : base(fixture)
         {
-            _cosmosClient = new CosmosClient(TestDefaultConfiguration.CosmosConnectionString);
+            _cosmosClient = CosmosClientHelpers.BuildClient();
         }
 
         [Fact]

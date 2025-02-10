@@ -18,6 +18,8 @@ using Orleans.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Orleans;
+using Azure.Identity;
+using Tester.AzureUtils.Migration.Helpers;
 
 namespace Tester.AzureUtils.Migration
 {
@@ -59,10 +61,11 @@ namespace Tester.AzureUtils.Migration
                     })
                     .AddMigrationAzureCosmosGrainStorage(DestinationStorageName, options =>
                     {
+                        options.ConfigureCosmosStorageOptions();
+
                         // options.ContainerName = $"destination{RandomIdentifier}";
                         options.ContainerName = $"destinationtest";
                         options.DatabaseName = "Orleans";
-                        options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosConnectionString);
                     })
                     .AddDataMigrator(SourceStorageName, DestinationStorageName);
             }
