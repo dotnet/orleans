@@ -224,7 +224,7 @@ namespace NonSilo.Tests.Membership
             Assert.DoesNotContain(testRig.TestAccessor.MonitoredSilos, s => s.Key.Equals(this.localSilo));
             var expectedNumProbedSilos = otherSilosAreStale ? otherSilos.Length : clusterMembershipOptions.NumProbedSilos;
             Assert.Equal(expectedNumProbedSilos, testRig.TestAccessor.MonitoredSilos.Count);
-            Assert.All(testRig.TestAccessor.MonitoredSilos, m => m.Key.Equals(m.Value.SiloAddress));
+            Assert.All(testRig.TestAccessor.MonitoredSilos, m => m.Key.Equals(m.Value.TargetSiloAddress));
             Assert.Empty(probeCalls);
 
             // Check that those silos are actually being probed periodically
@@ -290,7 +290,7 @@ namespace NonSilo.Tests.Membership
                 {
                     Assert.Equal(expectedMissedProbes, ((SiloHealthMonitor.ITestAccessor)siloMonitor).MissedProbes);
 
-                    var entry = table.Members.Single(m => m.Item1.SiloAddress.Equals(siloMonitor.SiloAddress)).Item1;
+                    var entry = table.Members.Single(m => m.Item1.SiloAddress.Equals(siloMonitor.TargetSiloAddress)).Item1;
                     var votes = entry.GetFreshVotes(now.UtcDateTime, clusterMembershipOptions.DeathVoteExpirationTimeout);
                     if (expectedMissedProbes < clusterMembershipOptions.NumMissedProbesLimit)
                     {
@@ -359,7 +359,7 @@ namespace NonSilo.Tests.Membership
 
             foreach (var siloMonitor in testRig.TestAccessor.MonitoredSilos.Values)
             {
-                this.output.WriteLine($"Checking missed probes on {siloMonitor.SiloAddress}: {((SiloHealthMonitor.ITestAccessor)siloMonitor).MissedProbes}");
+                this.output.WriteLine($"Checking missed probes on {siloMonitor.TargetSiloAddress}: {((SiloHealthMonitor.ITestAccessor)siloMonitor).MissedProbes}");
                 Assert.Equal(0, ((SiloHealthMonitor.ITestAccessor)siloMonitor).MissedProbes);
             }
 
@@ -533,12 +533,10 @@ namespace NonSilo.Tests.Membership
 
         private class ClusterHealthMonitorTestRig(
             MembershipTableManager manager,
-            IClusterMembershipService membershipService,
             IOptionsMonitor<ClusterMembershipOptions> optionsMonitor,
             ClusterHealthMonitor.ITestAccessor testAccessor)
         {
             public readonly MembershipTableManager Manager = manager;
-            public readonly IClusterMembershipService MembershipService = membershipService;
             public readonly IOptionsMonitor<ClusterMembershipOptions> OptionsMonitor = optionsMonitor;
             public readonly ClusterHealthMonitor.ITestAccessor TestAccessor = testAccessor;
         }
@@ -556,9 +554,6 @@ namespace NonSilo.Tests.Membership
                 this.lifecycle);
 
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-
-            var membershipService = Substitute.For<IClusterMembershipService>();
-            membershipService.CurrentSnapshot.ReturnsForAnyArgs(info => manager.MembershipTableSnapshot.CreateClusterMembershipSnapshot());
 
             var optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
             optionsMonitor.CurrentValue.ReturnsForAnyArgs(clusterMembershipOptions);
@@ -582,12 +577,11 @@ namespace NonSilo.Tests.Membership
                 this.prober,
                 this.timerFactory,
                 this.localSiloHealthMonitor,
-                membershipService,
+                manager,
                 this.localSiloDetails);
 
             return new(
                 manager: manager,
-                membershipService: membershipService,
                 optionsMonitor: optionsMonitor,
                 testAccessor: testAccessor);
         }

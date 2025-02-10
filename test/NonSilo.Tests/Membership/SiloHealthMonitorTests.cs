@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -26,12 +25,13 @@ namespace NonSilo.Tests.Membership
         private readonly DelegateAsyncTimerFactory _timerFactory;
         private readonly ILocalSiloHealthMonitor _localSiloHealthMonitor;
         private readonly IRemoteSiloProber _prober;
-        private readonly IClusterMembershipService _membershipService;
+        private readonly MembershipTableManager _membershipService;
         private readonly ClusterMembershipOptions _clusterMembershipOptions;
         private readonly IOptionsMonitor<ClusterMembershipOptions> _optionsMonitor;
         private readonly Channel<ProbeResult> _probeResults;
         private readonly SiloHealthMonitor _monitor;
-        private ClusterMembershipSnapshot _membershipSnapshot;
+        private readonly SiloAddress _targetSilo;
+        private readonly InMemoryMembershipTable _membershipTable;
 
         public SiloHealthMonitorTests(ITestOutputHelper output)
         {
@@ -65,23 +65,31 @@ namespace NonSilo.Tests.Membership
 
             _prober = Substitute.For<IRemoteSiloProber>();
 
-            _membershipService = Substitute.For<IClusterMembershipService>();
-
             _clusterMembershipOptions = new ClusterMembershipOptions();
             _optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
             _optionsMonitor.CurrentValue.ReturnsForAnyArgs(info => _clusterMembershipOptions);
 
+            var fatalErrorHandler = Substitute.For<IFatalErrorHandler>();
+            var membershipGossiper = Substitute.For<IMembershipGossiper>();
+            var lifecycle = new SiloLifecycleSubject(_loggerFactory.CreateLogger<SiloLifecycleSubject>());
+
+            _targetSilo = Silo("127.0.0.200:100@100");
+            _membershipTable = new(new TableVersion(0, "0"), Entry(_localSilo, SiloStatus.Active), Entry(_targetSilo, SiloStatus.Active));
+            _membershipService = new MembershipTableManager(
+                localSiloDetails: _localSiloDetails,
+                clusterMembershipOptions: Options.Create(_clusterMembershipOptions),
+                membershipTable: _membershipTable,
+                fatalErrorHandler: fatalErrorHandler,
+                gossiper: membershipGossiper,
+                log: _loggerFactory.CreateLogger<MembershipTableManager>(),
+                timerFactory: new AsyncTimerFactory(_loggerFactory),
+                lifecycle);
+
             _probeResults = Channel.CreateBounded<ProbeResult>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.Wait });
             Task onProbeResult(SiloHealthMonitor mon, ProbeResult res) => _probeResults.Writer.WriteAsync(res).AsTask();
 
-            _membershipSnapshot = Snapshot(
-                1,
-                Member(_localSilo, SiloStatus.Active),
-                Member(Silo("127.0.0.200:100@100"), SiloStatus.Active));
-            _membershipService.CurrentSnapshot.ReturnsForAnyArgs(info => _membershipSnapshot);
-
             _monitor = new SiloHealthMonitor(
-                Silo("127.0.0.200:100@100"),
+                _targetSilo,
                 onProbeResult,
                 _optionsMonitor,
                 _loggerFactory,
@@ -212,7 +220,9 @@ namespace NonSilo.Tests.Membership
             timerCall.Completion.TrySetResult(true);
 
             var otherSilo = Silo("127.0.0.1:1234@1234");
-            _membershipSnapshot = Snapshot(2, Member(_localSilo, SiloStatus.Active), Member(_monitor.SiloAddress, SiloStatus.Active), Member(otherSilo, SiloStatus.Joining));
+            await _membershipTable.InsertRow(Entry(_monitor.TargetSiloAddress, SiloStatus.Active), _membershipTable.Version.Next());
+            await _membershipTable.InsertRow(Entry(otherSilo, SiloStatus.Joining), _membershipTable.Version.Next());
+            await _membershipService.Refresh();
 
             // There is only one other active silo (the target silo), so an indirect probe cannot be performed.
             probeResult = await _probeResults.Reader.ReadAsync();
@@ -222,7 +232,9 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(0, probeResult.IntermediaryHealthDegradationScore);
 
             // Make the other silo active so that there is an intermediary to use for an indirect probe.
-            _membershipSnapshot = Snapshot(3, Member(_localSilo, SiloStatus.Active), Member(_monitor.SiloAddress, SiloStatus.Active), Member(otherSilo, SiloStatus.Active));
+            var etag = (await _membershipTable.ReadAll()).Members.Where(kv => kv.Item1.SiloAddress.Equals(otherSilo)).Single().Item2;
+            await _membershipTable.UpdateRow(Entry(otherSilo, SiloStatus.Active, iAmAliveTime: DateTime.UtcNow), etag, _membershipTable.Version.Next());
+            await _membershipService.Refresh();
 
             _prober.ClearReceivedCalls();
             timerCall = await _timerCalls.Reader.ReadAsync();
@@ -283,19 +295,60 @@ namespace NonSilo.Tests.Membership
             probeCall = _prober.ReceivedCalls().Single();
             args = probeCall.GetArguments();
             var target = Assert.IsType<SiloAddress>(args[0]);
-            Assert.Equal(_monitor.SiloAddress, target);
+            Assert.Equal(_monitor.TargetSiloAddress, target);
 
             await Shutdown();
         }
 
-        private static ClusterMembershipSnapshot Snapshot(long version, params ClusterMember[] members)
-            => new ClusterMembershipSnapshot(
-                ImmutableDictionary.CreateRange(
-                    members.Select(m => new KeyValuePair<SiloAddress, ClusterMember>(m.SiloAddress, m))),
-                new MembershipVersion(version));
+        [Fact]
+        public async Task SiloHealthMonitor_IndirectProbe_SkipsStaleSilo()
+        {
+            _clusterMembershipOptions.EnableIndirectProbes = true;
+            _clusterMembershipOptions.ProbeTimeout = TimeSpan.FromSeconds(2);
+
+            // Make direct probes fail.
+            _prober.Probe(default, default).ThrowsAsyncForAnyArgs(new Exception("Direct probe failing."));
+
+            // Start the monitor and trigger one timer cycle for a direct-probe attempt (which fails).
+            _monitor.Start();
+            var timerCall = await _timerCalls.Reader.ReadAsync();
+            timerCall.Completion.TrySetResult(true);
+            var firstProbeResult = await _probeResults.Reader.ReadAsync();
+            Assert.True(firstProbeResult.IsDirectProbe);
+            Assert.Equal(ProbeResultStatus.Failed, firstProbeResult.Status);
+
+            // Now add a 'stale' silo and a 'fresh' silo (both Active).
+            // This occurs after the first failed direct probe, matching the approach used in the test above.
+            var staleSilo = Silo("127.0.0.1:3333@3333");
+            await _membershipTable.InsertRow(
+                Entry(staleSilo, SiloStatus.Active, DateTime.UtcNow - TimeSpan.FromMinutes(30)),
+                _membershipTable.Version.Next());
+            _prober.ClearReceivedCalls();
+
+            // Trigger another timer cycle which will now attempt an indirect probe.
+            timerCall = await _timerCalls.Reader.ReadAsync();
+            timerCall.Completion.TrySetResult(true);
+            var probeResult = await _probeResults.Reader.ReadAsync();
+
+            // Verify that this time the probe is direct since it skipped the stale intermediary silos.
+            Assert.True(probeResult.IsDirectProbe);
+            var call = _prober.ReceivedCalls().LastOrDefault();
+            var args = call?.GetArguments();
+            var probedSilo = Assert.IsType<SiloAddress>(args?[0]);
+            Assert.Equal(_targetSilo, probedSilo);
+            Assert.Equal(_targetSilo, _monitor.TargetSiloAddress);
+
+            await Shutdown();
+        }
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
-        private static ClusterMember Member(SiloAddress address, SiloStatus status) => new ClusterMember(address, status, address.ToString());
+        private static MembershipEntry Entry(SiloAddress address, SiloStatus status, DateTimeOffset iAmAliveTime = default) => new()
+        {
+            SiloAddress = address,
+            Status = status,
+            StartTime = iAmAliveTime.UtcDateTime,
+            IAmAliveTime = iAmAliveTime.UtcDateTime
+        };
     }
 }
