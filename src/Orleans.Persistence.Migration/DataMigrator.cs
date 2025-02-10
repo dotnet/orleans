@@ -42,11 +42,15 @@ namespace Orleans.Persistence.Migration
             var migrationStats = new MigrationStats();
             await foreach (var storageEntry in _oldStorage.GetAll(cancellationToken))
             {
-                if (!_options.DontSkipMigrateEntries && storageEntry.MigrationEntryClient.EntryMigrationTime is not null)
+                if (!_options.DontSkipMigrateEntries)
                 {
-                    _logger.Info("Entry {entryName} is already migrated", storageEntry.Name);
-                    migrationStats.SkippedEntries++;
-                    continue;
+                    var migrationTime = await storageEntry.MigrationEntryClient.GetEntryMigrationTimeAsync();
+                    if (migrationTime is not null)
+                    {
+                        _logger.Info("Entry {entryName} is already migrated at {migrationTime}", storageEntry.Name, migrationTime);
+                        migrationStats.SkippedEntries++;
+                        continue;
+                    }
                 }
 
                 try

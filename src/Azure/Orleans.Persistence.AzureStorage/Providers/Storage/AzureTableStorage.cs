@@ -174,6 +174,10 @@ namespace Orleans.Storage
 
         public async IAsyncEnumerable<StorageEntry> GetAll([EnumeratorCancellation] CancellationToken cancellationToken)
         {
+            // another storage table will be used for the migration data: we can't modify original table due to ETag collisions and other concurrent access problems
+            var tableManager = this.tableDataManager.TableManager;
+            var migrationTableManager = await tableManager.CreateAndInitRecreateAsync("migratedEntries");
+
             var entries = this.tableDataManager.ReadAllAsync(cancellationToken);
             await foreach (var entry in entries.WithCancellation(cancellationToken))
             {
@@ -196,7 +200,7 @@ namespace Orleans.Storage
                     grainState.ETag = entry.ETag.ToString();
                 }
 
-                var tableEntryClient = new AzureStorageTableEntryClient(tableDataManager.TableManager, entry);
+                var tableEntryClient = new AzureStorageTableEntryClient(migrationTableManager, entry);
                 yield return new StorageEntry(entry.RowKey, grainReference, grainState, tableEntryClient);
             }
         }

@@ -127,8 +127,10 @@ namespace Tester.AzureUtils.Migration.Abstractions
             {
                 // entry migration time has to exist on every entry
                 // and be somewhat around the current time (same date for simplicity)
-                Assert.True(storageEntry.MigrationEntryClient.EntryMigrationTime.HasValue);
-                Assert.True(storageEntry.MigrationEntryClient.EntryMigrationTime!.Value.Date == currentTime.Date);
+                var migrationTime = await storageEntry.MigrationEntryClient.GetEntryMigrationTimeAsync();
+
+                Assert.NotNull(migrationTime);
+                Assert.True(migrationTime.Value.Date == currentTime.Date);
             }
         }
 #endif

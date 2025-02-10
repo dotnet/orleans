@@ -18,17 +18,15 @@ internal class AzureStorageBlobEntryClient : StorageMigrationEntryClient
         _blob = blob;
     }
 
-    public DateTime? EntryMigrationTime
+    public ValueTask<DateTime?> GetEntryMigrationTimeAsync()
     {
-        get
+        if (!_blob.Metadata.TryGetValue("migrationTime", out var migrationTime))
         {
-            if (!_blob.Metadata.TryGetValue("migrationTime", out var migrationTime))
-            {
-                return null;
-            }
-
-            return DateTime.TryParse(migrationTime, out var time) ? time : null;
+            return new ValueTask<DateTime?>(result: (DateTime?)null);
         }
+
+        DateTime? result = DateTime.TryParse(migrationTime, out var time) ? time : null;
+        return new ValueTask<DateTime?>(result);
     }
 
     public async Task MarkMigratedAsync(CancellationToken cancellationToken)

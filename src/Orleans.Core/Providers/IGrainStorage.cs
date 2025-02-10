@@ -25,7 +25,7 @@ namespace Orleans.Storage
 
         public interface StorageMigrationEntryClient
         {
-            DateTime? EntryMigrationTime { get; }
+            ValueTask<DateTime?> GetEntryMigrationTimeAsync();
 
             Task MarkMigratedAsync(CancellationToken cancellationToken);
         }
