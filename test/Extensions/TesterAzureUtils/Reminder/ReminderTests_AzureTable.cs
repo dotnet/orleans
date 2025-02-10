@@ -46,7 +46,7 @@ namespace Tester.AzureUtils.TimerTests
             await Test_Reminders_Basic_StopByRef();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9337"), TestCategory("Functional")]
         public async Task Rem_Azure_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
