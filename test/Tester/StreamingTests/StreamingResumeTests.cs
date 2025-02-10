@@ -26,8 +26,7 @@ namespace Tester.StreamingTests
             await ResumeAfterInactivityImpl(true);
         }
 
-        [SkippableFact]
-        public virtual async Task ResumeAfterInactivityImpl(bool waitForCacheToFlush)
+        protected virtual async Task ResumeAfterInactivityImpl(bool waitForCacheToFlush)
         {
             var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
 
