@@ -125,6 +125,11 @@ namespace Orleans.Storage
         /// <see cref="IGrainStorage.WriteStateAsync"/>
         public async Task WriteStateAsync(string grainType, GrainReference grainId, IGrainState grainState)
         {
+            _ = await WriteStateWithEntryAsync(grainType, grainId, grainState);
+        }
+
+        public async Task<StorageEntry> WriteStateWithEntryAsync(string grainType, GrainReference grainId, IGrainState grainState)
+        {
             var blobName = GetBlobName(grainType, grainId);
             try
             {
@@ -137,6 +142,9 @@ namespace Orleans.Storage
                 await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, mimeType, blob);
 
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_DataRead, "Written: GrainType={0} Grainid={1} ETag={2} to BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
+
+                var storageMigrationEntry = new AzureStorageBlobEntryClient(blob);
+                return new StorageEntry(grainType, grainId, grainState, storageMigrationEntry);
             }
             catch (Exception ex)
             {
@@ -313,6 +321,16 @@ namespace Orleans.Storage
             return result;
         }
 
+        public Task<StorageEntry> GetStorageEntryAsync(string grainType, GrainReference grainId, IGrainState grainState)
+        {
+            var blobName = GetBlobName(grainType, grainId);
+            var blob = container.GetBlobClient(blobName);
+            var storageEntryClient = new AzureStorageBlobEntryClient(blob);
+            var storageEntry = new StorageEntry(grainType, grainId, grainState, storageEntryClient);
+
+            return Task.FromResult(storageEntry);
+        }
+
         public async IAsyncEnumerable<StorageEntry> GetAll([EnumeratorCancellation] CancellationToken cancellationToken)
         {
             await foreach (var blob in this.container.GetBlobsAsync(traits: BlobTraits.Metadata, cancellationToken: cancellationToken))
@@ -332,8 +350,6 @@ namespace Orleans.Storage
                 yield return new StorageEntry(name, reference, state, storageMigrationEntry);
             }
         }
-
-        public Task<StorageEntry> WriteStateWithEntryAsync(string grainType, GrainReference grainReference, IGrainState grainState) => throw new NotImplementedException();
     }
 
     public static class AzureBlobGrainStorageFactory

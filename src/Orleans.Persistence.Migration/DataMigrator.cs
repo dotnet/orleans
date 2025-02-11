@@ -51,7 +51,7 @@ namespace Orleans.Persistence.Migration
                     var migrationTime = await storageEntry.MigrationEntryClient.GetEntryMigrationTimeAsync();
                     if (migrationTime is not null)
                     {
-                        _logger.Info("Entry {entryName} is already migrated at {migrationTime}", storageEntry.Name, migrationTime);
+                        _logger.Info("Entry {entryName} is already migrated at {migrationTime}", storageEntry.GrainType, migrationTime);
                         migrationStats.SkippedEntries++;
                         continue;
                     }
@@ -68,22 +68,22 @@ namespace Orleans.Persistence.Migration
                         {
                             // sometimes the storage does not allow direct writing (i.e. CosmosDB with it's GrainActivationContext dependency)
                             // meaning we should use a special method to write a grain state
-                            await migrationGrainStorage.MigrateGrainStateAsync(storageEntry.Name, storageEntry.GrainReference, storageEntry.GrainState);
+                            await migrationGrainStorage.MigrateGrainStateAsync(storageEntry.GrainType, storageEntry.GrainReference, storageEntry.GrainState);
                         }
                         else
                         {
-                            await _newStorage.WriteStateAsync(storageEntry.Name, storageEntry.GrainReference, storageEntry.GrainState);
+                            await _newStorage.WriteStateAsync(storageEntry.GrainType, storageEntry.GrainReference, storageEntry.GrainState);
                         }
                     }
                     // guarding against any exception which can happen against different storages (i.e. storage/cosmos/etc) here
                     catch (InconsistentStateException ex) when (ex.InnerException is RequestFailedException reqExc && reqExc.Message.StartsWith("The specified blob already exists"))
                     {
-                        _logger.Info("Migrated blob already exists, but was not skipped: {entryName};", storageEntry.Name);
+                        _logger.Info("Migrated blob already exists, but was not skipped: {entryName};", storageEntry.GrainType);
                         // ignore: we have already migrated this entry to new storage.
                     }
                     catch (InconsistentStateException ex) when (ex.Message.Contains("Resource with specified id or name already exists"))
                     {
-                        _logger.Info("Migrated cosmosDb doc already exists, but was not skipped: {entryName};", storageEntry.Name);
+                        _logger.Info("Migrated cosmosDb doc already exists, but was not skipped: {entryName};", storageEntry.GrainType);
                         // ignore: we have already migrated this entry to new storage.
                     }
 
@@ -92,7 +92,7 @@ namespace Orleans.Persistence.Migration
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error migrating grain {GrainType} with reference key='{GrainReference}'", storageEntry.Name, storageEntry.GrainReference.GetPrimaryKey());
+                    _logger.LogError(ex, "Error migrating grain {GrainType} with reference key='{GrainReference}'", storageEntry.GrainType, storageEntry.GrainReference.GetPrimaryKey());
                     migrationStats.FailedEntries++;
                 }
             }

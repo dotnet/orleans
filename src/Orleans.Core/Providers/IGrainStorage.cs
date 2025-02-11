@@ -10,14 +10,14 @@ namespace Orleans.Storage
 {
     public readonly struct StorageEntry
     {
-        public string Name { get; }
+        public string GrainType { get; }
         public GrainReference GrainReference { get; }
         public IGrainState GrainState { get; }
         public StorageMigrationEntryClient MigrationEntryClient { get; }
 
         public StorageEntry(string name, GrainReference grainReference, IGrainState grainState, StorageMigrationEntryClient migrationEntryClient)
         {
-            Name = name;
+            GrainType = name;
             GrainReference = grainReference;
             GrainState = grainState;
             MigrationEntryClient = migrationEntryClient;
@@ -27,7 +27,10 @@ namespace Orleans.Storage
         {
             ValueTask<DateTime?> GetEntryMigrationTimeAsync();
 
-            Task MarkMigratedAsync(CancellationToken cancellationToken);
+            /// <summary>
+            /// Returns string representing a changed ETag, if applicable
+            /// </summary>
+            Task<string> MarkMigratedAsync(CancellationToken cancellationToken);
         }
     }
 
@@ -72,6 +75,8 @@ namespace Orleans.Storage
         /// Also returns object representing underlying entry in the storage
         /// </returns>
         Task<StorageEntry> WriteStateWithEntryAsync(string grainType, GrainReference grainReference, IGrainState grainState);
+
+        Task<StorageEntry> GetStorageEntryAsync(string grainType, GrainReference grainReference, IGrainState grainState);
 
         /// <summary>
         /// Get all entries in storage

@@ -104,6 +104,20 @@ namespace Orleans.Storage
         /// <see cref="IGrainStorage.WriteStateAsync"/>
         public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
+            _ = await WriteStateCoreAsync(grainType, grainReference, grainState);
+        }
+
+        public async Task<StorageEntry> WriteStateWithEntryAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        {
+            var tableEntity = await WriteStateCoreAsync(grainType, grainReference, grainState);
+            var migrationTableManager = await GetMigrationTableManagerAsync();
+
+            var tableEntryClient = new AzureStorageTableEntryClient(migrationTableManager, tableEntity);
+            return new StorageEntry(grainType, grainReference, grainState, tableEntryClient);
+        }
+
+        private async Task<TableEntity> WriteStateCoreAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string pk = GetKeyString(grainReference);
@@ -121,6 +135,8 @@ namespace Orleans.Storage
                 await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainReference, this.options.TableName, grainState.ETag).ConfigureAwait(false);
                 grainState.ETag = entity.ETag.ToString();
                 grainState.RecordExists = true;
+
+                return entity;
             }
             catch (Exception exc)
             {
@@ -516,11 +532,24 @@ namespace Orleans.Storage
             lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableGrainStorage>(this.name), this.options.InitStage, Init, Close);
         }
 
+        public async Task<StorageEntry> GetStorageEntryAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        {
+            string pk = GetKeyString(grainReference);
+            var rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
+            var tableEntity = new TableEntity(pk, rowKey)
+            {
+                ETag = ETag.All
+            };
+
+            var migrationTableManager = await GetMigrationTableManagerAsync();
+            var tableEntryClient = new AzureStorageTableEntryClient(migrationTableManager, tableEntity);
+            return new StorageEntry(grainType, grainReference, grainState, tableEntryClient);
+        }
+
         public async IAsyncEnumerable<StorageEntry> GetAll([EnumeratorCancellation] CancellationToken cancellationToken)
         {
             // another storage table will be used for the migration data: we can't modify original table due to ETag collisions and other concurrent access problems
-            var tableManager = this.tableDataManager.TableManager;
-            var migrationTableManager = await tableManager.CreateAndInitRecreateAsync("migratedEntries");
+            var migrationTableManager = await GetMigrationTableManagerAsync();
 
             var entries = this.tableDataManager.ReadAllAsync(cancellationToken);
             await foreach (var entry in entries.WithCancellation(cancellationToken))
@@ -549,9 +578,10 @@ namespace Orleans.Storage
             }
         }
 
-        public Task<StorageEntry> WriteStateWithEntryAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        private Task<AzureTableDataManager<TableEntity>> GetMigrationTableManagerAsync()
         {
-            throw new NotImplementedException();
+            var tableManager = this.tableDataManager.TableManager;
+            return tableManager.CreateAndInitRecreateAsync("migratedEntries"); 
         }
     }
 
