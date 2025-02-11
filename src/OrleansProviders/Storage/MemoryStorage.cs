@@ -134,7 +134,6 @@ namespace Orleans.Storage
         }
 
         public void Dispose() => storageGrains = null;
-        public IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 
     /// <summary>

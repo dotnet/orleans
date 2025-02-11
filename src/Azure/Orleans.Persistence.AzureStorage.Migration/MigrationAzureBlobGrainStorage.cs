@@ -348,7 +348,6 @@ namespace Orleans.Storage.Migration.AzureStorage
         /// </summary>
         /// <param name="contents">The serialized contents.</param>
         private object ConvertFromStorageFormat(BinaryData contents) => this.grainStorageSerializer.Deserialize<object>(contents);
-        public IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 
     public static class MigrationAzureBlobGrainStorageFactory

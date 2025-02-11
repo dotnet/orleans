@@ -96,8 +96,6 @@ namespace Orleans.Persistence.Migration
             }
         }
 
-        public IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
-
         public static IGrainStorage Create(IServiceProvider serviceProvider, string name)
         {
             var options = serviceProvider

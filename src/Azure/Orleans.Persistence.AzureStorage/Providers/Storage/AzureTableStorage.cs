@@ -34,7 +34,7 @@ namespace Orleans.Storage
     /// <summary>
     /// Simple storage for writing grain state data to Azure table storage.
     /// </summary>
-    public class AzureTableGrainStorage : IGrainStorage, IRestExceptionDecoder, ILifecycleParticipant<ISiloLifecycle>
+    public class AzureTableGrainStorage : IExtendedGrainStorage, IRestExceptionDecoder, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly AzureTableStorageOptions options;
         private readonly ClusterOptions clusterOptions;
@@ -169,39 +169,6 @@ namespace Orleans.Storage
                 logger.Error((int)AzureProviderErrorCode.AzureTableProvider_DeleteError, string.Format("Error {0}: GrainType={1} Grainid={2} ETag={3} from Table={4} Exception={5}",
                     operation, grainType, grainReference, grainState.ETag, this.options.TableName, exc.Message), exc);
                 throw;
-            }
-        }
-
-        public async IAsyncEnumerable<StorageEntry> GetAll([EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            // another storage table will be used for the migration data: we can't modify original table due to ETag collisions and other concurrent access problems
-            var tableManager = this.tableDataManager.TableManager;
-            var migrationTableManager = await tableManager.CreateAndInitRecreateAsync("migratedEntries");
-
-            var entries = this.tableDataManager.ReadAllAsync(cancellationToken);
-            await foreach (var entry in entries.WithCancellation(cancellationToken))
-            {
-                var pkParts = entry.PartitionKey.Split('_');
-                if (pkParts.Length != 2)
-                {
-                    // a broken record - log and continue
-                    logger.Error((int)AzureProviderErrorCode.AzureTableProvider_Storage_ReadingAll, $"Error on parsing table storage record. PartitionKey='{entry.PartitionKey}'");
-                    continue;
-                }
-
-                var grainReferenceKey = pkParts[1];
-                var grainReference = GrainReference.FromKeyString(grainReferenceKey, this.grainReferenceRuntime);
-                var grainState = new GrainState<object>();
-                if (entry is not null)
-                {
-                    var loadedState = ConvertFromStorageFormat(entry, grainState.Type);
-                    grainState.RecordExists = loadedState != null;
-                    grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
-                    grainState.ETag = entry.ETag.ToString();
-                }
-
-                var tableEntryClient = new AzureStorageTableEntryClient(migrationTableManager, entry);
-                yield return new StorageEntry(entry.RowKey, grainReference, grainState, tableEntryClient);
             }
         }
 
@@ -547,6 +514,44 @@ namespace Orleans.Storage
         public void Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableGrainStorage>(this.name), this.options.InitStage, Init, Close);
+        }
+
+        public async IAsyncEnumerable<StorageEntry> GetAll([EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            // another storage table will be used for the migration data: we can't modify original table due to ETag collisions and other concurrent access problems
+            var tableManager = this.tableDataManager.TableManager;
+            var migrationTableManager = await tableManager.CreateAndInitRecreateAsync("migratedEntries");
+
+            var entries = this.tableDataManager.ReadAllAsync(cancellationToken);
+            await foreach (var entry in entries.WithCancellation(cancellationToken))
+            {
+                var pkParts = entry.PartitionKey.Split('_');
+                if (pkParts.Length != 2)
+                {
+                    // a broken record - log and continue
+                    logger.Error((int)AzureProviderErrorCode.AzureTableProvider_Storage_ReadingAll, $"Error on parsing table storage record. PartitionKey='{entry.PartitionKey}'");
+                    continue;
+                }
+
+                var grainReferenceKey = pkParts[1];
+                var grainReference = GrainReference.FromKeyString(grainReferenceKey, this.grainReferenceRuntime);
+                var grainState = new GrainState<object>();
+                if (entry is not null)
+                {
+                    var loadedState = ConvertFromStorageFormat(entry, grainState.Type);
+                    grainState.RecordExists = loadedState != null;
+                    grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
+                    grainState.ETag = entry.ETag.ToString();
+                }
+
+                var tableEntryClient = new AzureStorageTableEntryClient(migrationTableManager, entry);
+                yield return new StorageEntry(entry.RowKey, grainReference, grainState, tableEntryClient);
+            }
+        }
+
+        public Task<StorageEntry> WriteStateWithEntryAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        {
+            throw new NotImplementedException();
         }
     }
 

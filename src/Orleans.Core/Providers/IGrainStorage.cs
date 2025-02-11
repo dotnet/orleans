@@ -56,6 +56,22 @@ namespace Orleans.Storage
         /// <param name="grainState">Copy of last-known state data object for this grain.</param>
         /// <returns>Completion promise for the Delete operation on the specified grain.</returns>
         Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState);
+    }
+
+    /// <summary>
+    /// Interface which extends <see cref="IGrainStorage"/> to provide API over underlying storage entries
+    /// </summary>
+    public interface IExtendedGrainStorage : IGrainStorage
+    {
+        /// <summary>Write data function for this storage instance.</summary>
+        /// <param name="grainType">Type of this grain [fully qualified class name]</param>
+        /// <param name="grainReference">Grain reference object for this grain.</param>
+        /// <param name="grainState">State data object to be written for this grain.</param>
+        /// <returns>
+        /// Completion promise for the Write operation on the specified grain.
+        /// Also returns object representing underlying entry in the storage
+        /// </returns>
+        Task<StorageEntry> WriteStateWithEntryAsync(string grainType, GrainReference grainReference, IGrainState grainState);
 
         /// <summary>
         /// Get all entries in storage

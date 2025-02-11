@@ -105,7 +105,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
 
 #if NET7_0_OR_GREATER
         [Fact]
-        public async Task OfflineMigrator_SampleRun()
+        public async Task DataMigrator_SampleRun()
         {
             var originalEntries = await GenerateGrainsAndSaveAsync(n: 5);
 
@@ -123,7 +123,14 @@ namespace Tester.AzureUtils.Migration.Abstractions
             // in debug purposes and for future reruns
             var currentTime = DateTime.UtcNow;
 
-            await foreach (var storageEntry in SourceStorage.GetAll(CancellationToken.None))
+            var entries = this.SourceStorageEntriesController?.GetAll(CancellationToken.None);
+            if (entries is null)
+            {
+                Assert.True(false, "SourceStorageEntriesController is null");
+                return;
+            }
+
+            await foreach (var storageEntry in entries)
             {
                 // entry migration time has to exist on every entry
                 // and be somewhat around the current time (same date for simplicity)
@@ -142,7 +149,14 @@ namespace Tester.AzureUtils.Migration.Abstractions
 
             // iterate over all entries in the storage
             var storageEntries = new Dictionary<Guid, StorageEntry>();
-            await foreach (var storageEntry in SourceStorage.GetAll(CancellationToken.None))
+            var entries = this.SourceStorageEntriesController?.GetAll(CancellationToken.None);
+            if (entries is null)
+            {
+                Assert.True(false, "SourceStorageEntriesController is null");
+                return;
+            }
+
+            await foreach (var storageEntry in entries)
             {
                 storageEntries.Add(storageEntry.GrainReference.GrainIdentity.PrimaryKey, storageEntry);
             }

@@ -10,7 +10,7 @@ namespace Orleans.Persistence.Migration
         private readonly ILogger<DataMigrator> _logger;
         private readonly Options _options;
 
-        private readonly IGrainStorage _oldStorage;
+        private readonly IExtendedGrainStorage _oldStorage;
         private readonly IGrainStorage _newStorage;
 
         readonly IReminderMigrationTable _reminderMigrationStorage;
@@ -25,7 +25,11 @@ namespace Orleans.Persistence.Migration
             _logger = logger;
             _options = options ?? new Options();
 
-            _oldStorage = oldStorage;
+            // instead of doing re-registrations of same storage, we can just check if it's already IGrainStorageEntriesController
+            // if not - we simply fail fast with an explicit error message 
+            _oldStorage = (oldStorage is IExtendedGrainStorage oldStorageEntriesController)
+                ? oldStorageEntriesController
+                : throw new ArgumentException($"Implement {nameof(IExtendedGrainStorage)} on grainStorage to support data migration.", paramName: nameof(oldStorage));
             _newStorage = newStorage;
 
             _reminderMigrationStorage = reminderMigrationTable;

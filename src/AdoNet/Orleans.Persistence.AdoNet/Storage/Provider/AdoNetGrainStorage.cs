@@ -615,7 +615,5 @@ namespace Orleans.Storage
 
             return serializers;
         }
-
-        public IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 }

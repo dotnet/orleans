@@ -317,6 +317,4 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
             throw CreateOrleansException(ex, default);
         }
     }
-
-    public IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
 }

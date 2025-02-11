@@ -121,8 +121,6 @@ namespace Orleans.TestingHost
         {
             (realStorageProvider as ILifecycleParticipant<ISiloLifecycle>)?.Participate(lifecycle);
         }
-
-        public IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 
     /// <summary>

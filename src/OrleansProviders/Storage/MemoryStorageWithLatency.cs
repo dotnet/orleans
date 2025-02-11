@@ -112,7 +112,5 @@ namespace Orleans.Storage
                 throw new AggregateException(error);
             }
         }
-
-        public IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 }

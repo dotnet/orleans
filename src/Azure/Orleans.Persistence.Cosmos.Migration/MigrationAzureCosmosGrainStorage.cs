@@ -38,7 +38,6 @@ namespace Orleans.Persistence.Cosmos.Migration
         }
 
         public void Participate(ISiloLifecycle lifecycle) => this.cosmosGrainStorage.Participate(lifecycle);
-        public IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public Task ClearStateAsync(string stateName, GrainReference grainReference, IGrainState grainState)
             => this.cosmosGrainStorage.ClearStateAsync(stateName, grainReference, grainState);

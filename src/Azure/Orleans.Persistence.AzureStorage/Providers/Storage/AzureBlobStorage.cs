@@ -26,7 +26,7 @@ namespace Orleans.Storage
     /// <summary>
     /// Simple storage provider for writing grain state data to Azure blob storage in JSON format.
     /// </summary>
-    public class AzureBlobGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
+    public class AzureBlobGrainStorage : IExtendedGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
         static Regex _pickAllBlobsRegex = new Regex("(?<name>[^-]+)-(?<reference>[^-]+).json");
 
@@ -332,6 +332,8 @@ namespace Orleans.Storage
                 yield return new StorageEntry(name, reference, state, storageMigrationEntry);
             }
         }
+
+        public Task<StorageEntry> WriteStateWithEntryAsync(string grainType, GrainReference grainReference, IGrainState grainState) => throw new NotImplementedException();
     }
 
     public static class AzureBlobGrainStorageFactory

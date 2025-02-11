@@ -68,6 +68,9 @@ namespace Tester.AzureUtils.Migration.Abstractions
             }
         }
 
+        protected IExtendedGrainStorage? SourceStorageEntriesController
+            => (SourceStorage as IExtendedGrainStorage) ?? null;
+
         private IGrainStorage? destinationStorage;
         protected IGrainStorage DestinationStorage
         {
