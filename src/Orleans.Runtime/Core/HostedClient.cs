@@ -19,7 +19,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// A client which is hosted within a silo.
     /// </summary>
-    internal sealed class HostedClient : IGrainContext, IGrainExtensionBinder, IDisposable, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed partial class HostedClient : IGrainContext, IGrainExtensionBinder, IDisposable, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly object lockObj = new object();
         private readonly Channel<Message> incomingMessages;
@@ -240,10 +240,7 @@ namespace Orleans.Runtime
                     var more = await reader.WaitToReadAsync();
                     if (!more)
                     {
-                        if (this.logger.IsEnabled(LogLevel.Debug))
-                        {
-                            this.logger.LogDebug($"{nameof(Runtime.HostedClient)} completed processing all messages. Shutting down.");
-                        }
+                        LogDebugShuttingDown();
                         break;
                     }
 
@@ -257,14 +254,14 @@ namespace Orleans.Runtime
                                 this.invokableObjects.Dispatch(message);
                                 break;
                             default:
-                                this.logger.LogError((int)ErrorCode.Runtime_Error_100327, "Message not supported: {Message}", message);
+                                LogErrorUnsupportedMessage(message);
                                 break;
                         }
                     }
                 }
                 catch (Exception exception)
                 {
-                    this.logger.LogError((int)ErrorCode.Runtime_Error_100326, exception, "RunClientMessagePump has thrown an exception. Continuing.");
+                    LogErrorMessagePumpException(exception);
                 }
             }
         }
@@ -398,5 +395,22 @@ namespace Orleans.Runtime
         {
             // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = $"{nameof(Runtime.HostedClient)} completed processing all messages. Shutting down.")]
+        private partial void LogDebugShuttingDown();
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100327,
+            Level = LogLevel.Error,
+            Message = "Message not supported: {Message}")]
+        private partial void LogErrorUnsupportedMessage(Message message);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100326,
+            Level = LogLevel.Error,
+            Message = "RunClientMessagePump has thrown an exception. Continuing.")]
+        private partial void LogErrorMessagePumpException(Exception exception);
     }
 }

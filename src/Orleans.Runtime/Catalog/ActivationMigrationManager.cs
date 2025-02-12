@@ -153,10 +153,7 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
 
         try
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Monitoring cluster membership updates");
-            }
+            LogDebugMonitoringUpdates();
 
             var previousSnapshot = _clusterMembershipService.CurrentSnapshot;
             await foreach (var snapshot in _clusterMembershipService.MembershipUpdates)
@@ -181,10 +178,7 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
         }
         finally
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("No longer monitoring cluster membership updates");
-            }
+            LogDebugNoLongerMonitoring();
         }
     }
 
@@ -195,10 +189,7 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
             var remote = _grainFactory.GetSystemTarget<IActivationMigrationManagerSystemTarget>(Constants.ActivationMigratorType, targetSilo);
             await Task.Yield();
 
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Starting migration worker for target silo {SiloAddress}", targetSilo);
-            }
+            LogDebugStartingWorker(targetSilo);
 
             var items = new List<MigrationWorkItem>();
             var batch = new List<GrainMigrationPackage>();
@@ -222,16 +213,13 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
                         item.SetCompleted();
                     }
 
-                    if (_logger.IsEnabled(LogLevel.Debug))
-                    {
-                        _logger.LogDebug("Migrated {Count} activations to target silo {SiloAddress}", items.Count, targetSilo);
-                    }
+                    LogDebugMigratedActivations(items.Count, targetSilo);
                 }
                 catch (Exception exception)
                 {
                     if (!_shuttingDownCts.IsCancellationRequested)
                     {
-                        _logger.LogError(exception, "Error while migrating {Count} grain activations to {SiloAddress}", items.Count, targetSilo);
+                        LogErrorMigratingActivations(exception, items.Count, targetSilo);
                     }
 
                     foreach (var item in items)
@@ -257,10 +245,7 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
         }
         finally
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Exiting migration worker for target silo {SiloAddress}", targetSilo);
-            }
+            LogDebugExitingWorker(targetSilo);
         }
     }
 
@@ -380,4 +365,43 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
             }
         }
     }
+
+    // Log value types
+    private readonly struct SiloAddressLogValue
+    {
+        private readonly SiloAddress _silo;
+        public SiloAddressLogValue(SiloAddress silo) => _silo = silo;
+        public override string ToString() => _silo.ToStringWithHashCode();
+    }
+
+    // Logger methods at end of class
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Monitoring cluster membership updates")]
+    private partial void LogDebugMonitoringUpdates();
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "No longer monitoring cluster membership updates")]
+    private partial void LogDebugNoLongerMonitoring();
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Starting migration worker for target silo {SiloAddress}")]
+    private partial void LogDebugStartingWorker(SiloAddress siloAddress);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Migrated {Count} activations to target silo {SiloAddress}")]
+    private partial void LogDebugMigratedActivations(int count, SiloAddress siloAddress);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error while migrating {Count} grain activations to {SiloAddress}")]
+    private partial void LogErrorMigratingActivations(Exception exception, int count, SiloAddress siloAddress);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Exiting migration worker for target silo {SiloAddress}")]
+    private partial void LogDebugExitingWorker(SiloAddress siloAddress);
 }
