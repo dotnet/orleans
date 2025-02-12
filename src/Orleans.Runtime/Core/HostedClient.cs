@@ -240,7 +240,7 @@ namespace Orleans.Runtime
                     var more = await reader.WaitToReadAsync();
                     if (!more)
                     {
-                        LogDebugShuttingDown();
+                        LogDebugShuttingDown(this.logger);
                         break;
                     }
 
@@ -254,14 +254,14 @@ namespace Orleans.Runtime
                                 this.invokableObjects.Dispatch(message);
                                 break;
                             default:
-                                LogErrorUnsupportedMessage(message);
+                                LogErrorUnsupportedMessage(this.logger, message);
                                 break;
                         }
                     }
                 }
                 catch (Exception exception)
                 {
-                    LogErrorMessagePumpException(exception);
+                    LogErrorMessagePumpException(this.logger, exception);
                 }
             }
         }
@@ -399,18 +399,18 @@ namespace Orleans.Runtime
         [LoggerMessage(
             Level = LogLevel.Debug,
             Message = $"{nameof(Runtime.HostedClient)} completed processing all messages. Shutting down.")]
-        private partial void LogDebugShuttingDown();
+        private static partial void LogDebugShuttingDown(ILogger logger);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.Runtime_Error_100327,
             Level = LogLevel.Error,
             Message = "Message not supported: {Message}")]
-        private partial void LogErrorUnsupportedMessage(Message message);
+        private static partial void LogErrorUnsupportedMessage(ILogger logger, Message message);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.Runtime_Error_100326,
             Level = LogLevel.Error,
             Message = "RunClientMessagePump has thrown an exception. Continuing.")]
-        private partial void LogErrorMessagePumpException(Exception exception);
+        private static partial void LogErrorMessagePumpException(ILogger logger, Exception exception);
     }
 }
