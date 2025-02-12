@@ -307,7 +307,15 @@ namespace Orleans
         [Id(10)]
         public DateTime IAmAliveTime { get; set; }
 
-        internal DateTimeOffset EffectiveIAmAliveTime => StartTime > IAmAliveTime ? StartTime : IAmAliveTime;
+        internal DateTime EffectiveIAmAliveTime
+        {
+            get
+            {
+                var startTimeUtc = DateTime.SpecifyKind(StartTime, DateTimeKind.Utc);
+                var iAmAliveTimeUtc = DateTime.SpecifyKind(IAmAliveTime, DateTimeKind.Utc);
+                return startTimeUtc > iAmAliveTimeUtc ? startTimeUtc : iAmAliveTimeUtc;
+            }
+        }
 
         public void AddOrUpdateSuspector(SiloAddress localSilo, DateTime voteTime, int maxVotes)
         {
