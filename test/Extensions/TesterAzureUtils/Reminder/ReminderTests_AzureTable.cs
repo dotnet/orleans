@@ -66,7 +66,7 @@ namespace Tester.AzureUtils.TimerTests
             await Test_Reminders_ReminderNotFound();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9344"), TestCategory("Functional")]
         public async Task Rem_Azure_Basic()
         {
             // start up a test grain and get the period that it's programmed to use.
