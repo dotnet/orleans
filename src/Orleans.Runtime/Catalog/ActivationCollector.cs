@@ -458,7 +458,7 @@ namespace Orleans.Runtime
             CatalogInstruments.ActivationCollections.Add(1);
             if (list is { Count: > 0 })
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("CollectActivations {Activations}", list.ToStrings(d => d.GrainId.ToString() + d.ActivationId));
+                LogCollectActivations(new(list));
                 await DeactivateActivationsFromCollector(list, cancellationToken);
             }
 
@@ -560,6 +560,16 @@ namespace Orleans.Runtime
             Message = "Before collection #{CollectionNumber}: memory: {MemoryBefore}MB, #activations: {ActivationCount}, collector: {CollectorStatus}"
         )]
         private partial void LogBeforeCollection(int collectionNumber, long memoryBefore, int activationCount, ActivationCollector collectorStatus);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "CollectActivations {Activations}"
+        )]
+        private partial void LogCollectActivations(ActivationsLogValue activations);
+        private struct ActivationsLogValue(List<ICollectibleGrainContext> list)
+        {
+            public override string ToString() => list.ToStrings(d => d.GrainId.ToString() + d.ActivationId);
+        }
 
         [LoggerMessage(
             EventId = (int)ErrorCode.Catalog_AfterCollection,
