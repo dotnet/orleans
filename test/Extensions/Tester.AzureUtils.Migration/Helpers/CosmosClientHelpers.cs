@@ -62,8 +62,9 @@ namespace Tester.AzureUtils.Migration.Helpers
         public static async Task<MigrationTestGrain_State> GetGrainStateFromCosmosAsync(
             this CosmosClient cosmosClient,
             IDocumentIdProvider documentIdProvider,
-            string stateName,
-            GrainReference grain)
+            GrainReference grain,
+            string stateName = "state" // when cosmos is a target storage for migration, state is the default name of how Orleans writes a partitionKey
+        )
         {
             var database = cosmosClient.GetDatabase(MigrationAzureStorageTableToCosmosDbTests.OrleansDatabase);
             var container = database.Client.GetContainer(database.Id, MigrationAzureStorageTableToCosmosDbTests.OrleansContainer);

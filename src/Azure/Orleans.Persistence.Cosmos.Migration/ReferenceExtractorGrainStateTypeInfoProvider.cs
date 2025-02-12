@@ -58,8 +58,25 @@ namespace Orleans.Persistence.Cosmos.Migration
 
         /// <notes>
         /// Orleans 7.x+ have a hardcoded "state" value for Grain`T.
-        /// Meaning for the migration tooling we need to find out if it is a Grain`T or not
+        /// Meaning for the migration tooling we need to find out if it is a Grain`T or not.
+        ///<br/>
+        /// See Grain`T: https://github.com/dotnet/orleans/blob/116da427e1a1e56477ef94f6058f1f5d1aec2f11/src/Orleans.Runtime/Core/GrainRuntime.cs#L86C9-L86C88 <br/>
+        /// and PersistentState`T: https://github.com/dotnet/orleans/blob/116da427e1a1e56477ef94f6058f1f5d1aec2f11/src/Orleans.Runtime/Facet/Persistent/PersistentStateStorageFactory.cs#L31
         /// </notes>
-        private string? DetermineOverrideStateName(Type grainClass) => null;
+        private static string? DetermineOverrideStateName(Type grainClass)
+        {
+            var baseType = grainClass.BaseType;
+            if (baseType is null)
+            {
+                return null;
+            }
+
+            if (baseType.IsGenericType && baseType.GetGenericTypeDefinition() == typeof(Grain<>))
+            {
+                return "state";
+            }
+
+            return null;
+        }
     }
 }
