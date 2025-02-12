@@ -577,7 +577,6 @@ namespace Orleans.Runtime
 
         [LoggerMessage(
             Level = LogLevel.Information,
-            EventId = (int)ErrorCode.IGC_DeactivatingInconsistentState,
             Message = "Deactivating {Target} due to inconsistent state.")]
         private static partial void LogDeactivatingInconsistentState(ILogger logger, IGrainContext target, Exception exception);
 
