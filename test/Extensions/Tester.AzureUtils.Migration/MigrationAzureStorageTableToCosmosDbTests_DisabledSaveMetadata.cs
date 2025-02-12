@@ -1,28 +1,37 @@
 #if NET8_0_OR_GREATER
-using Azure;
-using Azure.Core;
-using Azure.Identity;
-using Microsoft.Azure.Cosmos;
+using Orleans.ApplicationParts;
 using Orleans.Hosting;
 using Orleans.Persistence.Cosmos.Migration;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
 using Tester.AzureUtils.Migration.Abstractions;
-using Tester.AzureUtils.Migration.Helpers;
+using Tester.AzureUtils.Migration.Grains;
 using TestExtensions;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
+using Microsoft.Extensions.Logging;
+using Orleans.Serialization;
+using Orleans.Runtime;
+using Orleans.Metadata;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using Orleans;
+using Azure.Identity;
+using Tester.AzureUtils.Migration.Helpers;
 
 namespace Tester.AzureUtils.Migration
 {
-    [TestCategory("Functionals"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureBlobStorage")]
-    public class MigrationReadonlyAzureStorageTableToCosmosDbTests : MigrationGrainsReadonlyOriginalStorageTests, IClassFixture<MigrationReadonlyAzureStorageTableToCosmosDbTests.Fixture>
+    [TestCategory("Functionals"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureTableStorage")]
+    public class MigrationAzureStorageTableToCosmosDbWithDisabledMetadataSaveTests : MigrationGrainsWithoutSaveMetadataTests, IClassFixture<MigrationAzureStorageTableToCosmosDbWithDisabledMetadataSaveTests.Fixture>
     {
         public const string OrleansDatabase = "Orleans";
         public const string OrleansContainer = "destinationtest";
 
         public static string RandomIdentifier = Guid.NewGuid().ToString().Replace("-", "");
 
-        public MigrationReadonlyAzureStorageTableToCosmosDbTests(Fixture fixture) : base(fixture)
+        public MigrationAzureStorageTableToCosmosDbWithDisabledMetadataSaveTests(Fixture fixture) : base(fixture)
         {
         }
 
@@ -45,8 +54,8 @@ namespace Tester.AzureUtils.Migration
                         options.SourceStorageName = SourceStorageName;
                         options.DestinationStorageName = DestinationStorageName;
 
-                        options.WriteToDestinationOnly = true; // original storage will not be touched!
-                        options.SaveMigrationMetadata = true; // save migration metadata
+                        options.WriteToDestinationOnly = false; // original storage will get the updated states as well
+                        options.SaveMigrationMetadata = false; // DON'T save migration metadata
                     })
                     .AddAzureTableGrainStorage(SourceStorageName, options =>
                     {

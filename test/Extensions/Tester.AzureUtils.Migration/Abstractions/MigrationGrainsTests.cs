@@ -40,7 +40,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task ReadFromTargetTest()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(200);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(101);
             var oldGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
             var newGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 20, B = 30 });
             var stateName = typeof(SimplePersistentGrain).FullName;
@@ -56,7 +56,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task ReadFromSourceThenWriteToTargetTest()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(300);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(102);
             var oldGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
             var newState = new SimplePersistentGrain_State { A = 20, B = 30 };
             var stateName = typeof(SimplePersistentGrain).FullName;
@@ -80,7 +80,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task ClearAllTest()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(400);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(103);
             var oldGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
             var newGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 20, B = 30 });
             var stateName = typeof(SimplePersistentGrain).FullName;
@@ -123,7 +123,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             // in debug purposes and for future reruns
             var currentTime = DateTime.UtcNow;
 
-            var entries = this.SourceStorageEntriesController?.GetAll(CancellationToken.None);
+            var entries = this.SourceExtendedStorage?.GetAll(CancellationToken.None);
             if (entries is null)
             {
                 Assert.True(false, "SourceStorageEntriesController is null");
@@ -149,7 +149,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
 
             // iterate over all entries in the storage
             var storageEntries = new Dictionary<Guid, StorageEntry>();
-            var entries = this.SourceStorageEntriesController?.GetAll(CancellationToken.None);
+            var entries = this.SourceExtendedStorage?.GetAll(CancellationToken.None);
             if (entries is null)
             {
                 Assert.True(false, "SourceStorageEntriesController is null");

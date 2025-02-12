@@ -24,7 +24,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task ReadFromSourceTest()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(100);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(100000);
             var grainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
             var stateName = typeof(MigrationTestGrain).FullName;
 
@@ -38,7 +38,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task UpdatesStatesInBothStorages()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(50000);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(100001);
             var oldGrainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
             var newState = new MigrationTestGrain_State { A = 20, B = 30 };
             var stateName = typeof(MigrationTestGrain).FullName;
@@ -61,6 +61,12 @@ namespace Tester.AzureUtils.Migration.Abstractions
             await grain.SetA(newState.A);
             await grain.SetB(newState.B);
 
+            // since saveMigrationMetadata is enabled, we should be able to check that metadata is already there
+            Assert.NotNull(SourceExtendedStorage);
+            var storageEntry = await SourceExtendedStorage!.GetStorageEntryAsync(stateName, (GrainReference)grain, oldGrainState);
+            var migrationTime = await storageEntry.MigrationEntryClient.GetEntryMigrationTimeAsync();
+            Assert.NotNull(migrationTime);
+
             // verify updated state in both storages
             cosmosGrainState = await _cosmosClient.GetGrainStateFromCosmosAsync(DocumentIdProvider, stateName!, (GrainReference)grain);
             Assert.Equal(20, cosmosGrainState.A);
@@ -78,7 +84,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task DataMigrator_MovesDataToDestinationStorage()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(500);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(100002);
             var oldGrainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
             var stateName = typeof(MigrationTestGrain).FullName;
 

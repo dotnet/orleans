@@ -33,14 +33,14 @@ internal class AzureStorageTableEntryClient : StorageMigrationEntryClient
         if (entity is null && etag is null)
         {
             return null;
-        }
+        }   
 
         return entity.Timestamp.Value.DateTime;
     }
 
     public async Task<string> MarkMigratedAsync(CancellationToken cancellationToken)
     {
-        await this.tableManager.UpsertTableEntryAsync(new TableEntity(partitionKey, rowKey));
+        await this.tableManager.UpsertTableEntryAsync(new TableEntity(partitionKey, rowKey) { ETag = ETag.All });
         return null; // ETag of original entry is never updated, because a new entry is created\updated in a separate storage table
     }
 }

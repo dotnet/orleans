@@ -53,6 +53,9 @@ namespace Tester.AzureUtils.Migration
                     {
                         options.SourceStorageName = SourceStorageName;
                         options.DestinationStorageName = DestinationStorageName;
+
+                        options.WriteToDestinationOnly = false; // original storage will get the updated states as well
+                        options.SaveMigrationMetadata = true; // save migration metadata
                     })
                     .AddAzureTableGrainStorage(SourceStorageName, options =>
                     {

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans.Runtime;
@@ -38,15 +39,21 @@ namespace Orleans.Persistence.Migration
         private readonly IGrainStorage _destinationStorage;
 
         private readonly MigrationGrainStorageOptions _options;
+        private readonly ILogger<MigrationGrainStorage> _logger;
 
-        public MigrationGrainStorage(IGrainStorage sourceStorage, IGrainStorage destinationStorage, MigrationGrainStorageOptions options)
+        public MigrationGrainStorage(
+            IGrainStorage sourceStorage,
+            IGrainStorage destinationStorage,
+            MigrationGrainStorageOptions options,
+            ILogger<MigrationGrainStorage> logger)
         {
             _options = options;
             _sourceStorage = sourceStorage;
             _destinationStorage = destinationStorage;
 
+            _logger = logger;
             _extendedSourceStorage = sourceStorage as IExtendedGrainStorage;
-            _saveMigrationMetadata = _extendedSourceStorage is not null && options.SaveMigrationState;
+            _saveMigrationMetadata = _extendedSourceStorage is not null && options.SaveMigrationMetadata;
         }
 
         public async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
@@ -105,16 +112,28 @@ namespace Orleans.Persistence.Migration
                 }
 
                 // mark entity as migrated only after both writes (to source and destination) were successful
-                if (_saveMigrationMetadata)
+                try
                 {
-                    storageEntry ??= await _extendedSourceStorage.GetStorageEntryAsync(grainType, grainReference, grainState);
-
-                    var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-                    var updatedETag = await storageEntry.Value.MigrationEntryClient.MarkMigratedAsync(cts.Token);
-                    if (updatedETag is not null)
+                    if (_saveMigrationMetadata)
                     {
-                        etag.SourceETag = updatedETag; // override the ETag with one from the storageEntry
+                        storageEntry ??= await _extendedSourceStorage.GetStorageEntryAsync(grainType, grainReference, grainState);
+
+                        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                        var updatedETag = await storageEntry.Value.MigrationEntryClient.MarkMigratedAsync(cts.Token);
+                        if (updatedETag is not null)
+                        {
+                            etag.SourceETag = updatedETag; // override the ETag with one from the storageEntry
+                        }
                     }
+                }
+                catch (Exception ex)
+                {
+                    if (_logger.IsEnabled(LogLevel.Warning))
+                    {
+                        _logger.Warn((int)MigrationErrorCodes.MigrationMetadataNotWritten, $"failed to save migration metadata for grain (type = {grainType}, id = {grainReference.GrainId})", ex);
+                    }
+                    
+                    // swallow the exception, since we don't want to affect the grain state write with this operation
                 }
             }
             finally
@@ -125,14 +144,13 @@ namespace Orleans.Persistence.Migration
 
         public static IGrainStorage Create(IServiceProvider serviceProvider, string name)
         {
-            var options = serviceProvider
-                .GetRequiredService<IOptionsMonitor<MigrationGrainStorageOptions>>()
-                .Get(name);
+            var logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<MigrationGrainStorage>();
+            var options = serviceProvider.GetRequiredService<IOptionsMonitor<MigrationGrainStorageOptions>>().Get(name);
 
             var source = serviceProvider.GetRequiredServiceByName<IGrainStorage>(options.SourceStorageName);
             var destination = serviceProvider.GetRequiredServiceByName<IGrainStorage>(options.DestinationStorageName);
 
-            return new MigrationGrainStorage(source, destination, options);
+            return new MigrationGrainStorage(source, destination, options, logger);
         }
     }
 
@@ -156,6 +174,6 @@ namespace Orleans.Persistence.Migration
         /// If enabled, will also save the metadata of migration process in the source storage.
         /// For example, it will persistently keep the migrationTime of the specific storage entry. <br/>
         /// </summary>
-        public bool SaveMigrationState { get; set; } = false;
+        public bool SaveMigrationMetadata { get; set; } = false;
     }
 }

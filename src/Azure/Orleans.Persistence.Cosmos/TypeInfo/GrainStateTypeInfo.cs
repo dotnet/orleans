@@ -4,9 +4,27 @@ namespace Orleans.Persistence.Cosmos.TypeInfo
 {
     internal sealed class GrainStateTypeInfo
     {
+        private readonly string? overrideStateName = null;
+
         private readonly Func<string, GrainId, IGrainState, Task> readStateFunc;
         private readonly Func<string, GrainId, IGrainState, Task> writeStateFunc;
         private readonly Func<string, GrainId, IGrainState, Task> clearStateFunc;
+
+        public GrainStateTypeInfo(
+            string? overrideStateName,
+            string grainTypeName,
+            Func<GrainReference, string> grainKeyFormatter,
+            Func<string, GrainId, IGrainState, Task> readStateFunc,
+            Func<string, GrainId, IGrainState, Task> writeStateFunc,
+            Func<string, GrainId, IGrainState, Task> clearStateFunc)
+        {
+            this.overrideStateName = overrideStateName;
+            this.readStateFunc = readStateFunc;
+            this.writeStateFunc = writeStateFunc;
+            this.clearStateFunc = clearStateFunc;
+            this.GrainTypeName = grainTypeName;
+            this.GrainKeyFormatter = grainKeyFormatter;
+        }
 
         public GrainStateTypeInfo(
             string grainTypeName,
@@ -28,11 +46,20 @@ namespace Orleans.Persistence.Cosmos.TypeInfo
 
         public GrainId GetGrainId(GrainReference grainReference) => new(this.GrainTypeName, this.GrainKeyFormatter(grainReference));
 
-        public Task ReadStateAsync(string stateName, GrainReference grainReference, IGrainState grainState) => this.readStateFunc(stateName, this.GetGrainId(grainReference), grainState);
+        public Task ReadStateAsync(string stateName, GrainReference grainReference, IGrainState grainState)
+            => overrideStateName is null
+                ? this.readStateFunc(stateName, this.GetGrainId(grainReference), grainState)
+                : this.readStateFunc(overrideStateName, this.GetGrainId(grainReference), grainState);
 
-        public Task WriteStateAsync(string stateName, GrainReference grainReference, IGrainState grainState) => this.writeStateFunc(stateName, this.GetGrainId(grainReference), grainState);
+        public Task WriteStateAsync(string stateName, GrainReference grainReference, IGrainState grainState)
+            => overrideStateName is null
+                ? this.writeStateFunc(stateName, this.GetGrainId(grainReference), grainState)
+                : this.writeStateFunc(overrideStateName, this.GetGrainId(grainReference), grainState);
 
-        public Task ClearStateAsync(string stateName, GrainReference grainReference, IGrainState grainState) => this.clearStateFunc(stateName, this.GetGrainId(grainReference), grainState);
+        public Task ClearStateAsync(string stateName, GrainReference grainReference, IGrainState grainState)
+            => overrideStateName is null
+                ? this.clearStateFunc(stateName, this.GetGrainId(grainReference), grainState)
+                : this.clearStateFunc(overrideStateName, this.GetGrainId(grainReference), grainState);
 
         public static Func<GrainReference, string> GetGrainKeyFormatter(Type grainClass)
         {

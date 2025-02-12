@@ -9,10 +9,12 @@ using Orleans.Configuration;
 
 #if NET7_0_OR_GREATER
 using Orleans.Persistence.Migration;
+
 #endif
 
 #if NET8_0_OR_GREATER
 using Orleans.Persistence.Cosmos;
+using Azure.Data.Tables;
 #endif
 
 namespace Tester.AzureUtils.Migration.Abstractions
@@ -68,7 +70,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             }
         }
 
-        protected IExtendedGrainStorage? SourceStorageEntriesController
+        protected IExtendedGrainStorage? SourceExtendedStorage
             => (SourceStorage as IExtendedGrainStorage) ?? null;
 
         private IGrainStorage? destinationStorage;

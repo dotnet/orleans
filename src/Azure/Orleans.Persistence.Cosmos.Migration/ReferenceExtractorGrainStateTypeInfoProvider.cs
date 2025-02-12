@@ -46,10 +46,20 @@ namespace Orleans.Persistence.Cosmos.Migration
                 var writeStateFunc = CosmosGrainStorage.WriteStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(grainStorage);
                 var clearStateFunc = CosmosGrainStorage.ClearStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(grainStorage);
 
-                grainStateTypeInfo = this.grainStateTypeInfo[(typeCode, grainStateType)] = new GrainStateTypeInfo(grainTypeName, grainKeyFormatter, readStateFunc, writeStateFunc, clearStateFunc);
+                var overrideStateName = DetermineOverrideStateName(grainClass);
+
+                grainStateTypeInfo
+                    = this.grainStateTypeInfo[(typeCode, grainStateType)]
+                    = new GrainStateTypeInfo(overrideStateName, grainTypeName, grainKeyFormatter, readStateFunc, writeStateFunc, clearStateFunc);
             }
 
             return grainStateTypeInfo;
         }
+
+        /// <notes>
+        /// Orleans 7.x+ have a hardcoded "state" value for Grain`T.
+        /// Meaning for the migration tooling we need to find out if it is a Grain`T or not
+        /// </notes>
+        private string? DetermineOverrideStateName(Type grainClass) => null;
     }
 }
