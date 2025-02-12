@@ -996,11 +996,10 @@ internal sealed partial class ActivationData :
                                 else if (currentRequestActiveTime > _shared.MaxWarningRequestProcessingTime)
                                 {
                                     // Consider: Handle long request detection for reentrant activations -- this logic only works for non-reentrant activations
-                                    _shared.Logger.LogWarning(
-                                        (int)ErrorCode.Dispatcher_ExtendedMessageProcessing,
-                                        "Current request has been active for {CurrentRequestActiveTime} for grain {Grain}. Currently executing {BlockingRequest}. Trying to enqueue {Message}.",
+                                    LogWarningDispatcher_ExtendedMessageProcessing(
+                                        _shared.Logger,
                                         currentRequestActiveTime,
-                                        ToDetailedString(),
+                                        new(this),
                                         _blockingRequest,
                                         message);
                                 }
@@ -1462,11 +1461,11 @@ internal sealed partial class ActivationData :
             {
                 if (ForwardingAddress is { } address)
                 {
-                    _shared.Logger.LogDebug((int)ErrorCode.Catalog_RerouteAllQueuedMessages, "Rerouting {NumMessages} messages from invalid grain activation {Grain} to {ForwardingAddress}.", msgs.Count, this, address);
+                    LogReroutingMessages(_shared.Logger, msgs.Count, this, address);
                 }
                 else
                 {
-                    _shared.Logger.LogDebug((int)ErrorCode.Catalog_RerouteAllQueuedMessages, "Rerouting {NumMessages} messages from invalid grain activation {Grain}.", msgs.Count, this);
+                    LogReroutingMessagesNoForwarding(_shared.Logger, msgs.Count, this);
                 }
             }
 
@@ -1540,11 +1539,8 @@ internal sealed partial class ActivationData :
                             {
                                 // If this was a duplicate, it's not an error, just a race.
                                 // Forward on all of the pending messages, and then forget about this activation.
-                                _shared.Logger.LogDebug(
-                                    (int)ErrorCode.Catalog_DuplicateActivation,
-                                    "Tried to create a duplicate activation {Address}, but we'll use {ForwardingAddress} instead. "
-                                    + "GrainInstance type is {GrainInstanceType}."
-                                    + "Full activation address is {Address}. We have {WaitingCount} messages to forward.",
+                                LogDuplicateActivation(
+                                    _shared.Logger,
                                     Address,
                                     ForwardingAddress,
                                     GrainInstance?.GetType(),
@@ -1563,7 +1559,7 @@ internal sealed partial class ActivationData :
                     registrationException = exception;
                     if (!cancellationToken.IsCancellationRequested)
                     {
-                        _shared.Logger.LogWarning((int)ErrorCode.Runtime_Error_100064, registrationException, "Failed to register grain {Grain} in grain directory", ToString());
+                        LogFailedToRegisterGrain(_shared.Logger, registrationException, this);
                     }
 
                     success = false;
@@ -1585,7 +1581,7 @@ internal sealed partial class ActivationData :
 
             if (_shared.Logger.IsEnabled(LogLevel.Debug))
             {
-                _shared.Logger.LogDebug((int)ErrorCode.Catalog_BeforeCallingActivate, "Activating grain {Grain}", this);
+                LogActivatingGrain(_shared.Logger, this);
             }
 
             // Start grain lifecycle within try-catch wrapper to safely capture any exceptions thrown from called function
@@ -1601,7 +1597,7 @@ internal sealed partial class ActivationData :
                 }
                 catch (Exception exception)
                 {
-                    _shared.Logger.LogError(exception, "Error starting lifecycle for activation '{Activation}'.", this);
+                    LogErrorStartingLifecycle(_shared.Logger, exception, this);
                     throw;
                 }
 
@@ -1613,7 +1609,7 @@ internal sealed partial class ActivationData :
                     }
                     catch (Exception exception)
                     {
-                        _shared.Logger.LogError(exception, $"Error thrown from {nameof(IGrainBase.OnActivateAsync)} for activation '{{Activation}}'.", this);
+                        LogErrorInGrainMethod(_shared.Logger, exception, nameof(IGrainBase.OnActivateAsync), this);
                         throw;
                     }
                 }
@@ -1629,7 +1625,7 @@ internal sealed partial class ActivationData :
 
                 if (_shared.Logger.IsEnabled(LogLevel.Debug))
                 {
-                    _shared.Logger.LogDebug((int)ErrorCode.Catalog_AfterCallingActivate, "Finished activating grain {Grain}", this);
+                    LogFinishedActivatingGrain(_shared.Logger, this);
                 }
             }
             catch (Exception exception)
@@ -1638,7 +1634,7 @@ internal sealed partial class ActivationData :
 
                 // Capture the exception so that it can be propagated to rejection messages
                 var sourceException = (exception as OrleansLifecycleCanceledException)?.InnerException ?? exception;
-                _shared.Logger.LogError((int)ErrorCode.Catalog_ErrorCallingActivate, sourceException, "Error activating grain {Grain}", this);
+                LogErrorActivatingGrain(_shared.Logger, sourceException, this);
 
                 // Unregister this as a message target after some period of time.
                 // This is delayed so that consistently failing activation, perhaps due to an application bug or network
@@ -1659,7 +1655,7 @@ internal sealed partial class ActivationData :
         }
         catch (Exception exception)
         {
-            _shared.Logger.LogError(exception, "Activation of grain {Grain} failed", this);
+            LogActivationFailed(_shared.Logger, exception, this);
             Deactivate(new(DeactivationReasonCode.ApplicationError, exception, "Failed to activate grain."));
         }
         finally
@@ -1682,7 +1678,7 @@ internal sealed partial class ActivationData :
         {
             if (_shared.Logger.IsEnabled(LogLevel.Trace))
             {
-                _shared.Logger.LogTrace("Completing deactivation of '{Activation}'", ToDetailedString());
+                LogCompletingDeactivation(_shared.Logger, this);
             }
 
             // Stop timers from firing.
@@ -1696,22 +1692,16 @@ internal sealed partial class ActivationData :
                     try
                     {
                         if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                            _shared.Logger.LogDebug(
-                                (int)ErrorCode.Catalog_BeforeCallingDeactivate,
-                                "About to call OnDeactivateAsync for '{Activation}'",
-                                this);
+                            LogBeforeOnDeactivateAsync(_shared.Logger, this);
 
                         await grainBase.OnDeactivateAsync(DeactivationReason, cancellationToken).WaitAsync(cancellationToken);
 
                         if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                            _shared.Logger.LogDebug(
-                                (int)ErrorCode.Catalog_AfterCallingDeactivate,
-                                "Returned from calling '{Activation}' OnDeactivateAsync method",
-                                this);
+                            LogAfterOnDeactivateAsync(_shared.Logger, this);
                     }
                     catch (Exception exception)
                     {
-                        _shared.Logger.LogError(exception, $"Error thrown from {nameof(IGrainBase.OnDeactivateAsync)} for activation '{{Activation}}'.", this);
+                        LogErrorInGrainMethod(_shared.Logger, exception, nameof(IGrainBase.OnDeactivateAsync), this);
 
                         // Swallow the exception and continue with deactivation.
                         encounteredError = true;
@@ -1730,7 +1720,7 @@ internal sealed partial class ActivationData :
             }
             catch (Exception exception)
             {
-                _shared.Logger.LogError(exception, "Error stopping lifecycle for activation '{Activation}'.", this);
+                LogErrorStartingLifecycle(_shared.Logger, exception, this);
 
                 // Swallow the exception and continue with deactivation.
                 encounteredError = true;
@@ -1763,7 +1753,7 @@ internal sealed partial class ActivationData :
                 }
                 catch (Exception exception)
                 {
-                    _shared.Logger.LogWarning(exception, "Failed to migrate activation '{Activation}'.", this);
+                    LogFailedToMigrateActivation(_shared.Logger, exception, this);
                 }
                 finally
                 {
@@ -1787,7 +1777,7 @@ internal sealed partial class ActivationData :
                 {
                     if (!cancellationToken.IsCancellationRequested)
                     {
-                        _shared.Logger.LogError(exception, "Failed to unregister activation '{Activation}' from directory.", this);
+                        LogFailedToUnregisterActivation(_shared.Logger, exception, this);
                     }
                 }
             }
@@ -1799,7 +1789,7 @@ internal sealed partial class ActivationData :
         }
         catch (Exception ex)
         {
-            _shared.Logger.LogWarning((int)ErrorCode.Catalog_DeactivateActivation_Exception, ex, "Error deactivating '{Activation}'.", this);
+            LogErrorDeactivating(_shared.Logger, ex, this);
         }
 
         if (IsStuckDeactivating)
@@ -1827,7 +1817,7 @@ internal sealed partial class ActivationData :
         }
         catch (Exception exception)
         {
-            _shared.Logger.LogWarning(exception, "Exception disposing activation '{Activation}'.", this);
+            LogExceptionDisposing(_shared.Logger, exception, this);
         }
 
         // Signal deactivation
@@ -2301,4 +2291,129 @@ internal sealed partial class ActivationData :
     )]
     private static partial void LogAttemptToRegisterWithPreviousActivation(ILogger logger, GrainId grainId, GrainAddress previousRegistration);
 
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Dispatcher_ExtendedMessageProcessing,
+        Level = LogLevel.Warning,
+        Message = "Current request has been active for {CurrentRequestActiveTime} for grain {Grain}. Currently executing {BlockingRequest}. Trying to enqueue {Message}.")]
+    private static partial void LogWarningDispatcher_ExtendedMessageProcessing(
+        ILogger logger,
+        TimeSpan currentRequestActiveTime,
+        ActivationDetailsLogValue grain,
+        Message blockingRequest,
+        Message message);
+
+    private readonly struct ActivationDetailsLogValue
+    {
+        private readonly ActivationData _activation;
+        private readonly bool _includeExtraDetails;
+
+        public ActivationDetailsLogValue(ActivationData activation, bool includeExtraDetails = false)
+        {
+            _activation = activation;
+            _includeExtraDetails = includeExtraDetails;
+        }
+
+        public override string ToString() => _activation.ToDetailedString(_includeExtraDetails);
+    }
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Runtime_Error_100064,
+        Level = LogLevel.Warning,
+        Message = "Failed to register grain {Grain} in grain directory")]
+    private static partial void LogFailedToRegisterGrain(ILogger logger, Exception exception, ActivationData grain);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Catalog_BeforeCallingActivate,
+        Level = LogLevel.Debug,
+        Message = "Activating grain {Grain}")]
+    private static partial void LogActivatingGrain(ILogger logger, ActivationData grain);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error starting lifecycle for activation '{Activation}'")]
+    private static partial void LogErrorStartingLifecycle(ILogger logger, Exception exception, ActivationData activation);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error thrown from {MethodName} for activation '{Activation}'")]
+    private static partial void LogErrorInGrainMethod(ILogger logger, Exception exception, string methodName, ActivationData activation);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Catalog_AfterCallingActivate,
+        Level = LogLevel.Debug,
+        Message = "Finished activating grain {Grain}")]
+    private static partial void LogFinishedActivatingGrain(ILogger logger, ActivationData grain);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Catalog_ErrorCallingActivate,
+        Level = LogLevel.Error,
+        Message = "Error activating grain {Grain}")]
+    private static partial void LogErrorActivatingGrain(ILogger logger, Exception exception, ActivationData grain);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Activation of grain {Grain} failed")]
+    private static partial void LogActivationFailed(ILogger logger, Exception exception, ActivationData grain);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Completing deactivation of '{Activation}'")]
+    private static partial void LogCompletingDeactivation(ILogger logger, ActivationData activation);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Catalog_BeforeCallingDeactivate,
+        Level = LogLevel.Debug,
+        Message = "About to call OnDeactivateAsync for '{Activation}'")]
+    private static partial void LogBeforeOnDeactivateAsync(ILogger logger, ActivationData activation);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Catalog_AfterCallingDeactivate,
+        Level = LogLevel.Debug,
+        Message = "Returned from calling '{Activation}' OnDeactivateAsync method")]
+    private static partial void LogAfterOnDeactivateAsync(ILogger logger, ActivationData activation);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Failed to unregister activation '{Activation}' from directory")]
+    private static partial void LogFailedToUnregisterActivation(ILogger logger, Exception exception, ActivationData activation);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Catalog_DeactivateActivation_Exception,
+        Level = LogLevel.Warning,
+        Message = "Error deactivating '{Activation}'")]
+    private static partial void LogErrorDeactivating(ILogger logger, Exception exception, ActivationData activation);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Exception disposing activation '{Activation}'")]
+    private static partial void LogExceptionDisposing(ILogger logger, Exception exception, ActivationData activation);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Failed to migrate activation '{Activation}'")]
+    private static partial void LogFailedToMigrateActivation(ILogger logger, Exception exception, ActivationData activation);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Catalog_DuplicateActivation,
+        Level = LogLevel.Debug,
+        Message = "Tried to create a duplicate activation {Address}, but we'll use {ForwardingAddress} instead. GrainInstance type is {GrainInstanceType}. Full activation address is {FullAddress}. We have {WaitingCount} messages to forward")]
+    private static partial void LogDuplicateActivation(
+        ILogger logger,
+        GrainAddress address,
+        SiloAddress? forwardingAddress,
+        Type? grainInstanceType,
+        string fullAddress,
+        int waitingCount);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Catalog_RerouteAllQueuedMessages,
+        Level = LogLevel.Debug,
+        Message = "Rerouting {NumMessages} messages from invalid grain activation {Grain} to {ForwardingAddress}")]
+    private static partial void LogReroutingMessages(ILogger logger, int numMessages, ActivationData grain, SiloAddress forwardingAddress);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Catalog_RerouteAllQueuedMessages,
+        Level = LogLevel.Debug,
+        Message = "Rerouting {NumMessages} messages from invalid grain activation {Grain}")]
+    private static partial void LogReroutingMessagesNoForwarding(ILogger logger, int numMessages, ActivationData grain);
 }
