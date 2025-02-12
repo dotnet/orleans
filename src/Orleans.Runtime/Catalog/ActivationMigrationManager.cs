@@ -53,7 +53,7 @@ internal interface IActivationMigrationManager
 /// <summary>
 /// Migrates grain activations to target hosts and handles migration requests from other hosts.
 /// </summary>
-internal class ActivationMigrationManager : SystemTarget, IActivationMigrationManagerSystemTarget, IActivationMigrationManager, ILifecycleParticipant<ISiloLifecycle>
+internal partial class ActivationMigrationManager : SystemTarget, IActivationMigrationManagerSystemTarget, IActivationMigrationManager, ILifecycleParticipant<ISiloLifecycle>
 {
     private const int MaxBatchSize = 1_000;
     private readonly ConcurrentDictionary<SiloAddress, (Task PumpTask, Channel<MigrationWorkItem> WorkItemChannel)> _workers = new();
