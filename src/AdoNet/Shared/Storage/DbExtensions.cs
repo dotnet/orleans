@@ -145,11 +145,10 @@ namespace Orleans.Tests.SqlUtils
         /// use it since it expects .NET <see cref="System.DateTime"/>. This function throws if the given <see paramref="fieldName"/> does not exist.</remarks>
         public static DateTime? GetDateTimeValueOrDefault(this IDataRecord record, string fieldName, DateTime? @default = default)
         {
-
             try
             {
                 var ordinal = record.GetOrdinal(fieldName);
-                return record.IsDBNull(ordinal) ? @default : record.GetDateTime(ordinal);
+                return record.IsDBNull(ordinal) ? @default : DateTime.SpecifyKind(record.GetDateTime(ordinal), DateTimeKind.Utc);
             }
             catch (IndexOutOfRangeException e)
             {
@@ -250,7 +249,7 @@ namespace Orleans.Tests.SqlUtils
             try
             {
                 var ordinal = record.GetOrdinal(fieldName);
-                return record.GetDateTime(ordinal);
+                return DateTime.SpecifyKind(record.GetDateTime(ordinal), DateTimeKind.Utc);
             }
             catch (IndexOutOfRangeException e)
             {
