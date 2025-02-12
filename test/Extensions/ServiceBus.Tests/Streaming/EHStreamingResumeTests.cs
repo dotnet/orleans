@@ -27,6 +27,12 @@ namespace ServiceBus.Tests.Streaming
                         {
                             options.StreamInactivityPeriod = StreamInactivityPeriod;
                         }));
+                        b.ConfigureCacheEviction(ob => ob.Configure(options =>
+                        {
+                            options.MetadataMinTimeInCache = MetadataMinTimeInCache;
+                            options.DataMaxAgeInCache = DataMaxAgeInCache;
+                            options.DataMinTimeInCache = DataMinTimeInCache;
+                        }));
                         b.ConfigureEventHub(ob => ob.Configure(options =>
                         {
                             options.ConfigureTestDefaults(EHPath, EHConsumerGroup);

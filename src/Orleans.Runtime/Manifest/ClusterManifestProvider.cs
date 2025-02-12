@@ -1,6 +1,9 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,10 +21,11 @@ namespace Orleans.Runtime.Metadata
         private readonly IServiceProvider _services;
         private readonly IClusterMembershipService _clusterMembershipService;
         private readonly IFatalErrorHandler _fatalErrorHandler;
-        private readonly CancellationTokenSource _cancellation = new CancellationTokenSource();
+        private readonly CancellationTokenSource _shutdownCts = new();
         private readonly AsyncEnumerable<ClusterManifest> _updates;
         private ClusterManifest _current;
-        private Task _runTask;
+        private IInternalGrainFactory? _grainFactory;
+        private Task? _runTask;
 
         public ClusterManifestProvider(
             ILocalSiloDetails localSiloDetails,
@@ -36,10 +40,10 @@ namespace Orleans.Runtime.Metadata
             _services = services;
             _clusterMembershipService = clusterMembershipService;
             _fatalErrorHandler = fatalErrorHandler;
-            this.LocalGrainManifest = siloManifestProvider.SiloManifest;
+            LocalGrainManifest = siloManifestProvider.SiloManifest;
             _current = new ClusterManifest(
                 MajorMinorVersion.Zero,
-                ImmutableDictionary.CreateRange(new[] { new KeyValuePair<SiloAddress, GrainManifest>(localSiloDetails.SiloAddress, this.LocalGrainManifest) }));
+                ImmutableDictionary.CreateRange([new KeyValuePair<SiloAddress, GrainManifest>(localSiloDetails.SiloAddress, LocalGrainManifest)]));
             _updates = new AsyncEnumerable<ClusterManifest>(
                 initialValue: _current,
                 updateValidator: (previous, proposed) => proposed.Version > previous.Version,
@@ -61,23 +65,27 @@ namespace Orleans.Runtime.Metadata
                     _logger.LogDebug("Starting to process membership updates");
                 }
 
-                var cancellation = _cancellation.Token;
+                var cancellation = _shutdownCts.Token;
                 await foreach (var _ in _clusterMembershipService.MembershipUpdates.WithCancellation(cancellation))
                 {
                     while (true)
                     {
                         var membershipSnapshot = _clusterMembershipService.CurrentSnapshot;
 
-                        var success = await this.UpdateManifest(membershipSnapshot);
+                        var success = await UpdateManifest(membershipSnapshot);
 
                         if (success || cancellation.IsCancellationRequested)
                         {
                             break;
                         }
 
-                        await Task.Delay(TimeSpan.FromSeconds(5));
+                        await Task.Delay(TimeSpan.FromSeconds(5), cancellation);
                     }
                 }
+            }
+            catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+            {
+                // Ignore during shutdown.
             }
             catch (Exception exception) when (_fatalErrorHandler.IsUnexpected(exception))
             {
@@ -118,7 +126,7 @@ namespace Orleans.Runtime.Metadata
             }
 
             // Next, fill missing entries.
-            var tasks = new List<Task<(SiloAddress Key, GrainManifest Value, Exception Exception)>>();
+            var tasks = new List<Task<(SiloAddress Key, GrainManifest? Value, Exception? Exception)>>();
             foreach (var entry in clusterMembership.Members)
             {
                 var member = entry.Value;
@@ -143,14 +151,13 @@ namespace Orleans.Runtime.Metadata
 
                 tasks.Add(GetManifest(member.SiloAddress));
 
-                async Task<(SiloAddress, GrainManifest, Exception)> GetManifest(SiloAddress siloAddress)
+                async Task<(SiloAddress, GrainManifest?, Exception?)> GetManifest(SiloAddress siloAddress)
                 {
                     try
                     {
                         // Get the manifest from the remote silo.
-                        var grainFactory = _services.GetRequiredService<IInternalGrainFactory>();
-                        var remoteManifestProvider = grainFactory.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, member.SiloAddress);
-                        var manifest = await remoteManifestProvider.GetSiloManifest();
+                        var remoteManifestProvider = _grainFactory!.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, member.SiloAddress);
+                        var manifest = await remoteManifestProvider.GetSiloManifest().AsTask().WaitAsync(_shutdownCts.Token);
                         return (siloAddress, manifest, null);
                     }
                     catch (Exception exception)
@@ -168,7 +175,10 @@ namespace Orleans.Runtime.Metadata
                 if (result.Exception is Exception exception)
                 {
                     fetchSuccess = false;
-                    _logger.LogWarning(exception, "Error retrieving silo manifest for silo {SiloAddress}", result.Key);
+                    if (exception is not OperationCanceledException)
+                    {
+                        _logger.LogWarning(exception, "Error retrieving silo manifest for silo {SiloAddress}", result.Key);
+                    }
                 }
                 else
                 {
@@ -187,14 +197,18 @@ namespace Orleans.Runtime.Metadata
             return fetchSuccess;
         }
 
-        private Task StartAsync(CancellationToken _)
+        [MemberNotNull(nameof(_runTask))]
+        private Task StartAsync(CancellationToken cancellationToken)
         {
+            Debug.Assert(_grainFactory is not null);
             _runTask = Task.Run(ProcessMembershipUpdates);
             return Task.CompletedTask;
         }
 
-        private Task Initialize(CancellationToken _)
+        [MemberNotNull(nameof(_grainFactory))]
+        private Task Initialize(CancellationToken cancellationToken)
         {
+            _grainFactory = _services.GetRequiredService<IInternalGrainFactory>();
             var catalog = _services.GetRequiredService<Catalog>();
             catalog.RegisterSystemTarget(ActivatorUtilities.CreateInstance<ClusterManifestSystemTarget>(_services));
             return Task.CompletedTask;
@@ -202,10 +216,10 @@ namespace Orleans.Runtime.Metadata
 
         private async Task StopAsync(CancellationToken cancellationToken)
         {
-            _cancellation.Cancel();
+            _shutdownCts.Cancel();
             if (_runTask is Task task)
             {
-                await task;
+                await task.WaitAsync(cancellationToken).SuppressThrowing();
             }
         }
 
@@ -226,12 +240,17 @@ namespace Orleans.Runtime.Metadata
 
         public async ValueTask DisposeAsync()
         {
-            await this.StopAsync(CancellationToken.None);
+            if (_shutdownCts.IsCancellationRequested)
+            {
+                return;
+            }
+
+            await StopAsync(CancellationToken.None);
         }
 
         public void Dispose()
         {
-            _cancellation.Cancel();
+            DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
     }
 }

@@ -98,7 +98,7 @@ namespace UnitTests.Directory
             throw new NotImplementedException();
         }
 
-        public void SetSiloRemovedCatalogCallback(Action<SiloAddress, SiloStatus> catalogOnSiloRemoved)
+        public void SetSiloRemovedCatalogCallback(Action<ILocalGrainDirectory, SiloAddress, SiloStatus> catalogOnSiloRemoved)
         {
             throw new NotImplementedException();
         }

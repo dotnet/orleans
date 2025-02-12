@@ -61,6 +61,9 @@ namespace Tester
                 siloBuilder
                 .AddMemoryGrainStorage("MemoryStore")
                 .UseLocalhostClustering(baseSiloPort, baseGatewayPort);
+#pragma warning disable ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+                siloBuilder.AddDistributedGrainDirectory();
+#pragma warning restore ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             }).Build();
 
             var silo2 = new HostBuilder().UseOrleans((ctx, siloBuilder) =>
@@ -68,6 +71,9 @@ namespace Tester
                 siloBuilder
                 .AddMemoryGrainStorage("MemoryStore")
                 .UseLocalhostClustering(baseSiloPort + 1, baseGatewayPort + 1, new IPEndPoint(IPAddress.Loopback, baseSiloPort));
+#pragma warning disable ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+                siloBuilder.AddDistributedGrainDirectory();
+#pragma warning restore ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             }).Build();
 
             var clientHost = new HostBuilder().UseOrleansClient((ctx, clientBuilder) =>

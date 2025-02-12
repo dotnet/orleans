@@ -880,7 +880,7 @@ namespace UnitTests.Grains
         }
     }
 
-    internal class NonReentrentStressGrainWithoutState : Grain, INonReentrentStressGrainWithoutState
+    internal class NonReentrantStressGrainWithoutState : Grain, INonReentrantStressGrainWithoutState
     {
         private const int Multiple = 100;
         private ILogger logger;
@@ -897,64 +897,113 @@ namespace UnitTests.Grains
             //if grain created outside a cluster
             if (loggerFactory == null)
                 loggerFactory = NullLoggerFactory.Instance;
-            logger = loggerFactory.CreateLogger($"NonReentrentStressGrainWithoutState-{_id}");
+            logger = loggerFactory.CreateLogger($"NonReentrantStressGrainWithoutState-{_id}");
 
             executing = false;
-            logger.LogInformation("--> OnActivateAsync");
-            logger.LogInformation("<-- OnActivateAsync");
+            logger.LogDebug("--> OnActivateAsync");
+            logger.LogDebug("<-- OnActivateAsync");
             return base.OnActivateAsync(cancellationToken);
         }
 
         private async Task SetOne(int iter, int level)
         {
-            logger.LogInformation("---> SetOne {Iteration}-{Level}_0", iter, level);
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug("---> SetOne {Iteration}-{Level}_0", iter, level);
+            }
+
             CheckRuntimeEnvironment("SetOne");
             if (level > 0)
             {
-                logger.LogInformation("SetOne {Iteration}-{Level}_1. Before await Task.Done.", iter, level);
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug("SetOne {Iteration}-{Level}_1. Before await Task.Done.", iter, level);
+                }
+
                 await Task.CompletedTask;
-                logger.LogInformation("SetOne {Iteration}-{Level}_2. After await Task.Done.", iter, level);
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug("SetOne {Iteration}-{Level}_2. After await Task.Done.", iter, level);
+                }
+
                 CheckRuntimeEnvironment($"SetOne {iter}-{level}_3");
-                logger.LogInformation("SetOne {Iteration}-{Level}_4. Before await Task.Delay.", iter, level);
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug("SetOne {Iteration}-{Level}_4. Before await Task.Delay.", iter, level);
+                }
+
                 await Task.Delay(TimeSpan.FromMilliseconds(10));
-                logger.LogInformation("SetOne {Iteration}-{Level}_5. After await Task.Delay.", iter, level);
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug("SetOne {Iteration}-{Level}_5. After await Task.Delay.", iter, level);
+                }
+
                 CheckRuntimeEnvironment($"SetOne {iter}-{level}_6");
                 var nextLevel = level - 1;
                 await SetOne(iter, nextLevel);
-                logger.LogInformation(
-                    "SetOne {Iteration}-{Level}_7 => {2}. After await SetOne call.",
-                    iter,
-                    level,
-                    nextLevel);
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug(
+                        "SetOne {Iteration}-{Level}_7 => {NextLevel}. After await SetOne call.",
+                        iter,
+                        level,
+                        nextLevel);
+                }
+
                 CheckRuntimeEnvironment($"SetOne {iter}-{level}_8");
-                logger.LogInformation("SetOne {Iteration}-{Level}_9. Finished SetOne.", iter, level);
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug("SetOne {Iteration}-{Level}_9. Finished SetOne.", iter, level);
+                }
             }
 
             CheckRuntimeEnvironment($"SetOne {iter}-{level}_10");
-            logger.LogInformation("<--- SetOne {Iteration}-{Level}_11", iter, level);
+            logger.LogDebug("<--- SetOne {Iteration}-{Level}_11", iter, level);
         }
 
         public async Task Test1()
         {
-            logger.LogInformation("Test1.Start");
-
             CheckRuntimeEnvironment("Test1.BeforeLoop");
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug("Test1.Start");
+            }
+
             var tasks = new List<Task>();
             for (var i = 0; i < Multiple; i++)
             {
-                logger.LogInformation("Test1_ ------> {CallNum}", i);
                 CheckRuntimeEnvironment($"Test1_{i}_0");
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug("Test1_ ------> {CallNum}", i);
+                }
+
                 var task = SetOne(i, LEVEL);
-                logger.LogInformation("After SetOne call {CallNum}", i);
                 CheckRuntimeEnvironment($"Test1_{i}_1");
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug("After SetOne call {CallNum}", i);
+                }
+
                 tasks.Add(task);
                 CheckRuntimeEnvironment($"Test1_{i}_2");
-                logger.LogInformation("Test1_ <------ {CallNum}", i);
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug("Test1_ <------ {CallNum}", i);
+                }
             }
             CheckRuntimeEnvironment("Test1.AfterLoop");
-            logger.LogInformation("Test1_About to WhenAll");
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug("Test1_About to WhenAll");
+            }
+
             await Task.WhenAll(tasks);
-            logger.LogInformation("Test1.Finish");
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug("Test1.Finish");
+            }
+
             CheckRuntimeEnvironment("Test1.Finish-CheckRuntimeEnvironment");
 //#if DEBUG
 //            // HACK for testing
@@ -966,11 +1015,11 @@ namespace UnitTests.Grains
         {
             var wrapper = new Task<Task>(async () =>
             {
-                logger.LogInformation("Before Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
+                logger.LogDebug("Before Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
                 await DoDelay(1);
-                logger.LogInformation("After Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
+                logger.LogDebug("After Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
                 await DoDelay(2);
-                logger.LogInformation("After Task.Delay #2 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
+                logger.LogDebug("After Task.Delay #2 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
             });
 
             if (doStart)
@@ -983,15 +1032,14 @@ namespace UnitTests.Grains
 
         private async Task DoDelay(int i)
         {
-            logger.LogInformation("Before Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
+            logger.LogDebug("Before Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
             await Task.Delay(1);
-            logger.LogInformation("After Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
+            logger.LogDebug("After Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
         }
 
         private void CheckRuntimeEnvironment(string str)
         {
             var callStack = new StackTrace();
-            //Log("CheckRuntimeEnvironment - {0} Executing={1}", str, executing);
             if (executing)
             {
                 var errorMsg = string.Format(
@@ -1002,15 +1050,12 @@ namespace UnitTests.Grains
                     TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment(),
                     callStack);
                 this.logger.LogError(1, "{Message}", "\n\n\n\n" + errorMsg + "\n\n\n\n");
-                //Environment.Exit(1);
-                throw new Exception(errorMsg);
+                throw new InvalidOperationException(errorMsg);
             }
-            //Assert.IsFalse(executing, "Found out that this grain is already in the middle of execution. Single threaded-ness violation!");
+
             executing = true;
-            //Log("CheckRuntimeEnvironment - Start sleep " + str);
             Thread.Sleep(10);
             executing = false;
-            //Log("CheckRuntimeEnvironment - End sleep " + str);
         }
     }
 

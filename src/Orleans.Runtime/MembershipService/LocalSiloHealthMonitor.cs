@@ -339,7 +339,7 @@ namespace Orleans.Runtime.MembershipService
 
             if (_runTask is Task task)
             {
-                await Task.WhenAny(task, ct.WhenCancelled()).ConfigureAwait(false);
+                await task.WaitAsync(ct).SuppressThrowing();
             }
         }
 

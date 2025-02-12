@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
@@ -6,156 +7,158 @@ using System.Threading;
 using System.Collections.Immutable;
 using Orleans.Internal;
 
-namespace Orleans.Runtime.MembershipService
+namespace Orleans.Runtime.MembershipService;
+
+/// <summary>
+/// Manages <see cref="ISiloStatusListener"/> instances.
+/// </summary>
+internal class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
 {
-    /// <summary>
-    /// Manages <see cref="ISiloStatusListener"/> instances.
-    /// </summary>
-    internal class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
+    private readonly object _listenersLock = new();
+    private readonly CancellationTokenSource _cancellation = new();
+    private readonly MembershipTableManager _membershipTableManager;
+    private readonly ILogger<SiloStatusListenerManager> _logger;
+    private readonly IFatalErrorHandler _fatalErrorHandler;
+    private ImmutableList<WeakReference<ISiloStatusListener>> _listeners = [];
+
+    public SiloStatusListenerManager(
+        MembershipTableManager membershipTableManager,
+        ILogger<SiloStatusListenerManager> log,
+        IFatalErrorHandler fatalErrorHandler)
     {
-        private readonly object listenersLock = new object();
-        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
-        private readonly MembershipTableManager membershipTableManager;
-        private readonly ILogger<SiloStatusListenerManager> log;
-        private readonly IFatalErrorHandler fatalErrorHandler;
-        private ImmutableList<WeakReference<ISiloStatusListener>> listeners = ImmutableList<WeakReference<ISiloStatusListener>>.Empty;
+        _membershipTableManager = membershipTableManager;
+        _logger = log;
+        _fatalErrorHandler = fatalErrorHandler;
+    }
 
-        public SiloStatusListenerManager(
-            MembershipTableManager membershipTableManager,
-            ILogger<SiloStatusListenerManager> log,
-            IFatalErrorHandler fatalErrorHandler)
+    public bool Subscribe(ISiloStatusListener listener)
+    {
+        lock (_listenersLock)
         {
-            this.membershipTableManager = membershipTableManager;
-            this.log = log;
-            this.fatalErrorHandler = fatalErrorHandler;
-        }
-
-        public bool Subscribe(ISiloStatusListener listener)
-        {
-            lock (this.listenersLock)
+            foreach (var reference in _listeners)
             {
-                foreach (var reference in this.listeners)
+                if (!reference.TryGetTarget(out var existing))
                 {
-                    if (!reference.TryGetTarget(out var existing))
-                    {
-                        continue;
-                    }
-
-                    if (ReferenceEquals(existing, listener)) return false;
+                    continue;
                 }
 
-                this.listeners = this.listeners.Add(new WeakReference<ISiloStatusListener>(listener));
-                return true;
+                if (ReferenceEquals(existing, listener)) return false;
             }
+
+            _listeners = _listeners.Add(new WeakReference<ISiloStatusListener>(listener));
+            return true;
         }
+    }
 
-        public bool Unsubscribe(ISiloStatusListener listener)
+    public bool Unsubscribe(ISiloStatusListener listener)
+    {
+        lock (_listenersLock)
         {
-            lock (this.listenersLock)
+            for (var i = 0; i < _listeners.Count; i++)
             {
-                for (var i = 0; i < this.listeners.Count; i++)
+                if (!_listeners[i].TryGetTarget(out var existing))
                 {
-                    if (!this.listeners[i].TryGetTarget(out var existing))
-                    {
-                        continue;
-                    }
-
-                    if (ReferenceEquals(existing, listener))
-                    {
-                        this.listeners = this.listeners.RemoveAt(i);
-                        return true;
-                    }
+                    continue;
                 }
 
-                return false;
-            }
-        }
-
-        private async Task ProcessMembershipUpdates()
-        {
-            ClusterMembershipSnapshot previous = default;
-            try
-            {
-                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting to process membership updates");
-                await foreach (var tableSnapshot in this.membershipTableManager.MembershipTableUpdates.WithCancellation(this.cancellation.Token))
+                if (ReferenceEquals(existing, listener))
                 {
-                    var snapshot = tableSnapshot.CreateClusterMembershipSnapshot();
-
-                    var update = (previous is null || snapshot.Version == MembershipVersion.MinValue) ? snapshot.AsUpdate() : snapshot.CreateUpdate(previous);
-                    this.NotifyObservers(update);
-                    previous = snapshot;
-                }
-            }
-            catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
-            {
-                this.log.LogError(exception, "Error processing membership updates");
-                this.fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
-            }
-            finally
-            {
-                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopping membership update processor");
-            }
-        }
-
-        private void NotifyObservers(ClusterMembershipUpdate update)
-        {
-            if (!update.HasChanges) return;
-
-            List<WeakReference<ISiloStatusListener>> toRemove = null;
-            var subscribers = this.listeners;
-            foreach (var change in update.Changes)
-            {
-                for (var i = 0; i < subscribers.Count; ++i)
-                {
-                    if (!subscribers[i].TryGetTarget(out var listener))
-                    {
-                        if (toRemove is null) toRemove = new List<WeakReference<ISiloStatusListener>>();
-                        toRemove.Add(subscribers[i]);
-                        continue;
-                    }
-
-                    try
-                    {
-                        listener.SiloStatusChangeNotification(change.SiloAddress, change.Status);
-                    }
-                    catch (Exception exception)
-                    {
-                        this.log.LogError(
-                            exception,
-                            "Exception while calling " + nameof(ISiloStatusListener.SiloStatusChangeNotification) + " on listener {Listener}",
-                            listener);
-                    }
+                    _listeners = _listeners.RemoveAt(i);
+                    return true;
                 }
             }
 
-            if (toRemove != null)
+            return false;
+        }
+    }
+
+    private async Task ProcessMembershipUpdates()
+    {
+        ClusterMembershipSnapshot? previous = default;
+        try
+        {
+            if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Starting to process membership updates.");
+            await foreach (var tableSnapshot in _membershipTableManager.MembershipTableUpdates.WithCancellation(_cancellation.Token))
             {
-                lock (this.listenersLock)
+                var snapshot = tableSnapshot.CreateClusterMembershipSnapshot();
+
+                var update = (previous is null || snapshot.Version == MembershipVersion.MinValue) ? snapshot.AsUpdate() : snapshot.CreateUpdate(previous);
+                NotifyObservers(update);
+                previous = snapshot;
+            }
+        }
+        catch (Exception exception) when (_fatalErrorHandler.IsUnexpected(exception))
+        {
+            _logger.LogError(exception, "Error processing membership updates.");
+            _fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
+        }
+        finally
+        {
+            if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Stopping membership update processor.");
+        }
+    }
+
+    private void NotifyObservers(ClusterMembershipUpdate update)
+    {
+        if (!update.HasChanges) return;
+
+        List<WeakReference<ISiloStatusListener>>? toRemove = null;
+        var subscribers = _listeners;
+        foreach (var change in update.Changes)
+        {
+            for (var i = 0; i < subscribers.Count; ++i)
+            {
+                if (!subscribers[i].TryGetTarget(out var listener))
                 {
-                    var builder = this.listeners.ToBuilder();
-                    foreach (var entry in toRemove) builder.Remove(entry);
-                    this.listeners = builder.ToImmutable();
+                    if (toRemove is null) toRemove = new List<WeakReference<ISiloStatusListener>>();
+                    toRemove.Add(subscribers[i]);
+                    continue;
+                }
+
+                try
+                {
+                    listener.SiloStatusChangeNotification(change.SiloAddress, change.Status);
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(
+                        exception,
+                        "Exception while calling " + nameof(ISiloStatusListener.SiloStatusChangeNotification) + " on listener '{Listener}'.",
+                        listener);
                 }
             }
         }
 
-        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+        if (toRemove != null)
         {
-            var tasks = new List<Task>();
-
-            lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.AfterRuntimeGrainServices, OnStart, _ => Task.CompletedTask);
-            lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.RuntimeInitialize, _ => Task.CompletedTask, OnStop);
-
-            Task OnStart(CancellationToken ct)
+            lock (_listenersLock)
             {
-                tasks.Add(Task.Run(() => this.ProcessMembershipUpdates()));
-                return Task.CompletedTask;
+                var builder = _listeners.ToBuilder();
+                foreach (var entry in toRemove) builder.Remove(entry);
+                _listeners = builder.ToImmutable();
             }
+        }
+    }
 
-            Task OnStop(CancellationToken ct)
+    void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+    {
+        Task? task = null;
+
+        lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.AfterRuntimeGrainServices, OnStart, _ => Task.CompletedTask);
+        lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.RuntimeInitialize, _ => Task.CompletedTask, OnStop);
+
+        Task OnStart(CancellationToken ct)
+        {
+            task = Task.Run(ProcessMembershipUpdates);
+            return Task.CompletedTask;
+        }
+
+        async Task OnStop(CancellationToken ct)
+        {
+            _cancellation.Cancel(throwOnFirstException: false);
+            if (task is not null)
             {
-                this.cancellation.Cancel(throwOnFirstException: false);
-                return Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
+                await task.WaitAsync(ct).SuppressThrowing();
             }
         }
     }

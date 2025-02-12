@@ -114,6 +114,7 @@
     <PackageVersion Include="Hyperion" Version="0.12.2" />
     <PackageVersion Include="Grpc.Tools" Version="2.67.0" />
     <PackageVersion Include="Testcontainers" Version="3.8.0" />
+    <PackageVersion Include="GitHubActionsTestLogger" Version="2.4.1" />
     <!-- Tooling related packages -->
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="8.0.0" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />

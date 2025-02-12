@@ -168,7 +168,7 @@ namespace Orleans.Runtime
                     _scanPeriodTimer.Dispose();
                     if (_runTask is Task task)
                     {
-                        await Task.WhenAny(task, ct.WhenCancelled());
+                        await task.WaitAsync(ct).SuppressThrowing();
                     }
                 });
         }

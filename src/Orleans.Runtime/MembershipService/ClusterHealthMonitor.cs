@@ -323,12 +323,12 @@ namespace Orleans.Runtime.MembershipService
             {
                 if (probeResult.Status == ProbeResultStatus.Failed && probeResult.FailedProbeCount >= this.clusterMembershipOptions.CurrentValue.NumMissedProbesLimit)
                 {
-                    await this.membershipService.TryToSuspectOrKill(monitor.SiloAddress).ConfigureAwait(false);
+                    await this.membershipService.TryToSuspectOrKill(monitor.TargetSiloAddress).ConfigureAwait(false);
                 }
             }
             else if (probeResult.Status == ProbeResultStatus.Failed)
             {
-                await this.membershipService.TryToSuspectOrKill(monitor.SiloAddress, probeResult.Intermediary).ConfigureAwait(false);
+                await this.membershipService.TryToSuspectOrKill(monitor.TargetSiloAddress, probeResult.Intermediary).ConfigureAwait(false);
             }
         }
 
@@ -341,7 +341,7 @@ namespace Orleans.Runtime.MembershipService
                 ok &= monitor.CheckHealth(lastCheckTime, out var monitorReason);
                 if (!string.IsNullOrWhiteSpace(monitorReason))
                 {
-                    var siloReason = $"Monitor for {monitor.SiloAddress} is degraded with: {monitorReason}.";
+                    var siloReason = $"Monitor for {monitor.TargetSiloAddress} is degraded with: {monitorReason}.";
                     if (string.IsNullOrWhiteSpace(reason))
                     {
                         reason = siloReason;
@@ -375,7 +375,7 @@ namespace Orleans.Runtime.MembershipService
                 }
                 catch (Exception exception)
                 {
-                    log.LogError(exception, "Error disposing monitor for {SiloAddress}.", monitor.SiloAddress);
+                    log.LogError(exception, "Error disposing monitor for {SiloAddress}.", monitor.TargetSiloAddress);
                 }
             }
         }
@@ -400,7 +400,7 @@ namespace Orleans.Runtime.MembershipService
                 }
                 catch (Exception exception)
                 {
-                    log.LogError(exception, "Error disposing monitor for {SiloAddress}.", monitor.SiloAddress);
+                    log.LogError(exception, "Error disposing monitor for {SiloAddress}.", monitor.TargetSiloAddress);
                 }
             }
 

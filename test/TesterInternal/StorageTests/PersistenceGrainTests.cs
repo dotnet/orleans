@@ -1130,7 +1130,7 @@ namespace UnitTests.StorageTests
         public async Task NonReentrentStressGrainWithoutState()
         {
             Guid id1 = Guid.NewGuid();
-            INonReentrentStressGrainWithoutState grain1 = this.HostedCluster.GrainFactory.GetGrain<INonReentrentStressGrainWithoutState>(id1);
+            INonReentrantStressGrainWithoutState grain1 = this.HostedCluster.GrainFactory.GetGrain<INonReentrantStressGrainWithoutState>(id1);
             await grain1.Test1();
         }
 
@@ -1149,7 +1149,7 @@ namespace UnitTests.StorageTests
         public async Task NonReentrentGrain_Task_Delay()
         {
             Guid id1 = Guid.NewGuid();
-            INonReentrentStressGrainWithoutState grain1 = this.HostedCluster.GrainFactory.GetGrain<INonReentrentStressGrainWithoutState>(id1);
+            INonReentrantStressGrainWithoutState grain1 = this.HostedCluster.GrainFactory.GetGrain<INonReentrantStressGrainWithoutState>(id1);
 
             await grain1.Task_Delay(DoStart);
         }

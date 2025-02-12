@@ -35,7 +35,6 @@ namespace NonSilo.Tests.Membership
         private readonly MembershipAgent agent;
         private readonly ILocalSiloHealthMonitor localSiloHealthMonitor;
         private readonly IOptionsMonitor<ClusterMembershipOptions> optionsMonitor;
-        private readonly IClusterMembershipService membershipService;
 
         public MembershipAgentTests(ITestOutputHelper output)
         {
@@ -110,9 +109,6 @@ namespace NonSilo.Tests.Membership
                 this.timerFactory,
                 this.remoteSiloProber);
             ((ILifecycleParticipant<ISiloLifecycle>)this.agent).Participate(this.lifecycle);
-
-            this.membershipService = Substitute.For<IClusterMembershipService>();
-            this.membershipService.CurrentSnapshot.ReturnsForAnyArgs(info => this.manager.MembershipTableSnapshot.CreateClusterMembershipSnapshot());
         }
 
         [Fact]
@@ -277,7 +273,7 @@ namespace NonSilo.Tests.Membership
                 remoteSiloProber,
                 this.timerFactory,
                 this.localSiloHealthMonitor,
-                this.membershipService,
+                manager,
                 this.localSiloDetails);
             var started = this.lifecycle.OnStart();
 
@@ -330,7 +326,7 @@ namespace NonSilo.Tests.Membership
                 this.remoteSiloProber,
                 this.timerFactory,
                 this.localSiloHealthMonitor,
-                this.membershipService,
+                manager,
                 this.localSiloDetails);
             var started = this.lifecycle.OnStart();
 

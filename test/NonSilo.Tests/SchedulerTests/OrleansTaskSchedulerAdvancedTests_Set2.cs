@@ -635,7 +635,7 @@ namespace UnitTests.SchedulerTests
             {
                 SiloAddress = SiloAddressUtils.NewLocalSiloAddress(23)
             };
-            var grain = new NonReentrentStressGrainWithoutState();
+            var grain = new NonReentrantStressGrainWithoutState();
 
             await Task.Factory.StartNew(() => grain.OnActivateAsync(CancellationToken.None), CancellationToken.None, TaskCreationOptions.None, scheduler).Unwrap();
 
