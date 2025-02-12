@@ -109,7 +109,7 @@ public static class RuntimeTypeNameParser
                 }
             }
 
-            coreType = new TupleTypeSpec(elements.ToArray(), input.TotalGenericArity);
+            coreType = new TupleTypeSpec([.. elements], input.TotalGenericArity);
         }
         else
         {
@@ -378,7 +378,7 @@ public static class RuntimeTypeNameParser
                 var c = Input[Index];
                 if (assertChar != c)
                 {
-                    ThrowUnexpectedCharacter(assertChar, c);
+                    ThrowUnexpectedCharacter(Input, Index, assertChar, c);
                 }
 
                 ++Index;
@@ -396,7 +396,13 @@ public static class RuntimeTypeNameParser
             }
         }
 
-        private static void ThrowUnexpectedCharacter(char expected, char actual) => throw new InvalidOperationException($"Encountered unexpected character. Expected '{expected}', actual '{actual}'.");
+        private static void ThrowUnexpectedCharacter(ReadOnlySpan<char> value, int position, char expected, char actual)
+        {
+            var valueString = new string(value);
+            var posString = position > 0 ? new string(' ', position) : "";
+            var message = $"Encountered unexpected character. Expected '{expected}', actual '{actual}' in string:\n> {valueString}\n> {posString}^";
+            throw new InvalidOperationException(message);
+        }
 
         private static void ThrowEndOfInput() => throw new InvalidOperationException("Tried to read past the end of the input");
 
