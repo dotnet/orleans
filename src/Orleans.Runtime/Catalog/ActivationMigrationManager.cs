@@ -172,7 +172,7 @@ internal partial class ActivationMigrationManager : SystemTarget, IActivationMig
                 }
                 catch (Exception exception)
                 {
-                    _logger.LogError(exception, "Error processing cluster membership updates");
+                    LogErrorProcessingMembershipUpdates(exception);
                 }
             }
         }
@@ -282,7 +282,7 @@ internal partial class ActivationMigrationManager : SystemTarget, IActivationMig
         {
             if (_logger.IsEnabled(LogLevel.Debug))
             {
-                _logger.LogDebug("Target silo {SiloAddress} is no longer active, so this migration activation worker is terminating", targetSilo);
+                LogDebugTargetSilo(targetSilo);
             }
 
             entry.WorkItemChannel.Writer.TryComplete();
@@ -311,7 +311,7 @@ internal partial class ActivationMigrationManager : SystemTarget, IActivationMig
         }
         catch (Exception exception)
         {
-            _logger.LogWarning(exception, "Error signaling shutdown.");
+            LogWarningSignalShutdownError(exception);
         }
 
         await Task.WhenAll(workerTasks).WaitAsync(cancellationToken).SuppressThrowing();
@@ -381,6 +381,12 @@ internal partial class ActivationMigrationManager : SystemTarget, IActivationMig
     private partial void LogDebugMonitoringUpdates();
 
     [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error processing cluster membership updates"
+    )]
+    private partial void LogErrorProcessingMembershipUpdates(Exception exception);
+
+    [LoggerMessage(
         Level = LogLevel.Debug,
         Message = "No longer monitoring cluster membership updates")]
     private partial void LogDebugNoLongerMonitoring();
@@ -404,4 +410,16 @@ internal partial class ActivationMigrationManager : SystemTarget, IActivationMig
         Level = LogLevel.Debug,
         Message = "Exiting migration worker for target silo {SiloAddress}")]
     private partial void LogDebugExitingWorker(SiloAddress siloAddress);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Target silo {SiloAddress} is no longer active, so this migration activation worker is terminating"
+    )]
+    private partial void LogDebugTargetSilo(SiloAddress siloAddress);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Error signaling shutdown"
+    )]
+    private partial void LogWarningSignalShutdownError(Exception exception);
 }
