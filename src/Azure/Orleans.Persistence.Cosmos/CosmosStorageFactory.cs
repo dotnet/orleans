@@ -32,7 +32,10 @@ public static class CosmosStorageFactory
     /// <param name="name">The name.</param>
     /// <param name="grainStateTypeInfoProvider">provider for grainStateTypeInfo (probably based on activation context)</param>
     /// <returns>A new <see cref="CosmosGrainStorage"/> instance.</returns>
-    internal static IGrainStorage Create(IServiceProvider services, string name, IGrainStateTypeInfoProvider grainStateTypeInfoProvider)
+    internal static IGrainStorage Create(
+        IServiceProvider services,
+        string name,
+        IGrainStateTypeInfoProvider grainStateTypeInfoProvider)
     {
         var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>();
         var idProvider = services.GetServiceByName<IDocumentIdProvider>(name) ?? services.GetRequiredService<IDocumentIdProvider>();

@@ -11,10 +11,14 @@ namespace Orleans.Persistence.Cosmos.Migration
     internal class ReferenceExtractorGrainStateTypeInfoProvider : IGrainStateTypeInfoProvider
     {
         private readonly IGrainReferenceExtractor grainReferenceExtractor;
+        private readonly CosmosGrainStorageOptions options;
 
-        public ReferenceExtractorGrainStateTypeInfoProvider(IGrainReferenceExtractor grainReferenceExtractor)
+        public ReferenceExtractorGrainStateTypeInfoProvider(
+            IGrainReferenceExtractor grainReferenceExtractor,
+            CosmosGrainStorageOptions options)
         {
             this.grainReferenceExtractor = grainReferenceExtractor;
+            this.options = options;
         }
 
         private readonly ConcurrentDictionary<(ulong grainTypeCode, Type stateType), GrainStateTypeInfo> grainStateTypeInfo = new();
@@ -63,8 +67,14 @@ namespace Orleans.Persistence.Cosmos.Migration
         /// See Grain`T: https://github.com/dotnet/orleans/blob/116da427e1a1e56477ef94f6058f1f5d1aec2f11/src/Orleans.Runtime/Core/GrainRuntime.cs#L86C9-L86C88 <br/>
         /// and PersistentState`T: https://github.com/dotnet/orleans/blob/116da427e1a1e56477ef94f6058f1f5d1aec2f11/src/Orleans.Runtime/Facet/Persistent/PersistentStateStorageFactory.cs#L31
         /// </notes>
-        private static string? DetermineOverrideStateName(Type grainClass)
+        private string? DetermineOverrideStateName(Type grainClass)
         {
+            if (options.UseLegacySerialization)
+            {
+                // override of stateName is only applicable for orleans7+ serialization
+                return null;
+            }
+
             var baseType = grainClass.BaseType;
             if (baseType is null)
             {

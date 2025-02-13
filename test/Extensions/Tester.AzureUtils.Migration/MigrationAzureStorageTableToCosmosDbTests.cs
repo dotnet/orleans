@@ -26,8 +26,8 @@ namespace Tester.AzureUtils.Migration
     [TestCategory("Functionals"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureTableStorage")]
     public class MigrationAzureStorageTableToCosmosDbTests : MigrationTableStorageToCosmosTests, IClassFixture<MigrationAzureStorageTableToCosmosDbTests.Fixture>
     {
-        public const string OrleansDatabase = "Orleans";
-        public const string OrleansContainer = "destinationtest";
+        public static string OrleansDatabase = Resources.MigrationDatabase;
+        public static string OrleansContainer = Resources.MigrationLatestContainer;
 
         public static string RandomIdentifier = Guid.NewGuid().ToString().Replace("-", "");
 
@@ -67,8 +67,8 @@ namespace Tester.AzureUtils.Migration
                         options.ConfigureCosmosStorageOptions();
 
                         // options.ContainerName = $"destination{RandomIdentifier}";
-                        options.ContainerName = $"destinationtest";
-                        options.DatabaseName = "Orleans";
+                        options.ContainerName = OrleansContainer;
+                        options.DatabaseName = OrleansDatabase;
                     })
                     .AddDataMigrator(SourceStorageName, DestinationStorageName);
             }

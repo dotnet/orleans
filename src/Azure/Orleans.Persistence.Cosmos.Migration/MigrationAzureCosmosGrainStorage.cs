@@ -59,8 +59,12 @@ namespace Orleans.Persistence.Cosmos.Migration
     {
         public static IMigrationGrainStorage Create(IServiceProvider services, string name)
         {
+            var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>();
+            var cosmosGrainStorageOptions = optionsMonitor.Get(name);
+
             var referenceExtractorGrainStateTypeInfoProvider = new ReferenceExtractorGrainStateTypeInfoProvider(
-                services.GetRequiredService<IGrainReferenceExtractor>());
+                services.GetRequiredService<IGrainReferenceExtractor>(),
+                cosmosGrainStorageOptions);
 
             // pass in custom grain state type info provider, which will do the reference extraction for grain-reference type
             var cosmosGrainStorage = (CosmosGrainStorage)CosmosStorageFactory.Create(services, name, referenceExtractorGrainStateTypeInfoProvider);

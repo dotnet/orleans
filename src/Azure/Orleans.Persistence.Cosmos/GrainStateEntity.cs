@@ -10,7 +10,7 @@ namespace Orleans.Persistence.Cosmos;
 /// <typeparam name="TState">
 /// The underlying state type.
 /// </typeparam>
-internal sealed class GrainStateEntity<TState>
+internal sealed class LegacyGrainStateEntity<TState>
 {
     /// <summary>
     /// Gets or sets the entity ID.
@@ -52,6 +52,32 @@ internal sealed class GrainStateEntity<TState>
     /// Gets or sets the ETag.
     /// </summary>
     [Newtonsoft.Json.JsonProperty("_etag")]
-    [System.Text.Json.Serialization.JsonPropertyName("_etag")]
+    [JsonPropertyName("_etag")]
+    public string ETag { get; set; } = default!;
+}
+
+internal sealed class GrainStateEntity<TState>
+{
+    internal const string ID_FIELD = "id";
+    internal const string ETAG_FIELD = "_etag";
+
+    [Newtonsoft.Json.JsonProperty(nameof(GrainType))]
+    [System.Text.Json.Serialization.JsonPropertyName(nameof(GrainType))]
+    public string GrainType { get; set; } = default!;
+
+    [Newtonsoft.Json.JsonProperty(nameof(State))]
+    [System.Text.Json.Serialization.JsonPropertyName(nameof(State))]
+    public TState State { get; set; } = default!;
+
+    [Newtonsoft.Json.JsonProperty(nameof(PartitionKey))]
+    [System.Text.Json.Serialization.JsonPropertyName(nameof(PartitionKey))]
+    public string PartitionKey { get; set; } = default!;
+
+    [Newtonsoft.Json.JsonProperty(ID_FIELD)]
+    [System.Text.Json.Serialization.JsonPropertyName(ID_FIELD)]
+    public string Id { get; set; } = default!;
+
+    [Newtonsoft.Json.JsonProperty(ETAG_FIELD)]
+    [System.Text.Json.Serialization.JsonPropertyName(ETAG_FIELD)]
     public string ETag { get; set; } = default!;
 }

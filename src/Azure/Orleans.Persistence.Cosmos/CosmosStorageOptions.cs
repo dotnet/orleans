@@ -29,4 +29,13 @@ public class CosmosGrainStorageOptions : CosmosOptions
     /// The default is <c>true</c>.
     /// </summary>
     public bool DeleteStateOnClear { get; set; } = true;
+
+
+    /// <summary>
+    /// If true, will use a <see cref="LegacyGrainStateEntity{TState}"/> for serialization of grain data in CosmosDb storage.
+    /// </summary>
+    /// <notes>
+    /// Is not recommended to be enabled. It is not compatible with latest Orleans format
+    /// </notes>
+    public bool UseLegacySerialization { get; set; } = false;
 }

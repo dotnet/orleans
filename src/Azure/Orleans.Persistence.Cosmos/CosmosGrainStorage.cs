@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
@@ -170,15 +171,26 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
         {
             var (documentId, partitionKey) = this.idProvider.GetDocumentIdentifiers(stateName, grainId.Type, grainId.Key);
 
-            var response = await this.container.ReadItemAsync<GrainStateEntity<T>>(documentId, new PartitionKey(partitionKey)).ConfigureAwait(false);
-
-            grainState.State = response.Resource.State;
-            grainState.ETag = response.ETag;
-            grainState.RecordExists = true;
-
-            if (grainState.State is ITimeToLiveAware grainStateTtlAware)
+            if (options.UseLegacySerialization)
             {
-                grainStateTtlAware.SetTimeToLive(response.Resource.Ttl);
+                var response = await this.container.ReadItemAsync<LegacyGrainStateEntity<T>>(documentId, new PartitionKey(partitionKey)).ConfigureAwait(false);
+
+                grainState.State = response.Resource.State;
+                grainState.ETag = response.ETag;
+                grainState.RecordExists = true;
+
+                if (grainState.State is ITimeToLiveAware grainStateTtlAware)
+                {
+                    grainStateTtlAware.SetTimeToLive(response.Resource.Ttl);
+                }
+            }
+            else
+            {
+                var response = await this.container.ReadItemAsync<GrainStateEntity<T>>(documentId, new PartitionKey(partitionKey)).ConfigureAwait(false);
+
+                grainState.State = response.Resource.State;
+                grainState.ETag = response.ETag;
+                grainState.RecordExists = true;
             }
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
@@ -201,37 +213,73 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
         {
             var (documentId, partitionKey) = this.idProvider.GetDocumentIdentifiers(stateName, grainId.Type, grainId.Key);
 
-            var entity = new GrainStateEntity<T>
+            if (options.UseLegacySerialization)
             {
-                ETag = grainState.ETag,
-                Id = documentId,
-                Type = grainId.Type,
-                State = (T)grainState.State,
-                PartitionKey = partitionKey,
-                Ttl = GetTimeToLive(grainState),
-            };
+                var entity = new LegacyGrainStateEntity<T>
+                {
+                    ETag = grainState.ETag,
+                    Id = documentId,
+                    Type = grainId.Type,
+                    State = (T)grainState.State,
+                    PartitionKey = partitionKey,
+                    Ttl = GetTimeToLive(grainState),
+                };
 
-            var pk = new PartitionKey(partitionKey);
+                var pk = new PartitionKey(partitionKey);
 
-            Task<ItemResponse<GrainStateEntity<T>>> responseTask;
+                Task<ItemResponse<LegacyGrainStateEntity<T>>> responseTask;
 
-            if (string.IsNullOrEmpty(grainState.ETag))
-            {
-                responseTask = this.container.CreateItemAsync(entity, pk);
-            }
-            else if (grainState.ETag == "*") // AnyETag
-            {
-                responseTask = this.container.UpsertItemAsync(entity, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag });
+                if (string.IsNullOrEmpty(grainState.ETag))
+                {
+                    responseTask = this.container.CreateItemAsync(entity, pk);
+                }
+                else if (grainState.ETag == "*") // AnyETag
+                {
+                    responseTask = this.container.UpsertItemAsync(entity, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag });
+                }
+                else
+                {
+                    responseTask = this.container.ReplaceItemAsync(entity, entity.Id, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag });
+                }
+
+                var response = await responseTask.ConfigureAwait(false);
+
+                grainState.ETag = response.ETag;
+                grainState.RecordExists = true;
             }
             else
             {
-                responseTask = this.container.ReplaceItemAsync(entity, entity.Id, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag });
+                var entity = new GrainStateEntity<T>
+                {
+                    ETag = grainState.ETag,
+                    Id = documentId,
+                    GrainType = stateName,
+                    State = (T)grainState.State,
+                    PartitionKey = partitionKey,
+                };
+
+                var pk = new PartitionKey(partitionKey);
+
+                Task<ItemResponse<GrainStateEntity<T>>> responseTask;
+
+                if (string.IsNullOrEmpty(grainState.ETag))
+                {
+                    responseTask = this.container.CreateItemAsync(entity, pk);
+                }
+                else if (grainState.ETag == "*") // AnyETag
+                {
+                    responseTask = this.container.UpsertItemAsync(entity, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag });
+                }
+                else
+                {
+                    responseTask = this.container.ReplaceItemAsync(entity, entity.Id, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag });
+                }
+
+                var response = await responseTask.ConfigureAwait(false);
+
+                grainState.ETag = response.ETag;
+                grainState.RecordExists = true;
             }
-
-            var response = await responseTask.ConfigureAwait(false);
-
-            grainState.ETag = response.ETag;
-            grainState.RecordExists = true;
         }
         catch (CosmosException ex) when (
             ex.StatusCode == HttpStatusCode.PreconditionFailed ||
@@ -260,7 +308,14 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
             {
                 if (!string.IsNullOrEmpty(grainState.ETag))
                 {
-                    await this.container.DeleteItemAsync<GrainStateEntity<T>>(documentId, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag }).ConfigureAwait(false);
+                    if (options.UseLegacySerialization)
+                    {
+                        await this.container.DeleteItemAsync<LegacyGrainStateEntity<T>>(documentId, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag }).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await this.container.DeleteItemAsync<GrainStateEntity<T>>(documentId, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag }).ConfigureAwait(false);
+                    }
                 }
 
                 grainState.ETag = null;
@@ -268,24 +323,47 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
             }
             else
             {
-                var entity = new GrainStateEntity<T>
+                if (options.UseLegacySerialization)
                 {
-                    ETag = grainState.ETag,
-                    Id = documentId,
-                    Type = grainId.Type,
-                    State = (T)defaultState,
-                    PartitionKey = partitionKey,
-                    Ttl = GetTimeToLive(grainState),
-                };
+                    var entity = new LegacyGrainStateEntity<T>
+                    {
+                        ETag = grainState.ETag,
+                        Id = documentId,
+                        Type = grainId.Type,
+                        State = (T)defaultState,
+                        PartitionKey = partitionKey,
+                        Ttl = GetTimeToLive(grainState),
+                    };
 
-                var responseTask = string.IsNullOrEmpty(grainState.ETag) ?
-                    this.container.CreateItemAsync(entity, pk) :
-                    this.container.ReplaceItemAsync(entity, entity.Id, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag }); // AnyETag or item etag
+                    var responseTask = string.IsNullOrEmpty(grainState.ETag) ?
+                        this.container.CreateItemAsync(entity, pk) :
+                        this.container.ReplaceItemAsync(entity, entity.Id, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag }); // AnyETag or item etag
 
-                var response = await responseTask.ConfigureAwait(false);
+                    var response = await responseTask.ConfigureAwait(false);
 
-                grainState.ETag = response.ETag;
-                grainState.RecordExists = true;
+                    grainState.ETag = response.ETag;
+                    grainState.RecordExists = true;
+                }
+                else
+                {
+                    var entity = new GrainStateEntity<T>
+                    {
+                        ETag = grainState.ETag,
+                        Id = documentId,
+                        GrainType = stateName,
+                        State = (T)defaultState,
+                        PartitionKey = partitionKey,
+                    };
+
+                    var responseTask = string.IsNullOrEmpty(grainState.ETag) ?
+                        this.container.CreateItemAsync(entity, pk) :
+                        this.container.ReplaceItemAsync(entity, entity.Id, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag }); // AnyETag or item etag
+
+                    var response = await responseTask.ConfigureAwait(false);
+
+                    grainState.ETag = response.ETag;
+                    grainState.RecordExists = true;
+                }
             }
 
             // Set the state to default only on successful storage write operation.

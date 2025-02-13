@@ -61,23 +61,35 @@ namespace Tester.AzureUtils.Migration.Helpers
         /// </remarks>
         public static async Task<MigrationTestGrain_State> GetGrainStateFromCosmosAsync(
             this CosmosClient cosmosClient,
+            string databaseName,
+            string containerName,
             IDocumentIdProvider documentIdProvider,
             GrainReference grain,
-            string stateName = "state" // when cosmos is a target storage for migration, state is the default name of how Orleans writes a partitionKey
+            string? stateName = "state", // when cosmos is a target storage for migration, state is the default name of how Orleans writes a partitionKey
+            bool latestOrleansSerializationFormat = true
         )
         {
-            var database = cosmosClient.GetDatabase(MigrationAzureStorageTableToCosmosDbTests.OrleansDatabase);
-            var container = database.Client.GetContainer(database.Id, MigrationAzureStorageTableToCosmosDbTests.OrleansContainer);
+            var database = cosmosClient.GetDatabase(databaseName);
+            var container = database.Client.GetContainer(database.Id, containerName);
 
             var grainId = grain.GetPrimaryKeyLong();
             var grainIdRepresentation = grainId.ToString("X", CultureInfo.InvariantCulture); // document number is represented in Cosmos in such a way
             var (documentId, partitionKey) = documentIdProvider.GetDocumentIdentifiers(
-                stateName,
+                stateName!,
                 "migrationtestgrain", // GrainTypeAttribute's value for MigrationTestGrain
                 grainIdRepresentation);
+
             var response = await container.ReadItemAsync<dynamic>(documentId, new PartitionKey(partitionKey));
             JObject data = response.Resource;
-            var dataState = data["state"]!;
+
+            var dataState = latestOrleansSerializationFormat
+                ? data["State"]!
+                : data["state"]!;
+
+            if (dataState is null)
+            {
+                throw new InvalidDataException("Grain state is null");
+            }
 
             return new MigrationTestGrain_State
             {

@@ -1,26 +1,28 @@
 #if NET8_0_OR_GREATER
+using System.Globalization;
+using Microsoft.Azure.Cosmos;
+using Newtonsoft.Json.Linq;
 using Orleans;
 using Orleans.Runtime;
-using Xunit;
 using Tester.AzureUtils.Migration.Grains;
-using Microsoft.Azure.Cosmos;
-using TestExtensions;
 using Tester.AzureUtils.Migration.Helpers;
+using TestExtensions;
+using Xunit;
 
 namespace Tester.AzureUtils.Migration.Abstractions
 {
-    public abstract class MigrationGrainsWithoutSaveMetadataTests : MigrationBaseTests
+    public abstract class MigrationTableStorageToCosmosLegacySerializationTests : MigrationBaseTests
     {
         readonly string _databaseName;
         readonly string _containerName;
 
         readonly CosmosClient _cosmosClient;
 
-        protected MigrationGrainsWithoutSaveMetadataTests(BaseAzureTestClusterFixture fixture)
+        protected MigrationTableStorageToCosmosLegacySerializationTests(BaseAzureTestClusterFixture fixture)
             : base(fixture)
         {
-            _databaseName = MigrationAzureStorageTableToCosmosDbWithDisabledMetadataSaveTests.OrleansDatabase;
-            _containerName = MigrationAzureStorageTableToCosmosDbWithDisabledMetadataSaveTests.OrleansContainer;
+            _databaseName = MigrationAzureStorageTableToCosmosDbLegacySerializationTests.OrleansDatabase;
+            _containerName = MigrationAzureStorageTableToCosmosDbLegacySerializationTests.OrleansContainer;
 
             _cosmosClient = CosmosClientHelpers.BuildClient();
         }
@@ -28,7 +30,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task ReadFromSourceTest()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(1000);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(100000);
             var grainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
             var stateName = typeof(MigrationTestGrain).FullName;
 
@@ -40,9 +42,9 @@ namespace Tester.AzureUtils.Migration.Abstractions
         }
 
         [Fact]
-        public async Task UpdatesBothTables_WithoutMetadataSave()
+        public async Task UpdatesStatesInBothStorages()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(1001);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(100001);
             var oldGrainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
             var newState = new MigrationTestGrain_State { A = 20, B = 30 };
             var stateName = typeof(MigrationTestGrain).FullName;
@@ -56,7 +58,9 @@ namespace Tester.AzureUtils.Migration.Abstractions
                 databaseName: _databaseName,
                 containerName: _containerName,
                 DocumentIdProvider,
-                (GrainReference)grain);
+                (GrainReference)grain,
+                stateName!,
+                latestOrleansSerializationFormat: false);
 
             Assert.Equal(33, cosmosGrainState.A);
             Assert.Equal(806, cosmosGrainState.B);
@@ -70,18 +74,20 @@ namespace Tester.AzureUtils.Migration.Abstractions
             await grain.SetA(newState.A);
             await grain.SetB(newState.B);
 
-            // since saveMigrationMetadata is DISABLED, we should be able to check that metadata is not saved
+            // since saveMigrationMetadata is enabled, we should be able to check that metadata is already there
             Assert.NotNull(SourceExtendedStorage);
             var storageEntry = await SourceExtendedStorage!.GetStorageEntryAsync(stateName, (GrainReference)grain, oldGrainState);
             var migrationTime = await storageEntry.MigrationEntryClient.GetEntryMigrationTimeAsync();
-            Assert.Null(migrationTime);
+            Assert.NotNull(migrationTime);
 
             // verify updated state in both storages
             cosmosGrainState = await _cosmosClient.GetGrainStateFromCosmosAsync(
                 databaseName: _databaseName,
                 containerName: _containerName,
                 DocumentIdProvider,
-                (GrainReference)grain);
+                (GrainReference)grain,
+                stateName!,
+                latestOrleansSerializationFormat: false);
 
             Assert.Equal(20, cosmosGrainState.A);
             Assert.Equal(30, cosmosGrainState.B);
@@ -98,20 +104,20 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task DataMigrator_MovesDataToDestinationStorage()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(1002);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(100002);
             var oldGrainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
             var stateName = typeof(MigrationTestGrain).FullName;
 
             await SourceStorage.WriteStateAsync(stateName, (GrainReference)grain, oldGrainState);
-
             await DataMigrator.MigrateGrainsAsync(CancellationToken.None);
 
-            // ensure cosmos db state is updated
             var cosmosGrainState = await _cosmosClient.GetGrainStateFromCosmosAsync(
                 databaseName: _databaseName,
                 containerName: _containerName,
                 DocumentIdProvider,
-                (GrainReference)grain);
+                (GrainReference)grain,
+                stateName!,
+                latestOrleansSerializationFormat: false);
 
             Assert.Equal(oldGrainState.State.A, cosmosGrainState.A);
             Assert.Equal(oldGrainState.State.B, cosmosGrainState.B);
@@ -125,7 +131,9 @@ namespace Tester.AzureUtils.Migration.Abstractions
                 databaseName: _databaseName,
                 containerName: _containerName,
                 DocumentIdProvider,
-                (GrainReference)grain);
+                (GrainReference)grain,
+                stateName!,
+                latestOrleansSerializationFormat: false);
 
             Assert.Equal(oldGrainState.State.A, cosmosGrainState2.A);
             Assert.Equal(oldGrainState.State.B, cosmosGrainState2.B);

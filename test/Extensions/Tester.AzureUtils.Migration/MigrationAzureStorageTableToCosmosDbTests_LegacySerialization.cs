@@ -24,14 +24,14 @@ using Tester.AzureUtils.Migration.Helpers;
 namespace Tester.AzureUtils.Migration
 {
     [TestCategory("Functionals"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureTableStorage")]
-    public class MigrationAzureStorageTableToCosmosDbWithDisabledMetadataSaveTests : MigrationGrainsWithoutSaveMetadataTests, IClassFixture<MigrationAzureStorageTableToCosmosDbWithDisabledMetadataSaveTests.Fixture>
+    public class MigrationAzureStorageTableToCosmosDbLegacySerializationTests : MigrationTableStorageToCosmosLegacySerializationTests, IClassFixture<MigrationAzureStorageTableToCosmosDbLegacySerializationTests.Fixture>
     {
         public static string OrleansDatabase = Resources.MigrationDatabase;
-        public static string OrleansContainer = Resources.MigrationLatestContainer;
+        public static string OrleansContainer = Resources.MigrationLegacyContainer; // container has different partition key '/pk'
 
         public static string RandomIdentifier = Guid.NewGuid().ToString().Replace("-", "");
 
-        public MigrationAzureStorageTableToCosmosDbWithDisabledMetadataSaveTests(Fixture fixture) : base(fixture)
+        public MigrationAzureStorageTableToCosmosDbLegacySerializationTests(Fixture fixture) : base(fixture)
         {
         }
 
@@ -55,7 +55,7 @@ namespace Tester.AzureUtils.Migration
                         options.DestinationStorageName = DestinationStorageName;
 
                         options.WriteToDestinationOnly = false; // original storage will get the updated states as well
-                        options.SaveMigrationMetadata = false; // DON'T save migration metadata
+                        options.SaveMigrationMetadata = true; // save migration metadata
                     })
                     .AddAzureTableGrainStorage(SourceStorageName, options =>
                     {
@@ -69,6 +69,9 @@ namespace Tester.AzureUtils.Migration
                         // options.ContainerName = $"destination{RandomIdentifier}";
                         options.ContainerName = OrleansContainer;
                         options.DatabaseName = OrleansDatabase;
+
+                        // which writes in non-orleans-8 compatible format
+                        options.UseLegacySerialization = true;
                     })
                     .AddDataMigrator(SourceStorageName, DestinationStorageName);
             }
