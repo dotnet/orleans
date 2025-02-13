@@ -20,6 +20,8 @@ namespace Orleans.Persistence.Cosmos;
 /// </summary>
 internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
 {
+    private const string KEY_STRING_SEPARATOR = "__";
+
     // for access from GrainStateTypeInfoProvider implementations
     internal static readonly MethodInfo ReadStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(ReadStateAsyncCore), 1, BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(string), typeof(GrainId), typeof(IGrainState) }, null)!;
     internal static readonly MethodInfo WriteStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(WriteStateAsyncCore), 1, BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(string), typeof(GrainId), typeof(IGrainState) }, null)!;
@@ -29,6 +31,7 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
 
     private readonly IDocumentIdProvider idProvider;
     private readonly CosmosGrainStorageOptions options;
+    private readonly string serviceId;
     private readonly string name;
     private readonly IServiceProvider serviceProvider;
 
@@ -42,12 +45,14 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
     /// <param name="options">The options.</param>
     /// <param name="serviceProvider">The service provider.</param>
     /// <param name="idProvider">The partition key provider.</param>
+    /// <param name="clusterOptions">Cluster options</param>
     /// <param name="grainStateTypeInfoProvider">Provides grain state type info via activation context</param>
     public CosmosGrainStorage(
         string name,
         CosmosGrainStorageOptions options,
         IServiceProvider serviceProvider,
         IDocumentIdProvider idProvider,
+        IOptions<ClusterOptions> clusterOptions,
         IGrainStateTypeInfoProvider grainStateTypeInfoProvider)
     {
         ArgumentNullException.ThrowIfNull(name);
@@ -60,6 +65,7 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
         this.options = options;
         this.serviceProvider = serviceProvider;
         this.idProvider = idProvider;
+        this.serviceId = clusterOptions.Value.ServiceId;
         this.grainStateTypeInfoProvider = grainStateTypeInfoProvider;
     }
 
@@ -171,7 +177,7 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
         {
             var (documentId, partitionKey) = this.idProvider.GetDocumentIdentifiers(stateName, grainId.Type, grainId.Key);
 
-            if (options.UseLegacySerialization)
+            if (options.UseLegacyFormat)
             {
                 var response = await this.container.ReadItemAsync<LegacyGrainStateEntity<T>>(documentId, new PartitionKey(partitionKey)).ConfigureAwait(false);
 
@@ -213,12 +219,12 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
         {
             var (documentId, partitionKey) = this.idProvider.GetDocumentIdentifiers(stateName, grainId.Type, grainId.Key);
 
-            if (options.UseLegacySerialization)
+            if (options.UseLegacyFormat)
             {
                 var entity = new LegacyGrainStateEntity<T>
                 {
                     ETag = grainState.ETag,
-                    Id = documentId,
+                    Id = GetId(documentId),
                     Type = grainId.Type,
                     State = (T)grainState.State,
                     PartitionKey = partitionKey,
@@ -252,7 +258,7 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
                 var entity = new GrainStateEntity<T>
                 {
                     ETag = grainState.ETag,
-                    Id = documentId,
+                    Id = GetId(documentId),
                     GrainType = stateName,
                     State = (T)grainState.State,
                     PartitionKey = partitionKey,
@@ -308,7 +314,7 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
             {
                 if (!string.IsNullOrEmpty(grainState.ETag))
                 {
-                    if (options.UseLegacySerialization)
+                    if (options.UseLegacyFormat)
                     {
                         await this.container.DeleteItemAsync<LegacyGrainStateEntity<T>>(documentId, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag }).ConfigureAwait(false);
                     }
@@ -323,12 +329,12 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
             }
             else
             {
-                if (options.UseLegacySerialization)
+                if (options.UseLegacyFormat)
                 {
                     var entity = new LegacyGrainStateEntity<T>
                     {
                         ETag = grainState.ETag,
-                        Id = documentId,
+                        Id = GetId(documentId),
                         Type = grainId.Type,
                         State = (T)defaultState,
                         PartitionKey = partitionKey,
@@ -349,7 +355,7 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
                     var entity = new GrainStateEntity<T>
                     {
                         ETag = grainState.ETag,
-                        Id = documentId,
+                        Id = GetId(documentId),
                         GrainType = stateName,
                         State = (T)defaultState,
                         PartitionKey = partitionKey,
@@ -394,5 +400,15 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
         {
             throw CreateOrleansException(ex, default);
         }
+    }
+
+    internal string GetId(string documentId)
+    {
+        if (options.UseLegacyFormat)
+        {
+            return documentId;
+        }
+
+        return $"{CosmosIdSanitizer.Sanitize(serviceId)}{KEY_STRING_SEPARATOR}{documentId}";
     }
 }

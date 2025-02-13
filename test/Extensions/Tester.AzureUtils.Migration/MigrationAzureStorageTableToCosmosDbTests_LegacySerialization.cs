@@ -71,7 +71,7 @@ namespace Tester.AzureUtils.Migration
                         options.DatabaseName = OrleansDatabase;
 
                         // which writes in non-orleans-8 compatible format
-                        options.UseLegacySerialization = true;
+                        options.UseLegacyFormat = true;
                     })
                     .AddDataMigrator(SourceStorageName, DestinationStorageName);
             }

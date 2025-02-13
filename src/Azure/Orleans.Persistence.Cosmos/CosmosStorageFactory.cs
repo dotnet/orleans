@@ -39,12 +39,14 @@ public static class CosmosStorageFactory
     {
         var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>();
         var idProvider = services.GetServiceByName<IDocumentIdProvider>(name) ?? services.GetRequiredService<IDocumentIdProvider>();
+        var clusterOptions = services.GetRequiredService<IOptions<ClusterOptions>>();
 
         return new CosmosGrainStorage(
             name,
             optionsMonitor.Get(name),
             services,
             idProvider,
+            clusterOptions,
             grainStateTypeInfoProvider);
     }
 }

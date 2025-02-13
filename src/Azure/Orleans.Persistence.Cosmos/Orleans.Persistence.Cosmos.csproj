@@ -20,5 +20,6 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Orleans.Persistence.Cosmos.Migration" />
+    <InternalsVisibleTo Include="Tester.AzureUtils.Migration" />
   </ItemGroup>
 </Project>

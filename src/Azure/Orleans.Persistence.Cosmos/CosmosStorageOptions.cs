@@ -32,10 +32,10 @@ public class CosmosGrainStorageOptions : CosmosOptions
 
 
     /// <summary>
-    /// If true, will use a <see cref="LegacyGrainStateEntity{TState}"/> for serialization of grain data in CosmosDb storage.
+    /// If true, will use a <see cref="LegacyGrainStateEntity{TState}"/> for saving grain data in CosmosDb storage.
     /// </summary>
     /// <notes>
     /// Is not recommended to be enabled. It is not compatible with latest Orleans format
     /// </notes>
-    public bool UseLegacySerialization { get; set; } = false;
+    public bool UseLegacyFormat { get; set; } = false;
 }

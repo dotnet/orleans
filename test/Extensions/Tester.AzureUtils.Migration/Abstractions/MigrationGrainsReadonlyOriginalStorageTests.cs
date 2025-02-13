@@ -54,7 +54,8 @@ namespace Tester.AzureUtils.Migration.Abstractions
             await grain.SetB(806);
 
             // lets fetch data through cosmosClient
-            var cosmosGrainState = await _cosmosClient.GetGrainStateFromCosmosAsync(
+            var cosmosGrainState = await GetGrainStateFromCosmosAsync(
+                _cosmosClient,
                 databaseName: _databaseName,
                 containerName: _containerName, 
                 DocumentIdProvider,
@@ -79,7 +80,8 @@ namespace Tester.AzureUtils.Migration.Abstractions
             Assert.NotNull(migrationTime);
 
             // verify updated state only in destination storage
-            cosmosGrainState = await _cosmosClient.GetGrainStateFromCosmosAsync(
+            cosmosGrainState = await GetGrainStateFromCosmosAsync(
+                _cosmosClient,
                 databaseName: _databaseName,
                 containerName: _containerName,
                 DocumentIdProvider,
@@ -110,7 +112,8 @@ namespace Tester.AzureUtils.Migration.Abstractions
             await DataMigrator.MigrateGrainsAsync(CancellationToken.None);
 
             // ensure cosmos db state is updated
-            var cosmosGrainState = await _cosmosClient.GetGrainStateFromCosmosAsync(
+            var cosmosGrainState = await GetGrainStateFromCosmosAsync(
+                _cosmosClient,
                 databaseName: _databaseName,
                 containerName: _containerName,
                 DocumentIdProvider,
@@ -124,7 +127,8 @@ namespace Tester.AzureUtils.Migration.Abstractions
             Assert.True(statsRun2.SkippedEntries != 0); // it should skip entries (at least one - the one that we migrated on 1st DataMigrator.MigrateGrainsAsync() run)
 
             // ensure state one more time
-            var cosmosGrainState2 = await _cosmosClient.GetGrainStateFromCosmosAsync(
+            var cosmosGrainState2 = await GetGrainStateFromCosmosAsync(
+                _cosmosClient,
                 databaseName: _databaseName,
                 containerName: _containerName,
                 DocumentIdProvider,

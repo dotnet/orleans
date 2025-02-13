@@ -15,6 +15,10 @@ using Orleans.Persistence.Migration;
 #if NET8_0_OR_GREATER
 using Orleans.Persistence.Cosmos;
 using Azure.Data.Tables;
+using Microsoft.Azure.Cosmos;
+using Newtonsoft.Json.Linq;
+using System.Globalization;
+using Tester.AzureUtils.Migration.Grains;
 #endif
 
 namespace Tester.AzureUtils.Migration.Abstractions
@@ -138,6 +142,61 @@ namespace Tester.AzureUtils.Migration.Abstractions
                 }
                 return this.cosmosDocumentIdProvider;
             }
+        }
+
+
+        /// <summary>
+        /// Loads currently stored grain state from Cosmos DB.
+        /// </summary>
+        /// <remarks>
+        /// We can't call `DestinationStorage.ReadAsync()` because of the inner implementation details
+        /// </remarks>
+        protected async Task<MigrationTestGrain_State> GetGrainStateFromCosmosAsync(
+            CosmosClient cosmosClient,
+            string databaseName,
+            string containerName,
+            IDocumentIdProvider documentIdProvider,
+            GrainReference grain,
+            string? stateName = "state", // when cosmos is a target storage for migration, state is the default name of how Orleans writes a partitionKey
+            bool latestOrleansSerializationFormat = true
+        )
+        {
+            var database = cosmosClient.GetDatabase(databaseName);
+            var container = database.Client.GetContainer(database.Id, containerName);
+
+            var grainId = grain.GetPrimaryKeyLong();
+            var grainIdRepresentation = grainId.ToString("X", CultureInfo.InvariantCulture); // document number is represented in Cosmos in such a way
+            var (documentId, partitionKey) = documentIdProvider.GetDocumentIdentifiers(
+                stateName!,
+                "migrationtestgrain", // GrainTypeAttribute's value for MigrationTestGrain
+                grainIdRepresentation);
+
+            string entityId;
+            if (latestOrleansSerializationFormat)
+            {
+                entityId = CosmosIdSanitizer.Sanitize(ClusterOptions.ServiceId) + "__" + documentId;
+            }
+            else
+            {
+                entityId = documentId;
+            }
+            var response = await container.ReadItemAsync<dynamic>(entityId, new PartitionKey(partitionKey));
+            JObject data = response.Resource;
+
+            var dataState = latestOrleansSerializationFormat
+                ? data["State"]!
+                : data["state"]!;
+
+            if (dataState is null)
+            {
+                throw new InvalidDataException("Grain state is null");
+            }
+
+            return new MigrationTestGrain_State
+            {
+                A = dataState["A"]!.Value<int>(),
+                B = dataState["B"]!.Value<int>()
+            };
         }
 #endif
     }
