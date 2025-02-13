@@ -549,7 +549,7 @@ namespace Orleans.Runtime
             EventId = (int)ErrorCode.SiloGcWarning,
             Message = $"A verbose logging level ({{highestLogLevel}}) is configured. This will impact performance. The recommended log level is {nameof(LogLevel.Information)}."
         )]
-        private static partial void LogWarningSiloGcVerboseLOggingConfigured(ILogger logger, LogLevel highestLogLevel);
+        private static partial void LogWarningSiloGcVerboseLOggingConfigured(ILogger logger, string highestLogLevel);
 
         [LoggerMessage(
             Level = LogLevel.Information,
