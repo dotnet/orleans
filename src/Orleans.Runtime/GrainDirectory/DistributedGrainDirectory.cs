@@ -189,10 +189,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                 continue;
             }
 
-            if (_logger.IsEnabled(LogLevel.Trace))
-            {
-                _logger.LogTrace("Invoked '{Operation}' on '{Owner}' for grain '{GrainId}' and received result '{Result}'.", operation, owner, grainId, result);
-            }
+            LogTraceInvokedOperation(_logger, operation, owner, grainId, result);
 
             return result;
         }
@@ -210,9 +207,9 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
     public async ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRange range, bool isValidation)
     {
-        if (!isValidation && _logger.IsEnabled(LogLevel.Debug))
+        if (!isValidation)
         {
-            _logger.LogDebug("Collecting registered activations for range {Range} at version {MembershipVersion}.", range, membershipVersion);
+            LogDebugCollectingRegisteredActivations(_logger, range, membershipVersion);
         }
 
         var recoveryMembershipVersion = _recoveryMembershipVersion;
@@ -257,14 +254,14 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                     }
                     catch (Exception exception)
                     {
-                        _logger.LogWarning(exception, "Failed to deactivate activation {Activation}", activation);
+                        LogWarningFailedToDeactivateActivation(_logger, exception, activation);
                     }
                 }
                 else
                 {
                     if (!isValidation)
                     {
-                        _logger.LogTrace("Sending activation '{Activation}' for recovery because its in the requested range {Range} (version {Version}).", activation.GrainId, range, membershipVersion);
+                        LogTraceSendingActivationForRecovery(_logger, activation.GrainId, range, membershipVersion);
                     }
 
                     result.Add(activation.Address);
@@ -274,15 +271,9 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
         await Task.WhenAll(deactivationTasks);
 
-        if (!isValidation && _logger.IsEnabled(LogLevel.Debug))
+        if (!isValidation)
         {
-            _logger.LogDebug(
-                "Submitting {Count} registered activations for range {Range} at version {MembershipVersion}. Deactivated {DeactivationCount} in-doubt registrations. Took {ElapsedMilliseconds}ms",
-                result.Count,
-                range,
-                membershipVersion,
-                deactivationTasks.Count,
-                stopwatch.ElapsedMilliseconds);
+            LogDebugSubmittingRegisteredActivations(_logger, result.Count, range, membershipVersion, deactivationTasks.Count, stopwatch.ElapsedMilliseconds);
         }
 
         return result.AsImmutable();
@@ -387,19 +378,10 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                         tasks.Add(partition.ProcessMembershipUpdateAsync(current));
                     }
 
-                    if (_logger.IsEnabled(LogLevel.Debug))
-                    {
-                        var deltaSize = currentRanges.SizePercent - previousRanges.SizePercent;
-                        var meanSizePercent = current.Members.Length > 0 ? 100.0 / current.Members.Length : 0f;
-                        var deviationFromMean = Math.Abs(meanSizePercent - currentRanges.SizePercent);
-                        _logger.LogDebug(
-                            "Updated view from '{PreviousVersion}' to '{Version}'. Now responsible for {Range:0.00}% (Δ {DeltaPercent:0.00}%). {DeviationFromMean:0.00}% from ideal share.",
-                             previous.Version,
-                             current.Version,
-                             currentRanges.SizePercent,
-                             deltaSize,
-                             deviationFromMean);
-                    }
+                    var deltaSize = currentRanges.SizePercent - previousRanges.SizePercent;
+                    var meanSizePercent = current.Members.Length > 0 ? 100.0 / current.Members.Length : 0f;
+                    var deviationFromMean = Math.Abs(meanSizePercent - currentRanges.SizePercent);
+                    LogDebugUpdatedView(previous.Version, current.Version, currentRanges.SizePercent, deltaSize, deviationFromMean);
 
                     previousUpdate = update.ClusterMembershipSnapshot;
                     previous = current;
@@ -410,7 +392,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             {
                 if (!_stoppedCts.IsCancellationRequested)
                 {
-                    _logger.LogError(exception, "Error processing membership updates.");
+                    LogErrorProcessingMembershipUpdates(exception);
                 }
             }
         }
@@ -444,4 +426,46 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         SiloAddress? GetPrimaryForGrain(GrainId grainId);
         Task<GrainAddress?> GetLocalRecord(GrainId grainId);
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Updated view from '{PreviousVersion}' to '{Version}'. Now responsible for {Range:0.00}% (Δ {DeltaPercent:0.00}%). {DeviationFromMean:0.00}% from ideal share."
+    )]
+    private partial void LogDebugUpdatedView(MembershipVersion previousVersion, MembershipVersion version, double range, double deltaPercent, double deviationFromMean);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error processing membership updates."
+    )]
+    private partial void LogErrorProcessingMembershipUpdates(Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Invoked '{Operation}' on '{Owner}' for grain '{GrainId}' and received result '{Result}'."
+    )]
+    private static partial void LogTraceInvokedOperation(ILogger logger, string operation, SiloAddress owner, GrainId grainId, object result);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Collecting registered activations for range {Range} at version {MembershipVersion}."
+    )]
+    private static partial void LogDebugCollectingRegisteredActivations(ILogger logger, RingRange range, MembershipVersion membershipVersion);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Failed to deactivate activation {Activation}"
+    )]
+    private static partial void LogWarningFailedToDeactivateActivation(ILogger logger, Exception exception, IGrainContext activation);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Sending activation '{Activation}' for recovery because its in the requested range {Range} (version {Version})."
+    )]
+    private static partial void LogTraceSendingActivationForRecovery(ILogger logger, GrainId activation, RingRange range, MembershipVersion version);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Submitting {Count} registered activations for range {Range} at version {MembershipVersion}. Deactivated {DeactivationCount} in-doubt registrations. Took {ElapsedMilliseconds}ms"
+    )]
+    private static partial void LogDebugSubmittingRegisteredActivations(ILogger logger, int count, RingRange range, MembershipVersion membershipVersion, int deactivationCount, long elapsedMilliseconds);
 }
