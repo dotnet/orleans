@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
-    internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IActivationLifecycleObserver
+    internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IActivationLifecycleObserver
     {
         private readonly GrainAddress _address;
         private readonly GrainTypeSharedContext _shared;
@@ -169,7 +169,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exception)
                 {
-                    _shared.Logger.LogError(exception, "Error in stateless worker message loop");
+                    LogErrorInMessageLoop(_shared.Logger, exception);
                 }
             }
         }
@@ -342,5 +342,11 @@ namespace Orleans.Runtime
         private record DeactivateWorkItemState(DeactivationReason DeactivationReason, CancellationToken CancellationToken);
         private record DeactivatedTaskWorkItemState(TaskCompletionSource<bool> Completion);
         private record DisposeAsyncWorkItemState(TaskCompletionSource<bool> Completion);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error in stateless worker message loop"
+        )]
+        private static partial void LogErrorInMessageLoop(ILogger logger, Exception exception);
     }
 }

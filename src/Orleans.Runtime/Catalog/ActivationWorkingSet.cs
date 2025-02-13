@@ -14,7 +14,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Maintains a list of activations which are recently active.
     /// </summary>
-    internal sealed class ActivationWorkingSet : IActivationWorkingSet, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILifecycleParticipant<ISiloLifecycle>
     {
         private class MemberState
         {
@@ -118,7 +118,7 @@ namespace Orleans.Runtime
                     }
                     catch (Exception exception)
                     {
-                        _logger.LogError(exception, "Exception visiting working set member {Member}", pair.Key);
+                        LogExceptionVisitingWorkingSetMember(exception, pair.Key);
                     }
                 }
             }
@@ -172,6 +172,12 @@ namespace Orleans.Runtime
                     }
                 });
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Exception visiting working set member {Member}"
+        )]
+        private partial void LogExceptionVisitingWorkingSetMember(Exception exception, IActivationWorkingSetMember member);
     }
 
     /// <summary>
