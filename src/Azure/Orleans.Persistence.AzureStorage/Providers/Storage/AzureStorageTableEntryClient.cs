@@ -14,15 +14,15 @@ internal class AzureStorageTableEntryClient : StorageMigrationEntryClient
     /// </summary>
     private readonly AzureTableDataManager<TableEntity> tableManager;
 
-    private readonly string partitionKey;
-    private readonly string rowKey;
+    // internal for testing
+    internal readonly string partitionKey;
+    internal readonly string rowKey;
 
     public AzureStorageTableEntryClient(
         AzureTableDataManager<TableEntity> tableDataManager,
         TableEntity tableEntity)
     {
         this.tableManager = tableDataManager;
-
         this.partitionKey = tableEntity.PartitionKey;
         this.rowKey = tableEntity.RowKey;
     }

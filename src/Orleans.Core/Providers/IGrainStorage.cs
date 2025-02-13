@@ -82,7 +82,7 @@ namespace Orleans.Storage
         /// Get all entries in storage
         /// </summary>
         /// <returns>The entries in storage</returns>
-        IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken);
+        IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken, DateTime? startTime = null, DateTime? endTime = null);
     }
 
     /// <summary>

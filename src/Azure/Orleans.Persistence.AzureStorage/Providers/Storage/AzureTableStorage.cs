@@ -1,20 +1,14 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Net;
-using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Data.Tables;
-using Azure.Storage.Blobs.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -25,7 +19,6 @@ using Orleans.Persistence.AzureStorage;
 using Orleans.Persistence.AzureStorage.Providers.Storage;
 using Orleans.Providers.Azure;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
@@ -436,10 +429,28 @@ namespace Orleans.Storage
                 return tableManager.InitTableAsync();
             }
 
-            public IAsyncEnumerable<TableEntity> ReadAllAsync(CancellationToken cancellationToken)
+            public IAsyncEnumerable<TableEntity> ReadAllAsync(
+                CancellationToken cancellationToken,
+                DateTime? startTime = null,
+                DateTime? endTime = null)
             {
                 if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_Storage_ReadingAll, "Reading All entries from Table={0}", TableName);
-                return tableManager.ReadTableEntries(cancellationToken);
+
+                string filter = null;
+                if (startTime.HasValue && endTime.HasValue)
+                {
+                    filter = $"Timestamp ge datetime'{startTime.Value:yyyy-MM-ddTHH:mm:ss.fffffffZ}' and Timestamp le datetime'{endTime.Value:yyyy-MM-ddTHH:mm:ss.fffffffZ}'";
+                }
+                else if (startTime.HasValue)
+                {
+                    filter = $"Timestamp ge datetime'{startTime.Value:yyyy-MM-ddTHH:mm:ss.fffffffZ}'";
+                }
+                else if (endTime.HasValue)
+                {
+                    filter = $"Timestamp le datetime'{endTime.Value:yyyy-MM-ddTHH:mm:ss.fffffffZ}'";
+                }
+
+                return tableManager.ReadTableEntries(filter, cancellationToken);
             }
 
             public async Task<TableEntity> Read(string partitionKey, string rowKey)
@@ -546,12 +557,15 @@ namespace Orleans.Storage
             return new StorageEntry(grainType, grainReference, grainState, tableEntryClient);
         }
 
-        public async IAsyncEnumerable<StorageEntry> GetAll([EnumeratorCancellation] CancellationToken cancellationToken)
+        public async IAsyncEnumerable<StorageEntry> GetAll(
+            [EnumeratorCancellation] CancellationToken cancellationToken,
+            DateTime? startTime = null,
+            DateTime? endTime = null)
         {
             // another storage table will be used for the migration data: we can't modify original table due to ETag collisions and other concurrent access problems
             var migrationTableManager = await GetMigrationTableManagerAsync();
 
-            var entries = this.tableDataManager.ReadAllAsync(cancellationToken);
+            var entries = this.tableDataManager.ReadAllAsync(cancellationToken, startTime, endTime);
             await foreach (var entry in entries.WithCancellation(cancellationToken))
             {
                 var pkParts = entry.PartitionKey.Split('_');
@@ -577,6 +591,10 @@ namespace Orleans.Storage
                 yield return new StorageEntry(entry.RowKey, grainReference, grainState, tableEntryClient);
             }
         }
+
+        // only for testing
+        internal AzureTableDataManager<TableEntity> GetUnderlyingTableDataManager()
+            => this.tableDataManager.TableManager;
 
         private Task<AzureTableDataManager<TableEntity>> GetMigrationTableManagerAsync()
         {

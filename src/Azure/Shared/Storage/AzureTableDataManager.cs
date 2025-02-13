@@ -526,8 +526,8 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
-        public IAsyncEnumerable<TableEntity> ReadTableEntries(CancellationToken cancellationToken)
-            => Table.QueryAsync<TableEntity>(cancellationToken: cancellationToken);
+        public IAsyncEnumerable<TableEntity> ReadTableEntries(string filter, CancellationToken cancellationToken)
+            => Table.QueryAsync<TableEntity>(filter: filter, cancellationToken: cancellationToken);
 
         /// <summary>
         /// Read data entries and their corresponding eTags from the Azure table.

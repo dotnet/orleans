@@ -1,9 +1,13 @@
 #if NET8_0_OR_GREATER
 using System.Globalization;
+using FluentAssertions;
 using Microsoft.Azure.Cosmos;
 using Newtonsoft.Json.Linq;
 using Orleans;
+using Orleans.GrainDirectory.AzureStorage;
+using Orleans.Persistence.AzureStorage.Providers.Storage;
 using Orleans.Runtime;
+using Orleans.Storage;
 using Tester.AzureUtils.Migration.Grains;
 using Tester.AzureUtils.Migration.Helpers;
 using TestExtensions;
@@ -133,6 +137,64 @@ namespace Tester.AzureUtils.Migration.Abstractions
 
             Assert.Equal(oldGrainState.State.A, cosmosGrainState2.A);
             Assert.Equal(oldGrainState.State.B, cosmosGrainState2.B);
+        }
+
+        [Fact]
+        public async Task DataMigrator_WithFilterByTimestamp()
+        {
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(100003);
+            var oldGrainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
+            var stateName = typeof(MigrationTestGrain).FullName;
+
+            // write to source storage
+            await SourceStorage.WriteStateAsync(stateName, (GrainReference)grain, oldGrainState);
+            if (SourceStorage is not AzureTableGrainStorage azureTableGrainStorage)
+            {
+                Assert.False(true, "SourceStorage is not AzureTableGrainStorage");
+                return;
+            }
+
+            // get the migrated storage entry (they will match partitionKey and rowKey)
+            var tableEntry = await SourceExtendedStorage!.GetStorageEntryAsync(stateName, (GrainReference)grain, oldGrainState);
+            if (tableEntry.MigrationEntryClient is not AzureStorageTableEntryClient tableEntryClient)
+            {
+                Assert.False(true, "MigrationEntryClient is not AzureStorageTableEntryClient");
+                return;
+            }
+
+            var tableDataManager = azureTableGrainStorage.GetUnderlyingTableDataManager();
+            var (originalEntry, _) = await tableDataManager.ReadSingleTableEntryAsync(tableEntryClient.partitionKey, tableEntryClient.rowKey);
+            if (!originalEntry.Timestamp.HasValue)
+            {
+                Assert.False(true, "tableEntity.Timestamp is null");
+                return;
+            }
+
+            var tableEntityTimestamp = originalEntry.Timestamp.Value;
+
+            // restrict data migrator so that it would pick a single storage entry
+            var stats = await DataMigrator.MigrateGrainsAsync(CancellationToken.None,
+                startTime: tableEntityTimestamp.AddMilliseconds(-1).DateTime,
+                endTime: tableEntityTimestamp.AddMilliseconds(1).DateTime);
+
+            Assert.True(stats.MigratedEntries == 1 || stats.SkippedEntries == 1, "either entity should be migrated or skipped if other data migrator already processed entry");
+
+            var cosmosGrainState = await GetGrainStateFromCosmosAsync(
+                _cosmosClient,
+                databaseName: _databaseName,
+                containerName: _containerName,
+                DocumentIdProvider,
+                (GrainReference)grain);
+
+            Assert.Equal(oldGrainState.State.A, cosmosGrainState.A);
+            Assert.Equal(oldGrainState.State.B, cosmosGrainState.B);
+
+            // rerun migration again -> it should be skipped at this point
+            var stats2 = await DataMigrator.MigrateGrainsAsync(CancellationToken.None,
+                startTime: tableEntityTimestamp.AddMilliseconds(-1).DateTime,
+                endTime: tableEntityTimestamp.AddMilliseconds(1).DateTime);
+
+            Assert.Equal((uint)1, stats2.SkippedEntries);
         }
     }
 }

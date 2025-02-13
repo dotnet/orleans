@@ -331,10 +331,22 @@ namespace Orleans.Storage
             return Task.FromResult(storageEntry);
         }
 
-        public async IAsyncEnumerable<StorageEntry> GetAll([EnumeratorCancellation] CancellationToken cancellationToken)
+        public async IAsyncEnumerable<StorageEntry> GetAll(
+            [EnumeratorCancellation] CancellationToken cancellationToken,
+            DateTime? startTime = null,
+            DateTime? endTime = null)
         {
             await foreach (var blob in this.container.GetBlobsAsync(traits: BlobTraits.Metadata, cancellationToken: cancellationToken))
             {
+                if (startTime is not null && blob.Properties.LastModified < startTime)
+                {
+                    continue;
+                }
+                if (endTime is not null && blob.Properties.LastModified > endTime)
+                {
+                    continue;
+                }
+
                 var match = _pickAllBlobsRegex.Match(blob.Name);
                 if (!match.Success)
                 {
