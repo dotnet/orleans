@@ -2298,22 +2298,13 @@ internal sealed partial class ActivationData :
     private static partial void LogWarningDispatcher_ExtendedMessageProcessing(
         ILogger logger,
         TimeSpan currentRequestActiveTime,
-        ActivationDetailsLogValue grain,
+        ActivationDataLogValue grain,
         Message blockingRequest,
         Message message);
 
-    private readonly struct ActivationDetailsLogValue
+    private readonly struct ActivationDataLogValue(ActivationData activation, bool includeExtraDetails = false)
     {
-        private readonly ActivationData _activation;
-        private readonly bool _includeExtraDetails;
-
-        public ActivationDetailsLogValue(ActivationData activation, bool includeExtraDetails = false)
-        {
-            _activation = activation;
-            _includeExtraDetails = includeExtraDetails;
-        }
-
-        public override string ToString() => _activation.ToDetailedString(_includeExtraDetails);
+        public override string ToString() => activation.ToDetailedString(includeExtraDetails);
     }
 
     [LoggerMessage(

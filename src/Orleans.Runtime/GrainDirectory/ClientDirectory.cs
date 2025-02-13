@@ -29,7 +29,7 @@ namespace Orleans.Runtime.GrainDirectory;
 /// has updated.
 /// The process of removing defunct clients is left to the <see cref="IConnectedClientCollection"/> implementation on each silo.
 /// </remarks>
-internal sealed class ClientDirectory : SystemTarget, ILocalClientDirectory, IRemoteClientDirectory, ILifecycleParticipant<ISiloLifecycle>
+internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirectory, IRemoteClientDirectory, ILifecycleParticipant<ISiloLifecycle>
 {
     private readonly SimpleConsistentRingProvider _consistentRing;
     private readonly IInternalGrainFactory _grainFactory;
@@ -398,7 +398,7 @@ internal sealed class ClientDirectory : SystemTarget, ILocalClientDirectory, IRe
             }
             catch (Exception exception)
             {
-                _logger.LogError(exception, "Exception publishing client routing table");
+                LogErrorPublishingClientRoutingTable(exception);
             }
         }
     }
@@ -462,11 +462,7 @@ internal sealed class ClientDirectory : SystemTarget, ILocalClientDirectory, IRe
 
         if (ReferenceEquals(previousRoutes, newRoutes))
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Skipping publishing of routes because target silo already has them");
-            }
-
+            LogDebugSkippingPublishingRoutes();
             return;
         }
 
@@ -499,10 +495,7 @@ internal sealed class ClientDirectory : SystemTarget, ILocalClientDirectory, IRe
 
         try
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Publishing routes to {Silo}", successor);
-            }
+            LogDebugPublishingRoutes(successor);
 
             var remote = _grainFactory.GetSystemTarget<IRemoteClientDirectory>(Constants.ClientDirectoryType, successor);
             await remote.OnUpdateClientRoutes(_table).WaitAsync(_shutdownCts.Token);
@@ -515,10 +508,7 @@ internal sealed class ClientDirectory : SystemTarget, ILocalClientDirectory, IRe
                 _previousSuccessor = successor;
             }
 
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Successfully routes to {Silo}", successor);
-            }
+            LogDebugSuccessfullyPublishedRoutes(successor);
 
             _nextPublishTask = null;
             if (ShouldPublish())
@@ -528,7 +518,7 @@ internal sealed class ClientDirectory : SystemTarget, ILocalClientDirectory, IRe
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Exception publishing client routing table to silo {SiloAddress}", successor);
+            LogErrorPublishingClientRoutingTableToSilo(exception, successor);
         }
     }
 
@@ -565,4 +555,34 @@ internal sealed class ClientDirectory : SystemTarget, ILocalClientDirectory, IRe
         public long ObservedConnectedClientsVersion { get => instance._observedConnectedClientsVersion; set => instance._observedConnectedClientsVersion = value; }
         public Task PublishUpdates() => instance.PublishUpdates();
     }
+
+    [LoggerMessage(
+        EventId = 0,
+        Level = LogLevel.Error,
+        Message = "Exception publishing client routing table")]
+    private partial void LogErrorPublishingClientRoutingTable(Exception exception);
+
+    [LoggerMessage(
+        EventId = 0,
+        Level = LogLevel.Debug,
+        Message = "Skipping publishing of routes because target silo already has them")]
+    private partial void LogDebugSkippingPublishingRoutes();
+
+    [LoggerMessage(
+        EventId = 0,
+        Level = LogLevel.Debug,
+        Message = "Publishing routes to {Silo}")]
+    private partial void LogDebugPublishingRoutes(SiloAddress silo);
+
+    [LoggerMessage(
+        EventId = 0,
+        Level = LogLevel.Debug,
+        Message = "Successfully published routes to {Silo}")]
+    private partial void LogDebugSuccessfullyPublishedRoutes(SiloAddress silo);
+
+    [LoggerMessage(
+        EventId = 0,
+        Level = LogLevel.Error,
+        Message = "Exception publishing client routing table to silo {SiloAddress}")]
+    private partial void LogErrorPublishingClientRoutingTableToSilo(Exception exception, SiloAddress siloAddress);
 }
