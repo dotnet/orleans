@@ -114,7 +114,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                 }
                 catch (Exception exception) when (attemptsRemaining > 0)
                 {
-                    _logger.LogError(exception, "Exception calling remote client directory");
+                    LogErrorCallingRemoteClientDirectory(exception);
                 }
 
                 // Try again to find the requested client's routes.
@@ -178,19 +178,12 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         UpdateRoutingTable(update);
         if (ShouldPublish())
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Client table updated, publishing to successor");
-            }
-
+            LogDebugClientTableUpdated();
             _schedulePublishUpdate();
         }
         else
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Client table not updated");
-            }
+            LogDebugClientTableNotUpdated();
         }
 
         return Task.CompletedTask;
@@ -557,6 +550,12 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     }
 
     [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Exception calling remote client directory"
+    )]
+    private partial void LogErrorCallingRemoteClientDirectory(Exception exception);
+
+    [LoggerMessage(
         EventId = 0,
         Level = LogLevel.Error,
         Message = "Exception publishing client routing table")]
@@ -585,4 +584,18 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         Level = LogLevel.Error,
         Message = "Exception publishing client routing table to silo {SiloAddress}")]
     private partial void LogErrorPublishingClientRoutingTableToSilo(Exception exception, SiloAddress siloAddress);
+
+    [LoggerMessage(
+        EventId = 0,
+        Level = LogLevel.Debug,
+        Message = "Client table updated, publishing to successor"
+    )]
+    private partial void LogDebugClientTableUpdated();
+
+    [LoggerMessage(
+        EventId = 0,
+        Level = LogLevel.Debug,
+        Message = "Client table not updated"
+    )]
+    private partial void LogDebugClientTableNotUpdated();
 }
