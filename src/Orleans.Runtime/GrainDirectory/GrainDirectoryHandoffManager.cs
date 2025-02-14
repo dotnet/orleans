@@ -232,40 +232,35 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        private readonly struct SiloAddressLogValue(SiloAddress siloAddress)
-        {
-            public override string ToString() => siloAddress.ToString();
-        }
-
         [LoggerMessage(
             Level = LogLevel.Debug,
             Message = "Processing silo add event for {AddedSilo}"
         )]
-        private static partial void LogDebugProcessingSiloAddEvent(ILogger logger, SiloAddressLogValue addedSilo);
+        private static partial void LogDebugProcessingSiloAddEvent(ILogger logger, SiloAddress addedSilo);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
             Message = "{AddedSilo} is not my immediate successor."
         )]
-        private static partial void LogDebugNotImmediateSuccessor(ILogger logger, SiloAddressLogValue addedSilo);
+        private static partial void LogDebugNotImmediateSuccessor(ILogger logger, SiloAddress addedSilo);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
             Message = "Splitting my partition between me and {AddedSilo}"
         )]
-        private static partial void LogDebugSplittingPartition(ILogger logger, SiloAddressLogValue addedSilo);
+        private static partial void LogDebugSplittingPartition(ILogger logger, SiloAddress addedSilo);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
             Message = "Sending {Count} single activation entries to {AddedSilo}"
         )]
-        private static partial void LogDebugSendingEntries(ILogger logger, int count, SiloAddressLogValue addedSilo);
+        private static partial void LogDebugSendingEntries(ILogger logger, int count, SiloAddress addedSilo);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
             Message = "Silo {AddedSilo} is no longer active and therefore cannot receive this partition split"
         )]
-        private static partial void LogWarningSiloNotActive(ILogger logger, SiloAddressLogValue addedSilo);
+        private static partial void LogWarningSiloNotActive(ILogger logger, SiloAddress addedSilo);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
