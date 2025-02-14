@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans
-{ 
+{
     /// <summary>
     /// Logger for options on the client.
     /// </summary>
@@ -50,7 +50,7 @@ namespace Orleans
     /// <summary>
     /// Base class for client and silo default options loggers.
     /// </summary>
-    public abstract class OptionsLogger 
+    public abstract partial class OptionsLogger
     {
         private readonly ILogger logger;
         private readonly IServiceProvider services;
@@ -98,18 +98,31 @@ namespace Orleans
         {
             try
             {
-                var stringBuiler = new StringBuilder();
-                stringBuiler.AppendLine($"Configuration {formatter.Name}: ");
+                var stringBuilder = new StringBuilder();
+                stringBuilder.AppendLine($"Configuration {formatter.Name}: ");
                 foreach (var setting in formatter.Format())
                 {
-                    stringBuiler.AppendLine($"{setting}");
+                    stringBuilder.AppendLine($"{setting}");
                 }
-                this.logger.LogInformation(stringBuiler.ToString());
-            } catch(Exception ex)
+                LogInformationOptions(logger, stringBuilder);
+            }
+            catch(Exception ex)
             {
-                this.logger.LogError(ex, $"An error occurred while logging options {formatter.Name}", formatter.Name);
+                LogErrorOptions(logger, ex, formatter.Name);
                 throw;
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "{Options}"
+        )]
+        private static partial void LogInformationOptions(ILogger logger, StringBuilder options);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "An error occurred while logging options {FormatterName}"
+        )]
+        private static partial void LogErrorOptions(ILogger logger, Exception exception, string formatterName);
     }
 }

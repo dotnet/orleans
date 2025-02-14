@@ -21,7 +21,7 @@ namespace Orleans
     /// <item><description>OnStop stops all stages regardless of errors even if canceled.</description></item>
     /// </list>
     /// </remarks>
-    public abstract class LifecycleSubject : ILifecycleSubject
+    public abstract partial class LifecycleSubject : ILifecycleSubject
     {
         private readonly List<OrderedObserver> subscribers = [];
         protected readonly ILogger Logger;
@@ -86,14 +86,7 @@ namespace Orleans
         /// <param name="elapsed">The period of time which elapsed before <see cref="OnStart"/> completed once it was initiated.</param>
         protected virtual void PerfMeasureOnStart(int stage, TimeSpan elapsed)
         {
-            if (this.Logger.IsEnabled(LogLevel.Trace))
-            {
-                this.Logger.LogTrace(
-                    (int)ErrorCode.SiloStartPerfMeasure,
-                    "Starting lifecycle stage '{Stage}' took '{Elapsed}'.",
-                    GetStageName(stage),
-                    elapsed);
-            }
+            LogTraceSiloStartPerfMeasure(Logger, GetStageName(stage), elapsed);
         }
 
         /// <inheritdoc />
@@ -157,14 +150,7 @@ namespace Orleans
         /// <param name="elapsed">The period of time which elapsed before <see cref="OnStop"/> completed once it was initiated.</param>
         protected virtual void PerfMeasureOnStop(int stage, TimeSpan elapsed)
         {
-            if (this.Logger.IsEnabled(LogLevel.Trace))
-            {
-                this.Logger.LogTrace(
-                    (int)ErrorCode.SiloStartPerfMeasure,
-                    "Stopping lifecycle stage '{Stage}' took '{Elapsed}'.",
-                    GetStageName(stage),
-                    elapsed);
-            }
+            LogTraceSiloStopPerfMeasure(Logger, GetStageName(stage), elapsed);
         }
 
         /// <inheritdoc />
@@ -264,5 +250,19 @@ namespace Orleans
             /// <inheritdoc />
             public void Dispose() => Observer = null;
         }
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.SiloStartPerfMeasure,
+            Level = LogLevel.Trace,
+            Message = "Starting lifecycle stage '{Stage}' took '{Elapsed}'."
+        )]
+        private static partial void LogTraceSiloStartPerfMeasure(ILogger logger, string stage, TimeSpan elapsed);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.SiloStartPerfMeasure,
+            Level = LogLevel.Trace,
+            Message = "Stopping lifecycle stage '{Stage}' took '{Elapsed}'."
+        )]
+        private static partial void LogTraceSiloStopPerfMeasure(ILogger logger, string stage, TimeSpan elapsed);
     }
 }

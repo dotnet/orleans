@@ -37,7 +37,7 @@ namespace Orleans.Messaging
     //
     // The list of known gateways is managed by the GatewayManager class. See comments there for details.
     // </summary>
-    internal class ClientMessageCenter : IMessageCenter, IDisposable
+    internal partial class ClientMessageCenter : IMessageCenter, IDisposable
     {
         private readonly object grainBucketUpdateLock = new object();
 
@@ -169,10 +169,7 @@ namespace Orleans.Messaging
         {
             if (!Running)
             {
-                this.logger.LogError(
-                    (int)ErrorCode.ProxyClient_MsgCtrNotRunning,
-                    "Ignoring {Message} because the Client message center is not running",
-                    msg);
+                LogErrorProxyClientMsgCtrNotRunning(logger, msg);
                 return;
             }
 
@@ -183,15 +180,7 @@ namespace Orleans.Messaging
                 if (connection is null) return;
 
                 connection.Send(msg);
-
-                if (this.logger.IsEnabled(LogLevel.Trace))
-                {
-                    this.logger.LogTrace(
-                        (int)ErrorCode.ProxyClient_QueueRequest,
-                        "Sending message {Message} via gateway {Gateway}",
-                        msg,
-                        connection.RemoteEndPoint);
-                }
+                LogTraceProxyClientQueueRequest(logger, msg, connection.RemoteEndPoint);
             }
             else
             {
@@ -423,5 +412,19 @@ namespace Orleans.Messaging
         {
             gatewayManager.Dispose();
         }
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.ProxyClient_MsgCtrNotRunning,
+            Level = LogLevel.Error,
+            Message = "Ignoring {Message} because the Client message center is not running"
+        )]
+        private static partial void LogErrorProxyClientMsgCtrNotRunning(ILogger logger, Message message);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.ProxyClient_QueueRequest,
+            Level = LogLevel.Trace,
+            Message = "Sending message {Message} via gateway {Gateway}"
+        )]
+        private static partial void LogTraceProxyClientQueueRequest(ILogger logger, Message message, EndPoint gateway);
     }
 }

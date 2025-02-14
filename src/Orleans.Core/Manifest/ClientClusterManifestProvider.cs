@@ -19,7 +19,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// <see cref="IClusterManifestProvider"/> implementation for external clients.
     /// </summary>
-    internal class ClientClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable, IDisposable
+    internal partial class ClientClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable, IDisposable
     {
         private readonly TaskCompletionSource<bool> _initialized = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly ILogger<ClientClusterManifestProvider> _logger;
@@ -90,11 +90,11 @@ namespace Orleans.Runtime
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                _logger.LogInformation("Graceful shutdown of cluster manifest provider was canceled.");
+                LogInformationGracefulShutdownCanceled(_logger);
             }
             catch (Exception exception)
             {
-                _logger.LogError(exception, "Error stopping cluster manifest provider.");
+                LogErrorStoppingClusterManifestProvider(_logger, exception);
             }
         }
 
@@ -173,10 +173,7 @@ namespace Orleans.Runtime
 
                         _initialized.TrySetResult(true);
 
-                        if (_logger.IsEnabled(LogLevel.Debug))
-                        {
-                            _logger.LogDebug("Refreshed cluster manifest");
-                        }
+                        LogDebugRefreshedClusterManifest(_logger);
 
                         await Task.Delay(_typeManagementOptions.TypeMapRefreshInterval, _shutdownCts.Token);
                     }
@@ -186,7 +183,7 @@ namespace Orleans.Runtime
                     }
                     catch (Exception exception)
                     {
-                        _logger.LogWarning(exception, "Error trying to get cluster manifest from gateway {Gateway}", gateway);
+                        LogWarningErrorTryingToGetClusterManifest(_logger, exception, gateway);
                         await Task.Delay(StandardExtensions.Min(_typeManagementOptions.TypeMapRefreshInterval, TimeSpan.FromSeconds(5)), _shutdownCts.Token).SuppressThrowing();
 
                         // Reset the gateway so that another will be selected on the next iteration.
@@ -198,10 +195,7 @@ namespace Orleans.Runtime
             {
                 _initialized.TrySetResult(false);
 
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug("Stopped refreshing cluster manifest");
-                }
+                LogDebugStoppedRefreshingClusterManifest(_logger);
             }
         }
 
@@ -215,7 +209,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exception)
             {
-                _logger.LogWarning(exception, "Failed to fetch cluster manifest update from {Provider}.", provider);
+                LogWarningFailedToFetchClusterManifestUpdate(_logger, exception, provider);
 
                 // If the provider does not support the new API, fall back to the old one.
                 var manifest = await provider.GetClusterManifest();
@@ -244,5 +238,41 @@ namespace Orleans.Runtime
         {
             _shutdownCts.Cancel();
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Graceful shutdown of cluster manifest provider was canceled."
+        )]
+        private static partial void LogInformationGracefulShutdownCanceled(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error stopping cluster manifest provider."
+        )]
+        private static partial void LogErrorStoppingClusterManifestProvider(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Refreshed cluster manifest"
+        )]
+        private static partial void LogDebugRefreshedClusterManifest(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Error trying to get cluster manifest from gateway {Gateway}"
+        )]
+        private static partial void LogWarningErrorTryingToGetClusterManifest(ILogger logger, Exception exception, SiloAddress gateway);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Stopped refreshing cluster manifest"
+        )]
+        private static partial void LogDebugStoppedRefreshingClusterManifest(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Failed to fetch cluster manifest update from {Provider}."
+        )]
+        private static partial void LogWarningFailedToFetchClusterManifestUpdate(ILogger logger, Exception exception, IClusterManifestSystemTarget provider);
     }
 }
