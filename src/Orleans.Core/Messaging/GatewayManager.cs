@@ -68,16 +68,12 @@ namespace Orleans.Messaging
             {
                 // this situation can occur if the client starts faster than the silos.
                 var providerName = this.gatewayListProvider.GetType().FullName;
-                this.logger.LogWarning((int)ErrorCode.GatewayManager_NoGateways, "Could not find any gateway in '{GatewayListProviderName}'. Orleans client cannot initialize until at least one gateway becomes available.", providerName);
+                LogWarningNoGateways(this.logger, providerName);
                 var message = $"Could not find any gateway in '{providerName}'. Orleans client cannot initialize until at least one gateway becomes available.";
                 throw new SiloUnavailableException(message);
             }
 
-            this.logger.LogInformation(
-                (int)ErrorCode.GatewayManager_FoundKnownGateways,
-                "Found {GatewayCount} gateways: {Gateways}",
-                knownGateways.Count,
-                Utils.EnumerableToString(knownGateways));
+            LogInformationFoundKnownGateways(this.logger, knownGateways.Count, new(knownGateways));
 
             this.roundRobinCounter = this.gatewayOptions.PreferredGatewayIndex >= 0 ? this.gatewayOptions.PreferredGatewayIndex : Random.Shared.Next(knownGateways.Count);
             var newGateways = new List<SiloAddress>();
@@ -194,7 +190,7 @@ namespace Orleans.Messaging
                     {
                         if (cachedLiveGateways.Count == 0 && knownGateways.Count > 0)
                         {
-                            this.logger.LogWarning("All known gateways have been marked dead locally. Expediting gateway refresh and resetting all gateways to live status.");
+                            LogWarningAllGatewaysMarkedDead(this.logger);
 
                             cachedLiveGateways = knownGateways;
                             cachedLiveGatewaysSet = new HashSet<SiloAddress>(knownGateways);
@@ -267,7 +263,7 @@ namespace Orleans.Messaging
             }
             catch (Exception exc)
             {
-                LogErrorRefreshingGateways(logger, exc);
+                LogErrorRefreshingGateways(this.logger, exc);
             }
         }
 
@@ -368,10 +364,7 @@ namespace Orleans.Messaging
 
                 if (!isLiveGateway)
                 {
-                    if (logger.IsEnabled(LogLevel.Information))
-                    {
-                        this.logger.LogInformation("Closing connection to {Endpoint} because it has been marked as dead", address);
-                    }
+                    LogInformationClosingConnection(this.logger, address);
 
                     await this.connectionManager.CloseAsync(address);
                 }
@@ -384,11 +377,42 @@ namespace Orleans.Messaging
         }
 
         [LoggerMessage(
+            EventId = (int)ErrorCode.GatewayManager_NoGateways,
+            Level = LogLevel.Warning,
+            Message = "Could not find any gateway in '{GatewayListProviderName}'. Orleans client cannot initialize until at least one gateway becomes available."
+        )]
+        private static partial void LogWarningNoGateways(ILogger logger, string gatewayListProviderName);
+
+        private record struct UrisLogValue(IList<Uri> Uris)
+        {
+            public override string ToString() => Utils.EnumerableToString(Uris);
+        }
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.GatewayManager_FoundKnownGateways,
+            Level = LogLevel.Information,
+            Message = "Found {GatewayCount} gateways: {Gateways}"
+        )]
+        private static partial void LogInformationFoundKnownGateways(ILogger logger, int gatewayCount, UrisLogValue gateways);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "All known gateways have been marked dead locally. Expediting gateway refresh and resetting all gateways to live status."
+        )]
+        private static partial void LogWarningAllGatewaysMarkedDead(ILogger logger);
+
+        [LoggerMessage(
             EventId = (int)ErrorCode.ProxyClient_GetGateways,
             Level = LogLevel.Error,
             Message = "Error refreshing gateways."
         )]
         private static partial void LogErrorRefreshingGateways(ILogger logger, Exception exc);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Closing connection to {Endpoint} because it has been marked as dead"
+        )]
+        private static partial void LogInformationClosingConnection(ILogger logger, SiloAddress endpoint);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.GatewayManager_AllGatewaysDead,
@@ -397,7 +421,7 @@ namespace Orleans.Messaging
         )]
         private static partial void LogWarningAllGatewaysDead(ILogger logger);
 
-        private readonly struct SiloAddresses(List<SiloAddress> addresses)
+        private readonly struct SiloAddressesLogValue(List<SiloAddress> addresses)
         {
             public override string ToString() => Utils.EnumerableToString(addresses);
         }
@@ -407,6 +431,6 @@ namespace Orleans.Messaging
             Level = LogLevel.Debug,
             Message = "Refreshed the live gateway list. Found {KnownGatewayCount} gateways from gateway list provider: {KnownGateways}. Picked only known live out of them. Now has {LiveGatewayCount} live gateways: {LiveGateways}. Previous refresh time was = {PreviousRefreshTime}"
         )]
-        private static partial void LogDebugRefreshedLiveGatewayList(ILogger logger, int knownGatewayCount, SiloAddresses knownGateways, int liveGatewayCount, SiloAddresses liveGateways, DateTime previousRefreshTime);
+        private static partial void LogDebugRefreshedLiveGatewayList(ILogger logger, int knownGatewayCount, SiloAddressesLogValue knownGateways, int liveGatewayCount, SiloAddressesLogValue liveGateways, DateTime previousRefreshTime);
     }
 }

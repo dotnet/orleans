@@ -85,7 +85,7 @@ namespace Orleans.Messaging
             numMessages = 0;
             this.grainBuckets = new WeakReference<ClientOutboundConnection>[clientMessagingOptions.Value.ClientSenderBuckets];
             logger = loggerFactory.CreateLogger<ClientMessageCenter>();
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Proxy grain client constructed");
+            LogDebugProxyGrainClientConstructed();
             ClientInstruments.RegisterConnectedGatewayCountObserve(() => connectionManager.ConnectionCount);
         }
 
@@ -94,7 +94,7 @@ namespace Orleans.Messaging
             await EstablishInitialConnection(cancellationToken);
 
             Running = true;
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Proxy grain client started");
+            LogDebugProxyGrainClientStarted();
         }
 
         private async Task EstablishInitialConnection(CancellationToken cancellationToken)
@@ -169,7 +169,7 @@ namespace Orleans.Messaging
         {
             if (!Running)
             {
-                LogErrorProxyClientMsgCtrNotRunning(logger, msg);
+                LogErrorProxyClientMsgCtrNotRunning(msg);
                 return;
             }
 
@@ -180,7 +180,7 @@ namespace Orleans.Messaging
                 if (connection is null) return;
 
                 connection.Send(msg);
-                LogTraceProxyClientQueueRequest(logger, msg, connection.RemoteEndPoint);
+                LogTraceProxyClientQueueRequest(msg, connection.RemoteEndPoint);
             }
             else
             {
@@ -197,7 +197,7 @@ namespace Orleans.Messaging
 
                         connection.Send(message);
 
-                        LogTraceProxyClientQueueRequest(logger, message, connection.RemoteEndPoint);
+                        LogTraceProxyClientQueueRequest(message, connection.RemoteEndPoint);
                     }
                     catch (Exception exception)
                     {
@@ -248,11 +248,7 @@ namespace Orleans.Messaging
                 if (numGateways == 0)
                 {
                     RejectMessage(msg, "No gateways available");
-                    logger.LogWarning(
-                        (int)ErrorCode.ProxyClient_CannotSend,
-                        "Unable to send message {Message}; Gateway manager state is {GatewayManager}",
-                        msg,
-                        gatewayManager);
+                    LogWarningProxyClientCannotSend(msg, gatewayManager);
                     return new ValueTask<Connection>(default(Connection));
                 }
 
@@ -286,11 +282,7 @@ namespace Orleans.Messaging
             if (addr == null)
             {
                 RejectMessage(msg, "No gateways available");
-                logger.LogWarning(
-                    (int)ErrorCode.ProxyClient_CannotSend_NoGateway,
-                    "Unable to send message {Message}; Gateway manager state is {GatewayManager}",
-                    msg,
-                    gatewayManager);
+                LogWarningProxyClientCannotSendNoGateway(msg, gatewayManager);
                 return new ValueTask<Connection>(default(Connection));
             }
 
@@ -373,11 +365,11 @@ namespace Orleans.Messaging
 
             if (msg.Direction != Message.Directions.Request)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.ProxyClient_DroppingMsg, "Dropping message: {Message}. Reason = {Reason}", msg, reason);
+                if (logger.IsEnabled(LogLevel.Debug)) LogDebugProxyClientDroppingMsg(msg, reason);
             }
             else
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {Message}. Reason = {Reason}", msg, reason);
+                if (logger.IsEnabled(LogLevel.Debug)) LogDebugProxyClientRejectingMsg(msg, reason);
                 MessagingInstruments.OnRejectedMessage(msg);
                 var error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
                 DispatchLocalMessage(error);
@@ -411,13 +403,53 @@ namespace Orleans.Messaging
             Level = LogLevel.Error,
             Message = "Ignoring {Message} because the Client message center is not running"
         )]
-        private static partial void LogErrorProxyClientMsgCtrNotRunning(ILogger logger, Message message);
+        private partial void LogErrorProxyClientMsgCtrNotRunning(Message message);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.ProxyClient_QueueRequest,
             Level = LogLevel.Trace,
             Message = "Sending message {Message} via gateway {Gateway}"
         )]
-        private static partial void LogTraceProxyClientQueueRequest(ILogger logger, Message message, EndPoint gateway);
+        private partial void LogTraceProxyClientQueueRequest(Message message, EndPoint gateway);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Proxy grain client constructed"
+        )]
+        private partial void LogDebugProxyGrainClientConstructed();
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Proxy grain client started"
+        )]
+        private partial void LogDebugProxyGrainClientStarted();
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.ProxyClient_CannotSend,
+            Level = LogLevel.Warning,
+            Message = "Unable to send message {Message}; Gateway manager state is {GatewayManager}"
+        )]
+        private partial void LogWarningProxyClientCannotSend(Message message, GatewayManager gatewayManager);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.ProxyClient_CannotSend_NoGateway,
+            Level = LogLevel.Warning,
+            Message = "Unable to send message {Message}; Gateway manager state is {GatewayManager}"
+        )]
+        private partial void LogWarningProxyClientCannotSendNoGateway(Message message, GatewayManager gatewayManager);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.ProxyClient_DroppingMsg,
+            Level = LogLevel.Debug,
+            Message = "Dropping message: {Message}. Reason = {Reason}"
+        )]
+        private partial void LogDebugProxyClientDroppingMsg(Message message, string reason);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.ProxyClient_RejectingMsg,
+            Level = LogLevel.Debug,
+            Message = "Rejecting message: {Message}. Reason = {Reason}"
+        )]
+        private partial void LogDebugProxyClientRejectingMsg(Message message, string reason);
     }
 }
