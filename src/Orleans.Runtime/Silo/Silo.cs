@@ -481,7 +481,6 @@ namespace Orleans.Runtime
                 catch (Exception exception)
                 {
                     LogErrorStoppingGrainService(logger, grainService, exception);
-                    logger.LogError(exception, "Stopping GrainService '{GrainService}' failed.", grainService);
                     if (!ct.IsCancellationRequested)
                     {
                         throw;
