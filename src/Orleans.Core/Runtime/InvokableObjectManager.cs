@@ -11,7 +11,7 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans
 {
-    internal class InvokableObjectManager : IDisposable
+    internal partial class InvokableObjectManager : IDisposable
     {
         private readonly CancellationTokenSource disposed = new CancellationTokenSource();
         private readonly ConcurrentDictionary<ObserverGrainId, LocalObjectData> localObjects = new ConcurrentDictionary<ObserverGrainId, LocalObjectData>();
@@ -60,10 +60,7 @@ namespace Orleans
         {
             if (!ObserverGrainId.TryParse(message.TargetGrain, out var observerId))
             {
-                this.logger.LogError(
-                    (int)ErrorCode.ProxyClient_OGC_TargetNotFound_2,
-                    "Message is not addressed to an observer. {Message}",
-                    message);
+                LogErrorProxyClientOGCTargetNotFound2(logger, message);
                 return;
             }
 
@@ -73,11 +70,7 @@ namespace Orleans
             }
             else
             {
-                this.logger.LogError(
-                    (int)ErrorCode.ProxyClient_OGC_TargetNotFound,
-                    "Unexpected target grain in request: {TargetGrain}. Message: {Message}",
-                    message.TargetGrain,
-                    message);
+                LogErrorProxyClientOGCTargetNotFound(logger, message.TargetGrain, message);
             }
         }
 
@@ -154,13 +147,8 @@ namespace Orleans
                 var obj = (IAddressable)this.LocalObject.Target;
                 if (obj == null)
                 {
-                    //// Remove from the dictionary record for the garbage collected object? But now we won't be able to detect invalid dispatch IDs anymore.
-                    _manager.logger.LogWarning(
-                        (int)ErrorCode.Runtime_Error_100162,
-                        "Object associated with Observer ID {ObserverId} has been garbage collected. Deleting object reference and unregistering it. Message = {message}",
-                        this.ObserverId,
-                        message);
-
+                    // Remove from the dictionary record for the garbage collected object? But now we won't be able to detect invalid dispatch IDs anymore.
+                    LogWarningRuntimeError100162(_manager.logger, this.ObserverId, message);
                     // Try to remove. If it's not there, we don't care.
                     _manager.TryDeregister(this.ObserverId);
                     return;
@@ -174,8 +162,7 @@ namespace Orleans
                     this.Running = true;
                 }
 
-                if (_manager.logger.IsEnabled(LogLevel.Trace))
-                    _manager.logger.LogTrace("InvokeLocalObjectAsync {Message} start {Start}", message, start);
+                LogTraceInvokeLocalObjectAsync(_manager.logger, message, start);
 
                 if (start)
                 {
@@ -243,14 +230,7 @@ namespace Orleans
                         }
                         catch (Exception deserializationException)
                         {
-                            if (_manager.logger.IsEnabled(LogLevel.Warning))
-                            {
-                                _manager.logger.LogWarning(
-                                    deserializationException,
-                                    "Exception during message body deserialization in " + nameof(LocalObjectMessagePumpAsync) + " for message: {Message}",
-                                    message);
-                            }
-
+                            LogWarningDeserializationException(_manager.logger, deserializationException, message);
                             _manager.runtimeClient.SendResponse(message, Response.FromException(deserializationException));
                             continue;
                         }
@@ -285,9 +265,7 @@ namespace Orleans
                     catch (Exception outerException)
                     {
                         // ignore, keep looping.
-                        _manager.logger.LogWarning(
-                            outerException,
-                            "Exception in " + nameof(LocalObjectMessagePumpAsync));
+                        LogWarningLocalObjectMessagePumpAsync(_manager.logger, outerException);
                     }
                 }
             }
@@ -310,7 +288,7 @@ namespace Orleans
                 catch (Exception exc2)
                 {
                     _manager.runtimeClient.SendResponse(message, Response.FromException(exc2));
-                    _manager.logger.LogWarning((int)ErrorCode.ProxyClient_OGC_SendResponseFailed, exc2, "Exception trying to send a response.");
+                    LogWarningProxyClientOGCSendResponseFailed(_manager.logger, exc2);
                     return;
                 }
 
@@ -326,39 +304,27 @@ namespace Orleans
                 switch (message.Direction)
                 {
                     case Message.Directions.OneWay:
-                        {
-                            _manager.logger.LogError(
-                                (int)ErrorCode.ProxyClient_OGC_UnhandledExceptionInOneWayInvoke,
-                                exception,
-                                "Exception during invocation of notification {Request}, interface {Interface}. Ignoring exception because this is a one way request.",
-                                request.ToString(),
-                                message.InterfaceType);
-                            break;
-                        }
+                        LogErrorProxyClientOGCUnhandledExceptionInOneWayInvoke(_manager.logger, exception, request.ToString(), message.InterfaceType);
+                        break;
 
                     case Message.Directions.Request:
+                        Exception deepCopy;
+                        try
                         {
-                            Exception deepCopy;
-                            try
-                            {
-                                // we're expected to notify the caller if the deep copy failed.
-                                deepCopy = (Exception)_manager.deepCopier.Copy(exception);
-                            }
-                            catch (Exception ex2)
-                            {
-                                _manager.runtimeClient.SendResponse(message, Response.FromException(ex2));
-                                _manager.logger.LogWarning(
-                                    (int)ErrorCode.ProxyClient_OGC_SendExceptionResponseFailed,
-                                    ex2,
-                                    "Exception trying to send an exception response");
-                                return;
-                            }
-
-                            // the deep-copy succeeded.
-                            var response = Response.FromException(deepCopy);
-                            _manager.runtimeClient.SendResponse(message, response);
-                            break;
+                            // we're expected to notify the caller if the deep copy failed.
+                            deepCopy = (Exception)_manager.deepCopier.Copy(exception);
                         }
+                        catch (Exception ex2)
+                        {
+                            _manager.runtimeClient.SendResponse(message, Response.FromException(ex2));
+                            LogWarningProxyClientOGCSendExceptionResponseFailed(_manager.logger, ex2);
+                            return;
+                        }
+
+                        // the deep-copy succeeded.
+                        var response = Response.FromException(deepCopy);
+                        _manager.runtimeClient.SendResponse(message, response);
+                        break;
 
                     default:
                         throw new InvalidOperationException($"Unrecognized direction for message {message}, request {request}, which resulted in exception: {exception}");
@@ -381,5 +347,70 @@ namespace Orleans
 
             public Task Deactivated => Task.CompletedTask;
         }
+
+        private readonly struct ObserverGrainIdLogValue(ObserverGrainId observerId)
+        {
+            public override string ToString() => observerId.ToString();
+        }
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.ProxyClient_OGC_TargetNotFound_2,
+            Level = LogLevel.Error,
+            Message = "Message is not addressed to an observer. {Message}"
+        )]
+        private static partial void LogErrorProxyClientOGCTargetNotFound2(ILogger logger, Message message);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.ProxyClient_OGC_TargetNotFound,
+            Level = LogLevel.Error,
+            Message = "Unexpected target grain in request: {TargetGrain}. Message: {Message}"
+        )]
+        private static partial void LogErrorProxyClientOGCTargetNotFound(ILogger logger, GrainId targetGrain, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.Runtime_Error_100162,
+            Message = "Object associated with Observer ID {ObserverId} has been garbage collected. Deleting object reference and unregistering it. Message = {message}"
+        )]
+        private static partial void LogWarningRuntimeError100162(ILogger logger, ObserverGrainId observerId, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "InvokeLocalObjectAsync {Message} start {Start}"
+        )]
+        private static partial void LogTraceInvokeLocalObjectAsync(ILogger logger, Message message, bool start);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.ProxyClient_OGC_SendResponseFailed,
+            Message = "Exception trying to send a response."
+        )]
+        private static partial void LogWarningProxyClientOGCSendResponseFailed(ILogger logger, Exception exc);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)ErrorCode.ProxyClient_OGC_UnhandledExceptionInOneWayInvoke,
+            Message = "Exception during invocation of notification {Request}, interface {Interface}. Ignoring exception because this is a one way request."
+        )]
+        private static partial void LogErrorProxyClientOGCUnhandledExceptionInOneWayInvoke(ILogger logger, Exception exception, string request, GrainInterfaceType @interface);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.ProxyClient_OGC_SendExceptionResponseFailed,
+            Message = "Exception trying to send an exception response"
+        )]
+        private static partial void LogWarningProxyClientOGCSendExceptionResponseFailed(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Exception during message body deserialization in LocalObjectMessagePumpAsync for message: {Message}"
+        )]
+        private static partial void LogWarningDeserializationException(ILogger logger, Exception exception, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Exception in LocalObjectMessagePumpAsync"
+        )]
+        private static partial void LogWarningLocalObjectMessagePumpAsync(ILogger logger, Exception exception);
     }
 }
