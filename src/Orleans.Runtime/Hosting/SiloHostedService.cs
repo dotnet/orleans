@@ -7,7 +7,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Hosting
 {
-    internal class SiloHostedService : IHostedService
+    internal partial class SiloHostedService : IHostedService
     {
         private readonly ILogger logger;
         private readonly Silo silo;
@@ -24,16 +24,16 @@ namespace Orleans.Hosting
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            this.logger.LogInformation("Starting Orleans Silo.");
+            LogInformationStartingSilo(logger);
             await this.silo.StartAsync(cancellationToken).ConfigureAwait(false);
-            this.logger.LogInformation("Orleans Silo started.");
+            LogInformationSiloStarted(logger);
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            this.logger.LogInformation("Stopping Orleans Silo");
+            LogInformationStoppingSilo(logger);
             await this.silo.StopAsync(cancellationToken).ConfigureAwait(false);
-            this.logger.LogInformation("Orleans Silo stopped.");
+            LogInformationSiloStopped(logger);
         }
 
         private static void ValidateSystemConfiguration(IEnumerable<IConfigurationValidator> configurationValidators)
@@ -43,5 +43,29 @@ namespace Orleans.Hosting
                 validator.ValidateConfiguration();
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Starting Orleans Silo."
+        )]
+        private static partial void LogInformationStartingSilo(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Orleans Silo started."
+        )]
+        private static partial void LogInformationSiloStarted(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Stopping Orleans Silo"
+        )]
+        private static partial void LogInformationStoppingSilo(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Orleans Silo stopped."
+        )]
+        private static partial void LogInformationSiloStopped(ILogger logger);
     }
 }
