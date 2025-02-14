@@ -70,7 +70,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
            ServiceLifecycleStage.ApplicationServices,
            _ => Task.CompletedTask,
            OnStop);
-    }  
+    }
 
     private async Task OnStart(CancellationToken cancellationToken)
     {
@@ -153,13 +153,17 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     public void UnsubscribeFromReports(IActivationRebalancerReportListener listener) =>
         _statusListeners.Remove(listener);
 
-    [LoggerMessage(Level = LogLevel.Trace, Message =
-        "I have not received a report from the activation rebalancer for the last {Duration} which is more than the " +
-        "allowed interval {Period}. I will now try to wake it up with the assumption that it has has been stopped ungracefully.")]
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "I have not received a report from the activation rebalancer for the last {Duration} which is more than the " +
+        "allowed interval {Period}. I will now try to wake it up with the assumption that it has has been stopped ungracefully."
+    )]
     private partial void LogStartingRebalancer(TimeSpan duration, TimeSpan period);
 
-    [LoggerMessage(Level = LogLevel.Trace, Message =
-        "My silo '{Silo}' is stopping now, and I am the host of the activation rebalancer. " +
-        "I will attempt to migrate the rebalancer to another silo.")]
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "My silo '{Silo}' is stopping now, and I am the host of the activation rebalancer. " +
+        "I will attempt to migrate the rebalancer to another silo."
+    )]
     private partial void LogMigratingRebalancer(SiloAddress silo);
-} 
+}
