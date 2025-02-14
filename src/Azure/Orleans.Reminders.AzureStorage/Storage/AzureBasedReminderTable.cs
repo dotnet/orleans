@@ -33,17 +33,28 @@ namespace Orleans.Runtime.ReminderService
             this.loggerFactory = loggerFactory;
             this.clusterOptions = clusterOptions.Value;
             this.storageOptions = storageOptions.Value;
+            this.remTableManager = new RemindersTableManager(
+                this.clusterOptions.ServiceId,
+                this.clusterOptions.ClusterId,
+                this.storageOptions,
+                this.loggerFactory);
 
             this.reminderTableEntryBuilder = reminderTableEntryBuilder ?? DefaultReminderTableEntryBuilder.Instance;
         }
 
         public async Task Init()
         {
-            this.remTableManager = await RemindersTableManager.GetManager(
-                this.clusterOptions.ServiceId,
-                this.clusterOptions.ClusterId,
-                this.loggerFactory,
-                options: this.storageOptions);
+            try
+            {
+                logger.Info("Creating RemindersTableManager for service id {0} and cluster id {1}.", clusterOptions.ServiceId, clusterOptions.ClusterId);
+                await remTableManager.InitTableAsync();
+            }
+            catch (Exception ex)
+            {
+                string errorMsg = $"Exception trying to create or connect to the Azure table: {ex.Message}";
+                logger.Error((int)AzureReminderErrorCode.AzureTable_39, errorMsg, ex);
+                throw new OrleansException(errorMsg, ex);
+            }
         }
 
         private ReminderTableData ConvertFromTableEntryList(List<(ReminderTableEntry Entity, string ETag)> entries)
