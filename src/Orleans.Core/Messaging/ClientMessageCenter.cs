@@ -197,14 +197,7 @@ namespace Orleans.Messaging
 
                         connection.Send(message);
 
-                        if (this.logger.IsEnabled(LogLevel.Trace))
-                        {
-                            this.logger.LogTrace(
-                                (int)ErrorCode.ProxyClient_QueueRequest,
-                                "Sending message {Message} via gateway {Gateway}",
-                                message,
-                                connection.RemoteEndPoint);
-                        }
+                        LogTraceProxyClientQueueRequest(logger, message, connection.RemoteEndPoint);
                     }
                     catch (Exception exception)
                     {
