@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Concurrency;
 using Orleans.Configuration;
-using Orleans.Internal;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime.MembershipService
@@ -131,7 +130,7 @@ namespace Orleans.Runtime.MembershipService
     }
 
     [Reentrant]
-    internal sealed class MembershipTableSystemTarget : SystemTarget, IMembershipTableSystemTarget, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed partial class MembershipTableSystemTarget : SystemTarget, IMembershipTableSystemTarget, ILifecycleParticipant<ISiloLifecycle>
     {
         private InMemoryMembershipTable table;
         private readonly ILogger logger;
@@ -145,7 +144,7 @@ namespace Orleans.Runtime.MembershipService
         {
             logger = loggerFactory.CreateLogger<MembershipTableSystemTarget>();
             table = new InMemoryMembershipTable(deepCopier);
-            logger.LogInformation((int)ErrorCode.MembershipGrainBasedTable1, "GrainBasedMembershipTable Activated.");
+            LogInformationGrainBasedMembershipTableActivated(logger);
             catalog.RegisterSystemTarget(this);
         }
 
@@ -156,13 +155,13 @@ namespace Orleans.Runtime.MembershipService
 
         public Task InitializeMembershipTable(bool tryInitTableVersion)
         {
-            logger.LogInformation("InitializeMembershipTable {TryInitTableVersion}.", tryInitTableVersion);
+            LogInformationInitializeMembershipTable(logger, tryInitTableVersion);
             return Task.CompletedTask;
         }
 
         public Task DeleteMembershipTableEntries(string clusterId)
         {
-            logger.LogInformation("DeleteMembershipTableEntries {ClusterId}", clusterId);
+            LogInformationDeleteMembershipTableEntries(logger, clusterId);
             table = null;
             return Task.CompletedTask;
         }
@@ -180,38 +179,27 @@ namespace Orleans.Runtime.MembershipService
 
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("InsertRow entry = {Entry}, table version = {Version}", entry.ToString(), tableVersion);
+            LogDebugInsertRow(logger, entry, tableVersion);
             bool result = table.Insert(entry, tableVersion);
             if (result == false)
-                logger.LogInformation(
-                    (int)ErrorCode.MembershipGrainBasedTable2,
-                    "Insert of {Entry} and table version {Version} failed. Table now is {Table}",
-                    entry.ToString(),
-                    tableVersion,
-                    table.ReadAll());
+                LogInformationInsertRowFailed(logger, entry, tableVersion, table.ReadAll());
 
             return Task.FromResult(result);
         }
 
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("UpdateRow entry = {Entry}, etag = {ETag}, table version = {Version}", entry.ToString(), etag, tableVersion);
+            LogDebugUpdateRow(logger, entry, etag, tableVersion);
             bool result = table.Update(entry, etag, tableVersion);
             if (result == false)
-                logger.LogInformation(
-                    (int)ErrorCode.MembershipGrainBasedTable3,
-                    "Update of {Entry}, eTag {ETag}, table version {Version} failed. Table now is {Table}",
-                    entry.ToString(),
-                    etag,
-                    tableVersion,
-                    table.ReadAll());
+                LogInformationUpdateRowFailed(logger, entry, etag, tableVersion, table.ReadAll());
 
             return Task.FromResult(result);
         }
 
         public Task UpdateIAmAlive(MembershipEntry entry)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("UpdateIAmAlive entry = {Entry}", entry.ToString());
+            LogDebugUpdateIAmAlive(logger, entry);
             table.UpdateIAmAlive(entry);
             return Task.CompletedTask;
         }
@@ -226,5 +214,56 @@ namespace Orleans.Runtime.MembershipService
         {
             // Do nothing, just ensure that this instance is created so that it can register itself in the catalog.
         }
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.MembershipGrainBasedTable1,
+            Level = LogLevel.Information,
+            Message = "GrainBasedMembershipTable Activated."
+        )]
+        private static partial void LogInformationGrainBasedMembershipTableActivated(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "InitializeMembershipTable {TryInitTableVersion}."
+        )]
+        private static partial void LogInformationInitializeMembershipTable(ILogger logger, bool tryInitTableVersion);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "DeleteMembershipTableEntries {ClusterId}"
+        )]
+        private static partial void LogInformationDeleteMembershipTableEntries(ILogger logger, string clusterId);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "InsertRow entry = {Entry}, table version = {Version}"
+        )]
+        private static partial void LogDebugInsertRow(ILogger logger, MembershipEntry entry, TableVersion version);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.MembershipGrainBasedTable2,
+            Level = LogLevel.Information,
+            Message = "Insert of {Entry} and table version {Version} failed. Table now is {Table}"
+        )]
+        private static partial void LogInformationInsertRowFailed(ILogger logger, MembershipEntry entry, TableVersion version, MembershipTableData table);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "UpdateRow entry = {Entry}, etag = {ETag}, table version = {Version}"
+        )]
+        private static partial void LogDebugUpdateRow(ILogger logger, MembershipEntry entry, string etag, TableVersion version);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.MembershipGrainBasedTable3,
+            Level = LogLevel.Information,
+            Message = "Update of {Entry}, eTag {ETag}, table version {Version} failed. Table now is {Table}"
+        )]
+        private static partial void LogInformationUpdateRowFailed(ILogger logger, MembershipEntry entry, string etag, TableVersion version, MembershipTableData table);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "UpdateIAmAlive entry = {Entry}"
+        )]
+        private static partial void LogDebugUpdateIAmAlive(ILogger logger, MembershipEntry entry);
     }
 }
