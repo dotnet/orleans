@@ -116,11 +116,7 @@ namespace Orleans
             }
             catch (Exception ex) when (ex is not OrleansLifecycleCanceledException)
             {
-                this.Logger.LogError(
-                    (int)ErrorCode.LifecycleStartFailure,
-                    ex,
-                    "Lifecycle start canceled due to errors at stage '{Stage}'.",
-                    _highStage is { } highStage ? GetStageName(highStage) : "Unknown");
+                LogErrorLifecycleStartFailure(Logger, ex, _highStage is { } highStage ? GetStageName(highStage) : "Unknown");
                 throw;
             }
 
@@ -167,7 +163,7 @@ namespace Orleans
             {
                 if (cancellationToken.IsCancellationRequested && !loggedCancellation)
                 {
-                    this.Logger.LogWarning("Lifecycle stop operations canceled at stage '{Stage}' by request.", GetStageName(observerGroup.Key));
+                    LogWarningLifecycleStopCanceled(Logger, GetStageName(observerGroup.Key));
                     loggedCancellation = true;
                 }
 
@@ -182,11 +178,7 @@ namespace Orleans
                 }
                 catch (Exception ex)
                 {
-                    this.Logger.LogWarning(
-                        (int)ErrorCode.LifecycleStopFailure,
-                        ex,
-                        "Stopping lifecycle encountered an error at stage '{Stage}'. Continuing to stop.",
-                        _highStage is { } highStage ? GetStageName(highStage) : "Unknown");
+                    LogWarningLifecycleStopFailure(Logger, ex, _highStage is { } highStage ? GetStageName(highStage) : "Unknown");
                 }
 
                 this.OnStopStageCompleted(stage);
@@ -250,6 +242,26 @@ namespace Orleans
             /// <inheritdoc />
             public void Dispose() => Observer = null;
         }
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.LifecycleStartFailure,
+            Level = LogLevel.Error,
+            Message = "Lifecycle start canceled due to errors at stage '{Stage}'."
+        )]
+        private static partial void LogErrorLifecycleStartFailure(ILogger logger, Exception ex, string stage);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.LifecycleStopFailure,
+            Level = LogLevel.Warning,
+            Message = "Stopping lifecycle encountered an error at stage '{Stage}'. Continuing to stop."
+        )]
+        private static partial void LogWarningLifecycleStopFailure(ILogger logger, Exception ex, string stage);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Lifecycle stop operations canceled at stage '{Stage}' by request."
+        )]
+        private static partial void LogWarningLifecycleStopCanceled(ILogger logger, string stage);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.SiloStartPerfMeasure,
