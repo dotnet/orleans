@@ -401,7 +401,7 @@ namespace Orleans.Runtime.Messaging
                     }
                     catch (Exception exception)
                     {
-                        _gateway.logger.LogWarning(exception, "Exception in message loop for client {ClientId}", Id);
+                        LogWarningGatewayClientMessageLoopException(_gateway.logger, Id);
                     }
                 }
             }
@@ -482,8 +482,6 @@ namespace Orleans.Runtime.Messaging
                 }
             }
         }
-
-        // logger.LogError(exception, "Error performing gateway maintenance");
         [LoggerMessage(
             Level = LogLevel.Error,
             Message = "Error performing gateway maintenance"
@@ -516,5 +514,11 @@ namespace Orleans.Runtime.Messaging
             Message = "Client {ClientId} received new connection ({NewConnection}) before the previous connection ({PreviousConnection}) had been removed"
         )]
         private static partial void LogWarningGatewayClientReceivedNewConnectionBeforePreviousConnectionRemoved(ILogger logger, ClientGrainId clientId, GatewayInboundConnection newConnection, GatewayInboundConnection previousConnection);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Exception in message loop for client {ClientId}"
+        )]
+        private static partial void LogWarningGatewayClientMessageLoopException(ILogger logger, ClientGrainId clientId);
     }
 }

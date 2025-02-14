@@ -421,7 +421,6 @@ namespace Orleans.Runtime.Placement
         )]
         private partial void LogWarningAllActiveSilos();
 
-        // _logger.LogDebug("Invalidating {Count} cached entries for message {Message}", cacheUpdates.Count, message);
         [LoggerMessage(
             Level = LogLevel.Debug,
             Message = "Invalidating {Count} cached entries for message {Message}"
