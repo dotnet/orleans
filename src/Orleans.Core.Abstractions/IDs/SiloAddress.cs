@@ -280,9 +280,7 @@ namespace Orleans.Runtime
             BinaryPrimitives.WriteInt32LittleEndian(buf[20..], Generation);
             BinaryPrimitives.WriteInt32LittleEndian(buf[24..], seed);
 
-            hashCode = (int)StableHash.ComputeHash(buf);
-            hashCodeSet = true;
-            return hashCode;
+            return (int)StableHash.ComputeHash(buf);
         }
 
         private int CalculateConsistentHashCode()
