@@ -1,4 +1,3 @@
-
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -8,7 +7,7 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
-    internal class MessageFactory
+    internal partial class MessageFactory
     {
         private static ulong _nextId;
 
@@ -85,13 +84,7 @@ namespace Orleans.Runtime
                 RejectionInfo = info,
                 Exception = ex,
             };
-            if (_logger.IsEnabled(LogLevel.Debug))
-                _logger.LogDebug(
-                    ex,
-                    "Creating {RejectionType} rejection with info '{Info}' at:" + Environment.NewLine + "{StackTrace}",
-                    type,
-                    info,
-                    Utils.GetStackTrace());
+            LogDebugCreatingRejectionResponse(_logger, ex, type, info, new StacktraceLogValue());
             return response;
         }
 
@@ -101,9 +94,30 @@ namespace Orleans.Runtime
             response.Result = Message.ResponseTypes.Status;
             response.BodyObject = new StatusResponse(isExecuting, isWaiting, diagnostics);
 
-            if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Creating {RequestMessage} status update with diagnostics {Diagnostics}", request, diagnostics);
-
+            LogDebugCreatingStatusUpdate(_logger, request, new(diagnostics));
             return response;
         }
+
+        private readonly struct StacktraceLogValue()
+        {
+            public override string ToString() => Utils.GetStackTrace(skipFrames: 1);
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Creating {RejectionType} rejection with info '{Info}' at:\n{StackTrace}"
+        )]
+        private static partial void LogDebugCreatingRejectionResponse(ILogger logger, Exception ex, Message.RejectionTypes rejectionType, string info, StacktraceLogValue stacktrace);
+
+        private readonly struct DiagnosticsLogValue(List<string> diagnostics)
+        {
+            public override string ToString() => string.Join(", ", diagnostics);
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Creating {RequestMessage} status update with diagnostics {Diagnostics}"
+        )]
+        private static partial void LogDebugCreatingStatusUpdate(ILogger logger, Message requestMessage, DiagnosticsLogValue diagnostics);
     }
 }
