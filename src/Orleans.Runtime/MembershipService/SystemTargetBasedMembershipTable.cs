@@ -11,7 +11,7 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime.MembershipService
 {
-    internal class SystemTargetBasedMembershipTable : IMembershipTable
+    internal partial class SystemTargetBasedMembershipTable : IMembershipTable
     {
         private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
@@ -40,7 +40,7 @@ namespace Orleans.Runtime.MembershipService
             bool isPrimarySilo = siloDetails.SiloAddress.Endpoint.Equals(options.PrimarySiloEndpoint);
             if (isPrimarySilo)
             {
-                this.logger.LogInformation((int)ErrorCode.MembershipFactory1, "Creating in-memory membership table");
+                LogInformationCreatingInMemoryMembershipTable(logger);
                 var catalog = serviceProvider.GetRequiredService<Catalog>();
                 catalog.RegisterSystemTarget(ActivatorUtilities.CreateInstance<MembershipTableSystemTarget>(serviceProvider));
             }
@@ -60,13 +60,13 @@ namespace Orleans.Runtime.MembershipService
         {
             var timespan = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(5);
             // This is a quick temporary solution to enable primary node to start fully before secondaries.
-            // Secondary silos waits untill GrainBasedMembershipTable is created. 
+            // Secondary silos waits untill GrainBasedMembershipTable is created.
             for (int i = 0; i < 100; i++)
             {
                 try
                 {
                     await membershipTableSystemTarget.ReadAll().WaitAsync(timespan);
-                    logger.LogInformation((int)ErrorCode.MembershipTableGrainInit2, "Connected to membership table provider.");
+                    LogInformationConnectedToMembershipTableProvider(logger);
                     return;
                 }
                 catch (Exception exc)
@@ -74,14 +74,11 @@ namespace Orleans.Runtime.MembershipService
                     var type = exc.GetBaseException().GetType();
                     if (type == typeof(TimeoutException) || type == typeof(OrleansException))
                     {
-                        logger.LogInformation(
-                            (int)ErrorCode.MembershipTableGrainInit3,
-                            "Waiting for membership table provider to initialize. Going to sleep for {Duration} and re-try to reconnect.",
-                            timespan);
+                        LogInformationWaitingForMembershipTableProvider(logger, timespan);
                     }
                     else
                     {
-                        logger.LogInformation((int)ErrorCode.MembershipTableGrainInit4, "Membership table provider failed to initialize. Giving up.");
+                        LogInformationMembershipTableProviderFailedToInitialize(logger);
                         throw;
                     }
                 }
@@ -103,6 +100,34 @@ namespace Orleans.Runtime.MembershipService
         public Task UpdateIAmAlive(MembershipEntry entry) => this.grain.UpdateIAmAlive(entry);
 
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => this.grain.CleanupDefunctSiloEntries(beforeDate);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.MembershipFactory1,
+            Level = LogLevel.Information,
+            Message = "Creating in-memory membership table"
+        )]
+        private static partial void LogInformationCreatingInMemoryMembershipTable(ILogger logger);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.MembershipTableGrainInit2,
+            Level = LogLevel.Information,
+            Message = "Connected to membership table provider."
+        )]
+        private static partial void LogInformationConnectedToMembershipTableProvider(ILogger logger);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.MembershipTableGrainInit3,
+            Level = LogLevel.Information,
+            Message = "Waiting for membership table provider to initialize. Going to sleep for {Duration} and re-try to reconnect."
+        )]
+        private static partial void LogInformationWaitingForMembershipTableProvider(ILogger logger, TimeSpan duration);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.MembershipTableGrainInit4,
+            Level = LogLevel.Information,
+            Message = "Membership table provider failed to initialize. Giving up."
+        )]
+        private static partial void LogInformationMembershipTableProviderFailedToInitialize(ILogger logger);
     }
 
     [Reentrant]
