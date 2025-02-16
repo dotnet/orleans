@@ -80,7 +80,9 @@ namespace Tester.AzureUtils.Migration
                         options.DatabaseName = OrleansDatabase;
 
                         // which writes in non-orleans-8 compatible format
-                        options.UseLegacyFormat = true;
+#pragma warning disable OrleansCosmosExperimental
+                        options.UseExperimentalFormat = true;
+#pragma warning restore OrleansCosmosExperimental
                     })
                     .AddDataMigrator(SourceStorageName, DestinationStorageName);
             }

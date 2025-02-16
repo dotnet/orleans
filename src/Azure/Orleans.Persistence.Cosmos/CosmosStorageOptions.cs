@@ -2,6 +2,7 @@
 // Copyright (c) Microsoft. All rights reserved.
 // </copyright>
 
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Core;
 
 namespace Orleans.Persistence.Cosmos;
@@ -32,10 +33,12 @@ public class CosmosGrainStorageOptions : CosmosOptions
 
 
     /// <summary>
-    /// If true, will use a <see cref="LegacyGrainStateEntity{TState}"/> for saving grain data in CosmosDb storage.
+    /// If true, will use a <see cref="ExperimentalGrainStateEntity{TState}"/> for saving grain data in CosmosDb storage.
     /// </summary>
     /// <notes>
-    /// Is not recommended to be enabled. It is not compatible with latest Orleans format
+    /// Not compatible with default usage of latest Orleans 8 version.
+    /// Use it with caution.
     /// </notes>
-    public bool UseLegacyFormat { get; set; } = false;
+    [Experimental("OrleansCosmosExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9351")]
+    public bool UseExperimentalFormat { get; set; } = false;
 }

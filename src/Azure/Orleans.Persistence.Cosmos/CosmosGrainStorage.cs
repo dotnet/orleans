@@ -2,11 +2,8 @@
 // Copyright (c) Microsoft. All rights reserved.
 // </copyright>
 
-using System.Collections.Concurrent;
-using System.Globalization;
 using System.Net;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
@@ -173,9 +170,11 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
         {
             var (documentId, partitionKey) = this.idProvider.GetDocumentIdentifiers(stateName, grainId.Type, grainId.Key);
 
-            if (options.UseLegacyFormat)
+#pragma warning disable OrleansCosmosExperimental
+            if (options.UseExperimentalFormat)
+#pragma warning restore OrleansCosmosExperimental
             {
-                var response = await this.container.ReadItemAsync<LegacyGrainStateEntity<T>>(documentId, new PartitionKey(partitionKey)).ConfigureAwait(false);
+                var response = await this.container.ReadItemAsync<ExperimentalGrainStateEntity<T>>(documentId, new PartitionKey(partitionKey)).ConfigureAwait(false);
 
                 grainState.State = response.Resource.State;
                 grainState.ETag = response.ETag;
@@ -215,9 +214,11 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
         {
             var (documentId, partitionKey) = this.idProvider.GetDocumentIdentifiers(stateName, grainId.Type, grainId.Key);
 
-            if (options.UseLegacyFormat)
+#pragma warning disable OrleansCosmosExperimental
+            if (options.UseExperimentalFormat)
+#pragma warning restore OrleansCosmosExperimental
             {
-                var entity = new LegacyGrainStateEntity<T>
+                var entity = new ExperimentalGrainStateEntity<T>
                 {
                     ETag = grainState.ETag,
                     Id = documentId,
@@ -229,7 +230,7 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
 
                 var pk = new PartitionKey(partitionKey);
 
-                Task<ItemResponse<LegacyGrainStateEntity<T>>> responseTask;
+                Task<ItemResponse<ExperimentalGrainStateEntity<T>>> responseTask;
 
                 if (string.IsNullOrEmpty(grainState.ETag))
                 {
@@ -310,9 +311,11 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
             {
                 if (!string.IsNullOrEmpty(grainState.ETag))
                 {
-                    if (options.UseLegacyFormat)
+#pragma warning disable OrleansCosmosExperimental
+                    if (options.UseExperimentalFormat)
+#pragma warning restore OrleansCosmosExperimental
                     {
-                        await this.container.DeleteItemAsync<LegacyGrainStateEntity<T>>(documentId, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag }).ConfigureAwait(false);
+                        await this.container.DeleteItemAsync<ExperimentalGrainStateEntity<T>>(documentId, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag }).ConfigureAwait(false);
                     }
                     else
                     {
@@ -325,9 +328,11 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
             }
             else
             {
-                if (options.UseLegacyFormat)
+#pragma warning disable OrleansCosmosExperimental
+                if (options.UseExperimentalFormat)
+#pragma warning restore OrleansCosmosExperimental
                 {
-                    var entity = new LegacyGrainStateEntity<T>
+                    var entity = new ExperimentalGrainStateEntity<T>
                     {
                         ETag = grainState.ETag,
                         Id = documentId,

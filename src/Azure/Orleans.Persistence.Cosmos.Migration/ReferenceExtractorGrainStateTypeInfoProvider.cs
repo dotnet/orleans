@@ -69,7 +69,9 @@ namespace Orleans.Persistence.Cosmos.Migration
         /// </notes>
         private string? DetermineOverrideStateName(Type grainClass)
         {
-            if (options.UseLegacyFormat)
+#pragma warning disable OrleansCosmosExperimental
+            if (options.UseExperimentalFormat)
+#pragma warning restore OrleansCosmosExperimental
             {
                 // override of stateName is only applicable for orleans7+ serialization
                 return null;

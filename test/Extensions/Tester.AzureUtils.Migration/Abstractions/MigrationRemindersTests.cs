@@ -136,8 +136,8 @@ namespace Tester.AzureUtils.Migration.Abstractions
 
         private static string GenerateReminderName() => "Reminder" + Guid.NewGuid().ToString().Replace("-", "");
 
-        private TableClient GetOldTableClient() => GetTable(MigrationAzureTableTests.OldTableName);
-        private TableClient GetMigratedTableClient() => GetTable(MigrationAzureTableTests.DestinationTableName);
+        private TableClient GetOldTableClient() => GetTable(MigrationAzureTableRemindersTests.OldTableName);
+        private TableClient GetMigratedTableClient() => GetTable(MigrationAzureTableRemindersTests.DestinationTableName);
         private TableClient GetTable(string tableName) => new Azure.Data.Tables.TableClient(TestDefaultConfiguration.DataConnectionString, tableName);
     }
 }

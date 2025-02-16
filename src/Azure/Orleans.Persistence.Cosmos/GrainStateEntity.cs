@@ -10,7 +10,7 @@ namespace Orleans.Persistence.Cosmos;
 /// <typeparam name="TState">
 /// The underlying state type.
 /// </typeparam>
-internal sealed class LegacyGrainStateEntity<TState>
+internal sealed class ExperimentalGrainStateEntity<TState>
 {
     /// <summary>
     /// Gets or sets the entity ID.
