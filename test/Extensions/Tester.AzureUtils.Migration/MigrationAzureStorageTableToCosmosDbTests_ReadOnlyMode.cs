@@ -3,7 +3,10 @@ using Azure;
 using Azure.Core;
 using Azure.Identity;
 using Microsoft.Azure.Cosmos;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
+using Orleans.Persistence.Cosmos.DocumentIdProviders;
+using Orleans.Persistence.Cosmos;
 using Orleans.Persistence.Cosmos.Migration;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
@@ -38,6 +41,12 @@ namespace Tester.AzureUtils.Migration
         {
             public void Configure(ISiloBuilder siloBuilder)
             {
+                siloBuilder
+                    .ConfigureServices(services =>
+                    {
+                        services.TryAddSingleton<IDocumentIdProvider, ClusterDocumentIdProvider>();
+                    });
+
                 siloBuilder
                     .AddMigrationTools()
                     .AddMigrationGrainStorageAsDefault(options =>

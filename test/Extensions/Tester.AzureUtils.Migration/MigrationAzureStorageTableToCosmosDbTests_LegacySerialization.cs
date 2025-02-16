@@ -20,6 +20,9 @@ using Xunit;
 using Orleans;
 using Azure.Identity;
 using Tester.AzureUtils.Migration.Helpers;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Persistence.Cosmos.DocumentIdProviders;
+using Orleans.Persistence.Cosmos;
 
 namespace Tester.AzureUtils.Migration
 {
@@ -47,6 +50,12 @@ namespace Tester.AzureUtils.Migration
         {
             public void Configure(ISiloBuilder siloBuilder)
             {
+                siloBuilder
+                    .ConfigureServices(services =>
+                    {
+                        services.TryAddSingleton<IDocumentIdProvider, ClusterDocumentIdProvider>();
+                    });
+
                 siloBuilder
                     .AddMigrationTools()
                     .AddMigrationGrainStorageAsDefault(options =>

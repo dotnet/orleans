@@ -170,17 +170,8 @@ namespace Tester.AzureUtils.Migration.Abstractions
                 stateName!,
                 "migrationtestgrain", // GrainTypeAttribute's value for MigrationTestGrain
                 grainIdRepresentation);
-
-            string entityId;
-            if (latestOrleansSerializationFormat)
-            {
-                entityId = CosmosIdSanitizer.Sanitize(ClusterOptions.ServiceId) + "__" + documentId;
-            }
-            else
-            {
-                entityId = documentId;
-            }
-            var response = await container.ReadItemAsync<dynamic>(entityId, new PartitionKey(partitionKey));
+            
+            var response = await container.ReadItemAsync<dynamic>(documentId, new PartitionKey(partitionKey));
             JObject data = response.Resource;
 
             var dataState = latestOrleansSerializationFormat
