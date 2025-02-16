@@ -217,7 +217,9 @@ namespace Benchmarks
             },
             ["StatelessWorker"] = _ =>
             {
-                BenchmarkRunner.Run<StatelessWorkerBenchmark>();
+                RunBenchmark("", () => new StatelessWorkerBenchmark(),
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Dispose());
             },
             ["GrainStorage.Memory"] = _ =>
             {
@@ -299,7 +301,6 @@ namespace Benchmarks
                 return;
             }
 
-            //_benchmarks["StatelessWorker_Monotonic"]([]);
             _benchmarks[args[0]](slicedArgs);
         }
 

@@ -1,235 +1,191 @@
 using System.Diagnostics;
-using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Columns;
-using BenchmarkDotNet.Configs;
-using BenchmarkDotNet.Diagnosers;
-using BenchmarkDotNet.Jobs;
-using BenchmarkDotNet.Reports;
-using BenchmarkDotNet.Running;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Concurrency;
 
 namespace Benchmarks.Ping;
 
-[Config(typeof(Config))]
 public class StatelessWorkerBenchmark : IDisposable
 {
-    private class Config : ManualConfig
-    {
-        public Config()
-        {
-            AddJob(Job.ShortRun);
-            AddDiagnoser(MemoryDiagnoser.Default);
-            AddColumnProvider(new WorkerColumnProvider());
-        }
-    }
-
-    private const int MaxConcurrency = 100;
-
     private readonly IHost _host;
-    private readonly IMontonicGrain _montonicGrain;
-    private readonly IAdaptiveGrain _adaptiveGrain;
-    private readonly CancellationTokenSource _cts = new();
+    private readonly IGrainFactory _grainFactory;
 
     public StatelessWorkerBenchmark()
     {
-        var hostBuilder = new HostBuilder().UseOrleans((_, siloBuilder) =>
-            siloBuilder.UseLocalhostClustering());
+        _host = new HostBuilder()
+            .UseOrleans((_, siloBuilder) => siloBuilder
+            .UseLocalhostClustering())
+            .Build();
 
-        _host = hostBuilder.Build();
         _host.StartAsync().GetAwaiter().GetResult();
-
-        var grainFactory = _host.Services.GetRequiredService<IGrainFactory>();
-
-        _montonicGrain = grainFactory.GetGrain<IMontonicGrain>(0);
-        _adaptiveGrain = grainFactory.GetGrain<IAdaptiveGrain>(0);
-
-        _ = Task.Run(async () =>
-        {
-            while (!_cts.IsCancellationRequested)
-            {
-                await Task.Delay(250);
-                Console.WriteLine(
-                    $"Active Workers (Current/Max/Avg): " +
-                    $"{BaseGrain<SWMontonicGrain>.GetActiveWorkers()}/" +
-                    $"{SWMontonicGrain.GetMaxActiveWorkers()}/" +
-                    $"{SWMontonicGrain.GetAverageActiveWorkers():F2}");
-            }
-        });
+        _grainFactory = _host.Services.GetRequiredService<IGrainFactory>();
     }
 
-    [GlobalCleanup]
     public void Dispose()
     {
-        _cts.Cancel();
         _host.StopAsync().GetAwaiter().GetResult();
+        _host.Dispose();
     }
 
-    [Benchmark] public Task Monotonic() => Run(_montonicGrain);
-    [Benchmark] public Task Adaptive() => Run(_adaptiveGrain);
-
-    private async static Task Run<T>(T grain) where T : IProcessorGrain
+    public async Task RunAsync()
     {
+        await Run<IMontonicGrain, SWMontonicGrain>(_grainFactory.GetGrain<IMontonicGrain>(0));
+        await Run<IAdaptiveGrain, SWAdaptiveGrain>(_grainFactory.GetGrain<IAdaptiveGrain>(0));
+    }
+
+    private async static Task Run<T, H>(T grain)
+        where T : IProcessorGrain
+        where H : BaseGrain<H>
+    {
+        Console.WriteLine($"Executing benchmark for {typeof(H).Name}");
+
+        using var cts = new CancellationTokenSource();
+
+        var statsCollector = Task.Run(async () =>
+        {
+            while (!cts.Token.IsCancellationRequested)
+            {
+                await Task.Delay(1, cts.Token);
+                BaseGrain<H>.UpdateStats();
+            }
+        }, cts.Token);
+
         var tasks = new List<Task>();
-        for (var i = 0; i < MaxConcurrency; i++)
+
+        const int ConcurrencyLevel = 100;
+
+        for (var i = 0; i < ConcurrencyLevel; i++)
         {
             tasks.Add(grain.Process());
         }
 
         await Task.WhenAll(tasks);
-    }
-}
 
-public class WorkerColumnProvider : IColumnProvider
-{
-    public IEnumerable<IColumn> GetColumns(Summary summary)
-    {
-        yield return new MaxWorkersColumn();
-        yield return new AvgWorkersColumn();
-    }
-}
+        var cooldownMs = Math.Ceiling(1.5 * BenchmarkStatics.ProcessDelayMs *
+            ((double)ConcurrencyLevel / BenchmarkStatics.MaxWorkersLimit));
 
-public class MaxWorkersColumn : IColumn
-{
-    public string Id => "MaxWorkers";
-    public string ColumnName => "Max Workers";
-    public bool AlwaysShow => true;
-    public ColumnCategory Category => ColumnCategory.Custom;
-    public int PriorityInCategory => 10;
-    public bool IsNumeric => true;
-    public UnitType UnitType => UnitType.Dimensionless;
-    public string Legend => "Maximum number of active workers during the benchmark";
+        var cooldownPeriod = TimeSpan.FromMilliseconds(cooldownMs);
+        Console.WriteLine($"Waiting for cooldown period {cooldownPeriod}\n");
 
-    public string GetValue(Summary summary, BenchmarkCase benchmarkCase) =>
-        GetValue(summary, benchmarkCase, SummaryStyle.Default);
+        await Task.Delay(cooldownPeriod);
 
-    public string GetValue(Summary summary, BenchmarkCase benchmarkCase, SummaryStyle style)
-    {
-        if (benchmarkCase.Descriptor.WorkloadMethod.Name == nameof(StatelessWorkerBenchmark.Monotonic))
+        cts.Cancel();
+
+        try
         {
-            return SWMontonicGrain.GetMaxActiveWorkers().ToString();
+            await statsCollector;
         }
-        else if (benchmarkCase.Descriptor.WorkloadMethod.Name == nameof(StatelessWorkerBenchmark.Adaptive))
+        catch (OperationCanceledException)
         {
-            return SWAdaptiveGrain.GetMaxActiveWorkers().ToString();
+
         }
-        return "N/A";
+
+        BaseGrain<H>.Stop();
+
+        Console.WriteLine($"{typeof(H).Name} Stats:");
+        Console.WriteLine($" Active Workers:  {BaseGrain<H>.GetActiveWorkers()}");
+        Console.WriteLine($" Maximum Workers: {BaseGrain<H>.GetMaxActiveWorkers()}");
+        Console.WriteLine($" Average Workers: {BaseGrain<H>.GetAverageActiveWorkers():F2}");
+        Console.Write("\n\n");
     }
 
-    public bool IsDefault(Summary summary, BenchmarkCase benchmarkCase) => false;
-
-    public bool IsAvailable(Summary summary) => true;
-}
-
-public class AvgWorkersColumn : IColumn
-{
-    public string Id => "AvgWorkers";
-    public string ColumnName => "Average Workers";
-    public bool AlwaysShow => true;
-    public ColumnCategory Category => ColumnCategory.Custom;
-    public int PriorityInCategory => 11;
-    public bool IsNumeric => true;
-    public UnitType UnitType => UnitType.Dimensionless;
-    public string Legend => "Average number of active workers during the benchmark";
-
-    public string GetValue(Summary summary, BenchmarkCase benchmarkCase)
+    public static class BenchmarkStatics
     {
-        return GetValue(summary, benchmarkCase, SummaryStyle.Default);
+        public const int MaxWorkersLimit = 10;
+        public const int ProcessDelayMs = 1000;
     }
 
-    public string GetValue(Summary summary, BenchmarkCase benchmarkCase, SummaryStyle style)
+    public interface IProcessorGrain : IGrainWithIntegerKey
     {
-        if (benchmarkCase.Descriptor.WorkloadMethod.Name == nameof(StatelessWorkerBenchmark.Monotonic))
+        Task Process();
+    }
+
+    public interface IAdaptiveGrain : IProcessorGrain { }
+    public interface IMontonicGrain : IProcessorGrain { }
+
+    [StatelessWorker(BenchmarkStatics.MaxWorkersLimit, StatelessWorkerOperatingMode.Adaptive)]
+    public class SWAdaptiveGrain : BaseGrain<SWAdaptiveGrain>, IAdaptiveGrain { }
+
+    [StatelessWorker(BenchmarkStatics.MaxWorkersLimit, StatelessWorkerOperatingMode.Monotonic)]
+    public class SWMontonicGrain : BaseGrain<SWMontonicGrain>, IMontonicGrain { }
+
+    public abstract class BaseGrain<T> : Grain, IProcessorGrain where T : BaseGrain<T>
+    {
+        private static int _activeWorkers = 0;
+        private static int _maxActiveWorkers = 0;
+        private static long _totalWorkerTicks = 0;
+        private static long _lastUpdateTicks = 0;
+
+        private static int _watchStarted = 0;
+        private static int _watchStopped = 0;
+
+        private static readonly Stopwatch Watch = new();
+
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            return SWMontonicGrain.GetAverageActiveWorkers().ToString("F2");
-        }
-        else if (benchmarkCase.Descriptor.WorkloadMethod.Name == nameof(StatelessWorkerBenchmark.Adaptive))
-        {
-            return SWAdaptiveGrain.GetAverageActiveWorkers().ToString("F2");
-        }
-        return "N/A";
-    }
-
-    public bool IsDefault(Summary summary, BenchmarkCase benchmarkCase) => false;
-
-    public bool IsAvailable(Summary summary) => true;
-}
-
-public interface IProcessorGrain : IGrainWithIntegerKey
-{
-    Task Process();
-}
-
-public interface IMontonicGrain : IProcessorGrain { }
-public interface IAdaptiveGrain : IProcessorGrain { }
-
-[StatelessWorker(10, StatelessWorkerOperatingMode.Monotonic)]
-public class SWMontonicGrain : BaseGrain<SWMontonicGrain>, IMontonicGrain;
-
-[StatelessWorker(10, StatelessWorkerOperatingMode.Adaptive)]
-public class SWAdaptiveGrain : BaseGrain<SWAdaptiveGrain>, IAdaptiveGrain;
-
-public abstract class BaseGrain<T> : Grain, IProcessorGrain
-    where T : BaseGrain<T>
-{
-    // Static fields are unique for each closed generic type.
-    // e.g., BaseGrain<SWMontonicGrain> and BaseGrain<SWAdaptiveGrain>
-
-    private static int _activeWorkers = 0;
-    private static int _maxActiveWorkers = 0;
-    private static long _totalWorkerSeconds = 0; // Total worker-seconds accumulated
-    private static long _lastUpdateTicks = 0;
-    private static readonly Stopwatch Watch = Stopwatch.StartNew();
-
-    public override Task OnActivateAsync(CancellationToken cancellationToken)
-    {
-        Interlocked.Increment(ref _activeWorkers);
-        UpdateStats();
-
-        return Task.CompletedTask;
-    }
-
-    public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
-    {
-        Interlocked.Decrement(ref _activeWorkers);
-        UpdateStats();
-
-        return Task.CompletedTask;
-    }
-
-    public Task Process() => Task.Delay(Random.Shared.Next(1, 3) * 1000);
-
-    public static int GetActiveWorkers() => Volatile.Read(ref _activeWorkers);
-    public static int GetMaxActiveWorkers() => Volatile.Read(ref _maxActiveWorkers);
-
-    public static double GetAverageActiveWorkers()
-    {
-        var elapsedSeconds = Watch.Elapsed.TotalSeconds;
-        return elapsedSeconds == 0 ? 0 : Interlocked.Read(ref _totalWorkerSeconds) / elapsedSeconds;
-    }
-
-    private static void UpdateStats()
-    {
-        var currentWorkers = Interlocked.CompareExchange(ref _activeWorkers, 0, 0);
-
-        // Update max workers
-        int oldMax;
-        do
-        {
-            oldMax = Volatile.Read(ref _maxActiveWorkers);
-            if (currentWorkers <= oldMax)
+            if (Interlocked.CompareExchange(ref _watchStarted, 1, 0) == 0)
             {
-                break;
+                Watch.Start();
             }
 
-        } while (Interlocked.CompareExchange(ref _maxActiveWorkers, currentWorkers, oldMax) != oldMax);
+            Interlocked.Increment(ref _activeWorkers);
+            UpdateStats();
 
-        // Update total worker-seconds
-        long elapsedTicks = Watch.Elapsed.Ticks;
-        long lastUpdateTicks = Interlocked.Exchange(ref _lastUpdateTicks, elapsedTicks);
-        double elapsedSinceLastUpdate = (elapsedTicks - lastUpdateTicks) / (double)Stopwatch.Frequency;
+            return Task.CompletedTask;
+        }
 
-        Interlocked.Add(ref _totalWorkerSeconds, (long)(currentWorkers * elapsedSinceLastUpdate));
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+        {
+            Interlocked.Decrement(ref _activeWorkers);
+            UpdateStats();
+
+            if (Volatile.Read(ref _activeWorkers) == 0 &&
+                Interlocked.CompareExchange(ref _watchStopped, 1, 0) == 0)
+            {
+                Watch.Stop();
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task Process() => Task.Delay(BenchmarkStatics.ProcessDelayMs);
+
+        public static void UpdateStats()
+        {
+            var currentWorkers = Volatile.Read(ref _activeWorkers);
+
+            int oldMax;
+            do
+            {
+                oldMax = Volatile.Read(ref _maxActiveWorkers);
+                if (currentWorkers <= oldMax)
+                {
+                    break;
+                }
+            } while (Interlocked.CompareExchange(ref _maxActiveWorkers, currentWorkers, oldMax) != oldMax);
+
+            var elapsedTicks = Watch.Elapsed.Ticks;
+            var previousUpdate = Interlocked.Exchange(ref _lastUpdateTicks, elapsedTicks);
+            var elapsedSinceLastUpdate = elapsedTicks - previousUpdate;
+
+            Interlocked.Add(ref _totalWorkerTicks, currentWorkers * elapsedSinceLastUpdate);
+        }
+
+        public static void Stop()
+        {
+            UpdateStats();
+            Watch.Stop();
+        }
+
+        public static int GetActiveWorkers() => Volatile.Read(ref _activeWorkers);
+        public static int GetMaxActiveWorkers() => Volatile.Read(ref _maxActiveWorkers);
+
+        public static double GetAverageActiveWorkers()
+        {
+            var totalTicks = Volatile.Read(ref _totalWorkerTicks);
+            double elapsedTicks = Watch.Elapsed.Ticks;
+
+            return elapsedTicks == 0 ? 0 : totalTicks / elapsedTicks;
+        }
     }
 }
