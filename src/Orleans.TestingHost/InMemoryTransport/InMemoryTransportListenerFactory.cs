@@ -9,9 +9,7 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
-using Orleans.Internal;
 using Orleans.Networking.Shared;
-using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 
 namespace Orleans.TestingHost.InMemoryTransport;

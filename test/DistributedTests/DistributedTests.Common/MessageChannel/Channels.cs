@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Text.Json;
+using Azure.Identity;
 using Azure.Storage.Queues;
 
 namespace DistributedTests.Common.MessageChannel
@@ -69,10 +71,13 @@ namespace DistributedTests.Common.MessageChannel
         private static readonly string CLIENT_TO_SERVER_QUEUE = "servers-{0}";
         private static readonly string SILO_TO_CLIENT_QUEUE = "client-{0}";
 
-        public static async Task<ISendChannel> CreateSendChannel(string clusterId, SecretConfiguration configuration)
+        public static Task<ISendChannel> CreateSendChannel(string clusterId, Uri azureQueueUri)
+            => CreateSendChannel(clusterId, azureQueueUri.CreateQueueServiceClient());
+
+        public static async Task<ISendChannel> CreateSendChannel(string clusterId, QueueServiceClient queueServiceClient)
         {
-            var writeQueue = new QueueClient(configuration.ClusteringConnectionString, string.Format(CLIENT_TO_SERVER_QUEUE, clusterId));
-            var readQueue = new QueueClient(configuration.ClusteringConnectionString, string.Format(SILO_TO_CLIENT_QUEUE, clusterId));
+            var writeQueue = queueServiceClient.GetQueueClient(string.Format(CLIENT_TO_SERVER_QUEUE, clusterId));
+            var readQueue = queueServiceClient.GetQueueClient(string.Format(SILO_TO_CLIENT_QUEUE, clusterId));
 
             await writeQueue.CreateIfNotExistsAsync();
             await readQueue.CreateIfNotExistsAsync();
@@ -80,10 +85,13 @@ namespace DistributedTests.Common.MessageChannel
             return new SendChannel(writeQueue, readQueue);
         }
 
-        public static async Task<IReceiveChannel> CreateReceiveChannel(string serverName, string clusterId, SecretConfiguration configuration)
+        public static Task<IReceiveChannel> CreateReceiveChannel(string serverName, string clusterId, Uri azureQueueUri)
+            => CreateReceiveChannel(serverName, clusterId, azureQueueUri.CreateQueueServiceClient());
+
+        public static async Task<IReceiveChannel> CreateReceiveChannel(string serverName, string clusterId, QueueServiceClient queueServiceClient)
         {
-            var readQueue = new QueueClient(configuration.ClusteringConnectionString, string.Format(CLIENT_TO_SERVER_QUEUE, clusterId));
-            var writeQueue = new QueueClient(configuration.ClusteringConnectionString, string.Format(SILO_TO_CLIENT_QUEUE, clusterId));
+            var writeQueue = queueServiceClient.GetQueueClient(string.Format(SILO_TO_CLIENT_QUEUE, clusterId));
+            var readQueue = queueServiceClient.GetQueueClient(string.Format(CLIENT_TO_SERVER_QUEUE, clusterId));
 
             await writeQueue.CreateIfNotExistsAsync();
             await readQueue.CreateIfNotExistsAsync();

@@ -18,7 +18,8 @@ namespace DistributedTests.Client.Commands
             AddOption(OptionHelper.CreateOption<string>("--serviceId", isRequired: true));
             AddOption(OptionHelper.CreateOption<string>("--clusterId", isRequired: true));
             AddOption(OptionHelper.CreateOption<int>("--connectionsPerEndpoint", defaultValue: 1, validator: OptionHelper.OnlyStrictlyPositive));
-            AddOption(OptionHelper.CreateOption("--secretSource", defaultValue: SecretConfiguration.SecretSource.File));
+            AddOption(OptionHelper.CreateOption<Uri>("--azureQueueUri", isRequired: true));
+            AddOption(OptionHelper.CreateOption<Uri>("--azureTableUri", isRequired: true));
 
             // LoadGeneratorParameters
             AddOption(OptionHelper.CreateOption<int>("--numWorkers", defaultValue: 250, validator: OptionHelper.OnlyStrictlyPositive));

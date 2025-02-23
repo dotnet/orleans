@@ -14,11 +14,11 @@ namespace Orleans.Clustering.Cassandra;
 internal sealed class CassandraGatewayListProvider : IGatewayListProvider
 {
     private const string NotInitializedMessage = $"This instance has not been initialized. Ensure that {nameof(IGatewayListProvider.InitializeGatewayListProvider)} is called to initialize this instance before use.";
-    private readonly ClusterOptions _clusterOptions;
     private readonly TimeSpan _maxStaleness;
     private readonly string _identifier;
     private readonly CassandraClusteringOptions _options;
     private readonly IServiceProvider _serviceProvider;
+    private readonly int? _ttlSeconds;
     private ISession? _session;
     private OrleansQueries? _queries;
     private DateTime _cacheUntil;
@@ -32,14 +32,15 @@ internal sealed class CassandraGatewayListProvider : IGatewayListProvider
         IOptions<ClusterOptions> clusterOptions,
         IOptions<GatewayOptions> gatewayOptions,
         IOptions<CassandraClusteringOptions> options,
+        IOptions<ClusterMembershipOptions> clusterMembershipOptions,
         IServiceProvider serviceProvider)
     {
-        _clusterOptions = clusterOptions.Value;
-        _identifier = $"{_clusterOptions.ServiceId}-{_clusterOptions.ClusterId}";
+        _identifier = $"{clusterOptions.Value.ServiceId}-{clusterOptions.Value.ClusterId}";
         _options = options.Value;
         _serviceProvider = serviceProvider;
 
         _maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
+        _ttlSeconds = _options.GetCassandraTtlSeconds(clusterMembershipOptions.Value);
     }
 
     private ISession Session => _session ?? throw new InvalidOperationException(NotInitializedMessage);
@@ -56,7 +57,7 @@ internal sealed class CassandraGatewayListProvider : IGatewayListProvider
 
         _queries = await OrleansQueries.CreateInstance(_session);
 
-        await _session.ExecuteAsync(_queries.EnsureTableExists());
+        await _session.ExecuteAsync(_queries.EnsureTableExists(_ttlSeconds));
         await _session.ExecuteAsync(_queries.EnsureIndexExists);
     }
 

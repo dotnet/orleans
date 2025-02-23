@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Core
@@ -53,6 +54,43 @@ namespace Orleans.Core
         /// A <see cref="Task"/> representing the operation.
         /// </returns>
         Task ReadStateAsync();
+
+        /// <summary>
+        /// Clears the grain state.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <remarks>
+        /// This will usually mean the state record is deleted from backing store, but the specific behavior is defined by the storage provider instance configured for this grain.
+        /// If the Etag does not match what is present in the backing store, then this operation will fail; Set <see cref="Etag"/> to <see langword="null"/> to indicate "always delete".
+        /// </remarks>
+        /// <returns>
+        /// A <see cref="Task"/> representing the operation.
+        /// </returns>
+        Task ClearStateAsync(CancellationToken cancellationToken) => ClearStateAsync();
+
+        /// <summary>
+        /// Writes grain state to storage.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <remarks>
+        /// If the Etag does not match what is present in the backing store, then this operation will fail; Set <see cref="Etag"/> to <see langword="null"/> to indicate "always delete".
+        /// </remarks>
+        /// <returns>
+        /// A <see cref="Task"/> representing the operation.
+        /// </returns>
+        Task WriteStateAsync(CancellationToken cancellationToken) => WriteStateAsync();
+
+        /// <summary>
+        /// Reads grain state from storage.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <remarks>
+        /// Any previous contents of the grain state data will be overwritten.
+        /// </remarks>
+        /// <returns>
+        /// A <see cref="Task"/> representing the operation.
+        /// </returns>
+        Task ReadStateAsync(CancellationToken cancellationToken) => ReadStateAsync();
     }
 
     /// <summary>

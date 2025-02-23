@@ -169,9 +169,19 @@ namespace Orleans.Serialization.Internal
                 return Array.Empty<Assembly>();
             }
 
+#if NETCOREAPP3_1_OR_GREATER
+            var assemblyContext = AssemblyLoadContext.GetLoadContext(assembly) ?? AssemblyLoadContext.Default; 
+#endif
+
             return ExpandApplicationParts(
                 new[] { assembly }.Concat(assembly.GetCustomAttributes<ApplicationPartAttribute>()
-                    .Select(name => Assembly.Load(new AssemblyName(name.AssemblyName)))));
+                    .Select(name =>
+#if NETCOREAPP3_1_OR_GREATER
+                        assemblyContext.LoadFromAssemblyName(new AssemblyName(name.AssemblyName))
+#else
+                        Assembly.Load(new AssemblyName(name.AssemblyName))
+#endif
+                    )));
 
             static IEnumerable<Assembly> ExpandApplicationParts(IEnumerable<Assembly> assemblies)
             {
@@ -199,9 +209,18 @@ namespace Orleans.Serialization.Internal
                         return;
                     }
 
+#if NETCOREAPP3_1_OR_GREATER
+                    var assemblyContext = AssemblyLoadContext.GetLoadContext(assembly) ?? AssemblyLoadContext.Default; 
+#endif
+
                     foreach (var attribute in attributes)
                     {
-                        var referenced = Assembly.Load(new AssemblyName(attribute.AssemblyName));
+                        var assemblyName = new AssemblyName(attribute.AssemblyName);
+#if NETCOREAPP3_1_OR_GREATER
+                        var referenced = assemblyContext.LoadFromAssemblyName(assemblyName);
+#else
+                        var referenced = Assembly.Load(assemblyName);
+#endif
                         if (assemblies.Add(referenced))
                         {
                             ExpandAssembly(assemblies, referenced);

@@ -225,7 +225,7 @@ namespace Orleans.Runtime.Configuration
             var mark = "<--SNIP-->";
             if (string.IsNullOrEmpty(connectionString)) return "null";
             //if connection string format doesn't contain any secretKey, then return just <--SNIP-->
-            if (!secretKeys.Any(key => connectionString.Contains(key))) return mark;
+            if (!Array.Exists(secretKeys, key => connectionString.Contains(key))) return mark;
 
             string connectionInfo = connectionString;
 

@@ -188,7 +188,7 @@ namespace Tester.StreamingTests.BroadcastChannel
                 await stream.Publish(2);
                 // Wait to be sure that published event reached the grain
                 var counter = 0;
-                var cts = new CancellationTokenSource(CallTimeoutMs);
+                using var cts = new CancellationTokenSource(CallTimeoutMs);
                 while (!cts.IsCancellationRequested)
                 {
                     counter = await badGrain.GetOnPublishedCounter();
@@ -238,7 +238,7 @@ namespace Tester.StreamingTests.BroadcastChannel
 
         private static async Task<List<T>> Get<T>(Func<Task<List<T>>> func, int expectedCount, int timeoutMs = CallTimeoutMs)
         {
-            var cts = new CancellationTokenSource(timeoutMs);
+            using var cts = new CancellationTokenSource(timeoutMs);
             while (!cts.IsCancellationRequested)
             {
                 try

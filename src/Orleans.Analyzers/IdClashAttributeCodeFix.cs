@@ -38,7 +38,6 @@ public class IdClashAttributeCodeFix : CodeFixProvider
                         .OfType<AttributeSyntax>()
                         .Where(a => a.IsAttribute(Constants.IdAttributeName))
                         .Select(a => int.Parse(a.ArgumentList.Arguments.Single().ToString()))
-                        .ToList()
                         .Max() + 1;
 
                     var newAttribute = attribute.ReplaceNode(

@@ -1,7 +1,6 @@
 variables:
   clusterId: '{{ "now" | date: "%s" }}'
   serviceId: '{{ "now" | date: "%s" }}'
-  secretSource: KeyVault
   framework: net8.0
 
 jobs:
@@ -11,7 +10,7 @@ jobs:
     executable: DistributedTests.Server.exe
     readyStateText: Orleans Silo started.
     framework: net8.0
-    arguments: "{{configurator}} --clusterId {{clusterId}} --serviceId {{serviceId}} --secretSource {{secretSource}} {{configuratorOptions}}"
+    arguments: "{{configurator}} --clusterId {{clusterId}} --serviceId {{serviceId}} --azureQueueUri {{azureQueueUri}} --azureTableUri {{azureTableUri}} {{configuratorOptions}}"
     onConfigure:
       - if (job.endpoints.Count > 0) {
           job.endpoints.RemoveRange(job.variables.instances, job.endpoints.Count - job.variables.instances);
@@ -22,7 +21,7 @@ jobs:
     executable: DistributedTests.Client.exe
     waitForExit: true
     framework: net8.0
-    arguments: "{{command}} --clusterId {{clusterId}} --serviceId {{serviceId}} --secretSource {{secretSource}} {{commandOptions}}"
+    arguments: "{{command}} --clusterId {{clusterId}} --serviceId {{serviceId}} --azureQueueUri {{azureQueueUri}} --azureTableUri {{azureTableUri}} {{commandOptions}}"
     onConfigure:
       - if (job.endpoints.Count > 0) {
           job.endpoints.Reverse();
@@ -173,7 +172,8 @@ results:
 profiles:
   local:
     variables:
-      secretSource: File
+      azureQueueUri: "http://127.0.0.1:10001"
+      azureTableUri: "http://127.0.0.1:10002"
     jobs:
       server:
         endpoints:

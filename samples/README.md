@@ -245,6 +245,14 @@ In-memory clustering example where everything is written in F#:
 
 - How to develop a reminder grain in F#
 
+## [F# Grain Service](https://github.com/PiotrJustyna/road-to-orleans/tree/main/1c#readme)
+
+- How to use grain service from other grains in F#
+
+### Demonstrates
+
+- How to develop grain service and grain service client in F#
+
 ## [Streaming: Pub/Sub Streams over Azure Event Hubs](https://learn.microsoft.com/samples/dotnet/samples/orleans-streaming-pubsub-with-azure-event-hub)
 
 An application using Orleans Streams with [Azure Event Hubs](https://azure.microsoft.com/services/event-hubs/) as the provider and implicit subscribers.

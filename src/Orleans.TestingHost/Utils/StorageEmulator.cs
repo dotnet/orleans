@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 
 namespace Orleans.TestingHost.Utils
 {
@@ -68,13 +69,13 @@ namespace Orleans.TestingHost.Utils
                 using(var process = Process.Start(CreateProcessArguments("help")))
                 {
                     process.WaitForExit();
-                    var help = string.Empty;
+                    StringBuilder help = new();
                     while(!process.StandardOutput.EndOfStream)
                     {
-                        help += process.StandardOutput.ReadLine();
+                        help.Append(process.StandardOutput.ReadLine());
                     }
 
-                    return help;
+                    return help.ToString();
                 }
             }
             catch (Exception exc)

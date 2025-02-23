@@ -5,7 +5,7 @@ using Orleans.Concurrency;
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory;
 
-[Alias("IGrainDirectoryReplica")]
+[Alias("IGrainDirectoryPartition")]
 internal interface IGrainDirectoryPartition : ISystemTarget
 {
     [Alias("RegisterAsync")]
@@ -24,7 +24,7 @@ internal interface IGrainDirectoryPartition : ISystemTarget
     ValueTask<bool> AcknowledgeSnapshotTransferAsync(SiloAddress silo, int partitionIndex, MembershipVersion version);
 }
 
-[Alias("IGrainDirectoryReplicaClient")]
+[Alias("IGrainDirectoryClient")]
 internal interface IGrainDirectoryClient : ISystemTarget
 {
     [Alias("GetRegisteredActivations")]
@@ -34,7 +34,7 @@ internal interface IGrainDirectoryClient : ISystemTarget
     ValueTask<Immutable<List<GrainAddress>>> RecoverRegisteredActivations(MembershipVersion membershipVersion, RingRange range, SiloAddress siloAddress, int partitionId);
 }
 
-[Alias("IGrainDirectoryReplicaTestHooks")]
+[Alias("IGrainDirectoryTestHooks")]
 internal interface IGrainDirectoryTestHooks : ISystemTarget
 {
     [Alias("CheckIntegrityAsync")]

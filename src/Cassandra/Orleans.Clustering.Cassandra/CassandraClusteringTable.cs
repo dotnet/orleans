@@ -16,17 +16,23 @@ internal sealed class CassandraClusteringTable : IMembershipTable
     private const string NotInitializedMessage = $"This instance has not been initialized. Ensure that {nameof(IMembershipTable.InitializeMembershipTable)} is called to initialize this instance before use.";
     private readonly ClusterOptions _clusterOptions;
     private readonly CassandraClusteringOptions _options;
+    private readonly int? _ttlSeconds;
     private readonly IServiceProvider _serviceProvider;
     private ISession? _session;
     private OrleansQueries? _queries;
     private readonly string _identifier;
 
-    public CassandraClusteringTable(IOptions<ClusterOptions> clusterOptions, IOptions<CassandraClusteringOptions> options, IServiceProvider serviceProvider)
+    public CassandraClusteringTable(
+        IOptions<ClusterOptions> clusterOptions,
+        IOptions<CassandraClusteringOptions> options,
+        IOptions<ClusterMembershipOptions> clusterMembershipOptions,
+        IServiceProvider serviceProvider)
     {
         _clusterOptions = clusterOptions.Value;
         _options = options.Value;
         _identifier = $"{_clusterOptions.ServiceId}-{_clusterOptions.ClusterId}";
         _serviceProvider = serviceProvider;
+        _ttlSeconds = _options.GetCassandraTtlSeconds(clusterMembershipOptions.Value);
     }
 
     private ISession Session => _session ?? throw new InvalidOperationException(NotInitializedMessage);
@@ -43,7 +49,7 @@ internal sealed class CassandraClusteringTable : IMembershipTable
 
         _queries = await OrleansQueries.CreateInstance(_session);
 
-        await _session.ExecuteAsync(_queries.EnsureTableExists());
+        await _session.ExecuteAsync(_queries.EnsureTableExists(_ttlSeconds));
         await _session.ExecuteAsync(_queries.EnsureIndexExists);
 
         if (!tryInitTableVersion)
@@ -169,15 +175,31 @@ internal sealed class CassandraClusteringTable : IMembershipTable
 
     async Task IMembershipTable.UpdateIAmAlive(MembershipEntry entry)
     {
-        await Session.ExecuteAsync(await Queries.UpdateIAmAliveTime(_identifier, entry));
+        if (_ttlSeconds.HasValue)
+        {
+            // User has opted in to Cassandra TTL behavior for membership table rows, which means the entire row's data
+            // has to be written back so each cell's TTL can be updated
+            MembershipTableData existingRow = await ((IMembershipTable)this).ReadRow(entry.SiloAddress);
+
+            await Session.ExecuteAsync(await Queries.UpdateIAmAliveTimeWithTtL(
+                clusterIdentifier: _identifier,
+                // The MembershipEntry given to this method by Orleans only contains the SiloAddress and new IAmAliveTime
+                iAmAliveEntry: entry,
+                existingEntry: existingRow.Members[0].Item1,
+                existingVersion: existingRow.Version));
+        }
+        else
+        {
+            await Session.ExecuteAsync(await Queries.UpdateIAmAliveTime(_identifier, entry));
+        }
     }
 
     public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
     {
         var allEntries =
             (await Session.ExecuteAsync(await Queries.MembershipReadAll(_identifier)))
-            .Select(r => GetMembershipEntry(r))
-            .Where(e => e is not null)
+            .Select(GetMembershipEntry)
+            .Where((MembershipEntry? e) => e is not null)
             .Cast<MembershipEntry>();
 
         foreach (var e in allEntries)

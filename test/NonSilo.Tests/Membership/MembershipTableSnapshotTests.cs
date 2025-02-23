@@ -1,3 +1,4 @@
+using FluentAssertions.Common;
 using Orleans;
 using Orleans.Runtime;
 using Xunit;
@@ -55,6 +56,32 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public void MembershipTableSnapshot_CreateUpdatePreservesIAmAliveTime()
+        {
+            var originalSilo = Silo("127.0.0.1:100@1");
+            var earlierDate = new DateTimeOffset(new DateTime(2025, 1, 30, 12, 30, 45, DateTimeKind.Utc));
+            var laterDate = earlierDate.AddDays(1);
+
+            // Merging a later snapshot with an earlier date with an older snapshot with a later date should preserve the later date.
+            {
+                var originalSnapshot = MembershipTableSnapshot.Create(Table(Entry(originalSilo, SiloStatus.Active, laterDate)));
+                var newSnapshot = MembershipTableSnapshot.Update(originalSnapshot, Table(Entry(originalSilo, SiloStatus.Active, earlierDate)));
+
+                var iAmAliveTime = newSnapshot.Entries[originalSilo].IAmAliveTime;
+                Assert.Equal(laterDate, iAmAliveTime);
+            }
+
+            // Now do the same thing, but using a snapshot instead of a table
+            {
+                var originalSnapshot = MembershipTableSnapshot.Create(Table(Entry(originalSilo, SiloStatus.Active, laterDate)));
+                var newSnapshot = MembershipTableSnapshot.Update(originalSnapshot, MembershipTableSnapshot.Create(Table(Entry(originalSilo, SiloStatus.Active, earlierDate))));
+
+                var iAmAliveTime = newSnapshot.Entries[originalSilo].IAmAliveTime;
+                Assert.Equal(laterDate, iAmAliveTime);
+            }
+        }
+
+        [Fact]
         public void MembershipTableSnapshot_GetSiloStatus_UnknownSilo_KnownSuccessor()
         {
             var unknownSilo = Silo("127.0.0.1:100@1");
@@ -68,9 +95,9 @@ namespace NonSilo.Tests.Membership
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
-        private static MembershipEntry Entry(SiloAddress address, SiloStatus status)
+        private static MembershipEntry Entry(SiloAddress address, SiloStatus status, DateTimeOffset iAmAliveTime = default)
         {
-            return new MembershipEntry { SiloAddress = address, Status = status };
+            return new MembershipEntry { SiloAddress = address, Status = status, IAmAliveTime = iAmAliveTime.UtcDateTime };
         }
 
         private static MembershipTableData Table(params MembershipEntry[] entries)

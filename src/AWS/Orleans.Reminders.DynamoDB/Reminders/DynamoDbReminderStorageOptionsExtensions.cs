@@ -24,7 +24,7 @@ namespace Orleans.Configuration
         {
             var parameters = connectionString.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
 
-            var serviceConfig = parameters.Where(p => p.Contains(ServicePropertyName)).FirstOrDefault();
+            var serviceConfig = Array.Find(parameters, p => p.Contains(ServicePropertyName));
             if (!string.IsNullOrWhiteSpace(serviceConfig))
             {
                 var value = serviceConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -32,7 +32,7 @@ namespace Orleans.Configuration
                     options.Service = value[1];
             }
 
-            var secretKeyConfig = parameters.Where(p => p.Contains(SecretKeyPropertyName)).FirstOrDefault();
+            var secretKeyConfig = Array.Find(parameters, p => p.Contains(SecretKeyPropertyName));
             if (!string.IsNullOrWhiteSpace(secretKeyConfig))
             {
                 var value = secretKeyConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -40,7 +40,7 @@ namespace Orleans.Configuration
                     options.SecretKey = value[1];
             }
 
-            var accessKeyConfig = parameters.Where(p => p.Contains(AccessKeyPropertyName)).FirstOrDefault();
+            var accessKeyConfig = Array.Find(parameters, p => p.Contains(AccessKeyPropertyName));
             if (!string.IsNullOrWhiteSpace(accessKeyConfig))
             {
                 var value = accessKeyConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -48,7 +48,7 @@ namespace Orleans.Configuration
                     options.AccessKey = value[1];
             }
 
-            var readCapacityUnitsConfig = parameters.Where(p => p.Contains(ReadCapacityUnitsPropertyName)).FirstOrDefault();
+            var readCapacityUnitsConfig = Array.Find(parameters, p => p.Contains(ReadCapacityUnitsPropertyName));
             if (!string.IsNullOrWhiteSpace(readCapacityUnitsConfig))
             {
                 var value = readCapacityUnitsConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -56,7 +56,7 @@ namespace Orleans.Configuration
                     options.ReadCapacityUnits = int.Parse(value[1]);
             }
 
-            var writeCapacityUnitsConfig = parameters.Where(p => p.Contains(WriteCapacityUnitsPropertyName)).FirstOrDefault();
+            var writeCapacityUnitsConfig = Array.Find(parameters, p => p.Contains(WriteCapacityUnitsPropertyName));
             if (!string.IsNullOrWhiteSpace(writeCapacityUnitsConfig))
             {
                 var value = writeCapacityUnitsConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -64,7 +64,7 @@ namespace Orleans.Configuration
                     options.WriteCapacityUnits = int.Parse(value[1]);
             }
 
-            var useProvisionedThroughputConfig = parameters.Where(p => p.Contains(UseProvisionedThroughputPropertyName)).FirstOrDefault();
+            var useProvisionedThroughputConfig = Array.Find(parameters, p => p.Contains(UseProvisionedThroughputPropertyName));
             if (!string.IsNullOrWhiteSpace(useProvisionedThroughputConfig))
             {
                 var value = useProvisionedThroughputConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -72,7 +72,7 @@ namespace Orleans.Configuration
                     options.UseProvisionedThroughput = bool.Parse(value[1]);
             }
 
-            var createIfNotExistsPropertyNameConfig = parameters.Where(p => p.Contains(CreateIfNotExistsPropertyName)).FirstOrDefault();
+            var createIfNotExistsPropertyNameConfig = Array.Find(parameters, p => p.Contains(CreateIfNotExistsPropertyName));
             if (!string.IsNullOrWhiteSpace(createIfNotExistsPropertyNameConfig))
             {
                 var value = createIfNotExistsPropertyNameConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -80,7 +80,7 @@ namespace Orleans.Configuration
                     options.CreateIfNotExists = bool.Parse(value[1]);
             }
 
-            var updateIfExistsPropertyNameConfig = parameters.Where(p => p.Contains(UpdateIfExistsPropertyName)).FirstOrDefault();
+            var updateIfExistsPropertyNameConfig = Array.Find(parameters, p => p.Contains(UpdateIfExistsPropertyName));
             if (!string.IsNullOrWhiteSpace(updateIfExistsPropertyNameConfig))
             {
                 var value = updateIfExistsPropertyNameConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);

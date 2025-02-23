@@ -27,6 +27,12 @@ namespace Tester.StreamingTests
                         {
                             options.StreamInactivityPeriod = StreamInactivityPeriod;
                         }));
+                        b.ConfigureCacheEviction(ob => ob.Configure(options =>
+                        {
+                            options.MetadataMinTimeInCache = MetadataMinTimeInCache;
+                            options.DataMaxAgeInCache = DataMaxAgeInCache;
+                            options.DataMinTimeInCache = DataMinTimeInCache;
+                        }));
                     });
             }
         }

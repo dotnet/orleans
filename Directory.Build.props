@@ -50,8 +50,8 @@
 
   <!-- Versioning properties -->
   <PropertyGroup>
-    <AssemblyVersion>8.0.0.0</AssemblyVersion>
-    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">8.0.0</VersionPrefix>
+    <AssemblyVersion>9.0.0.0</AssemblyVersion>
+    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">9.1.0</VersionPrefix>
   </PropertyGroup>
 
   <!-- For Debug builds generated a date/time dependent version suffix -->

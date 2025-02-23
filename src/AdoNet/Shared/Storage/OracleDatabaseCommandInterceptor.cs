@@ -61,7 +61,7 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="enumName">String value of a OracleDbType enum value.</param>
         /// <returns>An action which takes a OracleParameter as IDbDataParameter.</returns>
-        private Action<IDbDataParameter> BuildSetOracleDbTypeAction(string enumName)
+        private static Action<IDbDataParameter> BuildSetOracleDbTypeAction(string enumName)
         {
             var type = Type.GetType("Oracle.ManagedDataAccess.Client.OracleParameter, Oracle.ManagedDataAccess");
 

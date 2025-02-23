@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration.Memory;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using System.Runtime.InteropServices;
 using TestExtensions;
 using TestVersionGrainInterfaces;
 using TestVersionGrains;
@@ -28,7 +29,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         private const string VersionsProjectDirectory = "Grains";
         private const string GrainsV1ProjectName = "TestVersionGrains";
         private const string GrainsV2ProjectName = "TestVersionGrains2";
-        private const string VersionTestBinaryName = "TestVersionGrains.exe";
+        private static readonly string VersionTestBinaryName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "TestVersionGrains.exe" : "TestVersionGrains";
         private readonly FileInfo assemblyGrainsV1;
         private readonly FileInfo assemblyGrainsV2;
 
@@ -61,7 +62,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             assemblyGrainsV2 = GetVersionTestDirectory(testDirectory, GrainsV2ProjectName);
         }
 
-        private FileInfo GetVersionTestDirectory(DirectoryInfo testDirectory, string directoryName)
+        private static FileInfo GetVersionTestDirectory(DirectoryInfo testDirectory, string directoryName)
         {
             var projectDirectory = Path.Combine(testDirectory.FullName, VersionsProjectDirectory, directoryName, BinDirectory);
 

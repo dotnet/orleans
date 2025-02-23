@@ -126,7 +126,7 @@ namespace Orleans.Runtime.Placement
                 throw new OrleansException(
                     $"No active nodes are compatible with grain {grainType} and interface {target.InterfaceType} version {target.InterfaceVersion}. "
                     + $"Known nodes with grain type: {allWithTypeString}. "
-                    + $"All known nodes compatible with interface version: {allWithTypeString}");
+                    + $"All known nodes compatible with interface version: {allWithInterfaceString}");
             }
 
             return compatibleSilos;

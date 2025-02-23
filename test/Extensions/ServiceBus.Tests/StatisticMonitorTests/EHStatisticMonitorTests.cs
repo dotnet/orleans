@@ -111,7 +111,7 @@ namespace ServiceBus.Tests.MonitorTests
             }
         }
 
-        private void AssertCacheMonitorCallCounters(CacheMonitorCounters totalCacheMonitorCallCounters)
+        private static void AssertCacheMonitorCallCounters(CacheMonitorCounters totalCacheMonitorCallCounters)
         {
             var c = totalCacheMonitorCallCounters;
             Assert.True(c.TrackCachePressureMonitorStatusChangeCallCounter > 0,
@@ -122,7 +122,7 @@ namespace ServiceBus.Tests.MonitorTests
             Assert.True(0 == c.TrackMessagePurgedCounter, $"Expected {nameof(c.TrackMessagePurgedCounter)} == 0, got {c.TrackMessagePurgedCounter}");
         }
 
-        private void AssertReceiverMonitorCallCounters(EventHubReceiverMonitorCounters totalReceiverMonitorCallCounters)
+        private static void AssertReceiverMonitorCallCounters(EventHubReceiverMonitorCounters totalReceiverMonitorCallCounters)
         {
             var c = totalReceiverMonitorCallCounters;
             Assert.True(ehPartitionCountPerSilo == c.TrackInitializationCallCounter, $"Expected {nameof(c.TrackInitializationCallCounter)} == {ehPartitionCountPerSilo}, got {c.TrackInitializationCallCounter}");
@@ -131,7 +131,7 @@ namespace ServiceBus.Tests.MonitorTests
             Assert.True(0 == c.TrackShutdownCallCounter, $"Expected {nameof(c.TrackShutdownCallCounter)} == 0, got {c.TrackShutdownCallCounter}");
         }
 
-        private void AssertObjectPoolMonitorCallCounters(ObjectPoolMonitorCounters totalObjectPoolMonitorCallCounters)
+        private static void AssertObjectPoolMonitorCallCounters(ObjectPoolMonitorCounters totalObjectPoolMonitorCallCounters)
         {
             var c = totalObjectPoolMonitorCallCounters;
             Assert.True(c.TrackObjectAllocatedByCacheCallCounter > 0, $"Expected {nameof(c.TrackObjectAllocatedByCacheCallCounter)} > 0, got {c.TrackObjectAllocatedByCacheCallCounter}");

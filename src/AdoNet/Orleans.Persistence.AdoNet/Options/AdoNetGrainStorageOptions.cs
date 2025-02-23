@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using Orleans.Persistence.AdoNet.Storage;
 using Orleans.Runtime;
 using Orleans.Storage;
@@ -37,6 +38,21 @@ namespace Orleans.Configuration
 
         /// <inheritdoc/>
         public IGrainStorageSerializer GrainStorageSerializer { get; set; }
+
+        /// <summary>
+        /// Gets or sets the hasher picker to use for this storage provider. 
+        /// </summary>
+        public IStorageHasherPicker HashPicker { get; set; }
+
+        /// <summary>
+        /// Sets legacy Orleans v3-compatible hash picker to use for this storage provider. Invoke this method if you need to run
+        /// Orleans v7+ silo against existing Orleans v3-initialized database and keep existing grain state.
+        /// </summary>
+        public void UseOrleans3CompatibleHasher()
+        {
+            // content-aware hashing with different pickers, unable to use standard StorageHasherPicker
+            this.HashPicker = new Orleans3CompatibleStorageHashPicker();
+        }
     }
 
     /// <summary>
@@ -70,6 +86,27 @@ namespace Orleans.Configuration
             {
                 throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". {nameof(options.ConnectionString)} is required.");
             }
+
+            if (this.options.HashPicker == null)
+            {
+                throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} {name}. {nameof(options.HashPicker)} is required.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Provides default configuration HashPicker for AdoNetGrainStorageOptions.
+    /// </summary>
+    public class DefaultAdoNetGrainStorageOptionsHashPickerConfigurator : IPostConfigureOptions<AdoNetGrainStorageOptions>
+    {
+        public void PostConfigure(string name, AdoNetGrainStorageOptions options)
+        {
+            // preserving explicitly configured HashPicker
+            if (options.HashPicker != null)
+                return;
+
+            // set default IHashPicker if not configured yet
+            options.HashPicker = new StorageHasherPicker(new[] { new OrleansDefaultHasher() });
         }
     }
 }

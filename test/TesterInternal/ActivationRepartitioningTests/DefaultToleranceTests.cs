@@ -461,7 +461,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         }
     }
 
-    [Immovable]
+    [Immovable(ImmovableKind.Repartitioner)]
     public class CImmovable : GrainBase, ICImmovable
     {
         public Task Ping(Scenario scenario) =>
@@ -482,7 +482,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
             };
     }
 
-    [Immovable]
+    [Immovable(ImmovableKind.Repartitioner)]
     public class SP : GrainBase, ISP
     {
         // We are just 'Immovable' on this type, because we just want it to push messages to the stream,

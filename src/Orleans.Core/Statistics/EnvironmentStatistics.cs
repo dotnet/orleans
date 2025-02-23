@@ -71,7 +71,7 @@ public EnvironmentStatistics GetEnvironmentStatistics()
         {
             if (source.Name.Equals("System.Runtime"))
             {
-                Dictionary<string, string?>? refreshInterval = new() { ["EventCounterIntervalSec"] = "0.5" };
+                Dictionary<string, string?>? refreshInterval = new() { ["EventCounterIntervalSec"] = "1" };
                 EnableEvents(source, EventLevel.Informational, (EventKeywords)(-1), refreshInterval);
             }
         }

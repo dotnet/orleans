@@ -7,6 +7,7 @@ using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.WireProtocol;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Serialization.Codecs;
 
@@ -15,7 +16,7 @@ namespace Orleans.Serialization.Codecs;
 /// </summary>
 /// <typeparam name="T">The element type.</typeparam>
 [RegisterSerializer]
-public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>
+public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>, IBaseCodec<Collection<T>>
 {
     private readonly Type CodecElementType = typeof(T);
 
@@ -41,16 +42,7 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>
 
         writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
-        if (value.Count > 0)
-        {
-            UInt32Codec.WriteField(ref writer, 0, (uint)value.Count);
-            uint innerFieldIdDelta = 1;
-            foreach (var element in value)
-            {
-                _fieldCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, element);
-                innerFieldIdDelta = 0;
-            }
-        }
+        Serialize(ref writer, value);
 
         writer.WriteEndObject();
     }
@@ -112,10 +104,60 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>
         return result;
     }
 
-    private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
+    private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
         $"Declared length of {typeof(Collection<T>)}, {length}, is greater than total length of input.");
 
     private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
+
+    public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Collection<T> value) where TBufferWriter : IBufferWriter<byte>
+    {
+        if (value.Count > 0)
+        {
+            UInt32Codec.WriteField(ref writer, 0, (uint)value.Count);
+            uint innerFieldIdDelta = 1;
+            foreach (var element in value)
+            {
+                _fieldCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, element);
+                innerFieldIdDelta = 0;
+            }
+        }
+    }
+
+    public void Deserialize<TInput>(ref Reader<TInput> reader, Collection<T> value)
+    {
+        // If the value has some values added by the constructor, clear them.
+        // If those values are in the serialized payload, they will be added below.
+        value.Clear();
+
+        uint fieldId = 0;
+        while (true)
+        {
+            var header = reader.ReadFieldHeader();
+            if (header.IsEndBaseOrEndObject)
+            {
+                break;
+            }
+
+            fieldId += header.FieldIdDelta;
+            switch (fieldId)
+            {
+                case 0:
+                    var length = (int)UInt32Codec.ReadValue(ref reader, header);
+                    if (length > 10240 && length > reader.Length)
+                    {
+                        ThrowInvalidSizeException(length);
+                    }
+
+                    break;
+                case 1:
+                    value.Add(_fieldCodec.ReadValue(ref reader, header));
+                    break;
+                default:
+                    reader.ConsumeUnknownField(header);
+                    break;
+            }
+        }
+    }
 }
 
 /// <summary>
@@ -162,6 +204,8 @@ public sealed class CollectionCopier<T> : IDeepCopier<Collection<T>>, IBaseCopie
     /// <inheritdoc/>
     public void DeepCopy(Collection<T> input, Collection<T> output, CopyContext context)
     {
+        output.Clear();
+
         foreach (var item in input)
         {
             output.Add(_copier.DeepCopy(item, context));

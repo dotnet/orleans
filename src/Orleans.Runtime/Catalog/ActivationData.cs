@@ -701,7 +701,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 }
 
                 var executionTime = _busyDuration.Elapsed;
-                if (executionTime >= slowRunningRequestDuration)
+                if (executionTime >= slowRunningRequestDuration && !message.IsLocalOnly)
                 {
                     GetStatusList(ref diagnostics);
                     if (timeSinceQueued.HasValue)
@@ -722,7 +722,10 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             {
                 var message = running.Key;
                 var runDuration = running.Value;
-                if (ReferenceEquals(message, _blockingRequest)) continue;
+                if (ReferenceEquals(message, _blockingRequest) || message.IsLocalOnly)
+                {
+                    continue;
+                }
 
                 // Check how long they've been executing.
                 var executionTime = runDuration.Elapsed;
@@ -744,6 +747,11 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             foreach (var pair in _waitingRequests)
             {
                 var message = pair.Message;
+                if (message.IsLocalOnly)
+                {
+                    continue;
+                }
+
                 var queuedTime = pair.QueuedTime.Elapsed;
                 if (queuedTime >= longQueueTimeDuration)
                 {
@@ -1206,14 +1214,15 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         {
             if (_shared.Logger.IsEnabled(LogLevel.Debug))
             {
-                _shared.Logger.LogDebug("Rehydrating grain from previous activation");
+                _shared.Logger.LogDebug("Rehydrating grain '{GrainContext}' from previous activation.", this);
             }
 
             lock (this)
             {
                 if (State != ActivationState.Creating)
                 {
-                    throw new InvalidOperationException($"Attempted to rehydrate a grain in the {State} state");
+                    _shared.Logger.LogWarning("Ignoring attempt to rehydrate grain '{GrainContext}' in the '{State}' state.", this, State);
+                    return;
                 }
 
                 if (context.TryGetValue(GrainAddressMigrationContextKey, out GrainAddress? previousRegistration) && previousRegistration is not null)

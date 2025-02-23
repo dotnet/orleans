@@ -70,7 +70,6 @@ namespace NonSilo.Tests
         /// </summary>
         [Fact]
         public void ParsedTypeNamesAreIdenticalToFormattedNames()
-
         {
             foreach (var type in _types)
             {
@@ -85,7 +84,17 @@ namespace NonSilo.Tests
                 _output.WriteLine($"Reparsed     : {reparsed}");
                 Assert.Equal(formatted, reparsed.Format());
             }
-        } 
+        }
+
+        [Fact]
+        public void InvalidNamesThrowDescriptiveErrorMessage()
+        {
+            var input = "MalformedName[`";
+            var exception = Assert.Throws<InvalidOperationException>(() => RuntimeTypeNameParser.Parse(input));
+            _output.WriteLine(exception.Message);
+            Assert.Contains(input, exception.Message);
+            Assert.Contains("^", exception.Message); // Position indicator
+        }
         
         public class Inner<T>
         {

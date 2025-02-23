@@ -291,7 +291,7 @@ namespace Orleans.Runtime
 
                 if (this.messagePump != null)
                 {
-                    await Task.WhenAny(cancellation.WhenCancelled(), this.messagePump);
+                    await messagePump.WaitAsync(cancellation).SuppressThrowing();
                 }
             }
         }

@@ -28,7 +28,7 @@ namespace Orleans.Runtime
         private readonly LocalClientDetails _localClientDetails;
         private readonly GatewayManager _gatewayManager;
         private readonly AsyncEnumerable<ClusterManifest> _updates;
-        private readonly CancellationTokenSource _cancellation = new CancellationTokenSource();
+        private readonly CancellationTokenSource _shutdownCts = new CancellationTokenSource();
         private ClusterManifest _current;
         private Task? _runTask;
 
@@ -77,17 +77,37 @@ namespace Orleans.Runtime
             return _initialized.Task;
         }
 
+        public async Task StopAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                _shutdownCts.Cancel();
+
+                if (_runTask is { } task)
+                {
+                    await task.WaitAsync(cancellationToken);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogInformation("Graceful shutdown of cluster manifest provider was canceled.");
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Error stopping cluster manifest provider.");
+            }
+        }
+
         private async Task RunAsync()
         {
             try
             {
                 var grainFactory = _services.GetRequiredService<IInternalGrainFactory>();
-                var cancellationTask = _cancellation.Token.WhenCancelled();
                 SiloAddress? gateway = null;
                 IClusterManifestSystemTarget? provider = null;
                 var minorVersion = 0;
                 var gatewayVersion = MajorMinorVersion.MinValue;
-                while (!_cancellation.IsCancellationRequested)
+                while (!_shutdownCts.IsCancellationRequested)
                 {
                     // Select a new gateway if the current one is not available.
                     // This could be caused by a temporary issue or a permanent gateway failure.
@@ -96,7 +116,7 @@ namespace Orleans.Runtime
                         gateway = _gatewayManager.GetLiveGateway();
                         if (gateway is null)
                         {
-                            await Task.Delay(StandardExtensions.Min(_typeManagementOptions.TypeMapRefreshInterval, TimeSpan.FromMilliseconds(500)));
+                            await Task.Delay(StandardExtensions.Min(_typeManagementOptions.TypeMapRefreshInterval, TimeSpan.FromMilliseconds(500)), _shutdownCts.Token);
                             continue;
                         }
 
@@ -114,19 +134,11 @@ namespace Orleans.Runtime
 
                     try
                     {
-                        var refreshTask = GetClusterManifestUpdate(provider, gatewayVersion);
-                        var task = await Task.WhenAny(cancellationTask, refreshTask).ConfigureAwait(false);
-
-                        if (ReferenceEquals(task, cancellationTask))
-                        {
-                            return;
-                        }
-
-                        var updateResult = await refreshTask;
+                        var updateResult = await GetClusterManifestUpdate(provider, gatewayVersion).WaitAsync(_shutdownCts.Token);
                         if (updateResult is null)
                         {
                             // There was no newer cluster manifest, so wait for the next refresh interval and try again.
-                            await Task.WhenAny(cancellationTask, Task.Delay(_typeManagementOptions.TypeMapRefreshInterval));
+                            await Task.Delay(_typeManagementOptions.TypeMapRefreshInterval, _shutdownCts.Token);
                             continue;
                         }
 
@@ -155,7 +167,7 @@ namespace Orleans.Runtime
                         var updatedManifest = new ClusterManifest(new MajorMinorVersion(gatewayVersion.Major, ++minorVersion), siloManifests);
                         if (!_updates.TryPublish(updatedManifest))
                         {
-                            await Task.Delay(StandardExtensions.Min(_typeManagementOptions.TypeMapRefreshInterval, TimeSpan.FromMilliseconds(500)));
+                            await Task.Delay(StandardExtensions.Min(_typeManagementOptions.TypeMapRefreshInterval, TimeSpan.FromMilliseconds(500)), _shutdownCts.Token);
                             continue;
                         }
 
@@ -166,12 +178,16 @@ namespace Orleans.Runtime
                             _logger.LogDebug("Refreshed cluster manifest");
                         }
 
-                        await Task.WhenAny(cancellationTask, Task.Delay(_typeManagementOptions.TypeMapRefreshInterval));
+                        await Task.Delay(_typeManagementOptions.TypeMapRefreshInterval, _shutdownCts.Token);
+                    }
+                    catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+                    {
+                        // Ignore during shutdown.
                     }
                     catch (Exception exception)
                     {
                         _logger.LogWarning(exception, "Error trying to get cluster manifest from gateway {Gateway}", gateway);
-                        await Task.Delay(StandardExtensions.Min(_typeManagementOptions.TypeMapRefreshInterval, TimeSpan.FromSeconds(5)));
+                        await Task.Delay(StandardExtensions.Min(_typeManagementOptions.TypeMapRefreshInterval, TimeSpan.FromSeconds(5)), _shutdownCts.Token).SuppressThrowing();
 
                         // Reset the gateway so that another will be selected on the next iteration.
                         gateway = null;
@@ -209,16 +225,24 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public ValueTask DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
-            _cancellation.Cancel();
-            return _runTask is Task task ? new ValueTask(task) : default;
+            if (_shutdownCts.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _shutdownCts.Cancel();
+            if (_runTask is Task task)
+            {
+                await task.SuppressThrowing();
+            }
         }
 
         /// <inheritdoc />
         public void Dispose()
         {
-            _cancellation.Cancel();
+            _shutdownCts.Cancel();
         }
     }
 }

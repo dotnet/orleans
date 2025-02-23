@@ -142,7 +142,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
 
         Assert.Single(data.Members);
         Assert.NotNull(data.Version.VersionEtag);
- 
+
         Assert.NotEqual(newTableVersion.VersionEtag, data.Version.VersionEtag);
         Assert.Equal(newTableVersion.Version, data.Version.Version);
 
@@ -328,10 +328,16 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         Assert.Single(tableData.Members);
     }
 
-    [Fact]
-    public async Task MembershipTable_UpdateIAmAlive()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task MembershipTable_UpdateIAmAlive(bool cassandraTtl)
     {
-        var (membershipTable, _) = await CreateNewMembershipTableAsync();
+        // Drop the membership table before starting because the TTL behavior depends on the table creation
+        ISession ttlSession = await CreateSession();
+        await ttlSession.ExecuteAsync(new SimpleStatement("DROP TABLE IF EXISTS membership;"));
+
+        var (membershipTable, _) = await CreateNewMembershipTableAsync(cassandraTtl:cassandraTtl);
 
         var tableData = await membershipTable.ReadAll();
 
@@ -339,6 +345,14 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         var newEntry = CreateMembershipEntryForTest();
         var ok = await membershipTable.InsertRow(newEntry, newTableVersion);
         Assert.True(ok);
+        MembershipEntry originalMembershipEntry = (await membershipTable.ReadAll())
+            .Members.First(e => e.Item1.SiloAddress.Equals(newEntry.SiloAddress))
+            .Item1;
+        Assert.Null(originalMembershipEntry.SuspectTimes);
+
+        // Validate initial TTL values
+        var initialTtlValues = new Dictionary<string, int>();
+        await ValidateTtlValues(initial:true);
 
         var amAliveTime = DateTime.UtcNow.Add(TimeSpan.FromSeconds(5));
 
@@ -352,12 +366,166 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         await membershipTable.UpdateIAmAlive(entry);
 
         tableData = await membershipTable.ReadAll();
-        var member = tableData.Members.First(e => e.Item1.SiloAddress.Equals(newEntry.SiloAddress));
+        MembershipEntry updatedMember = tableData.Members
+            .First(e => e.Item1.SiloAddress.Equals(newEntry.SiloAddress))
+            .Item1;
 
         // compare that the value is close to what we passed in, but not exactly, as the underlying store can set its own precision settings
         // (ie: in SQL Server this is defined as datetime2(3), so we don't expect precision to account for less than 0.001s values)
-        Assert.True((amAliveTime - member.Item1.IAmAliveTime).Duration() < TimeSpan.FromSeconds(2), "Expected time around " + amAliveTime + " but got " + member.Item1.IAmAliveTime + " that is off by " + (amAliveTime - member.Item1.IAmAliveTime).Duration().ToString());
+        Assert.True(
+            (amAliveTime - updatedMember.IAmAliveTime).Duration() < TimeSpan.FromSeconds(2),
+            $"Expected time around {amAliveTime} but got {updatedMember.IAmAliveTime} that is off by {(amAliveTime - updatedMember.IAmAliveTime).Duration()}");
         Assert.Equal(newTableVersion.Version, tableData.Version.Version);
+
+        // Validate the rest of the data is still the same after the update
+        Assert.Equal(originalMembershipEntry.SiloAddress, updatedMember.SiloAddress);
+        Assert.Equal(originalMembershipEntry.SiloName, updatedMember.SiloName);
+        Assert.Equal(originalMembershipEntry.HostName, updatedMember.HostName);
+        Assert.Equal(originalMembershipEntry.Status, updatedMember.Status);
+        Assert.Equal(originalMembershipEntry.ProxyPort, updatedMember.ProxyPort);
+        Assert.Null(updatedMember.SuspectTimes);
+        Assert.Equal(originalMembershipEntry.StartTime, updatedMember.StartTime);
+
+        // Validate the TTL values are greater than the initial values read after the delay
+        await ValidateTtlValues(initial:false);
+
+        // Validate data automatically expires when using Cassandra TTL, and is still present if not
+        // The Cassandra TTL is set to 20 seconds for this testing
+        using var cts = new CancellationTokenSource(delay:TimeSpan.FromSeconds(30));
+        if (cassandraTtl)
+        {
+            await ValidateDataIsDeleted(cts.Token);
+        }
+        else
+        {
+            await ValidateDataIsNotDeleted(cts.Token);
+        }
+
+        return;
+
+        async Task ValidateTtlValues(bool initial)
+        {
+            if (cassandraTtl && initial)
+            {
+                // When actually using the TTL, wait 5 seconds so the TTL values will be less than 20
+                await Task.Delay(TimeSpan.FromSeconds(5), CancellationToken.None);
+            }
+
+            // Cassandra columns that are part of the primary key are not available with the TTL command
+            // See https://issues.apache.org/jira/browse/CASSANDRA-9312
+            Row ttlResult = (await ttlSession.ExecuteAsync(new SimpleStatement(
+                    """
+                    SELECT
+                        TTL (version) as version_tll,
+                        TTL (silo_name) as siloname_ttl,
+                        TTL (host_name) as hostname_ttl,
+                        TTL (status) as status_ttl,
+                        TTL (proxy_port) as proxyport_ttl,
+                        TTL (suspect_times) as suspecttimes_ttl,
+                        TTL (start_time) as starttime_ttl,
+                        TTL (i_am_alive_time) as iamalivetime_ttl
+                    FROM membership
+                    """)))
+                .First();
+
+            object versionTtl = ttlResult["version_tll"];
+            object siloNameTtl = ttlResult["siloname_ttl"];
+            object hostNameTtl = ttlResult["hostname_ttl"];
+            object statusTtl = ttlResult["status_ttl"];
+            object proxyPortTtl = ttlResult["proxyport_ttl"];
+            object suspectTimesTtl = ttlResult["suspecttimes_ttl"];
+            object startTimeTtl = ttlResult["starttime_ttl"];
+            object iAmAliveTtl = ttlResult["iamalivetime_ttl"];
+
+            if (cassandraTtl)
+            {
+                // TTLs should be non-null, and if not the initial TTL check, should be greater
+                Assert.True(int.TryParse(versionTtl.ToString(), out int versionInt));
+                Assert.True(int.TryParse(siloNameTtl.ToString(), out int siloNameInt));
+                Assert.True(int.TryParse(hostNameTtl.ToString(), out int hostNameInt));
+                Assert.True(int.TryParse(statusTtl.ToString(), out int statusInt));
+                Assert.True(int.TryParse(proxyPortTtl.ToString(), out int proxyPortInt));
+                Assert.True(int.TryParse(startTimeTtl.ToString(), out int startTimeInt));
+                Assert.True(int.TryParse(iAmAliveTtl.ToString(), out int iAmAliveInt));
+                if (initial)
+                {
+                    Assert.True(versionInt > 0);
+                    Assert.True(siloNameInt > 0);
+                    Assert.True(hostNameInt > 0);
+                    Assert.True(statusInt > 0);
+                    Assert.True(proxyPortInt > 0);
+                    Assert.True(startTimeInt > 0);
+                    Assert.True(iAmAliveInt > 0);
+
+                    initialTtlValues["version_tll"] = versionInt;
+                    initialTtlValues["siloname_ttl"] = siloNameInt;
+                    initialTtlValues["hostname_ttl"] = hostNameInt;
+                    initialTtlValues["status_ttl"] = statusInt;
+                    initialTtlValues["proxyport_ttl"] = proxyPortInt;
+                    initialTtlValues["starttime_ttl"] = startTimeInt;
+                    initialTtlValues["iamalivetime_ttl"] = iAmAliveInt;
+                }
+                else
+                {
+                    Assert.True(versionInt > initialTtlValues["version_tll"]);
+                    Assert.True(siloNameInt > initialTtlValues["siloname_ttl"]);
+                    Assert.True(hostNameInt > initialTtlValues["hostname_ttl"]);
+                    Assert.True(statusInt > initialTtlValues["status_ttl"]);
+                    Assert.True(proxyPortInt > initialTtlValues["proxyport_ttl"]);
+                    Assert.True(startTimeInt > initialTtlValues["starttime_ttl"]);
+                    Assert.True(iAmAliveInt > initialTtlValues["iamalivetime_ttl"]);
+                }
+
+                // suspect times will always be null because we're not actually filing it out in the test
+                Assert.Null(suspectTimesTtl);
+            }
+            else
+            {
+                // TTLs should always be null when Cassandra TTL is disabled (default_time_to_live is 0)
+                Assert.Null(versionTtl);
+                Assert.Null(siloNameTtl);
+                Assert.Null(hostNameTtl);
+                Assert.Null(statusTtl);
+                Assert.Null(proxyPortTtl);
+                Assert.Null(suspectTimesTtl);
+                Assert.Null(startTimeTtl);
+                Assert.Null(iAmAliveTtl);
+            }
+        }
+
+        async Task ValidateDataIsDeleted(CancellationToken ct)
+        {
+            while (true)
+            {
+                if (ct.IsCancellationRequested)
+                {
+                    throw new TimeoutException("Did not validate Cassandra data deletion within timeout");
+                }
+
+                tableData = await membershipTable.ReadAll();
+                if (tableData.Members.Count == 0)
+                {
+                    // Success!
+                    return;
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(1), CancellationToken.None);
+            }
+        }
+
+        async Task ValidateDataIsNotDeleted(CancellationToken ct)
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                tableData = await membershipTable.ReadAll();
+                if (tableData.Members.Count == 0)
+                {
+                    throw new Exception("Cassandra data was unexpectedly deleted when not using a TTL");
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(1), CancellationToken.None);
+            }
+        }
     }
 
     [Fact]
@@ -457,7 +625,10 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         return siloAddress;
     }
 
-    private async Task<(IMembershipTable, IGatewayListProvider)> CreateNewMembershipTableAsync(string serviceId, string clusterId)
+    private async Task<(IMembershipTable, IGatewayListProvider)> CreateNewMembershipTableAsync(
+        string serviceId,
+        string clusterId,
+        bool cassandraTtl = false)
     {
         var session = await CreateSession();
 
@@ -465,7 +636,19 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             .AddSingleton<CassandraClusteringTable>()
             .AddSingleton<CassandraGatewayListProvider>()
             .Configure<ClusterOptions>(o => { o.ServiceId = serviceId; o.ClusterId = clusterId; })
-            .Configure<CassandraClusteringOptions>(o => o.ConfigureClient(async _ => await CreateSession()))
+            .Configure<CassandraClusteringOptions>(o =>
+            {
+                o.ConfigureClient(async _ => await CreateSession());
+                o.UseCassandraTtl = cassandraTtl;
+            })
+            .Configure<ClusterMembershipOptions>(o =>
+            {
+                if (cassandraTtl)
+                {
+                    // Shorten the Cassandra TTL period so we can more easily check that rows are automatically deleted
+                    o.DefunctSiloExpiration = TimeSpan.FromSeconds(20);
+                }
+            })
             .Configure<GatewayOptions>(o => o.GatewayListRefreshPeriod = TimeSpan.FromSeconds(15))
             .BuildServiceProvider();
         IMembershipTable membershipTable = services.GetRequiredService<CassandraClusteringTable>();
@@ -484,12 +667,12 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         return container.session;
     }
 
-    private Task<(IMembershipTable, IGatewayListProvider)> CreateNewMembershipTableAsync()
+    private Task<(IMembershipTable, IGatewayListProvider)> CreateNewMembershipTableAsync(bool cassandraTtl = false)
     {
         var serviceId = $"Service_{Guid.NewGuid()}";
         var clusterId = $"Cluster_{Guid.NewGuid()}";
 
-        return CreateNewMembershipTableAsync(serviceId, clusterId);
+        return CreateNewMembershipTableAsync(serviceId, clusterId, cassandraTtl);
     }
 
     [Fact]

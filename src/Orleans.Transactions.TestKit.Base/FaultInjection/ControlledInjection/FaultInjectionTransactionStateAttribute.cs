@@ -59,7 +59,7 @@ namespace Orleans.Transactions.TestKit
             return context => Create(context, genericCreate, args);
         }
 
-        private object Create(IGrainContext context, MethodInfo genericCreate, object[] args)
+        private static object Create(IGrainContext context, MethodInfo genericCreate, object[] args)
         {
             IFaultInjectionTransactionalStateFactory factory = context.ActivationServices.GetRequiredService<IFaultInjectionTransactionalStateFactory>();
             return genericCreate.Invoke(factory, args);

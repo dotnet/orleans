@@ -79,7 +79,10 @@ namespace Orleans.Runtime
                 async ct =>
                 {
                     _scanPeriodTimer.Dispose();
-                    if (_runTask is Task task) await Task.WhenAny(task, ct.WhenCancelled());
+                    if (_runTask is Task task)
+                    {
+                        await task.WaitAsync(ct).SuppressThrowing();
+                    }
                 });
         }
 

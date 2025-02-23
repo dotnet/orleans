@@ -10,6 +10,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Metadata;
+using Orleans.Placement;
 using Orleans.Providers;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
@@ -158,21 +159,18 @@ namespace Orleans.Runtime
 
         public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[]? types = null)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetDetailedGrainStatistics");
             var stats = GetDetailedGrainStatisticsCore();
             return Task.FromResult(stats);
         }
 
         public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
         {
-            logger.LogInformation("GetSimpleGrainStatistics");
             return Task.FromResult(_grainCountStatistics.GetSimpleGrainStatistics().Select(p =>
                 new SimpleGrainStatistic { SiloAddress = this.localSiloDetails.SiloAddress, GrainType = p.Key, ActivationCount = (int)p.Value }).ToArray());
         }
 
         public async Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId)
         {
-            logger.LogInformation("DetailedGrainReport for grain id {GrainId}", grainId);
             string? grainClassName;
             try
             {
@@ -307,7 +305,7 @@ namespace Orleans.Runtime
             var remainingCount = count;
             foreach (var (grainId, grainContext) in activationDirectory)
             {
-                if (!_migratabilityChecker.IsMigratable(grainId.Type))
+                if (!_migratabilityChecker.IsMigratable(grainId.Type, ImmovableKind.Rebalancer))
                 {
                     continue;
                 }

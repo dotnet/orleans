@@ -95,7 +95,7 @@ namespace UnitTests.General
             }
         }
 
-        private async Task<List<string>> CollectActivationIds(IPlacementTestGrain grain, int sampleSize)
+        private static async Task<List<string>> CollectActivationIds(IPlacementTestGrain grain, int sampleSize)
         {
             var tasks = new List<Task<string>>(sampleSize);
             for (var i = 0; i < sampleSize; ++i)
@@ -107,10 +107,10 @@ namespace UnitTests.General
             return tasks.Select(t => t.Result).ToList();
         }
 
-        private async Task<int> ActivationCount(IPlacementTestGrain grain, int sampleSize)
+        private static async Task<int> ActivationCount(IPlacementTestGrain grain, int sampleSize)
         {
             var activations = await CollectActivationIds(grain, sampleSize);
-            return activations.Distinct().Count();    
+            return activations.Distinct().Count();
         }
 
         [Fact, TestCategory("Placement"), TestCategory("BVT")]

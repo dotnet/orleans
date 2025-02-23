@@ -18,7 +18,6 @@ using static Orleans.Internal.StandardExtensions;
 
 namespace Orleans
 {
-
     internal class OutsideRuntimeClient : IRuntimeClient, IDisposable, IClusterConnectionStatusListener
     {
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
@@ -37,6 +36,7 @@ namespace Orleans
 
         public IInternalGrainFactory InternalGrainFactory { get; private set; }
 
+        private ClientClusterManifestProvider _manifestProvider;
         private MessageFactory messageFactory;
         private readonly LocalClientDetails _localClientDetails;
         private readonly ILoggerFactory loggerFactory;
@@ -98,6 +98,7 @@ namespace Orleans
             try
             {
                 _statusObservers = this.ServiceProvider.GetServices<IClusterConnectionStatusObserver>().ToArray();
+                _manifestProvider = ServiceProvider.GetRequiredService<ClientClusterManifestProvider>();
 
                 this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
                 this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
@@ -148,6 +149,7 @@ namespace Orleans
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             this.callbackTimer.Dispose();
+
             if (this.callbackTimerTask is { } task)
             {
                 await task.WaitAsync(cancellationToken);
@@ -156,6 +158,11 @@ namespace Orleans
             if (MessageCenter is { } messageCenter)
             {
                 await messageCenter.StopAsync(cancellationToken);
+            }
+
+            if (_manifestProvider is { } provider)
+            {
+                await provider.StopAsync(cancellationToken);
             }
 
             ConstructorReset();
@@ -184,7 +191,7 @@ namespace Orleans
             this.InternalGrainFactory.CreateObjectReference<IClientGatewayObserver>(this.gatewayObserver);
 
             await ExecuteWithRetries(
-                async () => await this.ServiceProvider.GetRequiredService<ClientClusterManifestProvider>().StartAsync(),
+                _manifestProvider.StartAsync,
                 retryFilter,
                 cancellationToken);
 

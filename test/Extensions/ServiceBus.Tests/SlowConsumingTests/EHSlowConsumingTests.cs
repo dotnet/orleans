@@ -112,7 +112,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
             return grains;
         }
 
-        private async Task StopHealthyConsumerGrainComing(List<ISampleStreaming_ConsumerGrain> grains)
+        private static async Task StopHealthyConsumerGrainComing(List<ISampleStreaming_ConsumerGrain> grains)
         {
             List<Task> tasks = new List<Task>();
             foreach (var grain in grains)

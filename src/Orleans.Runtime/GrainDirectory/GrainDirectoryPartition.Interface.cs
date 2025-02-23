@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.GrainDirectory;
 
-internal sealed partial class GrainDirectoryReplica
+internal sealed partial class GrainDirectoryPartition
 {
     async ValueTask<DirectoryResult<GrainAddress>> IGrainDirectoryPartition.RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration)
     {

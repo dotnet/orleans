@@ -90,9 +90,9 @@ namespace Orleans
             {
                 this.Logger.LogTrace(
                     (int)ErrorCode.SiloStartPerfMeasure,
-                    "Starting lifecycle stage {Stage} took {Elapsed} Milliseconds",
-                    stage,
-                    elapsed.TotalMilliseconds);
+                    "Starting lifecycle stage '{Stage}' took '{Elapsed}'.",
+                    GetStageName(stage),
+                    elapsed);
             }
         }
 
@@ -108,7 +108,7 @@ namespace Orleans
                 {
                     if (cancellationToken.IsCancellationRequested)
                     {
-                        throw new OrleansLifecycleCanceledException("Lifecycle start canceled by request");
+                        throw new OrleansLifecycleCanceledException($"Lifecycle start canceled at stage '{GetStageName(observerGroup.Key)}' by request.");
                     }
 
                     var stage = observerGroup.Key;
@@ -126,8 +126,8 @@ namespace Orleans
                 this.Logger.LogError(
                     (int)ErrorCode.LifecycleStartFailure,
                     ex,
-                    "Lifecycle start canceled due to errors at stage {Stage}",
-                    this._highStage);
+                    "Lifecycle start canceled due to errors at stage '{Stage}'.",
+                    _highStage is { } highStage ? GetStageName(highStage) : "Unknown");
                 throw;
             }
 
@@ -161,9 +161,9 @@ namespace Orleans
             {
                 this.Logger.LogTrace(
                     (int)ErrorCode.SiloStartPerfMeasure,
-                    "Stopping lifecycle stage {Stage} took {Elapsed} Milliseconds",
-                    stage,
-                    elapsed.TotalMilliseconds);
+                    "Stopping lifecycle stage '{Stage}' took '{Elapsed}'.",
+                    GetStageName(stage),
+                    elapsed);
             }
         }
 
@@ -181,7 +181,7 @@ namespace Orleans
             {
                 if (cancellationToken.IsCancellationRequested && !loggedCancellation)
                 {
-                    this.Logger.LogWarning("Lifecycle stop operations canceled by request.");
+                    this.Logger.LogWarning("Lifecycle stop operations canceled at stage '{Stage}' by request.", GetStageName(observerGroup.Key));
                     loggedCancellation = true;
                 }
 
@@ -190,32 +190,32 @@ namespace Orleans
                 try
                 {
                     var stopwatch = ValueStopwatch.StartNew();
-                    await Task.WhenAll(observerGroup.Select(orderedObserver => CallOnStop(orderedObserver, cancellationToken)));
+                    await Task.WhenAll(observerGroup.Select(orderedObserver => orderedObserver?.Observer is not null ? CallObserverStopAsync(orderedObserver.Observer, cancellationToken) : Task.CompletedTask));
                     stopwatch.Stop();
                     this.PerfMeasureOnStop(stage, stopwatch.Elapsed);
                 }
                 catch (Exception ex)
                 {
-                    this.Logger.LogError(
+                    this.Logger.LogWarning(
                         (int)ErrorCode.LifecycleStopFailure,
                         ex,
-                        "Stopping lifecycle encountered an error at stage {Stage}. Continuing to stop.",
-                        this._highStage);
+                        "Stopping lifecycle encountered an error at stage '{Stage}'. Continuing to stop.",
+                        _highStage is { } highStage ? GetStageName(highStage) : "Unknown");
                 }
 
                 this.OnStopStageCompleted(stage);
             }
+        }
 
-            static Task CallOnStop(OrderedObserver observer, CancellationToken cancellationToken)
+        protected virtual Task CallObserverStopAsync(ILifecycleObserver observer, CancellationToken cancellationToken)
+        {
+            try
             {
-                try
-                {
-                    return observer.Observer?.OnStop(cancellationToken) ?? Task.CompletedTask;
-                }
-                catch (Exception ex)
-                {
-                    return Task.FromException(ex);
-                }
+                return observer.OnStop(cancellationToken) ?? Task.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                return Task.FromException(ex);
             }
         }
 

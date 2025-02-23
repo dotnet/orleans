@@ -44,6 +44,23 @@ namespace Orleans.Runtime.Utilities
             }
         }
 
+        public bool TryPublish<TState>(Func<T, TState, T> updateFunc, TState state) => TryPublishCore(updateFunc, state) == PublishResult.Success;
+        
+        public void Publish<TState>(Func<T, TState, T> updateFunc, TState state)
+        {
+            switch (TryPublishCore(updateFunc, state))
+            {
+                case PublishResult.Success:
+                    return;
+                case PublishResult.InvalidUpdate:
+                    ThrowInvalidUpdate();
+                    break;
+                case PublishResult.Disposed:
+                    ThrowDisposed();
+                    break;
+            }
+        }
+
         private PublishResult TryPublish(Element newItem)
         {
             if (_current.IsDisposed) return PublishResult.Disposed;
@@ -58,6 +75,30 @@ namespace Orleans.Runtime.Utilities
                 }
 
                 var curr = _current;
+                Interlocked.Exchange(ref _current, newItem);
+                if (newItem.IsValid) _onPublished(newItem.Value);
+                curr.SetNext(newItem);
+
+                return PublishResult.Success;
+            }
+        }
+
+        private PublishResult TryPublishCore<TState>(Func<T, TState, T> updateFunc, TState state)
+        {
+            if (_current.IsDisposed) return PublishResult.Disposed;
+
+            lock (_updateLock)
+            {
+                if (_current.IsDisposed) return PublishResult.Disposed;
+
+                var curr = _current;
+                var newItem = new Element(updateFunc(curr.Value, state));
+
+                if (curr.IsValid && newItem.IsValid && !_updateValidator(curr.Value, newItem.Value))
+                {
+                    return PublishResult.InvalidUpdate;
+                }
+
                 Interlocked.Exchange(ref _current, newItem);
                 if (newItem.IsValid) _onPublished(newItem.Value);
                 curr.SetNext(newItem);

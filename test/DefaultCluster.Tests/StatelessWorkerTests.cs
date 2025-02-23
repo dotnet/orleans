@@ -26,7 +26,7 @@ namespace DefaultCluster.Tests.General
         {
             var grain = this.GrainFactory.GetGrain<IStatelessWorkerExceptionGrain>(0);
 
-            for (int i=0; i<100; i++)
+            for (int i = 0; i < 100; i++)
             {
                 var ex = await Assert.ThrowsAsync<Exception>(() => grain.Ping());
                 Assert.Equal("oops", ex.Message);
@@ -39,14 +39,14 @@ namespace DefaultCluster.Tests.General
             var gatewayOptions = this.Fixture.Client.ServiceProvider.GetRequiredService<IOptions<StaticGatewayListProviderOptions>>();
             var gatewaysCount = gatewayOptions.Value.Gateways.Count;
             // do extra calls to trigger activation of ExpectedMaxLocalActivations local activations
-            int numberOfCalls = ExpectedMaxLocalActivations * 3 * gatewaysCount; 
+            int numberOfCalls = ExpectedMaxLocalActivations * 3 * gatewaysCount;
 
             IStatelessWorkerGrain grain = this.GrainFactory.GetGrain<IStatelessWorkerGrain>(GetRandomGrainId());
             List<Task> promises = new List<Task>();
 
             // warmup
             for (int i = 0; i < gatewaysCount; i++)
-                promises.Add(grain.LongCall()); 
+                promises.Add(grain.LongCall());
             await Task.WhenAll(promises);
 
             await Task.Delay(2000);
@@ -100,7 +100,7 @@ namespace DefaultCluster.Tests.General
             // message forwards. When the issue occurs, this test will throw an exception.
 
             // We are trying to trigger a race condition and need more than 1 attempt to reliably reproduce the issue.
-            for (var attempt = 0; attempt < 100; attempt ++)
+            for (var attempt = 0; attempt < 100; attempt++)
             {
                 var grain = this.GrainFactory.GetGrain<IStatelessWorkerGrain>(attempt);
                 await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => grain.DummyCall()));
@@ -123,7 +123,7 @@ namespace DefaultCluster.Tests.General
 
             IStatelessWorkerGrain grain = this.GrainFactory.GetGrain<IStatelessWorkerGrain>(GetRandomGrainId());
             List<Task> promises = new List<Task>();
-            
+
             for (int i = 0; i < numberOfCalls; i++)
                 promises.Add(grain.LongCall());
             await Task.WhenAll(promises);
@@ -135,9 +135,12 @@ namespace DefaultCluster.Tests.General
         public async Task StatelessWorker_DoesNotThrow_IfMarkedWithMayInterleave()
         {
             var grain = GrainFactory.GetGrain<IStatelessWorkerWithMayInterleaveGrain>(0);
-            var exception = await Record.ExceptionAsync(grain.GoFast);
-
-            Assert.Null(exception);
+            var observer = new CallbackObserver();
+            var reference = GrainFactory.CreateObjectReference<ICallbackGrainObserver>(observer);
+            var task = grain.GoFast(reference);
+            await observer.OnCallback.WaitAsync(TimeSpan.FromSeconds(10));
+            observer.Signal();
+            await task;
         }
 
         [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
@@ -145,29 +148,46 @@ namespace DefaultCluster.Tests.General
         {
             var grain = GrainFactory.GetGrain<IStatelessWorkerWithMayInterleaveGrain>(0);
 
-            var delay = TimeSpan.FromSeconds(1);
-            await grain.SetDelay(delay);
+            List<CallbackObserver> callbacks = [new(), new(), new()];
+            var callbackReferences = callbacks.Select(c => GrainFactory.CreateObjectReference<ICallbackGrainObserver>(c)).ToList();
+            List<Task> completions = [grain.GoSlow(callbackReferences[0]), grain.GoSlow(callbackReferences[1]), grain.GoSlow(callbackReferences[2])];
+            var callbackSignals = callbacks.Select(c => c.OnCallback).ToList();
 
-            var stopwatch = Stopwatch.StartNew();
-            await Task.WhenAll(grain.GoSlow(), grain.GoSlow(), grain.GoSlow());
-            stopwatch.Stop();
-
-            Assert.InRange(stopwatch.Elapsed.TotalSeconds, 2.85, 3.15); // theoretically it should be 3.0
+            var triggered = await Task.WhenAny(callbackSignals).WaitAsync(TimeSpan.FromSeconds(10));
+            callbackSignals.Remove(triggered);
+            await Assert.ThrowsAsync<TimeoutException>(async () => await Task.WhenAny(callbackSignals).WaitAsync(TimeSpan.FromSeconds(5)));
+            callbacks.ForEach(c => c.Signal());
+            await Task.WhenAll(completions).WaitAsync(TimeSpan.FromSeconds(10));
         }
 
         [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task StatelessWorker_ShouldInterleaveCalls_IfMayInterleavePredicatedMatches()
         {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var grain = GrainFactory.GetGrain<IStatelessWorkerWithMayInterleaveGrain>(0);
 
-            var delay = TimeSpan.FromSeconds(1);
-            await grain.SetDelay(delay);
+            List<CallbackObserver> callbacks = [new(), new(), new()];
+            var callbackReferences = callbacks.Select(c => GrainFactory.CreateObjectReference<ICallbackGrainObserver>(c)).ToList();
+            var completion = Task.WhenAll(grain.GoFast(callbackReferences[0]), grain.GoFast(callbackReferences[1]), grain.GoFast(callbackReferences[2]));
 
-            var stopwatch = Stopwatch.StartNew();
-            await Task.WhenAll(grain.GoFast(), grain.GoFast(), grain.GoFast());
-            stopwatch.Stop();
+            // Wait for all callbacks to be triggered simultaneously, giving up if they don't signal before the timeout.
+            await Task.WhenAll(callbacks.Select(c => c.OnCallback)).WaitAsync(cts.Token);
+            callbacks.ForEach(c => c.Signal());
 
-            Assert.InRange(stopwatch.Elapsed.TotalSeconds, 0.85, 1.15); // theoretically it should be 1.0
+            await completion;
+        }
+
+        private sealed class CallbackObserver : ICallbackGrainObserver
+        {
+            private readonly TaskCompletionSource _waitAsyncTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            private readonly TaskCompletionSource _wasCalledTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public void Signal() => _waitAsyncTcs.TrySetResult();
+            public Task OnCallback => _wasCalledTcs.Task;
+            async Task ICallbackGrainObserver.WaitAsync()
+            {
+                _wasCalledTcs.TrySetResult();
+                await _waitAsyncTcs.Task;
+            }
         }
     }
 }

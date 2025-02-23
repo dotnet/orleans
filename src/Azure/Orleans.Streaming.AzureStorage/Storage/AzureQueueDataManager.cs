@@ -386,7 +386,7 @@ namespace Orleans.AzureUtils
             }
         }
 
-        private string SanitizeQueueName(string queueName)
+        private static string SanitizeQueueName(string queueName)
         {
             var tmp = queueName;
             //Azure queue naming rules : https://learn.microsoft.com/rest/api/storageservices/Naming-Queues-and-Metadata?redirectedfrom=MSDN
@@ -404,7 +404,7 @@ namespace Orleans.AzureUtils
             return tmp;
         }
 
-        private void ValidateQueueName(string queueName)
+        private static void ValidateQueueName(string queueName)
         {
             // Naming Queues and Metadata: http://msdn.microsoft.com/en-us/library/windowsazure/dd179349.aspx
             if (!(queueName.Length >= 3 && queueName.Length <= 63))

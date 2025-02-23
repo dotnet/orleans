@@ -25,7 +25,7 @@ namespace ServiceBus.Tests
         {
             await base.InitializeAsync();
             var collector = new Microsoft.Extensions.Diagnostics.Metrics.Testing.MetricCollector<long>(Instruments.Meter, "orleans-streams-queue-read-duration");
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             // Wait for 10 queue read
             await collector.WaitForMeasurementsAsync(10, cts.Token);
         }

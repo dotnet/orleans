@@ -100,7 +100,7 @@ public sealed class GrainDirectoryResilienceTests
                             var address = silo.SiloAddress;
                             for (var partitionIndex = 0; partitionIndex < DirectoryMembershipSnapshot.PartitionsPerSilo; partitionIndex++)
                             {
-                                var replica = ((IInternalGrainFactory)client).GetSystemTarget<IGrainDirectoryTestHooks>(GrainDirectoryReplica.CreateGrainId(address, partitionIndex).GrainId);
+                                var replica = ((IInternalGrainFactory)client).GetSystemTarget<IGrainDirectoryTestHooks>(GrainDirectoryPartition.CreateGrainId(address, partitionIndex).GrainId);
                                 integrityChecks.Add(replica.CheckIntegrityAsync().AsTask());
                             }
                         }

@@ -215,7 +215,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             return itemCount;
         }
 
-        private async Task AddDataIntoCache(EventHubQueueCacheForTesting cache, int count)
+        private static async Task AddDataIntoCache(EventHubQueueCacheForTesting cache, int count)
         {
             await Task.Delay(10);
             List<EventData> messages = Enumerable.Range(0, count)
@@ -224,7 +224,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             cache.Add(messages, DateTime.UtcNow);
         }
 
-        private EventData MakeEventData(long sequenceNumber)
+        private static EventData MakeEventData(long sequenceNumber)
         {
             byte[] ignore = { 12, 23 };
             var now = DateTime.UtcNow;

@@ -343,7 +343,7 @@ namespace Orleans.Serialization.UnitTests
             _log.WriteLine($"Read references:\n{references}");
         }
 
-        private void GetGeneratedSerializer<T>(out IFieldCodec<T> serializer)
+        private static void GetGeneratedSerializer<T>(out IFieldCodec<T> serializer)
         {
             var services = new ServiceCollection().AddSerializer();
             var serviceProvider = services.BuildServiceProvider();
