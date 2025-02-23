@@ -5,8 +5,8 @@ using Orleans.Clustering.Cosmos;
 using Orleans.Hosting;
 using Orleans.Providers;
 
-[assembly: RegisterProvider("Cosmos", "Clustering", "Silo", typeof(CosmosClusteringProviderBuilder))]
-[assembly: RegisterProvider("Cosmos", "Clustering", "Client", typeof(CosmosClusteringProviderBuilder))]
+[assembly: RegisterProvider("AzureCosmosDB", "Clustering", "Silo", typeof(CosmosClusteringProviderBuilder))]
+[assembly: RegisterProvider("AzureCosmosDB", "Clustering", "Client", typeof(CosmosClusteringProviderBuilder))]
 
 namespace Orleans.Hosting;
 
