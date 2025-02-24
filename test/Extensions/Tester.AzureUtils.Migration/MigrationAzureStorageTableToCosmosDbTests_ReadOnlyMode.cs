@@ -54,7 +54,7 @@ namespace Tester.AzureUtils.Migration
                         options.SourceStorageName = SourceStorageName;
                         options.DestinationStorageName = DestinationStorageName;
 
-                        options.WriteToDestinationOnly = true; // original storage will not be touched!
+                        options.Mode = GrainMigrationMode.ReadWriteDestination; // original storage will not be touched!
                     })
                     .AddAzureTableGrainStorage(SourceStorageName, options =>
                     {

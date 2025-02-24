@@ -11,6 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Moq" Version="$(MoqVersion)" />
     <PackageReference Include="Azure.Data.Tables" Version="$(AzureDataTablesVersion)" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
     <PackageReference Include="Azure.Identity" Version="$(AzureIdentityVersion)" />
