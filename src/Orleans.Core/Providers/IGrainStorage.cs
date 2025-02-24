@@ -13,24 +13,12 @@ namespace Orleans.Storage
         public string GrainType { get; }
         public GrainReference GrainReference { get; }
         public IGrainState GrainState { get; }
-        public StorageMigrationEntryClient MigrationEntryClient { get; }
 
-        public StorageEntry(string name, GrainReference grainReference, IGrainState grainState, StorageMigrationEntryClient migrationEntryClient)
+        public StorageEntry(string name, GrainReference grainReference, IGrainState grainState)
         {
             GrainType = name;
             GrainReference = grainReference;
             GrainState = grainState;
-            MigrationEntryClient = migrationEntryClient;
-        }
-
-        public interface StorageMigrationEntryClient
-        {
-            ValueTask<DateTime?> GetEntryMigrationTimeAsync();
-
-            /// <summary>
-            /// Returns string representing a changed ETag, if applicable
-            /// </summary>
-            Task<string> MarkMigratedAsync(CancellationToken cancellationToken);
         }
     }
 
@@ -66,23 +54,11 @@ namespace Orleans.Storage
     /// </summary>
     public interface IExtendedGrainStorage : IGrainStorage
     {
-        /// <summary>Write data function for this storage instance.</summary>
-        /// <param name="grainType">Type of this grain [fully qualified class name]</param>
-        /// <param name="grainReference">Grain reference object for this grain.</param>
-        /// <param name="grainState">State data object to be written for this grain.</param>
-        /// <returns>
-        /// Completion promise for the Write operation on the specified grain.
-        /// Also returns object representing underlying entry in the storage
-        /// </returns>
-        Task<StorageEntry> WriteStateWithEntryAsync(string grainType, GrainReference grainReference, IGrainState grainState);
-
-        Task<StorageEntry> GetStorageEntryAsync(string grainType, GrainReference grainReference, IGrainState grainState);
-
         /// <summary>
         /// Get all entries in storage
         /// </summary>
         /// <returns>The entries in storage</returns>
-        IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken, DateTime? startTime = null, DateTime? endTime = null);
+        IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken);
     }
 
     /// <summary>

@@ -526,7 +526,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
-        public IAsyncEnumerable<TableEntity> ReadTableEntries(string filter, CancellationToken cancellationToken)
+        public IAsyncEnumerable<TableEntity> ReadTableEntries(CancellationToken cancellationToken, string filter = null)
             => Table.QueryAsync<TableEntity>(filter: filter, cancellationToken: cancellationToken);
 
         /// <summary>

@@ -10,15 +10,15 @@ namespace Orleans.Persistence.Migration
         private readonly ILogger<DataMigrator> _logger;
         private readonly Options _options;
 
-        private readonly IExtendedGrainStorage _oldStorage;
-        private readonly IGrainStorage _newStorage;
+        private readonly IExtendedGrainStorage _sourceStorage;
+        private readonly IGrainStorage _destinationStorage;
 
         readonly IReminderMigrationTable _reminderMigrationStorage;
 
         public DataMigrator(
             ILogger<DataMigrator> logger,
-            IGrainStorage oldStorage,
-            IGrainStorage newStorage,
+            IGrainStorage sourceStorage,
+            IGrainStorage destinationStorage,
             IReminderMigrationTable reminderMigrationTable,
             Options options)
         {
@@ -27,10 +27,10 @@ namespace Orleans.Persistence.Migration
 
             // instead of doing re-registrations of same storage, we can just check if it's already IGrainStorageEntriesController
             // if not - we simply fail fast with an explicit error message 
-            _oldStorage = (oldStorage is IExtendedGrainStorage oldStorageEntriesController)
+            _sourceStorage = (sourceStorage is IExtendedGrainStorage oldStorageEntriesController)
                 ? oldStorageEntriesController
-                : throw new ArgumentException($"Implement {nameof(IExtendedGrainStorage)} on grainStorage to support data migration.", paramName: nameof(oldStorage));
-            _newStorage = newStorage;
+                : throw new ArgumentException($"Implement {nameof(IExtendedGrainStorage)} on grainStorage to support data migration.", paramName: nameof(sourceStorage));
+            _destinationStorage = destinationStorage;
 
             _reminderMigrationStorage = reminderMigrationTable;
         }
@@ -39,22 +39,21 @@ namespace Orleans.Persistence.Migration
         /// Careful: is a long-time running operation.<br/>
         /// Goes through all the data items in the old storage and migrates them in a new format to the new storage.
         /// </summary>
-        public async Task<MigrationStats> MigrateGrainsAsync(
-            CancellationToken cancellationToken,
-            DateTime? startTime = null,
-            DateTime? endTime = null)
+        public async Task<MigrationStats> MigrateGrainsAsync(CancellationToken cancellationToken)
         {
             _logger.Info("Starting grains migration");
 
             var migrationStats = new MigrationStats();
-            await foreach (var storageEntry in _oldStorage.GetAll(cancellationToken, startTime, endTime))
+            await foreach (var storageEntry in _sourceStorage.GetAll(cancellationToken))
             {
                 if (!_options.DontSkipMigrateEntries)
                 {
-                    var migrationTime = await storageEntry.MigrationEntryClient.GetEntryMigrationTimeAsync();
-                    if (migrationTime is not null)
+                    IGrainState tmpState = new GrainState<object>();
+                    await _destinationStorage.ReadStateAsync(storageEntry.GrainType, storageEntry.GrainReference, tmpState);
+
+                    if (tmpState is not null && tmpState.RecordExists)
                     {
-                        _logger.Info("Entry {entryName} is already migrated at {migrationTime}", storageEntry.GrainType, migrationTime);
+                        _logger.Info("Entry (type='{grainType}';ref='{reference}') already exists at destination storage", storageEntry.GrainType, storageEntry.GrainReference);
                         migrationStats.SkippedEntries++;
                         continue;
                     }
@@ -67,7 +66,7 @@ namespace Orleans.Persistence.Migration
 
                     try
                     {
-                        if (_newStorage is IMigrationGrainStorage migrationGrainStorage)
+                        if (_destinationStorage is IMigrationGrainStorage migrationGrainStorage)
                         {
                             // sometimes the storage does not allow direct writing (i.e. CosmosDB with it's GrainActivationContext dependency)
                             // meaning we should use a special method to write a grain state
@@ -75,7 +74,7 @@ namespace Orleans.Persistence.Migration
                         }
                         else
                         {
-                            await _newStorage.WriteStateAsync(storageEntry.GrainType, storageEntry.GrainReference, storageEntry.GrainState);
+                            await _destinationStorage.WriteStateAsync(storageEntry.GrainType, storageEntry.GrainReference, storageEntry.GrainState);
                         }
                     }
                     // guarding against any exception which can happen against different storages (i.e. storage/cosmos/etc) here
@@ -90,7 +89,6 @@ namespace Orleans.Persistence.Migration
                         // ignore: we have already migrated this entry to new storage.
                     }
 
-                    await storageEntry.MigrationEntryClient.MarkMigratedAsync(cancellationToken);
                     migrationStats.MigratedEntries++;
                 }
                 catch (Exception ex)

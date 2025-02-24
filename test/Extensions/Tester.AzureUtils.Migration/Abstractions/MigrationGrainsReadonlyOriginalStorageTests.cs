@@ -73,12 +73,6 @@ namespace Tester.AzureUtils.Migration.Abstractions
             await grain.SetA(newState.A);
             await grain.SetB(newState.B);
 
-            // since saveMigrationMetadata is enabled, we should be able to check that metadata is already there
-            Assert.NotNull(SourceExtendedStorage);
-            var storageEntry = await SourceExtendedStorage!.GetStorageEntryAsync(stateName, (GrainReference)grain, oldGrainState);
-            var migrationTime = await storageEntry.MigrationEntryClient.GetEntryMigrationTimeAsync();
-            Assert.NotNull(migrationTime);
-
             // verify updated state only in destination storage
             cosmosGrainState = await GetGrainStateFromCosmosAsync(
                 _cosmosClient,

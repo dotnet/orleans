@@ -129,16 +129,6 @@ namespace Tester.AzureUtils.Migration.Abstractions
                 Assert.True(false, "SourceStorageEntriesController is null");
                 return;
             }
-
-            await foreach (var storageEntry in entries)
-            {
-                // entry migration time has to exist on every entry
-                // and be somewhat around the current time (same date for simplicity)
-                var migrationTime = await storageEntry.MigrationEntryClient.GetEntryMigrationTimeAsync();
-
-                Assert.NotNull(migrationTime);
-                Assert.True(migrationTime.Value.Date == currentTime.Date);
-            }
         }
 #endif
 
