@@ -1,21 +1,9 @@
 #if NET8_0_OR_GREATER
-using Orleans.ApplicationParts;
 using Orleans.Hosting;
 using Orleans.Persistence.Cosmos.Migration;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
 using Tester.AzureUtils.Migration.Abstractions;
-using Tester.AzureUtils.Migration.Grains;
-using TestExtensions;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using Microsoft.Extensions.Logging;
-using Orleans.Serialization;
-using Orleans.Runtime;
-using Orleans.Metadata;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Orleans;
 using Azure.Identity;
@@ -83,7 +71,10 @@ namespace Tester.AzureUtils.Migration
                         options.UseExperimentalFormat = true;
 #pragma warning restore OrleansCosmosExperimental
                     })
-                    .AddDataMigrator(SourceStorageName, DestinationStorageName);
+                    .AddDataMigrator(SourceStorageName, DestinationStorageName, new DataMigrator.Options
+                    {
+                        RunAsBackgroundTask = false // we want to manually call data migrator
+                    });
             }
         }
     }

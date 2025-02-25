@@ -14,14 +14,14 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace Tester.AzureUtils.Migration
 {
     [TestCategory("Functionals"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureTableStorage")]
-    public class MigrationAzureStorageTableToCosmosDbTests : MigrationTableStorageToCosmosTests, IClassFixture<MigrationAzureStorageTableToCosmosDbTests.Fixture>
+    public class MigrationAzureStorageTableToCosmosDbBackgroundDataMigratorTests : MigrationTableStorageToCosmosTestsWithBackgroundDataMigrator, IClassFixture<MigrationAzureStorageTableToCosmosDbBackgroundDataMigratorTests.Fixture>
     {
         public static string OrleansDatabase = Resources.MigrationDatabase;
         public static string OrleansContainer = Resources.MigrationLatestContainer;
 
         public static string RandomIdentifier = Guid.NewGuid().ToString().Replace("-", "");
 
-        public MigrationAzureStorageTableToCosmosDbTests(Fixture fixture) : base(fixture)
+        public MigrationAzureStorageTableToCosmosDbBackgroundDataMigratorTests(Fixture fixture) : base(fixture)
         {
         }
 
@@ -67,7 +67,8 @@ namespace Tester.AzureUtils.Migration
                     })
                     .AddDataMigrator(SourceStorageName, DestinationStorageName, new DataMigrator.Options
                     {
-                        RunAsBackgroundTask = false // we want to manually call data migrator
+                        RunAsBackgroundTask = true, // we want to manually call data migrator
+                        BackgroundTaskInitialDelay = TimeSpan.FromSeconds(1)
                     });
             }
         }

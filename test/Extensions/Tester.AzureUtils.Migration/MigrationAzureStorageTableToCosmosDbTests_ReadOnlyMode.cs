@@ -1,8 +1,4 @@
 #if NET8_0_OR_GREATER
-using Azure;
-using Azure.Core;
-using Azure.Identity;
-using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
 using Orleans.Persistence.Cosmos.DocumentIdProviders;
@@ -12,7 +8,6 @@ using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
 using Tester.AzureUtils.Migration.Abstractions;
 using Tester.AzureUtils.Migration.Helpers;
-using TestExtensions;
 using Xunit;
 
 namespace Tester.AzureUtils.Migration
@@ -69,7 +64,10 @@ namespace Tester.AzureUtils.Migration
                         options.ContainerName = OrleansContainer;
                         options.DatabaseName = OrleansDatabase;
                     })
-                    .AddDataMigrator(SourceStorageName, DestinationStorageName);
+                    .AddDataMigrator(SourceStorageName, DestinationStorageName, new DataMigrator.Options
+                    {
+                        RunAsBackgroundTask = false // we want to manually call data migrator
+                    });
             }
         }
     }

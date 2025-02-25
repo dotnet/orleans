@@ -4,13 +4,14 @@ using Orleans.Runtime;
 using Xunit;
 using Tester.AzureUtils.Migration.Grains;
 using Microsoft.Azure.Cosmos;
-using TestExtensions;
 using Tester.AzureUtils.Migration.Helpers;
 
 namespace Tester.AzureUtils.Migration.Abstractions
 {
     public abstract class MigrationGrainsReadonlyOriginalStorageTests : MigrationBaseTests
     {
+        const int baseId = 100;
+
         readonly string _databaseName;
         readonly string _containerName;
 
@@ -28,7 +29,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task ReadFromSourceTest()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(10);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(baseId + 1);
             var grainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
             var stateName = typeof(MigrationTestGrain).FullName;
 
@@ -42,7 +43,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task UpdatesOnlyDestinationStorage()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(11);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(baseId + 2);
             var oldGrainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
             var newState = new MigrationTestGrain_State { A = 20, B = 30 };
             var stateName = typeof(MigrationTestGrain).FullName;
@@ -97,7 +98,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task DataMigrator_MovesDataToDestinationStorage()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(12);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(baseId + 3);
             var oldGrainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
             var stateName = typeof(MigrationTestGrain).FullName;
 

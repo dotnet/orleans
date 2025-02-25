@@ -59,7 +59,10 @@ namespace Tester.AzureUtils.Migration
                             migrationOptions.TableName = DestinationTableName;
                         }
                     )
-                    .AddDataMigrator(SourceStorageName, DestinationStorageName);
+                    .AddDataMigrator(SourceStorageName, DestinationStorageName, new DataMigrator.Options
+                    {
+                        RunAsBackgroundTask = false // we want to manually call data migrator
+                    });
             }
         }   
 

@@ -16,6 +16,8 @@ namespace Tester.AzureUtils.Migration.Abstractions
 {
     public abstract class MigrationRemindersTests : MigrationBaseTests
     {
+        const int baseId = 300;
+
         private IReminderTableEntryBuilder? migrationEntryBuilder;
         protected IReminderTableEntryBuilder MigrationEntryBuilder
         {
@@ -37,7 +39,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task UpsertRow_WritesIntoTwoTables()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(10000);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 1);
             var grainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
             var stateName = typeof(SimplePersistentGrain).FullName;
             var grainReference = (GrainReference)grain;
@@ -74,7 +76,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task Read_ReturnsOriginalGrainReferenceAndReminder()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(10001);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 2);
             var grainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
             var stateName = typeof(SimplePersistentGrain).FullName;
             var grainReference = (GrainReference)grain;
@@ -103,7 +105,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task DataMigrator_ProperlyMigratesData()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(10002);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 3);
             var grainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
             var stateName = typeof(SimplePersistentGrain).FullName;
             var grainReference = (GrainReference)grain;

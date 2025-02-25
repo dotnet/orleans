@@ -118,15 +118,24 @@ namespace Orleans.Persistence.Migration
             string newStorageName,
             DataMigrator.Options options = null)
         {
-            return services.AddSingleton(sp =>
+            services.AddSingleton(sp =>
             {
                 return new DataMigrator(
                     sp.GetService<ILogger<DataMigrator>>(),
+                    sp.GetRequiredService<IClusterMembershipService>(),
+                    sp.GetRequiredService<ILocalSiloDetails>(),
                     sp.GetRequiredServiceByName<IGrainStorage>(oldStorageName),
                     sp.GetRequiredServiceByName<IGrainStorage>(newStorageName),
                     sp.GetService<IReminderMigrationTable>(),
                     options);
             });
+
+            if (options.RunAsBackgroundTask)
+            {
+                services.AddHostedService<DataMigrator>(sp => sp.GetService<DataMigrator>());
+            }
+
+            return services;
         }
     }
 }

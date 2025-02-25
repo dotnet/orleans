@@ -5,6 +5,6 @@ namespace Orleans.Persistence.Migration
         Runtime = 100000,
         MigrationBase = Runtime + 10000,
 
-        MigrationMetadataNotWritten = MigrationBase + 1,
+        DataMigrationBackgroundTaskFailed = MigrationBase + 1,
     }
 }

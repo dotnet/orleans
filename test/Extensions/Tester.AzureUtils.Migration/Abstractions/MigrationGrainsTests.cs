@@ -1,13 +1,9 @@
 using Orleans;
-using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Storage;
-using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-using Microsoft.Extensions.DependencyInjection;
-using FluentAssertions;
 
 
 #if NET7_0_OR_GREATER
@@ -18,6 +14,8 @@ namespace Tester.AzureUtils.Migration.Abstractions
 {
     public abstract class MigrationGrainsTests : MigrationBaseTests
     {
+        const int baseId = 200;
+
         protected MigrationGrainsTests(BaseAzureTestClusterFixture fixture)
             : base(fixture)
         {
@@ -26,7 +24,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task ReadFromSourceTest()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(100);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 1);
             var grainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
             var stateName = typeof(SimplePersistentGrain).FullName;
 
@@ -40,7 +38,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task ReadFromTargetTest()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(101);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 2);
             var oldGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
             var newGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 20, B = 30 });
             var stateName = typeof(SimplePersistentGrain).FullName;
@@ -56,7 +54,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task ReadFromSourceThenWriteToTargetTest()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(102);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 3);
             var oldGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
             var newState = new SimplePersistentGrain_State { A = 20, B = 30 };
             var stateName = typeof(SimplePersistentGrain).FullName;
@@ -80,7 +78,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [Fact]
         public async Task ClearAllTest()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(103);
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 4);
             var oldGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
             var newGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 20, B = 30 });
             var stateName = typeof(SimplePersistentGrain).FullName;
@@ -167,7 +165,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             var storageEntries = new Dictionary<Guid, StorageEntryRef>(n);
             for (var i = 0; i < n; i++)
             {
-                var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(i);
+                var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + i + 50);
                 var oldGrainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
                 var grainReference = (GrainReference)grain;
 

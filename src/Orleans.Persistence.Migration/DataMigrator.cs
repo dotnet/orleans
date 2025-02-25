@@ -1,22 +1,27 @@
 using Azure;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Storage;
 
 namespace Orleans.Persistence.Migration
 {
-    public class DataMigrator
+    public class DataMigrator : IHostedService
     {
         private readonly ILogger<DataMigrator> _logger;
         private readonly Options _options;
 
+        private readonly IClusterMembershipService _clusterMembershipService;
+        private readonly ILocalSiloDetails _localSiloDetails;
+
         private readonly IExtendedGrainStorage _sourceStorage;
         private readonly IGrainStorage _destinationStorage;
-
         readonly IReminderMigrationTable _reminderMigrationStorage;
 
         public DataMigrator(
             ILogger<DataMigrator> logger,
+            IClusterMembershipService clusterMembershipService,
+            ILocalSiloDetails localSiloDetails,
             IGrainStorage sourceStorage,
             IGrainStorage destinationStorage,
             IReminderMigrationTable reminderMigrationTable,
@@ -24,6 +29,9 @@ namespace Orleans.Persistence.Migration
         {
             _logger = logger;
             _options = options ?? new Options();
+
+            _clusterMembershipService = clusterMembershipService;
+            _localSiloDetails = localSiloDetails;
 
             // instead of doing re-registrations of same storage, we can just check if it's already IGrainStorageEntriesController
             // if not - we simply fail fast with an explicit error message 
@@ -33,6 +41,82 @@ namespace Orleans.Persistence.Migration
             _destinationStorage = destinationStorage;
 
             _reminderMigrationStorage = reminderMigrationTable;
+        }
+
+        public Task StartAsync(CancellationToken cancellationToken) => ExecuteBackgroundMigrationAsync(cancellationToken);
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        private async Task ExecuteBackgroundMigrationAsync(CancellationToken stoppingToken)
+        {
+            if (!_options.RunAsBackgroundTask)
+            {
+                _logger.Info($"{nameof(DataMigrator)} is disabled as background task. Cancelling work");
+                return;
+            }
+
+            if (_options.BackgroundTaskInitialDelay.HasValue)
+            {
+                await Task.Delay(_options.BackgroundTaskInitialDelay.Value, stoppingToken);
+            }
+
+            try
+            {
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    await _clusterMembershipService.Refresh();
+                    var firstAddressSilo = _clusterMembershipService.CurrentSnapshot.Members.Values
+                        .Where(s => s.Status == SiloStatus.Active)
+                        .OrderBy(s => s.SiloAddress)
+                        .FirstOrDefault();
+
+                    if (firstAddressSilo is null)
+                    {
+                        _logger.Info("No silos available, retrying in 15 sec...");
+                        await Task.Delay(TimeSpan.FromSeconds(15), stoppingToken);
+                        continue;
+                    }
+
+                    if (!firstAddressSilo.SiloAddress.Equals(_localSiloDetails.SiloAddress))
+                    {
+                        // DataMigrator should run only from the "primary" silo (can be changed later after cluster updates),
+                        // So we can await and retry here
+                        await Task.Delay(TimeSpan.FromSeconds(15), stoppingToken);
+                        continue;
+                    }
+
+                    // current silo is primary. Starting work here
+                    var migrateGrainsTask = MigrateGrainsAsync(stoppingToken);
+                    var migrateRemindersTask = MigrateRemindersAsync(stoppingToken);
+                    await Task.WhenAll(migrateGrainsTask, migrateRemindersTask);
+
+                    var grainMigrationResult = await migrateGrainsTask;
+                    var reminderMigrationResult = await migrateRemindersTask;
+
+                    if (grainMigrationResult.EntriesMigratedOrSkipped)
+                    {
+                        _logger.Info("Successfully migrated all grains!");
+                    }
+
+                    if (!reminderMigrationResult.IsAvailable)
+                    {
+                        _logger.Info("Reminder migration is not available. " + reminderMigrationResult.Reason);
+                    }
+                    else if (reminderMigrationResult.EntriesMigratedOrSkipped)
+                    {
+                        _logger.Info("Successfully migrated all reminders!");
+                    }
+
+                    if (grainMigrationResult.EntriesMigratedOrSkipped && reminderMigrationResult.EntriesMigratedOrSkipped)
+                    {
+                        _logger.Info("Migration completed");
+                        return;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error((int)MigrationErrorCodes.DataMigrationBackgroundTaskFailed, $"Failed to run {nameof(DataMigrator)} background work", ex);
+            }
         }
 
         /// <summary>
@@ -46,6 +130,7 @@ namespace Orleans.Persistence.Migration
             var migrationStats = new MigrationStats();
             await foreach (var storageEntry in _sourceStorage.GetAll(cancellationToken))
             {
+                migrationStats.EntriesProcessed++;
                 if (!_options.DontSkipMigrateEntries)
                 {
                     IGrainState tmpState = new GrainState<object>();
@@ -106,7 +191,11 @@ namespace Orleans.Persistence.Migration
         {
             if (_reminderMigrationStorage is null)
             {
-                throw new InvalidOperationException("Migration reminder storage is not available. Use 'UseMigrationAzureTableReminderStorage()' to register Reminder's migration component.");
+                return new MigrationStats
+                {
+                    IsAvailable = false,
+                    Reason = "Migration reminder storage is not available. Use 'UseMigrationAzureTableReminderStorage()' to register Reminder's migration component."
+                };
             }
 
             _logger.Info("Starting reminders migration");
@@ -126,6 +215,7 @@ namespace Orleans.Persistence.Migration
 
                     foreach (var entry in entries.Reminders)
                     {
+                        migrationStats.EntriesProcessed++;
                         try
                         {
                             await _reminderMigrationStorage.DestinationReminderTable.UpsertRow(entry);
@@ -154,15 +244,44 @@ namespace Orleans.Persistence.Migration
 
         public class MigrationStats
         {
+            /// <summary>
+            /// If migration is not available, will be false.
+            /// See <see cref="Reason"/> for reason.
+            /// </summary>
+            public bool IsAvailable { get; internal set; } = true;
+            /// <summary>
+            /// If migration is not available, will contain reason details.
+            /// </summary>
+            public string Reason { get;internal set; }
+
             public uint SkippedEntries { get; internal set; }
             public uint MigratedEntries { get; internal set; }
             public uint FailedEntries { get; internal set; }
+            public uint EntriesProcessed { get; internal set; }
+
+            public bool EntriesMigratedOrSkipped
+                => SkippedEntries + MigratedEntries == EntriesProcessed
+                    && FailedEntries == 0;
         }
 
         public class Options
         {
             public bool DontSkipMigrateEntries { get; set; } = false;
             public uint RemindersMigrationBatchSize { get; set; } = 10000;
+
+            /// <summary>
+            /// If set to true, will launch DataMigrator as a background task
+            /// (migration will happen automatically on app startup).
+            /// <br/>
+            /// Can be delayed from the app startup to await cluster stability via <see cref="BackgroundTaskInitialDelay"/>
+            /// </summary>
+            public bool RunAsBackgroundTask { get; set; } = true;
+
+            /// <summary>
+            /// Time to await after app startup before running <see cref="DataMigrator.ExecuteBackgroundMigrationAsync(CancellationToken)"/>.
+            /// If you want to skip awaiting, set it to null.
+            /// </summary>
+            public TimeSpan? BackgroundTaskInitialDelay { get; set; } = TimeSpan.FromMinutes(2);
         }
     }
 }
