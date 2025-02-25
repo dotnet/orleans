@@ -134,6 +134,41 @@ namespace Tester.AzureUtils.Migration.Units
         }
 
         [Fact]
+        public async Task ReadDestinationWithFallback_WriteDestination_Mode_ShouldNotTouchDestinationStorage()
+        {
+            var grainState = CreateGrainState();
+            var storage = BuildMigrationGrainStorage(GrainMigrationMode.ReadDestinationWithFallback_WriteDestination);
+
+            await storage.ClearStateAsync(grainType, grainReference!, grainState);
+            await storage.ReadStateAsync(grainType, grainReference!, grainState);
+            await storage.WriteStateAsync(grainType, grainReference!, grainState);
+
+            // ClearStateAsync is invoked for destination only
+            sourceStorage.Verify(
+                x => x.ClearStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Never());
+            destinationStorage.Verify(
+                x => x.ClearStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Once());
+
+            // WriteStateAsync is invoked for destination only
+            sourceStorage.Verify(
+                x => x.WriteStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Never());
+            destinationStorage.Verify(
+                x => x.WriteStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Once());
+
+            // ReadStateAsync is happening for both storages, if not found in first lookup (here - destination)
+            sourceStorage.Verify(
+                x => x.ReadStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Once());
+            destinationStorage.Verify(
+                x => x.ReadStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Once());
+        }
+
+        [Fact]
         public async Task ReadWriteDestination_Mode_ShouldNotTouchDestinationStorage()
         {
             var grainState = CreateGrainState();

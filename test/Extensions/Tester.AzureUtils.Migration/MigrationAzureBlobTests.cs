@@ -30,6 +30,8 @@ namespace Tester.AzureUtils.Migration
                     {
                         options.SourceStorageName = SourceStorageName;
                         options.DestinationStorageName = DestinationStorageName;
+
+                        options.Mode = GrainMigrationMode.ReadDestinationWithFallback_WriteBoth;
                     })
                     .AddAzureBlobGrainStorage(SourceStorageName, options =>
                     {

@@ -5,7 +5,6 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 
-
 #if NET7_0_OR_GREATER
 using Orleans.Persistence.Migration;
 #endif

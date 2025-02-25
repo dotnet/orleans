@@ -130,9 +130,9 @@ namespace Orleans.Persistence.Migration
                     options);
             });
 
-            if (options.RunAsBackgroundTask)
+            if (options?.RunAsBackgroundTask == true)
             {
-                services.AddHostedService<DataMigrator>(sp => sp.GetService<DataMigrator>());
+                services.AddHostedService(sp => sp.GetService<DataMigrator>());
             }
 
             return services;

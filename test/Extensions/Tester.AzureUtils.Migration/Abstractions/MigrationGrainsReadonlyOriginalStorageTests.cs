@@ -36,8 +36,10 @@ namespace Tester.AzureUtils.Migration.Abstractions
             // Write directly to source storage
             await SourceStorage.WriteStateAsync(stateName, (GrainReference)grain, grainState);
 
-            Assert.Equal(grainState.State.A, await grain.GetA());
-            Assert.Equal(grainState.State.A * grainState.State.B, await grain.GetAxB());
+            var currentA = await grain.GetA();
+            var currentAB = await grain.GetAxB();
+            Assert.Equal(grainState.State.A, currentA);
+            Assert.Equal(grainState.State.A * grainState.State.B, currentAB);
         }
 
         [Fact]

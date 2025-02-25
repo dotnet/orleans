@@ -66,6 +66,7 @@ namespace Orleans.Persistence.Migration
                     break;
                 }
 
+                case GrainMigrationMode.ReadDestinationWithFallback_WriteDestination:
                 case GrainMigrationMode.ReadWriteDestination:
                 {
                     grainState.ETag = eTag.DestinationETag;
@@ -107,6 +108,7 @@ namespace Orleans.Persistence.Migration
                     break;
                 }
 
+                case GrainMigrationMode.ReadDestinationWithFallback_WriteDestination:
                 case GrainMigrationMode.ReadDestinationWithFallback_WriteBoth:
                 {
                     await _destinationStorage.ReadStateAsync(grainType, grainReference, grainState);
@@ -148,6 +150,7 @@ namespace Orleans.Persistence.Migration
                     }
 
                     case GrainMigrationMode.ReadWriteDestination:
+                    case GrainMigrationMode.ReadDestinationWithFallback_WriteDestination:
                     {
                         grainState.ETag = grainState.RecordExists ? etag.DestinationETag : default;
                         await _destinationStorage.WriteStateAsync(grainType, grainReference, grainState);
@@ -230,8 +233,16 @@ namespace Orleans.Persistence.Migration
         ReadDestinationWithFallback_WriteBoth = 2,
 
         /// <summary>
+        /// Reading would happen from destination storage, and if entry does not exist, will also check source storage.
+        /// Write will target only destination.
+        /// <br/>
+        /// <i>Should be used as latter step of migration.</i>
+        /// </summary>
+        ReadDestinationWithFallback_WriteDestination = 3,
+
+        /// <summary>
         /// Reading and writing happens only against destination storage
         /// </summary>
-        ReadWriteDestination = 3
+        ReadWriteDestination = 4
     }
 }
