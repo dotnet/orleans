@@ -144,14 +144,13 @@ namespace Tester.AzureUtils.Migration.Abstractions
             }
         }
 
-
         /// <summary>
         /// Loads currently stored grain state from Cosmos DB.
         /// </summary>
         /// <remarks>
         /// We can't call `DestinationStorage.ReadAsync()` because of the inner implementation details
         /// </remarks>
-        protected async Task<MigrationTestGrain_State> GetGrainStateFromCosmosAsync(
+        protected async Task<JToken> GetGrainStateJsonFromCosmosAsync(
             CosmosClient cosmosClient,
             string databaseName,
             string containerName,
@@ -170,7 +169,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
                 stateName!,
                 "migrationtestgrain", // GrainTypeAttribute's value for MigrationTestGrain
                 grainIdRepresentation);
-            
+
             var response = await container.ReadItemAsync<dynamic>(documentId, new PartitionKey(partitionKey));
             JObject data = response.Resource;
 
@@ -182,6 +181,27 @@ namespace Tester.AzureUtils.Migration.Abstractions
             {
                 throw new InvalidDataException("Grain state is null");
             }
+
+            return dataState;
+        }
+
+        /// <summary>
+        /// Loads currently stored grain state from Cosmos DB.
+        /// </summary>
+        /// <remarks>
+        /// We can't call `DestinationStorage.ReadAsync()` because of the inner implementation details
+        /// </remarks>
+        protected async Task<MigrationTestGrain_State> GetGrainStateFromCosmosAsync(
+            CosmosClient cosmosClient,
+            string databaseName,
+            string containerName,
+            IDocumentIdProvider documentIdProvider,
+            GrainReference grain,
+            string? stateName = "state", // when cosmos is a target storage for migration, state is the default name of how Orleans writes a partitionKey
+            bool latestOrleansSerializationFormat = true
+        )
+        {
+            var dataState = await GetGrainStateJsonFromCosmosAsync(cosmosClient, databaseName, containerName, documentIdProvider, grain, stateName, latestOrleansSerializationFormat);
 
             return new MigrationTestGrain_State
             {

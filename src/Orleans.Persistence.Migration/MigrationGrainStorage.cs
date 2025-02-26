@@ -32,13 +32,30 @@ namespace Orleans.Persistence.Migration
             public static MigrationEtag ParseFromJson(string json) => (MigrationEtag)JsonConvert.DeserializeObject(json, typeof(MigrationEtag));
         }
 
-        private readonly IExtendedGrainStorage _extendedSourceStorage;
-
         private readonly IGrainStorage _sourceStorage;
         private readonly IGrainStorage _destinationStorage;
 
-        private readonly MigrationGrainStorageOptions _options;
         private readonly ILogger<MigrationGrainStorage> _logger;
+
+        public GrainMigrationMode GrainMigrationMode { get; private set; }
+
+        /// <summary>
+        /// Completely disables migration tooling to use only the source storage
+        /// </summary>
+        public void DisableMigrationTooling()
+        {
+            _logger.Info($"Disabled {nameof(MigrationGrainStorage)} per request.");
+            GrainMigrationMode = GrainMigrationMode.Disabled;
+        }
+
+        /// <summary>
+        /// Changes mode to specified one
+        /// </summary>
+        public void ChangeMode(GrainMigrationMode mode)
+        {
+            _logger.Info($"Changed {nameof(MigrationGrainStorage)} mode to {{mode}}", mode);
+            GrainMigrationMode = mode;
+        }
 
         public MigrationGrainStorage(
             IGrainStorage sourceStorage,
@@ -46,18 +63,17 @@ namespace Orleans.Persistence.Migration
             MigrationGrainStorageOptions options,
             ILogger<MigrationGrainStorage> logger)
         {
-            _options = options;
             _sourceStorage = sourceStorage;
             _destinationStorage = destinationStorage;
 
             _logger = logger;
-            _extendedSourceStorage = sourceStorage as IExtendedGrainStorage;
+            GrainMigrationMode = options.Mode;
         }
 
         public async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             var eTag = MigrationEtag.ParseFromJson(grainState.ETag);
-            switch (_options.Mode)
+            switch (GrainMigrationMode)
             {
                 case GrainMigrationMode.Disabled:
                 {
@@ -85,13 +101,13 @@ namespace Orleans.Persistence.Migration
                     break;
                 }
 
-                default: throw new ArgumentOutOfRangeException(nameof(_options.Mode));
+                default: throw new ArgumentOutOfRangeException(nameof(GrainMigrationMode));
             }
         }
 
         public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            switch (_options.Mode)
+            switch (GrainMigrationMode)
             {
                 case GrainMigrationMode.Disabled:
                 case GrainMigrationMode.ReadSource_WriteBoth:
@@ -125,7 +141,7 @@ namespace Orleans.Persistence.Migration
                     break;
                 }
 
-                default: throw new ArgumentOutOfRangeException(nameof(_options.Mode));
+                default: throw new ArgumentOutOfRangeException(nameof(GrainMigrationMode));
             }
         }
 
@@ -139,7 +155,7 @@ namespace Orleans.Persistence.Migration
 
             try
             {
-                switch (_options.Mode)
+                switch (GrainMigrationMode)
                 {
                     case GrainMigrationMode.Disabled:
                     {
@@ -173,7 +189,7 @@ namespace Orleans.Persistence.Migration
                         break;
                     }
 
-                    default: throw new ArgumentOutOfRangeException(nameof(_options.Mode));
+                    default: throw new ArgumentOutOfRangeException(nameof(GrainMigrationMode));
                 }
             }
             finally

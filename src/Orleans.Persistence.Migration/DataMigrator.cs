@@ -130,6 +130,7 @@ namespace Orleans.Persistence.Migration
             var migrationStats = new MigrationStats();
             await foreach (var storageEntry in _sourceStorage.GetAll(cancellationToken))
             {
+                var initGrainType = storageEntry.GrainType;
                 migrationStats.EntriesProcessed++;
                 if (!_options.DontSkipMigrateEntries)
                 {
@@ -175,6 +176,7 @@ namespace Orleans.Persistence.Migration
                     }
 
                     migrationStats.MigratedEntries++;
+                    _logger.Debug("Grain {grainType} with key {grainKey} is migrated successfully", storageEntry.GrainType, storageEntry.GrainReference.GetPrimaryKey());
                 }
                 catch (Exception ex)
                 {

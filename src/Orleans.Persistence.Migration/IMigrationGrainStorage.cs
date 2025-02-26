@@ -14,6 +14,6 @@ namespace Orleans.Persistence.Migration
         /// Similar to <see cref="IGrainStorage.WriteStateAsync(string, GrainReference, IGrainState)"/> but for migrating grain state from one storage to another.
         /// Can do some extra work to ensure a proper migration or data preparation.
         /// </summary>
-        Task MigrateGrainStateAsync(string grainType, GrainReference grainReference, IGrainState grainState);
+        Task<GrainReference> MigrateGrainStateAsync(string grainType, GrainReference grainReference, IGrainState grainState);
     }
 }

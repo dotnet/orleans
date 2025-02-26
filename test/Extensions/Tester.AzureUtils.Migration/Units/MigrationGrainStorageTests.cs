@@ -201,6 +201,68 @@ namespace Tester.AzureUtils.Migration.Units
                 times: Times.Once());
         }
 
+        [Fact]
+        public async Task Disable_ShouldAffectBehavior()
+        {
+            var grainState = CreateGrainState();
+            var storage = BuildMigrationGrainStorage(GrainMigrationMode.ReadWriteDestination);
+
+            await storage.ClearStateAsync(grainType, grainReference!, grainState);
+            await storage.ReadStateAsync(grainType, grainReference!, grainState);
+            await storage.WriteStateAsync(grainType, grainReference!, grainState);
+
+            // source not invoked at all
+            sourceStorage.Verify(
+                x => x.ClearStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Never());
+            sourceStorage.Verify(
+                x => x.ReadStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Never());
+            sourceStorage.Verify(
+                x => x.WriteStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Never());
+
+            // destination is always invoked
+            destinationStorage.Verify(
+                x => x.ClearStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Once());
+            destinationStorage.Verify(
+                x => x.ReadStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Once());
+            destinationStorage.Verify(
+                x => x.WriteStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Once());
+
+            // then change to disabled
+            storage.DisableMigrationTooling();
+
+            await storage.ClearStateAsync(grainType, grainReference!, grainState);
+            await storage.ReadStateAsync(grainType, grainReference!, grainState);
+            await storage.WriteStateAsync(grainType, grainReference!, grainState);
+
+            // source is now invoked
+            sourceStorage.Verify(
+                x => x.ClearStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Once());
+            sourceStorage.Verify(
+                x => x.ReadStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Once());
+            sourceStorage.Verify(
+                x => x.WriteStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Once());
+
+            // destination is not touched more than it was before
+            destinationStorage.Verify(
+                x => x.ClearStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Once());
+            destinationStorage.Verify(
+                x => x.ReadStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Once());
+            destinationStorage.Verify(
+                x => x.WriteStateAsync(It.IsAny<string>(), It.IsAny<GrainReference>(), It.IsAny<IGrainState>()),
+                times: Times.Once());
+        }
+
         IGrainState CreateGrainState()
         {
             var state = new GrainState<object>();

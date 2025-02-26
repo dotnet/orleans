@@ -48,10 +48,12 @@ namespace Orleans.Persistence.Cosmos.Migration
         public Task WriteStateAsync(string stateName, GrainReference grainReference, IGrainState grainState)
             => this.cosmosGrainStorage.WriteStateAsync(stateName, grainReference, grainState);
 
-        public Task MigrateGrainStateAsync(string stateName, GrainReference grainReference, IGrainState grainState)
+        public async Task<GrainReference> MigrateGrainStateAsync(string stateName, GrainReference grainReference, IGrainState grainState)
         {
             var grainTypeData = this.grainStateTypeInfoProvider.GetGrainStateTypeInfo(cosmosGrainStorage, grainReference, grainState);
-            return grainTypeData.WriteStateAsync(stateName, grainReference, grainState);
+            await grainTypeData.WriteStateAsync(stateName, grainReference, grainState);
+
+            return grainReference;
         }
     }
 
