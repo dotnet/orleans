@@ -16,7 +16,9 @@ namespace Orleans.Persistence.Migration
 
         private readonly IExtendedGrainStorage _sourceStorage;
         private readonly IGrainStorage _destinationStorage;
-        readonly IReminderMigrationTable _reminderMigrationStorage;
+        private readonly IReminderMigrationTable _reminderMigrationStorage;
+
+        private readonly CancellationTokenSource _backgroundWorkCts = new();
 
         public DataMigrator(
             ILogger<DataMigrator> logger,
@@ -43,8 +45,12 @@ namespace Orleans.Persistence.Migration
             _reminderMigrationStorage = reminderMigrationTable;
         }
 
-        public Task StartAsync(CancellationToken cancellationToken) => ExecuteBackgroundMigrationAsync(cancellationToken);
-        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task StartAsync(CancellationToken cancellationToken) => ExecuteBackgroundMigrationAsync(_backgroundWorkCts.Token);
+        public Task StopAsync(CancellationToken cancellationToken)
+        {
+            _backgroundWorkCts.Cancel();
+            return Task.CompletedTask;
+        }
 
         private async Task ExecuteBackgroundMigrationAsync(CancellationToken stoppingToken)
         {
@@ -59,9 +65,9 @@ namespace Orleans.Persistence.Migration
                 await Task.Delay(_options.BackgroundTaskInitialDelay.Value, stoppingToken);
             }
 
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                while (!stoppingToken.IsCancellationRequested)
+                try
                 {
                     await _clusterMembershipService.Refresh();
                     var firstAddressSilo = _clusterMembershipService.CurrentSnapshot.Members.Values
@@ -112,10 +118,11 @@ namespace Orleans.Persistence.Migration
                         return;
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error((int)MigrationErrorCodes.DataMigrationBackgroundTaskFailed, $"Failed to run {nameof(DataMigrator)} background work", ex);
+                catch (Exception ex)
+                {
+                    _logger.Error((int)MigrationErrorCodes.DataMigrationBackgroundTaskFailed, $"Failed to run {nameof(DataMigrator)} background work. Retrying in 2 seconds...", ex);
+                    await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+                }
             }
         }
 
@@ -139,7 +146,7 @@ namespace Orleans.Persistence.Migration
 
                     if (tmpState is not null && tmpState.RecordExists)
                     {
-                        _logger.Info("Entry (type='{grainType}';ref='{reference}') already exists at destination storage", storageEntry.GrainType, storageEntry.GrainReference);
+                        _logger.Info("Entry (type='{grainType}';ref='{reference}') already exists at destination storage", storageEntry.GrainType, storageEntry.GrainReference.ToShortKeyString());
                         migrationStats.SkippedEntries++;
                         continue;
                     }
@@ -176,11 +183,11 @@ namespace Orleans.Persistence.Migration
                     }
 
                     migrationStats.MigratedEntries++;
-                    _logger.Debug("Grain {grainType} with key {grainKey} is migrated successfully", storageEntry.GrainType, storageEntry.GrainReference.GetPrimaryKey());
+                    _logger.Debug("Grain {grainType} with key {grainKey} is migrated successfully", storageEntry.GrainType, storageEntry.GrainReference.ToShortKeyString());
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error migrating grain {GrainType} with reference key='{GrainReference}'", storageEntry.GrainType, storageEntry.GrainReference.GetPrimaryKey());
+                    _logger.LogError(ex, "Error migrating grain {GrainType} with reference key='{GrainReference}'", storageEntry.GrainType, storageEntry.GrainReference.ToShortKeyString());
                     migrationStats.FailedEntries++;
                 }
             }

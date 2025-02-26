@@ -10,12 +10,12 @@ namespace Orleans.Persistence.Migration
     /// </summary>
     internal class TransformerGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly IGrainTransformer _transformer;
+        private readonly IGrainStorageTransformer _transformer;
 
         private readonly IGrainStorage _innerGrainStorage;
         private readonly ILifecycleParticipant<ISiloLifecycle> _innerGrainStorageParticipant;
 
-        protected TransformerGrainStorage(IGrainTransformer grainTransformer, IGrainStorage grainStorage)
+        protected TransformerGrainStorage(IGrainStorageTransformer grainTransformer, IGrainStorage grainStorage)
         {
             _transformer = grainTransformer;
             _innerGrainStorage = grainStorage;
@@ -48,7 +48,7 @@ namespace Orleans.Persistence.Migration
         public static IGrainStorage Create(IServiceProvider serviceProvider, string innerGrainStorageName, string grainTransformerName)
         {
             var innerGrainStorage = serviceProvider.GetRequiredServiceByName<IGrainStorage>(innerGrainStorageName);
-            var grainTransformer = serviceProvider.GetRequiredServiceByName<IGrainTransformer>(grainTransformerName);
+            var grainTransformer = serviceProvider.GetRequiredServiceByName<IGrainStorageTransformer>(grainTransformerName);
 
             return new TransformerGrainStorage(grainTransformer, innerGrainStorage);
         }
@@ -59,7 +59,7 @@ namespace Orleans.Persistence.Migration
     /// <summary>
     /// Provides API to control the grain data before it is communicated to the underlying storage.
     /// </summary>
-    public interface IGrainTransformer
+    public interface IGrainStorageTransformer
     {
         void BeforeClearState(ref string grainType, GrainReference grainReference, IGrainState grainState);
         void BeforeReadState(ref string grainType, GrainReference grainReference, IGrainState grainState);

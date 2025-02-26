@@ -75,7 +75,7 @@ namespace Tester.AzureUtils.Migration
             }
         }
 
-        public class TestGrainTransformer : IGrainTransformer
+        public class TestGrainTransformer : IGrainStorageTransformer
         {
             private readonly ILogger<TestGrainTransformer> _logger;
 

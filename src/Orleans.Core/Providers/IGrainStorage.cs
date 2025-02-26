@@ -14,6 +14,8 @@ namespace Orleans.Storage
         public GrainReference GrainReference { get; }
         public IGrainState GrainState { get; }
 
+        public object? Cursor { get; }
+
         public StorageEntry(string name, GrainReference grainReference, IGrainState grainState)
         {
             GrainType = name;

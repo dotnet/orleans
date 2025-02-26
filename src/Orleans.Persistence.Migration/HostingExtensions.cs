@@ -148,7 +148,7 @@ namespace Orleans.Persistence.Migration
         public static ISiloBuilder AddTransformingGrainStorage<TGrainTransformer>(
             this ISiloBuilder builder,
             string name,
-            string innerGrainStorageName) where TGrainTransformer : class, IGrainTransformer
+            string innerGrainStorageName) where TGrainTransformer : class, IGrainStorageTransformer
         {
             builder.ConfigureServices(services =>
             {
@@ -163,14 +163,14 @@ namespace Orleans.Persistence.Migration
         public static IServiceCollection AddTransformingGrainStorage<TGrainTransformer>(
             this IServiceCollection services,
             string name,
-            string innerGrainStorageName) where TGrainTransformer : class, IGrainTransformer
+            string innerGrainStorageName) where TGrainTransformer : class, IGrainStorageTransformer
         {
             if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
             {
                 services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
             }
 
-            return services.AddSingletonNamedService<IGrainTransformer, TGrainTransformer>(name)
+            return services.AddSingletonNamedService<IGrainStorageTransformer, TGrainTransformer>(name)
                            .AddSingletonNamedService<IGrainStorage>(name, (sp, n) => TransformerGrainStorage.Create(sp, innerGrainStorageName, name))
                            .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
         }
