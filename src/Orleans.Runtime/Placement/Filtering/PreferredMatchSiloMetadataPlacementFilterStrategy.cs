@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Orleans.Metadata;
 using Orleans.Placement;
 
@@ -23,6 +24,7 @@ public class PreferredMatchSiloMetadataPlacementFilterStrategy(string[] orderedM
         {
             throw new ArgumentException("Invalid ordered-metadata-keys property value.");
         }
+
         OrderedMetadataKeys = placementFilterGrainProperty.Split(",");
         var minCandidatesProperty = GetPlacementFilterGrainProperty("min-candidates", properties);
         if (!int.TryParse(minCandidatesProperty, out var parsedMinCandidates))
@@ -37,6 +39,6 @@ public class PreferredMatchSiloMetadataPlacementFilterStrategy(string[] orderedM
         IReadOnlyDictionary<string, string> existingProperties)
     {
         yield return new KeyValuePair<string, string>("ordered-metadata-keys", string.Join(",", OrderedMetadataKeys));
-        yield return new KeyValuePair<string, string>("min-candidates", MinCandidates.ToString());
+        yield return new KeyValuePair<string, string>("min-candidates", MinCandidates.ToString(CultureInfo.InvariantCulture));
     }
 }

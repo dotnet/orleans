@@ -1,17 +1,14 @@
-using System;
 using System.Threading.Tasks;
-using Orleans.Runtime.Services;
 
 #nullable enable
 namespace Orleans.Runtime.MembershipService.SiloMetadata;
 
-public class SiloMetadataClient(IServiceProvider serviceProvider)
-    : GrainServiceClient<ISiloMetadataGrainService>(serviceProvider), ISiloMetadataClient
+internal sealed class SiloMetadataClient(IInternalGrainFactory grainFactory) : ISiloMetadataClient
 {
     public async Task<SiloMetadata> GetSiloMetadata(SiloAddress siloAddress)
     {
-        var grainService = GetGrainService(siloAddress);
-        var metadata = await grainService.GetSiloMetadata();
+        var metadataSystemTarget = grainFactory.GetSystemTarget<ISiloMetadataSystemTarget>(Constants.SiloMetadataType, siloAddress);
+        var metadata = await metadataSystemTarget.GetSiloMetadata();
         return metadata;
     }
 }

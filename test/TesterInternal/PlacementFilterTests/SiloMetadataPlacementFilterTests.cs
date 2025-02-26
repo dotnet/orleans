@@ -2,38 +2,45 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime.MembershipService.SiloMetadata;
 using Orleans.Runtime.Placement.Filtering;
 using Orleans.TestingHost;
-using TestExtensions;
 using Xunit;
 
 namespace UnitTests.PlacementFilterTests;
 
 [TestCategory("Placement"), TestCategory("Filters"), TestCategory("SiloMetadata")]
-public class SiloMetadataPlacementFilterTests : TestClusterPerTest
+public class SiloMetadataPlacementFilterTests(SiloMetadataPlacementFilterTests.Fixture fixture) : IClassFixture<SiloMetadataPlacementFilterTests.Fixture>
 {
-    protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    public class Fixture : IAsyncLifetime
     {
-        builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-    }
-
-    private class SiloConfigurator : ISiloConfigurator
-    {
-        public void Configure(ISiloBuilder hostBuilder)
+        public InProcessTestCluster Cluster { get; private set; }
+        public async Task DisposeAsync()
         {
-            hostBuilder.UseSiloMetadata(new Dictionary<string, string>
+            if (Cluster is { } cluster)
+            {
+                await cluster.DisposeAsync();
+            }
+        }
+
+        public async Task InitializeAsync()
+        {
+            var builder = new InProcessTestClusterBuilder(3);
+            builder.ConfigureSilo((options, siloBuilder) => siloBuilder.UseSiloMetadata(new Dictionary<string, string>
             {
                 {"first", "1"},
                 {"second", "2"},
                 {"third", "3"},
                 {"unique", Guid.NewGuid().ToString()}
-            });
+            }));
+
+            Cluster = builder.Build();
+            await Cluster.DeployAsync();
+            await Cluster.WaitForLivenessToStabilizeAsync();
         }
     }
 
     [Fact, TestCategory("Functional")]
     public async Task PlacementFilter_GrainWithoutFilterCanBeCalled()
     {
-        await HostedCluster.WaitForLivenessToStabilizeAsync();
-        var managementGrain = Client.GetGrain<IManagementGrain>(0);
+        var managementGrain = fixture.Cluster.Client.GetGrain<IManagementGrain>(0);
         var silos = await managementGrain.GetHosts(true);
         Assert.NotNull(silos);
     }
@@ -45,14 +52,13 @@ public class SiloMetadataPlacementFilterTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task PlacementFilter_RequiredFilterCanBeCalled()
     {
-        await HostedCluster.WaitForLivenessToStabilizeAsync();
         var id = 0;
-        foreach (var hostedClusterSilo in HostedCluster.Silos)
+        foreach (var hostedClusterSilo in fixture.Cluster.Silos)
         {
             for (var i = 0; i < 50; i++)
             {
                 ++id;
-                var firstSp = HostedCluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);
+                var firstSp = fixture.Cluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);
                 var firstSiloMetadataCache = firstSp.GetRequiredService<IClusterClient>();
                 var managementGrain = firstSiloMetadataCache.GetGrain<IUniqueRequiredMatchFilteredGrain>(id);
                 var hostingSilo = await managementGrain.GetHostingSilo();
@@ -69,14 +75,13 @@ public class SiloMetadataPlacementFilterTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task PlacementFilter_PreferredFilterCanBeCalled()
     {
-        await HostedCluster.WaitForLivenessToStabilizeAsync();
         var id = 0;
-        foreach (var hostedClusterSilo in HostedCluster.Silos)
+        foreach (var hostedClusterSilo in fixture.Cluster.Silos)
         {
             for (var i = 0; i < 50; i++)
             {
                 ++id;
-                var firstSp = HostedCluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);
+                var firstSp = fixture.Cluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);
                 var firstSiloMetadataCache = firstSp.GetRequiredService<IClusterClient>();
                 var managementGrain = firstSiloMetadataCache.GetGrain<IPreferredMatchFilteredGrain>(id);
                 var hostingSilo = await managementGrain.GetHostingSilo();
@@ -93,19 +98,19 @@ public class SiloMetadataPlacementFilterTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task PlacementFilter_PreferredMin2FilterCanBeCalled()
     {
-        await HostedCluster.WaitForLivenessToStabilizeAsync();
         var id = 0;
-        foreach (var hostedClusterSilo in HostedCluster.Silos)
+        foreach (var hostedClusterSilo in fixture.Cluster.Silos)
         {
             var dict = new Dictionary<SiloAddress, int>();
-            foreach (var clusterSilo in HostedCluster.Silos)
+            foreach (var clusterSilo in fixture.Cluster.Silos)
             {
                 dict[clusterSilo.SiloAddress] = 0;
             }
+
             for (var i = 0; i < 50; i++)
             {
                 ++id;
-                var firstSp = HostedCluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);
+                var firstSp = fixture.Cluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);
                 var firstSiloMetadataCache = firstSp.GetRequiredService<IClusterClient>();
                 var managementGrain = firstSiloMetadataCache.GetGrain<IPreferredMatchMin2FilteredGrain>(id);
                 var hostingSilo = await managementGrain.GetHostingSilo();
@@ -127,19 +132,19 @@ public class SiloMetadataPlacementFilterTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task PlacementFilter_PreferredMultipleFilterCanBeCalled()
     {
-        await HostedCluster.WaitForLivenessToStabilizeAsync();
         var id = 0;
-        foreach (var hostedClusterSilo in HostedCluster.Silos)
+        foreach (var hostedClusterSilo in fixture.Cluster.Silos)
         {
             var dict = new Dictionary<SiloAddress, int>();
-            foreach (var clusterSilo in HostedCluster.Silos)
+            foreach (var clusterSilo in fixture.Cluster.Silos)
             {
                 dict[clusterSilo.SiloAddress] = 0;
             }
+
             for (var i = 0; i < 50; i++)
             {
                 ++id;
-                var firstSp = HostedCluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);
+                var firstSp = fixture.Cluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);
                 var firstSiloMetadataCache = firstSp.GetRequiredService<IClusterClient>();
                 var managementGrain = firstSiloMetadataCache.GetGrain<IPreferredMatchMultipleFilteredGrain>(id);
                 var hostingSilo = await managementGrain.GetHostingSilo();
@@ -161,21 +166,18 @@ public class SiloMetadataPlacementFilterTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task PlacementFilter_PreferredMin2FilterCanBeCalledWithLargerCluster()
     {
-        await HostedCluster.WaitForLivenessToStabilizeAsync();
-        await HostedCluster.StartAdditionalSiloAsync();
-        await HostedCluster.WaitForLivenessToStabilizeAsync();
         var id = 0;
-        foreach (var hostedClusterSilo in HostedCluster.Silos)
+        foreach (var hostedClusterSilo in fixture.Cluster.Silos)
         {
             var dict = new Dictionary<SiloAddress, int>();
-            foreach (var clusterSilo in HostedCluster.Silos)
+            foreach (var clusterSilo in fixture.Cluster.Silos)
             {
                 dict[clusterSilo.SiloAddress] = 0;
             }
             for (var i = 0; i < 50; i++)
             {
                 ++id;
-                var firstSp = HostedCluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);
+                var firstSp = fixture.Cluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);
                 var firstSiloMetadataCache = firstSp.GetRequiredService<IClusterClient>();
                 var managementGrain = firstSiloMetadataCache.GetGrain<IPreferredMatchMin2FilteredGrain>(id);
                 var hostingSilo = await managementGrain.GetHostingSilo();
@@ -197,21 +199,18 @@ public class SiloMetadataPlacementFilterTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task PlacementFilter_PreferredNoMetadataFilterCanBeCalled()
     {
-        await HostedCluster.WaitForLivenessToStabilizeAsync();
-        await HostedCluster.StartAdditionalSiloAsync();
-        await HostedCluster.WaitForLivenessToStabilizeAsync();
         var id = 0;
-        foreach (var hostedClusterSilo in HostedCluster.Silos)
+        foreach (var hostedClusterSilo in fixture.Cluster.Silos)
         {
             var dict = new Dictionary<SiloAddress, int>();
-            foreach (var clusterSilo in HostedCluster.Silos)
+            foreach (var clusterSilo in fixture.Cluster.Silos)
             {
                 dict[clusterSilo.SiloAddress] = 0;
             }
             for (var i = 0; i < 50; i++)
             {
                 ++id;
-                var firstSp = HostedCluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);
+                var firstSp = fixture.Cluster.GetSiloServiceProvider(hostedClusterSilo.SiloAddress);
                 var firstSiloMetadataCache = firstSp.GetRequiredService<IClusterClient>();
                 var managementGrain = firstSiloMetadataCache.GetGrain<IPreferredMatchNoMetadataFilteredGrain>(id);
                 var hostingSilo = await managementGrain.GetHostingSilo();

@@ -11,7 +11,6 @@ namespace Orleans.Runtime.MembershipService.SiloMetadata;
 
 public static class SiloMetadataHostingExtensions
 {
-
     /// <summary>
     /// Configure silo metadata from the builder configuration.
     /// </summary>
@@ -58,7 +57,7 @@ public static class SiloMetadataHostingExtensions
     {
         var dictionary = configurationSection.Get<Dictionary<string, string>>();
 
-        return builder.UseSiloMetadata(dictionary ?? new Dictionary<string, string>());
+        return builder.UseSiloMetadata(dictionary ?? []);
     }
 
     /// <summary>
@@ -73,16 +72,15 @@ public static class SiloMetadataHostingExtensions
         {
             services
                 .AddOptionsWithValidateOnStart<SiloMetadata>()
-                .Configure(m =>
-                {
-                    m.AddMetadata(metadata);
-                });
+                .Configure(m => m.AddMetadata(metadata));
 
-            services.AddGrainService<SiloMetadataGrainService>();
+            services.AddSingleton<SiloMetadataSystemTarget>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloMetadataSystemTarget>();
             services.AddSingleton<SiloMetadataCache>();
             services.AddFromExisting<ISiloMetadataCache, SiloMetadataCache>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloMetadataCache>();
             services.AddSingleton<ISiloMetadataClient, SiloMetadataClient>();
+
             // Placement filters
             services.AddPlacementFilter<PreferredMatchSiloMetadataPlacementFilterStrategy, PreferredMatchSiloMetadataPlacementFilterDirector>(ServiceLifetime.Transient);
             services.AddPlacementFilter<RequiredMatchSiloMetadataPlacementFilterStrategy, RequiredMatchSiloMetadataPlacementFilterDirector>(ServiceLifetime.Transient);

@@ -14,11 +14,11 @@ internal class PreferredMatchSiloMetadataPlacementFilterDirector(
 {
     public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, IEnumerable<SiloAddress> silos)
     {
-        var preferredMatchSiloMetadataPlacementFilterStrategy = (filterStrategy as PreferredMatchSiloMetadataPlacementFilterStrategy);
+        var preferredMatchSiloMetadataPlacementFilterStrategy = filterStrategy as PreferredMatchSiloMetadataPlacementFilterStrategy;
         var minCandidates = preferredMatchSiloMetadataPlacementFilterStrategy?.MinCandidates ?? 1;
         var orderedMetadataKeys = preferredMatchSiloMetadataPlacementFilterStrategy?.OrderedMetadataKeys ?? [];
         
-        var localSiloMetadata = siloMetadataCache.GetMetadata(localSiloDetails.SiloAddress).Metadata;
+        var localSiloMetadata = siloMetadataCache.GetSiloMetadata(localSiloDetails.SiloAddress).Metadata;
 
         if (localSiloMetadata.Count == 0)
         {
@@ -39,7 +39,7 @@ internal class PreferredMatchSiloMetadataPlacementFilterDirector(
         var scoreCounts = new int[orderedMetadataKeys.Length+1];
         for (var i = 0; i < siloList.Count; i++)
         {
-            var siloMetadata = siloMetadataCache.GetMetadata(siloList[i]).Metadata;
+            var siloMetadata = siloMetadataCache.GetSiloMetadata(siloList[i]).Metadata;
             var siloScore = 0;
             for (var j = orderedMetadataKeys.Length - 1; j >= 0; --j)
             {

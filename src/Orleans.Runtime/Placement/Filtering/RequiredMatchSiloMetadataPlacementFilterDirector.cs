@@ -19,12 +19,12 @@ internal class RequiredMatchSiloMetadataPlacementFilterDirector(ILocalSiloDetail
             return silos;
         }
 
-        var localMetadata = siloMetadataCache.GetMetadata(localSiloDetails.SiloAddress);
+        var localMetadata = siloMetadataCache.GetSiloMetadata(localSiloDetails.SiloAddress);
         var localRequiredMetadata = GetMetadata(localMetadata, metadataKeys);
 
         return silos.Where(silo =>
         {
-            var remoteMetadata = siloMetadataCache.GetMetadata(silo);
+            var remoteMetadata = siloMetadataCache.GetSiloMetadata(silo);
             return DoesMetadataMatch(localRequiredMetadata, remoteMetadata, metadataKeys);
         });
     }
@@ -33,7 +33,7 @@ internal class RequiredMatchSiloMetadataPlacementFilterDirector(ILocalSiloDetail
     {
         for (var i = 0; i < metadataKeys.Length; i++)
         {
-            if(localMetadata[i] != siloMetadata.Metadata?.GetValueOrDefault(metadataKeys[i]))
+            if (localMetadata[i] != siloMetadata.Metadata.GetValueOrDefault(metadataKeys[i]))
             {
                 return false;
             }
@@ -46,8 +46,9 @@ internal class RequiredMatchSiloMetadataPlacementFilterDirector(ILocalSiloDetail
         var result = new string?[metadataKeys.Length];
         for (var i = 0; i < metadataKeys.Length; i++)
         {
-            result[i] = siloMetadata.Metadata?.GetValueOrDefault(metadataKeys[i]);
+            result[i] = siloMetadata.Metadata.GetValueOrDefault(metadataKeys[i]);
         }
+
         return result;
     }
 }

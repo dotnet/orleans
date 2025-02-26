@@ -2,126 +2,117 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime.MembershipService.SiloMetadata;
 using Orleans.TestingHost;
-using TestExtensions;
 using Xunit;
 
 namespace UnitTests.SiloMetadataTests;
 
-
 [TestCategory("SiloMetadata")]
-public class SiloMetadataConfigTests : TestClusterPerTest
+public class SiloMetadataTests(SiloMetadataTests.Fixture fixture) : IClassFixture<SiloMetadataTests.Fixture>
 {
-    protected override void ConfigureTestCluster(TestClusterBuilder builder)
-    {
-        builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-    }
-
-    private class SiloConfigurator : ISiloConfigurator
-    {
-        public static readonly List<KeyValuePair<string, string>> Metadata =
+    private static readonly List<KeyValuePair<string, string>> Metadata =
         [
             new("Orleans:Metadata:first", "1"),
             new("Orleans:Metadata:second", "2"),
             new("Orleans:Metadata:third", "3")
         ];
 
-        public void Configure(ISiloBuilder hostBuilder)
+    public class Fixture : IAsyncLifetime
+    {
+        public InProcessTestCluster Cluster { get; private set; }
+        public async Task DisposeAsync()
         {
-            var config = new ConfigurationBuilder()
-                .AddInMemoryCollection(Metadata)
-                .Build();
-            hostBuilder.UseSiloMetadata(config);
+            if (Cluster is { } cluster)
+            {
+                await cluster.DisposeAsync();
+            }
+        }
+
+        public async Task InitializeAsync()
+        {
+            var builder = new InProcessTestClusterBuilder(3);
+            builder.ConfigureSiloHost((options, hostBuilder) =>
+            {
+                hostBuilder.Configuration.AddInMemoryCollection(Metadata);
+            });
+
+            builder.ConfigureSilo((options, siloBuilder) =>
+            {
+                siloBuilder
+                .UseSiloMetadata()
+                .UseSiloMetadata(new Dictionary<string, string>
+                {
+                    {"host.id", Guid.NewGuid().ToString()}
+                });
+            });
+
+            Cluster = builder.Build();
+            await Cluster.DeployAsync();
+            await Cluster.WaitForLivenessToStabilizeAsync();
         }
     }
 
     [Fact, TestCategory("Functional")]
-    public async Task SiloMetadata_CanBeSetAndRead()
+    public void SiloMetadata_FromConfiguration_CanBeSetAndRead()
     {
-        await HostedCluster.WaitForLivenessToStabilizeAsync();
-        HostedCluster.AssertAllSiloMetadataMatchesOnAllSilos(SiloConfigurator.Metadata.Select(kv => kv.Key.Split(':').Last()).ToArray());
+        fixture.Cluster.AssertAllSiloMetadataMatchesOnAllSilos(Metadata.Select(kv => kv.Key.Split(':').Last()).ToArray());
     }
 
     [Fact, TestCategory("Functional")]
-    public async Task SiloMetadata_HasConfiguredValues()
+    public void SiloMetadata_HasConfiguredValues()
     {
-        await HostedCluster.WaitForLivenessToStabilizeAsync();
-
-        var first = HostedCluster.Silos.First();
-        var firstSp = HostedCluster.GetSiloServiceProvider(first.SiloAddress);
+        var first = fixture.Cluster.Silos.First();
+        var firstSp = fixture.Cluster.GetSiloServiceProvider(first.SiloAddress);
         var firstSiloMetadataCache = firstSp.GetRequiredService<ISiloMetadataCache>();
-        var metadata = firstSiloMetadataCache.GetMetadata(first.SiloAddress);
+        var metadata = firstSiloMetadataCache.GetSiloMetadata(first.SiloAddress);
         Assert.NotNull(metadata);
         Assert.NotNull(metadata.Metadata);
-        Assert.Equal(SiloConfigurator.Metadata.Count, metadata.Metadata.Count);
-        foreach (var kv in SiloConfigurator.Metadata)
+        Assert.True(metadata.Metadata.Count >= Metadata.Count);
+        foreach (var kv in Metadata)
         {
             Assert.Equal(kv.Value, metadata.Metadata[kv.Key.Split(':').Last()]);
         }
     }
-}
-
-[TestCategory("SiloMetadata")]
-public class SiloMetadataTests : TestClusterPerTest
-{
-    protected override void ConfigureTestCluster(TestClusterBuilder builder)
-    {
-        builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-    }
-
-    private class SiloConfigurator : ISiloConfigurator
-    {
-        public void Configure(ISiloBuilder hostBuilder)
-        {
-            hostBuilder.UseSiloMetadata(new Dictionary<string, string>
-            {
-                {"host.id", Guid.NewGuid().ToString()}
-            });
-        }
-    }
 
     [Fact, TestCategory("Functional")]
-    public async Task SiloMetadata_CanBeSetAndRead()
+    public void SiloMetadata_CanBeSetAndRead()
     {
-        await HostedCluster.WaitForLivenessToStabilizeAsync();
-        HostedCluster.AssertAllSiloMetadataMatchesOnAllSilos(["host.id"]);
+        fixture.Cluster.AssertAllSiloMetadataMatchesOnAllSilos(["host.id"]);
     }
 
     [Fact, TestCategory("Functional")]
     public async Task SiloMetadata_NewSilosHaveMetadata()
     {
-        await HostedCluster.WaitForLivenessToStabilizeAsync();
-        await HostedCluster.StartAdditionalSiloAsync();
-        HostedCluster.AssertAllSiloMetadataMatchesOnAllSilos(["host.id"]);
+        await fixture.Cluster.StartAdditionalSiloAsync();
+        await fixture.Cluster.WaitForLivenessToStabilizeAsync();
+        fixture.Cluster.AssertAllSiloMetadataMatchesOnAllSilos(["host.id"]);
     }
 
     [Fact, TestCategory("Functional")]
     public async Task SiloMetadata_RemovedSiloHasNoMetadata()
     {
-        await HostedCluster.WaitForLivenessToStabilizeAsync();
-        HostedCluster.AssertAllSiloMetadataMatchesOnAllSilos(["host.id"]);
-        var first = HostedCluster.Silos.First();
-        var firstSp = HostedCluster.GetSiloServiceProvider(first.SiloAddress);
+        fixture.Cluster.AssertAllSiloMetadataMatchesOnAllSilos(["host.id"]);
+        var first = fixture.Cluster.Silos.First();
+        var firstSp = fixture.Cluster.GetSiloServiceProvider(first.SiloAddress);
         var firstSiloMetadataCache = firstSp.GetRequiredService<ISiloMetadataCache>();
 
-        var second = HostedCluster.Silos.Skip(1).First();
-        var metadata = firstSiloMetadataCache.GetMetadata(second.SiloAddress);
+        var second = fixture.Cluster.Silos.Skip(1).First();
+        var metadata = firstSiloMetadataCache.GetSiloMetadata(second.SiloAddress);
         Assert.NotNull(metadata);
         Assert.NotEmpty(metadata.Metadata);
 
-        await HostedCluster.StopSiloAsync(second);
-        metadata = firstSiloMetadataCache.GetMetadata(second.SiloAddress);
+        await fixture.Cluster.StopSiloAsync(second);
+        metadata = firstSiloMetadataCache.GetSiloMetadata(second.SiloAddress);
         Assert.NotNull(metadata);
         Assert.Empty(metadata.Metadata);
     }
 
     [Fact, TestCategory("Functional")]
-    public async Task SiloMetadata_BadSiloAddressHasNoMetadata()
+    public void SiloMetadata_BadSiloAddressHasNoMetadata()
     {
-        await HostedCluster.WaitForLivenessToStabilizeAsync();
-        var first = HostedCluster.Silos.First();
-        var firstSp = HostedCluster.GetSiloServiceProvider(first.SiloAddress);
+        var first = fixture.Cluster.Silos.First();
+        var firstSp = fixture.Cluster.GetSiloServiceProvider(first.SiloAddress);
         var firstSiloMetadataCache = firstSp.GetRequiredService<ISiloMetadataCache>();
-        var metadata = firstSiloMetadataCache.GetMetadata(SiloAddress.Zero);
+        var metadata = firstSiloMetadataCache.GetSiloMetadata(SiloAddress.Zero);
         Assert.NotNull(metadata);
         Assert.Empty(metadata.Metadata);
     }
@@ -129,7 +120,7 @@ public class SiloMetadataTests : TestClusterPerTest
 
 public static class SiloMetadataTestExtensions
 {
-    public static void AssertAllSiloMetadataMatchesOnAllSilos(this TestCluster hostedCluster, string[] expectedKeys)
+    public static void AssertAllSiloMetadataMatchesOnAllSilos(this InProcessTestCluster hostedCluster, string[] expectedKeys)
     {
         var exampleSiloMetadata = new Dictionary<SiloAddress, SiloMetadata>();
         var first = hostedCluster.Silos.First();
@@ -137,7 +128,7 @@ public static class SiloMetadataTestExtensions
         var firstSiloMetadataCache = firstSp.GetRequiredService<ISiloMetadataCache>();
         foreach (var otherSilo in hostedCluster.Silos)
         {
-            var metadata = firstSiloMetadataCache.GetMetadata(otherSilo.SiloAddress);
+            var metadata = firstSiloMetadataCache.GetSiloMetadata(otherSilo.SiloAddress);
             Assert.NotNull(metadata);
             Assert.NotNull(metadata.Metadata);
             foreach (var expectedKey in expectedKeys)
@@ -154,7 +145,7 @@ public static class SiloMetadataTestExtensions
             var remoteMetadata = new Dictionary<SiloAddress, SiloMetadata>();
             foreach (var otherSilo in hostedCluster.Silos)
             {
-                var metadata = siloMetadataCache.GetMetadata(otherSilo.SiloAddress);
+                var metadata = siloMetadataCache.GetSiloMetadata(otherSilo.SiloAddress);
                 Assert.NotNull(metadata);
                 Assert.NotNull(metadata.Metadata);
                 foreach (var expectedKey in expectedKeys)

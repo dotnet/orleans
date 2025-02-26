@@ -5,8 +5,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Configuration;
-using Orleans.Internal;
 
 #nullable enable
 namespace Orleans.Runtime.MembershipService.SiloMetadata;
@@ -22,44 +20,44 @@ internal class SiloMetadataCache(
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
     {
-        var tasks = new List<Task>(1);
-        var cancellation = new CancellationTokenSource();
-        Task OnRuntimeInitializeStart(CancellationToken _)
+        Task? task = null;
+        Task OnStart(CancellationToken _)
         {
-            tasks.Add(Task.Run(() => this.ProcessMembershipUpdates(cancellation.Token)));
+            task = Task.Run(() => this.ProcessMembershipUpdates(_cts.Token));
             return Task.CompletedTask;
         }
 
-        async Task OnRuntimeInitializeStop(CancellationToken ct)
+        async Task OnStop(CancellationToken ct)
         {
-            cancellation.Cancel(throwOnFirstException: false);
-            var shutdownGracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod), ct.WhenCancelled());
-            await Task.WhenAny(shutdownGracePeriod, Task.WhenAll(tasks));
+            await _cts.CancelAsync().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            if (task is not null)
+            {
+                await task.WaitAsync(ct).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            }
         }
 
         lifecycle.Subscribe(
             nameof(ClusterMembershipService),
-            ServiceLifecycleStage.RuntimeInitialize,
-            OnRuntimeInitializeStart,
-            OnRuntimeInitializeStop);
+            ServiceLifecycleStage.RuntimeServices,
+            OnStart,
+            OnStop);
     }
-
 
     private async Task ProcessMembershipUpdates(CancellationToken ct)
     {
         try
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Starting to process membership updates");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Starting to process membership updates.");
             await foreach (var update in membershipTableManager.MembershipTableUpdates.WithCancellation(ct))
             {
                 // Add entries for members that aren't already in the cache
-                foreach (var membershipEntry in update.Entries.Where(e => e.Value.Status != SiloStatus.Dead))
+                foreach (var membershipEntry in update.Entries.Where(e => e.Value.Status is SiloStatus.Active or SiloStatus.Joining))
                 {
                     if (!_metadata.ContainsKey(membershipEntry.Key))
                     {
                         try
                         {
-                            var metadata = await siloMetadataClient.GetSiloMetadata(membershipEntry.Key);
+                            var metadata = await siloMetadataClient.GetSiloMetadata(membershipEntry.Key).WaitAsync(ct);
                             _metadata.TryAdd(membershipEntry.Key, metadata);
                         }
                         catch(Exception exception)
@@ -85,6 +83,10 @@ internal class SiloMetadataCache(
                 }
             }
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Ignore and continue shutting down.
+        }
         catch (Exception exception)
         {
             logger.LogError(exception, "Error processing membership updates");
@@ -95,7 +97,7 @@ internal class SiloMetadataCache(
         }
     }
 
-    public SiloMetadata GetMetadata(SiloAddress siloAddress) => _metadata.GetValueOrDefault(siloAddress) ?? SiloMetadata.Empty;
+    public SiloMetadata GetSiloMetadata(SiloAddress siloAddress) => _metadata.GetValueOrDefault(siloAddress) ?? SiloMetadata.Empty;
 
     public void SetMetadata(SiloAddress siloAddress, SiloMetadata metadata) => _metadata.TryAdd(siloAddress, metadata);
 

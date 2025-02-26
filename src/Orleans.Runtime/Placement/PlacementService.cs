@@ -125,7 +125,6 @@ namespace Orleans.Runtime.Placement
 
             var compatibleSilos = silos.Intersect(AllActiveSilos).ToArray();
 
-
             var filters = _filterStrategyResolver.GetPlacementFilterStrategies(grainType);
             if (filters.Length > 0)
             {
@@ -138,7 +137,6 @@ namespace Orleans.Runtime.Placement
 
                 compatibleSilos = filteredSilos.ToArray();
             }
-
 
             if (compatibleSilos.Length == 0)
             {

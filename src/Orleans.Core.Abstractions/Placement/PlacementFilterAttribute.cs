@@ -12,6 +12,9 @@ namespace Orleans.Placement;
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
 public abstract class PlacementFilterAttribute : Attribute, IGrainPropertiesProviderAttribute
 {
+    /// <summary>
+    /// Gets the placement filter strategy.
+    /// </summary>
     public PlacementFilterStrategy PlacementFilterStrategy { get; private set; }
 
     protected PlacementFilterAttribute(PlacementFilterStrategy placement)

@@ -1,11 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
 #nullable enable
 namespace Orleans.Placement;
 
+/// <summary>
+/// Represents a strategy for filtering silos which a grain can be placed on.
+/// </summary>
 public abstract class PlacementFilterStrategy
 {
     public int Order { get; private set; }
@@ -36,7 +40,6 @@ public abstract class PlacementFilterStrategy
 
     public virtual void AdditionalInitialize(GrainProperties properties)
     {
-
     }
 
     /// <summary>
@@ -58,7 +61,7 @@ public abstract class PlacementFilterStrategy
             properties[WellKnownGrainTypeProperties.PlacementFilter] = typeName;
         }
 
-        properties[$"{WellKnownGrainTypeProperties.PlacementFilter}.{typeName}.order"] = Order.ToString();
+        properties[$"{WellKnownGrainTypeProperties.PlacementFilter}.{typeName}.order"] = Order.ToString(CultureInfo.InvariantCulture);
 
         foreach (var additionalGrainProperty in GetAdditionalGrainProperties(services, grainClass, grainType, properties))
         {

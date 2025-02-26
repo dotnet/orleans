@@ -11,5 +11,5 @@ internal class TestSiloMetadataCache : ISiloMetadataCache
         _metadata = metadata;
     }
 
-    public SiloMetadata GetMetadata(SiloAddress siloAddress) => _metadata.GetValueOrDefault(siloAddress) ?? new SiloMetadata();
+    public SiloMetadata GetSiloMetadata(SiloAddress siloAddress) => _metadata.GetValueOrDefault(siloAddress) ?? SiloMetadata.Empty;
 }
