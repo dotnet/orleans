@@ -101,6 +101,10 @@ namespace Orleans.Runtime.MembershipService
                     this.observedMembershipVersion = tableSnapshot.Version;
                 }
             }
+            catch (OperationCanceledException) when (shutdownCancellation.IsCancellationRequested)
+            {
+                // Ignore and continue shutting down.
+            }
             catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
             {
                 this.fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
