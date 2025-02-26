@@ -1,6 +1,5 @@
 using System.Net;
 using Orleans.Runtime.MembershipService.SiloMetadata;
-using Orleans.Runtime.Placement;
 using Orleans.Runtime.Placement.Filtering;
 using Xunit;
 
@@ -36,7 +35,7 @@ public class RequiredMatchSiloMetadataPlacementFilterDirectorTests
             {
                 {testLocalSiloAddress, SiloMetadata.Empty}
             }));
-        var result = director.Filter(new RequiredMatchSiloMetadataPlacementFilterStrategy(), new PlacementTarget(),
+        var result = director.Filter(new RequiredMatchSiloMetadataPlacementFilterStrategy(), default,
             new List<SiloAddress>() { testLocalSiloAddress }
         ).ToList();
         Assert.NotNull(result);
@@ -59,7 +58,7 @@ public class RequiredMatchSiloMetadataPlacementFilterDirectorTests
                 {testOtherSiloAddress, SiloMetadata.Empty},
                 {testLocalSiloAddress, siloMetadata},
             }));
-        var result = director.Filter(new RequiredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 0), new PlacementTarget(),
+        var result = director.Filter(new RequiredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 0), default,
             new List<SiloAddress>() { testOtherSiloAddress }).ToList();
         Assert.Empty(result);
     }
@@ -82,7 +81,7 @@ public class RequiredMatchSiloMetadataPlacementFilterDirectorTests
                 {testOtherSiloAddress, otherSiloMetadata},
                 {testLocalSiloAddress, localSiloMetadata},
             }));
-        var result = director.Filter(new RequiredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 0), new PlacementTarget(),
+        var result = director.Filter(new RequiredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 0), default,
             new List<SiloAddress>() { testOtherSiloAddress }).ToList();
         Assert.Empty(result);
     }
@@ -105,7 +104,7 @@ public class RequiredMatchSiloMetadataPlacementFilterDirectorTests
                 {testOtherSiloAddress, otherSiloMetadata},
                 {testLocalSiloAddress, localSiloMetadata},
             }));
-        var result = director.Filter(new RequiredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 0), new PlacementTarget(),
+        var result = director.Filter(new RequiredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 0), default,
             new List<SiloAddress>() { testOtherSiloAddress }).ToList();
         Assert.NotEmpty(result);
     }
@@ -132,7 +131,7 @@ public class RequiredMatchSiloMetadataPlacementFilterDirectorTests
                 {testOtherSiloAddress2, otherSiloMetadata2},
                 {testLocalSiloAddress, localSiloMetadata},
             }));
-        var result = director.Filter(new RequiredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 0), new PlacementTarget(),
+        var result = director.Filter(new RequiredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 0), default,
             new List<SiloAddress>() { testOtherSiloAddress1, testOtherSiloAddress2 }).ToList();
         Assert.NotEmpty(result);
         Assert.Equal(2, result.Count);

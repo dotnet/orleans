@@ -1,5 +1,6 @@
 using System.Net;
 using Orleans.Metadata;
+using Orleans.Placement;
 using Orleans.Runtime.MembershipService.SiloMetadata;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Placement.Filtering;
@@ -37,7 +38,7 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
             {
                 {testLocalSiloAddress, SiloMetadata.Empty}
             }));
-        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy(), new PlacementTarget(),
+        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy(), default,
             new List<SiloAddress>() { testLocalSiloAddress }
         ).ToList();
         Assert.NotNull(result);
@@ -60,7 +61,7 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
                 {testOtherSiloAddress, SiloMetadata.Empty},
                 {testLocalSiloAddress, siloMetadata},
             }));
-        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 1, 0), new PlacementTarget(),
+        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy(["metadata.key"], 1, 0), default,
             new List<SiloAddress>() { testOtherSiloAddress }).ToList();
         Assert.NotEmpty(result);
     }
@@ -114,7 +115,7 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
                 {testOtherSiloAddress3, otherSiloMetadata3},
                 {testLocalSiloAddress, localSiloMetadata},
             }));
-        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy([key], minCandidates, 0), new PlacementTarget(),
+        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy([key], minCandidates, 0), default,
             new List<SiloAddress>() { testOtherSiloAddress1, testOtherSiloAddress2, testOtherSiloAddress3 }).ToList();
         Assert.NotEmpty(result);
         Assert.Equal(expectedCount, result.Count);
@@ -168,7 +169,7 @@ public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
                 {testOtherSiloAddress3, otherSiloMetadata3},
                 {testLocalSiloAddress, localSiloMetadata},
             }));
-        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy(keys, minCandidates, 0), new PlacementTarget(),
+        var result = director.Filter(new PreferredMatchSiloMetadataPlacementFilterStrategy(keys, minCandidates, 0), default,
             new List<SiloAddress>() { testOtherSiloAddress1, testOtherSiloAddress2, testOtherSiloAddress3 }).ToList();
         Assert.NotEmpty(result);
         Assert.Equal(expectedCount, result.Count);

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Placement;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Placement.Filtering;
@@ -129,10 +130,11 @@ namespace Orleans.Runtime.Placement
             if (filters.Length > 0)
             {
                 IEnumerable<SiloAddress> filteredSilos = compatibleSilos;
+                var context = new PlacementFilterContext(target.GrainIdentity.Type, target.InterfaceType, target.InterfaceVersion);
                 foreach (var placementFilter in filters)
                 {
                     var director = _placementFilterDirectoryResolver.GetFilterDirector(placementFilter);
-                    filteredSilos = director.Filter(placementFilter, target, filteredSilos);
+                    filteredSilos = director.Filter(placementFilter, context, filteredSilos);
                 }
 
                 compatibleSilos = filteredSilos.ToArray();
