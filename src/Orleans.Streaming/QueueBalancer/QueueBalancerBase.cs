@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 
@@ -65,7 +66,7 @@ namespace Orleans.Streams
                 Logger.LogError(exc, "Error signaling shutdown token.");
             }
 
-            await _listenForClusterChangesTask;
+            await _listenForClusterChangesTask.SuppressThrowing();
         }
 
         /// <inheritdoc/>
