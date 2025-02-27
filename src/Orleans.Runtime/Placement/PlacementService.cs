@@ -7,8 +7,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Placement;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Internal;
+using Orleans.Runtime.Placement.Filtering;
 using Orleans.Runtime.Versions;
 
 namespace Orleans.Runtime.Placement
@@ -28,6 +30,8 @@ namespace Orleans.Runtime.Placement
         private readonly ISiloStatusOracle _siloStatusOracle;
         private readonly bool _assumeHomogeneousSilosForTesting;
         private readonly PlacementWorker[] _workers;
+        private readonly PlacementFilterStrategyResolver _filterStrategyResolver;
+        private readonly PlacementFilterDirectorResolver _placementFilterDirectoryResolver;
 
         /// <summary>
         /// Create a <see cref="PlacementService"/> instance.
@@ -41,11 +45,15 @@ namespace Orleans.Runtime.Placement
             GrainVersionManifest grainInterfaceVersions,
             CachedVersionSelectorManager versionSelectorManager,
             PlacementDirectorResolver directorResolver,
-            PlacementStrategyResolver strategyResolver)
+            PlacementStrategyResolver strategyResolver,
+            PlacementFilterStrategyResolver filterStrategyResolver,
+            PlacementFilterDirectorResolver placementFilterDirectoryResolver)
         {
             LocalSilo = localSiloDetails.SiloAddress;
             _strategyResolver = strategyResolver;
             _directorResolver = directorResolver;
+            _filterStrategyResolver = filterStrategyResolver;
+            _placementFilterDirectoryResolver = placementFilterDirectoryResolver;
             _logger = logger;
             _grainLocator = grainLocator;
             _grainInterfaceVersions = grainInterfaceVersions;
@@ -117,6 +125,21 @@ namespace Orleans.Runtime.Placement
                 : _grainInterfaceVersions.GetSupportedSilos(grainType).Result;
 
             var compatibleSilos = silos.Intersect(AllActiveSilos).ToArray();
+
+            var filters = _filterStrategyResolver.GetPlacementFilterStrategies(grainType);
+            if (filters.Length > 0)
+            {
+                IEnumerable<SiloAddress> filteredSilos = compatibleSilos;
+                var context = new PlacementFilterContext(target.GrainIdentity.Type, target.InterfaceType, target.InterfaceVersion);
+                foreach (var placementFilter in filters)
+                {
+                    var director = _placementFilterDirectoryResolver.GetFilterDirector(placementFilter);
+                    filteredSilos = director.Filter(placementFilter, context, filteredSilos);
+                }
+
+                compatibleSilos = filteredSilos.ToArray();
+            }
+
             if (compatibleSilos.Length == 0)
             {
                 var allWithType = _grainInterfaceVersions.GetSupportedSilos(grainType).Result;
