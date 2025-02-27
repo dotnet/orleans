@@ -77,7 +77,8 @@ namespace NonSilo.Tests.Membership
         private async Task BasicScenarioTest(InMemoryMembershipTable membershipTable, bool gracefulShutdown = true)
         {
             var timers = new List<DelegateAsyncTimer>();
-            var timerCalls = new ConcurrentQueue<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)>();
+            var timerCalls = new BlockingCollection<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)>();
+
             var timerFactory = new DelegateAsyncTimerFactory(
                 (period, name) =>
                 {
@@ -85,7 +86,7 @@ namespace NonSilo.Tests.Membership
                         overridePeriod =>
                         {
                             var task = new TaskCompletionSource<bool>();
-                            timerCalls.Enqueue((overridePeriod, task));
+                            timerCalls.Add((overridePeriod, task));
                             return task.Task;
                         });
                     timers.Add(timer);
@@ -166,20 +167,25 @@ namespace NonSilo.Tests.Membership
             {
                 // Check that a timer is being requested and that after it expires a call to
                 // refresh the membership table is made.
-                Assert.True(timerCalls.TryDequeue(out var timer));
+                using var cts = new CancellationTokenSource();
+                cts.CancelAfter(TimeSpan.FromSeconds(10));
+                var (_, completion) = timerCalls.Take(cts.Token);
                 membershipTable.ClearCalls();
-                timer.Completion.TrySetResult(true);
+                completion.TrySetResult(true);
                 while (membershipTable.Calls.Count == 0) await Task.Delay(10);
                 Assert.Contains(membershipTable.Calls, c => c.Method.Equals(nameof(IMembershipTable.ReadAll)));
             }
 
-            var cts = new CancellationTokenSource();
-            if (!gracefulShutdown) cts.Cancel();
+            var shutdownCts = new CancellationTokenSource();
+            if (!gracefulShutdown) shutdownCts.Cancel();
             Assert.Equal(0, timers.First().DisposedCounter);
-            var stopped = this.lifecycle.OnStop(cts.Token);
+            var stopped = this.lifecycle.OnStop(shutdownCts.Token);
 
             // Complete any timers that were waiting.
-            while (timerCalls.TryDequeue(out var t)) t.Completion.TrySetResult(false);
+            while (timerCalls.TryTake(out var t))
+            {
+                t.Completion.TrySetResult(false);
+            }
 
             await stopped;
             Assert.Equal(1, timers.First().DisposedCounter);
