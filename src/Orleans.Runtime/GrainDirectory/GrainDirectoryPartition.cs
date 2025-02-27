@@ -19,25 +19,16 @@ namespace Orleans.Runtime.GrainDirectory;
 /// <summary>
 /// Represents a single contiguous partition of the distributed grain directory.
 /// </summary>
-/// <param name="partitionIndex">The index of this partition on this silo. Each silo hosts a fixed number of dynamically sized partitions.</param>
-internal sealed partial class GrainDirectoryPartition(
-    int partitionIndex,
-    DistributedGrainDirectory owner,
-    ILocalSiloDetails localSiloDetails,
-    ILoggerFactory loggerFactory,
-    IServiceProvider serviceProvider,
-    IInternalGrainFactory grainFactory)
-    : SystemTarget(CreateGrainId(localSiloDetails.SiloAddress, partitionIndex), localSiloDetails.SiloAddress, loggerFactory), IGrainDirectoryPartition, IGrainDirectoryTestHooks
+internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDirectoryPartition, IGrainDirectoryTestHooks
 {
     internal static SystemTargetGrainId CreateGrainId(SiloAddress siloAddress, int partitionIndex) => SystemTargetGrainId.Create(Constants.GrainDirectoryPartitionType, siloAddress, partitionIndex.ToString(CultureInfo.InvariantCulture));
     private readonly Dictionary<GrainId, GrainAddress> _directory = [];
-    private readonly int _partitionIndex = partitionIndex;
-    private readonly DistributedGrainDirectory _owner = owner;
-    private readonly IServiceProvider _serviceProvider = serviceProvider;
-    private readonly IInternalGrainFactory _grainFactory = grainFactory;
+    private readonly int _partitionIndex;
+    private readonly DistributedGrainDirectory _owner;
+    private readonly IInternalGrainFactory _grainFactory;
     private readonly CancellationTokenSource _drainSnapshotsCts = new();
-    private readonly SiloAddress _id = localSiloDetails.SiloAddress;
-    private readonly ILogger<GrainDirectoryPartition> _logger = loggerFactory.CreateLogger<GrainDirectoryPartition>();
+    private readonly SiloAddress _id;
+    private readonly ILogger<GrainDirectoryPartition> _logger;
     private readonly TaskCompletionSource _snapshotsDrainedTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly AsyncEnumerable<DirectoryMembershipSnapshot> _viewUpdates = new(
         DirectoryMembershipSnapshot.Default,
@@ -56,6 +47,21 @@ internal sealed partial class GrainDirectoryPartition(
     private CancellationToken ShutdownToken => _owner.OnStoppedToken;
 
     private RingRange _currentRange;
+
+    /// <param name="partitionIndex">The index of this partition on this silo. Each silo hosts a fixed number of dynamically sized partitions.</param>
+    public GrainDirectoryPartition(
+        int partitionIndex,
+        DistributedGrainDirectory owner,
+        IInternalGrainFactory grainFactory,
+        SystemTargetShared shared) : base(CreateGrainId(shared.SiloAddress, partitionIndex), shared)
+    {
+        _partitionIndex = partitionIndex;
+        _owner = owner;
+        _grainFactory = grainFactory;
+        _id = shared.SiloAddress;
+        _logger = shared.LoggerFactory.CreateLogger<GrainDirectoryPartition>();
+        shared.ActivationDirectory.RecordNewTarget(this);
+    }
 
     // The current directory membership snapshot.
     public DirectoryMembershipSnapshot CurrentView { get; private set; } = DirectoryMembershipSnapshot.Default;

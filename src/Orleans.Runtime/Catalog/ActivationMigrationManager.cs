@@ -53,7 +53,7 @@ internal interface IActivationMigrationManager
 /// <summary>
 /// Migrates grain activations to target hosts and handles migration requests from other hosts.
 /// </summary>
-internal partial class ActivationMigrationManager : SystemTarget, IActivationMigrationManagerSystemTarget, IActivationMigrationManager, ILifecycleParticipant<ISiloLifecycle>
+internal sealed partial class ActivationMigrationManager : SystemTarget, IActivationMigrationManagerSystemTarget, IActivationMigrationManager, ILifecycleParticipant<ISiloLifecycle>
 {
     private const int MaxBatchSize = 1_000;
     private readonly ConcurrentDictionary<SiloAddress, (Task PumpTask, Channel<MigrationWorkItem> WorkItemChannel)> _workers = new();
@@ -74,13 +74,14 @@ internal partial class ActivationMigrationManager : SystemTarget, IActivationMig
         ILoggerFactory loggerFactory,
         IInternalGrainFactory grainFactory,
         Catalog catalog,
-        IClusterMembershipService clusterMembershipService) : base(Constants.ActivationMigratorType, localSiloDetails.SiloAddress, loggerFactory)
+        SystemTargetShared shared,
+        IClusterMembershipService clusterMembershipService) : base(Constants.ActivationMigratorType, shared)
     {
         _grainFactory = grainFactory;
         _logger = loggerFactory.CreateLogger<ActivationMigrationManager>();
         _catalog = catalog;
         _clusterMembershipService = clusterMembershipService;
-        _catalog.RegisterSystemTarget(this);
+        shared.ActivationDirectory.RecordNewTarget(this);
 
         {
             using var _ = new ExecutionContextSuppressor();

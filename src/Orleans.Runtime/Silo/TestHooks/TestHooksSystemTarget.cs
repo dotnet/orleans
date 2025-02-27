@@ -25,7 +25,7 @@ namespace Orleans.Runtime.TestHooks
     /// <summary>
     /// Test hook functions for white box testing implemented as a SystemTarget
     /// </summary>
-    internal class TestHooksSystemTarget : SystemTarget, ITestHooksSystemTarget
+    internal sealed class TestHooksSystemTarget : SystemTarget, ITestHooksSystemTarget
     {
         private readonly IServiceProvider serviceProvider;
         private readonly ISiloStatusOracle siloStatusOracle;
@@ -42,14 +42,21 @@ namespace Orleans.Runtime.TestHooks
             ILoggerFactory loggerFactory,
             ISiloStatusOracle siloStatusOracle,
             TestHooksEnvironmentStatisticsProvider environmentStatistics,
-            IOptions<LoadSheddingOptions> loadSheddingOptions)
-            : base(Constants.TestHooksSystemTargetType, siloDetails.SiloAddress, loggerFactory)
+            IOptions<LoadSheddingOptions> loadSheddingOptions,
+            SystemTargetShared shared)
+            : base(Constants.TestHooksSystemTargetType, shared)
         {
             this.serviceProvider = serviceProvider;
             this.siloStatusOracle = siloStatusOracle;
             this.environmentStatistics = environmentStatistics;
             this.loadSheddingOptions = loadSheddingOptions.Value;
             this.consistentRingProvider = this.serviceProvider.GetRequiredService<IConsistentRingProvider>();
+            shared.ActivationDirectory.RecordNewTarget(this);
+        }
+
+        public void Initialize()
+        {
+            // No-op
         }
 
         public Task<SiloAddress> GetConsistentRingPrimaryTargetSilo(uint key)

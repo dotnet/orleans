@@ -9,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.ConsistentRing;
-using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
 using Orleans.Services;
@@ -31,12 +30,9 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private readonly TaskCompletionSource<int> siloTerminatedTask = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly InsideRuntimeClient runtimeClient;
-        private readonly SystemTarget fallbackScheduler;
-        private readonly ISiloStatusOracle siloStatusOracle;
         private readonly Watchdog platformWatchdog;
         private readonly TimeSpan waitForMessageToBeQueuedForOutbound;
         private readonly TimeSpan initTimeout;
-        private readonly Catalog catalog;
         private readonly object lockable = new object();
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
@@ -73,7 +69,6 @@ namespace Orleans.Runtime
             Services = services;
             RingProvider = services.GetRequiredService<IConsistentRingProvider>();
             platformWatchdog = services.GetRequiredService<Watchdog>();
-            fallbackScheduler = services.GetRequiredService<FallbackSystemTarget>();
             this.siloDetails = siloDetails;
 
             IOptions<ClusterMembershipOptions> clusterMembershipOptions = services.GetRequiredService<IOptions<ClusterMembershipOptions>>();
@@ -124,10 +119,6 @@ namespace Orleans.Runtime
             messageCenter = Services.GetRequiredService<MessageCenter>();
             messageCenter.SniffIncomingMessage = runtimeClient.SniffIncomingMessage;
 
-            catalog = Services.GetRequiredService<Catalog>();
-
-            siloStatusOracle = Services.GetRequiredService<ISiloStatusOracle>();
-
             this.SystemStatus = SystemStatus.Created;
 
             this.siloLifecycle = this.Services.GetRequiredService<ISiloLifecycleSubject>();
@@ -153,7 +144,6 @@ namespace Orleans.Runtime
         {
             // SystemTarget for provider init calls
             this.lifecycleSchedulingSystemTarget = Services.GetRequiredService<LifecycleSchedulingSystemTarget>();
-            catalog.RegisterSystemTarget(lifecycleSchedulingSystemTarget);
 
             try
             {
@@ -164,21 +154,6 @@ namespace Orleans.Runtime
                 LogErrorSiloStart(logger, exc);
                 throw;
             }
-        }
-
-        private void CreateSystemTargets()
-        {
-            var siloControl = ActivatorUtilities.CreateInstance<SiloControl>(Services);
-            catalog.RegisterSystemTarget(siloControl);
-
-        }
-
-        private void InjectDependencies()
-        {
-            catalog.SiloStatusOracle = this.siloStatusOracle;
-
-            // SystemTarget for provider init calls
-            catalog.RegisterSystemTarget(fallbackScheduler);
         }
 
         private Task OnRuntimeInitializeStart(CancellationToken ct)
@@ -215,13 +190,6 @@ namespace Orleans.Runtime
 
         private Task OnRuntimeServicesStart(CancellationToken ct)
         {
-            //TODO: Setup all (or as many as possible) of the class started in this call to work directly with lifecycle
-            var stopWatch = Stopwatch.StartNew();
-
-            // This has to follow the above steps that start the runtime components
-            CreateSystemTargets();
-            InjectDependencies();
-
             return Task.CompletedTask;
         }
 
@@ -273,7 +241,8 @@ namespace Orleans.Runtime
         private async Task RegisterGrainService(IGrainService service)
         {
             var grainService = (GrainService)service;
-            catalog.RegisterSystemTarget(grainService);
+            var activationDirectory = this.Services.GetRequiredService<ActivationDirectory>();
+            activationDirectory.RecordNewTarget(grainService);
             grainServices.Add(grainService);
 
             try
@@ -422,6 +391,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
+                    var catalog = this.Services.GetRequiredService<Catalog>();
                     await catalog.DeactivateAllActivations(ct);
                 }
                 catch (Exception exception)
@@ -711,20 +681,12 @@ namespace Orleans.Runtime
     }
 
     // A dummy system target for fallback scheduler
-    internal class FallbackSystemTarget : SystemTarget
+    internal sealed class LifecycleSchedulingSystemTarget : SystemTarget
     {
-        public FallbackSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
-            : base(Constants.FallbackSystemTargetType, localSiloDetails.SiloAddress, loggerFactory)
+        public LifecycleSchedulingSystemTarget(SystemTargetShared shared)
+            : base(Constants.LifecycleSchedulingSystemTargetType, shared)
         {
-        }
-    }
-
-    // A dummy system target for fallback scheduler
-    internal class LifecycleSchedulingSystemTarget : SystemTarget
-    {
-        public LifecycleSchedulingSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
-            : base(Constants.LifecycleSchedulingSystemTargetType, localSiloDetails.SiloAddress, loggerFactory)
-        {
+            shared.ActivationDirectory.RecordNewTarget(this);
         }
     }
 }

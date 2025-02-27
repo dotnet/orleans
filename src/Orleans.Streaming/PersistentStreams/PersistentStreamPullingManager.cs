@@ -10,13 +10,12 @@ using RunState = Orleans.Configuration.StreamLifecycleOptions.RunState;
 using Orleans.Internal;
 using System.Threading;
 using Orleans.Streams.Filtering;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime.Scheduler;
 using System.Diagnostics.Metrics;
 
 namespace Orleans.Streams
 {
-    internal partial class PersistentStreamPullingManager : SystemTarget, IPersistentStreamPullingManager, IStreamQueueBalanceListener
+    internal sealed partial class PersistentStreamPullingManager : SystemTarget, IPersistentStreamPullingManager, IStreamQueueBalanceListener
     {
         private static readonly TimeSpan QUEUES_PRINT_PERIOD = TimeSpan.FromMinutes(5);
 
@@ -24,11 +23,11 @@ namespace Orleans.Streams
         private readonly Dictionary<QueueId, PersistentStreamPullingAgent> deactivatedAgents = new();
         private readonly string streamProviderName;
         private readonly IStreamPubSub pubSub;
+        private readonly SystemTargetShared _systemTargetShared;
 
         private readonly StreamPullingAgentOptions options;
         private readonly AsyncSerialExecutor nonReentrancyGuarantor; // for non-reentrant execution of queue change notifications.
         private readonly ILogger logger;
-        private readonly ILoggerFactory loggerFactory;
         private int latestRingNotificationSequenceNumber;
         private int latestCommandNumber;
         private readonly IQueueAdapter queueAdapter;
@@ -43,6 +42,7 @@ namespace Orleans.Streams
         private int nextAgentId;
         private int NumberRunningAgents { get { return queuesToAgentsMap.Count; } }
 
+
         internal PersistentStreamPullingManager(
             SystemTargetGrainId managerId,
             string strProviderName,
@@ -51,12 +51,11 @@ namespace Orleans.Streams
             IStreamQueueBalancer streamQueueBalancer,
             IStreamFilter streamFilter,
             StreamPullingAgentOptions options,
-            ILoggerFactory loggerFactory,
-            SiloAddress siloAddress,
             IQueueAdapter queueAdapter,
             IBackoffProvider deliveryBackoffProvider,
-            IBackoffProvider queueReaderBackoffProvider)
-            : base(managerId, siloAddress, loggerFactory)
+            IBackoffProvider queueReaderBackoffProvider,
+            SystemTargetShared shared)
+            : base(managerId, shared)
         {
             if (string.IsNullOrWhiteSpace(strProviderName))
             {
@@ -86,11 +85,12 @@ namespace Orleans.Streams
             this.queueAdapter = queueAdapter ?? throw new ArgumentNullException(nameof(queueAdapter));
             _deliveryBackoffProvider = deliveryBackoffProvider;
             _queueReaderBackoffProvider = queueReaderBackoffProvider;
+            _systemTargetShared = shared;
             queueAdapterCache = adapterFactory.GetQueueAdapterCache();
-            logger = loggerFactory.CreateLogger($"{GetType().FullName}.{streamProviderName}");
+            logger = shared.LoggerFactory.CreateLogger($"{GetType().FullName}.{streamProviderName}");
             LogInfoCreated(GetType().Name, streamProviderName);
-            this.loggerFactory = loggerFactory;
             StreamInstruments.RegisterPersistentStreamPullingAgentsObserve(() => new Measurement<int>(queuesToAgentsMap.Count, new KeyValuePair<string, object>("name", streamProviderName)));
+            shared.ActivationDirectory.RecordNewTarget(this);
         }
 
         public async Task Initialize()
@@ -238,8 +238,19 @@ namespace Orleans.Streams
                         var agentIdNumber = Interlocked.Increment(ref nextAgentId);
                         var agentId = SystemTargetGrainId.Create(Constants.StreamPullingAgentType, this.Silo, $"{streamProviderName}_{agentIdNumber}_{queueId:H}");
                         IStreamFailureHandler deliveryFailureHandler = await adapterFactory.GetDeliveryFailureHandler(queueId);
-                        agent = new PersistentStreamPullingAgent(agentId, streamProviderName, this.loggerFactory, pubSub, streamFilter, queueId, this.options, this.Silo, queueAdapter, queueAdapterCache, deliveryFailureHandler, _deliveryBackoffProvider, _queueReaderBackoffProvider);
-                        this.ActivationServices.GetRequiredService<Catalog>().RegisterSystemTarget(agent);
+                        agent = new PersistentStreamPullingAgent(
+                            agentId,
+                            streamProviderName,
+                            pubSub,
+                            streamFilter,
+                            queueId,
+                            this.options,
+                            queueAdapter,
+                            queueAdapterCache,
+                            deliveryFailureHandler,
+                            _deliveryBackoffProvider,
+                            _queueReaderBackoffProvider,
+                            _systemTargetShared);
                         queuesToAgentsMap.Add(queueId, agent);
                         agents.Add(agent);
                     }

@@ -15,7 +15,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// This class collects runtime statistics for all silos in the current deployment for use by placement.
     /// </summary>
-    internal partial class DeploymentLoadPublisher : SystemTarget, IDeploymentLoadPublisher, ISiloStatusListener, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed partial class DeploymentLoadPublisher : SystemTarget, IDeploymentLoadPublisher, ISiloStatusListener, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly ILocalSiloDetails _siloDetails;
         private readonly ISiloStatusOracle _siloStatusOracle;
@@ -46,8 +46,8 @@ namespace Orleans.Runtime
             IActivationWorkingSet activationWorkingSet,
             IEnvironmentStatisticsProvider environmentStatisticsProvider,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
-            Catalog catalog)
-            : base(Constants.DeploymentLoadPublisherSystemTargetType, siloDetails.SiloAddress, loggerFactory)
+            SystemTargetShared shared)
+            : base(Constants.DeploymentLoadPublisherSystemTargetType, shared)
         {
             _logger = loggerFactory.CreateLogger<DeploymentLoadPublisher>();
             _siloDetails = siloDetails;
@@ -60,8 +60,8 @@ namespace Orleans.Runtime
             _statisticsRefreshTime = options.Value.DeploymentLoadPublisherRefreshTime;
             _periodicStats = new ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>();
             _siloStatisticsChangeListeners = new List<ISiloStatisticsChangeListener>();
-            catalog.RegisterSystemTarget(this);
             siloStatusOracle.SubscribeToSiloStatusEvents(this);
+            shared.ActivationDirectory.RecordNewTarget(this);
         }
 
         private async Task StartAsync(CancellationToken cancellationToken)

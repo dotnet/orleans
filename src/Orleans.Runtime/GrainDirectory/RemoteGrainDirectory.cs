@@ -14,12 +14,13 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly LocalGrainDirectoryPartition partition;
         private readonly ILogger logger;
 
-        internal RemoteGrainDirectory(LocalGrainDirectory r, GrainType grainType, ILoggerFactory loggerFactory)
-            : base(grainType, r.MyAddress, loggerFactory)
+        internal RemoteGrainDirectory(LocalGrainDirectory localGrainDirectory, GrainType grainType, SystemTargetShared shared)
+            : base(grainType, shared)
         {
-            router = r;
-            partition = r.DirectoryPartition;
-            logger = loggerFactory.CreateLogger($"{typeof(RemoteGrainDirectory).FullName}.CacheValidator");
+            router = localGrainDirectory;
+            partition = localGrainDirectory.DirectoryPartition;
+            logger = shared.LoggerFactory.CreateLogger($"{typeof(RemoteGrainDirectory).FullName}.CacheValidator");
+            shared.ActivationDirectory.RecordNewTarget(this);
         }
 
         public Task<AddressAndTag> RegisterAsync(GrainAddress address, GrainAddress? previousAddress, int hopCount)

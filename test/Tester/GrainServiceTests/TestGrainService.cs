@@ -44,7 +44,7 @@ namespace Tester
         }
     }
 
-    public class TestGrainService : GrainService, ITestGrainService
+    public sealed class TestGrainService : GrainService, ITestGrainService
     {
         private readonly TestGrainServiceOptions config;
 
