@@ -43,8 +43,7 @@ using Microsoft.Extensions.Configuration;
 using Orleans.Serialization.Internal;
 using Orleans.Core;
 using Orleans.Placement.Repartitioning;
-using Orleans.GrainDirectory;
-using Orleans.Runtime.Hosting;
+using Orleans.Runtime.Placement.Filtering;
 
 namespace Orleans.Hosting
 {
@@ -205,6 +204,10 @@ namespace Orleans.Hosting
 
             // Configure the default placement strategy.
             services.TryAddSingleton<PlacementStrategy, RandomPlacement>();
+
+            // Placement filters
+            services.AddSingleton<PlacementFilterStrategyResolver>();
+            services.AddSingleton<PlacementFilterDirectorResolver>();
 
             // Placement directors
             services.AddPlacementDirector<RandomPlacement, RandomPlacementDirector>();

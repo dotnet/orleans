@@ -84,7 +84,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         ILocalSiloDetails localSiloDetails,
         ILoggerFactory loggerFactory,
         IServiceProvider serviceProvider,
-        IInternalGrainFactory grainFactory) : base(Constants.GrainDirectory, localSiloDetails.SiloAddress, loggerFactory)
+        IInternalGrainFactory grainFactory) : base(Constants.GrainDirectoryType, localSiloDetails.SiloAddress, loggerFactory)
     {
         _serviceProvider = serviceProvider;
         _membershipService = membershipService;

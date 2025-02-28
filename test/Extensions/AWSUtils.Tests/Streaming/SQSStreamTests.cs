@@ -196,7 +196,7 @@ namespace AWSUtils.Tests.Streaming
         {
             var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, SQS_STREAM_PROVIDER_NAME, 17, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
-                this.HostedCluster.StartAdditionalSilo);
+                () => HostedCluster.StartAdditionalSilo());
         }
     }
 }
