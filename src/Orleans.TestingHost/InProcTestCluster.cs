@@ -10,7 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Configuration.Memory;
 using Orleans.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
@@ -272,6 +271,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         {
             stabilizationTime += TestingUtils.Multiply(clusterMembershipOptions.TableRefreshTimeout, 2);
         }
+
         return stabilizationTime;
     }
 
@@ -279,7 +279,26 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// Start an additional silo, so that it joins the existing cluster.
     /// </summary>
     /// <returns>SiloHandle for the newly started silo.</returns>
-    public InProcessSiloHandle StartAdditionalSilo(bool startAdditionalSiloOnNewPort = false)
+    public InProcessSiloHandle StartAdditionalSilo()
+    {
+        return StartAdditionalSiloAsync().GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Start an additional silo, so that it joins the existing cluster.
+    /// </summary>
+    /// <returns>SiloHandle for the newly started silo.</returns>
+    public async Task<InProcessSiloHandle> StartAdditionalSiloAsync()
+    {
+        return (await StartSilosAsync(1)).Single();
+    }
+
+    /// <summary>
+    /// Start an additional silo, so that it joins the existing cluster.
+    /// </summary>
+    /// <returns>SiloHandle for the newly started silo.</returns>
+    [Obsolete("Use overload which does not have a 'startAdditionalSiloOnNewPort' parameter.")]
+    public InProcessSiloHandle StartAdditionalSilo(bool startAdditionalSiloOnNewPort)
     {
         return StartAdditionalSiloAsync(startAdditionalSiloOnNewPort).GetAwaiter().GetResult();
     }
@@ -288,9 +307,9 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// Start an additional silo, so that it joins the existing cluster.
     /// </summary>
     /// <returns>SiloHandle for the newly started silo.</returns>
-    public async Task<InProcessSiloHandle> StartAdditionalSiloAsync(bool startAdditionalSiloOnNewPort = false)
+    public async Task<InProcessSiloHandle> StartAdditionalSiloAsync(bool startAdditionalSiloOnNewPort)
     {
-        return (await StartSilosAsync(1, startAdditionalSiloOnNewPort)).Single();
+        return (await StartSilosAsync(1)).Single();
     }
 
     /// <summary>
@@ -299,13 +318,24 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <param name="silosToStart">Number of silos to start.</param>
     /// <param name="startAdditionalSiloOnNewPort"></param>
     /// <returns>List of SiloHandles for the newly started silos.</returns>
-    public async Task<List<InProcessSiloHandle>> StartSilosAsync(int silosToStart, bool startAdditionalSiloOnNewPort = false)
+    [Obsolete("Use overload which does not have a 'startAdditionalSiloOnNewPort' parameter.")]
+    public async Task<List<InProcessSiloHandle>> StartSilosAsync(int silosToStart, bool startAdditionalSiloOnNewPort)
+    {
+        return await StartSilosAsync(silosToStart);
+    }
+
+    /// <summary>
+    /// Start a number of additional silo, so that they join the existing cluster.
+    /// </summary>
+    /// <param name="silosToStart">Number of silos to start.</param>
+    /// <returns>List of SiloHandles for the newly started silos.</returns>
+    public async Task<List<InProcessSiloHandle>> StartSilosAsync(int silosToStart)
     {
         var instances = new List<InProcessSiloHandle>();
         if (silosToStart > 0)
         {
             var siloStartTasks = Enumerable.Range(_startedInstances, silosToStart)
-                .Select(instanceNumber => Task.Run(() => StartSiloAsync((short)instanceNumber, Options, startSiloOnNewPort: startAdditionalSiloOnNewPort))).ToArray();
+                .Select(instanceNumber => Task.Run(() => StartSiloAsync((short)instanceNumber, Options))).ToArray();
 
             try
             {
@@ -628,10 +658,24 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <param name="cluster">The InProcessTestCluster in which the silo should be deployed</param>
     /// <param name="instanceNumber">The instance number to deploy</param>
     /// <param name="clusterOptions">The options to use.</param>
+    /// <returns>A handle to the silo deployed</returns>
+    public static async Task<InProcessSiloHandle> StartSiloAsync(InProcessTestCluster cluster, int instanceNumber, InProcessTestClusterOptions clusterOptions)
+    {
+        if (cluster == null) throw new ArgumentNullException(nameof(cluster));
+        return await cluster.StartSiloAsync(instanceNumber, clusterOptions);
+    }
+
+    /// <summary>
+    /// Start a new silo in the target cluster
+    /// </summary>
+    /// <param name="cluster">The InProcessTestCluster in which the silo should be deployed</param>
+    /// <param name="instanceNumber">The instance number to deploy</param>
+    /// <param name="clusterOptions">The options to use.</param>
     /// <param name="configurationOverrides">Configuration overrides.</param>
     /// <param name="startSiloOnNewPort">Whether we start this silo on a new port, instead of the default one</param>
     /// <returns>A handle to the silo deployed</returns>
-    public static async Task<InProcessSiloHandle> StartSiloAsync(InProcessTestCluster cluster, int instanceNumber, InProcessTestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource> configurationOverrides = null, bool startSiloOnNewPort = false)
+    [Obsolete("Use the overload which does not have a 'startSiloOnNewPort' parameter.")]
+    public static async Task<InProcessSiloHandle> StartSiloAsync(InProcessTestCluster cluster, int instanceNumber, InProcessTestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource> configurationOverrides, bool startSiloOnNewPort)
     {
         if (cluster == null) throw new ArgumentNullException(nameof(cluster));
         return await cluster.StartSiloAsync(instanceNumber, clusterOptions, configurationOverrides, startSiloOnNewPort);
@@ -642,16 +686,28 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// </summary>
     /// <param name="instanceNumber">The instance number to deploy</param>
     /// <param name="clusterOptions">The options to use.</param>
-    /// <param name="configurationOverrides">Configuration overrides.</param>
-    /// <param name="startSiloOnNewPort">Whether we start this silo on a new port, instead of the default one</param>
     /// <returns>A handle to the deployed silo.</returns>
-    public async Task<InProcessSiloHandle> StartSiloAsync(int instanceNumber, InProcessTestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource> configurationOverrides = null, bool startSiloOnNewPort = false)
+    public async Task<InProcessSiloHandle> StartSiloAsync(int instanceNumber, InProcessTestClusterOptions clusterOptions)
     {
-        var siloOptions = InProcessTestSiloSpecificOptions.Create(this, clusterOptions, instanceNumber, startSiloOnNewPort);
+        var siloOptions = InProcessTestSiloSpecificOptions.Create(this, clusterOptions, instanceNumber, assignNewPort: true);
         var handle = await CreateSiloAsync(siloOptions);
         handle.InstanceNumber = (short)instanceNumber;
         Interlocked.Increment(ref _startedInstances);
         return handle;
+    }
+
+    /// <summary>
+    /// Starts a new silo.
+    /// </summary>
+    /// <param name="instanceNumber">The instance number to deploy</param>
+    /// <param name="clusterOptions">The options to use.</param>
+    /// <param name="configurationOverrides">Configuration overrides.</param>
+    /// <param name="startSiloOnNewPort">Whether we start this silo on a new port, instead of the default one</param>
+    /// <returns>A handle to the deployed silo.</returns>
+    [Obsolete("Use the overload which does not have a 'startSiloOnNewPort' parameter.")]
+    public async Task<InProcessSiloHandle> StartSiloAsync(int instanceNumber, InProcessTestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource> configurationOverrides, bool startSiloOnNewPort)
+    {
+        return await StartSiloAsync(instanceNumber, clusterOptions);
     }
 
     private async Task StopSiloAsync(InProcessSiloHandle instance, bool stopGracefully)

@@ -169,6 +169,6 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
     {
         var multiRunner = new MultipleStreamsTestRunner(InternalClient, AdoNetStreamProviderName, 17, false);
 
-        await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(HostedCluster.StartAdditionalSilo);
+        await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(() => HostedCluster.StartAdditionalSilo());
     }
 }

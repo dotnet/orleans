@@ -543,7 +543,7 @@ namespace Orleans.Serialization.Serializers
             }
             else if (searchType.BaseType is object
                 && CreateCodecInstance(
-                    fieldType,
+                    fieldType.BaseType,
                     searchType.BaseType switch
                     {
                         { IsConstructedGenericType: true } => searchType.BaseType.GetGenericTypeDefinition(),
