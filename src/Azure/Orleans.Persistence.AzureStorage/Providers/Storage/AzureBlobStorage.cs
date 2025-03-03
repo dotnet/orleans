@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure;
@@ -12,10 +15,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans.Configuration;
-using Orleans.Persistence.AzureStorage;
+using Orleans.Persistence.AzureStorage.Providers.Storage.Cursors;
 using Orleans.Providers.Azure;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
@@ -24,8 +26,10 @@ namespace Orleans.Storage
     /// <summary>
     /// Simple storage provider for writing grain state data to Azure blob storage in JSON format.
     /// </summary>
-    public class AzureBlobGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
+    public class AzureBlobGrainStorage : IExtendedGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
+        static Regex _pickAllBlobsRegex = new Regex("(?<name>[^-]+)-(?<reference>[^-]+).json");
+
         private JsonSerializerSettings jsonSettings;
 
         private BlobContainerClient container;
@@ -35,6 +39,7 @@ namespace Orleans.Storage
         private SerializationManager serializationManager;
         private IGrainFactory grainFactory;
         private ITypeResolver typeResolver;
+        private readonly IGrainReferenceRuntime grainReferenceRuntime;
 
         /// <summary> Default constructor </summary>
         public AzureBlobGrainStorage(
@@ -43,6 +48,7 @@ namespace Orleans.Storage
             SerializationManager serializationManager,
             IGrainFactory grainFactory,
             ITypeResolver typeResolver,
+            IGrainReferenceRuntime grainReferenceRuntime,
             ILogger<AzureBlobGrainStorage> logger)
         {
             this.name = name;
@@ -50,6 +56,7 @@ namespace Orleans.Storage
             this.serializationManager = serializationManager;
             this.grainFactory = grainFactory;
             this.typeResolver = typeResolver;
+            this.grainReferenceRuntime = grainReferenceRuntime;
             this.logger = logger;
         }
 
@@ -304,6 +311,37 @@ namespace Orleans.Storage
             }
 
             return result;
+        }
+
+        public async IAsyncEnumerable<StorageEntry> GetAll(object storageEntryCursor, [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await foreach (var blobHierarchyItem in this.container.GetBlobsByHierarchyAsync(cancellationToken: cancellationToken))
+            {
+                var blob = blobHierarchyItem.Blob;
+                // skipping items which are "less" lexicographically than the cursor. There is no other way to do at a call level to storage according to parameters
+                // https://learn.microsoft.com/en-gb/rest/api/storageservices/list-blobs?tabs=microsoft-entra-id#uri-parameters
+                if (storageEntryCursor is AzureBlobStorageEntryCursor cursor)
+                {
+                    if (string.Compare(blob.Name, cursor.BlobName, StringComparison.Ordinal) <= 0)
+                    {
+                        continue;
+                    }
+                }
+
+                var match = _pickAllBlobsRegex.Match(blob.Name);
+                if (!match.Success)
+                {
+                    continue;
+                }
+
+                var name = match.Groups["name"].Value;
+                var reference = GrainReference.FromKeyString(match.Groups["reference"].Value, this.grainReferenceRuntime);
+                var state = new GrainState<object>();
+                await ReadStateAsync(name, reference, state);
+
+                var entryCursor = new AzureBlobStorageEntryCursor(blob.Name);
+                yield return new StorageEntry(name, reference, state, entryCursor);
+            }
         }
     }
 

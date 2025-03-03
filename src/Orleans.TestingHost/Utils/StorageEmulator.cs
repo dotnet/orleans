@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using Azure.Data.Tables;
 
 namespace Orleans.TestingHost.Utils
 {
@@ -88,6 +89,25 @@ namespace Orleans.TestingHost.Utils
         /// <returns><em>TRUE</em> if the process was started successfully. <em>FALSE</em> otherwise.</returns>
         public static bool TryStart()
         {
+            // storage emulator can be started via azurite.
+            // In that case checking the launch of StorageEmulator is not sufficient.
+            // We can try to create and delete some table to check if 
+            try
+            {
+                var noRetryOptions = new TableClientOptions();
+                noRetryOptions.Retry.MaxRetries = 0;
+
+                var service = new TableServiceClient("UseDevelopmentStorage=true", noRetryOptions);
+                var tmpTableName = "tmp" + Guid.NewGuid().ToString().Replace("-", "").ToLowerInvariant();
+                service.CreateTable(tmpTableName);
+                service.DeleteTable(tmpTableName);
+
+                return true;
+            }
+            catch
+            {
+            }
+
             if (!StorageEmulator.Exists)
                 return false;
 

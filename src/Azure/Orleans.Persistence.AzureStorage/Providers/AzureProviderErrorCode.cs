@@ -16,6 +16,7 @@ namespace Orleans.Providers.Azure
         AzureTableProvider_DeleteError              = AzureTableProviderBase + 8,
         AzureTableProvider_InitProvider             = AzureTableProviderBase + 9,
         AzureTableProvider_ParamConnectionString    = AzureTableProviderBase + 10,
+        AzureTableProvider_Storage_ReadingAll       = AzureTableProviderBase + 11,
 
         AzureBlobProviderBase                       = ProvidersBase + 300,
         AzureBlobProvider_BlobNotFound              = AzureBlobProviderBase + 1,
