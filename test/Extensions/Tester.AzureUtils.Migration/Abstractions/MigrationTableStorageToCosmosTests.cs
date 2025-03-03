@@ -114,7 +114,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
 
             // rerun data migrator should not invoke anything -> all data is migrated already
             var statsRun2 = await DataMigrator.MigrateGrainsAsync(CancellationToken.None);
-            Assert.True(statsRun2.SkippedEntries != 0); // it should skip entries (at least one - the one that we migrated on 1st DataMigrator.MigrateGrainsAsync() run)
+            Assert.True(statsRun2.SkippedAllEntries || statsRun2.SkippedEntries != 0); // it should skip entries (at least one - the one that we migrated on 1st DataMigrator.MigrateGrainsAsync() run)
 
             // ensure state one more time
             var cosmosGrainState2 = await GetGrainStateFromCosmosAsync(

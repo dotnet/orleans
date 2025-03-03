@@ -113,14 +113,10 @@ namespace Tester.AzureUtils.Migration.Abstractions
 
             var stats2 = await DataMigrator.MigrateGrainsAsync(CancellationToken.None);
             Assert.Equal((uint)0, stats2.MigratedEntries);
-            Assert.True(stats2.SkippedEntries >= 5);
+            Assert.True(stats2.SkippedAllEntries || stats2.SkippedEntries >= 5);
             Assert.Equal((uint)0, stats2.FailedEntries);
 
-            // ensure all of the source storage entries have a metadata of "migrationTime" on them
-            // in debug purposes and for future reruns
-            var currentTime = DateTime.UtcNow;
-
-            var entries = this.SourceExtendedStorage?.GetAll(CancellationToken.None);
+            var entries = this.SourceExtendedStorage?.GetAll(storageEntryCursor: null, CancellationToken.None);
             if (entries is null)
             {
                 Assert.True(false, "SourceStorageEntriesController is null");
@@ -136,7 +132,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
 
             // iterate over all entries in the storage
             var storageEntries = new Dictionary<Guid, StorageEntry>();
-            var entries = this.SourceExtendedStorage?.GetAll(CancellationToken.None);
+            var entries = this.SourceExtendedStorage?.GetAll(storageEntryCursor: null, CancellationToken.None);
             if (entries is null)
             {
                 Assert.True(false, "SourceStorageEntriesController is null");

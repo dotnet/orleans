@@ -19,6 +19,7 @@ namespace Orleans.Persistence.Migration
         private readonly IReminderMigrationTable _reminderMigrationStorage;
 
         private readonly CancellationTokenSource _backgroundWorkCts = new();
+        private object _lastProcessedGrainCursor;
 
         public DataMigrator(
             ILogger<DataMigrator> logger,
@@ -132,10 +133,10 @@ namespace Orleans.Persistence.Migration
         /// </summary>
         public async Task<MigrationStats> MigrateGrainsAsync(CancellationToken cancellationToken)
         {
-            _logger.Info("Starting grains migration");
+            _logger.Info("Starting grains migration. LastProcessedGrainCursor: {cursor}", _lastProcessedGrainCursor);
 
             var migrationStats = new MigrationStats();
-            await foreach (var storageEntry in _sourceStorage.GetAll(cancellationToken))
+            await foreach (var storageEntry in _sourceStorage.GetAll(_lastProcessedGrainCursor, cancellationToken))
             {
                 var initGrainType = storageEntry.GrainType;
                 migrationStats.EntriesProcessed++;
@@ -183,7 +184,8 @@ namespace Orleans.Persistence.Migration
                     }
 
                     migrationStats.MigratedEntries++;
-                    _logger.Debug("Grain {grainType} with key {grainKey} is migrated successfully", storageEntry.GrainType, storageEntry.GrainReference.ToShortKeyString());
+                    _lastProcessedGrainCursor = storageEntry.Cursor;
+                    _logger.Debug("Grain {grainType} with key {grainKey} is migrated successfully. StorageEntry: {storageEntry}", storageEntry.GrainType, storageEntry.GrainReference.ToShortKeyString(), _lastProcessedGrainCursor);
                 }
                 catch (Exception ex)
                 {
@@ -262,6 +264,11 @@ namespace Orleans.Persistence.Migration
             /// If migration is not available, will contain reason details.
             /// </summary>
             public string Reason { get;internal set; }
+
+            /// <summary>
+            /// If all entries were skipped on the query level
+            /// </summary>
+            public bool SkippedAllEntries => EntriesProcessed == 0;
 
             public uint SkippedEntries { get; internal set; }
             public uint MigratedEntries { get; internal set; }

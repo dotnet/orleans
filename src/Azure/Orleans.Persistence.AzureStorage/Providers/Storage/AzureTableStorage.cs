@@ -16,6 +16,7 @@ using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
 using Orleans.Persistence.AzureStorage;
+using Orleans.Persistence.AzureStorage.Providers.Storage.Cursors;
 using Orleans.Providers.Azure;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -412,10 +413,10 @@ namespace Orleans.Storage
                 return tableManager.InitTableAsync();
             }
 
-            public IAsyncEnumerable<TableEntity> ReadAllAsync(CancellationToken cancellationToken)
+            public IAsyncEnumerable<TableEntity> ReadAllAsync(CancellationToken cancellationToken, string filter = null)
             {
                 if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_Storage_ReadingAll, "Reading All entries from Table={0}", TableName);
-                return tableManager.ReadTableEntries(cancellationToken);
+                return tableManager.ReadTableEntries(cancellationToken, filter);
             }
 
             public async Task<TableEntity> Read(string partitionKey, string rowKey)
@@ -508,12 +509,13 @@ namespace Orleans.Storage
             lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableGrainStorage>(this.name), this.options.InitStage, Init, Close);
         }
 
-        public async IAsyncEnumerable<StorageEntry> GetAll([EnumeratorCancellation] CancellationToken cancellationToken)
+        public async IAsyncEnumerable<StorageEntry> GetAll(object storageEntryCursor, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             // another storage table will be used for the migration data: we can't modify original table due to ETag collisions and other concurrent access problems
             var migrationTableManager = await GetMigrationTableManagerAsync();
 
-            var entries = this.tableDataManager.ReadAllAsync(cancellationToken);
+            var filterQuery = CalculateFilter(storageEntryCursor);
+            var entries = this.tableDataManager.ReadAllAsync(filter: filterQuery, cancellationToken: cancellationToken);
             await foreach (var entry in entries.WithCancellation(cancellationToken))
             {
                 var pkParts = entry.PartitionKey.Split('_');
@@ -535,7 +537,22 @@ namespace Orleans.Storage
                     grainState.ETag = entry.ETag.ToString();
                 }
 
-                yield return new StorageEntry(entry.RowKey, grainReference, grainState);
+                var entryCursor = new AzureTableStorageEntryCursor(entry.PartitionKey, entry.RowKey);
+                yield return new StorageEntry(entry.RowKey, grainReference, grainState, entryCursor);
+            }
+
+            string CalculateFilter(object cursor)
+            {
+                if (cursor is null)
+                {
+                    return null;
+                }
+                if (cursor is not AzureTableStorageEntryCursor azureTableCursor)
+                {
+                    return null;
+                }
+
+                return $"PartitionKey gt '{azureTableCursor.PartitionKey}' and RowKey ge '{azureTableCursor.RowKey}'";
             }
         }
 

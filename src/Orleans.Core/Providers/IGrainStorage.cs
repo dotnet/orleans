@@ -14,13 +14,18 @@ namespace Orleans.Storage
         public GrainReference GrainReference { get; }
         public IGrainState GrainState { get; }
 
-        public object? Cursor { get; }
+        /// <summary>
+        /// Represents the pointer to the entry in the underlying storage.
+        /// </summary>
+        public object Cursor { get; }
 
-        public StorageEntry(string name, GrainReference grainReference, IGrainState grainState)
+        public StorageEntry(string name, GrainReference grainReference, IGrainState grainState, object cursor)
         {
             GrainType = name;
             GrainReference = grainReference;
             GrainState = grainState;
+
+            Cursor = cursor;
         }
     }
 
@@ -60,7 +65,7 @@ namespace Orleans.Storage
         /// Get all entries in storage
         /// </summary>
         /// <returns>The entries in storage</returns>
-        IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken);
+        IAsyncEnumerable<StorageEntry> GetAll(object storageEntryCursor, CancellationToken cancellationToken);
     }
 
     /// <summary>

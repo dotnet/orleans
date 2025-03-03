@@ -36,6 +36,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Tester.AzureUtils.Migration"/>
+    <InternalsVisibleTo Include="Tester.AzureUtils.Migration" />
   </ItemGroup>
 </Project>
