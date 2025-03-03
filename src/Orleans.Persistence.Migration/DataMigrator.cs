@@ -122,7 +122,7 @@ namespace Orleans.Persistence.Migration
                 catch (Exception ex)
                 {
                     _logger.Error((int)MigrationErrorCodes.DataMigrationBackgroundTaskFailed, $"Failed to run {nameof(DataMigrator)} background work. Retrying in 2 seconds...", ex);
-                    await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+                    await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
                 }
             }
         }
