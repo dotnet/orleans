@@ -167,42 +167,5 @@ namespace Orleans.Persistence.Migration
             }
             return services;
         }
-
-        /// <summary>
-        /// Register a <see cref="TransformerGrainStorage"/> which gives extra API to control the storage payload
-        /// </summary>
-        /// <param name="builder">silo builder</param>
-        /// <param name="name">name of grain storage registration</param>
-        /// <param name="innerGrainStorageName">name of grain storage which will be used as implementation</param>
-        /// <returns></returns>
-        public static ISiloBuilder AddTransformingGrainStorage<TGrainTransformer>(
-            this ISiloBuilder builder,
-            string name,
-            string innerGrainStorageName) where TGrainTransformer : class, IGrainStorageTransformer
-        {
-            builder.ConfigureServices(services =>
-            {
-                services.AddTransformingGrainStorage<TGrainTransformer>(name, innerGrainStorageName);
-            });
-            return builder;
-        }
-
-        /// <summary>
-        /// Configure silo to use Cosmos for grain storage.
-        /// </summary>
-        public static IServiceCollection AddTransformingGrainStorage<TGrainTransformer>(
-            this IServiceCollection services,
-            string name,
-            string innerGrainStorageName) where TGrainTransformer : class, IGrainStorageTransformer
-        {
-            if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
-            {
-                services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-            }
-
-            return services.AddSingletonNamedService<IGrainStorageTransformer, TGrainTransformer>(name)
-                           .AddSingletonNamedService<IGrainStorage>(name, (sp, n) => TransformerGrainStorage.Create(sp, innerGrainStorageName, name))
-                           .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
-        }
     }
 }
