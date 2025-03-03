@@ -114,6 +114,12 @@ namespace Orleans.Persistence.Migration
                         _logger.Info("Migration completed");
                         return;
                     }
+
+                    if (grainMigrationResult.SkippedAllEntries)
+                    {
+                        _logger.Info("Migration completed");
+                        return;
+                    }
                 }
                 catch (Exception ex)
                 {
