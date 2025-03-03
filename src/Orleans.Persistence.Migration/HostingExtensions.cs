@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -106,20 +107,50 @@ namespace Orleans.Persistence.Migration
         /// <summary>
         /// Configure a component to migrate inner data in storages
         /// </summary>
-        public static ISiloBuilder AddDataMigrator(this ISiloBuilder builder, string oldStorage, string newStorage, DataMigrator.Options options = null)
-            => builder.ConfigureServices(services => services.AddDataMigrator(oldStorage, newStorage, options));
+        /// <param name="builder">DI of the app</param>
+        /// <param name="oldStorage">source storage (one you were already using)</param>
+        /// <param name="newStorage">(one you would like to migrate to)</param>
+        /// <param name="configureOptions">options of data migrator configuration</param>
+        /// <param name="runAsBackgroundService">if true, the migrator will be started as a background service</param>
+        public static ISiloBuilder AddDataMigrator(this ISiloBuilder builder, string oldStorage, string newStorage, Action<DataMigratorOptions> configureOptions, bool runAsBackgroundService = false)
+            => builder.ConfigureServices(services => services.AddDataMigrator(oldStorage, newStorage, configureOptions, runAsBackgroundService));
 
         /// <summary>
         /// Configure a component to migrate inner data in storages
         /// </summary>
+        /// <param name="builder">DI of the app</param>
+        /// <param name="oldStorage">source storage (one you were already using)</param>
+        /// <param name="newStorage">(one you would like to migrate to)</param>
+        /// <param name="configureOptions">options of data migrator configuration</param>
+        /// <param name="runAsBackgroundService">if true, the migrator will be started as a background service</param>
+        public static ISiloBuilder AddDataMigrator(this ISiloBuilder builder, string oldStorage, string newStorage, Action<OptionsBuilder<DataMigratorOptions>> configureOptions = null, bool runAsBackgroundService = false)
+            => builder.ConfigureServices(services => services.AddDataMigrator(oldStorage, newStorage, configureOptions, runAsBackgroundService));
+
+
+        public static IServiceCollection AddDataMigrator(this IServiceCollection services, string oldStorageName, string newStorageName, Action<DataMigratorOptions> configureOptions = null, bool runAsBackgroundService = false)
+            => services.AddDataMigrator(oldStorageName, newStorageName, ob => ob.Configure(configureOptions), runAsBackgroundService);
+
+        /// <summary>
+        /// Configure a component to migrate inner data in storages
+        /// </summary>
+        /// <param name="services">DI of the app</param>
+        /// <param name="oldStorageName">source storage (one you were already using)</param>
+        /// <param name="newStorageName">(one you would like to migrate to)</param>
+        /// <param name="configureOptions">options of data migrator configuration</param>
+        /// <param name="runAsBackgroundService">if true, the migrator will be started as a background service</param>
         public static IServiceCollection AddDataMigrator(
             this IServiceCollection services,
             string oldStorageName,
             string newStorageName,
-            DataMigrator.Options options = null)
+            Action<OptionsBuilder<DataMigratorOptions>> configureOptions = null,
+            bool runAsBackgroundService = false)
         {
+            configureOptions?.Invoke(services.AddOptions<DataMigratorOptions>("dataMigrator"));
+
             services.AddSingleton(sp =>
             {
+                var options = sp.GetRequiredService<IOptionsMonitor<DataMigratorOptions>>().Get("dataMigrator");
+
                 return new DataMigrator(
                     sp.GetService<ILogger<DataMigrator>>(),
                     sp.GetRequiredService<IClusterMembershipService>(),
@@ -130,11 +161,10 @@ namespace Orleans.Persistence.Migration
                     options);
             });
 
-            if (options?.RunAsBackgroundTask == true)
+            if (runAsBackgroundService)
             {
                 services.AddHostedService(sp => sp.GetService<DataMigrator>());
             }
-
             return services;
         }
 

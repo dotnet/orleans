@@ -71,10 +71,7 @@ namespace Tester.AzureUtils.Migration
                         options.UseExperimentalFormat = true;
 #pragma warning restore OrleansCosmosExperimental
                     })
-                    .AddDataMigrator(SourceStorageName, DestinationStorageName, new DataMigrator.Options
-                    {
-                        RunAsBackgroundTask = false // we want to manually call data migrator
-                    });
+                    .AddDataMigrator(SourceStorageName, DestinationStorageName);
             }
         }
     }

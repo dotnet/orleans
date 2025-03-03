@@ -315,7 +315,7 @@ namespace Orleans.Storage
 
         public async IAsyncEnumerable<StorageEntry> GetAll(object storageEntryCursor, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            await foreach (var blobHierarchyItem in this.container.GetBlobsByHierarchyAsync(traits: BlobTraits.Metadata, cancellationToken: cancellationToken))
+            await foreach (var blobHierarchyItem in this.container.GetBlobsByHierarchyAsync(cancellationToken: cancellationToken))
             {
                 var blob = blobHierarchyItem.Blob;
                 // skipping items which are "less" lexicographically than the cursor. There is no other way to do at a call level to storage according to parameters

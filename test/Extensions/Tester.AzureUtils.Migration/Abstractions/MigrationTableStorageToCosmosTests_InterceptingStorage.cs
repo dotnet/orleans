@@ -2,14 +2,14 @@
 using Microsoft.Azure.Cosmos;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Storage;
 using Tester.AzureUtils.Migration.Grains;
 using Tester.AzureUtils.Migration.Helpers;
 using Xunit;
+using static Tester.AzureUtils.Migration.MigrationAzureStorageTableToCosmosDbWithStorageInterceptorTests;
 
 namespace Tester.AzureUtils.Migration.Abstractions
 {
-    public abstract class MigrationTableStorageToCosmosWithTransformGrainTests : MigrationBaseTests
+    public abstract class MigrationTableStorageToCosmosWithStorageInterceptorTests : MigrationBaseTests
     {
         const int baseId = 500; 
 
@@ -18,7 +18,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
 
         readonly CosmosClient _cosmosClient;
 
-        protected MigrationTableStorageToCosmosWithTransformGrainTests(BaseAzureTestClusterFixture fixture)
+        protected MigrationTableStorageToCosmosWithStorageInterceptorTests(BaseAzureTestClusterFixture fixture)
             : base(fixture)
         {
             _databaseName = MigrationAzureStorageTableToCosmosDbTests.OrleansDatabase;
@@ -45,9 +45,10 @@ namespace Tester.AzureUtils.Migration.Abstractions
                 databaseName: _databaseName,
                 containerName: _containerName,
                 DocumentIdProvider,
-                (GrainReference)grain);
+                (GrainReference)grain,
+                stateName: StorageDataInterceptor.TestPartitionKey);
 
-            var customField = cosmosGrainState["MyCustomTest"];
+            var customField = cosmosGrainState["A"];
             Assert.Equal(42, customField);
         }
     }

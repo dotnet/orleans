@@ -65,10 +65,7 @@ namespace Tester.AzureUtils.Migration
                         options.ContainerName = OrleansContainer;
                         options.DatabaseName = OrleansDatabase;
                     })
-                    .AddDataMigrator(SourceStorageName, DestinationStorageName, new DataMigrator.Options
-                    {
-                        RunAsBackgroundTask = false // we want to manually call data migrator
-                    });
+                    .AddDataMigrator(SourceStorageName, DestinationStorageName);
             }
         }
     }

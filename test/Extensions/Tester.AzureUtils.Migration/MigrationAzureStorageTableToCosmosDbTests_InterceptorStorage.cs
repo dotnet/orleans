@@ -10,18 +10,21 @@ using Tester.AzureUtils.Migration.Helpers;
 using Orleans.Persistence.Cosmos;
 using Orleans.Persistence.Cosmos.DocumentIdProviders;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Runtime;
+using Microsoft.Extensions.Logging;
+using Microsoft.Azure.Cosmos;
 
 namespace Tester.AzureUtils.Migration
 {
     [TestCategory("Functionals"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureTableStorage")]
-    public class MigrationAzureStorageTableToCosmosDbBackgroundDataMigratorTests : MigrationTableStorageToCosmosTestsWithBackgroundDataMigrator, IClassFixture<MigrationAzureStorageTableToCosmosDbBackgroundDataMigratorTests.Fixture>
+    public class MigrationAzureStorageTableToCosmosDbWithStorageInterceptorTests : MigrationTableStorageToCosmosWithStorageInterceptorTests, IClassFixture<MigrationAzureStorageTableToCosmosDbWithStorageInterceptorTests.Fixture>
     {
         public static string OrleansDatabase = Resources.MigrationDatabase;
         public static string OrleansContainer = Resources.MigrationLatestContainer;
 
         public static string RandomIdentifier = Guid.NewGuid().ToString().Replace("-", "");
 
-        public MigrationAzureStorageTableToCosmosDbBackgroundDataMigratorTests(Fixture fixture) : base(fixture)
+        public MigrationAzureStorageTableToCosmosDbWithStorageInterceptorTests(Fixture fixture) : base(fixture)
         {
         }
 
@@ -41,6 +44,7 @@ namespace Tester.AzureUtils.Migration
                     .ConfigureServices(services =>
                     {
                         services.TryAddSingleton<IDocumentIdProvider, ClusterDocumentIdProvider>();
+                        services.AddSingletonNamedService<ICosmosStorageDataInterceptor, StorageDataInterceptor>(DestinationStorageName);
                     });
 
                 siloBuilder
@@ -65,10 +69,28 @@ namespace Tester.AzureUtils.Migration
                         options.ContainerName = OrleansContainer;
                         options.DatabaseName = OrleansDatabase;
                     })
-                    .AddDataMigrator(SourceStorageName, DestinationStorageName, options =>
-                    {
-                        options.BackgroundTaskInitialDelay = TimeSpan.FromSeconds(1);
-                    }, runAsBackgroundService: true);
+                    .AddDataMigrator(SourceStorageName, DestinationStorageName);
+            }
+        }
+
+        public class StorageDataInterceptor : ICosmosStorageDataInterceptor
+        {
+            public const string TestPartitionKey = "testpartitionkey";
+
+            public void BeforeCreateItem(ref PartitionKey partitionKey, object payload) => Modify(ref partitionKey, payload);
+            public void BeforeReplaceItem(ref PartitionKey partitionKey, object payload) => Modify(ref partitionKey, payload);
+            public void BeforeUpsertItem(ref PartitionKey partitionKey, object payload) => Modify(ref partitionKey, payload);
+
+            void Modify(ref PartitionKey partitionKey, object payload)
+            {
+                var jsonPayload = payload as dynamic;
+
+                // testing adjusting partition key
+                jsonPayload.PartitionKey = TestPartitionKey;
+                partitionKey = new PartitionKey(TestPartitionKey);
+
+                // testing changing state field
+                jsonPayload.State.A = 42;
             }
         }
     }

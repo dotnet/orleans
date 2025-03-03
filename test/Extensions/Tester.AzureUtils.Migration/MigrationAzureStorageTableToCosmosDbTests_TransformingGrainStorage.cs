@@ -68,10 +68,7 @@ namespace Tester.AzureUtils.Migration
                         options.DatabaseName = OrleansDatabase;
                     })
                     .AddTransformingGrainStorage<TestGrainTransformer>(DestinationStorageName, "innerCosmos")
-                    .AddDataMigrator(SourceStorageName, DestinationStorageName, new DataMigrator.Options
-                    {
-                        RunAsBackgroundTask = false // we want to manually call data migrator
-                    });
+                    .AddDataMigrator(SourceStorageName, DestinationStorageName);
             }
         }
 

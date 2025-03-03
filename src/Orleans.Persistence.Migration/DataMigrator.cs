@@ -1,6 +1,8 @@
 using Azure;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Storage;
 
@@ -9,7 +11,7 @@ namespace Orleans.Persistence.Migration
     public class DataMigrator : IHostedService
     {
         private readonly ILogger<DataMigrator> _logger;
-        private readonly Options _options;
+        private readonly DataMigratorOptions _options;
 
         private readonly IClusterMembershipService _clusterMembershipService;
         private readonly ILocalSiloDetails _localSiloDetails;
@@ -28,10 +30,10 @@ namespace Orleans.Persistence.Migration
             IGrainStorage sourceStorage,
             IGrainStorage destinationStorage,
             IReminderMigrationTable reminderMigrationTable,
-            Options options)
+            DataMigratorOptions options)
         {
             _logger = logger;
-            _options = options ?? new Options();
+            _options = options ?? new();
 
             _clusterMembershipService = clusterMembershipService;
             _localSiloDetails = localSiloDetails;
@@ -55,12 +57,6 @@ namespace Orleans.Persistence.Migration
 
         private async Task ExecuteBackgroundMigrationAsync(CancellationToken stoppingToken)
         {
-            if (!_options.RunAsBackgroundTask)
-            {
-                _logger.Info($"{nameof(DataMigrator)} is disabled as background task. Cancelling work");
-                return;
-            }
-
             if (_options.BackgroundTaskInitialDelay.HasValue)
             {
                 await Task.Delay(_options.BackgroundTaskInitialDelay.Value, stoppingToken);
@@ -237,7 +233,7 @@ namespace Orleans.Persistence.Migration
                             _logger.LogError(ex, $"Exception occurred during reminder '{entry.ReminderName}' migration");
                             migrationStats.FailedEntries++;
                         }
-                        
+
                     }
 
                     currentPointer += _options.RemindersMigrationBatchSize;
@@ -263,7 +259,7 @@ namespace Orleans.Persistence.Migration
             /// <summary>
             /// If migration is not available, will contain reason details.
             /// </summary>
-            public string Reason { get;internal set; }
+            public string Reason { get; internal set; }
 
             /// <summary>
             /// If all entries were skipped on the query level
@@ -279,25 +275,17 @@ namespace Orleans.Persistence.Migration
                 => SkippedEntries + MigratedEntries == EntriesProcessed
                     && FailedEntries == 0;
         }
+    }
 
-        public class Options
-        {
-            public bool DontSkipMigrateEntries { get; set; } = false;
-            public uint RemindersMigrationBatchSize { get; set; } = 10000;
+    public class DataMigratorOptions
+    {
+        public bool DontSkipMigrateEntries { get; set; } = false;
+        public uint RemindersMigrationBatchSize { get; set; } = 10000;
 
-            /// <summary>
-            /// If set to true, will launch DataMigrator as a background task
-            /// (migration will happen automatically on app startup).
-            /// <br/>
-            /// Can be delayed from the app startup to await cluster stability via <see cref="BackgroundTaskInitialDelay"/>
-            /// </summary>
-            public bool RunAsBackgroundTask { get; set; } = true;
-
-            /// <summary>
-            /// Time to await after app startup before running <see cref="DataMigrator.ExecuteBackgroundMigrationAsync(CancellationToken)"/>.
-            /// If you want to skip awaiting, set it to null.
-            /// </summary>
-            public TimeSpan? BackgroundTaskInitialDelay { get; set; } = TimeSpan.FromMinutes(2);
-        }
+        /// <summary>
+        /// Time to await after app startup before running <see cref="DataMigrator.ExecuteBackgroundMigrationAsync(CancellationToken)"/>.
+        /// If you want to skip awaiting, set it to null.
+        /// </summary>
+        public TimeSpan? BackgroundTaskInitialDelay { get; set; } = TimeSpan.FromMinutes(2);
     }
 }
