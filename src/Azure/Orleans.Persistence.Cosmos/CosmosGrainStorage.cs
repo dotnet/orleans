@@ -30,7 +30,6 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
     private readonly CosmosGrainStorageOptions options;
     private readonly string name;
     private readonly IServiceProvider serviceProvider;
-    private readonly ICosmosStorageDataInterceptor storageDataInterceptor;
 
     private CosmosClient client = default!;
     private Container container = default!;
@@ -43,14 +42,12 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
     /// <param name="serviceProvider">The service provider.</param>
     /// <param name="idProvider">The partition key provider.</param>
     /// <param name="grainStateTypeInfoProvider">Provides grain state type info via activation context</param>
-    /// <param name="storageDataInterceptor">Allows to perform data manipulation before storage communication</param>
     public CosmosGrainStorage(
         string name,
         CosmosGrainStorageOptions options,
         IServiceProvider serviceProvider,
         IDocumentIdProvider idProvider,
-        IGrainStateTypeInfoProvider grainStateTypeInfoProvider,
-        ICosmosStorageDataInterceptor storageDataInterceptor)
+        IGrainStateTypeInfoProvider grainStateTypeInfoProvider)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(options);
@@ -63,7 +60,6 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
         this.serviceProvider = serviceProvider;
         this.idProvider = idProvider;
         this.grainStateTypeInfoProvider = grainStateTypeInfoProvider;
-        this.storageDataInterceptor = storageDataInterceptor;
     }
 
     /// <inheritdoc/>
@@ -238,17 +234,14 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
 
                 if (string.IsNullOrEmpty(grainState.ETag))
                 {
-                    storageDataInterceptor?.BeforeCreateItem(ref pk, entity);
                     responseTask = this.container.CreateItemAsync(entity, pk);
                 }
                 else if (grainState.ETag == "*") // AnyETag
                 {
-                    storageDataInterceptor?.BeforeUpsertItem(ref pk, entity);
                     responseTask = this.container.UpsertItemAsync(entity, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag });
                 }
                 else
                 {
-                    storageDataInterceptor?.BeforeReplaceItem(ref pk, entity);
                     responseTask = this.container.ReplaceItemAsync(entity, entity.Id, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag });
                 }
 
@@ -274,17 +267,14 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
 
                 if (string.IsNullOrEmpty(grainState.ETag))
                 {
-                    storageDataInterceptor?.BeforeCreateItem(ref pk, entity);
                     responseTask = this.container.CreateItemAsync(entity, pk);
                 }
                 else if (grainState.ETag == "*") // AnyETag
                 {
-                    storageDataInterceptor?.BeforeUpsertItem(ref pk, entity);
                     responseTask = this.container.UpsertItemAsync(entity, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag });
                 }
                 else
                 {
-                    storageDataInterceptor?.BeforeReplaceItem(ref pk, entity);
                     responseTask = this.container.ReplaceItemAsync(entity, entity.Id, pk, new ItemRequestOptions { IfMatchEtag = grainState.ETag });
                 }
 
