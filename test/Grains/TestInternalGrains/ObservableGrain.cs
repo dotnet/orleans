@@ -1,4 +1,4 @@
-using System.Threading.Channels;
+﻿using System.Threading.Channels;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -9,6 +9,21 @@ namespace UnitTests.Grains
         private readonly Channel<string> _updates = Channel.CreateUnbounded<string>();
 
         public IAsyncEnumerable<string> GetValues() => _updates.Reader.ReadAllAsync();
+
+        public async IAsyncEnumerable<int> GetValuesWithError(int errorIndex, bool waitAfterYield, string errorMessage)
+        {
+            await Task.CompletedTask;
+            for (var i = 0; i < int.MaxValue; i++)
+            {
+                if (i == errorIndex)
+                {
+                    throw new InvalidOperationException(errorMessage);
+                }
+
+                yield return i;
+                await Task.Yield();
+            }
+        }
 
         public ValueTask Complete()
         {
