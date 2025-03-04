@@ -137,7 +137,9 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 this.shutdownToken.Cancel();
                 if (listenToClusterChangeTask != default && !ct.IsCancellationRequested)
-                    await listenToClusterChangeTask.WaitAsync(ct);
+                {
+                    await listenToClusterChangeTask.WaitAsync(ct).SuppressThrowing();
+                }
             };
             lifecycle.Subscribe(nameof(CachedGrainLocator), ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
         }
