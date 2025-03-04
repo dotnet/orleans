@@ -95,8 +95,8 @@ public class StatelessWorkerBenchmark : IDisposable
 
         Console.WriteLine("Stats:");
         Console.WriteLine($" Active Workers:  {BaseGrain<H>.GetActiveWorkers()}");
-        Console.WriteLine($" Maximum Workers: {BaseGrain<H>.GetMaxActiveWorkers()}");
         Console.WriteLine($" Average Workers: {BaseGrain<H>.GetAverageActiveWorkers()}");
+        Console.WriteLine($" Maximum Workers: {BaseGrain<H>.GetMaxActiveWorkers()}");
         Console.Write("\n---------------------------------------------------------------------\n");
     }
 
