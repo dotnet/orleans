@@ -20,14 +20,21 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
     private readonly ConcurrentQueue<(WorkItemType Type, object State)> _workItems = new();
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = false };
 
+#pragma warning disable IDE0052 // Remove unread private members
     /// <summary>
     /// The <see cref="Task"/> representing the <see cref="RunMessageLoop"/> invocation.
     /// This is written once but never otherwise accessed. The purpose of retaining this field is for
     /// debugging, where being able to identify the message loop task corresponding to an activation can
     /// be useful.
     /// </summary>
-#pragma warning disable IDE0052 // Remove unread private members
     private readonly Task _messageLoopTask;
+
+    /// <summary>
+    /// The <see cref="Task"/> representing the <see cref="PeriodicallyRemoveWorkers"/> invocation.
+    /// This is written once but never otherwise accessed. The purpose of retaining this field is for
+    /// debugging, where being able to identify the message loop task corresponding to an activation can
+    /// be useful.
+    /// </summary>
     private readonly Task? _workerAdjustmentTask;
 #pragma warning restore IDE0052 // Remove unread private members
 
@@ -106,7 +113,6 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
     private void EnqueueWorkItem(WorkItemType type, object state)
     {
         _workItems.Enqueue(new(type, state));
-        Interlocked.Increment(ref _queueLength);
         _workSignal.Signal();
     }
 
@@ -177,7 +183,6 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
                     }
                 }
 
-                Interlocked.Decrement(ref _queueLength);
                 await _workSignal.WaitAsync();
             }
             catch (Exception exception)
@@ -256,75 +261,50 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
     private double _previousError = 0; 
     private double _integralTerm = 0;
 
-    private ulong _queueLength = 0;
     private const int WorkerRemovalBackoffMs = 1000;
     private const int WorkerRemovalPeriodMs = 500;
+    private const int ControlSignalNegativeMaxCount = 10;
+
     private PeriodicTimer? _monitorTimer;
+    private int _controlSignalNegativeCount = 0;
     private DateTime _lastWorkerRemovalTime = DateTime.MinValue;
 
     private async Task PeriodicallyRemoveWorkers()
     {
-        _monitorTimer = new(TimeSpan.FromMilliseconds(WorkerRemovalPeriodMs));
+        var workerRemovalTimespan = TimeSpan.FromMilliseconds(WorkerRemovalPeriodMs);
+        _monitorTimer = new(workerRemovalTimespan);
 
         try
         {
             while (await _monitorTimer.WaitForNextTickAsync())
             {
-                double averageWaitingCount = _workers.Count > 0 ? _workers.Average(w => w.WaitingCount) : 0;
+                var averageWaitingCount = _workers.Count > 0 ? _workers.Average(w => w.WaitingCount) : 0;
 
-                const double TargetWaitingCount = 0; // Out target is a zero waiting count.
-                double error = TargetWaitingCount - averageWaitingCount;
+                var error = -averageWaitingCount; // Our target is 0 waiting count: 0 - avgWC = -avgWC
 
                 _integralTerm += error;
-                double derivativeTerm = error - _previousError;
+                var derivativeTerm = error - _previousError;
                 _previousError = error;
 
-                double controlSignal = _kp * error + _ki * _integralTerm + _kd * derivativeTerm;
+                var controlSignal = _kp * error + _ki * _integralTerm + _kd * derivativeTerm;
 
-                // Check if it's time to remove workers (respecting the backoff period).
-                if ((DateTime.Now - _lastWorkerRemovalTime).TotalMilliseconds > WorkerRemovalBackoffMs)
+                _controlSignalNegativeCount = controlSignal < 0 ? ++_controlSignalNegativeCount : 0;
+
+                if (_controlSignalNegativeCount > ControlSignalNegativeMaxCount &&
+                    (DateTime.Now - _lastWorkerRemovalTime).TotalMilliseconds > WorkerRemovalBackoffMs)
                 {
-                    // If the control signal is negative, it indicates excess workers.
-                    if (controlSignal < 0)
+                    var inactiveWorkers = _workers.Where(w => w.IsInactive).ToList();
+                    if (inactiveWorkers.Count > 0)
                     {
-                        var inactiveWorkers = _workers.Where(w => w.IsInactive).ToList();
-                        if (inactiveWorkers.Count > 0)
-                        {
-                            var worker = inactiveWorkers[Random.Shared.Next(inactiveWorkers.Count)];
-                            var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
+                        var worker = inactiveWorkers[Random.Shared.Next(inactiveWorkers.Count)];
+                        var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
 
-                            worker.Deactivate(new(DeactivationReasonCode.RuntimeRequested,
-                                $"Worker deactivated due to PID control: QueueLength {_queueLength}, Avg Waiting Count {averageWaitingCount}, Control Signal {controlSignal:F3}"),
-                                cancellation.Token);
+                        worker.Deactivate(new(DeactivationReasonCode.RuntimeRequested,
+                            "Worker deactivated due to inactivity."), cancellation.Token);
 
-                            _lastWorkerRemovalTime = DateTime.UtcNow;
-                        }
+                        _controlSignalNegativeCount = 0;
+                        _lastWorkerRemovalTime = DateTime.UtcNow;
                     }
-
-                    /*
-                     if (controlSignal < 0)
-                        {
-                            // Use IEnumerable<Worker> directly without materializing the list.
-                            var inactiveWorkers = _workers.Where(w => w.IsInactive);
-
-                            // Get the count of inactive workers without materializing the list.
-                            int inactiveCount = inactiveWorkers.Count();
-
-                            if (inactiveCount > 0)
-                            {
-                                // Select a random inactive worker without materializing the list.
-                                var worker = inactiveWorkers.ElementAt(Random.Shared.Next(inactiveCount));
-
-                                var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
-
-                                worker.Deactivate(new(DeactivationReasonCode.RuntimeRequested,
-                                    $"Worker deactivated due to PID control: QueueLength {_queueLength}, Avg Waiting Count {averageWaitingCount}, Control Signal {controlSignal:F3}"),
-                                    cancellation.Token);
-
-                                _lastWorkerRemovalTime = DateTime.UtcNow;
-                            }
-                        }
-                     */
                 }
             }
         }
@@ -333,6 +313,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
             // Ignore
         }
     }
+
 
     private ActivationData CreateWorker(object? message)
     {

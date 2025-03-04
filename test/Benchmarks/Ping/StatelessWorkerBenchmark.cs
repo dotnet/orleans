@@ -37,7 +37,7 @@ public class StatelessWorkerBenchmark : IDisposable
         where T : IProcessorGrain
         where H : BaseGrain<H>
     {
-        Console.WriteLine($"Executing benchmark for {typeof(H).Name}");
+        Console.WriteLine($"Executing benchmark for '{typeof(H).Name}' with cooldown factor = {BenchmarkConstants.CooldownFactor:F1}");
 
         using var cts = new CancellationTokenSource();
 
@@ -53,19 +53,30 @@ public class StatelessWorkerBenchmark : IDisposable
         var tasks = new List<Task>();
 
         const int ConcurrencyLevel = 100;
+        const double Lambda = 10.0d;
 
         for (var i = 0; i < ConcurrencyLevel; i++)
         {
+            // For a Poisson process with rate λ (tasks / sec in our case), the time between arrivals is
+            // exponentially distributed with density: f(t) = λe^(-λt), t >= 0; and the interarrival
+            // time can be generated as: Δt = -ln(U) / λ, where U is uniformly distributed on (0, 1)
+
+            var u = Random.Shared.NextDouble();
+            var delaySec = -Math.Log(u > 0 ? u : double.Epsilon) / Lambda;
+            var delayMs = (int)(1000 * delaySec);
+
+            await Task.Delay(delayMs);
             tasks.Add(grain.Process());
         }
 
         await Task.WhenAll(tasks);
 
-        var cooldownMs = Math.Ceiling(1.5 * BenchmarkStatics.ProcessDelayMs *
-            ((double)ConcurrencyLevel / BenchmarkStatics.MaxWorkersLimit));
+        var cooldownMs = Math.Ceiling(
+            BenchmarkConstants.CooldownFactor * BenchmarkConstants.ProcessDelayMs *
+            ((double)ConcurrencyLevel / BenchmarkConstants.MaxWorkersLimit));
 
         var cooldownPeriod = TimeSpan.FromMilliseconds(cooldownMs);
-        Console.WriteLine($"Waiting for cooldown period {cooldownPeriod}\n");
+        Console.WriteLine($"\nWaiting {cooldownPeriod} for cooldown\n");
 
         await Task.Delay(cooldownPeriod);
 
@@ -82,17 +93,18 @@ public class StatelessWorkerBenchmark : IDisposable
 
         BaseGrain<H>.Stop();
 
-        Console.WriteLine($"{typeof(H).Name} Stats:");
+        Console.WriteLine("Stats:");
         Console.WriteLine($" Active Workers:  {BaseGrain<H>.GetActiveWorkers()}");
         Console.WriteLine($" Maximum Workers: {BaseGrain<H>.GetMaxActiveWorkers()}");
-        Console.WriteLine($" Average Workers: {BaseGrain<H>.GetAverageActiveWorkers():F2}");
-        Console.Write("\n\n");
+        Console.WriteLine($" Average Workers: {BaseGrain<H>.GetAverageActiveWorkers()}");
+        Console.Write("\n---------------------------------------------------------------------\n");
     }
 
-    public static class BenchmarkStatics
+    public static class BenchmarkConstants
     {
         public const int MaxWorkersLimit = 10;
         public const int ProcessDelayMs = 1000;
+        public const double CooldownFactor = 1.5;
     }
 
     public interface IProcessorGrain : IGrainWithIntegerKey
@@ -103,10 +115,10 @@ public class StatelessWorkerBenchmark : IDisposable
     public interface IAdaptiveGrain : IProcessorGrain { }
     public interface IMontonicGrain : IProcessorGrain { }
 
-    [StatelessWorker(BenchmarkStatics.MaxWorkersLimit, StatelessWorkerOperatingMode.Adaptive)]
+    [StatelessWorker(BenchmarkConstants.MaxWorkersLimit, StatelessWorkerOperatingMode.Adaptive)]
     public class SWAdaptiveGrain : BaseGrain<SWAdaptiveGrain>, IAdaptiveGrain { }
 
-    [StatelessWorker(BenchmarkStatics.MaxWorkersLimit, StatelessWorkerOperatingMode.Monotonic)]
+    [StatelessWorker(BenchmarkConstants.MaxWorkersLimit, StatelessWorkerOperatingMode.Monotonic)]
     public class SWMontonicGrain : BaseGrain<SWMontonicGrain>, IMontonicGrain { }
 
     public abstract class BaseGrain<T> : Grain, IProcessorGrain where T : BaseGrain<T>
@@ -148,7 +160,7 @@ public class StatelessWorkerBenchmark : IDisposable
             return Task.CompletedTask;
         }
 
-        public Task Process() => Task.Delay(BenchmarkStatics.ProcessDelayMs);
+        public Task Process() => Task.Delay(BenchmarkConstants.ProcessDelayMs);
 
         public static void UpdateStats()
         {
@@ -183,9 +195,10 @@ public class StatelessWorkerBenchmark : IDisposable
         public static double GetAverageActiveWorkers()
         {
             var totalTicks = Volatile.Read(ref _totalWorkerTicks);
-            double elapsedTicks = Watch.Elapsed.Ticks;
+            var elapsedTicks = Watch.Elapsed.Ticks;
+            var result = elapsedTicks == 0 ? 0 : (double)totalTicks / elapsedTicks;
 
-            return elapsedTicks == 0 ? 0 : totalTicks / elapsedTicks;
+            return Math.Round(result, MidpointRounding.ToEven);
         }
     }
 }
