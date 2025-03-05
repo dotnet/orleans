@@ -37,7 +37,7 @@ public class StatelessWorkerBenchmark : IDisposable
         where T : IProcessorGrain
         where H : BaseGrain<H>
     {
-        Console.WriteLine($"Executing benchmark for '{typeof(H).Name}' with cooldown factor = {BenchmarkConstants.CooldownFactor:F1}");
+        Console.WriteLine($"Executing benchmark for {typeof(H).Name}");
 
         using var cts = new CancellationTokenSource();
 
@@ -71,14 +71,25 @@ public class StatelessWorkerBenchmark : IDisposable
 
         await Task.WhenAll(tasks);
 
-        var cooldownMs = Math.Ceiling(
-            BenchmarkConstants.CooldownFactor * BenchmarkConstants.ProcessDelayMs *
-            ((double)ConcurrencyLevel / BenchmarkConstants.MaxWorkersLimit));
+        const int CooldownCycles = 5;
 
-        var cooldownPeriod = TimeSpan.FromMilliseconds(cooldownMs);
-        Console.WriteLine($"\nWaiting {cooldownPeriod} for cooldown\n");
+        for (var i = 1; i <= CooldownCycles; i++)
+        {
+            var cooldownCycle = $"({i}/{CooldownCycles})";
 
-        await Task.Delay(cooldownPeriod);
+            Console.WriteLine($"\nWaiting for cooldown {cooldownCycle}\n");
+
+            var cooldownMs = (int)Math.Ceiling(BenchmarkConstants.ProcessDelayMs *
+               ((double)ConcurrencyLevel / BenchmarkConstants.MaxWorkersLimit));
+
+            await Task.Delay(cooldownMs);
+
+            Console.WriteLine($"Stats {cooldownCycle}:");
+            Console.WriteLine($" Active Workers:  {BaseGrain<H>.GetActiveWorkers()}");
+            Console.WriteLine($" Average Workers: {BaseGrain<H>.GetAverageActiveWorkers()}");
+            Console.WriteLine($" Maximum Workers: {BaseGrain<H>.GetMaxActiveWorkers()}");
+            Console.Write("\n---------------------------------------------------------------------\n");
+        }
 
         cts.Cancel();
 
@@ -92,19 +103,12 @@ public class StatelessWorkerBenchmark : IDisposable
         }
 
         BaseGrain<H>.Stop();
-
-        Console.WriteLine("Stats:");
-        Console.WriteLine($" Active Workers:  {BaseGrain<H>.GetActiveWorkers()}");
-        Console.WriteLine($" Average Workers: {BaseGrain<H>.GetAverageActiveWorkers()}");
-        Console.WriteLine($" Maximum Workers: {BaseGrain<H>.GetMaxActiveWorkers()}");
-        Console.Write("\n---------------------------------------------------------------------\n");
     }
 
     public static class BenchmarkConstants
     {
         public const int MaxWorkersLimit = 10;
         public const int ProcessDelayMs = 1000;
-        public const double CooldownFactor = 1.5;
     }
 
     public interface IProcessorGrain : IGrainWithIntegerKey
