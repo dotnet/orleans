@@ -1,4 +1,4 @@
-﻿using System.Threading.Channels;
+using System.Threading.Channels;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -17,6 +17,11 @@ namespace UnitTests.Grains
             {
                 if (i == errorIndex)
                 {
+                    if (errorMessage == "cancel")
+                    {
+                        throw new OperationCanceledException(errorMessage);
+                    }
+
                     throw new InvalidOperationException(errorMessage);
                 }
 

@@ -1,4 +1,4 @@
-﻿namespace UnitTests.GrainInterfaces
+namespace UnitTests.GrainInterfaces
 {
     /// <summary>
     /// A grain which returns IAsyncEnumerable
