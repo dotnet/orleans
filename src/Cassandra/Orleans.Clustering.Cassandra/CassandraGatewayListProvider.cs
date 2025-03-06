@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Cassandra;
@@ -57,8 +58,54 @@ internal sealed class CassandraGatewayListProvider : IGatewayListProvider
 
         _queries = await OrleansQueries.CreateInstance(_session);
 
-        await _session.ExecuteAsync(_queries.EnsureTableExists(_ttlSeconds));
-        await _session.ExecuteAsync(_queries.EnsureIndexExists);
+        if (await DoesTableAlreadyExistAsync())
+        {
+            return;
+        }
+
+        try
+        {
+            await MakeTableAsync(true);
+        }
+        catch (WriteTimeoutException) // If there's contention on table creation, backoff a bit and try once more
+        {
+            // Randomize the delay to avoid contention, preferring that more instances will wait longer
+            var nextSingle = Random.Shared.NextSingle();
+            await Task.Delay(TimeSpan.FromSeconds(10) * Math.Sqrt(nextSingle));
+
+            if (await DoesTableAlreadyExistAsync())
+            {
+                return;
+            }
+
+            await MakeTableAsync(true);
+        }
+    }
+
+
+
+    private async Task MakeTableAsync(bool tryInitTableVersion)
+    {
+        await Session.ExecuteAsync(Queries.EnsureTableExists(_ttlSeconds));
+        await Session.ExecuteAsync(Queries.EnsureIndexExists);
+
+        if (!tryInitTableVersion)
+            return;
+
+        await Session.ExecuteAsync(await Queries.InsertMembershipVersion(_identifier));
+    }
+
+    private async Task<bool> DoesTableAlreadyExistAsync()
+    {
+        try
+        {
+            var resultSet = await Session.ExecuteAsync(Queries.CheckIfTableExists(Session.Keyspace));
+            return resultSet.Any();
+        }
+        catch (UnauthorizedException)
+        {
+            return false;
+        }
     }
 
     async Task<IList<Uri>> IGatewayListProvider.GetGateways()

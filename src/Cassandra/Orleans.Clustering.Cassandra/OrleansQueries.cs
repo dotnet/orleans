@@ -44,10 +44,16 @@ internal sealed class OrleansQueries
 
     public ConsistencyLevel MembershipReadConsistencyLevel { get; set; }
 
-    public IStatement CheckIfTableExists(string keyspace) =>
+    public IStatement CheckIfClusterVersionExists(string clusterIdentifier, ConsistencyLevel consistencyLevel) =>
+        new SimpleStatement(
+                $"SELECT version FROM membership WHERE partition_key = '{clusterIdentifier}';")
+            .SetConsistencyLevel(consistencyLevel);
+
+    public IStatement CheckIfTableExists(string keyspace, ConsistencyLevel consistencyLevel) =>
         new SimpleStatement(
                 $"SELECT * FROM system_schema.tables WHERE keyspace_name = '{keyspace}' AND table_name = 'membership';")
-            .SetConsistencyLevel(ConsistencyLevel.LocalOne);
+            .SetConsistencyLevel(consistencyLevel);
+
     /// <remarks>
     /// In Cassandra, a table-level <c>default_time_to_live</c> of <c>0</c> is treated as <c>disabled</c>.
     /// <para/>

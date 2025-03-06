@@ -12,6 +12,7 @@ using Xunit.Abstractions;
 namespace Tester.Cassandra.Clustering;
 
 [TestCategory("Cassandra"), TestCategory("Clustering")]
+[Collection("Cassandra")]
 public sealed class CassandraClusteringTableTests : IClassFixture<CassandraContainer>
 {
     private readonly CassandraContainer _cassandraContainer;
@@ -630,8 +631,6 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         string clusterId,
         bool cassandraTtl = false)
     {
-        var session = await CreateSession();
-
         var services = new ServiceCollection()
             .AddSingleton<CassandraClusteringTable>()
             .AddSingleton<CassandraGatewayListProvider>()
