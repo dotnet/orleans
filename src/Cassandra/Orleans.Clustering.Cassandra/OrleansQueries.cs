@@ -197,9 +197,10 @@ internal sealed class OrleansQueries
             IF
             	version = :expected_version;
             """,
+            // This is ignored because we're creating a LWT
             MembershipWriteConsistencyLevel);
 
-        return _updateIAmAliveWithTtlPreparedStatement.Bind(new
+        BoundStatement updateIAmAliveTimeWithTtL = _updateIAmAliveWithTtlPreparedStatement.Bind(new
         {
             partition_key = clusterIdentifier,
             // The same version still needs to be written, to update its cell-level TTL
@@ -217,6 +218,10 @@ internal sealed class OrleansQueries
             // But we still check that the version was the same during the update so we don't stomp on another update
             expected_version = existingVersion.Version,
         });
+
+        // To improve performance, we allow IAmAlive updates to be LocalSerial
+        updateIAmAliveTimeWithTtL.SetSerialConsistencyLevel(ConsistencyLevel.LocalSerial);
+        return updateIAmAliveTimeWithTtL;
     }
 
     public async ValueTask<IStatement> DeleteMembershipEntry(string clusterIdentifier, MembershipEntry membershipEntry)
