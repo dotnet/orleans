@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -394,13 +394,17 @@ namespace Orleans.GrainDirectory.AzureStorage
             const string operation = "ReadSingleTableEntryAsync";
             var startTime = DateTime.UtcNow;
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} table {TableName} partitionKey {PartitionKey} rowKey {RowKey}", operation, TableName, partitionKey, rowKey);
-            T retrievedResult = default;
 
             try
             {
                 try
                 {
-                    retrievedResult = await Table.GetEntityAsync<T>(partitionKey, rowKey);
+                    var result = await Table.GetEntityIfExistsAsync<T>(partitionKey, rowKey);
+                    if (result.HasValue)
+                    {
+                        //The ETag of data is needed in further operations.
+                        return (result.Value, result.Value.ETag.ToString());
+                    }
                 }
                 catch (RequestFailedException exception)
                 {
@@ -410,8 +414,6 @@ namespace Orleans.GrainDirectory.AzureStorage
                     }
                 }
 
-                //The ETag of data is needed in further operations.
-                if (retrievedResult != null) return (retrievedResult, retrievedResult.ETag.ToString());
                 if (Logger.IsEnabled(LogLevel.Debug)) Logger.LogDebug("Could not find table entry for PartitionKey={PartitionKey} RowKey={RowKey}", partitionKey, rowKey);
                 return (default, default);  // No data
             }
