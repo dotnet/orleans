@@ -12,7 +12,7 @@ namespace Orleans.Runtime
     internal sealed class StatelessWorkerPlacement : PlacementStrategy
     {
         private const string MaxLocalPropertyKey = "max-local-instances";
-        private const string OperatingModePropertyKey = "sw-operating-mode";
+        private const string ProactiveCollectionPropertyKey = "proactive-removal";
 
         private static readonly int DefaultMaxStatelessWorkers = Environment.ProcessorCount;
 
@@ -26,7 +26,7 @@ namespace Orleans.Runtime
         public int MaxLocal { get; private set; }
 
         [Id(1)]
-        public StatelessWorkerOperatingMode OperatingMode { get; private set; } 
+        public bool ProactiveWorkerCollection { get; private set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StatelessWorkerPlacement"/> class.
@@ -34,23 +34,26 @@ namespace Orleans.Runtime
         /// <param name="maxLocal">
         /// The maximum number of local instances which can be simultaneously active for a given grain.
         /// </param>
-        internal StatelessWorkerPlacement(int maxLocal, StatelessWorkerOperatingMode mode)
+        /// <param name="proactiveWorkerCollection">
+        /// Wether to proactively collect workers if they are inactive, or let them be collected by the activation collector.
+        /// </param>
+        internal StatelessWorkerPlacement(int maxLocal, bool proactiveWorkerCollection)
         {
             // If maxLocal was not specified on the StatelessWorkerAttribute,
             // we will use the defaultMaxStatelessWorkers, which is System.Environment.ProcessorCount.
             this.MaxLocal = maxLocal > 0 ? maxLocal : DefaultMaxStatelessWorkers;
-            this.OperatingMode = mode;
+            this.ProactiveWorkerCollection = proactiveWorkerCollection;
         }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StatelessWorkerPlacement"/> class.
         /// </summary>
-        public StatelessWorkerPlacement() : this(-1, StatelessWorkerOperatingMode.Monotonic)
+        public StatelessWorkerPlacement() : this(-1, false)
         {
         }
 
         /// <inheritdoc/>
-        public override string ToString() => $"StatelessWorkerPlacement(max={MaxLocal} | (mode={OperatingMode}))";
+        public override string ToString() => $"StatelessWorkerPlacement(max={MaxLocal} | (proactive={ProactiveWorkerCollection}))";
 
         /// <inheritdoc/>
         public override void Initialize(GrainProperties properties)
@@ -66,12 +69,12 @@ namespace Orleans.Runtime
                 }
             }
 
-            if (properties.Properties.TryGetValue(OperatingModePropertyKey, out var modeValue) &&
-                !string.IsNullOrWhiteSpace(modeValue))
+            if (properties.Properties.TryGetValue(ProactiveCollectionPropertyKey, out var proactive) &&
+                !string.IsNullOrWhiteSpace(proactive))
             {
-                if (byte.TryParse(modeValue, out var mode))
+                if (bool.TryParse(proactive, out var isProactive))
                 {
-                    OperatingMode = (StatelessWorkerOperatingMode)mode;
+                    ProactiveWorkerCollection = isProactive;
                 }
             }
         }
@@ -80,7 +83,7 @@ namespace Orleans.Runtime
         public override void PopulateGrainProperties(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
             properties[MaxLocalPropertyKey] = MaxLocal.ToString(CultureInfo.InvariantCulture);
-            properties[OperatingModePropertyKey] = ((byte)OperatingMode).ToString();
+            properties[ProactiveCollectionPropertyKey] = ProactiveWorkerCollection.ToString();
 
             base.PopulateGrainProperties(services, grainClass, grainType, properties);
         }
