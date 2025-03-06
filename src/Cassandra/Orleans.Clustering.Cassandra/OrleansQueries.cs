@@ -44,6 +44,10 @@ internal sealed class OrleansQueries
 
     public ConsistencyLevel MembershipReadConsistencyLevel { get; set; }
 
+    public IStatement CheckIfTableExists(string keyspace) =>
+        new SimpleStatement(
+                $"SELECT * FROM system_schema.tables WHERE keyspace_name = '{keyspace}' AND table_name = 'membership';")
+            .SetConsistencyLevel(ConsistencyLevel.LocalOne);
     /// <remarks>
     /// In Cassandra, a table-level <c>default_time_to_live</c> of <c>0</c> is treated as <c>disabled</c>.
     /// <para/>
@@ -71,7 +75,7 @@ internal sealed class OrleansQueries
           WITH compression = { 'class' : 'LZ4Compressor', 'enabled' : true }
             AND default_time_to_live = {{defaultTimeToLiveSeconds.GetValueOrDefault(0)}};
           """);
-
+    
     public IStatement EnsureIndexExists => new SimpleStatement("""
             CREATE INDEX IF NOT EXISTS ix_membership_status ON membership(status);
             """);

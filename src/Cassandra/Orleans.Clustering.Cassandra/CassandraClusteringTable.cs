@@ -49,13 +49,52 @@ internal sealed class CassandraClusteringTable : IMembershipTable
 
         _queries = await OrleansQueries.CreateInstance(_session);
 
-        await _session.ExecuteAsync(_queries.EnsureTableExists(_ttlSeconds));
-        await _session.ExecuteAsync(_queries.EnsureIndexExists);
+        if (await DoesTableAlreadyExistAsync())
+        {
+            return;
+        }
+
+        try
+        {
+            await MakeTableAsync(tryInitTableVersion);
+        }
+        catch (WriteTimeoutException) // If there's contention on table creation, backoff a bit and try once more
+        {
+            // Randomize the delay to avoid contention, preferring that more instances will wait longer
+            var nextSingle = Random.Shared.NextSingle();
+            await Task.Delay(TimeSpan.FromSeconds(10) * nextSingle * nextSingle);
+
+            if (await DoesTableAlreadyExistAsync())
+            {
+                return;
+            }
+
+            await MakeTableAsync(tryInitTableVersion);
+        }
+    }
+
+    private async Task MakeTableAsync(bool tryInitTableVersion)
+    {
+        await Session.ExecuteAsync(Queries.EnsureTableExists(_ttlSeconds));
+        await Session.ExecuteAsync(Queries.EnsureIndexExists);
 
         if (!tryInitTableVersion)
             return;
 
-        await _session.ExecuteAsync(await _queries.InsertMembershipVersion(_identifier));
+        await Session.ExecuteAsync(await Queries.InsertMembershipVersion(_identifier));
+    }
+
+    private async Task<bool> DoesTableAlreadyExistAsync()
+    {
+        try
+        {
+            var resultSet = await Session.ExecuteAsync(Queries.CheckIfTableExists(Session.Keyspace));
+            return resultSet.Any();
+        }
+        catch (UnauthorizedException)
+        {
+            return false;
+        }
     }
 
     async Task IMembershipTable.DeleteMembershipTableEntries(string clusterId)
