@@ -99,7 +99,12 @@ internal sealed class CassandraGatewayListProvider : IGatewayListProvider
     {
         try
         {
-            var resultSet = await Session.ExecuteAsync(Queries.CheckIfTableExists(Session.Keyspace));
+            var resultSet = await Session.ExecuteAsync(Queries.CheckIfTableExists(Session.Keyspace, ConsistencyLevel.LocalOne));
+            return resultSet.Any();
+        }
+        catch (UnavailableException)
+        {
+            var resultSet = await Session.ExecuteAsync(Queries.CheckIfTableExists(Session.Keyspace, ConsistencyLevel.One));
             return resultSet.Any();
         }
         catch (UnauthorizedException)
