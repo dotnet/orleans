@@ -40,6 +40,88 @@ internal sealed class OrleansQueries
         Session = session;
     }
 
+    internal async Task EnsureTableExistsAsync(int? ttl)
+    {
+        if (!await DoesTableAlreadyExistAsync())
+        {
+            try
+            {
+                await MakeTableAsync(ttl);
+            }
+            catch (WriteTimeoutException) // If there's contention on table creation, backoff a bit and try once more
+            {
+                // Randomize the delay to avoid contention, preferring that more instances will wait longer
+                var nextSingle = Random.Shared.NextSingle();
+                await Task.Delay(TimeSpan.FromSeconds(20) * Math.Sqrt(nextSingle));
+
+                if (!await DoesTableAlreadyExistAsync())
+                {
+                    await MakeTableAsync(ttl);
+                }
+            }
+        }
+    }
+
+    internal async Task EnsureClusterVersionExistsAsync(string clusterIdentifier)
+    {
+        if (!await DoesClusterVersionAlreadyExistAsync(clusterIdentifier))
+        {
+            try
+            {
+                await Session.ExecuteAsync(await InsertMembershipVersion(clusterIdentifier));
+            }
+            catch (WriteTimeoutException) // If there's contention on table creation, backoff a bit and try once more
+            {
+                // Randomize the delay to avoid contention, preferring that more instances will wait longer
+                var nextSingle = Random.Shared.NextSingle();
+                await Task.Delay(TimeSpan.FromSeconds(20) * Math.Sqrt(nextSingle));
+
+                if (!await DoesClusterVersionAlreadyExistAsync(clusterIdentifier))
+                {
+                    await Session.ExecuteAsync(await InsertMembershipVersion(clusterIdentifier));
+                }
+            }
+        }
+    }
+
+    private async Task<bool> DoesClusterVersionAlreadyExistAsync(string clusterIdentifier)
+    {
+        try
+        {
+            var resultSet = await Session.ExecuteAsync(CheckIfClusterVersionExists(clusterIdentifier, ConsistencyLevel.LocalOne));
+            return resultSet.Any();
+        }
+        catch (UnavailableException)
+        {
+            var resultSet = await Session.ExecuteAsync(CheckIfClusterVersionExists(clusterIdentifier, ConsistencyLevel.One));
+            return resultSet.Any();
+        }
+    }
+
+    private async Task<bool> DoesTableAlreadyExistAsync()
+    {
+        try
+        {
+            var resultSet = await Session.ExecuteAsync(CheckIfTableExists(Session.Keyspace, ConsistencyLevel.LocalOne));
+            return resultSet.Any();
+        }
+        catch (UnavailableException)
+        {
+            var resultSet = await Session.ExecuteAsync(CheckIfTableExists(Session.Keyspace, ConsistencyLevel.One));
+            return resultSet.Any();
+        }
+        catch (UnauthorizedException)
+        {
+            return false;
+        }
+    }
+
+    private async Task MakeTableAsync(int? ttlSeconds)
+    {
+        await Session.ExecuteAsync(EnsureTableExists(ttlSeconds));
+        await Session.ExecuteAsync(EnsureIndexExists);
+    }
+
     public ConsistencyLevel MembershipWriteConsistencyLevel { get; set; }
 
     public ConsistencyLevel MembershipReadConsistencyLevel { get; set; }
