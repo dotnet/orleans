@@ -40,7 +40,7 @@ internal sealed class OrleansQueries
         Session = session;
     }
 
-    internal async Task EnsureTableExistsAsync(int? ttl)
+    internal async Task EnsureTableExistsAsync(TimeSpan maxRetryDelay, int? ttl)
     {
         if (!await DoesTableAlreadyExistAsync())
         {
@@ -52,7 +52,7 @@ internal sealed class OrleansQueries
             {
                 // Randomize the delay to avoid contention, preferring that more instances will wait longer
                 var nextSingle = Random.Shared.NextSingle();
-                await Task.Delay(TimeSpan.FromSeconds(20) * Math.Sqrt(nextSingle));
+                await Task.Delay(maxRetryDelay * Math.Sqrt(nextSingle));
 
                 if (!await DoesTableAlreadyExistAsync())
                 {
@@ -62,7 +62,7 @@ internal sealed class OrleansQueries
         }
     }
 
-    internal async Task EnsureClusterVersionExistsAsync(string clusterIdentifier)
+    internal async Task EnsureClusterVersionExistsAsync(TimeSpan maxRetryDelay, string clusterIdentifier)
     {
         if (!await DoesClusterVersionAlreadyExistAsync(clusterIdentifier))
         {
@@ -74,7 +74,7 @@ internal sealed class OrleansQueries
             {
                 // Randomize the delay to avoid contention, preferring that more instances will wait longer
                 var nextSingle = Random.Shared.NextSingle();
-                await Task.Delay(TimeSpan.FromSeconds(20) * Math.Sqrt(nextSingle));
+                await Task.Delay(maxRetryDelay * Math.Sqrt(nextSingle));
 
                 if (!await DoesClusterVersionAlreadyExistAsync(clusterIdentifier))
                 {

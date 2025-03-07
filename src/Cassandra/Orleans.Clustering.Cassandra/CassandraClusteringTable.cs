@@ -49,10 +49,10 @@ internal sealed class CassandraClusteringTable : IMembershipTable
 
         _queries = await OrleansQueries.CreateInstance(_session);
 
-        await _queries.EnsureTableExistsAsync(_ttlSeconds);
+        await _queries.EnsureTableExistsAsync(_options.InitializeRetryMaxDelay, _ttlSeconds);
 
         if (tryInitTableVersion)
-            await _queries.EnsureClusterVersionExistsAsync(_identifier);
+            await _queries.EnsureClusterVersionExistsAsync(_options.InitializeRetryMaxDelay, _identifier);
     }
 
     async Task IMembershipTable.DeleteMembershipTableEntries(string clusterId)
