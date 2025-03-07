@@ -73,7 +73,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
                 {
                     if (!_shutdownCts.IsCancellationRequested)
                     {
-                        _logger.LogError(exception, "Error processing membership updates.");
+                        LogErrorProcessingMembershipUpdates(exception);
                     }
                 }
             }
@@ -89,4 +89,10 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         _shutdownCts.Cancel();
         await _runTask.SuppressThrowing();
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error processing membership updates."
+    )]
+    private partial void LogErrorProcessingMembershipUpdates(Exception exception);
 }

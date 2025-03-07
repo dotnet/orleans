@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Scheduler
     /// A single-concurrency, in-order task scheduler for per-activation work scheduling.
     /// </summary>
     [DebuggerDisplay("ActivationTaskScheduler-{myId} RunQueue={workerGroup.WorkItemCount}")]
-    internal sealed class ActivationTaskScheduler : TaskScheduler
+    internal sealed partial class ActivationTaskScheduler : TaskScheduler
     {
         private readonly ILogger logger;
 
@@ -32,7 +32,7 @@ namespace Orleans.Runtime.Scheduler
 #if EXTRA_STATS
             turnsExecutedStatistic = CounterStatistic.FindOrCreate(name + ".TasksExecuted");
 #endif
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Created {TaskScheduler} with GrainContext={GrainContext}", this, workerGroup.GrainContext);
+            LogCreatedTaskScheduler(this, workerGroup.GrainContext);
         }
 
         /// <summary>Gets an enumerable of the tasks currently scheduled on this scheduler.</summary>
@@ -136,5 +136,11 @@ namespace Orleans.Runtime.Scheduler
         }
 
         public override string ToString() => $"{GetType().Name}-{myId}:Queued={workerGroup.ExternalWorkItemCount}";
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Created {TaskScheduler} with GrainContext={GrainContext}"
+        )]
+        private partial void LogCreatedTaskScheduler(ActivationTaskScheduler taskScheduler, IGrainContext grainContext);
     }
 }

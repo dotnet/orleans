@@ -17,7 +17,7 @@ namespace Orleans.Runtime
     /// Made public for GrainService to inherit from it.
     /// Can be turned to internal after a refactoring that would remove the inheritance relation.
     /// </summary>
-    public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IGrainContext, IGrainExtensionBinder, ISpanFormattable, IDisposable, IGrainTimerRegistry
+    public abstract partial class SystemTarget : ISystemTarget, ISystemTargetBase, IGrainContext, IGrainExtensionBinder, ISpanFormattable, IDisposable, IGrainTimerRegistry
     {
         private readonly SystemTargetGrainId id;
         private readonly HashSet<IGrainTimer> _timers = [];
@@ -328,7 +328,7 @@ namespace Orleans.Runtime
                     }
 
                 default:
-                    this.logger.LogError((int)ErrorCode.Runtime_Error_100097, "Invalid message: {Message}", msg);
+                    LogInvalidMessage(this.logger, msg);
                     break;
             }
         }
@@ -398,5 +398,12 @@ namespace Orleans.Runtime
                 void ThrowAccessViolation(IGrainContext currentContext) => throw new InvalidOperationException($"Access violation: attempt to access context '{this}' from different context, '{currentContext}'.");
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)ErrorCode.Runtime_Error_100097,
+            Message = "Invalid message: {Message}"
+        )]
+        private static partial void LogInvalidMessage(ILogger logger, Message Message);
     }
 }
