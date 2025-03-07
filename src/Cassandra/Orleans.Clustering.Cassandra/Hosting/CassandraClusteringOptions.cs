@@ -27,6 +27,14 @@ public class CassandraClusteringOptions
     /// </remarks>
     public bool UseCassandraTtl { get; set; }
 
+    /// <summary>
+    /// Specifies the maximum amount of time to wait after encountering
+    /// contention during initialization before retrying.
+    /// </summary>
+    /// <remarks>This is generally only encountered with large numbers of silos connecting
+    /// in a short time period and using multi-datacenter Cassandara clusters</remarks>
+    public TimeSpan InitializeRetryMaxDelay { get; set; } = TimeSpan.FromSeconds(20);
+
     internal int? GetCassandraTtlSeconds(ClusterMembershipOptions clusterMembershipOptions) =>
         UseCassandraTtl
             ? Convert.ToInt32(
