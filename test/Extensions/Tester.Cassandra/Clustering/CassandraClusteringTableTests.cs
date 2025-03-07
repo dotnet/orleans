@@ -283,6 +283,21 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     }
 
     [Fact]
+    public async Task MembershipTable_ManyMembershipTables()
+    {
+        var tasks = new List<Task>();
+        for (var i = 0; i < 50; i++)
+        {
+            tasks.Add(Task.Run(async () =>
+            {
+                await Task.Yield();
+                var (membershipTable, _) = await CreateNewMembershipTableAsync();
+            }));
+        }
+        await Task.WhenAll(tasks);
+    }
+
+    [Fact]
     public async Task MembershipTable_UpdateRowInParallel()
     {
         var (membershipTable, _) = await CreateNewMembershipTableAsync();
