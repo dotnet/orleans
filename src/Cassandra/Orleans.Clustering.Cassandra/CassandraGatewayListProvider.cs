@@ -65,7 +65,7 @@ internal sealed class CassandraGatewayListProvider : IGatewayListProvider
 
         try
         {
-            await MakeTableAsync(true);
+            await MakeTableAsync();
         }
         catch (WriteTimeoutException) // If there's contention on table creation, backoff a bit and try once more
         {
@@ -78,21 +78,16 @@ internal sealed class CassandraGatewayListProvider : IGatewayListProvider
                 return;
             }
 
-            await MakeTableAsync(true);
+            await MakeTableAsync();
         }
     }
 
 
 
-    private async Task MakeTableAsync(bool tryInitTableVersion)
+    private async Task MakeTableAsync()
     {
         await Session.ExecuteAsync(Queries.EnsureTableExists(_ttlSeconds));
         await Session.ExecuteAsync(Queries.EnsureIndexExists);
-
-        if (!tryInitTableVersion)
-            return;
-
-        await Session.ExecuteAsync(await Queries.InsertMembershipVersion(_identifier));
     }
 
     private async Task<bool> DoesTableAlreadyExistAsync()
