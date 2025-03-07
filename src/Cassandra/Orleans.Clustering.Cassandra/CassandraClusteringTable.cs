@@ -49,82 +49,10 @@ internal sealed class CassandraClusteringTable : IMembershipTable
 
         _queries = await OrleansQueries.CreateInstance(_session);
 
-        if (!await DoesTableAlreadyExistAsync())
-        {
-            try
-            {
-                await MakeTableAsync();
-            }
-            catch (WriteTimeoutException) // If there's contention on table creation, backoff a bit and try once more
-            {
-                // Randomize the delay to avoid contention, preferring that more instances will wait longer
-                var nextSingle = Random.Shared.NextSingle();
-                await Task.Delay(TimeSpan.FromSeconds(20) * Math.Sqrt(nextSingle));
+        await _queries.EnsureTableExistsAsync(_ttlSeconds);
 
-                if (!await DoesTableAlreadyExistAsync())
-                {
-                    await MakeTableAsync();
-                }
-            }
-        }
-
-        
-        if (tryInitTableVersion && !await DoesClusterVersionAlreadyExistAsync(_identifier))
-        {
-            try
-            {
-                await Session.ExecuteAsync(await Queries.InsertMembershipVersion(_identifier));
-            }
-            catch (WriteTimeoutException) // If there's contention on table creation, backoff a bit and try once more
-            {
-                // Randomize the delay to avoid contention, preferring that more instances will wait longer
-                var nextSingle = Random.Shared.NextSingle();
-                await Task.Delay(TimeSpan.FromSeconds(20) * Math.Sqrt(nextSingle));
-
-                if (!await DoesClusterVersionAlreadyExistAsync(_identifier))
-                {
-                    await Session.ExecuteAsync(await Queries.InsertMembershipVersion(_identifier));
-                }
-            }
-        }
-    }
-
-    private async Task MakeTableAsync()
-    {
-        await Session.ExecuteAsync(Queries.EnsureTableExists(_ttlSeconds));
-        await Session.ExecuteAsync(Queries.EnsureIndexExists);
-    }
-
-    private async Task<bool> DoesTableAlreadyExistAsync()
-    {
-        try
-        {
-            var resultSet = await Session.ExecuteAsync(Queries.CheckIfTableExists(Session.Keyspace, ConsistencyLevel.LocalOne));
-            return resultSet.Any();
-        }
-        catch (UnavailableException)
-        {
-            var resultSet = await Session.ExecuteAsync(Queries.CheckIfTableExists(Session.Keyspace, ConsistencyLevel.One));
-            return resultSet.Any();
-        }
-        catch (UnauthorizedException)
-        {
-            return false;
-        }
-    }
-
-    private async Task<bool> DoesClusterVersionAlreadyExistAsync(string clusterIdentifier)
-    {
-        try
-        {
-            var resultSet = await Session.ExecuteAsync(Queries.CheckIfClusterVersionExists(clusterIdentifier, ConsistencyLevel.LocalOne));
-            return resultSet.Any();
-        }
-        catch (UnavailableException)
-        {
-            var resultSet = await Session.ExecuteAsync(Queries.CheckIfClusterVersionExists(clusterIdentifier, ConsistencyLevel.One));
-            return resultSet.Any();
-        }
+        if (tryInitTableVersion)
+            await _queries.EnsureClusterVersionExistsAsync(_identifier);
     }
 
     async Task IMembershipTable.DeleteMembershipTableEntries(string clusterId)
