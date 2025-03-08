@@ -17,7 +17,8 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
     private readonly GrainTypeSharedContext _shared;
     private readonly IGrainContextActivator _innerActivator;
     private readonly int _maxWorkers;
-    private readonly List<ActivationData> _workers = new();
+    private readonly WorkerCollector? _workerCollector;
+    private readonly List<ActivationData> _workers = [];
     private readonly ConcurrentQueue<(WorkItemType Type, object State)> _workItems = new();
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = false };
 
@@ -29,13 +30,6 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
     /// be useful.
     /// </summary>
     private readonly Task _messageLoopTask;
-    /// <summary>
-    /// The <see cref="Task"/> representing the <see cref="PeriodicallyCollectWorkers"/> invocation.
-    /// This is written once but never otherwise accessed. The purpose of retaining this field is for
-    /// debugging, where being able to identify the message loop task corresponding to an activation can
-    /// be useful.
-    /// </summary>
-    private readonly Task? _workerCollectionlTask;
 #pragma warning restore IDE0052 // Remove unread private members
 
     private GrainReference? _grainReference;
@@ -56,7 +50,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
 
         if (strategy.ProactiveWorkerCollection)
         {
-            _workerCollectionlTask = PeriodicallyCollectWorkers();
+            _workerCollector = new(this);
         }
     }
 
@@ -253,115 +247,6 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         }
     }
 
-    private double _previousError = 0; 
-    private double _integralTerm = 0;
-
-    private const double Kp = 0.433;
-    private const double Ki = 0.468;
-    private const double Kd = 0.480;
-
-    private const int WorkerRemovalBackoffMs = 1000;
-    private const int WorkerRemovalPeriodMs = 500;
-    private const int ControlSignalNegativeMaxCount = 10;
-
-    private PeriodicTimer? _monitorTimer;
-    private int _controlSignalNegativeCount = 0;
-    private DateTime _lastWorkerRemovalTime = DateTime.MinValue;
-
-    private void TriggerWorkerRemoval()
-    {
-        try
-        {
-            var averageWaitingCount = _workers.Count > 0 ? _workers.Average(w => w.WaitingCount) : 0;
-            var error = -averageWaitingCount; // Our target is 0 waiting count: 0 - avgWC = -avgWC
-
-            // Reset integral term if error changes sign, to prevent windup.
-            if (_previousError != 0 && Math.Sign(error) != Math.Sign(_previousError))
-            {
-                //_integralTerm = 0;
-            }
-
-            _integralTerm += error;
-            var derivativeTerm = error - _previousError;
-            _previousError = error;
-
-            Console.WriteLine("IntegralTerm: " + _integralTerm);
-
-            var controlSignal = Kp * error + Ki * _integralTerm + Kd * derivativeTerm;
-
-            _controlSignalNegativeCount = controlSignal < 0 ? ++_controlSignalNegativeCount : 0;
-
-            if (_controlSignalNegativeCount > ControlSignalNegativeMaxCount &&
-                (DateTime.Now - _lastWorkerRemovalTime).TotalMilliseconds > WorkerRemovalBackoffMs)
-            {
-                var inactiveWorkers = _workers.Where(w => w.IsInactive).ToImmutableArray();
-                if (inactiveWorkers.Length > 0)
-                {
-                    var worker = inactiveWorkers[Random.Shared.Next(inactiveWorkers.Length)];
-                    var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
-
-                    worker.Deactivate(new(DeactivationReasonCode.RuntimeRequested,
-                        "Worker deactivated due to inactivity."), cancellation.Token);
-
-                    _controlSignalNegativeCount = 0;
-                    _lastWorkerRemovalTime = DateTime.UtcNow;
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Ignore
-        }
-    }
-
-    private async Task PeriodicallyCollectWorkers()
-    {
-        var workerRemovalTimespan = TimeSpan.FromMilliseconds(WorkerRemovalPeriodMs);
-        _monitorTimer = new(workerRemovalTimespan);
-
-        try
-        {
-            while (await _monitorTimer.WaitForNextTickAsync())
-            {
-                var averageWaitingCount = _workers.Count > 0 ? _workers.Average(w => w.WaitingCount) : 0;
-                var error = -averageWaitingCount; // Our target is 0 waiting count: 0 - avgWC = -avgWC
-
-                _integralTerm += error;
-                var derivativeTerm = error - _previousError;
-                _previousError = error;
-
-                var controlSignal = Kp * error + Ki * _integralTerm + Kd * derivativeTerm;
-
-                _controlSignalNegativeCount = controlSignal < 0 ? ++_controlSignalNegativeCount : 0;
-
-                if (_controlSignalNegativeCount > ControlSignalNegativeMaxCount &&
-                    (DateTime.Now - _lastWorkerRemovalTime).TotalMilliseconds > WorkerRemovalBackoffMs)
-                {
-                    var inactiveWorkers = _workers.Where(w => w.IsInactive).ToImmutableArray();
-                    if (inactiveWorkers.Length > 0)
-                    {
-                        var worker = inactiveWorkers[Random.Shared.Next(inactiveWorkers.Length)];
-                        var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
-
-                        worker.Deactivate(new(DeactivationReasonCode.RuntimeRequested,
-                            "Worker deactivated due to inactivity."), cancellation.Token);
-
-                        var antiWindUpFactor = (double)(inactiveWorkers.Length - 1) / inactiveWorkers.Length;
-                        _integralTerm *= antiWindUpFactor;
-
-                        _controlSignalNegativeCount = 0;
-                        _lastWorkerRemovalTime = DateTime.UtcNow;
-                    }
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Ignore
-        }
-    }
-
-
     private ActivationData CreateWorker(object? message)
     {
         var address = GrainAddress.GetAddress(_address.SiloAddress, _address.GrainId, ActivationId.NewId());
@@ -386,8 +271,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
             worker.Deactivate(reason, cancellationToken);
         }
 
-        _monitorTimer?.Dispose();
-        _monitorTimer = null;
+        _workerCollector?.Dispose();
     }
 
     private async Task DeactivatedTaskInternal(TaskCompletionSource<bool> completion)
@@ -409,8 +293,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         }
         finally
         {
-            _monitorTimer?.Dispose();
-            _monitorTimer = null;
+            _workerCollector?.Dispose();
         }
     }
 
@@ -443,8 +326,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         }
         finally
         {
-            _monitorTimer?.Dispose();
-            _monitorTimer = null;
+            _workerCollector?.Dispose();
         }
     }
 
@@ -481,4 +363,102 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
     private record DeactivateWorkItemState(DeactivationReason DeactivationReason, CancellationToken CancellationToken);
     private record DeactivatedTaskWorkItemState(TaskCompletionSource<bool> Completion);
     private record DisposeAsyncWorkItemState(TaskCompletionSource<bool> Completion);
+
+    // https://www.ledjonbehluli.com/posts/orleans_adaptive_stateless_worker/
+    private class WorkerCollector : IDisposable
+    {
+#pragma warning disable IDE0052 // Remove unread private members
+        private readonly Task _collectionTask;
+#pragma warning restore IDE0052 // Remove unread private members
+
+        private readonly CancellationTokenSource _cts = new();
+
+        /// <summary>
+        /// We keep a WeakReference to the SW context to remain alive as long as the associated context is active,
+        /// without unintentionally extending its lifetime.
+        /// </summary>
+        private readonly WeakReference<StatelessWorkerGrainContext> _contextRef;
+
+        public WorkerCollector(StatelessWorkerGrainContext context)
+        {
+            _contextRef = new(context);
+            _collectionTask = Task.Run(PeriodicallyCollectWorkers);
+        }
+
+        private async Task PeriodicallyCollectWorkers()
+        {
+            const double Kp = 0.433;
+            const double Ki = 0.468;
+            const double Kd = 0.480;
+
+            const int WorkerRemovalBackoffMs = 1000;
+            const int WorkerRemovalPeriodMs = 500;
+            const int ControlSignalNegativeMaxCount = 10;
+
+            var _previousError = 0d;
+            var _integralTerm = 0d;
+
+            var _controlSignalNegativeCount = 0;
+            var _lastWorkerRemovalTime = DateTime.MinValue;
+
+            try
+            {
+                while (!_cts.Token.IsCancellationRequested)
+                {
+                    if (!_contextRef.TryGetTarget(out var context))
+                    {
+                        // The target is no longer alive, so i am stopping myself.
+                        break;
+                    }
+
+                    var _workers = context._workers;
+                    var averageWaitingCount = _workers.Count > 0 ? _workers.Average(w => w.WaitingCount) : 0;
+                    var error = -averageWaitingCount; // Our target is 0 waiting count: 0 - avgWC = -avgWC
+
+                    _integralTerm += error;
+                    var derivativeTerm = error - _previousError;
+                    _previousError = error;
+
+                    var controlSignal = Kp * error + Ki * _integralTerm + Kd * derivativeTerm;
+
+                    _controlSignalNegativeCount = controlSignal < 0 ? ++_controlSignalNegativeCount : 0;
+
+                    if (_controlSignalNegativeCount > ControlSignalNegativeMaxCount &&
+                        (DateTime.Now - _lastWorkerRemovalTime).TotalMilliseconds > WorkerRemovalBackoffMs)
+                    {
+                        var inactiveWorkers = _workers.Where(w => w.IsInactive).ToImmutableArray();
+                        if (inactiveWorkers.Length > 0)
+                        {
+                            var worker = inactiveWorkers[Random.Shared.Next(inactiveWorkers.Length)];
+                            var cancellation = new CancellationTokenSource(
+                                context._shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
+
+                            worker.Deactivate(new(DeactivationReasonCode.RuntimeRequested,
+                                "Worker deactivated due to inactivity."), cancellation.Token);
+
+                            var antiWindUpFactor = (double)(inactiveWorkers.Length - 1) / inactiveWorkers.Length;
+                            _integralTerm *= antiWindUpFactor;
+
+                            _controlSignalNegativeCount = 0;
+                            _lastWorkerRemovalTime = DateTime.UtcNow;
+                        }
+                    }
+
+                    await Task.Delay(WorkerRemovalPeriodMs, _cts.Token);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Ignore
+            }
+        }
+
+        public void Dispose()
+        {
+            _cts.Cancel();
+            _cts.Dispose();
+
+            GC.SuppressFinalize(this);
+        }
+    }
 }
