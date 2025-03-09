@@ -10,7 +10,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime.Utilities;
-using Orleans.Serialization;
 using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Runtime.MembershipService
@@ -243,28 +242,32 @@ namespace Orleans.Runtime.MembershipService
             if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting periodic membership table refreshes");
             try
             {
-                var targetMilliseconds = (int)this.clusterMembershipOptions.TableRefreshTimeout.TotalMilliseconds;
-                
-                TimeSpan? onceOffDelay = RandomTimeSpan.Next(this.clusterMembershipOptions.TableRefreshTimeout);
-                while (await this.membershipUpdateTimer.NextTick(onceOffDelay))
+                // jitter for initial
+                TimeSpan? overrideDelayPeriod = RandomTimeSpan.Next(this.clusterMembershipOptions.TableRefreshTimeout);
+                var exponentialBackoff = new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP);
+                var runningFailures = 0;
+                while (await this.membershipUpdateTimer.NextTick(overrideDelayPeriod))
                 {
-                    onceOffDelay = default;
-
                     try
                     {
                         var stopwatch = ValueStopwatch.StartNew();
+                        
                         await this.Refresh();
                         if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace("Refreshing membership table took {Elapsed}", stopwatch.Elapsed);
+                        // reset to allow normal refresh period after success
+                        overrideDelayPeriod = default;
+                        runningFailures = 0;
                     }
                     catch (Exception exception)
                     {
+                        runningFailures += 1;
                         this.log.LogWarning(
                             (int)ErrorCode.MembershipUpdateIAmAliveFailure,
                             exception,
-                            "Failed to refresh membership table, will retry shortly");
+                            "Failed to refresh membership table, will retry shortly. Retry attempt {retries}", runningFailures);
 
-                        // Retry quickly
-                        onceOffDelay = TimeSpan.FromMilliseconds(200);
+                        // Retry quickly and then exponentially back off
+                        overrideDelayPeriod = exponentialBackoff.Next(runningFailures);
                     }
                 }
             }
