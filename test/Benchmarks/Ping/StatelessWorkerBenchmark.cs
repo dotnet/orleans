@@ -71,7 +71,7 @@ public class StatelessWorkerBenchmark : IDisposable
 
         await Task.WhenAll(tasks);
 
-        const int CooldownCycles = 5;
+        const int CooldownCycles = 10;
 
         for (var i = 1; i <= CooldownCycles; i++)
         {
@@ -79,8 +79,8 @@ public class StatelessWorkerBenchmark : IDisposable
 
             Console.WriteLine($"\nWaiting for cooldown {cooldownCycle}\n");
 
-            var cooldownMs = (int)Math.Ceiling(BenchmarkConstants.ProcessDelayMs *
-               ((double)ConcurrencyLevel / BenchmarkConstants.MaxWorkersLimit));
+            var cooldownMs = (int)(0.1 * Math.Ceiling(BenchmarkConstants.ProcessDelayMs *
+               ((double)ConcurrencyLevel / BenchmarkConstants.MaxWorkersLimit)));
 
             await Task.Delay(cooldownMs);
 

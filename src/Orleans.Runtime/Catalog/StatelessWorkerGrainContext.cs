@@ -391,8 +391,8 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
             const double Ki = 0.468;
             const double Kd = 0.480;
 
-            const int WorkerRemovalBackoffMs = 1000;
-            const int WorkerRemovalPeriodMs = 500;
+            const int BackoffMs = 1000;
+            const int LoopPeriodMs = 100;
             const int ControlSignalNegativeMaxCount = 10;
 
             var _previousError = 0d;
@@ -423,8 +423,8 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
 
                     _controlSignalNegativeCount = controlSignal < 0 ? ++_controlSignalNegativeCount : 0;
 
-                    if (_controlSignalNegativeCount > ControlSignalNegativeMaxCount &&
-                        (DateTime.Now - _lastWorkerRemovalTime).TotalMilliseconds > WorkerRemovalBackoffMs)
+                    if (_controlSignalNegativeCount > ControlSignalNegativeMaxCount
+                        && (DateTime.Now - _lastWorkerRemovalTime).TotalMilliseconds > BackoffMs)
                     {
                         var inactiveWorkers = _workers.Where(w => w.IsInactive).ToImmutableArray();
                         if (inactiveWorkers.Length > 0)
@@ -444,7 +444,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
                         }
                     }
 
-                    await Task.Delay(WorkerRemovalPeriodMs, _cts.Token);
+                    await Task.Delay(LoopPeriodMs, _cts.Token);
                 }
             }
             catch (OperationCanceledException)
