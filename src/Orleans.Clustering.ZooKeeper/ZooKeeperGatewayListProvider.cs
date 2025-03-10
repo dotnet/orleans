@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
-using Orleans.Messaging;
+
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using Orleans.Configuration;
+using Orleans.Messaging;
 
 namespace Orleans.Runtime.Membership
 {
@@ -23,8 +26,10 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         private readonly string _deploymentConnectionString;
         private readonly TimeSpan _maxStaleness;
+        private readonly ZooKeeperBasedMembershipTable _zooKeeperBasedMembershipTable;
 
         public ZooKeeperGatewayListProvider(
+            ZooKeeperBasedMembershipTable zooKeeperBasedMembershipTable,
             ILogger<ZooKeeperGatewayListProvider> logger,
             IOptions<ZooKeeperGatewayListProviderOptions> options,
             IOptions<GatewayOptions> gatewayOptions,
@@ -34,6 +39,7 @@ namespace Orleans.Runtime.Membership
             _deploymentPath = "/" + clusterOptions.Value.ClusterId;
             _deploymentConnectionString = options.Value.ConnectionString + _deploymentPath;
             _maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
+            _zooKeeperBasedMembershipTable = zooKeeperBasedMembershipTable;
         }
 
         /// <summary>
@@ -47,12 +53,17 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         public async Task<IList<Uri>> GetGateways()
         {
-            var membershipTableData = await ZooKeeperBasedMembershipTable.ReadAll(this._deploymentConnectionString, this._watcher);
-            return membershipTableData.Members.Select(e => e.Item1).
-                Where(m => m.Status == SiloStatus.Active && m.ProxyPort != 0).
-                Select(m =>
+            var membershipTableData = await _zooKeeperBasedMembershipTable.ReadAll();
+
+            return membershipTableData
+                .Members
+                .Select(e => e.Item1)
+                .Where(m => m.Status == SiloStatus.Active && m.ProxyPort != 0)
+                .Select(m =>
                 {
-                    var gatewayAddress = SiloAddress.New(m.SiloAddress.Endpoint.Address, m.ProxyPort, m.SiloAddress.Generation);
+                    var endpoint = new IPEndPoint(m.SiloAddress.Endpoint.Address, m.ProxyPort);
+                    var gatewayAddress = SiloAddress.New(endpoint, m.SiloAddress.Generation);
+
                     return gatewayAddress.ToGatewayUri();
                 }).ToList();
         }
