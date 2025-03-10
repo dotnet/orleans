@@ -25,6 +25,9 @@ namespace Orleans.Runtime
         [Id(0)]
         public int MaxLocal { get; private set; }
 
+        /// <summary>
+        /// Instructs the runtime wether it should proactive collect idle workers or let them be collected by the activation collector.
+        /// </summary>
         [Id(1)]
         public bool ProactiveWorkerCollection { get; private set; }
 
@@ -87,11 +90,5 @@ namespace Orleans.Runtime
 
             base.PopulateGrainProperties(services, grainClass, grainType, properties);
         }
-    }
-
-    public enum StatelessWorkerOperatingMode : byte
-    {
-        Monotonic = 0,
-        Adaptive = 1
     }
 }

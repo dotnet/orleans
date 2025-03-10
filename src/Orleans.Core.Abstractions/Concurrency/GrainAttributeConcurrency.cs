@@ -57,9 +57,8 @@ namespace Orleans.Concurrency
         /// <summary>
         /// Initializes a new instance of the <see cref="StatelessWorkerAttribute"/> class.
         /// </summary>
-        /// <param name="maxLocalWorkers">
-        /// The maximum local workers.
-        /// </param>
+        /// <param name="maxLocalWorkers">The maximum local workers.</param>
+        /// <param name="proactiveWorkerCollection">Tries to collects idle workers before the configured collection age.</param>
         public StatelessWorkerAttribute(int maxLocalWorkers, bool proactiveWorkerCollection)
             : base(new StatelessWorkerPlacement(maxLocalWorkers, proactiveWorkerCollection))
         {
@@ -68,9 +67,16 @@ namespace Orleans.Concurrency
         /// <summary>
         /// Initializes a new instance of the <see cref="StatelessWorkerAttribute"/> class.
         /// </summary>
-        /// <param name="maxLocalWorkers">
-        /// The maximum local workers.
-        /// </param>
+        /// <param name="proactiveWorkerCollection">Tries to collects idle workers before the configured collection age.</param>
+        public StatelessWorkerAttribute(bool proactiveWorkerCollection)
+            : base(new StatelessWorkerPlacement(-1, proactiveWorkerCollection))
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StatelessWorkerAttribute"/> class.
+        /// </summary>
+        /// <param name="maxLocalWorkers">The maximum local workers.</param>
         public StatelessWorkerAttribute(int maxLocalWorkers)
             : base(new StatelessWorkerPlacement(maxLocalWorkers, false))
         {

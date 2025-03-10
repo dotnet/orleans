@@ -309,6 +309,7 @@ namespace Orleans.Hosting
             services.ConfigureFormatter<ActivationCountBasedPlacementOptions>();
             services.ConfigureFormatter<ResourceOptimizedPlacementOptions>();
             services.ConfigureFormatter<GrainCollectionOptions>();
+            services.ConfigureFormatter<StatelessWorkerOptions>();
             services.ConfigureFormatter<GrainVersioningOptions>();
             services.ConfigureFormatter<ConsistentRingOptions>();
             services.ConfigureFormatter<LoadSheddingOptions>();

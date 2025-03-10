@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime;
 
@@ -48,9 +49,10 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         _maxWorkers = strategy.MaxLocal;
         _messageLoopTask = Task.Run(RunMessageLoop);
 
-        if (strategy.ProactiveWorkerCollection)
+        if (strategy.ProactiveWorkerCollection ||
+            _shared.StatelessWorkerOptions.UseProactiveWorkerCollection)
         {
-            _workerCollector = new(this);
+            _workerCollector = new(this, _shared.StatelessWorkerOptions);
         }
     }
 
@@ -364,7 +366,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
     private record DeactivatedTaskWorkItemState(TaskCompletionSource<bool> Completion);
     private record DisposeAsyncWorkItemState(TaskCompletionSource<bool> Completion);
 
-    // https://www.ledjonbehluli.com/posts/orleans_adaptive_stateless_worker/
+    // See: https://www.ledjonbehluli.com/posts/orleans_adaptive_stateless_worker/
     private class WorkerCollector : IDisposable
     {
 #pragma warning disable IDE0052 // Remove unread private members
@@ -379,20 +381,23 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         /// </summary>
         private readonly WeakReference<StatelessWorkerGrainContext> _contextRef;
 
-        public WorkerCollector(StatelessWorkerGrainContext context)
+        public WorkerCollector(StatelessWorkerGrainContext context, StatelessWorkerOptions options)
         {
             _contextRef = new(context);
-            _collectionTask = Task.Run(PeriodicallyCollectWorkers);
+            _collectionTask = Task.Run(() => PeriodicallyCollectWorkers(
+                options.ProactiveWorkerCollectionBackoffPeriod));
         }
 
-        private async Task PeriodicallyCollectWorkers()
+        private async Task PeriodicallyCollectWorkers(TimeSpan backoffPeriod)
         {
+            // These parameter values were tuned using a genetic algorithm, for potential re-tuning see:
+            // https://github.com/ledjon-behluli/Orleans.FullyAdaptiveStatelessWorkerSimulations/blob/main/Orleans.FullyAdaptiveStatelessWorkerSimulations/Program.cs
+
             const double Kp = 0.433;
             const double Ki = 0.468;
             const double Kd = 0.480;
 
-            const int BackoffMs = 1000;
-            const int LoopPeriodMs = 100;
+            const int InspectionPeriodMs = 100;
             const int ControlSignalNegativeMaxCount = 10;
 
             var _previousError = 0d;
@@ -423,8 +428,8 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
 
                     _controlSignalNegativeCount = controlSignal < 0 ? ++_controlSignalNegativeCount : 0;
 
-                    if (_controlSignalNegativeCount > ControlSignalNegativeMaxCount
-                        && (DateTime.Now - _lastWorkerRemovalTime).TotalMilliseconds > BackoffMs)
+                    if (_controlSignalNegativeCount > ControlSignalNegativeMaxCount &&
+                        DateTime.Now - _lastWorkerRemovalTime > backoffPeriod)
                     {
                         var inactiveWorkers = _workers.Where(w => w.IsInactive).ToImmutableArray();
                         if (inactiveWorkers.Length > 0)
@@ -444,7 +449,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
                         }
                     }
 
-                    await Task.Delay(LoopPeriodMs, _cts.Token);
+                    await Task.Delay(InspectionPeriodMs, _cts.Token);
                 }
             }
             catch (OperationCanceledException)
