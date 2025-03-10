@@ -513,7 +513,7 @@ namespace Orleans.TestingHost
             var client = ClientHost;
             if (client != null)
             {
-                var cancelled = new CancellationTokenSource();
+                using var cancelled = new CancellationTokenSource();
                 cancelled.Cancel();
                 try
                 {
@@ -807,6 +807,8 @@ namespace Orleans.TestingHost
 
             await Task.Run(async () =>
             {
+                await DisposeAsync(ClientHost).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+
                 foreach (var handle in SecondarySilos)
                 {
                     await DisposeAsync(handle).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
@@ -816,8 +818,6 @@ namespace Orleans.TestingHost
                 {
                     await DisposeAsync(Primary).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
                 }
-
-                await DisposeAsync(ClientHost).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
                 ClientHost = null;
 
                 PortAllocator?.Dispose();
@@ -834,23 +834,14 @@ namespace Orleans.TestingHost
                 return;
             }
 
-            foreach (var handle in this.SecondarySilos)
-            {
-                handle.Dispose();
-            }
-
-            this.Primary?.Dispose();
-            this.ClientHost?.Dispose();
-            this.PortAllocator?.Dispose();
-
-            _disposed = true;
+            DisposeAsync().AsTask().Wait();
         }
 
         private static async Task DisposeAsync(IDisposable value)
         {
             if (value is IAsyncDisposable asyncDisposable)
             {
-                await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                await asyncDisposable.DisposeAsync().AsTask().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
             }
             else if (value is IDisposable disposable)
             {

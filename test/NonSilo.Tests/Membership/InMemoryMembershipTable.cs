@@ -12,7 +12,6 @@ namespace NonSilo.Tests.Membership
         private readonly object tableLock = new object();
         private readonly List<(string, object)> calls = new List<(string, object)>();
         private ImmutableList<(MembershipEntry, string)> entries = ImmutableList<(MembershipEntry, string)>.Empty;
-        private TableVersion version = new TableVersion(0, "0");
 
         public InMemoryMembershipTable() { }
 
@@ -24,7 +23,7 @@ namespace NonSilo.Tests.Membership
                 builder.Add((entry, version.VersionEtag));
             }
 
-            this.version = version;
+            this.Version = version;
             this.entries = builder.ToImmutable();
         }
 
@@ -37,6 +36,7 @@ namespace NonSilo.Tests.Membership
         }
 
         public Action OnReadAll { get; set; }
+        public TableVersion Version { get; set; } = new TableVersion(0, "0");
 
         public void ClearCalls()
         {
@@ -48,7 +48,7 @@ namespace NonSilo.Tests.Membership
             lock (this.tableLock)
             {
                 this.entries = ImmutableList<(MembershipEntry, string)>.Empty;
-                this.version = this.version.Next();
+                this.Version = this.Version.Next();
             }
         }
 
@@ -102,13 +102,13 @@ namespace NonSilo.Tests.Membership
                 this.calls.Add((nameof(InsertRow), (entry, tableVersion)));
                 this.ValidateVersion(tableVersion);
 
-                if (this.entries.Any(e => e.Item1.SiloAddress.Equals(entry.SiloAddress)))
+                if (this.entries.Exists(e => e.Item1.SiloAddress.Equals(entry.SiloAddress)))
                 {
                     return Task.FromResult(false);
                 }
 
-                this.version = new TableVersion(tableVersion.Version, tableVersion.Version.ToString());
-                this.entries = this.entries.Add((entry, this.version.VersionEtag));
+                this.Version = new TableVersion(tableVersion.Version, tableVersion.Version.ToString());
+                this.entries = this.entries.Add((entry, this.Version.VersionEtag));
 
                 return Task.FromResult(true);
             }
@@ -122,7 +122,7 @@ namespace NonSilo.Tests.Membership
                 this.calls.Add((nameof(ReadAll), null));
                 var result = new MembershipTableData(
                     this.entries.Select(e => Tuple.Create(e.Item1, e.Item2)).ToList(),
-                    this.version);
+                    this.Version);
                 return Task.FromResult(result);
             }
         }
@@ -134,7 +134,7 @@ namespace NonSilo.Tests.Membership
                 this.calls.Add((nameof(ReadRow), key));
                 var result = new MembershipTableData(
                     this.entries.Where(e => e.Item1.SiloAddress.Equals(key)).Select(e => Tuple.Create(e.Item1, e.Item2)).ToList(),
-                    this.version);
+                    this.Version);
                 return Task.FromResult(result);
             }
         }
@@ -158,7 +158,7 @@ namespace NonSilo.Tests.Membership
             {
                 this.calls.Add((nameof(UpdateRow), (entry, etag, tableVersion)));
                 this.ValidateVersion(tableVersion);
-                var existingEntry = this.entries.FirstOrDefault(e => e.Item1.SiloAddress.Equals(entry.SiloAddress));
+                var existingEntry = this.entries.Find(e => e.Item1.SiloAddress.Equals(entry.SiloAddress));
                 if (existingEntry.Item1 is null) return Task.FromResult(false);
 
                 if (!etag.Equals(existingEntry.Item2))
@@ -166,8 +166,8 @@ namespace NonSilo.Tests.Membership
                     throw new InvalidOperationException($"Mismatching row etag. Required: {existingEntry.Item2}, Provided: {etag}");
                 }
 
-                this.version = new TableVersion(tableVersion.Version, tableVersion.Version.ToString());
-                this.entries = this.entries.Replace(existingEntry, (entry, this.version.VersionEtag));
+                this.Version = new TableVersion(tableVersion.Version, tableVersion.Version.ToString());
+                this.entries = this.entries.Replace(existingEntry, (entry, this.Version.VersionEtag));
                 return Task.FromResult(true);
             }
         }
@@ -176,12 +176,12 @@ namespace NonSilo.Tests.Membership
         {
             lock (this.tableLock)
             {
-                if (this.version.VersionEtag != tableVersion.VersionEtag)
+                if (this.Version.VersionEtag != tableVersion.VersionEtag)
                 {
                     throw new InvalidOperationException("Etag mismatch");
                 }
 
-                if (this.version.Version >= tableVersion.Version)
+                if (this.Version.Version >= tableVersion.Version)
                 {
                     throw new InvalidOperationException("Version must increase on update");
                 }

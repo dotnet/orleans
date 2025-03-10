@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime;
+using Orleans.Runtime.Internal;
 using Orleans.Streams.Filtering;
 
 namespace Orleans.Streams
@@ -109,6 +110,7 @@ namespace Orleans.Streams
             {
                 if (queueAdapterCache != null)
                 {
+                    using var _ = new ExecutionContextSuppressor();
                     queueCache = queueAdapterCache.CreateQueueCache(QueueId);
                 }
             }
@@ -120,6 +122,7 @@ namespace Orleans.Streams
 
             try
             {
+                using var _ = new ExecutionContextSuppressor();
                 receiver = queueAdapter.CreateReceiver(QueueId);
             }
             catch (Exception exc)
@@ -130,6 +133,7 @@ namespace Orleans.Streams
 
             try
             {
+                using var _ = new ExecutionContextSuppressor();
                 receiverInitTask = OrleansTaskExtentions.SafeExecute(() => receiver.Initialize(this.options.InitQueueTimeout))
                     .LogException(logger, ErrorCode.PersistentStreamPullingAgent_03, $"QueueAdapterReceiver {QueueId:H} failed to Initialize.");
                 receiverInitTask.Ignore();
@@ -145,7 +149,7 @@ namespace Orleans.Streams
             // Setup a reader for a new receiver.
             // Even if the receiver failed to initialize, treat it as OK and start pumping it. It's receiver responsibility to retry initialization.
             var randomTimerOffset = RandomTimeSpan.Next(this.options.GetQueueMsgsTimerPeriod);
-            timer = RegisterTimer(AsyncTimerCallback, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
+            timer = RegisterGrainTimer(AsyncTimerCallback, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
 
             StreamInstruments.RegisterPersistentStreamPubSubCacheSizeObserve(() => new Measurement<int>(pubSubCache.Count, new KeyValuePair<string, object>("name", StatisticUniquePostfix)));
 
@@ -283,10 +287,7 @@ namespace Orleans.Streams
                     if (requestedHandshakeToken != null)
                     {
                         consumerData.SafeDisposeCursor(logger);
-                        // The handshake token points to an already processed event, we need to advance the cursor to
-                        // the next event.
                         consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, requestedHandshakeToken.Token);
-                        consumerData.Cursor.MoveNext(); //
                     }
                     else
                     {
@@ -349,9 +350,14 @@ namespace Orleans.Streams
                 pubSubCache.Remove(streamId);
         }
 
-        private async Task AsyncTimerCallback(object state)
+        private Task AsyncTimerCallback(QueueId queueId, CancellationToken cancellationToken)
         {
-            var queueId = (QueueId)state;
+            using var _ = new ExecutionContextSuppressor();
+            return PumpQueue(queueId, cancellationToken);
+        }
+
+        private async Task PumpQueue(QueueId queueId, CancellationToken cancellationToken)
+        {
             try
             {
                 Task localReceiverInitTask = receiverInitTask;
@@ -361,10 +367,10 @@ namespace Orleans.Streams
                     receiverInitTask = null;
                 }
 
-                if (IsShutdown) return; // timer was already removed, last tick
+                if (IsShutdown || cancellationToken.IsCancellationRequested) return; // timer was already removed, last tick
 
                 // loop through the queue until it is empty.
-                while (!IsShutdown) // timer will be set to null when we are asked to shutdown.
+                while (!IsShutdown && !cancellationToken.IsCancellationRequested) // timer will be set to null when we are asked to shutdown.
                 {
                     int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
                     if (maxCacheAddCount != QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG && maxCacheAddCount <= 0)
@@ -379,7 +385,8 @@ namespace Orleans.Streams
                         ReadLoopRetryMax,
                         ReadLoopRetryExceptionFilter,
                         Timeout.InfiniteTimeSpan,
-                        queueReaderBackoffProvider);
+                        queueReaderBackoffProvider,
+                        cancellationToken: cancellationToken);
                     if (!moreData)
                         return;
                 }
@@ -394,18 +401,18 @@ namespace Orleans.Streams
                     queueId,
                     ReadLoopRetryMax);
             }
-        }
 
-        private bool ReadLoopRetryExceptionFilter(Exception e, int retryCounter)
-        {
-            this.logger.LogWarning(
-                (int)ErrorCode.PersistentStreamPullingAgent_12,
-                e,
-                "Exception while retrying the {RetryCounter}th time reading from queue {QueueId}",
-                retryCounter,
-                QueueId);
+            bool ReadLoopRetryExceptionFilter(Exception e, int retryCounter)
+            {
+                this.logger.LogWarning(
+                    (int)ErrorCode.PersistentStreamPullingAgent_12,
+                    e,
+                    "Exception while retrying the {RetryCounter}th time reading from queue {QueueId}",
+                    retryCounter,
+                    QueueId);
 
-            return !IsShutdown;
+                return !cancellationToken.IsCancellationRequested && !IsShutdown;
+            }
         }
 
         /// <summary>
@@ -705,7 +712,7 @@ namespace Orleans.Streams
         /// <summary>
         /// Add call context for batch delivery call, then clear context immediately, without giving up turn.
         /// </summary>
-        private Task<StreamHandshakeToken> ContextualizedDeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
+        private static Task<StreamHandshakeToken> ContextualizedDeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
         {
             bool isRequestContextSet = batch.ImportRequestContext();
             try

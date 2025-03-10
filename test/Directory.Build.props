@@ -7,6 +7,8 @@
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
+    <WarnOnPackingNonPackableProject>false</WarnOnPackingNonPackableProject>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);FS2003;1591</NoWarn>
     <ServerGarbageCollection>true</ServerGarbageCollection>
@@ -25,6 +27,7 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="GitHubActionsTestLogger" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
   </ItemGroup>
 
 </Project>

@@ -10,7 +10,7 @@ namespace Tester.Cassandra.Utility
                 return;
             }
 
-            var timeoutCancellationTokenSource = new CancellationTokenSource();
+            using var timeoutCancellationTokenSource = new CancellationTokenSource();
             var completedTask = await Task.WhenAny(taskToComplete, Task.Delay(timeout, timeoutCancellationTokenSource.Token));
 
             if (taskToComplete == completedTask)
@@ -31,7 +31,7 @@ namespace Tester.Cassandra.Utility
                 return await taskToComplete;
             }
 
-            var timeoutCancellationTokenSource = new CancellationTokenSource();
+            using var timeoutCancellationTokenSource = new CancellationTokenSource();
             var completedTask = await Task.WhenAny(taskToComplete, Task.Delay(timeout, timeoutCancellationTokenSource.Token));
 
             if (taskToComplete == completedTask)

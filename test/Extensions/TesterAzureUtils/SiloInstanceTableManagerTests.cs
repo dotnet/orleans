@@ -279,7 +279,7 @@ namespace Tester.AzureUtils
             return data;
         }
 
-        private void CheckSiloInstanceTableEntry(SiloInstanceTableEntry referenceEntry, SiloInstanceTableEntry entry)
+        private static void CheckSiloInstanceTableEntry(SiloInstanceTableEntry referenceEntry, SiloInstanceTableEntry entry)
         {
             Assert.Equal(referenceEntry.DeploymentId, entry.DeploymentId);
             Assert.Equal(referenceEntry.Address, entry.Address);

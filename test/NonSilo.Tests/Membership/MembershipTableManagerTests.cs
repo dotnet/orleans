@@ -61,12 +61,13 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_ExistingCluster()
         {
+            var now = DateTimeOffset.UtcNow;
             var otherSilos = new[]
             {
-                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:300@100"), SiloStatus.ShuttingDown),
-                Entry(Silo("127.0.0.1:400@100"), SiloStatus.Joining),
-                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead),
+                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:300@100"), SiloStatus.ShuttingDown, now),
+                Entry(Silo("127.0.0.1:400@100"), SiloStatus.Joining, now),
+                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead, now),
             };
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
@@ -76,7 +77,8 @@ namespace NonSilo.Tests.Membership
         private async Task BasicScenarioTest(InMemoryMembershipTable membershipTable, bool gracefulShutdown = true)
         {
             var timers = new List<DelegateAsyncTimer>();
-            var timerCalls = new ConcurrentQueue<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)>();
+            var timerCalls = new BlockingCollection<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)>();
+
             var timerFactory = new DelegateAsyncTimerFactory(
                 (period, name) =>
                 {
@@ -84,7 +86,7 @@ namespace NonSilo.Tests.Membership
                         overridePeriod =>
                         {
                             var task = new TaskCompletionSource<bool>();
-                            timerCalls.Enqueue((overridePeriod, task));
+                            timerCalls.Add((overridePeriod, task));
                             return task.Task;
                         });
                     timers.Add(timer);
@@ -165,20 +167,25 @@ namespace NonSilo.Tests.Membership
             {
                 // Check that a timer is being requested and that after it expires a call to
                 // refresh the membership table is made.
-                Assert.True(timerCalls.TryDequeue(out var timer));
+                using var cts = new CancellationTokenSource();
+                cts.CancelAfter(TimeSpan.FromSeconds(10));
+                var (_, completion) = timerCalls.Take(cts.Token);
                 membershipTable.ClearCalls();
-                timer.Completion.TrySetResult(true);
+                completion.TrySetResult(true);
                 while (membershipTable.Calls.Count == 0) await Task.Delay(10);
                 Assert.Contains(membershipTable.Calls, c => c.Method.Equals(nameof(IMembershipTable.ReadAll)));
             }
 
-            var cts = new CancellationTokenSource();
-            if (!gracefulShutdown) cts.Cancel();
+            var shutdownCts = new CancellationTokenSource();
+            if (!gracefulShutdown) shutdownCts.Cancel();
             Assert.Equal(0, timers.First().DisposedCounter);
-            var stopped = this.lifecycle.OnStop(cts.Token);
+            var stopped = this.lifecycle.OnStop(shutdownCts.Token);
 
             // Complete any timers that were waiting.
-            while (timerCalls.TryDequeue(out var t)) t.Completion.TrySetResult(false);
+            while (timerCalls.TryTake(out var t))
+            {
+                t.Completion.TrySetResult(false);
+            }
 
             await stopped;
             Assert.Equal(1, timers.First().DisposedCounter);
@@ -193,17 +200,19 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_Restarted()
         {
+            var now = DateTimeOffset.UtcNow;
+
             // The table includes a predecessor which is still marked as active
             // This can happen if a node restarts quickly.
-            var predecessor = Entry(Silo("127.0.0.1:100@1"), SiloStatus.Active);
+            var predecessor = Entry(Silo("127.0.0.1:100@1"), SiloStatus.Active, now);
 
             var otherSilos = new[]
             {
                 predecessor,
-                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:300@100"), SiloStatus.ShuttingDown),
-                Entry(Silo("127.0.0.1:400@100"), SiloStatus.Joining),
-                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead),
+                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:300@100"), SiloStatus.ShuttingDown, now),
+                Entry(Silo("127.0.0.1:400@100"), SiloStatus.Joining, now),
+                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead, now),
             };
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
@@ -288,16 +297,18 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_Superseded()
         {
+            var now = DateTimeOffset.UtcNow;
+
             // The table includes a successor to this silo.
-            var successor = Entry(Silo("127.0.0.1:100@200"), SiloStatus.Active);
+            var successor = Entry(Silo("127.0.0.1:100@200"), SiloStatus.Active, now);
 
             var otherSilos = new[]
             {
                 successor,
-                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:300@100"), SiloStatus.ShuttingDown),
-                Entry(Silo("127.0.0.1:400@100"), SiloStatus.Joining),
-                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead),
+                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:300@100"), SiloStatus.ShuttingDown, now),
+                Entry(Silo("127.0.0.1:400@100"), SiloStatus.Joining, now),
+                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead, now),
             };
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
@@ -332,13 +343,14 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_AlreadyDeclaredDead()
         {
+            var now = DateTimeOffset.UtcNow;
             var otherSilos = new[]
             {
-                Entry(this.localSilo, SiloStatus.Dead),
-                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:300@100"), SiloStatus.ShuttingDown),
-                Entry(Silo("127.0.0.1:400@100"), SiloStatus.Joining),
-                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead),
+                Entry(this.localSilo, SiloStatus.Dead, now),
+                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:300@100"), SiloStatus.ShuttingDown, now),
+                Entry(Silo("127.0.0.1:400@100"), SiloStatus.Joining, now),
+                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead, now),
             };
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
@@ -373,9 +385,10 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_DeclaredDead_AfterJoining()
         {
+            var now = DateTimeOffset.UtcNow;
             var otherSilos = new[]
             {
-                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active)
+                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active, now)
             };
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
@@ -418,9 +431,10 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_TrySuspectOrKill_ButIAmKill()
         {
+            var now = DateTimeOffset.UtcNow;
             var otherSilos = new[]
             {
-                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active, now),
             };
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
@@ -457,10 +471,11 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_TrySuspectOrKill_AlreadyDead()
         {
+            var now = DateTimeOffset.UtcNow;
             var otherSilos = new[]
             {
-                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead),
+                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead, now),
             };
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
@@ -488,10 +503,11 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_TrySuspectOrKill_DeclareDead_SmallCluster()
         {
+            var now = DateTimeOffset.UtcNow;
             var otherSilos = new[]
             {
-                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead),
+                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead, now),
             };
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
@@ -521,16 +537,17 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_TrySuspectOrKill_ClocksNotSynchronized()
         {
+            var now = DateTime.UtcNow;
             var otherSilos = new[]
             {
-                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:300@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:400@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:600@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:700@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:800@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:900@100"), SiloStatus.Dead),
+                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:300@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:400@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:600@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:700@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:800@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:900@100"), SiloStatus.Dead, now),
             };
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
@@ -546,7 +563,6 @@ namespace NonSilo.Tests.Membership
                 siloLifecycle: this.lifecycle);
 
             // Rig the local clock.
-            var now = DateTime.UtcNow;
             manager.GetDateTimeUtcNow = () => now;
 
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
@@ -595,16 +611,17 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_TrySuspectOrKill_DeclareDead_LargerCluster()
         {
+            var now = DateTimeOffset.UtcNow;
             var otherSilos = new[]
             {
-                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:300@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:400@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:600@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:700@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:800@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.1:900@100"), SiloStatus.Dead),
+                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:300@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:400@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:600@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:700@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:800@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:900@100"), SiloStatus.Dead, now),
             };
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
@@ -690,9 +707,10 @@ namespace NonSilo.Tests.Membership
                     return t;
                 });
 
+            var now = DateTimeOffset.UtcNow;
             var otherSilos = new[]
             {
-                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active)
+                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active, now)
             };
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
@@ -737,9 +755,9 @@ namespace NonSilo.Tests.Membership
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
-        private static MembershipEntry Entry(SiloAddress address, SiloStatus status)
+        private static MembershipEntry Entry(SiloAddress address, SiloStatus status, DateTimeOffset iAmAliveTime)
         {
-            return new MembershipEntry { SiloAddress = address, Status = status };
+            return new MembershipEntry { SiloAddress = address, Status = status, IAmAliveTime =  iAmAliveTime.UtcDateTime, StartTime = iAmAliveTime.UtcDateTime };
         }
     }
 }

@@ -95,7 +95,7 @@ namespace UnitTests.General
             VerifyRing(rings);
         }
 
-        private Dictionary<SiloAddress, ConsistentRingProvider> CreateServers(int n)
+        private static Dictionary<SiloAddress, ConsistentRingProvider> CreateServers(int n)
         {
             Dictionary<SiloAddress, ConsistentRingProvider> rings = new Dictionary<SiloAddress, ConsistentRingProvider>();
 
@@ -107,7 +107,7 @@ namespace UnitTests.General
             return rings;
         }
 
-        private Dictionary<SiloAddress, ConsistentRingProvider> Combine(Dictionary<SiloAddress, ConsistentRingProvider> set1, Dictionary<SiloAddress, ConsistentRingProvider> set2)
+        private static Dictionary<SiloAddress, ConsistentRingProvider> Combine(Dictionary<SiloAddress, ConsistentRingProvider> set1, Dictionary<SiloAddress, ConsistentRingProvider> set2)
         {
             // tell set1 about every node in set2
             foreach (ConsistentRingProvider crp in set1.Values)
@@ -260,13 +260,13 @@ namespace UnitTests.General
         }
 
         public bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer) => _subscribers.Remove(observer);
-        public ImmutableArray<SiloAddress> GetActiveSilos() => [.. GetApproximateSiloStatuses(onlyActive: true).Keys];   
+        public ImmutableArray<SiloAddress> GetActiveSilos() => [.. GetApproximateSiloStatuses(onlyActive: true).Keys];
     }
 
     internal class RangeBreakable
     {
         private List<SingleRange> ranges { get; set; }
-        internal int NumRanges { get { return ranges.Count(); } }
+        internal int NumRanges { get { return ranges.Count; } }
 
         public RangeBreakable()
         {

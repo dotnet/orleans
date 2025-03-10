@@ -266,9 +266,26 @@ namespace Orleans.Runtime
         /// <returns>Consistent hash value for this silo address.</returns>
         public int GetConsistentHashCode() => hashCodeSet ? hashCode : CalculateConsistentHashCode();
 
+        /// <summary>Returns a consistent hash value for this silo address.</summary>
+        /// <returns>Consistent hash value for this silo address.</returns>
+        internal int GetConsistentHashCode(int seed)
+        {
+            var tmp = (0, 0L, 0L, 0L); // avoid stackalloc overhead by using a fixed size buffer
+            var buf = MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref tmp, 1))[..28];
+
+            Endpoint.Address.TryWriteBytes(buf, out var len);
+            Debug.Assert(len is 4 or 16);
+
+            BinaryPrimitives.WriteInt32LittleEndian(buf[16..], Endpoint.Port);
+            BinaryPrimitives.WriteInt32LittleEndian(buf[20..], Generation);
+            BinaryPrimitives.WriteInt32LittleEndian(buf[24..], seed);
+
+            return (int)StableHash.ComputeHash(buf);
+        }
+
         private int CalculateConsistentHashCode()
         {
-            Unsafe.SkipInit(out (long, long, long) tmp); // avoid stackalloc overhead by using a fixed size buffer
+            var tmp = (0L, 0L, 0L); // avoid stackalloc overhead by using a fixed size buffer
             var buf = MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref tmp, 1))[..24];
 
             Endpoint.Address.TryWriteBytes(buf, out var len);
@@ -293,7 +310,12 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="numHashes">The number of hash codes to return.</param>
         /// <returns>A collection of uniform hash codes variants for this instance.</returns>
-        public uint[] GetUniformHashCodes(int numHashes) => uniformHashCache ??= GetUniformHashCodesImpl(numHashes);
+        public uint[] GetUniformHashCodes(int numHashes)
+        {
+            var cache = uniformHashCache;
+            if (cache is not null && cache.Length == numHashes) return cache;
+            return uniformHashCache = GetUniformHashCodesImpl(numHashes);
+        }
 
         private uint[] GetUniformHashCodesImpl(int numHashes)
         {
@@ -327,6 +349,7 @@ namespace Orleans.Runtime
                 BinaryPrimitives.WriteInt32LittleEndian(bytes[offset..], extraBit);
                 hashes[extraBit] = StableHash.ComputeHash(bytes);
             }
+
             return hashes;
         }
 

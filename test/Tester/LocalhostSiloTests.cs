@@ -2,7 +2,6 @@ using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Internal;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -62,6 +61,9 @@ namespace Tester
                 siloBuilder
                 .AddMemoryGrainStorage("MemoryStore")
                 .UseLocalhostClustering(baseSiloPort, baseGatewayPort);
+#pragma warning disable ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+                siloBuilder.AddDistributedGrainDirectory();
+#pragma warning restore ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             }).Build();
 
             var silo2 = new HostBuilder().UseOrleans((ctx, siloBuilder) =>
@@ -69,6 +71,9 @@ namespace Tester
                 siloBuilder
                 .AddMemoryGrainStorage("MemoryStore")
                 .UseLocalhostClustering(baseSiloPort + 1, baseGatewayPort + 1, new IPEndPoint(IPAddress.Loopback, baseSiloPort));
+#pragma warning disable ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+                siloBuilder.AddDistributedGrainDirectory();
+#pragma warning restore ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             }).Build();
 
             var clientHost = new HostBuilder().UseOrleansClient((ctx, clientBuilder) =>
@@ -88,11 +93,11 @@ namespace Tester
             }
             finally
             {
-                var cancelled = new CancellationTokenSource();
+                using var cancelled = new CancellationTokenSource();
                 cancelled.Cancel();
-                Utils.SafeExecute(() => silo1.StopAsync(cancelled.Token));
-                Utils.SafeExecute(() => silo2.StopAsync(cancelled.Token));
-                Utils.SafeExecute(() => clientHost.StopAsync(cancelled.Token));
+                await Utils.SafeExecuteAsync(silo1.StopAsync(cancelled.Token));
+                await Utils.SafeExecuteAsync(silo2.StopAsync(cancelled.Token));
+                await Utils.SafeExecuteAsync(clientHost.StopAsync(cancelled.Token));
                 Utils.SafeExecute(() => silo1.Dispose());
                 Utils.SafeExecute(() => silo2.Dispose());
                 Utils.SafeExecute(() => clientHost.Dispose());

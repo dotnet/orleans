@@ -8,16 +8,15 @@ namespace UnitTests.Grains;
 [MayInterleave(nameof(MayInterleaveMethod))]
 public class StatelessWorkerWithMayInterleaveGrain : Grain, IStatelessWorkerWithMayInterleaveGrain
 {
-    private TimeSpan _delay = TimeSpan.FromMilliseconds(1);
-
     public static bool MayInterleaveMethod(IInvokable req) => req.GetMethodName() == nameof(GoFast);
 
-    public Task SetDelay(TimeSpan delay)
+    public async Task GoSlow(ICallbackGrainObserver callback)
     {
-        _delay = delay;
-        return Task.CompletedTask;
+        await callback.WaitAsync();
     }
 
-    public Task GoSlow() => Task.Delay(_delay);
-    public Task GoFast() => Task.Delay(_delay);
+    public async Task GoFast(ICallbackGrainObserver callback) 
+    {
+        await callback.WaitAsync();
+    }
 }

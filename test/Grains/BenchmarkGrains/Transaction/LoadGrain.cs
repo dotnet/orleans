@@ -43,7 +43,7 @@ namespace BenchmarkGrains.Transaction
             return report;
         }
 
-        private async Task<List<Task>> ResolvePending(List<Task> pending, Report report, bool all = false)
+        private static async Task<List<Task>> ResolvePending(List<Task> pending, Report report, bool all = false)
         {
             try
             {

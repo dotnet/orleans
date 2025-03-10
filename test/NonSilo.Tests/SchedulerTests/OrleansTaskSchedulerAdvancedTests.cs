@@ -5,6 +5,7 @@ using Orleans.Runtime.Scheduler;
 using Orleans.Internal;
 using Xunit;
 using Xunit.Abstractions;
+using System.Threading.Tasks;
 
 namespace UnitTests.SchedulerTests
 {
@@ -34,38 +35,42 @@ namespace UnitTests.SchedulerTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
-        public void Sched_AC_Test()
+        public async Task Sched_AC_Test()
         {
             int n = 0;
             bool insideTask = false;
             var context = UnitTestSchedulingContext.Create(loggerFactory);
 
             this.output.WriteLine("Running Main in Context=" + RuntimeContext.Current);
+            var tasksTask = new TaskCompletionSource<List<Task>>();
             context.Scheduler.QueueAction(() =>
                 {
+                    var tasks = new List<Task>(10);
                     for (int i = 0; i < 10; i++)
                     {
-                        Task.Factory.StartNew(() =>
+                        var taskNum = i;
+                        tasks.Add(Task.Factory.StartNew(() =>
                         {
-                            // ReSharper disable AccessToModifiedClosure
-                            this.output.WriteLine("Starting " + i + " in Context=" + RuntimeContext.Current);
+                            this.output.WriteLine("Starting " + taskNum + " in Context=" + RuntimeContext.Current);
                             Assert.False(insideTask, $"Starting new task when I am already inside task of iteration {n}");
                             insideTask = true;
+
+                            // Exacerbate the chance of a data race in the event that two of these tasks run concurrently.
                             int k = n;
                             Thread.Sleep(100);
                             n = k + 1;
+
                             insideTask = false;
-                            // ReSharper restore AccessToModifiedClosure
-                        }).Ignore();
+                        }));
                     }
+                    tasksTask.SetResult(tasks);
                 });
 
-            // Pause to let things run
-            Thread.Sleep(1500);
+            await Task.WhenAll(await tasksTask.Task);
 
             // N should be 10, because all tasks should execute serially
             Assert.True(n != 0, "Work items did not get executed");
-            Assert.Equal(10,  n);  // "Work items executed concurrently"
+            Assert.Equal(10, n);  // "Work items executed concurrently"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -85,7 +90,8 @@ namespace UnitTests.SchedulerTests
                         Assert.False(insideTask, $"Starting new task when I am already inside task of iteration {n}");
                         insideTask = true;
                         this.output.WriteLine("===> 1a"); 
-                        Thread.Sleep(1000); n = n + 3;
+                        Thread.Sleep(1000);
+                        n = n + 3;
                         this.output.WriteLine("===> 1b");
                         insideTask = false;
                     });

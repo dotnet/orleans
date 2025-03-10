@@ -99,7 +99,7 @@ namespace Orleans.Providers.Streams.Generator
             return segment;
         }
 
-        private StreamPosition GetStreamPosition(GeneratedBatchContainer queueMessage)
+        private static StreamPosition GetStreamPosition(GeneratedBatchContainer queueMessage)
         {
             return new StreamPosition(queueMessage.StreamId, queueMessage.RealToken);
         }

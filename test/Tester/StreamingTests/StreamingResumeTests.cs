@@ -8,11 +8,25 @@ namespace Tester.StreamingTests
     public abstract class StreamingResumeTests : TestClusterPerTest
     {
         protected static readonly TimeSpan StreamInactivityPeriod = TimeSpan.FromSeconds(5);
+        protected static readonly TimeSpan MetadataMinTimeInCache = StreamInactivityPeriod * 100;
+        protected static readonly TimeSpan DataMaxAgeInCache = StreamInactivityPeriod * 5;
+        protected static readonly TimeSpan DataMinTimeInCache = StreamInactivityPeriod * 4;
 
         protected const string StreamProviderName = "StreamingCacheMissTests";
 
         [SkippableFact]
         public virtual async Task ResumeAfterInactivity()
+        {
+            await ResumeAfterInactivityImpl(false);
+        }
+
+        [SkippableFact]
+        public virtual async Task ResumeAfterInactivityNotInCache()
+        {
+            await ResumeAfterInactivityImpl(true);
+        }
+
+        protected virtual async Task ResumeAfterInactivityImpl(bool waitForCacheToFlush)
         {
             var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
 
@@ -30,6 +44,22 @@ namespace Tester.StreamingTests
 
             // Wait for the stream to become inactive
             await Task.Delay(StreamInactivityPeriod.Multiply(3));
+
+            if (waitForCacheToFlush)
+            {
+                for (var i = 0; i < 5; i++)
+                {
+                    var otherStream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), Guid.NewGuid());
+                    await otherStream.OnNextAsync(interestingData);
+                }
+                // Wait a bit more for the cache to flush some events
+                await Task.Delay(StreamInactivityPeriod.Multiply(3));
+                for (var i = 0; i < 5; i++)
+                {
+                    var otherStream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), Guid.NewGuid());
+                    await otherStream.OnNextAsync(interestingData);
+                }
+            }
 
             await stream.OnNextAsync(interestingData);
 

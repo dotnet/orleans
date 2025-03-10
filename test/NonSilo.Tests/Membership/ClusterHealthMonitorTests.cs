@@ -4,7 +4,6 @@ using Microsoft.Extensions.Options;
 using NonSilo.Tests.Utilities;
 using NSubstitute;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using TestExtensions;
 using Xunit;
@@ -76,6 +75,15 @@ namespace NonSilo.Tests.Membership
         }
 
         /// <summary>
+        /// Tests that when silos are stale, they are monitored by all other silos.
+        /// </summary>
+        [Fact]
+        public async Task ClusterHealthMonitor_MonitorAllStaleSilos()
+        {
+            await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: true, numVotesForDeathDeclaration: 2, otherSilosAreStale: true);
+        }
+
+        /// <summary>
         /// Tests basic operation of <see cref="ClusterHealthMonitor"/> and <see cref="SiloHealthMonitor"/>, but with indirect probes disabled.
         /// </summary>
         [Fact]
@@ -138,11 +146,13 @@ namespace NonSilo.Tests.Membership
             await ClusterHealthMonitor_StaleJoinOrCreatedSilos_Runner(evictWhenMaxJoinAttemptTimeExceeded: false, numVotesForDeathDeclaration: 3);
         }
 
-        private async Task ClusterHealthMonitor_BasicScenario_Runner(bool enableIndirectProbes, int? numVotesForDeathDeclaration = default)
+        private async Task ClusterHealthMonitor_BasicScenario_Runner(bool enableIndirectProbes, int? numVotesForDeathDeclaration = default, bool otherSilosAreStale = false)
         {
+            var now = DateTimeOffset.UtcNow;
             var clusterMembershipOptions = new ClusterMembershipOptions
             {
                 EnableIndirectProbes = enableIndirectProbes,
+                NumProbedSilos = 3,
             };
 
             if (numVotesForDeathDeclaration.HasValue)
@@ -171,17 +181,18 @@ namespace NonSilo.Tests.Membership
             await this.lifecycle.OnStart();
             Assert.Empty(testRig.TestAccessor.MonitoredSilos);
 
+            var iAmAliveTime = otherSilosAreStale ? now.Subtract(TimeSpan.FromHours(1)) : now;
             var otherSilos = new[]
             {
-                Entry(Silo("127.0.0.200:100@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:200@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:300@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:400@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:500@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:600@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:700@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:800@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:900@100"), SiloStatus.Active)
+                Entry(Silo("127.0.0.200:100@100"), SiloStatus.Active, iAmAliveTime),
+                Entry(Silo("127.0.0.200:200@100"), SiloStatus.Active, iAmAliveTime),
+                Entry(Silo("127.0.0.200:300@100"), SiloStatus.Active, iAmAliveTime),
+                Entry(Silo("127.0.0.200:400@100"), SiloStatus.Active, iAmAliveTime),
+                Entry(Silo("127.0.0.200:500@100"), SiloStatus.Active, iAmAliveTime),
+                Entry(Silo("127.0.0.200:600@100"), SiloStatus.Active, iAmAliveTime),
+                Entry(Silo("127.0.0.200:700@100"), SiloStatus.Active, iAmAliveTime),
+                Entry(Silo("127.0.0.200:800@100"), SiloStatus.Active, iAmAliveTime),
+                Entry(Silo("127.0.0.200:900@100"), SiloStatus.Active, iAmAliveTime)
             };
 
             var lastVersion = testRig.TestAccessor.ObservedVersion;
@@ -211,12 +222,13 @@ namespace NonSilo.Tests.Membership
             await Until(() => testRig.TestAccessor.MonitoredSilos.Count > 0);
             Assert.NotEmpty(this.timers);
             Assert.DoesNotContain(testRig.TestAccessor.MonitoredSilos, s => s.Key.Equals(this.localSilo));
-            Assert.Equal(clusterMembershipOptions.NumProbedSilos, testRig.TestAccessor.MonitoredSilos.Count);
-            Assert.All(testRig.TestAccessor.MonitoredSilos, m => m.Key.Equals(m.Value.SiloAddress));
+            var expectedNumProbedSilos = otherSilosAreStale ? otherSilos.Length : clusterMembershipOptions.NumProbedSilos;
+            Assert.Equal(expectedNumProbedSilos, testRig.TestAccessor.MonitoredSilos.Count);
+            Assert.All(testRig.TestAccessor.MonitoredSilos, m => m.Key.Equals(m.Value.TargetSiloAddress));
             Assert.Empty(probeCalls);
 
             // Check that those silos are actually being probed periodically
-            await UntilEqual(clusterMembershipOptions.NumProbedSilos, () =>
+            await UntilEqual(expectedNumProbedSilos, () =>
             {
                 if (this.timerCalls.TryDequeue(out var timer))
                 {
@@ -225,7 +237,7 @@ namespace NonSilo.Tests.Membership
 
                 return probeCalls.Count;
             });
-            Assert.Equal(clusterMembershipOptions.NumProbedSilos, probeCalls.Count);
+            Assert.Equal(expectedNumProbedSilos, probeCalls.Count);
             while (probeCalls.TryDequeue(out var call)) Assert.Contains(testRig.TestAccessor.MonitoredSilos, k => k.Key.Equals(call.Item1));
 
             var monitoredSilos = testRig.TestAccessor.MonitoredSilos.Values.ToList();
@@ -257,11 +269,10 @@ namespace NonSilo.Tests.Membership
 
             for (var expectedMissedProbes = 1; expectedMissedProbes <= clusterMembershipOptions.NumMissedProbesLimit; expectedMissedProbes++)
             {
-                var now = DateTime.UtcNow;
                 this.membershipTable.ClearCalls();
 
                 // Wait for probes to be fired
-                await UntilEqual(clusterMembershipOptions.NumProbedSilos, () =>
+                await UntilEqual(expectedNumProbedSilos, () =>
                 {
                     if (this.timerCalls.TryDequeue(out var timer))
                     {
@@ -279,8 +290,8 @@ namespace NonSilo.Tests.Membership
                 {
                     Assert.Equal(expectedMissedProbes, ((SiloHealthMonitor.ITestAccessor)siloMonitor).MissedProbes);
 
-                    var entry = table.Members.Single(m => m.Item1.SiloAddress.Equals(siloMonitor.SiloAddress)).Item1;
-                    var votes = entry.GetFreshVotes(now, clusterMembershipOptions.DeathVoteExpirationTimeout);
+                    var entry = table.Members.Single(m => m.Item1.SiloAddress.Equals(siloMonitor.TargetSiloAddress)).Item1;
+                    var votes = entry.GetFreshVotes(now.UtcDateTime, clusterMembershipOptions.DeathVoteExpirationTimeout);
                     if (expectedMissedProbes < clusterMembershipOptions.NumMissedProbesLimit)
                     {
                         Assert.Empty(votes);
@@ -300,7 +311,7 @@ namespace NonSilo.Tests.Membership
             if (enableIndirectProbes && numVotesForDeathDeclaration <= 2 || numVotesForDeathDeclaration == 1)
             {
                 table = await this.membershipTable.ReadAll();
-                Assert.Equal(clusterMembershipOptions.NumProbedSilos, table.Members.Count(m => m.Item1.Status == SiloStatus.Dead));
+                Assert.Equal(expectedNumProbedSilos, table.Members.Count(m => m.Item1.Status == SiloStatus.Dead));
 
                 // There is no more to test here, since all of the monitored silos have been killed.
                 return;
@@ -348,7 +359,7 @@ namespace NonSilo.Tests.Membership
 
             foreach (var siloMonitor in testRig.TestAccessor.MonitoredSilos.Values)
             {
-                this.output.WriteLine($"Checking missed probes on {siloMonitor.SiloAddress}: {((SiloHealthMonitor.ITestAccessor)siloMonitor).MissedProbes}");
+                this.output.WriteLine($"Checking missed probes on {siloMonitor.TargetSiloAddress}: {((SiloHealthMonitor.ITestAccessor)siloMonitor).MissedProbes}");
                 Assert.Equal(0, ((SiloHealthMonitor.ITestAccessor)siloMonitor).MissedProbes);
             }
 
@@ -357,6 +368,7 @@ namespace NonSilo.Tests.Membership
 
         private async Task ClusterHealthMonitor_StaleJoinOrCreatedSilos_Runner(bool evictWhenMaxJoinAttemptTimeExceeded = true, int? numVotesForDeathDeclaration = default)
         {
+            var now = DateTimeOffset.UtcNow;
             var clusterMembershipOptions = new ClusterMembershipOptions
             {
                 EvictWhenMaxJoinAttemptTimeExceeded = evictWhenMaxJoinAttemptTimeExceeded
@@ -371,15 +383,15 @@ namespace NonSilo.Tests.Membership
 
             var otherSilos = new[]
             {
-                Entry(Silo("127.0.0.200:100@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:200@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:300@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:400@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:500@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:600@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:700@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:800@100"), SiloStatus.Active),
-                Entry(Silo("127.0.0.200:900@100"), SiloStatus.Active)
+                Entry(Silo("127.0.0.200:100@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.200:200@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.200:300@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.200:400@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.200:500@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.200:600@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.200:700@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.200:800@100"), SiloStatus.Active, now),
+                Entry(Silo("127.0.0.200:900@100"), SiloStatus.Active, now)
             };
 
             var joiningSilo = "127.0.0.200:111@100";
@@ -482,7 +494,7 @@ namespace NonSilo.Tests.Membership
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
-        private static MembershipEntry Entry(SiloAddress address, SiloStatus status, DateTime startTime = default) => new MembershipEntry { SiloAddress = address, Status = status, StartTime = startTime };
+        private static MembershipEntry Entry(SiloAddress address, SiloStatus status, DateTimeOffset startTime = default) => new MembershipEntry { SiloAddress = address, Status = status, StartTime = startTime.UtcDateTime, IAmAliveTime = startTime.UtcDateTime };
 
         private static async Task UntilEqual<T>(T expected, Func<T> getActual)
         {
@@ -521,12 +533,10 @@ namespace NonSilo.Tests.Membership
 
         private class ClusterHealthMonitorTestRig(
             MembershipTableManager manager,
-            IClusterMembershipService membershipService,
             IOptionsMonitor<ClusterMembershipOptions> optionsMonitor,
             ClusterHealthMonitor.ITestAccessor testAccessor)
         {
             public readonly MembershipTableManager Manager = manager;
-            public readonly IClusterMembershipService MembershipService = membershipService;
             public readonly IOptionsMonitor<ClusterMembershipOptions> OptionsMonitor = optionsMonitor;
             public readonly ClusterHealthMonitor.ITestAccessor TestAccessor = testAccessor;
         }
@@ -544,9 +554,6 @@ namespace NonSilo.Tests.Membership
                 this.lifecycle);
 
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-
-            var membershipService = Substitute.For<IClusterMembershipService>();
-            membershipService.CurrentSnapshot.ReturnsForAnyArgs(info => manager.MembershipTableSnapshot.CreateClusterMembershipSnapshot());
 
             var optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
             optionsMonitor.CurrentValue.ReturnsForAnyArgs(clusterMembershipOptions);
@@ -570,12 +577,11 @@ namespace NonSilo.Tests.Membership
                 this.prober,
                 this.timerFactory,
                 this.localSiloHealthMonitor,
-                membershipService,
+                manager,
                 this.localSiloDetails);
 
             return new(
                 manager: manager,
-                membershipService: membershipService,
                 optionsMonitor: optionsMonitor,
                 testAccessor: testAccessor);
         }

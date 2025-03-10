@@ -84,7 +84,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         ILocalSiloDetails localSiloDetails,
         ILoggerFactory loggerFactory,
         IServiceProvider serviceProvider,
-        IInternalGrainFactory grainFactory) : base(Constants.GrainDirectory, localSiloDetails.SiloAddress, loggerFactory)
+        IInternalGrainFactory grainFactory) : base(Constants.GrainDirectoryType, localSiloDetails.SiloAddress, loggerFactory)
     {
         _serviceProvider = serviceProvider;
         _membershipService = membershipService;
@@ -169,7 +169,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             {
                 // This likely indicates that the target silo has been declared dead.
                 ++attempts;
-                await Task.Delay(delay);
+                await Task.Delay(delay, cancellationToken);
                 delay *= 1.5;
                 continue;
             }

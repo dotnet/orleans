@@ -139,7 +139,7 @@ namespace Orleans.Transactions.TestKit
             });
         }
 
-        private async Task TestAfterDustSettles(Func<Task> what)
+        private static async Task TestAfterDustSettles(Func<Task> what)
         {
             int tries = 2;
             while (tries-- > 0)

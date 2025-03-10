@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
     <PackageReference Include="Azure.Core" />
+    <PackageReference Include="Azure.Identity" />
     <PackageReference Include="Azure.Storage.Blobs" />
     <PackageReference Include="Azure.Storage.Queues" />
     <PackageReference Include="Azure.Data.Tables" />

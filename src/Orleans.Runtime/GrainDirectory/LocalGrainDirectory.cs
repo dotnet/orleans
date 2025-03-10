@@ -23,7 +23,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly IInternalGrainFactory grainFactory;
         private readonly object writeLock = new object();
         private readonly IServiceProvider _serviceProvider;
-        private Action<SiloAddress, SiloStatus>? catalogOnSiloRemoved;
+        private Action<ILocalGrainDirectory, SiloAddress, SiloStatus>? catalogOnSiloRemoved;
         private DirectoryMembership directoryMembership = DirectoryMembership.Default;
 
         // Consider: move these constants into an appropriate place
@@ -139,7 +139,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         /// <inheritdoc />
-        public void SetSiloRemovedCatalogCallback(Action<SiloAddress, SiloStatus> callback)
+        public void SetSiloRemovedCatalogCallback(Action<ILocalGrainDirectory, SiloAddress, SiloStatus> callback)
         {
             if (callback == null) throw new ArgumentNullException(nameof(callback));
             lock (this.writeLock)
@@ -187,7 +187,7 @@ namespace Orleans.Runtime.GrainDirectory
                 try
                 {
                     // Only notify the catalog once. Order is important: call BEFORE updating membershipRingList.
-                    this.catalogOnSiloRemoved?.Invoke(silo, status);
+                    this.catalogOnSiloRemoved?.Invoke(this, silo, status);
                 }
                 catch (Exception exc)
                 {

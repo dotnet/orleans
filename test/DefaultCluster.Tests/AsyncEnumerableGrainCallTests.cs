@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime;
 using TestExtensions;
@@ -40,6 +40,43 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
         }
 
         Assert.Equal(5, values.Count);
+
+        // Check that the enumerator is disposed
+        var grainCalls = await grain.GetIncomingCalls();
+        Assert.Contains(grainCalls, c => c.InterfaceName.Contains(nameof(IAsyncEnumerableGrainExtension)) && c.MethodName.Contains(nameof(IAsyncDisposable.DisposeAsync)));
+    }
+
+    [Theory, TestCategory("BVT"), TestCategory("Observable")]
+    [InlineData(0, false)]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(9, false)]
+    [InlineData(9, true)]
+    [InlineData(10, false)]
+    [InlineData(10, true)]
+    [InlineData(11, false)]
+    [InlineData(11, true)]
+    public async Task ObservableGrain_AsyncEnumerable_Throws(int errorIndex, bool waitAfterYield)
+    {
+        const string ErrorMessage = "This is my error!";
+        var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
+
+        var values = new List<int>();
+        try
+        {
+            await foreach (var entry in grain.GetValuesWithError(errorIndex, waitAfterYield, ErrorMessage).WithBatchSize(10))
+            {
+                values.Add(entry);
+                Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
+            }
+        }
+        catch (InvalidOperationException iox)
+        {
+            Assert.Equal(ErrorMessage, iox.Message);
+        }
+
+        Assert.Equal(errorIndex, values.Count);
 
         // Check that the enumerator is disposed
         var grainCalls = await grain.GetIncomingCalls();
@@ -158,7 +195,7 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
         });
 
         var values = new List<string>();
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         await foreach (var entry in grain.GetValues().WithCancellation(cts.Token))
         {
             values.Add(entry);

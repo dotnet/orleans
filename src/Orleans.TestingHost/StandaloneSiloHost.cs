@@ -86,7 +86,7 @@ namespace Orleans.TestingHost
                         while (true)
                         {
                             await Task.Delay(5000);
-                            if (!Process.GetProcesses().Any(p => p.Id == monitorProcessId))
+                            if (!Array.Exists(Process.GetProcesses(), p => p.Id == monitorProcessId))
                             {
                                 Console.Error.WriteLine($"Parent process {monitorProcessId} has exited");
                                 Environment.Exit(0);

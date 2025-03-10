@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Threading;
@@ -124,14 +125,14 @@ namespace Orleans.Runtime.MembershipService
                 {
                     try
                     {
-                        if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stale silo with a joining or created state found, calling `TryToSuspectOrKill`");
+                        if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stale silo with a joining or created state found, calling 'TryToSuspectOrKill'");
                         await this.membershipService.TryToSuspectOrKill(member.Key);
                     }
                     catch(Exception exception)
                     {
                         log.LogError(
                             exception,
-                            "Silo {suspectAddress} has had the status `{siloStatus}` for longer than `MaxJoinAttemptTime` but a call to `TryToSuspectOrKill` has failed",
+                            "Silo {SuspectAddress} has had the status '{SiloStatus}' for longer than 'MaxJoinAttemptTime' but a call to 'TryToSuspectOrKill' has failed",
                             member.Value.SiloAddress,
                             member.Value.Status.ToString());
                     }
@@ -161,51 +162,87 @@ namespace Orleans.Runtime.MembershipService
                 return ImmutableDictionary<SiloAddress, SiloHealthMonitor>.Empty;
             }
 
-            // keep watching shutting-down silos as well, so we can properly ensure they are dead.
-            var tmpList = new List<SiloAddress>();
-            foreach (var member in membership.Entries)
-            {
-                if (IsFunctionalForMembership(member.Value.Status))
-                {
-                    tmpList.Add(member.Key);
-                }
-            }
+            var options = clusterMembershipOptions.CurrentValue;
+            var numProbedSilos = options.NumProbedSilos;
 
-            tmpList.Sort((x, y) => x.GetConsistentHashCode().CompareTo(y.GetConsistentHashCode()));
-
-            int myIndex = tmpList.FindIndex(el => el.Equals(self.SiloAddress));
-            if (myIndex < 0)
-            {
-                // this should not happen ...
-                log.LogError(
-                    (int)ErrorCode.Runtime_Error_100305,
-                    "This silo {SiloAddress} status {Status} is not in its own local silo list! This is a bug!",
-                    self.SiloAddress.ToString(),
-                    self.Status);
-                throw new OrleansMissingMembershipEntryException($"This silo {self.SiloAddress} status {self.Status} is not in its own local silo list! This is a bug!");
-            }
-
-            // Go over every node excluding me,
+            // Go over every node excluding this one.
             // Find up to NumProbedSilos silos after me, which are not suspected by anyone and add them to the probedSilos,
             // In addition, every suspected silo you encounter on the way, add it to the probedSilos.
             var silosToWatch = new List<SiloAddress>();
             var additionalSilos = new List<SiloAddress>();
 
-            for (int i = 0; i < tmpList.Count - 1 && silosToWatch.Count < this.clusterMembershipOptions.CurrentValue.NumProbedSilos; i++)
+            var tmpList = new List<(SiloAddress SiloAddress, int HashCode)>();
+            foreach (var (candidate, entry) in membership.Entries)
             {
-                var candidate = tmpList[(myIndex + i + 1) % tmpList.Count];
-                var candidateEntry = membership.Entries[candidate];
+                // Watch shutting-down silos as well, so we can properly ensure they become dead.
+                if (!IsFunctionalForMembership(entry.Status))
+                {
+                    continue;
+                }
 
-                if (candidate.IsSameLogicalSilo(this.localSiloDetails.SiloAddress)) continue;
+                tmpList.Add((candidate, 0));
 
-                bool isSuspected = candidateEntry.GetFreshVotes(now, this.clusterMembershipOptions.CurrentValue.DeathVoteExpirationTimeout).Count > 0;
-                if (isSuspected)
+                // Ignore the local silo.
+                if (candidate.IsSameLogicalSilo(this.localSiloDetails.SiloAddress))
+                {
+                    continue;
+                }
+
+                // Monitor all suspected and stale silos.
+                if (entry.GetFreshVotes(now, options.DeathVoteExpirationTimeout).Count > 0
+                    || entry.HasMissedIAmAlives(options, now))
                 {
                     additionalSilos.Add(candidate);
                 }
-                else
+            }
+
+            // Each silo monitors up to NumProbedSilos other silos.
+            // Monitoring is determined using multiple hash rings, each generated with a different seeded hash function.
+            // For each hash ring:
+            // 1. The hash values of all silos are updated based on the ring's seed and sorted to determine their positions.
+            // 2. The local silo finds its position in the sorted list and iterates over subsequent silos, wrapping around at the ends.
+            // 3. The first silo not already being monitored is selected and added to the monitoring set.
+            //
+            // This approach probabilistically constructs an Expander Graph (https://en.wikipedia.org/wiki/Expander_graph).
+            // Expander graphs improve fault detection time when there are multiple concurrent failures by minimizing overlap
+            // in monitoring sets between any two silos and reducing dependency chains (e.g., avoiding cases where one failed
+            // silo must be evicted before another failed silo can be detected).
+            // The idea to use an expander graph is taken from "Stable and Consistent Membership at Scale with Rapid" by Lalith Suresh et al:
+            // https://www.usenix.org/conference/atc18/presentation/suresh
+            for (var ringNum = 0; ringNum < numProbedSilos; ++ringNum)
+            {
+                // Update hash values with the current ring number.
+                for (var i = 0; i < tmpList.Count; i++)
                 {
-                    silosToWatch.Add(candidate);
+                    var siloAddress = tmpList[i].SiloAddress;
+                    tmpList[i] = (siloAddress, siloAddress.GetConsistentHashCode(ringNum));
+                }
+
+                // Sort the candidates based on their updated hash values.
+                tmpList.Sort((x, y) => x.HashCode.CompareTo(y.HashCode));
+
+                var myIndex = tmpList.FindIndex(el => el.SiloAddress.Equals(self.SiloAddress));
+                if (myIndex < 0)
+                {
+                    log.LogError(
+                        (int)ErrorCode.Runtime_Error_100305,
+                        "This silo {SiloAddress} status {Status} is not in its own local silo list! This is a bug!",
+                        self.SiloAddress.ToString(),
+                        self.Status);
+                    throw new OrleansMissingMembershipEntryException(
+                        $"This silo {self.SiloAddress} status {self.Status} is not in its own local silo list! This is a bug!");
+                }
+
+                // Starting at the local silo's index, find the first non-monitored silo and add it to the list.
+                for (var i = 0; i < tmpList.Count - 1; i++)
+                {
+                    var candidate = tmpList[(myIndex + i + 1) % tmpList.Count].SiloAddress;
+                    if (!silosToWatch.Contains(candidate))
+                    {
+                        Debug.Assert(!candidate.IsSameLogicalSilo(this.localSiloDetails.SiloAddress));
+                        silosToWatch.Add(candidate);
+                        break;
+                    }
                 }
             }
 
@@ -236,16 +273,12 @@ namespace Orleans.Runtime.MembershipService
             return result;
 
             static bool AreTheSame<T>(ImmutableDictionary<SiloAddress, T> first, ImmutableDictionary<SiloAddress, T> second)
-            {
-                return first.Count == second.Count && first.Count == first.Keys.Intersect(second.Keys).Count();
-            }
+                => first.Count == second.Count && first.Count == first.Keys.Intersect(second.Keys).Count();
 
             static bool IsFunctionalForMembership(SiloStatus status)
-            {
-                return status == SiloStatus.Active || status == SiloStatus.ShuttingDown || status == SiloStatus.Stopping;
-            }
+                => status is SiloStatus.Active or SiloStatus.ShuttingDown or SiloStatus.Stopping;
         }
-        
+
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
             var tasks = new List<Task>();
@@ -290,20 +323,12 @@ namespace Orleans.Runtime.MembershipService
             {
                 if (probeResult.Status == ProbeResultStatus.Failed && probeResult.FailedProbeCount >= this.clusterMembershipOptions.CurrentValue.NumMissedProbesLimit)
                 {
-                    await this.membershipService.TryToSuspectOrKill(monitor.SiloAddress).ConfigureAwait(false);
+                    await this.membershipService.TryToSuspectOrKill(monitor.TargetSiloAddress).ConfigureAwait(false);
                 }
             }
             else if (probeResult.Status == ProbeResultStatus.Failed)
             {
-                if (this.clusterMembershipOptions.CurrentValue.NumVotesForDeathDeclaration <= 2)
-                {
-                    // Since both this silo and another silo were unable to probe the target silo, we declare it dead.
-                    await this.membershipService.TryKill(monitor.SiloAddress).ConfigureAwait(false);
-                }
-                else
-                {
-                    await this.membershipService.TryToSuspectOrKill(monitor.SiloAddress).ConfigureAwait(false);
-                }
+                await this.membershipService.TryToSuspectOrKill(monitor.TargetSiloAddress, probeResult.Intermediary).ConfigureAwait(false);
             }
         }
 
@@ -316,7 +341,7 @@ namespace Orleans.Runtime.MembershipService
                 ok &= monitor.CheckHealth(lastCheckTime, out var monitorReason);
                 if (!string.IsNullOrWhiteSpace(monitorReason))
                 {
-                    var siloReason = $"Monitor for {monitor.SiloAddress} is degraded with: {monitorReason}.";
+                    var siloReason = $"Monitor for {monitor.TargetSiloAddress} is degraded with: {monitorReason}.";
                     if (string.IsNullOrWhiteSpace(reason))
                     {
                         reason = siloReason;
@@ -350,7 +375,7 @@ namespace Orleans.Runtime.MembershipService
                 }
                 catch (Exception exception)
                 {
-                    log.LogError(exception, "Error disposing monitor for {SiloAddress}.", monitor.SiloAddress);
+                    log.LogError(exception, "Error disposing monitor for {SiloAddress}.", monitor.TargetSiloAddress);
                 }
             }
         }
@@ -375,7 +400,7 @@ namespace Orleans.Runtime.MembershipService
                 }
                 catch (Exception exception)
                 {
-                    log.LogError(exception, "Error disposing monitor for {SiloAddress}.", monitor.SiloAddress);
+                    log.LogError(exception, "Error disposing monitor for {SiloAddress}.", monitor.TargetSiloAddress);
                 }
             }
 
