@@ -56,7 +56,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public override string ToString() => $"StatelessWorkerPlacement(max={MaxLocal} | (proactive={ProactiveWorkerCollection}))";
+        public override string ToString() => $"StatelessWorkerPlacement(max={MaxLocal}, proactive={ProactiveWorkerCollection})";
 
         /// <inheritdoc/>
         public override void Initialize(GrainProperties properties)
