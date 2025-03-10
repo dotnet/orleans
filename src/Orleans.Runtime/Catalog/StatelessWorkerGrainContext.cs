@@ -8,7 +8,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Configuration;
 
 namespace Orleans.Runtime;
 
@@ -52,7 +51,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         if (strategy.ProactiveWorkerCollection ||
             _shared.StatelessWorkerOptions.UseProactiveWorkerCollection)
         {
-            _workerCollector = new(this, _shared.StatelessWorkerOptions);
+            _workerCollector = new(this, _shared.StatelessWorkerOptions.ProactiveWorkerCollectionBackoffPeriod);
         }
     }
 
@@ -381,11 +380,10 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         /// </summary>
         private readonly WeakReference<StatelessWorkerGrainContext> _contextRef;
 
-        public WorkerCollector(StatelessWorkerGrainContext context, StatelessWorkerOptions options)
+        public WorkerCollector(StatelessWorkerGrainContext context, TimeSpan backoffPeriod)
         {
             _contextRef = new(context);
-            _collectionTask = Task.Run(() => PeriodicallyCollectWorkers(
-                options.ProactiveWorkerCollectionBackoffPeriod));
+            _collectionTask = Task.Run(() => PeriodicallyCollectWorkers(backoffPeriod));
         }
 
         private async Task PeriodicallyCollectWorkers(TimeSpan backoffPeriod)
