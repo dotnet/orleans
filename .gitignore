@@ -214,6 +214,3 @@ src/SetupTestScriptOutput.txt
 
 # VS Code
 .ionide/
-/test/Benchmarks/BenchmarkDotNet.Artifacts/results/Benchmarks.Ping.StatelessWorkerBenchmark-report-github.md
-/test/Benchmarks/BenchmarkDotNet.Artifacts/results/Benchmarks.Ping.StatelessWorkerBenchmark-report.csv
-/test/Benchmarks/BenchmarkDotNet.Artifacts/results/Benchmarks.Ping.StatelessWorkerBenchmark-report.html
