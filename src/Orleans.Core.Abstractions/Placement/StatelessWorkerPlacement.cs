@@ -26,7 +26,7 @@ namespace Orleans.Runtime
         public int MaxLocal { get; private set; }
 
         /// <summary>
-        /// Instructs the runtime wether it should proactive collect idle workers or let them be collected by the activation collector.
+        /// Instructs the runtime whether it should eagerly collect idle workers based on concurrent load or let them be collected by the activation collector.
         /// </summary>
         [Id(1)]
         public bool ProactiveWorkerCollection { get; private set; }
