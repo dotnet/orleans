@@ -42,7 +42,7 @@ namespace Orleans.Runtime.Membership
     /// </remarks>
     public class ZooKeeperBasedMembershipTable : IMembershipTable
     {
-        private ILogger _logger;
+        private readonly ILogger _logger;
         private readonly ZooKeeperClusteringSiloOptions _options;
         private const int ZOOKEEPER_CONNECTION_TIMEOUT = 5000;
 
@@ -169,12 +169,12 @@ namespace Orleans.Runtime.Membership
         /// <returns>True if the insert operation succeeded and false otherwise.</returns>
         public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
         {
-            string rowPath = ConvertToRowPath(entry.SiloAddress);
-            string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
-            byte[] newRowData = Serialize(entry);
-            byte[] newRowIAmAliveData = Serialize(entry.IAmAliveTime);
+            var rowPath = ConvertToRowPath(entry.SiloAddress);
+            var rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
+            var newRowData = Serialize(entry);
+            var newRowIAmAliveData = Serialize(entry.IAmAliveTime);
 
-            int expectedTableVersion = int.Parse(tableVersion.VersionEtag, CultureInfo.InvariantCulture);
+            var expectedTableVersion = int.Parse(tableVersion.VersionEtag, CultureInfo.InvariantCulture);
 
             return await ZooKeeper.Using(_rootConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, new ZooKeeperWatcher(_logger), async zk
                 => await zk.TryTransaction(tx
@@ -202,13 +202,13 @@ namespace Orleans.Runtime.Membership
         /// <returns>True if the update operation succeeded and false otherwise.</returns>
         public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
         {
-            string rowPath = ConvertToRowPath(entry.SiloAddress);
-            string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
+            var rowPath = ConvertToRowPath(entry.SiloAddress);
+            var rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
             var newRowData = Serialize(entry);
             var newRowIAmAliveData = Serialize(entry.IAmAliveTime);
 
-            int expectedTableVersion = int.Parse(tableVersion.VersionEtag, CultureInfo.InvariantCulture);
-            int expectedRowVersion = int.Parse(etag, CultureInfo.InvariantCulture);
+            var expectedTableVersion = int.Parse(tableVersion.VersionEtag, CultureInfo.InvariantCulture);
+            var expectedRowVersion = int.Parse(etag, CultureInfo.InvariantCulture);
 
             return await ZooKeeper.Using(_rootConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, new ZooKeeperWatcher(_logger), async zk
                 => await zk.TryTransaction(tx
@@ -231,8 +231,8 @@ namespace Orleans.Runtime.Membership
         /// <returns>Task representing the successful execution of this operation. </returns>
         public async Task UpdateIAmAlive(MembershipEntry entry)
         {
-            string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
-            byte[] newRowIAmAliveData = Serialize(entry.IAmAliveTime);
+            var rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
+            var newRowIAmAliveData = Serialize(entry.IAmAliveTime);
 
             //update the data for IAmAlive unconditionally
             await ZooKeeper.Using(_rootConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, new ZooKeeperWatcher(_logger), async zk
@@ -244,7 +244,7 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         public async Task DeleteMembershipTableEntries(string clusterId)
         {
-            string pathToDelete = $"/{clusterId}";
+            var pathToDelete = $"/{clusterId}";
 
             await ZooKeeper.Using(_rootConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, new ZooKeeperWatcher(_logger), async zk =>
             {
@@ -289,8 +289,8 @@ namespace Orleans.Runtime.Membership
         /// <param name="siloAddress">The silo address.</param>
         private async Task<(MembershipEntry membershipEntry, string version)> GetRow(ZooKeeper zk, SiloAddress siloAddress)
         {
-            string rowPath = ConvertToRowPath(siloAddress);
-            string rowIAmAlivePath = ConvertToRowIAmAlivePath(siloAddress);
+            var rowPath = ConvertToRowPath(siloAddress);
+            var rowIAmAlivePath = ConvertToRowIAmAlivePath(siloAddress);
 
             var rowData = await zk.getDataAsync(rowPath);
             var rowIAmAliveData = await zk.getDataAsync(rowIAmAlivePath);
@@ -298,7 +298,7 @@ namespace Orleans.Runtime.Membership
             var me = Deserialize<MembershipEntry>(rowData.Data);
             me.IAmAliveTime = Deserialize<DateTime>(rowIAmAliveData.Data);
 
-            int rowVersion = rowData.Stat.getVersion();
+            var rowVersion = rowData.Stat.getVersion();
             return (membershipEntry: me, version: rowVersion.ToString(CultureInfo.InvariantCulture));
         }
 
@@ -310,7 +310,7 @@ namespace Orleans.Runtime.Membership
 
         private static TableVersion ConvertToTableVersion(Stat stat)
         {
-            int version = stat.getVersion();
+            var version = stat.getVersion();
             return new TableVersion(version, version.ToString(CultureInfo.InvariantCulture));
         }
 
@@ -346,36 +346,36 @@ namespace Orleans.Runtime.Membership
     /// </summary>
     internal class ZooKeeperWatcher : Watcher
     {
-        private readonly ILogger logger;
+        private readonly ILogger _logger;
 
         public ZooKeeperWatcher(ILogger logger)
         {
-            this.logger = logger;
+            _logger = logger;
         }
 
         public override Task process(WatchedEvent ev)
         {
-            if (logger.IsEnabled(LogLevel.Debug))
+            if (_logger.IsEnabled(LogLevel.Debug))
             {
-                logger.LogDebug("DEBUG: {ev}", ev.ToString());
+                _logger.LogDebug("DEBUG: {ev}", ev.ToString());
             }
 
             switch (ev.getState())
             {
                 case KeeperState.AuthFailed:
-                    logger.LogError("ZooKeeper authentication failed");
+                    _logger.LogError("ZooKeeper authentication failed");
                     break;
                 case KeeperState.Expired:
-                    logger.LogError("ZooKeeper session expired");
+                    _logger.LogError("ZooKeeper session expired");
                     break;
                 case KeeperState.Disconnected:
-                    logger.LogError("ZooKeeper disconnected");
+                    _logger.LogError("ZooKeeper disconnected");
                     break;
                 case KeeperState.SyncConnected:
-                    logger.LogInformation("ZooKeeper connected");
+                    _logger.LogInformation("ZooKeeper connected");
                     break;
                 case KeeperState.ConnectedReadOnly:
-                    logger.LogInformation("ZooKeeper connected readonly");
+                    _logger.LogInformation("ZooKeeper connected readonly");
                     break;
             }
 

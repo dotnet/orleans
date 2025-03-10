@@ -17,29 +17,20 @@ namespace Orleans.Runtime.Membership
         private readonly ZooKeeperWatcher _watcher;
 
         /// <summary>
-        /// the node name for this deployment. for eg. /ClusterId
-        /// </summary>
-        private readonly string _deploymentPath;
-
-        /// <summary>
         /// The deployment connection string. for eg. "192.168.1.1,192.168.1.2/ClusterId"
         /// </summary>
-        private readonly string _deploymentConnectionString;
-        private readonly TimeSpan _maxStaleness;
         private readonly ZooKeeperBasedMembershipTable _zooKeeperBasedMembershipTable;
+        private readonly IOptions<GatewayOptions> _gatewayOptions;
 
         public ZooKeeperGatewayListProvider(
             ZooKeeperBasedMembershipTable zooKeeperBasedMembershipTable,
             ILogger<ZooKeeperGatewayListProvider> logger,
-            IOptions<ZooKeeperGatewayListProviderOptions> options,
-            IOptions<GatewayOptions> gatewayOptions,
-            IOptions<ClusterOptions> clusterOptions)
+            IOptions<GatewayOptions> gatewayOptions)
         {
             _watcher = new ZooKeeperWatcher(logger);
-            _deploymentPath = "/" + clusterOptions.Value.ClusterId;
-            _deploymentConnectionString = options.Value.ConnectionString + _deploymentPath;
-            _maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
+            
             _zooKeeperBasedMembershipTable = zooKeeperBasedMembershipTable;
+            _gatewayOptions = gatewayOptions;
         }
 
         /// <summary>
@@ -71,7 +62,7 @@ namespace Orleans.Runtime.Membership
         /// <summary>
         /// Specifies how often this IGatewayListProvider is refreshed, to have a bound on max staleness of its returned information.
         /// </summary>
-        public TimeSpan MaxStaleness => _maxStaleness;
+        public TimeSpan MaxStaleness => _gatewayOptions.Value.GatewayListRefreshPeriod;
 
         /// <summary>
         /// Specifies whether this IGatewayListProvider ever refreshes its returned information, or always returns the same gw list.
