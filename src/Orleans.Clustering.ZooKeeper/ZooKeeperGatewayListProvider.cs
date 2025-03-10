@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
-using Orleans.Messaging;
+
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using Orleans.Configuration;
+using Orleans.Messaging;
 
 namespace Orleans.Runtime.Membership
 {
@@ -14,26 +17,20 @@ namespace Orleans.Runtime.Membership
         private readonly ZooKeeperWatcher _watcher;
 
         /// <summary>
-        /// the node name for this deployment. for eg. /ClusterId
-        /// </summary>
-        private readonly string _deploymentPath;
-
-        /// <summary>
         /// The deployment connection string. for eg. "192.168.1.1,192.168.1.2/ClusterId"
         /// </summary>
-        private readonly string _deploymentConnectionString;
-        private readonly TimeSpan _maxStaleness;
+        private readonly ZooKeeperBasedMembershipTable _zooKeeperBasedMembershipTable;
+        private readonly IOptions<GatewayOptions> _gatewayOptions;
 
         public ZooKeeperGatewayListProvider(
+            ZooKeeperBasedMembershipTable zooKeeperBasedMembershipTable,
             ILogger<ZooKeeperGatewayListProvider> logger,
-            IOptions<ZooKeeperGatewayListProviderOptions> options,
-            IOptions<GatewayOptions> gatewayOptions,
-            IOptions<ClusterOptions> clusterOptions)
+            IOptions<GatewayOptions> gatewayOptions)
         {
             _watcher = new ZooKeeperWatcher(logger);
-            _deploymentPath = "/" + clusterOptions.Value.ClusterId;
-            _deploymentConnectionString = options.Value.ConnectionString + _deploymentPath;
-            _maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
+            
+            _zooKeeperBasedMembershipTable = zooKeeperBasedMembershipTable;
+            _gatewayOptions = gatewayOptions;
         }
 
         /// <summary>
@@ -47,12 +44,17 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         public async Task<IList<Uri>> GetGateways()
         {
-            var membershipTableData = await ZooKeeperBasedMembershipTable.ReadAll(this._deploymentConnectionString, this._watcher);
-            return membershipTableData.Members.Select(e => e.Item1).
-                Where(m => m.Status == SiloStatus.Active && m.ProxyPort != 0).
-                Select(m =>
+            var membershipTableData = await _zooKeeperBasedMembershipTable.ReadAll();
+
+            return membershipTableData
+                .Members
+                .Select(e => e.Item1)
+                .Where(m => m.Status == SiloStatus.Active && m.ProxyPort != 0)
+                .Select(m =>
                 {
-                    var gatewayAddress = SiloAddress.New(m.SiloAddress.Endpoint.Address, m.ProxyPort, m.SiloAddress.Generation);
+                    var endpoint = new IPEndPoint(m.SiloAddress.Endpoint.Address, m.ProxyPort);
+                    var gatewayAddress = SiloAddress.New(endpoint, m.SiloAddress.Generation);
+
                     return gatewayAddress.ToGatewayUri();
                 }).ToList();
         }
@@ -60,7 +62,7 @@ namespace Orleans.Runtime.Membership
         /// <summary>
         /// Specifies how often this IGatewayListProvider is refreshed, to have a bound on max staleness of its returned information.
         /// </summary>
-        public TimeSpan MaxStaleness => _maxStaleness;
+        public TimeSpan MaxStaleness => _gatewayOptions.Value.GatewayListRefreshPeriod;
 
         /// <summary>
         /// Specifies whether this IGatewayListProvider ever refreshes its returned information, or always returns the same gw list.
