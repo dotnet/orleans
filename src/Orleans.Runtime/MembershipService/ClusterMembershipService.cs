@@ -87,6 +87,10 @@ namespace Orleans.Runtime
                     this.updates.TryPublish(tableSnapshot.CreateClusterMembershipSnapshot());
                 }
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                // Ignore and continue shutting down.
+            }
             catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
             {
                 this.log.LogError(exception, "Error processing membership updates");
