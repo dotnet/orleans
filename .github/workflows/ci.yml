@@ -480,6 +480,53 @@ jobs:
         path: |
           **/TestResults/*
           **/logs/*
+  test-nats:
+    name: NATS stream provider tests
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      matrix:
+        provider: ["NATS"]
+        framework: [net8.0]
+#    services:
+#      nats:
+#        image: nats:latest
+#        ports:
+#        - 4222:4222
+#        - 8222:8222
+#        env:
+#          HTTP_PORT: 8222
+    steps:
+    - name: Start NATS
+      run: docker run -d --name nats -p 4222:4222 -p 8222:8222 nats:latest --js --http-port=8222
+    - name: Wait for NATS
+      run: sleep 5
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: |
+          8.0.x
+    - name: Test
+      run: dotnet test
+        --framework ${{ matrix.framework }}
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --blame-hang-timeout 10m
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
+        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
+        -- -parallel none -noshadow
+    - name: Clean up container
+      if: always()
+      run: docker rm -f nats
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
+        retention-days: 1
+        path: |
+          **/TestResults/*
+          **/logs/*
   test:
     name: Test
     runs-on: ${{ matrix.os }}
