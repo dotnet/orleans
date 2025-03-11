@@ -413,7 +413,7 @@ namespace Orleans.Runtime
             return new GrainReferenceKeyInfo(GrainId.ToKeyInfo());
         }
         
-        internal static GrainReference FromKeyString(string key, IGrainReferenceRuntime runtime)
+        public static GrainReference FromKeyString(string key, IGrainReferenceRuntime runtime)
         {
             if (string.IsNullOrWhiteSpace(key)) throw new ArgumentNullException(nameof(key), "GrainReference.FromKeyString cannot parse null key");
 

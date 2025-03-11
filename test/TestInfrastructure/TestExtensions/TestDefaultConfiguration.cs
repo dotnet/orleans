@@ -44,6 +44,30 @@ namespace TestExtensions
         public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
         public static string RedisConnectionString => defaultConfiguration[nameof(RedisConnectionString)];
 
+        private static CosmosConnection cosmosConnection;
+        public static CosmosConnection CosmosConnectionData
+        {
+            get
+            {
+                if (cosmosConnection is not null)
+                {
+                    return cosmosConnection;
+                }
+
+                try
+                {
+                    cosmosConnection = defaultConfiguration.GetSection(nameof(CosmosConnection)).Get<CosmosConnection>();
+                }
+                catch (Exception)
+                {
+                    cosmosConnection = CosmosConnection.LocalCosmosEmulator;
+                }
+
+                return cosmosConnection;
+            }
+        }
+        
+
         public static bool GetValue(string key, out string value)
         {
             value = defaultConfiguration.GetValue(key, default(string));

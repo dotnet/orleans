@@ -8,6 +8,8 @@ using Orleans.Runtime;
 using Orleans.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System.Collections.Generic;
+using System.Threading;
 
 namespace Orleans.TestingHost
 {
