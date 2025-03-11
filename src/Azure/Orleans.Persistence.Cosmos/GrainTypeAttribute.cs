@@ -10,8 +10,6 @@ namespace Orleans.Persistence.Cosmos;
 [AttributeUsage(AttributeTargets.Class)]
 public sealed class GrainTypeAttribute : Attribute
 {
-    public static int? MaxGrainTypeLengthAllowed = null;
-
     /// <summary>
     /// Initializes a new instance of the <see cref="GrainTypeAttribute"/> class.
     /// </summary>
@@ -28,11 +26,6 @@ public sealed class GrainTypeAttribute : Attribute
         if (grainType.Length == 0)
         {
             throw new ArgumentOutOfRangeException(nameof(grainType), "The value is an empty string.");
-        }
-
-        if (MaxGrainTypeLengthAllowed is not null && grainType.Length > MaxGrainTypeLengthAllowed.Value)
-        {
-            throw new ArgumentOutOfRangeException(nameof(grainType), $"The string is too long. Maximum length is {MaxGrainTypeLengthAllowed.Value}");
         }
 
         foreach (var c in grainType)

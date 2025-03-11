@@ -14,7 +14,7 @@ using Orleans.Persistence.Cosmos;
 
 namespace Tester.AzureUtils.Migration
 {
-    [TestCategory("Functionals"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureTableStorage")]
+    [TestCategory("Functional"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureTableStorage")]
     public class MigrationAzureStorageTableToCosmosDbLegacySerializationTests : MigrationTableStorageToCosmosLegacySerializationTests, IClassFixture<MigrationAzureStorageTableToCosmosDbLegacySerializationTests.Fixture>
     {
         public static string OrleansDatabase = Resources.MigrationDatabase;

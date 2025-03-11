@@ -1,5 +1,4 @@
-#if NET7_0_OR_GREATER
-using Microsoft.Extensions.Options;
+#if NET7_0_OR_GREATER 
 using Orleans.Hosting;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
@@ -8,7 +7,7 @@ using Xunit;
 
 namespace Tester.AzureUtils.Migration
 {
-    [TestCategory("Functionals"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureTableStorage")]
+    [TestCategory("Functional"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureTableStorage")]
     public class MigrationAzureTableRemindersTests : MigrationRemindersTests, IClassFixture<MigrationAzureTableRemindersTests.Fixture>
     {
         public static Guid Guid = Guid.NewGuid();

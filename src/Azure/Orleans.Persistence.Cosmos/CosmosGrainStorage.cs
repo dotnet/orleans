@@ -109,7 +109,7 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
     /// extracted from the <paramref name="source"/> exception.
     /// </summary>
     /// <param name="destination">
-    /// The exception to enreach with additional information.
+    /// The exception to enrich with additional information.
     /// </param>
     /// <param name="source">
     /// The exception from which to take additional information.
@@ -120,7 +120,7 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
     /// <returns>
     /// The <paramref name="destination"/> exception that was passed in for chaining.
     /// </returns>
-    private static Exception EnreachException(Exception destination, Exception source, GrainId grainId)
+    private static Exception EnrichException(Exception destination, Exception source, GrainId grainId)
     {
         var data = destination.Data;
         var originalStackTrace = source.StackTrace;
@@ -148,12 +148,12 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
 
     private static Exception CreateOrleansException(Exception source, GrainId grainId)
     {
-        return EnreachException(new OrleansException(source.Message), source, grainId);
+        return EnrichException(new OrleansException(source.Message), source, grainId);
     }
 
     private static Exception CreateInconsistentStateException(CosmosException source, IGrainState grainState, GrainId grainId)
     {
-        return EnreachException(
+        return EnrichException(
                 new InconsistentStateException(
                     source.Message,
                     storedEtag: source.Headers.ETag,
