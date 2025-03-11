@@ -48,10 +48,9 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         _maxWorkers = strategy.MaxLocal;
         _messageLoopTask = Task.Run(RunMessageLoop);
 
-        if (strategy.ProactiveWorkerCollection ||
-            _shared.StatelessWorkerOptions.UseProactiveWorkerCollection)
+        if (strategy.RemoveIdleWorkers || _shared.StatelessWorkerOptions.RemoveIdleWorkers)
         {
-            _workerCollector = new(this, _shared.StatelessWorkerOptions.ProactiveWorkerCollectionBackoffPeriod);
+            _workerCollector = new(this, _shared.StatelessWorkerOptions.RemoveIdleWorkersBackoffPeriod);
         }
     }
 
@@ -164,7 +163,11 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
                         case WorkItemType.OnDestroyActivation:
                             {
                                 var grainContext = (ActivationData)workItem.State;
-                                _workers.Remove(grainContext);
+                                lock (_workers)
+                                {
+                                    _workers.Remove(grainContext);
+                                }
+
                                 if (_workers.Count == 0)
                                 {
                                     // When the last worker is destroyed, we can consider the stateless worker grain
@@ -261,7 +264,11 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
         newWorker.Activate(requestContext, cancellation.Token);
 
-        _workers.Add(newWorker);
+        lock (_workers)
+        {
+            _workers.Add(newWorker);
+        }
+
         return newWorker;
     }
 
@@ -414,8 +421,17 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
                         break;
                     }
 
-                    var _workers = context._workers;
-                    var averageWaitingCount = _workers.Count > 0 ? _workers.Average(w => w.WaitingCount) : 0;
+                    var workers = context._workers;
+                    var averageWaitingCount = 0d;
+
+                    if (workers.Count > 0)
+                    {
+                        lock (workers)
+                        {
+                            averageWaitingCount = workers.Average(w => w.WaitingCount);
+                        }
+                    }
+
                     var error = -averageWaitingCount; // Our target is 0 waiting count: 0 - avgWC = -avgWC
 
                     _integralTerm += error;
@@ -429,7 +445,13 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
                     if (_controlSignalNegativeCount > ControlSignalNegativeMaxCount &&
                         DateTime.Now - _lastWorkerRemovalTime > backoffPeriod)
                     {
-                        var inactiveWorkers = _workers.Where(w => w.IsInactive).ToImmutableArray();
+                        ImmutableArray<ActivationData> inactiveWorkers = [];
+
+                        lock (workers)
+                        {
+                            inactiveWorkers = workers.Where(w => w.IsInactive).ToImmutableArray();
+                        }
+
                         if (inactiveWorkers.Length > 0)
                         {
                             var worker = inactiveWorkers[Random.Shared.Next(inactiveWorkers.Length)];

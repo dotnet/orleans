@@ -13,21 +13,21 @@ public class StatelessWorkerOptions
     /// workers will be deactivated according to <see cref="GrainCollectionOptions.CollectionAge"/>.
     /// </summary>
     /// <remarks>You can read more on this <see href="https://www.ledjonbehluli.com/posts/orleans_adaptive_stateless_worker/">here</see></remarks>
-    public bool UseProactiveWorkerCollection { get; set; } = DEFAULT_USE_PROACTIVE_WORKER_COLLECTION;
+    public bool RemoveIdleWorkers { get; set; } = DEFAULT_REMOVE_IDLE_WORKERS;
 
     /// <summary>
-    /// The default value for <see cref="UseProactiveWorkerCollection"/>.
+    /// The default value for <see cref="RemoveIdleWorkers"/>.
     /// </summary>
-    public const bool DEFAULT_USE_PROACTIVE_WORKER_COLLECTION = false;
+    public const bool DEFAULT_REMOVE_IDLE_WORKERS = false;
 
     /// <summary>
     /// The minimum time between consecutive worker collections.
     /// </summary>
-    /// <remarks>This setting has no effect if <see cref="UseProactiveWorkerCollection"/> is <see langword="false"/>.</remarks>
-    public TimeSpan ProactiveWorkerCollectionBackoffPeriod { get; set; } = DEFAULT_PROACTIVE_WORKER_COLLECTION_BACKOFF_PERIOD;
+    /// <remarks>This setting has no effect if <see cref="RemoveIdleWorkers"/> is <see langword="false"/>.</remarks>
+    public TimeSpan RemoveIdleWorkersBackoffPeriod { get; set; } = DEFAULT_REMOVE_IDLE_WORKERS_BACKOFF_PERIOD;
 
     /// <summary>
-    /// The default value for <see cref="ProactiveWorkerCollectionBackoffPeriod"/>.
+    /// The default value for <see cref="RemoveIdleWorkersBackoffPeriod"/>.
     /// </summary>
-    public static readonly TimeSpan DEFAULT_PROACTIVE_WORKER_COLLECTION_BACKOFF_PERIOD = TimeSpan.FromSeconds(1);
+    public static readonly TimeSpan DEFAULT_REMOVE_IDLE_WORKERS_BACKOFF_PERIOD = TimeSpan.FromSeconds(1);
 }

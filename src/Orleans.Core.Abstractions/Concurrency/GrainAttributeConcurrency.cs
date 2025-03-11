@@ -58,18 +58,18 @@ namespace Orleans.Concurrency
         /// Initializes a new instance of the <see cref="StatelessWorkerAttribute"/> class.
         /// </summary>
         /// <param name="maxLocalWorkers">The maximum local workers.</param>
-        /// <param name="proactiveWorkerCollection">Tries to collects idle workers before the configured collection age.</param>
-        public StatelessWorkerAttribute(int maxLocalWorkers, bool proactiveWorkerCollection)
-            : base(new StatelessWorkerPlacement(maxLocalWorkers, proactiveWorkerCollection))
+        /// <param name="removeIdleWorkers">Removes idle workers before the configured collection age.</param>
+        public StatelessWorkerAttribute(int maxLocalWorkers, bool removeIdleWorkers)
+            : base(new StatelessWorkerPlacement(maxLocalWorkers, removeIdleWorkers))
         {
         }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StatelessWorkerAttribute"/> class.
         /// </summary>
-        /// <param name="proactiveWorkerCollection">Tries to collects idle workers before the configured collection age.</param>
-        public StatelessWorkerAttribute(bool proactiveWorkerCollection)
-            : base(new StatelessWorkerPlacement(-1, proactiveWorkerCollection))
+        /// <param name="removeIdleWorkers">Removes idle workers before the configured collection age.</param>
+        public StatelessWorkerAttribute(bool removeIdleWorkers)
+            : base(new StatelessWorkerPlacement(-1, removeIdleWorkers))
         {
         }
 

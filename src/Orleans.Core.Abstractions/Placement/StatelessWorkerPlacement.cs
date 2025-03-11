@@ -12,7 +12,7 @@ namespace Orleans.Runtime
     internal sealed class StatelessWorkerPlacement : PlacementStrategy
     {
         private const string MaxLocalPropertyKey = "max-local-instances";
-        private const string ProactiveCollectionPropertyKey = "proactive-removal";
+        private const string RemoveIdleWorkersPropertyKey = "remove-idle-workers";
 
         private static readonly int DefaultMaxStatelessWorkers = Environment.ProcessorCount;
 
@@ -29,7 +29,7 @@ namespace Orleans.Runtime
         /// Instructs the runtime whether it should eagerly collect idle workers based on concurrent load or let them be collected by the activation collector.
         /// </summary>
         [Id(1)]
-        public bool ProactiveWorkerCollection { get; private set; }
+        public bool RemoveIdleWorkers { get; private set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StatelessWorkerPlacement"/> class.
@@ -37,15 +37,15 @@ namespace Orleans.Runtime
         /// <param name="maxLocal">
         /// The maximum number of local instances which can be simultaneously active for a given grain.
         /// </param>
-        /// <param name="proactiveWorkerCollection">
-        /// Wether to proactively collect workers if they are inactive, or let them be collected by the activation collector.
+        /// <param name="removeIdleWorkers">
+        /// Wether to proactively remove workers if they are inactive, or let them be collected by the activation collector.
         /// </param>
-        internal StatelessWorkerPlacement(int maxLocal, bool proactiveWorkerCollection)
+        internal StatelessWorkerPlacement(int maxLocal, bool removeIdleWorkers)
         {
             // If maxLocal was not specified on the StatelessWorkerAttribute,
             // we will use the defaultMaxStatelessWorkers, which is System.Environment.ProcessorCount.
             this.MaxLocal = maxLocal > 0 ? maxLocal : DefaultMaxStatelessWorkers;
-            this.ProactiveWorkerCollection = proactiveWorkerCollection;
+            this.RemoveIdleWorkers = removeIdleWorkers;
         }
 
         /// <summary>
@@ -56,7 +56,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public override string ToString() => $"StatelessWorkerPlacement(max={MaxLocal}, proactive={ProactiveWorkerCollection})";
+        public override string ToString() => $"StatelessWorkerPlacement(max={MaxLocal}, proactive={RemoveIdleWorkers})";
 
         /// <inheritdoc/>
         public override void Initialize(GrainProperties properties)
@@ -72,12 +72,12 @@ namespace Orleans.Runtime
                 }
             }
 
-            if (properties.Properties.TryGetValue(ProactiveCollectionPropertyKey, out var proactive) &&
+            if (properties.Properties.TryGetValue(RemoveIdleWorkersPropertyKey, out var proactive) &&
                 !string.IsNullOrWhiteSpace(proactive))
             {
                 if (bool.TryParse(proactive, out var isProactive))
                 {
-                    ProactiveWorkerCollection = isProactive;
+                    RemoveIdleWorkers = isProactive;
                 }
             }
         }
@@ -86,7 +86,7 @@ namespace Orleans.Runtime
         public override void PopulateGrainProperties(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
             properties[MaxLocalPropertyKey] = MaxLocal.ToString(CultureInfo.InvariantCulture);
-            properties[ProactiveCollectionPropertyKey] = ProactiveWorkerCollection.ToString();
+            properties[RemoveIdleWorkersPropertyKey] = RemoveIdleWorkers.ToString();
 
             base.PopulateGrainProperties(services, grainClass, grainType, properties);
         }
