@@ -13,6 +13,6 @@ public sealed class ClusterDocumentIdProvider : DocumentIdProviderBase
             throw new ArgumentNullException(nameof(options));
         }
 
-        this.serviceId = options.Value?.ServiceId;
+        this.ServiceId = options.Value?.ServiceId;
     }
 }

@@ -78,31 +78,6 @@ namespace Orleans.GrainDirectory.AzureStorage
         }
 
         /// <summary>
-        /// Creates a new <see cref="AzureTableDataManager{T}"/> instance and initializes it.
-        /// </summary>
-        internal async Task<AzureTableDataManager<T>> CreateAndInitRecreateAsync(string tableNameSuffix)
-        {
-            var copyTableName = BuildCopyTableName();
-            var copy = new AzureTableDataManager<T>(this.options, this.Logger, copyTableName);
-            await copy.InitTableAsync();
-            return copy;
-
-            string BuildCopyTableName()
-            {
-                // Table names must be from 3 to 63 characters long.
-                var leftoverLength = (63 - tableNameSuffix.Length);
-                if (this.TableName.Length >= (63 - tableNameSuffix.Length))
-                {
-                    // we cant append suffix, so lets trim to length of i.e. 55 and then build a tableName
-                    var tableName = this.TableName.Substring(0, length: leftoverLength);
-                    return tableName + tableNameSuffix;
-                }
-
-                return this.TableName + tableNameSuffix;
-            }
-        } 
-
-        /// <summary>
         /// Connects to, or creates and initializes a new Azure table if it does not already exist.
         /// </summary>
         /// <returns>Completion promise for this operation.</returns>

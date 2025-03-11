@@ -16,5 +16,5 @@ public interface IDocumentIdProvider
     /// <param name="grainTypeName">The grain type name.</param>
     /// <param name="grainKey">The grain key.</param>
     /// <returns>The document id and partition key.</returns>
-    (string documentId, string partitionKey) GetDocumentIdentifiers(string stateName, string grainTypeName, string grainKey);
+    (string DocumentId, string PartitionKey) GetDocumentIdentifiers(string stateName, string grainTypeName, string grainKey);
 }

@@ -16,6 +16,9 @@ namespace Orleans.Persistence.Migration
 {
     public static class HostingExtensions
     {
+        /// <summary>
+        /// Adds components required for migration tooling to function correctly
+        /// </summary>
         public static ISiloBuilder AddMigrationTools(this ISiloBuilder builder)
         {
             builder.ConfigureServices(services =>

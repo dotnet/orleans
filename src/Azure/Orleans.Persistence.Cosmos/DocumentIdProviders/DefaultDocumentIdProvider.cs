@@ -26,7 +26,7 @@ public sealed class DefaultDocumentIdProvider : DocumentIdProviderBase
         }
 
         // In PROD it should be null, we will not prefix item IDs with the service ID.
-        this.serviceId = options.Value?.ServiceId;
+        this.ServiceId = options.Value?.ServiceId;
     }
 }
 

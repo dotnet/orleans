@@ -511,12 +511,9 @@ namespace Orleans.Storage
 
         public async IAsyncEnumerable<StorageEntry> GetAll(object storageEntryCursor, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            // another storage table will be used for the migration data: we can't modify original table due to ETag collisions and other concurrent access problems
-            var migrationTableManager = await GetMigrationTableManagerAsync();
-
             var filterQuery = CalculateFilter(storageEntryCursor);
             var entries = this.tableDataManager.ReadAllAsync(filter: filterQuery, cancellationToken: cancellationToken);
-            await foreach (var entry in entries.WithCancellation(cancellationToken))
+            await foreach (var entry in entries)
             {
                 var pkParts = entry.PartitionKey.Split('_');
                 if (pkParts.Length != 2)
@@ -559,12 +556,6 @@ namespace Orleans.Storage
         // only for testing
         internal AzureTableDataManager<TableEntity> GetUnderlyingTableDataManager()
             => this.tableDataManager.TableManager;
-
-        private Task<AzureTableDataManager<TableEntity>> GetMigrationTableManagerAsync()
-        {
-            var tableManager = this.tableDataManager.TableManager;
-            return tableManager.CreateAndInitRecreateAsync("migratedEntries"); 
-        }
     }
 
     public static class AzureTableGrainStorageFactory

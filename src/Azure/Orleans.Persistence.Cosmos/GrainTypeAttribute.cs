@@ -1,4 +1,4 @@
-﻿// <copyright file="GrainTypeAttribute.cs" company="Microsoft">
+// <copyright file="GrainTypeAttribute.cs" company="Microsoft">
 // Copyright (c) Microsoft. All rights reserved.
 // </copyright>
 
@@ -10,6 +10,8 @@ namespace Orleans.Persistence.Cosmos;
 [AttributeUsage(AttributeTargets.Class)]
 public sealed class GrainTypeAttribute : Attribute
 {
+    public static int? MaxGrainTypeLengthAllowed = null;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="GrainTypeAttribute"/> class.
     /// </summary>
@@ -28,14 +30,17 @@ public sealed class GrainTypeAttribute : Attribute
             throw new ArgumentOutOfRangeException(nameof(grainType), "The value is an empty string.");
         }
 
-        if (grainType.Length > 32)
+        if (MaxGrainTypeLengthAllowed is not null && grainType.Length > MaxGrainTypeLengthAllowed.Value)
         {
-            throw new ArgumentOutOfRangeException(nameof(grainType), "The string is too long.");
+            throw new ArgumentOutOfRangeException(nameof(grainType), $"The string is too long. Maximum length is {MaxGrainTypeLengthAllowed.Value}");
         }
 
         foreach (var c in grainType)
         {
-            bool isValid = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z');
+            bool isValid =
+                (c >= '0' && c <= '9')
+                || (c >= 'a' && c <= 'z')
+                || (c == '`'); // for generic grains like [GrainType("mytype`1")]
 
             if (!isValid)
             {

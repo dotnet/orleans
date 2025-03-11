@@ -12,6 +12,13 @@ namespace Orleans.Persistence.Cosmos.Migration
 {
     public static class AzureCosmosSiloBuilderExtensions
     {
+        /// <summary>
+        /// Configure silo to use Azure Cosmos DB storage in migration mode.
+        /// </summary>
+        /// <param name="builder">Builder for the silo</param>
+        /// <param name="name">registration name for migration grain storage</param>
+        /// <param name="configureOptions">additional options</param>
+        /// <returns>configured silo builder</returns>
         public static ISiloBuilder AddMigrationAzureCosmosGrainStorage(
             this ISiloBuilder builder,
             string name,

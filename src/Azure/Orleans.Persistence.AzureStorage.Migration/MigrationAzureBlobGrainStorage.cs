@@ -20,8 +20,12 @@ using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 namespace Orleans.Storage.Migration.AzureStorage
 {
     /// <summary>
-    /// Simple storage provider for writing grain state data to Azure blob storage in JSON format.
+    /// Migration storage provider for writing grain state data format to Azure blob storage in JSON format.
     /// </summary>
+    /// <notes>
+    /// Is similar to <see cref="AzureBlobGrainStorage"/> with the difference
+    /// of using <see cref="IGrainReferenceExtractor"/> for converting grainReference into a migrated (new) format.
+    /// </notes>
     public class MigrationAzureBlobGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
         private BlobContainerClient container;

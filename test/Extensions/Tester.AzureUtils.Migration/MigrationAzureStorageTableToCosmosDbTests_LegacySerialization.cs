@@ -20,7 +20,7 @@ namespace Tester.AzureUtils.Migration
         public static string OrleansDatabase = Resources.MigrationDatabase;
         public static string OrleansContainer = Resources.MigrationLegacyContainer; // container has different partition key '/pk'
 
-        public static string RandomIdentifier = Guid.NewGuid().ToString().Replace("-", "");
+        public static string RandomIdentifier = Guid.NewGuid().ToString("N");
 
         public MigrationAzureStorageTableToCosmosDbLegacySerializationTests(Fixture fixture) : base(fixture)
         {

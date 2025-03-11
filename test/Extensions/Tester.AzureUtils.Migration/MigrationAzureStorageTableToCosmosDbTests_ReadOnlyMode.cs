@@ -18,7 +18,7 @@ namespace Tester.AzureUtils.Migration
         public static string OrleansDatabase = Resources.MigrationDatabase;
         public static string OrleansContainer = Resources.MigrationLatestContainer;
 
-        public static string RandomIdentifier = Guid.NewGuid().ToString().Replace("-", "");
+        public static string RandomIdentifier = Guid.NewGuid().ToString("N");
 
         public MigrationReadonlyAzureStorageTableToCosmosDbTests(Fixture fixture) : base(fixture)
         {

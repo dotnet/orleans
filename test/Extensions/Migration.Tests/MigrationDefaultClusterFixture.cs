@@ -20,21 +20,7 @@ namespace Migration.Tests
             TestDefaultConfiguration.InitializeDefaults();
         }
 
-        public override async Task InitializeAsync()
-        {
-            var builder = new TestClusterBuilder(1);
-            TestDefaultConfiguration.ConfigureTestCluster(builder);
-            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-
-            var testCluster = builder.Build();
-            if (testCluster.Primary == null)
-            {
-                await testCluster.DeployAsync().ConfigureAwait(false);
-            }
-
-            this.HostedCluster = testCluster;
-            this.Logger = this.Client?.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
-        }
+        public override Task InitializeAsync() => InitializeAsyncCore<SiloConfigurator>();
 
         public class SiloConfigurator : ISiloConfigurator
         {

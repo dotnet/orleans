@@ -66,7 +66,6 @@ namespace Orleans.Persistence.Migration
             {
                 try
                 {
-                    await _clusterMembershipService.Refresh();
                     var firstAddressSilo = _clusterMembershipService.CurrentSnapshot.Members.Values
                         .Where(s => s.Status == SiloStatus.Active)
                         .OrderBy(s => s.SiloAddress)
@@ -74,7 +73,7 @@ namespace Orleans.Persistence.Migration
 
                     if (firstAddressSilo is null)
                     {
-                        _logger.Info("No silos available, retrying in 15 sec...");
+                        _logger.LogInformation("No silos available, retrying in 15 sec...");
                         await Task.Delay(TimeSpan.FromSeconds(15), stoppingToken);
                         continue;
                     }
@@ -97,27 +96,27 @@ namespace Orleans.Persistence.Migration
 
                     if (grainMigrationResult.EntriesMigratedOrSkipped)
                     {
-                        _logger.Info("Successfully migrated all grains!");
+                        _logger.LogInformation("Successfully migrated all grains!");
                     }
 
                     if (!reminderMigrationResult.IsAvailable)
                     {
-                        _logger.Info("Reminder migration is not available. " + reminderMigrationResult.Reason);
+                        _logger.LogInformation("Reminder migration is not available. " + reminderMigrationResult.Reason);
                     }
                     else if (reminderMigrationResult.EntriesMigratedOrSkipped)
                     {
-                        _logger.Info("Successfully migrated all reminders!");
+                        _logger.LogInformation("Successfully migrated all reminders!");
                     }
 
                     if (grainMigrationResult.EntriesMigratedOrSkipped && reminderMigrationResult.EntriesMigratedOrSkipped)
                     {
-                        _logger.Info("Migration completed");
+                        _logger.LogInformation("Migration completed");
                         return;
                     }
 
                     if (grainMigrationResult.SkippedAllEntries)
                     {
-                        _logger.Info("Migration completed");
+                        _logger.LogInformation("Migration completed");
                         return;
                     }
                 }
@@ -135,21 +134,20 @@ namespace Orleans.Persistence.Migration
         /// </summary>
         public async Task<MigrationStats> MigrateGrainsAsync(CancellationToken cancellationToken)
         {
-            _logger.Info("Starting grains migration. LastProcessedGrainCursor: {cursor}", _lastProcessedGrainCursor);
+            _logger.LogInformation("Starting grains migration. LastProcessedGrainCursor: {cursor}", _lastProcessedGrainCursor);
 
             var migrationStats = new MigrationStats();
             await foreach (var storageEntry in _sourceStorage.GetAll(_lastProcessedGrainCursor, cancellationToken))
             {
-                var initGrainType = storageEntry.GrainType;
                 migrationStats.EntriesProcessed++;
-                if (!_options.DontSkipMigrateEntries)
+                if (!_options.ProcessMigratedEntries)
                 {
                     IGrainState tmpState = new GrainState<object>();
                     await _destinationStorage.ReadStateAsync(storageEntry.GrainType, storageEntry.GrainReference, tmpState);
 
                     if (tmpState is not null && tmpState.RecordExists)
                     {
-                        _logger.Info("Entry (type='{grainType}';ref='{reference}') already exists at destination storage", storageEntry.GrainType, storageEntry.GrainReference.ToShortKeyString());
+                        _logger.LogInformation("Entry (type='{grainType}';ref='{reference}') already exists at destination storage", storageEntry.GrainType, storageEntry.GrainReference.ToShortKeyString());
                         migrationStats.SkippedEntries++;
                         continue;
                     }
@@ -176,18 +174,18 @@ namespace Orleans.Persistence.Migration
                     // guarding against any exception which can happen against different storages (i.e. storage/cosmos/etc) here
                     catch (InconsistentStateException ex) when (ex.InnerException is RequestFailedException reqExc && reqExc.Message.StartsWith("The specified blob already exists"))
                     {
-                        _logger.Info("Migrated blob already exists, but was not skipped: {entryName};", storageEntry.GrainType);
+                        _logger.LogInformation("Migrated blob already exists, but was not skipped: {entryName};", storageEntry.GrainType);
                         // ignore: we have already migrated this entry to new storage.
                     }
                     catch (InconsistentStateException ex) when (ex.Message.Contains("Resource with specified id or name already exists"))
                     {
-                        _logger.Info("Migrated cosmosDb doc already exists, but was not skipped: {entryName};", storageEntry.GrainType);
+                        _logger.LogInformation("Migrated cosmosDb doc already exists, but was not skipped: {entryName};", storageEntry.GrainType);
                         // ignore: we have already migrated this entry to new storage.
                     }
 
                     migrationStats.MigratedEntries++;
                     _lastProcessedGrainCursor = storageEntry.Cursor;
-                    _logger.Debug("Grain {grainType} with key {grainKey} is migrated successfully. StorageEntry: {storageEntry}", storageEntry.GrainType, storageEntry.GrainReference.ToShortKeyString(), _lastProcessedGrainCursor);
+                    _logger.LogDebug("Grain {grainType} with key {grainKey} is migrated successfully. StorageEntry: {storageEntry}", storageEntry.GrainType, storageEntry.GrainReference.ToShortKeyString(), _lastProcessedGrainCursor);
                 }
                 catch (Exception ex)
                 {
@@ -196,7 +194,7 @@ namespace Orleans.Persistence.Migration
                 }
             }
 
-            _logger.Info("Finished grains migration");
+            _logger.LogInformation("Finished grains migration");
             return migrationStats;
         }
 
@@ -211,16 +209,18 @@ namespace Orleans.Persistence.Migration
                 };
             }
 
-            _logger.Info("Starting reminders migration");
+            _logger.LogInformation("Starting reminders migration");
             var migrationStats = new MigrationStats();
 
             uint currentPointer = startingGrainRefHashCode;
             while (true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 try
                 {
                     var entries = await _reminderMigrationStorage.SourceReminderTable.ReadRows(currentPointer, currentPointer + _options.RemindersMigrationBatchSize);
-                    _logger.Info($"Fetched batch: {entries.Reminders.Count} reminders");
+                    _logger.LogInformation($"Fetched batch: {entries.Reminders.Count} reminders");
                     if (entries.Reminders.Count == 0)
                     {
                         break;
@@ -251,7 +251,7 @@ namespace Orleans.Persistence.Migration
                 }
             }
 
-            _logger.Info("Finished reminders migration");
+            _logger.LogInformation("Finished reminders migration");
             return migrationStats;
         }
 
@@ -285,7 +285,15 @@ namespace Orleans.Persistence.Migration
 
     public class DataMigratorOptions
     {
-        public bool DontSkipMigrateEntries { get; set; } = false;
+        /// <summary>
+        /// If false, will lookup to destination storage to identify whether entry was already migrated.
+        /// If true, will forcefully migrate the entry.
+        /// </summary>
+        public bool ProcessMigratedEntries { get; set; } = false;
+
+        /// <summary>
+        /// Batch size of how many reminder entries should be taken at a single query to underlying storage
+        /// </summary>
         public uint RemindersMigrationBatchSize { get; set; } = 10000;
 
         /// <summary>

@@ -17,8 +17,6 @@ namespace Orleans.Persistence.Cosmos;
 /// </summary>
 internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
 {
-    private const string KEY_STRING_SEPARATOR = "__";
-
     // for access from GrainStateTypeInfoProvider implementations
     internal static readonly MethodInfo ReadStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(ReadStateAsyncCore), 1, BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(string), typeof(GrainId), typeof(IGrainState) }, null)!;
     internal static readonly MethodInfo WriteStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(WriteStateAsyncCore), 1, BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(string), typeof(GrainId), typeof(IGrainState) }, null)!;

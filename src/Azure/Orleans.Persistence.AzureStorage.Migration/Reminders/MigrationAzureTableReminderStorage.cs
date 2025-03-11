@@ -7,7 +7,6 @@ using Orleans.Persistence.Migration;
 using Orleans.Reminders.AzureStorage;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Orleans.Persistence.AzureStorage.Migration.Reminders
 {

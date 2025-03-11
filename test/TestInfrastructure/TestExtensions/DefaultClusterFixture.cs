@@ -16,7 +16,7 @@ namespace TestExtensions
             TestDefaultConfiguration.InitializeDefaults();
         }
 
-        public TestCluster HostedCluster { get; protected set; }
+        public TestCluster HostedCluster { get; private set; }
 
         public IGrainFactory GrainFactory => this.HostedCluster?.GrainFactory;
 
@@ -24,11 +24,15 @@ namespace TestExtensions
 
         public ILogger Logger { get; protected set; }
 
-        public virtual async Task InitializeAsync()
+        public virtual Task InitializeAsync()
+            => InitializeAsyncCore<SiloHostConfigurator>();
+
+        protected async Task InitializeAsyncCore<TConfigurator>()
+            where TConfigurator : class, new()
         {
             var builder = new TestClusterBuilder();
             TestDefaultConfiguration.ConfigureTestCluster(builder);
-            builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
+            builder.AddSiloBuilderConfigurator<TConfigurator>();
 
             var testCluster = builder.Build();
             if (testCluster.Primary == null)

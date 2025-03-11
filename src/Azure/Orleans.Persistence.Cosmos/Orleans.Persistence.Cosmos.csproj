@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Persistence.Cosmos</PackageId>
-    <Title>Microsoft Orleans Persistence Azure Cosmos Db</Title>
-    <Description>Microsoft Orleans persistence providers for Cosmos Db</Description>
+    <Title>Microsoft Orleans Persistence Azure Cosmos DB</Title>
+    <Description>Microsoft Orleans persistence providers for Azure Cosmos DB</Description>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable> <!-- explicitly is not packable: maybe will be released later -->
