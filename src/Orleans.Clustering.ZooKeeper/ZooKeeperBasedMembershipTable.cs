@@ -269,9 +269,9 @@ namespace Orleans.Runtime.Membership
                     var rowData = await GetRow(zk, SiloAddress.FromParsableString(child));
 
                     var membershipEntry = rowData.membershipEntry;
-
+                    
                     _logger.LogInformation("{child} status: {status} last: {alive}", child, membershipEntry.Status, membershipEntry.IAmAliveTime);
-                    if (membershipEntry.Status == SiloStatus.Dead && membershipEntry.IAmAliveTime < beforeDate)
+                    if (membershipEntry.Status != SiloStatus.Active && membershipEntry.IAmAliveTime < beforeDate)
                     {
                         _logger.LogInformation("Deleting defunct silo entry {address} status: {status} last: {alive}.", membershipEntry.SiloAddress, membershipEntry.Status, membershipEntry.IAmAliveTime);
                         deleteTasks.Add(ZKUtil.deleteRecursiveAsync(zk, rowPath));
