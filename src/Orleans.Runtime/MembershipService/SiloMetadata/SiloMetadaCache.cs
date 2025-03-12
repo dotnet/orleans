@@ -12,6 +12,7 @@ namespace Orleans.Runtime.MembershipService.SiloMetadata;
 internal class SiloMetadataCache(
     ISiloMetadataClient siloMetadataClient,
     MembershipTableManager membershipTableManager,
+    IOptions<ClusterMembershipOptions> clusterMembershipOptions,
     ILogger<SiloMetadataCache> logger)
     : ISiloMetadataCache, ILifecycleParticipant<ISiloLifecycle>, IDisposable
 {
@@ -54,7 +55,7 @@ internal class SiloMetadataCache(
                 // Add entries for members that aren't already in the cache
                 var recentlyActiveSilos = update.Entries
                     .Where(e => e.Value.Status is SiloStatus.Active or SiloStatus.Joining)
-                    .Where(e => !e.Value.HasMissedIAmAlives());
+                    .Where(e => !e.Value.HasMissedIAmAlives(clusterMembershipOptions.Value, DateTime.UtcNow));
                 foreach (var membershipEntry in recentlyActiveSilos)
                 {
                     if (!_metadata.ContainsKey(membershipEntry.Key))
