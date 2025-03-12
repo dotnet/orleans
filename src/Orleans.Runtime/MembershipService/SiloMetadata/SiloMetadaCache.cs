@@ -19,7 +19,7 @@ internal class SiloMetadataCache(
     : ISiloMetadataCache, ILifecycleParticipant<ISiloLifecycle>, IDisposable
 {
     private readonly ConcurrentDictionary<SiloAddress, SiloMetadata> _metadata = new();
-    private readonly ConcurrentDictionary<SiloAddress, DateTime> _negativeCache = new();
+    private readonly Dictionary<SiloAddress, DateTime> _negativeCache = new();
     private readonly CancellationTokenSource _cts = new();
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
@@ -71,7 +71,7 @@ internal class SiloMetadataCache(
                         {
                             var metadata = await siloMetadataClient.GetSiloMetadata(membershipEntry.Key).WaitAsync(ct);
                             _metadata.TryAdd(membershipEntry.Key, metadata);
-                            _negativeCache.TryRemove(membershipEntry.Key, out _);
+                            _negativeCache.Remove(membershipEntry.Key, out _);
                         }
                         catch(Exception exception)
                         {
@@ -87,7 +87,7 @@ internal class SiloMetadataCache(
                 foreach (var membershipEntry in deadSilos)
                 {
                     _metadata.TryRemove(membershipEntry.Key, out _);
-                    _negativeCache.TryRemove(membershipEntry.Key, out _);
+                    _negativeCache.Remove(membershipEntry.Key, out _);
                 }
 
                 // Remove entries for members that are no longer in the table
@@ -96,7 +96,7 @@ internal class SiloMetadataCache(
                     if (!update.Entries.ContainsKey(silo))
                     {
                         _metadata.TryRemove(silo, out _);
-                        _negativeCache.TryRemove(silo, out _);
+                        _negativeCache.Remove(silo, out _);
                     }
                 }
             }
