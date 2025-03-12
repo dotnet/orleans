@@ -16,6 +16,7 @@ internal class SiloMetadataCache(
     : ISiloMetadataCache, ILifecycleParticipant<ISiloLifecycle>, IDisposable
 {
     private readonly ConcurrentDictionary<SiloAddress, SiloMetadata> _metadata = new();
+    private readonly ConcurrentDictionary<SiloAddress, DateTime> _negativeCache = new();
     private readonly CancellationTokenSource _cts = new();
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
@@ -51,24 +52,35 @@ internal class SiloMetadataCache(
             await foreach (var update in membershipTableManager.MembershipTableUpdates.WithCancellation(ct))
             {
                 // Add entries for members that aren't already in the cache
-                foreach (var membershipEntry in update.Entries.Where(e => e.Value.Status is SiloStatus.Active or SiloStatus.Joining))
+                var recentlyActiveSilos = update.Entries
+                    .Where(e => e.Value.Status is SiloStatus.Active or SiloStatus.Joining)
+                    .Where(e => !e.Value.HasMissedIAmAlives());
+                foreach (var membershipEntry in recentlyActiveSilos)
                 {
                     if (!_metadata.ContainsKey(membershipEntry.Key))
                     {
+                        if (_negativeCache.TryGetValue(membershipEntry.Key, out var expiration) && expiration > DateTime.UtcNow)
+                        {
+                            continue;
+                        }
                         try
                         {
                             var metadata = await siloMetadataClient.GetSiloMetadata(membershipEntry.Key).WaitAsync(ct);
                             _metadata.TryAdd(membershipEntry.Key, metadata);
+                            _negativeCache.TryRemove(membershipEntry.Key, out _);
                         }
                         catch(Exception exception)
                         {
+                            _negativeCache.TryAdd(membershipEntry.Key, DateTime.UtcNow + TimeSpan.FromMinutes(10));
                             logger.LogError(exception, "Error fetching metadata for silo {Silo}", membershipEntry.Key);
                         }
                     }
                 }
 
                 // Remove entries for members that are now dead
-                foreach (var membershipEntry in update.Entries.Where(e => e.Value.Status == SiloStatus.Dead))
+                var deadSilos = update.Entries
+                    .Where(e => e.Value.Status == SiloStatus.Dead);
+                foreach (var membershipEntry in deadSilos)
                 {
                     _metadata.TryRemove(membershipEntry.Key, out _);
                 }
