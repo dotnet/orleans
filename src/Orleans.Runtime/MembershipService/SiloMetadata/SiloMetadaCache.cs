@@ -55,14 +55,15 @@ internal class SiloMetadataCache(
             await foreach (var update in membershipTableManager.MembershipTableUpdates.WithCancellation(ct))
             {
                 // Add entries for members that aren't already in the cache
+                var now = DateTime.UtcNow;
                 var recentlyActiveSilos = update.Entries
                     .Where(e => e.Value.Status is SiloStatus.Active or SiloStatus.Joining)
-                    .Where(e => !e.Value.HasMissedIAmAlives(clusterMembershipOptions.Value, DateTime.UtcNow));
+                    .Where(e => !e.Value.HasMissedIAmAlives(clusterMembershipOptions.Value, now));
                 foreach (var membershipEntry in recentlyActiveSilos)
                 {
                     if (!_metadata.ContainsKey(membershipEntry.Key))
                     {
-                        if (_negativeCache.TryGetValue(membershipEntry.Key, out var expiration) && expiration > DateTime.UtcNow)
+                        if (_negativeCache.TryGetValue(membershipEntry.Key, out var expiration) && expiration > now)
                         {
                             continue;
                         }
@@ -74,7 +75,7 @@ internal class SiloMetadataCache(
                         }
                         catch(Exception exception)
                         {
-                            _negativeCache.TryAdd(membershipEntry.Key, DateTime.UtcNow + TimeSpan.FromMinutes(10));
+                            _negativeCache.TryAdd(membershipEntry.Key, now + TimeSpan.FromMinutes(10));
                             logger.LogError(exception, "Error fetching metadata for silo {Silo}", membershipEntry.Key);
                         }
                     }
