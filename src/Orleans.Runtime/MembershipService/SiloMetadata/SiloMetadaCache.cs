@@ -118,3 +118,4 @@ internal class SiloMetadataCache(
 
     public void Dispose() => _cts.Cancel();
 }
+
