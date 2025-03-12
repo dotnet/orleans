@@ -86,6 +86,7 @@ internal class SiloMetadataCache(
                 foreach (var membershipEntry in deadSilos)
                 {
                     _metadata.TryRemove(membershipEntry.Key, out _);
+                    _negativeCache.TryRemove(membershipEntry.Key, out _);
                 }
 
                 // Remove entries for members that are no longer in the table
@@ -94,6 +95,7 @@ internal class SiloMetadataCache(
                     if (!update.Entries.ContainsKey(silo))
                     {
                         _metadata.TryRemove(silo, out _);
+                        _negativeCache.TryRemove(silo, out _);
                     }
                 }
             }
