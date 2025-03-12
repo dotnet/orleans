@@ -21,12 +21,16 @@ internal class SiloMetadataCache(
     private readonly ConcurrentDictionary<SiloAddress, SiloMetadata> _metadata = new();
     private readonly Dictionary<SiloAddress, DateTime> _negativeCache = new();
     private readonly CancellationTokenSource _cts = new();
+    private TimeSpan negativeCachePeriod;
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
     {
         Task? task = null;
         Task OnStart(CancellationToken _)
         {
+            // This gives time for the cluster to be voted Dead and for membership updates to propagate that out
+            negativeCachePeriod = clusterMembershipOptions.Value.ProbeTimeout * clusterMembershipOptions.Value.NumMissedProbesLimit 
+                                  + (2 * clusterMembershipOptions.Value.TableRefreshTimeout)
             task = Task.Run(() => this.ProcessMembershipUpdates(_cts.Token));
             return Task.CompletedTask;
         }
@@ -75,7 +79,7 @@ internal class SiloMetadataCache(
                         }
                         catch(Exception exception)
                         {
-                            _negativeCache.TryAdd(membershipEntry.Key, now + TimeSpan.FromMinutes(10));
+                            _negativeCache.TryAdd(membershipEntry.Key, now + negativeCachePeriod);
                             logger.LogError(exception, "Error fetching metadata for silo {Silo}", membershipEntry.Key);
                         }
                     }
