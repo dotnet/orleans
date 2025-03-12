@@ -30,7 +30,7 @@ internal class SiloMetadataCache(
         {
             // This gives time for the cluster to be voted Dead and for membership updates to propagate that out
             negativeCachePeriod = clusterMembershipOptions.Value.ProbeTimeout * clusterMembershipOptions.Value.NumMissedProbesLimit 
-                                  + (2 * clusterMembershipOptions.Value.TableRefreshTimeout)
+                                  + (2 * clusterMembershipOptions.Value.TableRefreshTimeout);
             task = Task.Run(() => this.ProcessMembershipUpdates(_cts.Token));
             return Task.CompletedTask;
         }
