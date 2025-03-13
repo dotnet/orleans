@@ -462,7 +462,7 @@ namespace NonSilo.Tests.Membership
 
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
             await manager.TryToSuspectOrKill(otherSilos.First().SiloAddress);
-            manager.TestingSuspectOrKillIdle.WaitOne();
+            manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
         }
 
@@ -527,7 +527,7 @@ namespace NonSilo.Tests.Membership
 
             var victim = otherSilos.First().SiloAddress;
             await manager.TryToSuspectOrKill(victim);
-            manager.TestingSuspectOrKillIdle.WaitOne();
+            manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
             Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.GetSiloStatus(victim));
         }
 
@@ -645,7 +645,7 @@ namespace NonSilo.Tests.Membership
             await manager.TryToSuspectOrKill(victim);
             await manager.TryToSuspectOrKill(victim);
             await manager.TryToSuspectOrKill(victim);
-            manager.TestingSuspectOrKillIdle.WaitOne();
+            manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
             Assert.Equal(SiloStatus.Active, manager.MembershipTableSnapshot.GetSiloStatus(victim));
 
             // Manually remove our vote and add another silo's vote so we can be the one to kill the silo.
@@ -660,7 +660,7 @@ namespace NonSilo.Tests.Membership
             }
 
             await manager.TryToSuspectOrKill(victim);
-            manager.TestingSuspectOrKillIdle.WaitOne();
+            manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
             Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.GetSiloStatus(victim));
 
             // One down, one to go. Now overshoot votes and kill ourselves instead (due to internal error).
@@ -679,7 +679,7 @@ namespace NonSilo.Tests.Membership
 
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
             await manager.TryToSuspectOrKill(victim);
-            manager.TestingSuspectOrKillIdle.WaitOne();
+            manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
             // We killed ourselves and should not have marked the other silo as dead.
