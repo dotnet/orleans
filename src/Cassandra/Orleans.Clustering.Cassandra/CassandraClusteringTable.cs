@@ -204,7 +204,7 @@ internal sealed class CassandraClusteringTable : IMembershipTable
 
         foreach (var e in allEntries)
         {
-            if (e is not { Status: SiloStatus.Active } && new DateTime(Math.Max(e.IAmAliveTime.Ticks, e.StartTime.Ticks)) < beforeDate)
+            if (e is not { Status: SiloStatus.Active } && new DateTime(Math.Max(e.IAmAliveTime.Ticks, e.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
             {
                 await Session.ExecuteAsync(await Queries.DeleteMembershipEntry(_identifier, e));
             }
