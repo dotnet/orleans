@@ -284,7 +284,7 @@ namespace NonSilo.Tests.Membership
 
                 while (probeCalls.TryDequeue(out var call)) ;
 
-                testRig.Manager.TestingSuspectOrKillIdle.WaitOne();
+                testRig.Manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
                 // Check that probes match the expected missed probes
                 table = await this.membershipTable.ReadAll();
                 foreach (var siloMonitor in monitoredSilos)
@@ -465,7 +465,7 @@ namespace NonSilo.Tests.Membership
             await testRig.Manager.Refresh();
 
             await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion);
-            testRig.Manager.TestingSuspectOrKillIdle.WaitOne();
+            testRig.Manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
             lastVersion = testRig.TestAccessor.ObservedVersion;
 
             table = await this.membershipTable.ReadAll();
