@@ -57,10 +57,9 @@ internal sealed class CassandraGatewayListProvider : IGatewayListProvider
 
         _queries = await OrleansQueries.CreateInstance(_session);
 
-        await _session.ExecuteAsync(_queries.EnsureTableExists(_ttlSeconds));
-        await _session.ExecuteAsync(_queries.EnsureIndexExists);
+        await _queries.EnsureTableExistsAsync(_options.InitializeRetryMaxDelay, _ttlSeconds);
     }
-
+    
     async Task<IList<Uri>> IGatewayListProvider.GetGateways()
     {
         if (_cachedResult is not null && _cacheUntil > DateTime.UtcNow)
