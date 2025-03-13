@@ -87,6 +87,10 @@ internal class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
                 previous = snapshot;
             }
         }
+        catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
+        {
+            // Ignore and continue shutting down.
+        }
         catch (Exception exception) when (_fatalErrorHandler.IsUnexpected(exception))
         {
             _logger.LogError(exception, "Error processing membership updates.");
