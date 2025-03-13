@@ -464,8 +464,9 @@ namespace NonSilo.Tests.Membership
 
             await testRig.Manager.Refresh();
 
-            await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion);
             testRig.Manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
+            await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion);
+            
             lastVersion = testRig.TestAccessor.ObservedVersion;
 
             table = await this.membershipTable.ReadAll();
