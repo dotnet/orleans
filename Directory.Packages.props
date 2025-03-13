@@ -89,7 +89,7 @@
     <PackageVersion Include="Microsoft.Extensions.Configuration.AzureKeyVault" Version="3.1.24" />
     <PackageVersion Include="System.CommandLine" Version="2.0.0-beta1.21308.1" />
     <PackageVersion Include="Microsoft.Crank.EventSources" Version="0.2.0-alpha.21457.1" />
-    <PackageVersion Include="MessagePack" Version="2.4.35" />
+    <PackageVersion Include="MessagePack" Version="2.5.192" />
     <PackageVersion Include="ZeroFormatter" Version="1.6.4" />
     <PackageVersion Include="Utf8Json" Version="1.3.7" />
     <PackageVersion Include="SpanJson" Version="3.3.1" />
