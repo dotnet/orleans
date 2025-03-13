@@ -15,6 +15,9 @@ namespace Orleans.Runtime.MembershipService
     /// </summary>
     internal class MembershipAgent : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, IDisposable, MembershipAgent.ITestAccessor
     {
+        private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MIN = TimeSpan.FromMilliseconds(200);
+        private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MAX = TimeSpan.FromMinutes(2);
+        private static readonly TimeSpan EXP_BACKOFF_STEP = TimeSpan.FromMilliseconds(1000);
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly MembershipTableManager tableManager;
         private readonly ILocalSiloDetails localSilo;
@@ -59,27 +62,31 @@ namespace Orleans.Runtime.MembershipService
             if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting periodic membership liveness timestamp updates");
             try
             {
-                TimeSpan? onceOffDelay = default;
-                while (await this.iAmAliveTimer.NextTick(onceOffDelay) && !this.tableManager.CurrentStatus.IsTerminating())
+                // jitter for initial
+                TimeSpan? overrideDelayPeriod = RandomTimeSpan.Next(this.clusterMembershipOptions.IAmAliveTablePublishTimeout);
+                var exponentialBackoff = new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP);
+                var runningFailures = 0;
+                while (await this.iAmAliveTimer.NextTick(overrideDelayPeriod) && !this.tableManager.CurrentStatus.IsTerminating())
                 {
-                    onceOffDelay = default;
-
                     try
                     {
                         var stopwatch = ValueStopwatch.StartNew();
                         ((ITestAccessor)this).OnUpdateIAmAlive?.Invoke();
                         await this.tableManager.UpdateIAmAlive();
                         if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace("Updating IAmAlive took {Elapsed}", stopwatch.Elapsed);
+                        overrideDelayPeriod = default;
+                        runningFailures = 0;
                     }
                     catch (Exception exception)
                     {
+                        runningFailures += 1;
                         this.log.LogWarning(
                             (int)ErrorCode.MembershipUpdateIAmAliveFailure,
                             exception,
                             "Failed to update table entry for this silo, will retry shortly");
 
-                        // Retry quickly
-                        onceOffDelay = TimeSpan.FromMilliseconds(200);
+                        // Retry quickly and then exponentially back off
+                        overrideDelayPeriod = exponentialBackoff.Next(runningFailures);
                     }
                 }
             }
