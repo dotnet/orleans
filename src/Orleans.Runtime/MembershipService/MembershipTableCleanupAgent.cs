@@ -14,7 +14,7 @@ namespace Orleans.Runtime.MembershipService
     /// <summary>
     /// Responsible for cleaning up dead membership table entries.
     /// </summary>
-    internal class MembershipTableCleanupAgent : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, IDisposable
+    internal partial class MembershipTableCleanupAgent : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
         private readonly ClusterMembershipOptions _clusterMembershipOptions;
         private readonly IMembershipTable _membershipTableProvider;
@@ -47,16 +47,12 @@ namespace Orleans.Runtime.MembershipService
         {
             if (!_clusterMembershipOptions.DefunctSiloCleanupPeriod.HasValue)
             {
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug($"Membership table cleanup is disabled due to {nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.DefunctSiloCleanupPeriod)} not being specified");
-                }
-
+                LogDebugMembershipTableCleanupDisabled(_logger);
                 return;
             }
 
             Debug.Assert(_cleanupDefunctSilosTimer is not null);
-            if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Starting membership table cleanup agent");
+            LogDebugStartingMembershipTableCleanupAgent(_logger);
             try
             {
                 var period = _clusterMembershipOptions.DefunctSiloCleanupPeriod.Value;
@@ -76,20 +72,18 @@ namespace Orleans.Runtime.MembershipService
                     catch (Exception exception) when (exception is NotImplementedException or MissingMethodException)
                     {
                         _cleanupDefunctSilosTimer.Dispose();
-                        _logger.LogWarning(
-                            (int)ErrorCode.MembershipCleanDeadEntriesFailure,
-                            $"{nameof(IMembershipTable.CleanupDefunctSiloEntries)} operation is not supported by the current implementation of {nameof(IMembershipTable)}. Disabling the timer now.");
+                        LogWarningCleanupDefunctSiloEntriesNotSupported(_logger);
                         return;
                     }
                     catch (Exception exception)
                     {
-                        _logger.LogError((int)ErrorCode.MembershipCleanDeadEntriesFailure, exception, "Failed to clean up defunct membership table entries");
+                        LogErrorFailedToCleanUpDefunctMembershipTableEntries(_logger, exception);
                     }
                 }
             }
             finally
             {
-                if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Stopped membership table cleanup agent");
+                LogDebugStoppedMembershipTableCleanupAgent(_logger);
             }
         }
 
@@ -124,5 +118,35 @@ namespace Orleans.Runtime.MembershipService
             reason = default;
             return true;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Membership table cleanup is disabled due to ClusterMembershipOptions.DefunctSiloCleanupPeriod not being specified"
+        )]
+        private static partial void LogDebugMembershipTableCleanupDisabled(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Starting membership table cleanup agent"
+        )]
+        private static partial void LogDebugStartingMembershipTableCleanupAgent(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "IMembershipTable.CleanupDefunctSiloEntries operation is not supported by the current implementation of IMembershipTable. Disabling the timer now."
+        )]
+        private static partial void LogWarningCleanupDefunctSiloEntriesNotSupported(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Failed to clean up defunct membership table entries"
+        )]
+        private static partial void LogErrorFailedToCleanUpDefunctMembershipTableEntries(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Stopped membership table cleanup agent"
+        )]
+        private static partial void LogDebugStoppedMembershipTableCleanupAgent(ILogger logger);
     }
 }

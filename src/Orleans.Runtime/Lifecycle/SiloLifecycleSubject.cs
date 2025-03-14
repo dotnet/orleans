@@ -11,7 +11,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Decorator over lifecycle subject for silo.  Adds some logging and monitoring
     /// </summary>
-    public class SiloLifecycleSubject : LifecycleSubject, ISiloLifecycleSubject
+    public partial class SiloLifecycleSubject : LifecycleSubject, ISiloLifecycleSubject
     {
         private static readonly ImmutableDictionary<int, string> StageNames = GetStageNames(typeof(ServiceLifecycleStage));
         private readonly List<MonitoredObserver> observers;
@@ -40,14 +40,7 @@ namespace Orleans.Runtime
         {
             foreach (var stage in this.observers.GroupBy(o => o.Stage).OrderBy(s => s.Key))
             {
-                if (this.Logger.IsEnabled(LogLevel.Debug))
-                {
-                    this.Logger.LogDebug(
-                        (int)ErrorCode.LifecycleStagesReport,
-                        "Stage {Stage}: {Observers}",
-                        this.GetStageName(stage.Key),
-                        string.Join(", ", stage.Select(o => o.Name)));
-                }
+                LogDebugLifecycleStagesReport(stage.Key, string.Join(", ", stage.Select(o => o.Name)));
             }
 
             return base.OnStart(cancellationToken);
@@ -77,27 +70,13 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         protected override void PerfMeasureOnStop(int stage, TimeSpan elapsed)
         {
-            if (this.Logger.IsEnabled(LogLevel.Debug))
-            {
-                this.Logger.LogDebug(
-                    (int)ErrorCode.SiloStartPerfMeasure,
-                    "Stopping lifecycle stage '{Stage}' took '{Elapsed}'.",
-                    this.GetStageName(stage),
-                    elapsed);
-            }
+            LogDebugStoppingLifecycleStage(this.GetStageName(stage), elapsed);
         }
 
         /// <inheritdoc />
         protected override void PerfMeasureOnStart(int stage, TimeSpan elapsed)
         {
-            if (this.Logger.IsEnabled(LogLevel.Debug))
-            {
-                this.Logger.LogDebug(
-                    (int)ErrorCode.SiloStartPerfMeasure,
-                    "Starting lifecycle stage '{Stage}' took '{Elapsed}'",
-                    this.GetStageName(stage),
-                    elapsed);
-            }
+            LogDebugStartingLifecycleStage(this.GetStageName(stage), elapsed);
         }
 
         /// <inheritdoc />
@@ -108,7 +87,7 @@ namespace Orleans.Runtime
             return base.Subscribe(observerName, stage, monitoredObserver);
         }
 
-        private class MonitoredObserver : ILifecycleObserver
+        private partial class MonitoredObserver : ILifecycleObserver
         {
             private readonly ILifecycleObserver observer;
             private readonly ILogger logger;
@@ -133,24 +112,11 @@ namespace Orleans.Runtime
                     var stopwatch = ValueStopwatch.StartNew();
                     await this.observer.OnStart(ct);
                     stopwatch.Stop();
-                    if (this.logger.IsEnabled(LogLevel.Debug))
-                    {
-                        this.logger.LogDebug(
-                            (int)ErrorCode.SiloStartPerfMeasure,
-                            "'{Name}' started in stage '{Stage}' in '{Elapsed}'.",
-                            this.Name,
-                            this.StageName,
-                            stopwatch.Elapsed);
-                    }
+                    LogDebugObserverStarted(this.Name, this.StageName, stopwatch.Elapsed);
                 }
                 catch (Exception exception)
                 {
-                    this.logger.LogError(
-                        (int)ErrorCode.LifecycleStartFailure,
-                        exception,
-                        "'{Name}' failed to start due to errors at stage '{Stage}'.",
-                        this.Name,
-                        this.StageName);
+                    LogErrorObserverStartFailure(exception, this.Name, this.StageName);
                     throw;
                 }
             }
@@ -160,48 +126,80 @@ namespace Orleans.Runtime
                 var stopwatch = ValueStopwatch.StartNew();
                 try
                 {
-                    if (this.logger.IsEnabled(LogLevel.Debug))
-                    {
-                        this.logger.LogDebug(
-                            (int)ErrorCode.SiloStartPerfMeasure,
-                            "'{Name}' stopping in stage '{Stage}'.",
-                            this.Name,
-                            this.StageName);
-                    }
+                    LogDebugObserverStopping(this.Name, this.StageName);
 
                     await this.observer.OnStop(cancellationToken);
                     stopwatch.Stop();
                     if (stopwatch.Elapsed > TimeSpan.FromSeconds(1))
                     {
-                        this.logger.LogWarning(
-                            (int)ErrorCode.SiloStartPerfMeasure,
-                            "'{Name}' stopped in stage '{Stage}' in '{Elapsed}'.",
-                            this.Name,
-                            this.StageName,
-                            stopwatch.Elapsed);
+                        LogObserverStopped(LogLevel.Warning, this.Name, this.StageName, stopwatch.Elapsed);
                     }
-                    else if (this.logger.IsEnabled(LogLevel.Debug))
+                    else
                     {
-                        this.logger.LogDebug(
-                            (int)ErrorCode.SiloStartPerfMeasure,
-                            "'{Name}' stopped in stage '{Stage}' in '{Elapsed}'.",
-                            this.Name,
-                            this.StageName,
-                            stopwatch.Elapsed);
+                        LogObserverStopped(LogLevel.Debug, this.Name, this.StageName, stopwatch.Elapsed);
                     }
                 }
                 catch (Exception exception)
                 {
-                    this.logger.LogError(
-                        (int)ErrorCode.LifecycleStartFailure,
-                        exception,
-                        "'{Name}' failed to stop due to errors at stage '{Stage}' after '{Elapsed}'.",
-                        this.Name,
-                        this.StageName,
-                        stopwatch.Elapsed);
+                    LogErrorObserverStopFailure(exception, this.Name, this.StageName, stopwatch.Elapsed);
                     throw;
                 }
             }
+
+            [LoggerMessage(
+                EventId = (int)ErrorCode.SiloStartPerfMeasure,
+                Level = LogLevel.Debug,
+                Message = "'{Name}' started in stage '{Stage}' in '{Elapsed}'."
+            )]
+            private partial void LogDebugObserverStarted(string name, string stage, TimeSpan elapsed);
+
+            [LoggerMessage(
+                EventId = (int)ErrorCode.LifecycleStartFailure,
+                Level = LogLevel.Error,
+                Message = "'{Name}' failed to start due to errors at stage '{Stage}'."
+            )]
+            private partial void LogErrorObserverStartFailure(Exception exception, string name, string stage);
+
+            [LoggerMessage(
+                EventId = (int)ErrorCode.SiloStartPerfMeasure,
+                Level = LogLevel.Debug,
+                Message = "'{Name}' stopping in stage '{Stage}'."
+            )]
+            private partial void LogDebugObserverStopping(string name, string stage);
+
+            [LoggerMessage(
+                EventId = (int)ErrorCode.SiloStartPerfMeasure,
+                Message = "'{Name}' stopped in stage '{Stage}' in '{Elapsed}'."
+            )]
+            private partial void LogObserverStopped(LogLevel logLevel, string name, string stage, TimeSpan elapsed);
+
+            [LoggerMessage(
+                EventId = (int)ErrorCode.LifecycleStartFailure,
+                Level = LogLevel.Error,
+                Message = "'{Name}' failed to stop due to errors at stage '{Stage}' after '{Elapsed}'."
+            )]
+            private partial void LogErrorObserverStopFailure(Exception exception, string name, string stage, TimeSpan elapsed);
         }
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.LifecycleStagesReport,
+            Level = LogLevel.Debug,
+            Message = "Stage {Stage}: {Observers}"
+        )]
+        private partial void LogDebugLifecycleStagesReport(int stage, string observers);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.SiloStartPerfMeasure,
+            Level = LogLevel.Debug,
+            Message = "Stopping lifecycle stage '{Stage}' took '{Elapsed}'."
+        )]
+        private partial void LogDebugStoppingLifecycleStage(string stage, TimeSpan elapsed);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.SiloStartPerfMeasure,
+            Level = LogLevel.Debug,
+            Message = "Starting lifecycle stage '{Stage}' took '{Elapsed}'"
+        )]
+        private partial void LogDebugStartingLifecycleStage(string stage, TimeSpan elapsed);
     }
 }
