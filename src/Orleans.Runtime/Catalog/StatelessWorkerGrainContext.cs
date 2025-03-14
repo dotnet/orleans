@@ -48,7 +48,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         _maxWorkers = strategy.MaxLocal;
         _messageLoopTask = Task.Run(RunMessageLoop);
 
-        if (strategy.RemoveIdleWorkers || _shared.StatelessWorkerOptions.RemoveIdleWorkers)
+        if (strategy.RemoveIdleWorkers && _shared.StatelessWorkerOptions.RemoveIdleWorkers)
         {
             _workerCollector = new(this, _shared.StatelessWorkerOptions.RemoveIdleWorkersBackoffPeriod);
         }

@@ -55,30 +55,17 @@ namespace Orleans.Concurrency
     public sealed class StatelessWorkerAttribute : PlacementAttribute, IGrainPropertiesProviderAttribute
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="StatelessWorkerAttribute"/> class.
+        /// When set to <see langword="true"/>, idle workers will be proactively deactivated by the runtime.
+        /// Otherwise if <see langword="false"/>, than the workers will be deactivated according to collection age.
         /// </summary>
-        /// <param name="maxLocalWorkers">The maximum local workers.</param>
-        /// <param name="removeIdleWorkers">Removes idle workers before the configured collection age.</param>
-        public StatelessWorkerAttribute(int maxLocalWorkers, bool removeIdleWorkers)
-            : base(new StatelessWorkerPlacement(maxLocalWorkers, removeIdleWorkers))
-        {
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="StatelessWorkerAttribute"/> class.
-        /// </summary>
-        /// <param name="removeIdleWorkers">Removes idle workers before the configured collection age.</param>
-        public StatelessWorkerAttribute(bool removeIdleWorkers)
-            : base(new StatelessWorkerPlacement(-1, removeIdleWorkers))
-        {
-        }
+        public bool RemoveIdleWorkers { get; set; } = true;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StatelessWorkerAttribute"/> class.
         /// </summary>
         /// <param name="maxLocalWorkers">The maximum local workers.</param>
         public StatelessWorkerAttribute(int maxLocalWorkers)
-            : base(new StatelessWorkerPlacement(maxLocalWorkers, false))
+            : base(new StatelessWorkerPlacement(maxLocalWorkers))
         {
         }
 
@@ -93,6 +80,11 @@ namespace Orleans.Concurrency
         /// <inheritdoc/>
         public override void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
+            if (PlacementStrategy is StatelessWorkerPlacement swPlacement)
+            {
+                swPlacement.RemoveIdleWorkers = RemoveIdleWorkers;
+            }
+
             base.Populate(services, grainClass, grainType, properties);
             properties[WellKnownGrainTypeProperties.Unordered] = "true";
         }

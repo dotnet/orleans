@@ -119,10 +119,10 @@ public class StatelessWorkerBenchmark : IDisposable
     public interface IAdaptiveGrain : IProcessorGrain { }
     public interface IMontonicGrain : IProcessorGrain { }
 
-    [StatelessWorker(BenchmarkConstants.MaxWorkersLimit, removeIdleWorkers: false)]
+    [StatelessWorker(BenchmarkConstants.MaxWorkersLimit, RemoveIdleWorkers = false)]
     public class SWMontonicGrain : BaseGrain<SWMontonicGrain>, IMontonicGrain { }
 
-    [StatelessWorker(BenchmarkConstants.MaxWorkersLimit, removeIdleWorkers: true)]
+    [StatelessWorker(BenchmarkConstants.MaxWorkersLimit, RemoveIdleWorkers = true)]
     public class SWAdaptiveGrain : BaseGrain<SWAdaptiveGrain>, IAdaptiveGrain { }
 
     public abstract class BaseGrain<T> : Grain, IProcessorGrain where T : BaseGrain<T>

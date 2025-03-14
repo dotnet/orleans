@@ -26,10 +26,11 @@ namespace Orleans.Runtime
         public int MaxLocal { get; private set; }
 
         /// <summary>
-        /// Instructs the runtime whether it should eagerly collect idle workers based on concurrent load or let them be collected by the activation collector.
+        /// When set to <see langword="true"/>, idle workers will be proactively deactivated by the runtime.
+        /// Otherwise if <see langword="false"/>, than the workers will be deactivated according to collection age.
         /// </summary>
         [Id(1)]
-        public bool RemoveIdleWorkers { get; private set; }
+        public bool RemoveIdleWorkers { get; internal set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StatelessWorkerPlacement"/> class.
@@ -37,47 +38,43 @@ namespace Orleans.Runtime
         /// <param name="maxLocal">
         /// The maximum number of local instances which can be simultaneously active for a given grain.
         /// </param>
-        /// <param name="removeIdleWorkers">
-        /// Wether to proactively remove workers if they are inactive, or let them be collected by the activation collector.
-        /// </param>
-        internal StatelessWorkerPlacement(int maxLocal, bool removeIdleWorkers)
+        internal StatelessWorkerPlacement(int maxLocal)
         {
             // If maxLocal was not specified on the StatelessWorkerAttribute,
             // we will use the defaultMaxStatelessWorkers, which is System.Environment.ProcessorCount.
             this.MaxLocal = maxLocal > 0 ? maxLocal : DefaultMaxStatelessWorkers;
-            this.RemoveIdleWorkers = removeIdleWorkers;
         }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StatelessWorkerPlacement"/> class.
         /// </summary>
-        public StatelessWorkerPlacement() : this(-1, false)
+        public StatelessWorkerPlacement() : this(-1)
         {
         }
 
         /// <inheritdoc/>
-        public override string ToString() => $"StatelessWorkerPlacement(max={MaxLocal}, proactive={RemoveIdleWorkers})";
+        public override string ToString() => $"StatelessWorkerPlacement(MaxLocal={MaxLocal}, RemoveIdleWorkers={RemoveIdleWorkers})";
 
         /// <inheritdoc/>
         public override void Initialize(GrainProperties properties)
         {
             base.Initialize(properties);
 
-            if (properties.Properties.TryGetValue(MaxLocalPropertyKey, out var value) &&
-                !string.IsNullOrWhiteSpace(value))
+            if (properties.Properties.TryGetValue(MaxLocalPropertyKey, out var maxLocalValue) &&
+                !string.IsNullOrWhiteSpace(maxLocalValue))
             {
-                if (int.TryParse(value, out var maxLocal))
+                if (int.TryParse(maxLocalValue, out var maxLocal))
                 {
                     MaxLocal = maxLocal;
                 }
             }
 
-            if (properties.Properties.TryGetValue(RemoveIdleWorkersPropertyKey, out var proactive) &&
-                !string.IsNullOrWhiteSpace(proactive))
+            if (properties.Properties.TryGetValue(RemoveIdleWorkersPropertyKey, out var removeIdleValue) &&
+                !string.IsNullOrWhiteSpace(removeIdleValue))
             {
-                if (bool.TryParse(proactive, out var isProactive))
+                if (bool.TryParse(removeIdleValue, out var removeIdle))
                 {
-                    RemoveIdleWorkers = isProactive;
+                    RemoveIdleWorkers = removeIdle;
                 }
             }
         }

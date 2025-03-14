@@ -8,9 +8,8 @@ namespace Orleans.Configuration;
 public class StatelessWorkerOptions
 {
     /// <summary>
-    /// When set to <see langword="true"/>, all stateless worker grains will use proactive worker collection.
-    /// This means that the runtime will proactively deactivate idle workers. Otherwise if <see langword="false"/>, than the
-    /// workers will be deactivated according to <see cref="GrainCollectionOptions.CollectionAge"/>.
+    /// When set to <see langword="true"/>, idle workers will be proactively deactivated by the runtime.
+    /// Otherwise if <see langword="false"/>, than the workers will be deactivated according to <see cref="GrainCollectionOptions.CollectionAge"/>.
     /// </summary>
     /// <remarks>You can read more on this <see href="https://www.ledjonbehluli.com/posts/orleans_adaptive_stateless_worker/">here</see></remarks>
     public bool RemoveIdleWorkers { get; set; } = DEFAULT_REMOVE_IDLE_WORKERS;
@@ -18,7 +17,7 @@ public class StatelessWorkerOptions
     /// <summary>
     /// The default value for <see cref="RemoveIdleWorkers"/>.
     /// </summary>
-    public const bool DEFAULT_REMOVE_IDLE_WORKERS = false;
+    public const bool DEFAULT_REMOVE_IDLE_WORKERS = true;
 
     /// <summary>
     /// The minimum time between consecutive worker collections.
