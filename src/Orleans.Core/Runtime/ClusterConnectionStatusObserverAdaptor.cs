@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime;
 
-internal sealed class ClusterConnectionStatusObserverAdaptor(
+internal sealed partial class ClusterConnectionStatusObserverAdaptor(
     IEnumerable<GatewayCountChangedHandler> gatewayCountChangedHandlers,
     IEnumerable<ConnectionToClusterLostHandler> connectionLostHandlers,
     ILogger<ClusterClient> logger) : IClusterConnectionStatusObserver
@@ -23,7 +23,7 @@ internal sealed class ClusterConnectionStatusObserverAdaptor(
             }
             catch (Exception ex)
             {
-                logger.LogError((int)ErrorCode.ClientError, ex, "Error sending cluster connection lost notification.");
+                LogErrorSendingClusterConnectionLostNotification(logger, ex);
             }
         }
     }
@@ -39,8 +39,20 @@ internal sealed class ClusterConnectionStatusObserverAdaptor(
             }
             catch (Exception ex)
             {
-                logger.LogError((int)ErrorCode.ClientError, ex, "Error sending gateway count changed notification.");
+                LogErrorSendingGatewayCountChangedNotification(logger, ex);
             }
         }
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error sending cluster connection lost notification."
+    )]
+    private static partial void LogErrorSendingClusterConnectionLostNotification(ILogger logger, Exception ex);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error sending gateway count changed notification."
+    )]
+    private static partial void LogErrorSendingGatewayCountChangedNotification(ILogger logger, Exception ex);
 }
