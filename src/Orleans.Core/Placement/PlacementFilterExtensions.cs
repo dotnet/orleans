@@ -14,7 +14,7 @@ public static class PlacementFilterExtensions
     /// <param name="strategyLifetime">The lifetime of the placement strategy.</param>
     /// <returns>The service collection.</returns>
     public static IServiceCollection AddPlacementFilter<TFilter, TDirector>(this IServiceCollection services, ServiceLifetime strategyLifetime)
-        where TFilter : PlacementFilterStrategy
+        where TFilter : PlacementFilterStrategy, new()
         where TDirector : class, IPlacementFilterDirector
     {
         services.Add(ServiceDescriptor.DescribeKeyed(typeof(PlacementFilterStrategy), typeof(TFilter).Name, typeof(TFilter), strategyLifetime));

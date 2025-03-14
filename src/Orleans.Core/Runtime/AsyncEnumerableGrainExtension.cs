@@ -216,7 +216,7 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
 
             // Wait for either the MoveNextAsync task to complete or the cancellation token to be cancelled.
             await moveNextTask.WaitAsync(cancellation.Token).SuppressThrowing();
-            if (moveNextTask is {IsCompletedSuccessfully: true })
+            if (moveNextTask.IsCompletedSuccessfully)
             {
                 OnMoveNext(requestId);
                 var hasValue = moveNextTask.GetAwaiter().GetResult();
@@ -230,6 +230,14 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
                     await typedEnumerator.DisposeAsync();
                     return (EnumerationResult.Completed, default);
                 }
+            }
+            else if (moveNextTask.Exception is { } moveNextException)
+            {
+                // Completed, but not successfully.
+                var exception = moveNextException.InnerExceptions.Count == 1 ? moveNextException.InnerException : moveNextException;
+                await RemoveEnumeratorAsync(requestId);
+                await typedEnumerator.DisposeAsync();
+                return (EnumerationResult.Error, exception);
             }
 
             return (EnumerationResult.Heartbeat, default);

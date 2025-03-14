@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -42,6 +43,11 @@ public enum EnumerationResult
     /// The attempt to enumerate failed because the enumerator was not found.
     /// </summary>
     MissingEnumeratorError = 1 << 4,
+
+    /// <summary>
+    /// The attempt to enumerate failed because the enumeration threw an exception.
+    /// </summary>
+    Error = 1 << 5,
 
     /// <summary>
     /// This result indicates that enumeration has completed and that no further results will be produced.
@@ -252,6 +258,11 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
             else
             {
                 result = await _target.MoveNext<T>(_requestId);
+            }
+
+            if (result.Status is EnumerationResult.Error)
+            {
+                ExceptionDispatchInfo.Capture((Exception)result.Value).Throw();
             }
 
             if (result.Status is not EnumerationResult.Heartbeat)

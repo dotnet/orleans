@@ -1,4 +1,4 @@
-namespace UnitTests.GrainInterfaces
+﻿namespace UnitTests.GrainInterfaces
 {
     /// <summary>
     /// A grain which returns IAsyncEnumerable
@@ -10,6 +10,7 @@ namespace UnitTests.GrainInterfaces
         ValueTask Deactivate();
         ValueTask OnNext(string data);
         IAsyncEnumerable<string> GetValues();
+        IAsyncEnumerable<int> GetValuesWithError(int errorIndex, bool waitAfterYield, string errorMessage);
 
         ValueTask<List<(string InterfaceName, string MethodName)>> GetIncomingCalls();
     }
