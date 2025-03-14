@@ -30,7 +30,7 @@ namespace Orleans.Runtime
         /// Otherwise if <see langword="false"/>, than the workers will be deactivated according to collection age.
         /// </summary>
         [Id(1)]
-        public bool RemoveIdleWorkers { get; internal set; }
+        public bool RemoveIdleWorkers { get; internal set; } = true;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StatelessWorkerPlacement"/> class.
