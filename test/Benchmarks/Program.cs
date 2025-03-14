@@ -215,6 +215,12 @@ namespace Benchmarks
             {
                 new FanoutBenchmark().PingForever().GetAwaiter().GetResult();
             },
+            ["StatelessWorker"] = _ =>
+            {
+                RunBenchmark("", () => new StatelessWorkerBenchmark(),
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Dispose());
+            },
             ["GrainStorage.Memory"] = _ =>
             {
                 RunBenchmark(

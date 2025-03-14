@@ -55,11 +55,15 @@ namespace Orleans.Concurrency
     public sealed class StatelessWorkerAttribute : PlacementAttribute, IGrainPropertiesProviderAttribute
     {
         /// <summary>
+        /// When set to <see langword="true"/>, idle workers will be proactively deactivated by the runtime.
+        /// Otherwise if <see langword="false"/>, than the workers will be deactivated according to collection age.
+        /// </summary>
+        public bool RemoveIdleWorkers { get; set; } = true;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="StatelessWorkerAttribute"/> class.
         /// </summary>
-        /// <param name="maxLocalWorkers">
-        /// The maximum local workers.
-        /// </param>
+        /// <param name="maxLocalWorkers">The maximum local workers.</param>
         public StatelessWorkerAttribute(int maxLocalWorkers)
             : base(new StatelessWorkerPlacement(maxLocalWorkers))
         {
@@ -76,6 +80,11 @@ namespace Orleans.Concurrency
         /// <inheritdoc/>
         public override void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
+            if (PlacementStrategy is StatelessWorkerPlacement swPlacement)
+            {
+                swPlacement.RemoveIdleWorkers = RemoveIdleWorkers;
+            }
+
             base.Populate(services, grainClass, grainType, properties);
             properties[WellKnownGrainTypeProperties.Unordered] = "true";
         }

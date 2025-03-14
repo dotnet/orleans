@@ -12,6 +12,8 @@ namespace Orleans.Runtime
     internal sealed class StatelessWorkerPlacement : PlacementStrategy
     {
         private const string MaxLocalPropertyKey = "max-local-instances";
+        private const string RemoveIdleWorkersPropertyKey = "remove-idle-workers";
+
         private static readonly int DefaultMaxStatelessWorkers = Environment.ProcessorCount;
 
         /// <inheritdoc/>
@@ -22,6 +24,13 @@ namespace Orleans.Runtime
         /// </summary>
         [Id(0)]
         public int MaxLocal { get; private set; }
+
+        /// <summary>
+        /// When set to <see langword="true"/>, idle workers will be proactively deactivated by the runtime.
+        /// Otherwise if <see langword="false"/>, than the workers will be deactivated according to collection age.
+        /// </summary>
+        [Id(1)]
+        public bool RemoveIdleWorkers { get; internal set; } = true;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StatelessWorkerPlacement"/> class.
@@ -44,18 +53,28 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public override string ToString() => $"StatelessWorkerPlacement(max={MaxLocal})";
+        public override string ToString() => $"StatelessWorkerPlacement(MaxLocal={MaxLocal}, RemoveIdleWorkers={RemoveIdleWorkers})";
 
         /// <inheritdoc/>
         public override void Initialize(GrainProperties properties)
         {
             base.Initialize(properties);
-            if (properties.Properties.TryGetValue(MaxLocalPropertyKey, out var value)
-                && !string.IsNullOrWhiteSpace(value))
+
+            if (properties.Properties.TryGetValue(MaxLocalPropertyKey, out var maxLocalValue) &&
+                !string.IsNullOrWhiteSpace(maxLocalValue))
             {
-                if (int.TryParse(value, out var maxLocal))
+                if (int.TryParse(maxLocalValue, out var maxLocal))
                 {
-                    this.MaxLocal = maxLocal;
+                    MaxLocal = maxLocal;
+                }
+            }
+
+            if (properties.Properties.TryGetValue(RemoveIdleWorkersPropertyKey, out var removeIdleValue) &&
+                !string.IsNullOrWhiteSpace(removeIdleValue))
+            {
+                if (bool.TryParse(removeIdleValue, out var removeIdle))
+                {
+                    RemoveIdleWorkers = removeIdle;
                 }
             }
         }
@@ -63,7 +82,8 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public override void PopulateGrainProperties(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
-            properties[MaxLocalPropertyKey] = this.MaxLocal.ToString(CultureInfo.InvariantCulture);
+            properties[MaxLocalPropertyKey] = MaxLocal.ToString(CultureInfo.InvariantCulture);
+            properties[RemoveIdleWorkersPropertyKey] = RemoveIdleWorkers.ToString();
 
             base.PopulateGrainProperties(services, grainClass, grainType, properties);
         }
