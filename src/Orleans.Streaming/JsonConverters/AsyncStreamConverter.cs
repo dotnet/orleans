@@ -11,21 +11,11 @@ using Orleans.Streams;
 
 namespace Orleans.Streaming.JsonConverters
 {
-
-    internal sealed class SystemTextJsonStreamConverterConfigurator(IRuntimeClient runtimeClient) : IPostConfigureOptions<SystemTextJsonGrainStorageSerializerOptions>
-    {
-        public void PostConfigure(string? name, SystemTextJsonGrainStorageSerializerOptions options)
-        {
-            options.JsonSerializerOptions.Converters.Add(new AsyncStreamConverter(runtimeClient));
-            options.JsonSerializerOptions.Converters.Add(new StreamIdJsonConverter());
-        }
-    }
-
     internal sealed class AsyncStreamConverter(IRuntimeClient runtimeClient) : JsonConverter<IAsyncStream>
     {
-        private readonly Type asyncStreamType = typeof(IAsyncStream);
+        private readonly Type _asyncStreamType = typeof(IAsyncStream);
 
-        public override bool CanConvert(Type typeToConvert) => asyncStreamType.IsAssignableFrom(typeToConvert);
+        public override bool CanConvert(Type typeToConvert) => _asyncStreamType.IsAssignableFrom(typeToConvert);
 
         public override IAsyncStream? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {

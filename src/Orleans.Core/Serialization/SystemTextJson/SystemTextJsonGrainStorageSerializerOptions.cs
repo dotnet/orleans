@@ -18,7 +18,6 @@ namespace Orleans.Serialization
             ReferenceHandler = ReferenceHandler.Preserve,
             WriteIndented = true,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault | JsonIgnoreCondition.WhenWritingNull,
-            PreferredObjectCreationHandling = JsonObjectCreationHandling.Populate,
         };
     }
 
