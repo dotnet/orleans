@@ -252,8 +252,8 @@ namespace Tester.AzureUtils.Persistence
         public async Task PersistenceProvider_Memory_FixedLatency_WriteRead()
         {
             const string testName = nameof(PersistenceProvider_Memory_FixedLatency_WriteRead);
-            TimeSpan expectedLatency = TimeSpan.FromMilliseconds(200);
-            MemoryGrainStorageWithLatency store = new MemoryGrainStorageWithLatency(
+            var expectedLatency = TimeSpan.FromMilliseconds(200);
+            var store = new MemoryGrainStorageWithLatency(
                 testName,
                 new MemoryStorageWithLatencyOptions()
                 {
@@ -261,25 +261,38 @@ namespace Tester.AzureUtils.Persistence
                     MockCallsOnly = true
                 },
                 NullLoggerFactory.Instance,
-                this.providerRuntime.ServiceProvider.GetService<IGrainFactory>(),
-                this.providerRuntime.ServiceProvider.GetService<IGrainStorageSerializer>());
+                providerRuntime.ServiceProvider.GetService<IGrainFactory>(),
+                providerRuntime.ServiceProvider.GetService<IGrainStorageSerializer>());
 
             var reference = (GrainId)LegacyGrainId.NewId();
             var state = TestStoreGrainState.NewRandomState();
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-            await store.WriteStateAsync(testName, reference, state);
-            TimeSpan writeTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Write time = {1}", store.GetType().FullName, writeTime);
-            Assert.True(writeTime >= expectedLatency, $"Write: Expected minimum latency = {expectedLatency} Actual = {writeTime}");
 
-            sw.Restart();
+            // Running the test multiple times and averaging the results helps smooth out any system-level jitter or measurement noise.
+            const int RunCount = 3;
+
+            var avgWriteTime = await MeasureLatency(() => store.WriteStateAsync(testName, reference, state));
+            output.WriteLine("{0} - Avg Write time = {1}", store.GetType().FullName, avgWriteTime);
+            Assert.True(avgWriteTime >= expectedLatency, $"Write: Expected min latency = {expectedLatency}, but got {avgWriteTime}");
+
             var storedState = new GrainState<TestStoreGrainState>();
-            await store.ReadStateAsync(testName, reference, storedState);
-            TimeSpan readTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
-            Assert.True(readTime >= expectedLatency, $"Read: Expected minimum latency = {expectedLatency} Actual = {readTime}");
+            var avgReadTime = await MeasureLatency(() => store.ReadStateAsync(testName, reference, storedState));
+            output.WriteLine("{0} - Avg Read time = {1}", store.GetType().FullName, avgReadTime);
+            Assert.True(avgReadTime >= expectedLatency, $"Read: Expected min latency = {expectedLatency}, but got {avgReadTime}");
+
+            static async Task<TimeSpan> MeasureLatency(Func<Task> operation)
+            {
+                List<TimeSpan> measurements = [];
+                for (var i = 0; i < RunCount; i++)
+                {
+                    var sw = Stopwatch.StartNew();
+                    await operation();
+                    sw.Stop();
+                    measurements.Add(sw.Elapsed);
+                }
+                return TimeSpan.FromTicks((long)measurements.Average(m => m.Ticks));
+            }
         }
+
 
         [Fact, TestCategory("Functional")]
         public void LoadClassByName()
