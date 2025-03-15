@@ -57,10 +57,10 @@ namespace UnitTests.StorageTests
         private void Roundtrip<X>(X instance)
         {
             var ns = _newtonSoft.Serialize(instance);
-         
+
             _systemTextJson.Deserialize<X>(_systemTextJson.Serialize(instance)).Should().BeEquivalentTo(instance);
             _newtonSoft.Deserialize<X>(ns).Should().BeEquivalentTo(instance);
-
+            
             _systemTextJson.Deserialize<X>(_newtonSoft.Serialize(instance)).Should().BeEquivalentTo(instance);
             _newtonSoft.Deserialize<X>(_systemTextJson.Serialize(instance)).Should().BeEquivalentTo(instance);
 
@@ -155,7 +155,7 @@ namespace UnitTests.StorageTests
             var stream = streamProvider.GetStream<int>(StreamId.Create("Test_namespace", "Test_key"));
 
             ConcurrentBag<int> values = new();
-            await stream.SubscribeAsync((x, t) =>
+            var handle = await stream.SubscribeAsync((x, t) =>
             {
                 values.Add(x);
                 return Task.CompletedTask;
@@ -176,11 +176,13 @@ namespace UnitTests.StorageTests
             stream = _newtonSoft.Deserialize<IAsyncStream<int>>(_newtonSoft.Serialize(stream));
 
             await stream.OnNextAsync(44);
-
+        
             values.Should().Contain(11);
             values.Should().Contain(22);
             values.Should().Contain(33);
             values.Should().Contain(44);
+
+            await handle.UnsubscribeAsync();
         }
 
         class Observer : IAsyncObserver<int>
