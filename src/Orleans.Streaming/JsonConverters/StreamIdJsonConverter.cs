@@ -9,6 +9,21 @@ namespace Orleans.Serialization
 {
     public sealed class StreamIdJsonConverter : JsonConverter<StreamId>
     {
+        // This is backward compatible with Newtonsoft.JsonSerializer
+        // which didn't have a JsonConverter for StreamId.
+        // StreamId used the default serialization that Newtonsoft provided.
+
+        // Ideally this STJ Converter would write Key and Namespace property in a similar way to
+        // GrainIdConverter.
+
+        // This implementation emulates Newtonsoft by both reading and writing
+        // the same structure.
+        //
+        // The alternatives were to
+        // 1. break backward compatibility which would have prevented switching from Newtonsoft to STJ if streamIds were stored in persistence.
+        // 2. To support reading the Newtonsoft format and the new format, but write using the preferred Key and Namespace format, which would allow a one-way migration, but prevent reverting to Newtonsoft.
+        // 3. Add a Newtonsoft.JsonConverter for StreamId which supported the previous default Newtonsoft structure and also the preferred STJ Key and Namespace approach. This would make reverting Orleans a breaking change.
+
         public override StreamId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType != JsonTokenType.StartObject)
@@ -16,10 +31,10 @@ namespace Orleans.Serialization
                 return default;
             }
 
-            // TODO: Look at supporting reading the format from Newtonsoft Json
+            // This is backward compatible with the way Newtonsoft writes StreamId
 
-            string? ns = default, key = default;
-
+            uint? ki = null;
+            byte[]? value = null;
             while (reader.Read())
             {
                 if (reader.TokenType == JsonTokenType.EndObject)
@@ -32,33 +47,49 @@ namespace Orleans.Serialization
 
                     switch (propertyName)
                     {
-                        case "Namespace":
-                            ns = reader.GetString();
+                        case "ki":
+                            ki = reader.GetUInt32();
                             break;
-                        case "Key":
-                            key = reader.GetString();
-                            break;
+                        case "fk":
+                            while (reader.Read())
+                            {
+                                if (reader.TokenType == JsonTokenType.EndObject)
+                                    break;
+
+                                if (reader.TokenType == JsonTokenType.PropertyName)
+                                {
+                                    propertyName = reader.GetString();
+                                    reader.Read();
+
+                                    if (propertyName == "$value")
+                                    {
+                                        value = reader.GetBytesFromBase64();
+                                    }
+                                }
+                            }
+                            break;                        
                     }
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                return default;
-            }
-            else
-            {
-                return StreamId.Create(ns!, key); // StreamId.Create does handle a null namespace parameter
-            }
+            return value is not { Length : >0 }
+                || !ki.HasValue
+                ? default
+                : new StreamId(value, (ushort)ki);
         }
 
         public override void Write(Utf8JsonWriter writer, StreamId value, JsonSerializerOptions options)
         {
             writer.WriteStartObject();
             if (value != default)
-            {            
-                writer.WriteString("Namespace", value.GetNamespace());
-                writer.WriteString("Key", value.GetKeyAsString());
+            {
+                writer.WriteString("$type", "Orleans.Runtime.StreamId, Orleans.Streaming");
+                writer.WriteStartObject("fk");
+                    writer.WriteString("$type","System.Byte[], System.Private.CoreLib");
+                    writer.WriteBase64String("$value", value.FullKey.Span);
+                writer.WriteEndObject();
+                writer.WriteNumber("ki", value.GetKeyIndex());
+                writer.WriteNumber("fh", (int)value.GetUniformHashCode());
             }
             writer.WriteEndObject();
         }
