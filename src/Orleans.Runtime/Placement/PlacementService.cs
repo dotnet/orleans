@@ -346,6 +346,7 @@ namespace Orleans.Runtime.Placement
             {
                 var resultTask = completedWorkItem.Result;
                 var messages = completedWorkItem.Messages;
+
                 if (resultTask.IsCompletedSuccessfully)
                 {
                     foreach (var message in messages)
@@ -354,28 +355,37 @@ namespace Orleans.Runtime.Placement
                         _placementService.SetMessageTargetPlacement(message.Message, siloAddress);
                         message.Completion.TrySetResult(true);
                     }
-
-                    messages.Clear();
                 }
-                else
+                else if (resultTask.IsCanceled)
+                {
+                    foreach (var message in messages)
+                    {
+                        message.Completion.TrySetCanceled();
+                    }
+                }
+                else if (resultTask.IsFaulted)
                 {
                     foreach (var message in messages)
                     {
                         message.Completion.TrySetException(OriginalException(resultTask.Exception));
                     }
-
-                    messages.Clear();
                 }
 
-                static Exception OriginalException(AggregateException exception)
+                messages.Clear();
+            }
+
+            private static Exception OriginalException(AggregateException exception)
+            {
+                if (exception is null)
                 {
-                    if (exception.InnerExceptions.Count == 1)
-                    {
-                        return exception.InnerException;
-                    }
+                    // Due to race conditions, it is possible to observe IsFaulted = true, but still Exception = null.
+                    // This is because the state transition to Faulted might have occurred just after the Exception
+                    // property check, but before the internal exception was retrieved.
 
-                    return exception;
+                    return new Exception("Task faulted without an exception.");
                 }
+
+                return exception.InnerExceptions.Count == 1 ? exception.InnerException : exception;
             }
 
             private async Task<SiloAddress> GetOrPlaceActivationAsync(Message firstMessage)
