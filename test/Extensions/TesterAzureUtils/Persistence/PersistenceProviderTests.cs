@@ -266,33 +266,20 @@ namespace Tester.AzureUtils.Persistence
 
             var reference = (GrainId)LegacyGrainId.NewId();
             var state = TestStoreGrainState.NewRandomState();
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+            await store.WriteStateAsync(testName, reference, state);
+            TimeSpan writeTime = sw.Elapsed;
+            this.output.WriteLine("{0} - Write time = {1}", store.GetType().FullName, writeTime);
+            Assert.True(writeTime >= expectedLatency, $"Write: Expected minimum latency = {expectedLatency} Actual = {writeTime}");
 
-            // Running the test multiple times and averaging the results helps smooth out any system-level jitter or measurement noise.
-            const int RunCount = 3;
-
-            var avgWriteTime = await MeasureLatency(() => store.WriteStateAsync(testName, reference, state));
-            output.WriteLine("{0} - Avg Write time = {1}", store.GetType().FullName, avgWriteTime);
-            Assert.True(avgWriteTime >= expectedLatency, $"Write: Expected min latency = {expectedLatency}, but got {avgWriteTime}");
-
+            sw.Restart();
             var storedState = new GrainState<TestStoreGrainState>();
-            var avgReadTime = await MeasureLatency(() => store.ReadStateAsync(testName, reference, storedState));
-            output.WriteLine("{0} - Avg Read time = {1}", store.GetType().FullName, avgReadTime);
-            Assert.True(avgReadTime >= expectedLatency, $"Read: Expected min latency = {expectedLatency}, but got {avgReadTime}");
-
-            static async Task<TimeSpan> MeasureLatency(Func<Task> operation)
-            {
-                List<TimeSpan> measurements = [];
-                for (var i = 0; i < RunCount; i++)
-                {
-                    var sw = Stopwatch.StartNew();
-                    await operation();
-                    sw.Stop();
-                    measurements.Add(sw.Elapsed);
-                }
-                return TimeSpan.FromTicks((long)measurements.Average(m => m.Ticks));
-            }
+            await store.ReadStateAsync(testName, reference, storedState);
+            TimeSpan readTime = sw.Elapsed;
+            this.output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
+            Assert.True(readTime >= expectedLatency, $"Read: Expected minimum latency = {expectedLatency} Actual = {readTime}");
         }
-
 
         [Fact, TestCategory("Functional")]
         public void LoadClassByName()
@@ -301,17 +288,6 @@ namespace Tester.AzureUtils.Persistence
             Type classType = new CachedTypeResolver().ResolveType(className);
             Assert.NotNull(classType); // Type
             Assert.True(typeof(IGrainStorage).IsAssignableFrom(classType), $"Is an IStorageProvider : {classType.FullName}");
-        }
-
-        private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(AzureTableStorageOptions options)
-        {
-            // TODO change test to include more serializer?
-            var serializer = new OrleansGrainStorageSerializer(this.providerRuntime.ServiceProvider.GetRequiredService<Serializer>());
-            AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(this.providerRuntime.ServiceProvider, options, serializer, "TestStorage");
-            ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this.providerRuntime.ServiceProvider);
-            store.Participate(lifecycle);
-            await lifecycle.OnStart();
-            return store;
         }
 
         private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(bool useJson = false, bool useFallback = true, bool useStringFormat = false, TypeNameHandling? typeNameHandling = null)
