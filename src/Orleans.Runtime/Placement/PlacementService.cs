@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -246,7 +247,7 @@ namespace Orleans.Runtime.Placement
 #pragma warning restore IDE0052 // Remove unread private members
             private readonly object _lockObj = new();
             private readonly PlacementService _placementService;
-            private List<(Message Message, TaskCompletionSource<bool> Completion)> _messages = new();
+            private List<(Message Message, TaskCompletionSource Completion)> _messages = new();
 
             public PlacementWorker(PlacementService placementService)
             {
@@ -259,7 +260,7 @@ namespace Orleans.Runtime.Placement
 
             public Task AddressMessage(Message message)
             {
-                var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
                 lock (_lockObj)
                 {
@@ -271,7 +272,7 @@ namespace Orleans.Runtime.Placement
                 return completion.Task;
             }
 
-            private List<(Message Message, TaskCompletionSource<bool> Completion)> GetMessages()
+            private List<(Message Message, TaskCompletionSource Completion)> GetMessages()
             {
                 lock (_lockObj)
                 {
@@ -347,45 +348,30 @@ namespace Orleans.Runtime.Placement
                 var resultTask = completedWorkItem.Result;
                 var messages = completedWorkItem.Messages;
 
-                if (resultTask.IsCompletedSuccessfully)
+                try
                 {
+                    var siloAddress = resultTask.Result;
                     foreach (var message in messages)
                     {
-                        var siloAddress = resultTask.Result;
                         _placementService.SetMessageTargetPlacement(message.Message, siloAddress);
-                        message.Completion.TrySetResult(true);
+                        message.Completion.TrySetResult();
                     }
                 }
-                else if (resultTask.IsCanceled)
+                catch (Exception exception)
                 {
+                    var originalException = exception switch
+                    {
+                        AggregateException ae when ae.InnerExceptions.Count == 1 => ae.InnerException,
+                        _ => exception,
+                    };
+
                     foreach (var message in messages)
                     {
-                        message.Completion.TrySetCanceled();
-                    }
-                }
-                else if (resultTask.IsFaulted)
-                {
-                    foreach (var message in messages)
-                    {
-                        message.Completion.TrySetException(OriginalException(resultTask.Exception));
+                        message.Completion.TrySetException(originalException);
                     }
                 }
 
                 messages.Clear();
-            }
-
-            private static Exception OriginalException(AggregateException exception)
-            {
-                if (exception is null)
-                {
-                    // Due to race conditions, it is possible to observe IsFaulted = true, but still Exception = null.
-                    // This is because the state transition to Faulted might have occurred just after the Exception
-                    // property check, but before the internal exception was retrieved.
-
-                    return new Exception("Task faulted without an exception.");
-                }
-
-                return exception.InnerExceptions.Count == 1 ? exception.InnerException : exception;
             }
 
             private async Task<SiloAddress> GetOrPlaceActivationAsync(Message firstMessage)
@@ -421,7 +407,7 @@ namespace Orleans.Runtime.Placement
 
             private class GrainPlacementWorkItem
             {
-                public List<(Message Message, TaskCompletionSource<bool> Completion)> Messages { get; } = new();
+                public List<(Message Message, TaskCompletionSource Completion)> Messages { get; } = new();
 
                 public Task<SiloAddress> Result { get; set; }
             }
