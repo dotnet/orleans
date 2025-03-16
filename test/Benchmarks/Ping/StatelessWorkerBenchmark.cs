@@ -29,7 +29,7 @@ public class StatelessWorkerBenchmark : IDisposable
 
     public async Task RunAsync()
     {
-        await Run<IMontonicGrain, SWMontonicGrain>(_grainFactory.GetGrain<IMontonicGrain>(0));
+        await Run<IMonotonicGrain, SWMonotonicGrain>(_grainFactory.GetGrain<IMonotonicGrain>(0));
         await Run<IAdaptiveGrain, SWAdaptiveGrain>(_grainFactory.GetGrain<IAdaptiveGrain>(0));
     }
 
@@ -117,12 +117,12 @@ public class StatelessWorkerBenchmark : IDisposable
     }
 
     public interface IAdaptiveGrain : IProcessorGrain { }
-    public interface IMontonicGrain : IProcessorGrain { }
+    public interface IMonotonicGrain : IProcessorGrain { }
 
-    [StatelessWorker(BenchmarkConstants.MaxWorkersLimit, RemoveIdleWorkers = false)]
-    public class SWMontonicGrain : BaseGrain<SWMontonicGrain>, IMontonicGrain { }
+    [StatelessWorker(BenchmarkConstants.MaxWorkersLimit, removeIdleWorkers: false)]
+    public class SWMonotonicGrain : BaseGrain<SWMonotonicGrain>, IMonotonicGrain { }
 
-    [StatelessWorker(BenchmarkConstants.MaxWorkersLimit, RemoveIdleWorkers = true)]
+    [StatelessWorker(BenchmarkConstants.MaxWorkersLimit, removeIdleWorkers: true)]
     public class SWAdaptiveGrain : BaseGrain<SWAdaptiveGrain>, IAdaptiveGrain { }
 
     public abstract class BaseGrain<T> : Grain, IProcessorGrain where T : BaseGrain<T>

@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 
 namespace Orleans.Runtime;
 
@@ -278,8 +279,6 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         {
             worker.Deactivate(reason, cancellationToken);
         }
-
-        _workerCollector?.Dispose();
     }
 
     private async Task DeactivatedTaskInternal(TaskCompletionSource<bool> completion)
@@ -298,10 +297,6 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         catch (Exception exception)
         {
             completion.TrySetException(exception);
-        }
-        finally
-        {
-            _workerCollector?.Dispose();
         }
     }
 
@@ -332,9 +327,10 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         {
             completion.TrySetException(exception);
         }
-        finally
+
+        if (_workerCollector is { } collector)
         {
-            _workerCollector?.Dispose();
+            await collector.DisposeAsync();
         }
     }
 
@@ -373,7 +369,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
     private record DisposeAsyncWorkItemState(TaskCompletionSource<bool> Completion);
 
     // See: https://www.ledjonbehluli.com/posts/orleans_adaptive_stateless_worker/
-    private class WorkerCollector : IDisposable
+    private sealed class WorkerCollector : IAsyncDisposable
     {
 #pragma warning disable IDE0052 // Remove unread private members
         private readonly Task _collectionTask;
@@ -405,11 +401,11 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
             const int InspectionPeriodMs = 100;
             const int ControlSignalNegativeMaxCount = 10;
 
-            var _previousError = 0d;
-            var _integralTerm = 0d;
+            var previousError = 0d;
+            var integralTerm = 0d;
 
-            var _controlSignalNegativeCount = 0;
-            var _lastWorkerRemovalTime = DateTime.MinValue;
+            var controlSignalNegativeCount = 0;
+            var lastWorkerRemovalTime = CoarseStopwatch.StartNew();
 
             try
             {
@@ -434,18 +430,18 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
 
                     var error = -averageWaitingCount; // Our target is 0 waiting count: 0 - avgWC = -avgWC
 
-                    _integralTerm += error;
-                    var derivativeTerm = error - _previousError;
-                    _previousError = error;
+                    integralTerm += error;
+                    var derivativeTerm = error - previousError;
+                    previousError = error;
 
-                    var controlSignal = Kp * error + Ki * _integralTerm + Kd * derivativeTerm;
+                    var controlSignal = Kp * error + Ki * integralTerm + Kd * derivativeTerm;
 
-                    _controlSignalNegativeCount = controlSignal < 0 ? ++_controlSignalNegativeCount : 0;
+                    controlSignalNegativeCount = controlSignal < 0 ? ++controlSignalNegativeCount : 0;
 
-                    if (_controlSignalNegativeCount > ControlSignalNegativeMaxCount &&
-                        DateTime.Now - _lastWorkerRemovalTime > backoffPeriod)
+                    if (controlSignalNegativeCount > ControlSignalNegativeMaxCount &&
+                        lastWorkerRemovalTime.Elapsed > backoffPeriod)
                     {
-                        ImmutableArray<ActivationData> inactiveWorkers = [];
+                        ImmutableArray<ActivationData> inactiveWorkers;
 
                         lock (workers)
                         {
@@ -455,17 +451,13 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
                         if (inactiveWorkers.Length > 0)
                         {
                             var worker = inactiveWorkers[Random.Shared.Next(inactiveWorkers.Length)];
-                            var cancellation = new CancellationTokenSource(
-                                context._shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
-
-                            worker.Deactivate(new(DeactivationReasonCode.RuntimeRequested,
-                                "Worker deactivated due to inactivity."), cancellation.Token);
+                            worker.Deactivate(new(DeactivationReasonCode.RuntimeRequested, "Worker deactivated due to inactivity."));
 
                             var antiWindUpFactor = (double)(inactiveWorkers.Length - 1) / inactiveWorkers.Length;
-                            _integralTerm *= antiWindUpFactor;
+                            integralTerm *= antiWindUpFactor;
 
-                            _controlSignalNegativeCount = 0;
-                            _lastWorkerRemovalTime = DateTime.UtcNow;
+                            controlSignalNegativeCount = 0;
+                            lastWorkerRemovalTime.Restart();
                         }
                     }
 
@@ -478,11 +470,30 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
             }
         }
 
-        public void Dispose()
+        public async ValueTask DisposeAsync()
         {
-            _cts.Cancel();
-            _cts.Dispose();
+            try
+            {
+                await _cts.CancelAsync().SuppressThrowing();
+            }
+            catch
+            {
+                // Ignore.
+            }
 
+            try
+            {
+                if (_collectionTask is { } task)
+                {
+                    await task.SuppressThrowing();
+                }
+            }
+            catch
+            {
+                // Ignore.
+            }
+
+            _cts.Dispose();
             GC.SuppressFinalize(this);
         }
     }

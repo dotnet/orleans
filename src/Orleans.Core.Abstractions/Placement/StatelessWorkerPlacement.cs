@@ -30,7 +30,7 @@ namespace Orleans.Runtime
         /// Otherwise if <see langword="false"/>, than the workers will be deactivated according to collection age.
         /// </summary>
         [Id(1)]
-        public bool RemoveIdleWorkers { get; internal set; } = true;
+        public bool RemoveIdleWorkers { get; private set; } = true;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StatelessWorkerPlacement"/> class.
@@ -38,11 +38,25 @@ namespace Orleans.Runtime
         /// <param name="maxLocal">
         /// The maximum number of local instances which can be simultaneously active for a given grain.
         /// </param>
-        internal StatelessWorkerPlacement(int maxLocal)
+        internal StatelessWorkerPlacement(int maxLocal) : this(maxLocal, true)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StatelessWorkerPlacement"/> class.
+        /// </summary>
+        /// <param name="maxLocal">
+        /// The maximum number of local instances which can be simultaneously active for a given grain.
+        /// </param>
+        /// <param name="removeIdleWorkers">
+        /// Whether idle workers will be proactively deactivated by the runtime instead of only being deactivated according to collection age.
+        /// </param>
+        internal StatelessWorkerPlacement(int maxLocal, bool removeIdleWorkers)
         {
             // If maxLocal was not specified on the StatelessWorkerAttribute,
             // we will use the defaultMaxStatelessWorkers, which is System.Environment.ProcessorCount.
             this.MaxLocal = maxLocal > 0 ? maxLocal : DefaultMaxStatelessWorkers;
+            this.RemoveIdleWorkers = removeIdleWorkers;
         }
 
         /// <summary>
@@ -83,7 +97,7 @@ namespace Orleans.Runtime
         public override void PopulateGrainProperties(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
             properties[MaxLocalPropertyKey] = MaxLocal.ToString(CultureInfo.InvariantCulture);
-            properties[RemoveIdleWorkersPropertyKey] = RemoveIdleWorkers.ToString();
+            properties[RemoveIdleWorkersPropertyKey] = RemoveIdleWorkers.ToString(CultureInfo.InvariantCulture);
 
             base.PopulateGrainProperties(services, grainClass, grainType, properties);
         }
