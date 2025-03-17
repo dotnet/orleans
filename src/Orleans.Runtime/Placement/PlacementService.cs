@@ -350,7 +350,7 @@ namespace Orleans.Runtime.Placement
 
                 try
                 {
-                    var siloAddress = resultTask.Result;
+                    var siloAddress = resultTask.GetAwaiter().GetResult();
                     foreach (var message in messages)
                     {
                         _placementService.SetMessageTargetPlacement(message.Message, siloAddress);
