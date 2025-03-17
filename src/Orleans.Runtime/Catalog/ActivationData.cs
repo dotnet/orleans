@@ -843,14 +843,25 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         {
         }
 
-        switch (_serviceScope)
+        await DisposeAsync(_serviceScope);
+    }
+
+    private static async ValueTask DisposeAsync(object obj)
+    {
+        try
         {
-            case IAsyncDisposable asyncDisposable:
+            if (obj is IAsyncDisposable asyncDisposable)
+            {
                 await asyncDisposable.DisposeAsync();
-                break;
-            case IDisposable disposable:
+            }
+            else if (obj is IDisposable disposable)
+            {
                 disposable.Dispose();
-                break;
+            }
+        }
+        catch
+        {
+            // Ignore.
         }
     }
 
@@ -1202,7 +1213,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 }
                 finally
                 {
-                    (op as IDisposable)?.Dispose();
+                    await DisposeAsync(op);
                 }
             }
         }
@@ -1254,10 +1265,6 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         catch (Exception exception)
         {
             _shared.Logger.LogError(exception, "Error while rehydrating activation");
-        }
-        finally
-        {
-            (context as IDisposable)?.Dispose();
         }
     }
 
@@ -2023,7 +2030,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
     }
 
-    private abstract class Command(CancellationTokenSource cts)
+    private abstract class Command(CancellationTokenSource cts) : IDisposable
     {
         private bool _disposed;
         private readonly CancellationTokenSource _cts = cts;
@@ -2040,11 +2047,20 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
         public virtual void Dispose()
         {
-            lock (this)
+            try
             {
-                _disposed = true;
-                _cts.Dispose();
+                lock (this)
+                {
+                    _disposed = true;
+                    _cts.Dispose();
+                }
             }
+            catch
+            {
+                // Ignore.
+            }
+
+            GC.SuppressFinalize(this);
         }
 
         public sealed class Deactivate(CancellationTokenSource cts, ActivationState previousState) : Command(cts)
@@ -2052,7 +2068,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             public ActivationState PreviousState { get; } = previousState;
         }
 
-        public sealed class Activate(Dictionary<string, object>? requestContext, CancellationTokenSource cts) : Command(cts), IDisposable
+        public sealed class Activate(Dictionary<string, object>? requestContext, CancellationTokenSource cts) : Command(cts)
         {
             public Dictionary<string, object>? RequestContext { get; } = requestContext;
         }
@@ -2060,6 +2076,12 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         public sealed class Rehydrate(IRehydrationContext context) : Command(new())
         {
             public readonly IRehydrationContext Context = context;
+
+            public override void Dispose()
+            {
+                base.Dispose();
+                (Context as IDisposable)?.Dispose();
+            }
         }
 
         public sealed class Delay(TimeSpan duration) : Command(new())
