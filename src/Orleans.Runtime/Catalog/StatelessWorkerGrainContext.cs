@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Internal;
 
 namespace Orleans.Runtime;
@@ -51,7 +52,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
 
         if (strategy.RemoveIdleWorkers && _shared.StatelessWorkerOptions.RemoveIdleWorkers)
         {
-            _workerCollector = new(this, _shared.StatelessWorkerOptions.RemoveIdleWorkersBackoffPeriod);
+            _workerCollector = new(this, _shared.StatelessWorkerOptions);
         }
     }
 
@@ -383,13 +384,13 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         /// </summary>
         private readonly WeakReference<StatelessWorkerGrainContext> _contextRef;
 
-        public WorkerCollector(StatelessWorkerGrainContext context, TimeSpan backoffPeriod)
+        public WorkerCollector(StatelessWorkerGrainContext context, StatelessWorkerOptions options)
         {
             _contextRef = new(context);
-            _collectionTask = Task.Run(() => PeriodicallyCollectWorkers(backoffPeriod));
+            _collectionTask = Task.Run(() => PeriodicallyCollectWorkers(options));
         }
 
-        private async Task PeriodicallyCollectWorkers(TimeSpan backoffPeriod)
+        private async Task PeriodicallyCollectWorkers(StatelessWorkerOptions options)
         {
             // These parameter values were tuned using a genetic algorithm, for potential re-tuning see:
             // https://github.com/ledjon-behluli/Orleans.FullyAdaptiveStatelessWorkerSimulations/blob/main/Orleans.FullyAdaptiveStatelessWorkerSimulations/Program.cs
@@ -398,13 +399,13 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
             const double Ki = 0.468;
             const double Kd = 0.480;
 
-            const int InspectionPeriodMs = 100;
-            const int ControlSignalNegativeMaxCount = 10;
-
             var previousError = 0d;
             var integralTerm = 0d;
 
-            var controlSignalNegativeCount = 0;
+            var inspectionPeriod = options.IdleWorkersInspectionPeriod;
+            var minIdleCyclesBeforeRemoval = options.MinIdleCyclesBeforeRemoval;
+
+            var detectedIdleCyclesCount = 0; // You can think of this as how many times the control signal was in the negative zone.
             var lastWorkerRemovalTime = CoarseStopwatch.StartNew();
 
             try
@@ -436,10 +437,9 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
 
                     var controlSignal = Kp * error + Ki * integralTerm + Kd * derivativeTerm;
 
-                    controlSignalNegativeCount = controlSignal < 0 ? ++controlSignalNegativeCount : 0;
+                    detectedIdleCyclesCount = controlSignal < 0 ? ++detectedIdleCyclesCount : 0;
 
-                    if (controlSignalNegativeCount > ControlSignalNegativeMaxCount &&
-                        lastWorkerRemovalTime.Elapsed > backoffPeriod)
+                    if (detectedIdleCyclesCount > minIdleCyclesBeforeRemoval)
                     {
                         ImmutableArray<ActivationData> inactiveWorkers;
 
@@ -456,12 +456,12 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
                             var antiWindUpFactor = (double)(inactiveWorkers.Length - 1) / inactiveWorkers.Length;
                             integralTerm *= antiWindUpFactor;
 
-                            controlSignalNegativeCount = 0;
+                            detectedIdleCyclesCount = 0;
                             lastWorkerRemovalTime.Restart();
                         }
                     }
 
-                    await Task.Delay(InspectionPeriodMs, _cts.Token);
+                    await Task.Delay(inspectionPeriod, _cts.Token);
                 }
             }
             catch (OperationCanceledException)

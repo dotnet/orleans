@@ -20,13 +20,24 @@ public class StatelessWorkerOptions
     public const bool DEFAULT_REMOVE_IDLE_WORKERS = true;
 
     /// <summary>
-    /// The minimum time between consecutive worker collections.
+    /// The time to inspect for idle workers.
     /// </summary>
     /// <remarks>This setting has no effect if <see cref="RemoveIdleWorkers"/> is <see langword="false"/>.</remarks>
-    public TimeSpan RemoveIdleWorkersBackoffPeriod { get; set; } = DEFAULT_REMOVE_IDLE_WORKERS_BACKOFF_PERIOD;
+    public TimeSpan IdleWorkersInspectionPeriod { get; set; } = DEFAULT_IDLE_WORKERS_INSPECTION_PERIOD;
 
     /// <summary>
-    /// The default value for <see cref="RemoveIdleWorkersBackoffPeriod"/>.
+    /// The default value for <see cref="IdleWorkersInspectionPeriod"/>.
     /// </summary>
-    public static readonly TimeSpan DEFAULT_REMOVE_IDLE_WORKERS_BACKOFF_PERIOD = TimeSpan.FromSeconds(1);
+    public static readonly TimeSpan DEFAULT_IDLE_WORKERS_INSPECTION_PERIOD = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// The minumun, consecutive number of idle cycles any given worker must exibit before it is deemed enough to remove the worker.
+    /// </summary>
+    /// <remarks>This should be ~3x per second of the inspection period.</remarks>
+    public int MinIdleCyclesBeforeRemoval { get; set; }
+
+    /// <summary>
+    /// The default value for <see cref="MinIdleCyclesBeforeRemoval"/>.
+    /// </summary>
+    public const int DEFAULT_MIN_IDLE_CYCLES_BEFORE_REMOVAL = 3;
 }
