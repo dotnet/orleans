@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Threading.Tasks;
 
 [assembly: RegisterProvider("Redis", "GrainDirectory", "Silo", typeof(RedisGrainDirectoryProviderBuilder))]
+[assembly: RegisterProvider("AzureRedisCache", "GrainDirectory", "Silo", typeof(RedisGrainDirectoryProviderBuilder))]
 
 namespace Orleans.Hosting;
 
