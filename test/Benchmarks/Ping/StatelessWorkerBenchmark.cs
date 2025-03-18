@@ -29,7 +29,7 @@ public class StatelessWorkerBenchmark : IDisposable
 
     public async Task RunAsync()
     {
-        //await Run<IMonotonicGrain, SWMonotonicGrain>(_grainFactory.GetGrain<IMonotonicGrain>(0));
+        await Run<IMonotonicGrain, SWMonotonicGrain>(_grainFactory.GetGrain<IMonotonicGrain>(0));
         await Run<IAdaptiveGrain, SWAdaptiveGrain>(_grainFactory.GetGrain<IAdaptiveGrain>(0));
     }
 
@@ -71,7 +71,7 @@ public class StatelessWorkerBenchmark : IDisposable
 
         await Task.WhenAll(tasks);
 
-        const int CooldownCycles = 10;
+        const int CooldownCycles = 25;
 
         for (var i = 1; i <= CooldownCycles; i++)
         {

@@ -8,8 +8,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Configuration;
-using Orleans.Internal;
 
 namespace Orleans.Runtime;
 
@@ -19,7 +17,6 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
     private readonly GrainTypeSharedContext _shared;
     private readonly IGrainContextActivator _innerActivator;
     private readonly int _maxWorkers;
-    private readonly WorkerCollector? _workerCollector;
     private readonly List<ActivationData> _workers = [];
     private readonly ConcurrentQueue<(WorkItemType Type, object State)> _workItems = new();
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = false };
@@ -36,6 +33,14 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
 
     private GrainReference? _grainReference;
 
+    private double _previousError = 0d;
+    private double _integralTerm = 0d;
+    private int _detectedIdleCyclesCount = 0;
+    private readonly bool _removeIdleWorkers;
+    private readonly int _minIdleCyclesBeforeRemoval;
+    private readonly TimeSpan _idleWorkersInspectionPeriod;
+    private static readonly object DummyObj = new();
+
     public StatelessWorkerGrainContext(
         GrainAddress address,
         GrainTypeSharedContext sharedContext,
@@ -46,14 +51,14 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         _innerActivator = innerActivator;
 
         var strategy = (StatelessWorkerPlacement)_shared.PlacementStrategy;
+        var options = _shared.StatelessWorkerOptions;
+
+        _removeIdleWorkers = strategy.RemoveIdleWorkers && options.RemoveIdleWorkers;
+        _idleWorkersInspectionPeriod = options.IdleWorkersInspectionPeriod;
+        _minIdleCyclesBeforeRemoval = options.MinIdleCyclesBeforeRemoval > 0 ? options.MinIdleCyclesBeforeRemoval : 1;
 
         _maxWorkers = strategy.MaxLocal;
         _messageLoopTask = Task.Run(RunMessageLoop);
-
-        if (strategy.RemoveIdleWorkers && _shared.StatelessWorkerOptions.RemoveIdleWorkers)
-        {
-            _workerCollector = new(this, _shared.StatelessWorkerOptions);
-        }
     }
 
     public GrainReference GrainReference => _grainReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
@@ -78,29 +83,22 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
     {
         get
         {
-            var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             EnqueueWorkItem(WorkItemType.DeactivatedTask, new DeactivatedTaskWorkItemState(completion));
             return completion.Task;
         }
     }
 
-    public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
-    {
-    }
+    public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) { }
 
-    public void ReceiveMessage(object message)
-    {
-        EnqueueWorkItem(WorkItemType.Message, message);
-    }
+    public void ReceiveMessage(object message) => EnqueueWorkItem(WorkItemType.Message, message);
 
-    public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken)
-    {
+    public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) =>
         EnqueueWorkItem(WorkItemType.Deactivate, new DeactivateWorkItemState(deactivationReason, cancellationToken));
-    }
 
     public async ValueTask DisposeAsync()
     {
-        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         EnqueueWorkItem(WorkItemType.DisposeAsync, new DisposeAsyncWorkItemState(completion));
         await completion.Task;
     }
@@ -133,6 +131,8 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
 
     private async Task RunMessageLoop()
     {
+        var inspectionWatch = CoarseStopwatch.StartNew();
+
         while (true)
         {
             try
@@ -165,10 +165,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
                         case WorkItemType.OnDestroyActivation:
                             {
                                 var grainContext = (ActivationData)workItem.State;
-                                lock (_workers)
-                                {
-                                    _workers.Remove(grainContext);
-                                }
+                                _workers.Remove(grainContext);
 
                                 if (_workers.Count == 0)
                                 {
@@ -178,15 +175,87 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
                                 }
                                 break;
                             }
-                        default: throw new NotSupportedException($"Work item of type {workItem.Type} is not supported");
+                        case WorkItemType.CollectIdleWorkers:
+                            {
+                                CollectIdleWorkers();
+                                inspectionWatch.Restart();
+                            }
+                            break;
+                        default:
+                            throw new NotSupportedException($"Work item of type {workItem.Type} is not supported");
                     }
                 }
 
-                await _workSignal.WaitAsync();
+                if (!_removeIdleWorkers)
+                {
+                    // If idle worker removal is disable, just wait for the _workSignal only.
+                    await _workSignal.WaitAsync();
+                    continue;
+                }
+
+                var workSignalTask = _workSignal.WaitAsync().AsTask();
+                var inspectionDueTask = Task.Delay(_idleWorkersInspectionPeriod);
+
+                // If the grain is busy and work signals come in continuously, the inspectionDueTask may rarely win the race.
+                // This means CollectIdleWorkers might not run when there is heavy activity, which seems ok since we only
+                // need to remove idle workers when the grain is underutilized, but that is not the case, as we need to
+                // sample the waiting counts in order for the PID to accumulate some error, otherwise it would consistently
+                // report a non-negative signal. Sampling intervals catch moments where there's almost no work but not
+                // exactly zero waiting count. These "almost idle" samples result in small negative errors that accumulate
+                // in the integral term. Over multiple samples, this accumulated integral becomes large enough to trigger
+                // worker removal. We run a collection round if there is no actual work and 1 inspection cycle worth of
+                // time has passed. Or even if there is work happening, but 1 inspection cycle worth of time has passed
+                // to avoid under-sampling.
+
+                var completed = await Task.WhenAny(workSignalTask, inspectionDueTask);
+                if (completed == inspectionDueTask || inspectionWatch.Elapsed > _idleWorkersInspectionPeriod)
+                {
+                    // We queue the collection task as a work item to give chance for the other "actual" work items.
+                    EnqueueWorkItem(WorkItemType.CollectIdleWorkers, DummyObj);
+                }
             }
             catch (Exception exception)
             {
                 _shared.Logger.LogError(exception, "Error in stateless worker message loop");
+            }
+        }
+    }
+
+    private void CollectIdleWorkers()
+    {
+        // These parameter values were tuned using a genetic algorithm, for potential re-tuning see:
+        // https://github.com/ledjon-behluli/Orleans.FullyAdaptiveStatelessWorkerSimulations/blob/main/Orleans.FullyAdaptiveStatelessWorkerSimulations/Program.cs
+
+        // For more info see:
+        // https://www.ledjonbehluli.com/posts/orleans_adaptive_stateless_worker/
+
+        const double Kp = 0.433;
+        const double Ki = 0.468;
+        const double Kd = 0.480;
+
+        var averageWaitingCount = _workers.Count > 0 ? _workers.Average(w => w.WaitingCount) : 0d;
+        var error = -averageWaitingCount; // Our target is 0 waiting count: 0 - avgWC = -avgWC
+
+        _integralTerm += error;
+        var derivativeTerm = error - _previousError;
+        _previousError = error;
+
+        var controlSignal = Kp * error + Ki * _integralTerm + Kd * derivativeTerm;
+
+        _detectedIdleCyclesCount = controlSignal < 0 ? ++_detectedIdleCyclesCount : 0;
+
+        if (_detectedIdleCyclesCount >= _minIdleCyclesBeforeRemoval)
+        {
+            var inactiveWorkers = _workers.Where(w => w.IsInactive).ToImmutableArray();
+            if (inactiveWorkers.Length > 0)
+            {
+                var worker = inactiveWorkers[Random.Shared.Next(inactiveWorkers.Length)];
+                worker.Deactivate(new(DeactivationReasonCode.RuntimeRequested, "Worker deactivated due to inactivity."));
+
+                var antiWindUpFactor = (double)(inactiveWorkers.Length - 1) / inactiveWorkers.Length;
+
+                _integralTerm *= antiWindUpFactor;
+                _detectedIdleCyclesCount = 0;
             }
         }
     }
@@ -264,12 +333,9 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
         var requestContext = (message as Message)?.RequestContextData ?? [];
         var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
-        newWorker.Activate(requestContext, cancellation.Token);
 
-        lock (_workers)
-        {
-            _workers.Add(newWorker);
-        }
+        newWorker.Activate(requestContext, cancellation.Token);
+        _workers.Add(newWorker);
 
         return newWorker;
     }
@@ -282,7 +348,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         }
     }
 
-    private async Task DeactivatedTaskInternal(TaskCompletionSource<bool> completion)
+    private async Task DeactivatedTaskInternal(TaskCompletionSource completion)
     {
         try
         {
@@ -293,7 +359,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
             }
 
             await Task.WhenAll(tasks);
-            completion.TrySetResult(true);
+            completion.TrySetResult();
         }
         catch (Exception exception)
         {
@@ -301,7 +367,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         }
     }
 
-    private async Task DisposeAsyncInternal(TaskCompletionSource<bool> completion)
+    private async Task DisposeAsyncInternal(TaskCompletionSource completion)
     {
         try
         {
@@ -322,16 +388,11 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
             }
 
             await Task.WhenAll(tasks);
-            completion.TrySetResult(true);
+            completion.TrySetResult();
         }
         catch (Exception exception)
         {
             completion.TrySetException(exception);
-        }
-
-        if (_workerCollector is { } collector)
-        {
-            await collector.DisposeAsync();
         }
     }
 
@@ -362,139 +423,11 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         DeactivatedTask,
         DisposeAsync,
         OnDestroyActivation,
+        CollectIdleWorkers
     }
 
     private record ActivateWorkItemState(Dictionary<string, object>? RequestContext, CancellationToken CancellationToken);
     private record DeactivateWorkItemState(DeactivationReason DeactivationReason, CancellationToken CancellationToken);
-    private record DeactivatedTaskWorkItemState(TaskCompletionSource<bool> Completion);
-    private record DisposeAsyncWorkItemState(TaskCompletionSource<bool> Completion);
-
-    // See: https://www.ledjonbehluli.com/posts/orleans_adaptive_stateless_worker/
-    private sealed class WorkerCollector : IAsyncDisposable
-    {
-#pragma warning disable IDE0052 // Remove unread private members
-        private readonly Task _collectionTask;
-#pragma warning restore IDE0052 // Remove unread private members
-
-        private readonly CancellationTokenSource _cts = new();
-
-        /// <summary>
-        /// We keep a WeakReference to the SW context to remain alive as long as the associated context is active,
-        /// without unintentionally extending its lifetime.
-        /// </summary>
-        private readonly WeakReference<StatelessWorkerGrainContext> _contextRef;
-
-        public WorkerCollector(StatelessWorkerGrainContext context, StatelessWorkerOptions options)
-        {
-            _contextRef = new(context);
-            _collectionTask = Task.Run(() => PeriodicallyCollectWorkers(options));
-        }
-
-        private async Task PeriodicallyCollectWorkers(StatelessWorkerOptions options)
-        {
-            // These parameter values were tuned using a genetic algorithm, for potential re-tuning see:
-            // https://github.com/ledjon-behluli/Orleans.FullyAdaptiveStatelessWorkerSimulations/blob/main/Orleans.FullyAdaptiveStatelessWorkerSimulations/Program.cs
-
-            const double Kp = 0.433;
-            const double Ki = 0.468;
-            const double Kd = 0.480;
-
-            var previousError = 0d;
-            var integralTerm = 0d;
-
-            var inspectionPeriod = options.IdleWorkersInspectionPeriod;
-            var minIdleCyclesBeforeRemoval = options.MinIdleCyclesBeforeRemoval;
-
-            var detectedIdleCyclesCount = 0; // You can think of this as how many times the control signal was in the negative zone.
-            var lastWorkerRemovalTime = CoarseStopwatch.StartNew();
-
-            try
-            {
-                while (!_cts.Token.IsCancellationRequested)
-                {
-                    if (!_contextRef.TryGetTarget(out var context))
-                    {
-                        // The target is no longer alive, so i am stopping myself.
-                        break;
-                    }
-
-                    var workers = context._workers;
-                    var averageWaitingCount = 0d;
-
-                    if (workers.Count > 0)
-                    {
-                        lock (workers)
-                        {
-                            averageWaitingCount = workers.Average(w => w.WaitingCount);
-                        }
-                    }
-
-                    var error = -averageWaitingCount; // Our target is 0 waiting count: 0 - avgWC = -avgWC
-
-                    integralTerm += error;
-                    var derivativeTerm = error - previousError;
-                    previousError = error;
-
-                    var controlSignal = Kp * error + Ki * integralTerm + Kd * derivativeTerm;
-
-                    detectedIdleCyclesCount = controlSignal < 0 ? ++detectedIdleCyclesCount : 0;
-
-                    if (detectedIdleCyclesCount > minIdleCyclesBeforeRemoval)
-                    {
-                        ImmutableArray<ActivationData> inactiveWorkers;
-
-                        lock (workers)
-                        {
-                            inactiveWorkers = workers.Where(w => w.IsInactive).ToImmutableArray();
-                        }
-
-                        if (inactiveWorkers.Length > 0)
-                        {
-                            var worker = inactiveWorkers[Random.Shared.Next(inactiveWorkers.Length)];
-                            worker.Deactivate(new(DeactivationReasonCode.RuntimeRequested, "Worker deactivated due to inactivity."));
-
-                            var antiWindUpFactor = (double)(inactiveWorkers.Length - 1) / inactiveWorkers.Length;
-                            integralTerm *= antiWindUpFactor;
-
-                            detectedIdleCyclesCount = 0;
-                            lastWorkerRemovalTime.Restart();
-                        }
-                    }
-
-                    await Task.Delay(inspectionPeriod, _cts.Token);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                // Ignore
-            }
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            try
-            {
-                await _cts.CancelAsync().SuppressThrowing();
-            }
-            catch
-            {
-                // Ignore.
-            }
-
-            try
-            {
-                if (_collectionTask is { } task)
-                {
-                    await task.SuppressThrowing();
-                }
-            }
-            catch
-            {
-                // Ignore.
-            }
-
-            _cts.Dispose();
-            GC.SuppressFinalize(this);
-        }
-    }
+    private record DeactivatedTaskWorkItemState(TaskCompletionSource Completion);
+    private record DisposeAsyncWorkItemState(TaskCompletionSource Completion);
 }

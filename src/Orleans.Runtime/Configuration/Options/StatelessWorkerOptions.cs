@@ -33,7 +33,6 @@ public class StatelessWorkerOptions
     /// <summary>
     /// The minumun, consecutive number of idle cycles any given worker must exibit before it is deemed enough to remove the worker.
     /// </summary>
-    /// <remarks>This should be ~3x per second of the inspection period.</remarks>
     public int MinIdleCyclesBeforeRemoval { get; set; }
 
     /// <summary>
