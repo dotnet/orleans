@@ -1,3 +1,5 @@
+#define COOPERATIVE_CANCELLATION
+#nullable enable
 using System;
 using System.Diagnostics;
 using System.Threading;
@@ -6,15 +8,14 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
-    internal class CallbackData
+    internal sealed class CallbackData
     {
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
         private int completed;
-        private StatusResponse lastKnownStatus;
+        private StatusResponse? lastKnownStatus;
         private ValueStopwatch stopwatch;
-
-        private CancellationTokenRegistration cancellationTokenRegistration;
+        private CancellationTokenRegistration _cancellationTokenRegistration;
 
         public CallbackData(
             SharedCallbackData shared,
@@ -31,29 +32,22 @@ namespace Orleans.Runtime
 
         public bool IsCompleted => this.completed == 1;
 
-        public void SubscribeForCancellation(IInvokable invokable)
+        public void SubscribeForCancellation(CancellationToken cancellationToken)
         {
-            if (invokable is not ICancellableInvokable cancellableInvokable)
+            if (!cancellationToken.CanBeCanceled)
             {
                 return;
             }
 
-            var cancellationToken = cancellableInvokable.GetCancellationToken();
-
-            if (cancellationToken.CanBeCanceled)
+            cancellationToken.ThrowIfCancellationRequested();
+            _cancellationTokenRegistration = cancellationToken.UnsafeRegister(static arg =>
             {
-                // Throw early if already cancelled
-                cancellationToken.ThrowIfCancellationRequested();
-
-                cancellationTokenRegistration = cancellationToken.Register(static arg =>
-                {
-                    var callbackData = (CallbackData)arg;
-                    var cancellableInvokable = (ICancellableInvokable)callbackData.Message.BodyObject;
-                    var cancellableTokenId = cancellableInvokable.GetCancellableTokenId();
-                    callbackData.shared.GrainFactory.GetGrain<ICancellableInvokableGrainExtension>(callbackData.Message.TargetGrain).CancelRemoteToken(cancellableTokenId).Ignore();
-                }, this);
-            }
+                var callbackData = (CallbackData)arg!;
+                callbackData.OnCancellation();
+            }, this);
         }
+
+        private void SignalCancellation() => shared.CancellationManager.SignalCancellation(Message.TargetSilo, Message.TargetGrain, Message.SendingGrain, Message.Id);
 
         public void OnStatusUpdate(StatusResponse status)
         {
@@ -79,6 +73,33 @@ namespace Orleans.Runtime
 
         private TimeSpan GetResponseTimeout() => (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
 
+        private void OnCancellation()
+        {
+            // If waiting for acknowledgement is enabled, simply signal to the remote grain that cancellation
+            // is requested and return.
+            if (shared.WaitForCancellationAcknowledgement)
+            {
+                SignalCancellation();
+                return;
+            }
+
+            // Otherwise, cancel the request immediately, without waiting for the callee to acknowledge the
+            // cancellation request. The callee will still be signaled.
+            if (Interlocked.CompareExchange(ref completed, 1, 0) != 0)
+            {
+                return;
+            }
+
+            stopwatch.Stop();
+            SignalCancellation();
+            shared.Unregister(Message);
+            ApplicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
+            ApplicationRequestInstruments.OnAppRequestsTimedOut();
+            OrleansCallBackDataEvent.Log.OnCanceled(Message);
+            context.Complete(Response.FromException(new OperationCanceledException(_cancellationTokenRegistration.Token)));
+            _cancellationTokenRegistration.Dispose();
+        }
+
         public void OnTimeout()
         {
             if (Interlocked.CompareExchange(ref completed, 1, 0) != 0)
@@ -86,10 +107,14 @@ namespace Orleans.Runtime
                 return;
             }
 
-            this.shared.Unregister(this.Message);
-
             this.stopwatch.Stop();
-            this.cancellationTokenRegistration.Dispose();
+            if (shared.CancelRequestOnTimeout)
+            {
+                SignalCancellation();
+            }
+
+            this.shared.Unregister(this.Message);
+            _cancellationTokenRegistration.Dispose();
             ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
             ApplicationRequestInstruments.OnAppRequestsTimedOut();
 
@@ -117,9 +142,9 @@ namespace Orleans.Runtime
                 return;
             }
 
-            this.shared.Unregister(this.Message);
             this.stopwatch.Stop();
-            this.cancellationTokenRegistration.Dispose();
+            this.shared.Unregister(this.Message);
+            _cancellationTokenRegistration.Dispose();
             ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             OrleansCallBackDataEvent.Log.OnTargetSiloFail(this.Message);
@@ -145,7 +170,7 @@ namespace Orleans.Runtime
             OrleansCallBackDataEvent.Log.DoCallback(this.Message);
 
             this.stopwatch.Stop();
-            this.cancellationTokenRegistration.Dispose();
+            _cancellationTokenRegistration.Dispose();
             ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
@@ -172,7 +197,7 @@ namespace Orleans.Runtime
                 context.Complete(Response.FromException(exc));
             }
 
-            static void HandleRejectionResponse(IResponseCompletionSource context, RejectionResponse rejection)
+            static void HandleRejectionResponse(IResponseCompletionSource context, RejectionResponse? rejection)
             {
                 Exception exception;
                 if (rejection?.RejectionType is Message.RejectionTypes.GatewayTooBusy)

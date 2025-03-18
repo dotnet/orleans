@@ -35,6 +35,11 @@ namespace Orleans.CodeGenerator
             var members = new List<ISerializableMember>();
             foreach (var member in type.Members)
             {
+                if (!member.IsSerializable)
+                {
+                    continue;
+                }
+
                 if (member is ISerializableMember serializable)
                 {
                     members.Add(serializable);
@@ -46,10 +51,6 @@ namespace Orleans.CodeGenerator
                 else if (member is MethodParameterFieldDescription methodParameter)
                 {
                     members.Add(new SerializableMethodMember(methodParameter));
-                }
-                else if (member is CancellableTokenFieldDescription cancellableTokenField)
-                {
-                    members.Add(new SerializableCancellableTokenMember(_codeGenerator, cancellableTokenField));
                 }
             }
 
@@ -251,6 +252,11 @@ namespace Orleans.CodeGenerator
             int typeIndex = 0;
             foreach (var member in serializableTypeDescription.Members.Distinct(MemberDescriptionTypeComparer.Default))
             {
+                if (!member.IsSerializable)
+                {
+                    continue;
+                }
+
                 // Add a codec field for any field in the target which does not have a static codec.
                 if (LibraryTypes.StaticCodecs.FindByUnderlyingType(member.Type) is not null)
                     continue;
@@ -1174,8 +1180,6 @@ namespace Orleans.CodeGenerator
 
             public bool IsShallowCopyable => LibraryTypes.IsShallowCopyable(_member.Parameter.Type) || _member.Parameter.HasAnyAttribute(LibraryTypes.ImmutableAttributes);
 
-            public bool IsCancellationToken => SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, _member.Parameter.Type);
-
             /// <summary>
             /// Gets syntax representing the type of this field.
             /// </summary>
@@ -1184,56 +1188,6 @@ namespace Orleans.CodeGenerator
             public bool IsValueType => _member.Type.IsValueType;
 
             public bool IsPrimaryConstructorParameter => _member.IsPrimaryConstructorParameter;
-
-            /// <summary>
-            /// Returns syntax for retrieving the value of this field, deep copying it if necessary.
-            /// </summary>
-            /// <param name="instance">The instance of the containing type.</param>
-            /// <returns>Syntax for retrieving the value of this field.</returns>
-            public ExpressionSyntax GetGetter(ExpressionSyntax instance) => instance.Member(_member.FieldName);
-
-            /// <summary>
-            /// Returns syntax for setting the value of this field.
-            /// </summary>
-            /// <param name="instance">The instance of the containing type.</param>
-            /// <param name="value">Syntax for the new value.</param>
-            /// <returns>Syntax for setting the value of this field.</returns>
-            public ExpressionSyntax GetSetter(ExpressionSyntax instance, ExpressionSyntax value) => AssignmentExpression(
-                        SyntaxKind.SimpleAssignmentExpression,
-                        instance.Member(_member.FieldName),
-                        value);
-
-            public FieldAccessorDescription GetGetterFieldDescription() => null;
-            public FieldAccessorDescription GetSetterFieldDescription() => null;
-        }
-
-        internal class SerializableCancellableTokenMember : ISerializableMember
-        {
-            private readonly CodeGenerator _codeGenerator;
-            private readonly CancellableTokenFieldDescription _member;
-
-            public SerializableCancellableTokenMember(CodeGenerator codeGenerator, CancellableTokenFieldDescription member)
-            {
-                _codeGenerator = codeGenerator;
-                _member = member;
-            }
-
-            public IMemberDescription Member => _member;
-
-            private LibraryTypes LibraryTypes => _codeGenerator.LibraryTypes;
-
-            public bool IsShallowCopyable => LibraryTypes.IsShallowCopyable(_member.Type);
-
-            public bool IsCancellationToken => false;
-
-            /// <summary>
-            /// Gets syntax representing the type of this field.
-            /// </summary>
-            public TypeSyntax TypeSyntax => _member.TypeSyntax;
-
-            public bool IsValueType => _member.Type.IsValueType;
-
-            public bool IsPrimaryConstructorParameter => false;
 
             /// <summary>
             /// Returns syntax for retrieving the value of this field, deep copying it if necessary.

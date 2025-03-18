@@ -108,15 +108,15 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
     /// <inheritdoc/>
     public ValueTask<(EnumerationResult Status, object Value)> StartEnumeration<T>(Guid requestId, [Immutable] IAsyncEnumerableRequest<T> request)
     {
-        request.SetTarget(GrainContext);
-        var enumerable = request.InvokeImplementation();
         ref var entry = ref CollectionsMarshal.GetValueRefOrAddDefault(_enumerators, requestId, out bool exists);
         if (exists)
         {
             return ThrowAlreadyExists();
         }
 
-        var cts = new CancellationTokenSource();
+        request.SetTarget(GrainContext);
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(request.GetCancellationToken());
+        var enumerable = request.InvokeImplementation();
         var enumerator = enumerable.GetAsyncEnumerator(cts.Token);
         entry.Enumerator = enumerator;
         entry.MaxBatchSize = request.MaxBatchSize;

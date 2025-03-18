@@ -108,6 +108,7 @@ internal static class InstrumentNames
     // App requests
     public const string APP_REQUESTS_LATENCY_HISTOGRAM = "orleans-app-requests-latency";
     public const string APP_REQUESTS_TIMED_OUT = "orleans-app-requests-timedout";
+    public const string APP_REQUESTS_CANCELED = "orleans-app-requests-canceled";
 
     // Reminders
     public const string REMINDERS_TARDINESS = "orleans-reminders-tardiness";

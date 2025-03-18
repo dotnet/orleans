@@ -43,8 +43,6 @@ using Microsoft.Extensions.Configuration;
 using Orleans.Serialization.Internal;
 using Orleans.Core;
 using Orleans.Placement.Repartitioning;
-using Orleans.Runtime.Cancellation;
-using Orleans.Serialization.Invocation;
 using Orleans.Runtime.Placement.Filtering;
 
 namespace Orleans.Hosting
@@ -102,9 +100,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IGrainCancellationTokenRuntime, GrainCancellationTokenRuntime>();
             services.AddTransient<CancellationSourcesExtension>();
             services.AddKeyedTransient<IGrainExtension>(typeof(ICancellationSourcesExtension), (sp, _) => sp.GetRequiredService<CancellationSourcesExtension>());
-            services.TryAddTransient<ICancellationRuntime, CancellationRuntime>();
-            services.AddTransient<CancellableInvokableGrainExtension>();
-            services.AddKeyedTransient<IGrainExtension>(typeof(ICancellableInvokableGrainExtension), (sp, _) => sp.GetRequiredService<CancellableInvokableGrainExtension>());
             services.TryAddSingleton<GrainFactory>(sp => sp.GetRequiredService<InsideRuntimeClient>().ConcreteGrainFactory);
             services.TryAddSingleton<InterfaceToImplementationMappingCache>();
             services.TryAddSingleton<GrainInterfaceTypeToGrainTypeResolver>();
@@ -420,6 +415,11 @@ namespace Orleans.Hosting
             services.AddFromExisting<IActivationMigrationManager, ActivationMigrationManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationMigrationManager>();
             services.AddSingleton<GrainMigratabilityChecker>();
+
+            // Cancellation manager
+            services.AddSingleton<GrainCallCancellationManager>();
+            services.AddFromExisting<IGrainCallCancellationManager, GrainCallCancellationManager>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainCallCancellationManager>();
 
             ApplyConfiguration(builder);
         }

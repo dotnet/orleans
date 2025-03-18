@@ -3884,16 +3884,6 @@ namespace Orleans.Serialization.UnitTests
         }
     }
 
-    public class CancellationTokenCodecTests(ITestOutputHelper output) : FieldCodecTester<CancellationToken, CancellationTokenCodec>(output)
-    {
-        protected override CancellationToken CreateValue() => default;
-        protected override CancellationToken[] TestValues =>
-        [
-            new CancellationToken(),
-            new CancellationToken(true)
-        ];
-    }
-
     public class CancellationTokenCopierTests(ITestOutputHelper output) : CopierTester<CancellationToken, IDeepCopier<CancellationToken>>(output)
     {
         protected override CancellationToken CreateValue() => default;

@@ -40,6 +40,7 @@ namespace Orleans.Runtime
         private MessageCenter messageCenter;
         private List<IIncomingGrainCallFilter> grainCallFilters;
         private readonly DeepCopier _deepCopier;
+        private IGrainCallCancellationManager _cancellationManager;
         private HostedClient hostedClient;
 
         private HostedClient HostedClient => this.hostedClient ??= this.ServiceProvider.GetRequiredService<HostedClient>();
@@ -83,14 +84,18 @@ namespace Orleans.Runtime
             this.sharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
-                this.ConcreteGrainFactory,
-                this.messagingOptions.ResponseTimeout);
+                this.messagingOptions.ResponseTimeout,
+                this.messagingOptions.CancelRequestOnTimeout,
+                this.messagingOptions.WaitForCancellationAcknowledgement,
+                cancellationManager: null);
 
             this.systemSharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
-                this.ConcreteGrainFactory,
-                this.messagingOptions.SystemResponseTimeout);
+                this.messagingOptions.SystemResponseTimeout,
+                this.messagingOptions.CancelRequestOnTimeout,
+                this.messagingOptions.WaitForCancellationAcknowledgement,
+                cancellationManager: null);
         }
 
         public IServiceProvider ServiceProvider { get; }
@@ -117,6 +122,9 @@ namespace Orleans.Runtime
             IResponseCompletionSource context,
             InvokeMethodOptions options)
         {
+            var cancellationToken = request.GetCancellationToken();
+            cancellationToken.ThrowIfCancellationRequested();
+
             var message = this.messageFactory.CreateMessage(request, options);
             message.InterfaceType = target.InterfaceType;
             message.InterfaceVersion = target.InterfaceVersion;
@@ -165,7 +173,7 @@ namespace Orleans.Runtime
                 // Register a callback for the request.
                 var callbackData = new CallbackData(sharedData, context, message);
                 callbacks.TryAdd((message.SendingGrain, message.Id), callbackData);
-                callbackData.SubscribeForCancellation(request);
+                callbackData.SubscribeForCancellation(cancellationToken);
             }
             else
             {
@@ -263,6 +271,7 @@ namespace Orleans.Runtime
                         case IInvokable invokable:
                             {
                                 invokable.SetTarget(target);
+
                                 CancellationSourcesExtension.RegisterCancellationTokens(target, invokable);
                                 if (GrainCallFilters is { Count: > 0 } || target.GrainInstance is IIncomingGrainCallFilter)
                                 {
@@ -275,6 +284,8 @@ namespace Orleans.Runtime
                                     response = await invokable.Invoke();
                                     response = this.responseCopier.Copy(response);
                                 }
+
+                                invokable.Dispose();
                                 break;
                             }
                         default:
@@ -417,7 +428,7 @@ namespace Orleans.Runtime
                 var status = (StatusResponse)message.BodyObject;
                 callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
                 var request = callback?.Message;
-                if (!(request is null))
+                if (request is not null)
                 {
                     callback.OnStatusUpdate(status);
                     if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Information))
@@ -428,10 +439,21 @@ namespace Orleans.Runtime
                 }
                 else
                 {
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Information))
+                    if (messagingOptions.CancelRequestOnTimeout)
+                    {
+                        // Cancel the call since the caller has abandoned it.
+                        // Note that the target and sender arguments are swapped because this is a response to the original request.
+                        _cancellationManager.SignalCancellation(
+                            message.SendingSilo,
+                            targetGrainId: message.SendingGrain,
+                            sendingGrainId: message.TargetGrain,
+                            messageId: message.Id);
+                    }
+
+                    if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Debug))
                     {
                         var diagnosticsString = string.Join("\n", status.Diagnostics);
-                        this.logger.LogInformation("Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}", message, diagnosticsString);
+                        this.logger.LogDebug("Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}", message, diagnosticsString);
                     }
                 }
 
@@ -522,6 +544,9 @@ namespace Orleans.Runtime
 
         public void Participate(ISiloLifecycle lifecycle)
         {
+            _cancellationManager = this.ServiceProvider.GetRequiredService<IGrainCallCancellationManager>();
+            sharedCallbackData.CancellationManager = _cancellationManager;
+            systemSharedCallbackData.CancellationManager = _cancellationManager;
             lifecycle.Subscribe<InsideRuntimeClient>(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
         }
 

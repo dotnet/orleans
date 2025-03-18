@@ -31,6 +31,7 @@ namespace Orleans
         public ClusterClient(IServiceProvider serviceProvider, OutsideRuntimeClient runtimeClient, ILoggerFactory loggerFactory, IOptions<ClientMessagingOptions> clientMessagingOptions)
         {
             ValidateSystemConfiguration(serviceProvider);
+            runtimeClient.ConsumeServices();
 
             _runtimeClient = runtimeClient;
             _logger = loggerFactory.CreateLogger<ClusterClient>();
