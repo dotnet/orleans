@@ -50,6 +50,11 @@ public enum EnumerationResult
     Error = 1 << 5,
 
     /// <summary>
+    /// Enumeration was canceled.
+    /// </summary>
+    Canceled = 1 << 6,
+
+    /// <summary>
     /// This result indicates that enumeration has completed and that no further results will be produced.
     /// </summary>
     CompletedWithElement = Completed | Element,
@@ -244,25 +249,25 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
         (EnumerationResult Status, object Value) result;
         while (true)
         {
-            if (_cancellationToken.IsCancellationRequested)
-            {
-                _current = default;
-                return false;
-            }
+            _cancellationToken.ThrowIfCancellationRequested();
 
             if (!_initialized)
             {
-                result = await _target.StartEnumeration(_requestId, _request);
+                result = await _target.StartEnumeration(_requestId, _request).AsTask().WaitAsync(_cancellationToken);
                 _initialized = true;
             }
             else
             {
-                result = await _target.MoveNext<T>(_requestId);
+                result = await _target.MoveNext<T>(_requestId).AsTask().WaitAsync(_cancellationToken);
             }
 
             if (result.Status is EnumerationResult.Error)
             {
                 ExceptionDispatchInfo.Capture((Exception)result.Value).Throw();
+            }
+            else if (result.Status is EnumerationResult.Canceled)
+            {
+                throw new OperationCanceledException();
             }
 
             if (result.Status is not EnumerationResult.Heartbeat)
@@ -274,7 +279,7 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
         if (result.Status is EnumerationResult.MissingEnumeratorError)
         {
             throw new EnumerationAbortedException("Enumeration aborted: the remote target does not have a record of this enumerator."
-                + " This likely indicates that the remote grain was deactivated since enumeration begun.");
+                + " This likely indicates that the remote grain was deactivated since enumeration begun or that the enumerator was idle for longer than the expiration period.");
         }
 
         Debug.Assert((result.Status & (EnumerationResult.Element | EnumerationResult.Batch | EnumerationResult.Completed)) != 0);

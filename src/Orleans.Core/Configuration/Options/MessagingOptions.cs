@@ -55,5 +55,10 @@ namespace Orleans.Configuration
         /// </summary>
         /// <value>The maximum message body size is 100 MB by default.</value>
         public int MaxMessageBodySize { get; set; } = 100 * 1024 * 1024;
+
+        /// <summary>
+        /// Gets the response timeout underlying the <see cref="ResponseTimeout"/> property, without debugger checks.
+        /// </summary>
+        internal TimeSpan ConfiguredResponseTimeout => _responseTimeout;
     }
 }

@@ -1,6 +1,7 @@
-﻿using Microsoft.Extensions.Logging;
+#nullable enable
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using Orleans.Internal;
-using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -82,6 +83,47 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
         var grainCalls = await grain.GetIncomingCalls();
         Assert.Contains(grainCalls, c => c.InterfaceName.Contains(nameof(IAsyncEnumerableGrainExtension)) && c.MethodName.Contains(nameof(IAsyncDisposable.DisposeAsync)));
     }
+
+    [Theory, TestCategory("BVT"), TestCategory("Observable")]
+    [InlineData(0, false)]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(9, false)]
+    [InlineData(9, true)]
+    [InlineData(10, false)]
+    [InlineData(10, true)]
+    [InlineData(11, false)]
+    [InlineData(11, true)]
+    public async Task ObservableGrain_AsyncEnumerable_Cancellation(int errorIndex, bool waitAfterYield)
+    {
+        // This special error message is interpreted to indicate that cancellation
+        // should occur when the index is reached.
+        const string ErrorMessage = "cancel";
+        var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
+
+        var values = new List<int>();
+        try
+        {
+            await foreach (var entry in grain.GetValuesWithError(errorIndex, waitAfterYield, ErrorMessage).WithBatchSize(10))
+            {
+                values.Add(entry);
+                Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
+            }
+        }
+        catch (OperationCanceledException oce)
+        {
+            var expectedMessage = new OperationCanceledException().Message;
+            Assert.Equal(expectedMessage, oce.Message);
+        }
+
+        Assert.Equal(errorIndex, values.Count);
+
+        // Check that the enumerator is disposed
+        var grainCalls = await grain.GetIncomingCalls();
+        Assert.Contains(grainCalls, c => c.InterfaceName.Contains(nameof(IAsyncEnumerableGrainExtension)) && c.MethodName.Contains(nameof(IAsyncDisposable.DisposeAsync)));
+    }
+
 
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_Batch()
@@ -196,15 +238,24 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
 
         var values = new List<string>();
         using var cts = new CancellationTokenSource();
-        await foreach (var entry in grain.GetValues().WithCancellation(cts.Token))
+        try
         {
-            values.Add(entry);
-            if (values.Count == 3)
+            await foreach (var entry in grain.GetValues().WithCancellation(cts.Token))
             {
-                cts.Cancel();
+                values.Add(entry);
+                if (values.Count == 3)
+                {
+                    cts.Cancel();
+                }
+
+                Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
             }
 
-            Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
+            Assert.Fail("Expected an exception to be thrown");
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
         }
 
         Assert.Equal(3, values.Count);
@@ -250,6 +301,100 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
     }
 
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    public async Task ObservableGrain_AsyncEnumerable_SlowConsumer()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cleanupInterval = TimeSpan.FromMilliseconds(100);
+        var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
+        using var listener = new AsyncEnumerableGrainExtensionListener(grain.GetGrainId(), cleanupInterval);
+
+        var producer = Task.Run(async () =>
+        {
+            foreach (var value in Enumerable.Range(0, 5))
+            {
+                await grain.OnNext(value.ToString());
+            }
+
+            await grain.Complete();
+        });
+
+        var values = new List<string>();
+        await foreach (var entry in grain.GetValues().WithBatchSize(1))
+        {
+            values.Add(entry);
+
+            // Sleep for 1 cycle before reading the next value.
+            // The enumerator should not be cleaned up.
+            var initialCleanupCount = listener.CleanupCount;
+            while (listener.CleanupCount == initialCleanupCount)
+            {
+                await Task.Delay(cleanupInterval / 10, cts.Token);
+            }
+
+            Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
+        }
+
+        Assert.Equal(5, values.Count);
+
+        // Check that the enumerator is disposed
+        var grainCalls = await grain.GetIncomingCalls();
+        Assert.Contains(grainCalls, c => c.InterfaceName.Contains(nameof(IAsyncEnumerableGrainExtension)) && c.MethodName.Contains(nameof(IAsyncDisposable.DisposeAsync)));
+    }
+
+    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    public async Task ObservableGrain_AsyncEnumerable_SlowConsumer_Evicted()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cleanupInterval = TimeSpan.FromMilliseconds(100);
+        var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
+        using var listener = new AsyncEnumerableGrainExtensionListener(grain.GetGrainId(), cleanupInterval);
+
+        var producer = Task.Run(async () =>
+        {
+            foreach (var value in Enumerable.Range(0, 5))
+            {
+                await grain.OnNext(value.ToString());
+            }
+
+            await grain.Complete();
+        });
+
+        var values = new List<string>();
+        try
+        {
+            await foreach (var entry in grain.GetValues().WithBatchSize(1))
+            {
+                values.Add(entry);
+
+                // After the 3rd iteration, sleep for longer than the cleanup duration
+                // and wait for the enumerator to be cleaned up.
+                if (values.Count >= 3)
+                {
+                    var initialCleanupCount = listener.CleanupCount;
+                    while (listener.CleanupCount < initialCleanupCount + 2)
+                    {
+                        await Task.Delay(cleanupInterval, cts.Token);
+                    }
+                }
+
+                Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
+            }
+
+            Assert.Fail("Expected an exception to be thrown");
+        }
+        catch (EnumerationAbortedException ex)
+        {
+            Assert.Contains("the remote target does not have a record of this enumerator", ex.Message);
+        }
+
+        Assert.Equal(3, values.Count);
+
+        // Check that the enumerator is disposed
+        var grainCalls = await grain.GetIncomingCalls();
+        Assert.Contains(grainCalls, c => c.InterfaceName.Contains(nameof(IAsyncEnumerableGrainExtension)) && c.MethodName.Contains(nameof(IAsyncDisposable.DisposeAsync)));
+    }
+
+    [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_Deactivate()
     {
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
@@ -276,5 +421,66 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
         });
 
         Assert.Equal(2, values.Count);
+    }
+
+    private sealed class AsyncEnumerableGrainExtensionListener : IObserver<KeyValuePair<string, object?>>, IObserver<DiagnosticListener>, IDisposable
+    {
+        private readonly IDisposable _allListenersSubscription;
+        private readonly GrainId _targetGrainId;
+        private readonly TimeSpan _enumeratorCleanupInterval;
+        private IDisposable? _instanceSubscription;
+
+        public AsyncEnumerableGrainExtensionListener(GrainId targetGrainId, TimeSpan enumeratorCleanupInterval)
+        {
+            _allListenersSubscription = DiagnosticListener.AllListeners.Subscribe(this);
+            _targetGrainId = targetGrainId;
+            _enumeratorCleanupInterval = enumeratorCleanupInterval;
+        }
+
+        public int CleanupCount { get; private set; }
+
+        void IObserver<KeyValuePair<string, object?>>.OnCompleted()
+        {
+            _instanceSubscription?.Dispose();
+        }
+
+        void IObserver<KeyValuePair<string, object?>>.OnError(Exception error)
+        {
+        }
+
+        void IObserver<KeyValuePair<string, object?>>.OnNext(KeyValuePair<string, object?> value)
+        {
+            var extension = (AsyncEnumerableGrainExtension)value.Value!;
+            if (extension.GrainContext.GrainId != _targetGrainId)
+            {
+                return;
+            }
+
+            if (value.Key == "OnAsyncEnumeratorGrainExtensionCreated")
+            {
+                extension.Timer.Change(_enumeratorCleanupInterval, _enumeratorCleanupInterval);
+            }
+
+            if (value.Key == "OnEnumeratorCleanupCompleted")
+            {
+                ++CleanupCount;
+            }
+        }
+
+        void IObserver<DiagnosticListener>.OnCompleted() { }
+        void IObserver<DiagnosticListener>.OnError(Exception error) { }
+        void IObserver<DiagnosticListener>.OnNext(DiagnosticListener value)
+        {
+            if (value.Name == "Orleans.Runtime.AsyncEnumerableGrainExtension")
+            {
+                _instanceSubscription = value.Subscribe(this);
+            }
+        }
+
+        public void Dispose()
+        {
+            _allListenersSubscription.Dispose();
+            _instanceSubscription?.Dispose();
+        }
     }
 }
