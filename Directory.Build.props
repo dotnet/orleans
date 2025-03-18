@@ -51,7 +51,7 @@
   <PropertyGroup>
     <!-- System packages -->
     <SystemRuntimeVersion>4.3.1</SystemRuntimeVersion>
-    <SystemDataSqlClientVersion>4.8.3</SystemDataSqlClientVersion>
+    <SystemDataSqlClientVersion>4.8.6</SystemDataSqlClientVersion>
     <SystemDataCommonVersion>4.3.0</SystemDataCommonVersion>
     <SystemDiagnosticsEventLogVersion>6.0.0</SystemDiagnosticsEventLogVersion>
     <SystemConfigurationConfigurationManagerVersion>6.0.0</SystemConfigurationConfigurationManagerVersion>
@@ -107,7 +107,7 @@
     <AzureStorageBlobsVersion>12.10.0</AzureStorageBlobsVersion>
     <AzureStorageQueuesVersion>12.8.0</AzureStorageQueuesVersion>
     <MicrosoftDataSQLiteVersion>6.0.0</MicrosoftDataSQLiteVersion>
-    <MicrosoftDataSqlClientVersion>4.0.0</MicrosoftDataSqlClientVersion>
+    <MicrosoftDataSqlClientVersion>4.0.5</MicrosoftDataSqlClientVersion>
     <MicrosoftServiceFabricServicesVersion>5.2.1235</MicrosoftServiceFabricServicesVersion>
 
     <FSharpCoreVersion>6.0.1</FSharpCoreVersion>
@@ -125,7 +125,7 @@
     <MoqVersion>4.16.1</MoqVersion>
     <NewRelicAgentApiVersion>8.0.0.0</NewRelicAgentApiVersion>
     <NewtonsoftJsonVersion>13.0.1</NewtonsoftJsonVersion>
-    <NpgsqlVersion>6.0.0</NpgsqlVersion>
+    <NpgsqlVersion>6.0.13</NpgsqlVersion>
     <NSubstituteVersion>4.2.2</NSubstituteVersion>
     <NSubstituteAnalyzersCSharpVersion>1.0.14</NSubstituteAnalyzersCSharpVersion>
     <ZooKeeperNetExVersion>3.4.12.4</ZooKeeperNetExVersion>
