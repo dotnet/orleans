@@ -60,7 +60,7 @@ namespace Orleans.Transactions.Azure.Tests
             }
             catch (Exception exc)
             {
-                logger.LogError($"Could not initialize connection to storage table {tableName}", exc);
+                logger.LogError(exc, $"Could not initialize connection to storage table {tableName}");
                 throw;
             }
         }
@@ -74,7 +74,7 @@ namespace Orleans.Transactions.Azure.Tests
             }
             catch (Exception exc)
             {
-                logger.LogError("Error creating CloudTableCreationClient.", exc);
+                logger.LogError(exc, "Error creating CloudTableCreationClient.");
                 throw;
             }
         }
