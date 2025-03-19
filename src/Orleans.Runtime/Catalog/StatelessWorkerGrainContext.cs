@@ -197,7 +197,6 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
     private async Task PeriodicallyCollectIdleWorkers()
     {
         Debug.Assert(_inspectionTimer != null);
-
         while (await _inspectionTimer.WaitForNextTickAsync())
         {
             EnqueueWorkItem(WorkItemType.CollectIdleWorkers, DummyObj);
@@ -394,16 +393,12 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
     {
     }
 
-    public void OnDestroyActivation(IGrainContext grainContext)
-    {
+    public void OnDestroyActivation(IGrainContext grainContext) =>
         EnqueueWorkItem(WorkItemType.OnDestroyActivation, grainContext);
-    }
-
-    public void Rehydrate(IRehydrationContext context)
-    {
+    
+    public void Rehydrate(IRehydrationContext context) =>
         // Migration is not supported, but we need to dispose of the context if it's provided
         (context as IDisposable)?.Dispose();
-    }
 
     public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
     {
