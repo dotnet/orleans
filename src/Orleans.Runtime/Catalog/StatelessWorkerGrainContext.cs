@@ -40,7 +40,6 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
     private double _previousError = 0d;
     private double _integralTerm = 0d;
     private int _detectedIdleCyclesCount = 0;
-    private readonly bool _removeIdleWorkers;
     private readonly int _minIdleCyclesBeforeRemoval;
     private static readonly object DummyObj = new();
 
@@ -54,19 +53,16 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         _innerActivator = innerActivator;
 
         var strategy = (StatelessWorkerPlacement)_shared.PlacementStrategy;
-
-        _maxWorkers = strategy.MaxLocal;
-
         var options = _shared.StatelessWorkerOptions;
 
-        _removeIdleWorkers = strategy.RemoveIdleWorkers && options.RemoveIdleWorkers;
-        if (_removeIdleWorkers)
+        if (strategy.RemoveIdleWorkers && options.RemoveIdleWorkers)
         {
             _minIdleCyclesBeforeRemoval = options.MinIdleCyclesBeforeRemoval > 0 ? options.MinIdleCyclesBeforeRemoval : 1;
             _inspectionTimer = new(options.IdleWorkersInspectionPeriod);
             _inspectionTask = PeriodicallyCollectIdleWorkers();
         }
-       
+
+        _maxWorkers = strategy.MaxLocal;
         _messageLoopTask = Task.Run(RunMessageLoop);
     }
 
@@ -140,8 +136,6 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
 
     private async Task RunMessageLoop()
     {
-        var inspectionWatch = CoarseStopwatch.StartNew();
-
         while (true)
         {
             try
@@ -184,10 +178,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
                                 }
                                 break;
                             }
-                        case WorkItemType.CollectIdleWorkers:
-                            {
-                                CollectIdleWorkers();
-                            }
+                        case WorkItemType.CollectIdleWorkers: CollectIdleWorkers();
                             break;
                         default:
                             throw new NotSupportedException($"Work item of type {workItem.Type} is not supported");
@@ -358,15 +349,16 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
             completion.TrySetException(exception);
         }
 
-        try
+        if (_inspectionTimer != null)
         {
-            if (_inspectionTimer != null)
-            {
-                _inspectionTimer.Dispose();
-                _inspectionTimer = null;
-            }
+            _inspectionTimer.Dispose();
+            _inspectionTimer = null;
         }
-        catch { } // Ignore
+
+        if (_inspectionTask != null)
+        {
+            await _inspectionTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        }
     }
 
     private async Task DisposeAsyncInternal(TaskCompletionSource completion)
