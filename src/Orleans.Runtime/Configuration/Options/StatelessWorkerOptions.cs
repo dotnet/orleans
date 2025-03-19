@@ -28,7 +28,7 @@ public class StatelessWorkerOptions
     /// <summary>
     /// The default value for <see cref="IdleWorkersInspectionPeriod"/>.
     /// </summary>
-    public static readonly TimeSpan DEFAULT_IDLE_WORKERS_INSPECTION_PERIOD = TimeSpan.FromSeconds(1);
+    public static readonly TimeSpan DEFAULT_IDLE_WORKERS_INSPECTION_PERIOD = TimeSpan.FromMilliseconds(500);
 
     /// <summary>
     /// The minumun, consecutive number of idle cycles any given worker must exibit before it is deemed enough to remove the worker.

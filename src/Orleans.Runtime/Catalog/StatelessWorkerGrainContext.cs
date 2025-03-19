@@ -3,6 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
@@ -33,12 +34,14 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
 
     private GrainReference? _grainReference;
 
+    // Idle worker removal fields
+    private readonly Task? _inspectionTask;
+    private PeriodicTimer? _inspectionTimer;
     private double _previousError = 0d;
     private double _integralTerm = 0d;
     private int _detectedIdleCyclesCount = 0;
     private readonly bool _removeIdleWorkers;
     private readonly int _minIdleCyclesBeforeRemoval;
-    private readonly TimeSpan _idleWorkersInspectionPeriod;
     private static readonly object DummyObj = new();
 
     public StatelessWorkerGrainContext(
@@ -51,13 +54,19 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         _innerActivator = innerActivator;
 
         var strategy = (StatelessWorkerPlacement)_shared.PlacementStrategy;
+
+        _maxWorkers = strategy.MaxLocal;
+
         var options = _shared.StatelessWorkerOptions;
 
         _removeIdleWorkers = strategy.RemoveIdleWorkers && options.RemoveIdleWorkers;
-        _idleWorkersInspectionPeriod = options.IdleWorkersInspectionPeriod;
-        _minIdleCyclesBeforeRemoval = options.MinIdleCyclesBeforeRemoval > 0 ? options.MinIdleCyclesBeforeRemoval : 1;
-
-        _maxWorkers = strategy.MaxLocal;
+        if (_removeIdleWorkers)
+        {
+            _minIdleCyclesBeforeRemoval = options.MinIdleCyclesBeforeRemoval > 0 ? options.MinIdleCyclesBeforeRemoval : 1;
+            _inspectionTimer = new(options.IdleWorkersInspectionPeriod);
+            _inspectionTask = PeriodicallyCollectIdleWorkers();
+        }
+       
         _messageLoopTask = Task.Run(RunMessageLoop);
     }
 
@@ -178,7 +187,6 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
                         case WorkItemType.CollectIdleWorkers:
                             {
                                 CollectIdleWorkers();
-                                inspectionWatch.Restart();
                             }
                             break;
                         default:
@@ -186,38 +194,22 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
                     }
                 }
 
-                if (!_removeIdleWorkers)
-                {
-                    // If idle worker removal is disable, just wait for the _workSignal only.
-                    await _workSignal.WaitAsync();
-                    continue;
-                }
-
-                var workSignalTask = _workSignal.WaitAsync().AsTask();
-                var inspectionDueTask = Task.Delay(_idleWorkersInspectionPeriod);
-
-                // If the grain is busy and work signals come in continuously, the inspectionDueTask may rarely win the race.
-                // This means CollectIdleWorkers might not run when there is heavy activity, which seems ok since we only
-                // need to remove idle workers when the grain is underutilized, but that is not the case, as we need to
-                // sample the waiting counts in order for the PID to accumulate some error, otherwise it would consistently
-                // report a non-negative signal. Sampling intervals catch moments where there's almost no work but not
-                // exactly zero waiting count. These "almost idle" samples result in small negative errors that accumulate
-                // in the integral term. Over multiple samples, this accumulated integral becomes large enough to trigger
-                // worker removal. We run a collection round if there is no actual work and 1 inspection cycle worth of
-                // time has passed. Or even if there is work happening, but 1 inspection cycle worth of time has passed
-                // to avoid under-sampling.
-
-                var completed = await Task.WhenAny(workSignalTask, inspectionDueTask);
-                if (completed == inspectionDueTask || inspectionWatch.Elapsed > _idleWorkersInspectionPeriod)
-                {
-                    // We queue the collection task as a work item to give chance for the other "actual" work items.
-                    EnqueueWorkItem(WorkItemType.CollectIdleWorkers, DummyObj);
-                }
+                await _workSignal.WaitAsync();
             }
             catch (Exception exception)
             {
                 _shared.Logger.LogError(exception, "Error in stateless worker message loop");
             }
+        }
+    }
+
+    private async Task PeriodicallyCollectIdleWorkers()
+    {
+        Debug.Assert(_inspectionTimer != null);
+
+        while (await _inspectionTimer.WaitForNextTickAsync())
+        {
+            EnqueueWorkItem(WorkItemType.CollectIdleWorkers, DummyObj);
         }
     }
 
@@ -365,6 +357,16 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         {
             completion.TrySetException(exception);
         }
+
+        try
+        {
+            if (_inspectionTimer != null)
+            {
+                _inspectionTimer.Dispose();
+                _inspectionTimer = null;
+            }
+        }
+        catch { } // Ignore
     }
 
     private async Task DisposeAsyncInternal(TaskCompletionSource completion)

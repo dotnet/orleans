@@ -71,7 +71,7 @@ public class StatelessWorkerBenchmark : IDisposable
 
         await Task.WhenAll(tasks);
 
-        const int CooldownCycles = 25;
+        const int CooldownCycles = 10;
 
         for (var i = 1; i <= CooldownCycles; i++)
         {
