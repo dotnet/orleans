@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,9 +16,9 @@ using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
 using Orleans.Persistence.AzureStorage;
+using Orleans.Persistence.AzureStorage.Providers.Storage.Cursors;
 using Orleans.Providers.Azure;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
@@ -26,13 +27,14 @@ namespace Orleans.Storage
     /// <summary>
     /// Simple storage for writing grain state data to Azure table storage.
     /// </summary>
-    public class AzureTableGrainStorage : IGrainStorage, IRestExceptionDecoder, ILifecycleParticipant<ISiloLifecycle>
+    public class AzureTableGrainStorage : IExtendedGrainStorage, IRestExceptionDecoder, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly AzureTableStorageOptions options;
         private readonly ClusterOptions clusterOptions;
         private readonly SerializationManager serializationManager;
         private readonly IGrainFactory grainFactory;
         private readonly ITypeResolver typeResolver;
+        private readonly IGrainReferenceRuntime grainReferenceRuntime;
         private readonly ILogger logger;
 
         private GrainStateTableDataManager tableDataManager;
@@ -56,6 +58,7 @@ namespace Orleans.Storage
             SerializationManager serializationManager,
             IGrainFactory grainFactory,
             ITypeResolver typeResolver,
+            IGrainReferenceRuntime grainReferenceRuntime,
             ILogger<AzureTableGrainStorage> logger)
         {
             this.options = options;
@@ -64,6 +67,7 @@ namespace Orleans.Storage
             this.serializationManager = serializationManager;
             this.grainFactory = grainFactory;
             this.typeResolver = typeResolver;
+            this.grainReferenceRuntime = grainReferenceRuntime;
             this.logger = logger;
         }
 
@@ -395,6 +399,8 @@ namespace Orleans.Storage
             private readonly AzureTableDataManager<TableEntity> tableManager;
             private readonly ILogger logger;
 
+            internal AzureTableDataManager<TableEntity> TableManager => tableManager;
+
             public GrainStateTableDataManager(AzureStorageOperationOptions options, ILogger logger)
             {
                 this.logger = logger;
@@ -405,6 +411,12 @@ namespace Orleans.Storage
             public Task InitTableAsync()
             {
                 return tableManager.InitTableAsync();
+            }
+
+            public IAsyncEnumerable<TableEntity> ReadAllAsync(CancellationToken cancellationToken, string filter = null)
+            {
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_Storage_ReadingAll, "Reading All entries from Table={0}", TableName);
+                return tableManager.ReadTableEntries(cancellationToken, filter);
             }
 
             public async Task<TableEntity> Read(string partitionKey, string rowKey)
@@ -496,6 +508,62 @@ namespace Orleans.Storage
         {
             lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableGrainStorage>(this.name), this.options.InitStage, Init, Close);
         }
+
+        public async IAsyncEnumerable<StorageEntry> GetAll(object storageEntryCursor, [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            var filterQuery = CalculateFilter(storageEntryCursor);
+            var entries = this.tableDataManager.ReadAllAsync(filter: filterQuery, cancellationToken: cancellationToken);
+            await foreach (var entry in entries)
+            {
+                var pkParts = entry.PartitionKey.Split('_');
+                if (pkParts.Length != 2)
+                {
+                    // a broken record - log and continue
+                    logger.Error((int)AzureProviderErrorCode.AzureTableProvider_Storage_ReadingAll, $"Error on parsing table storage record. PartitionKey='{entry.PartitionKey}'");
+                    continue;
+                }
+
+                var serviceId = pkParts[0];
+                if (!serviceId.Equals(clusterOptions.ServiceId, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    // a record from another service - log and continue
+                    logger.Debug("Skipping parse of storage entry: serviceId is different from local cluster. entryServiceId='{entryServiceId}', clusterServiceId='{clusterServiceId}'", serviceId, clusterOptions.ServiceId);
+                    continue;
+                }
+
+                var grainReferenceKey = pkParts[1];
+                var grainReference = GrainReference.FromKeyString(grainReferenceKey, this.grainReferenceRuntime);
+                var grainState = new GrainState<object>();
+                if (entry is not null)
+                {
+                    var loadedState = ConvertFromStorageFormat(entry, grainState.Type);
+                    grainState.RecordExists = loadedState != null;
+                    grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
+                    grainState.ETag = entry.ETag.ToString();
+                }
+
+                var entryCursor = new AzureTableStorageEntryCursor(entry.PartitionKey, entry.RowKey);
+                yield return new StorageEntry(entry.RowKey, grainReference, grainState, entryCursor);
+            }
+
+            string CalculateFilter(object cursor)
+            {
+                if (cursor is null)
+                {
+                    return null;
+                }
+                if (cursor is not AzureTableStorageEntryCursor azureTableCursor)
+                {
+                    return null;
+                }
+
+                return $"PartitionKey gt '{azureTableCursor.PartitionKey}' and RowKey ge '{azureTableCursor.RowKey}'";
+            }
+        }
+
+        // only for testing
+        internal AzureTableDataManager<TableEntity> GetUnderlyingTableDataManager()
+            => this.tableDataManager.TableManager;
     }
 
     public static class AzureTableGrainStorageFactory

@@ -22,13 +22,17 @@ namespace TestExtensions
 
         public IClusterClient Client => this.HostedCluster?.Client;
 
-        public ILogger Logger { get; private set; }
+        public ILogger Logger { get; protected set; }
 
-        public virtual async Task InitializeAsync()
+        public virtual Task InitializeAsync()
+            => InitializeAsyncCore<SiloHostConfigurator>();
+
+        protected async Task InitializeAsyncCore<TConfigurator>()
+            where TConfigurator : class, new()
         {
             var builder = new TestClusterBuilder();
             TestDefaultConfiguration.ConfigureTestCluster(builder);
-            builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
+            builder.AddSiloBuilderConfigurator<TConfigurator>();
 
             var testCluster = builder.Build();
             if (testCluster.Primary == null)

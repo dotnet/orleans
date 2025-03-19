@@ -61,11 +61,17 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <param name="options">Storage configuration.</param>
         /// <param name="logger">Logger to use.</param>
         public AzureTableDataManager(AzureStorageOperationOptions options, ILogger logger)
+            : this(options, logger, options?.TableName)
+        {
+        }
+
+        private AzureTableDataManager(AzureStorageOperationOptions options, ILogger logger, string tableName)
         {
             this.options = options ?? throw new ArgumentNullException(nameof(options));
+            if (tableName is null) throw new ArgumentNullException(nameof(options.TableName));
 
             Logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            TableName = options.TableName ?? throw new ArgumentNullException(nameof(options.TableName));
+            TableName = tableName;
             StoragePolicyOptions = options.StoragePolicyOptions ?? throw new ArgumentNullException(nameof(options.StoragePolicyOptions));
 
             AzureTableUtils.ValidateTableName(TableName);
@@ -494,6 +500,9 @@ namespace Orleans.GrainDirectory.AzureStorage
                 CheckAlertSlowAccess(startTime, operation);
             }
         }
+
+        public IAsyncEnumerable<TableEntity> ReadTableEntries(CancellationToken cancellationToken, string filter = null)
+            => Table.QueryAsync<TableEntity>(filter: filter, cancellationToken: cancellationToken);
 
         /// <summary>
         /// Read data entries and their corresponding eTags from the Azure table.
