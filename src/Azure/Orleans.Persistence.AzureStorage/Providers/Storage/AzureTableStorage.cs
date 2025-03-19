@@ -523,6 +523,14 @@ namespace Orleans.Storage
                     continue;
                 }
 
+                var serviceId = pkParts[0];
+                if (!serviceId.Equals(clusterOptions.ServiceId, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    // a record from another service - log and continue
+                    logger.Debug("Skipping parse of storage entry: serviceId is different from local cluster. entryServiceId='{entryServiceId}', clusterServiceId='{clusterServiceId}'", serviceId, clusterOptions.ServiceId);
+                    continue;
+                }
+
                 var grainReferenceKey = pkParts[1];
                 var grainReference = GrainReference.FromKeyString(grainReferenceKey, this.grainReferenceRuntime);
                 var grainState = new GrainState<object>();
