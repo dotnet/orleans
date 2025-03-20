@@ -11,7 +11,7 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans
 {
-    internal partial class InvokableObjectManager : IDisposable
+    internal sealed partial class InvokableObjectManager : IDisposable
     {
         private readonly CancellationTokenSource disposed = new CancellationTokenSource();
         private readonly ConcurrentDictionary<ObserverGrainId, LocalObjectData> localObjects = new ConcurrentDictionary<ObserverGrainId, LocalObjectData>();
@@ -60,7 +60,7 @@ namespace Orleans
         {
             if (!ObserverGrainId.TryParse(message.TargetGrain, out var observerId))
             {
-                LogErrorProxyClientOGCTargetNotFound2(logger, message);
+                LogNotAddressedToAnObserver(logger, message);
                 return;
             }
 
@@ -70,7 +70,7 @@ namespace Orleans
             }
             else
             {
-                LogErrorProxyClientOGCTargetNotFound(logger, message.TargetGrain, message);
+                LogUnexpectedTargetInRequest(logger, message.TargetGrain, message);
             }
         }
 
@@ -148,7 +148,7 @@ namespace Orleans
                 if (obj == null)
                 {
                     // Remove from the dictionary record for the garbage collected object? But now we won't be able to detect invalid dispatch IDs anymore.
-                    LogWarningRuntimeError100162(_manager.logger, this.ObserverId, message);
+                    LogObserverGarbageCollected(_manager.logger, this.ObserverId, message);
                     // Try to remove. If it's not there, we don't care.
                     _manager.TryDeregister(this.ObserverId);
                     return;
@@ -162,7 +162,7 @@ namespace Orleans
                     this.Running = true;
                 }
 
-                LogTraceInvokeLocalObjectAsync(_manager.logger, message, start);
+                LogInvokeLocalObjectAsync(_manager.logger, message, start);
 
                 if (start)
                 {
@@ -230,7 +230,7 @@ namespace Orleans
                         }
                         catch (Exception deserializationException)
                         {
-                            LogWarningDeserializationException(_manager.logger, deserializationException, message);
+                            LogErrorDeserializingMessageBody(_manager.logger, deserializationException, message);
                             _manager.runtimeClient.SendResponse(message, Response.FromException(deserializationException));
                             continue;
                         }
@@ -265,7 +265,7 @@ namespace Orleans
                     catch (Exception outerException)
                     {
                         // ignore, keep looping.
-                        LogWarningLocalObjectMessagePumpAsync(_manager.logger, outerException);
+                        LogErrorInMessagePumpLoop(_manager.logger, outerException);
                     }
                 }
             }
@@ -288,7 +288,7 @@ namespace Orleans
                 catch (Exception exc2)
                 {
                     _manager.runtimeClient.SendResponse(message, Response.FromException(exc2));
-                    LogWarningProxyClientOGCSendResponseFailed(_manager.logger, exc2);
+                    LogErrorSendingResponse(_manager.logger, exc2);
                     return;
                 }
 
@@ -304,7 +304,7 @@ namespace Orleans
                 switch (message.Direction)
                 {
                     case Message.Directions.OneWay:
-                        LogErrorProxyClientOGCUnhandledExceptionInOneWayInvoke(_manager.logger, exception, request.ToString(), message.InterfaceType);
+                        LogErrorInvokingOneWayRequest(_manager.logger, exception, request.ToString(), message.InterfaceType);
                         break;
 
                     case Message.Directions.Request:
@@ -317,7 +317,7 @@ namespace Orleans
                         catch (Exception ex2)
                         {
                             _manager.runtimeClient.SendResponse(message, Response.FromException(ex2));
-                            LogWarningProxyClientOGCSendExceptionResponseFailed(_manager.logger, ex2);
+                            LogErrorSendingExceptionResponse(_manager.logger, ex2);
                             return;
                         }
 
@@ -356,61 +356,61 @@ namespace Orleans
         [LoggerMessage(
             EventId = (int)ErrorCode.ProxyClient_OGC_TargetNotFound_2,
             Level = LogLevel.Error,
-            Message = "Message is not addressed to an observer. {Message}"
+            Message = "Message is not addressed to an observer. Message: '{Message}'."
         )]
-        private static partial void LogErrorProxyClientOGCTargetNotFound2(ILogger logger, Message message);
+        private static partial void LogNotAddressedToAnObserver(ILogger logger, Message message);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.ProxyClient_OGC_TargetNotFound,
             Level = LogLevel.Error,
-            Message = "Unexpected target grain in request: {TargetGrain}. Message: {Message}"
+            Message = "Unexpected target grain in request: {TargetGrain}. Message: '{Message}'."
         )]
-        private static partial void LogErrorProxyClientOGCTargetNotFound(ILogger logger, GrainId targetGrain, Message message);
+        private static partial void LogUnexpectedTargetInRequest(ILogger logger, GrainId targetGrain, Message message);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
             EventId = (int)ErrorCode.Runtime_Error_100162,
-            Message = "Object associated with Observer ID {ObserverId} has been garbage collected. Deleting object reference and unregistering it. Message = {message}"
+            Message = "Object associated with id '{ObserverId}' has been garbage collected. Deleting object reference and unregistering it. Message: '{Message}'."
         )]
-        private static partial void LogWarningRuntimeError100162(ILogger logger, ObserverGrainId observerId, Message message);
+        private static partial void LogObserverGarbageCollected(ILogger logger, ObserverGrainId observerId, Message message);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = "InvokeLocalObjectAsync {Message} start {Start}"
+            Message = "InvokeLocalObjectAsync '{Message}' start '{Start}'."
         )]
-        private static partial void LogTraceInvokeLocalObjectAsync(ILogger logger, Message message, bool start);
+        private static partial void LogInvokeLocalObjectAsync(ILogger logger, Message message, bool start);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
             EventId = (int)ErrorCode.ProxyClient_OGC_SendResponseFailed,
-            Message = "Exception trying to send a response."
+            Message = "Error sending a response."
         )]
-        private static partial void LogWarningProxyClientOGCSendResponseFailed(ILogger logger, Exception exc);
+        private static partial void LogErrorSendingResponse(ILogger logger, Exception exc);
 
         [LoggerMessage(
             Level = LogLevel.Error,
             EventId = (int)ErrorCode.ProxyClient_OGC_UnhandledExceptionInOneWayInvoke,
-            Message = "Exception during invocation of notification {Request}, interface {Interface}. Ignoring exception because this is a one way request."
+            Message = "Exception during invocation of notification '{Request}', interface '{Interface}'. Ignoring exception because this is a one way request."
         )]
-        private static partial void LogErrorProxyClientOGCUnhandledExceptionInOneWayInvoke(ILogger logger, Exception exception, string request, GrainInterfaceType @interface);
+        private static partial void LogErrorInvokingOneWayRequest(ILogger logger, Exception exception, string request, GrainInterfaceType @interface);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
             EventId = (int)ErrorCode.ProxyClient_OGC_SendExceptionResponseFailed,
-            Message = "Exception trying to send an exception response"
+            Message = "Error sending an exception response."
         )]
-        private static partial void LogWarningProxyClientOGCSendExceptionResponseFailed(ILogger logger, Exception exception);
+        private static partial void LogErrorSendingExceptionResponse(ILogger logger, Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
-            Message = "Exception during message body deserialization in LocalObjectMessagePumpAsync for message: {Message}"
+            Message = "Exception during message body deserialization in LocalObjectMessagePumpAsync for message: '{Message}'."
         )]
-        private static partial void LogWarningDeserializationException(ILogger logger, Exception exception, Message message);
+        private static partial void LogErrorDeserializingMessageBody(ILogger logger, Exception exception, Message message);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
-            Message = "Exception in LocalObjectMessagePumpAsync"
+            Message = "Exception in LocalObjectMessagePumpAsync."
         )]
-        private static partial void LogWarningLocalObjectMessagePumpAsync(ILogger logger, Exception exception);
+        private static partial void LogErrorInMessagePumpLoop(ILogger logger, Exception exception);
     }
 }

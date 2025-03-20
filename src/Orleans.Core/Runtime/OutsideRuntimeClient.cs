@@ -121,7 +121,7 @@ namespace Orleans
                 this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
                 // Client init / sign-on message
-                LogInformationClientStarting(logger, RuntimeVersion.Current, _localClientDetails.ClientAddress, _localClientDetails.ClientId);
+                LogStartingClient(logger, RuntimeVersion.Current, _localClientDetails.ClientAddress, _localClientDetails.ClientId);
 
                 if (TestOnlyThrowExceptionDuringInit)
                 {
@@ -130,7 +130,7 @@ namespace Orleans
             }
             catch (Exception exc)
             {
-                LogErrorOutsideRuntimeClientConstructorFailed(logger, exc);
+                LogConstructorException(logger, exc);
                 ConstructorReset();
                 throw;
             }
@@ -146,7 +146,7 @@ namespace Orleans
             // This helps to avoid any issues (such as deadlocks) caused by executing with the client's synchronization context/scheduler.
             await Task.Run(() => this.StartInternal(cancellationToken)).ConfigureAwait(false);
 
-            LogInformationProxyClientStartDone(logger, CurrentActivationAddress, _localClientDetails.ClientId);
+            LogStartedClient(logger, CurrentActivationAddress, _localClientDetails.ClientId);
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
@@ -236,7 +236,7 @@ namespace Orleans
                         break;
                     }
                 default:
-                    LogErrorMessageNotSupported(logger, message);
+                    LogMessageNotSupported(logger, message);
                     break;
             }
         }
@@ -290,7 +290,7 @@ namespace Orleans
                 context?.Complete();
             }
 
-            LogTraceSendMessage(logger, message);
+            LogSendingMessage(logger, message);
             MessageCenter.SendMessage(message);
         }
 
@@ -298,7 +298,7 @@ namespace Orleans
         {
             OrleansOutsideRuntimeClientEvent.Log.ReceiveResponse(response);
 
-            LogTraceReceivedMessage(logger, response);
+            LogReceivedMessage(logger, response);
 
             if (response.Result is Message.ResponseTypes.Status)
             {
@@ -310,7 +310,7 @@ namespace Orleans
                     callback.OnStatusUpdate(status);
                     if (status.Diagnostics != null && status.Diagnostics.Count > 0)
                     {
-                        LogInformationReceivedStatusUpdateForPendingRequest(logger, request, new(status.Diagnostics));
+                        LogReceivedStatusUpdateForPendingRequest(logger, request, new(status.Diagnostics));
                     }
                 }
                 else
@@ -328,7 +328,7 @@ namespace Orleans
 
                     if (status.Diagnostics != null && status.Diagnostics.Count > 0)
                     {
-                        LogInformationReceivedStatusUpdateForUnknownRequest(logger, response, new(status.Diagnostics));
+                        LogReceivedStatusUpdateForUnknownRequest(logger, response, new(status.Diagnostics));
                     }
                 }
 
@@ -507,41 +507,41 @@ namespace Orleans
         [LoggerMessage(
             Level = LogLevel.Information,
             EventId = (int)ErrorCode.ClientStarting,
-            Message = "Starting Orleans client with runtime version \"{RuntimeVersion}\", local address {LocalAddress} and client id {ClientId}"
+            Message = "Starting Orleans client with runtime version '{RuntimeVersion}', local address '{LocalAddress}' and client id '{ClientId}'."
         )]
-        private static partial void LogInformationClientStarting(ILogger logger, string runtimeVersion, SiloAddress localAddress, ClientGrainId clientId);
+        private static partial void LogStartingClient(ILogger logger, string runtimeVersion, SiloAddress localAddress, ClientGrainId clientId);
 
         [LoggerMessage(
             Level = LogLevel.Error,
             EventId = (int)ErrorCode.Runtime_Error_100319,
             Message = "OutsideRuntimeClient constructor failed."
         )]
-        private static partial void LogErrorOutsideRuntimeClientConstructorFailed(ILogger logger, Exception exc);
+        private static partial void LogConstructorException(ILogger logger, Exception exc);
 
         [LoggerMessage(
             Level = LogLevel.Information,
             EventId = (int)ErrorCode.ProxyClient_StartDone,
-            Message = "Started client with address {ActivationAddress} and id {ClientId}"
+            Message = "Started client with address '{ActivationAddress}' and id '{ClientId}'."
         )]
-        private static partial void LogInformationProxyClientStartDone(ILogger logger, GrainAddress activationAddress, ClientGrainId clientId);
+        private static partial void LogStartedClient(ILogger logger, GrainAddress activationAddress, ClientGrainId clientId);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = "Send {Message}"
+            Message = "Send '{Message}'."
         )]
-        private static partial void LogTraceSendMessage(ILogger logger, Message message);
+        private static partial void LogSendingMessage(ILogger logger, Message message);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = "Received {Message}"
+            Message = "Received '{Message}'."
         )]
-        private static partial void LogTraceReceivedMessage(ILogger logger, Message message);
+        private static partial void LogReceivedMessage(ILogger logger, Message message);
 
         [LoggerMessage(
             Level = LogLevel.Error,
-            Message = "Message not supported: {Message}."
+            Message = "Message not supported: '{Message}'."
         )]
-        private static partial void LogErrorMessageNotSupported(ILogger logger, Message message);
+        private static partial void LogMessageNotSupported(ILogger logger, Message message);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
@@ -564,7 +564,7 @@ namespace Orleans
         [LoggerMessage(
             Level = LogLevel.Warning,
             EventId = (int)ErrorCode.Runtime_Error_100011,
-            Message = "No callback for response message {ResponseMessage}"
+            Message = "No callback for response message '{ResponseMessage}'"
         )]
         private static partial void LogWarningNoCallbackForResponseMessage(ILogger logger, Message responseMessage);
 
@@ -575,15 +575,15 @@ namespace Orleans
 
         [LoggerMessage(
             Level = LogLevel.Information,
-            Message = "Received status update for pending request, Request: {RequestMessage}. Status: {Diagnostics}"
+            Message = "Received status update for pending request, Request: '{RequestMessage}'. Status: '{Diagnostics}'."
         )]
-        private static partial void LogInformationReceivedStatusUpdateForPendingRequest(ILogger logger, Message requestMessage, DiagnosticsLogData diagnostics);
+        private static partial void LogReceivedStatusUpdateForPendingRequest(ILogger logger, Message requestMessage, DiagnosticsLogData diagnostics);
 
         [LoggerMessage(
             Level = LogLevel.Information,
-            Message = "Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}"
+            Message = "Received status update for unknown request. Message: '{StatusMessage}'. Status: '{Diagnostics}'."
         )]
-        private static partial void LogInformationReceivedStatusUpdateForUnknownRequest(ILogger logger, Message statusMessage, DiagnosticsLogData diagnostics);
+        private static partial void LogReceivedStatusUpdateForUnknownRequest(ILogger logger, Message statusMessage, DiagnosticsLogData diagnostics);
 
     }
 }
