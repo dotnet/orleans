@@ -52,7 +52,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("789", stringResult);
         }
 
-        /// Multiple GetGrain requests with the same id return the same concrete grain 
+        /// Multiple GetGrain requests with the same id return the same concrete grain
         [Fact]
         public async Task GenericGrainTests_ConcreteGrainWithGenericInterfaceMultiplicity()
         {
@@ -149,7 +149,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(1.2f, floatResult);
         }
 
-        /// If both a concrete implementation and a generic implementation of a 
+        /// If both a concrete implementation and a generic implementation of a
         /// generic interface exist, prefer the concrete implementation.
         [Fact]
         public async Task GenericGrainTests_PreferConcreteGrainImplementationOfGenericInterface()
@@ -240,7 +240,7 @@ namespace DefaultCluster.Tests.General
             await grainRef1.Set(1);
             await grainRef1.Transform();  // ConcreteGrainWith2GenericInterfaces multiplies the set value by 10:
 
-            // A second reference to a different interface implemented by ConcreteGrainWith2GenericInterfaces 
+            // A second reference to a different interface implemented by ConcreteGrainWith2GenericInterfaces
             // will reference the same grain:
             var grainRef2 = GetGrain<IGenericGrain<int, string>>(grainId);
             // ConcreteGrainWith2GenericInterfaces returns a string representation of the current value multiplied by 10:
