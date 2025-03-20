@@ -100,14 +100,14 @@ internal class GrainCallCancellationManager : SystemTarget, IGrainCallCancellati
                 cancellationTask = GrainFactory.GetGrain<IGrainCallCancellationExtension>(request.TargetGrainId).CancelRequestAsync(request.SourceGrainId, request.MessageId);
             }
 
-            if (!cancellationTask.IsCompletedSuccessfully)
-            {
-                cancellationTask.AsTask().Ignore();
-            }
-            else
+            if (cancellationTask.IsCompletedSuccessfully)
             {
                 // Observe the completed task.
                 cancellationTask.GetAwaiter().GetResult();
+            }
+            else
+            {
+                cancellationTask.AsTask().Ignore();
             }
         }
 

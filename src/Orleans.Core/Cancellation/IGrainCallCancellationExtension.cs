@@ -39,7 +39,11 @@ internal sealed class ExternalClientGrainCallCancellationManager(IInternalGrainF
     {
         var targetGrain = grainFactory.GetGrain<IGrainCallCancellationExtension>(targetGrainId);
         var resultTask = targetGrain.CancelRequestAsync(sendingGrainId, messageId);
-        if (!resultTask.IsCompletedSuccessfully)
+        if (resultTask.IsCompletedSuccessfully)
+        {
+            resultTask.GetAwaiter().GetResult();
+        }
+        else
         {
             resultTask.AsTask().Ignore();
         }
