@@ -104,6 +104,11 @@ internal class GrainCallCancellationManager : SystemTarget, IGrainCallCancellati
             {
                 cancellationTask.AsTask().Ignore();
             }
+            else
+            {
+                // Observe the completed task.
+                cancellationTask.GetAwaiter().GetResult();
+            }
         }
 
         return ValueTask.CompletedTask;
