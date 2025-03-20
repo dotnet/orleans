@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Storage;
 
 [assembly: RegisterProvider("Redis", "GrainStorage", "Silo", typeof(RedisGrainStorageProviderBuilder))]
+[assembly: RegisterProvider("AzureRedisCache", "GrainStorage", "Silo", typeof(RedisGrainStorageProviderBuilder))]
 
 namespace Orleans.Hosting;
 
