@@ -34,9 +34,4 @@ public sealed class RedisStreamReceiverOptions
     /// Represents the default timeout duration for a delivered message to remain idle. Set to 5 seconds.
     /// </summary>
     public static readonly TimeSpan DefaultDeliveredMessageIdleTimeout = TimeSpan.FromSeconds(5);
-
-    /// <summary>
-    /// Represents the minimum idle timeout for delivered messages, set to 200 milliseconds.
-    /// </summary>
-    public static readonly TimeSpan MinDeliveredMessageIdleTimeout = TimeSpan.FromMilliseconds(200);
 }

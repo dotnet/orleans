@@ -6,6 +6,9 @@ using Orleans.Streaming.Redis;
 
 namespace Orleans.Hosting;
 
+/// <summary>
+/// Configures Redis streams on a silo.
+/// </summary>
 public sealed class SiloRedisStreamConfigurator : SiloPersistentStreamConfigurator
 {
     public SiloRedisStreamConfigurator(string name, Action<Action<IServiceCollection>> configureServicesDelegate)
@@ -49,6 +52,9 @@ public sealed class SiloRedisStreamConfigurator : SiloPersistentStreamConfigurat
     }
 }
 
+/// <summary>
+/// Configures Redis streams on a client.
+/// </summary>
 public sealed class ClusterClientRedisStreamConfigurator : ClusterClientPersistentStreamConfigurator
 {
     public ClusterClientRedisStreamConfigurator(string name, IClientBuilder builder)

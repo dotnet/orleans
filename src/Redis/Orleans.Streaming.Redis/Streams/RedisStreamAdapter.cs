@@ -48,7 +48,7 @@ internal sealed class RedisStreamAdapter : IQueueAdapter
 
     public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
     {
-        var queue = new RedisStreamStorage(_loggerFactory, _clusterOptions, _redisOptions, _receiverOptions, queueId);
+        var queue = new RedisStreamStorage(_clusterOptions, _redisOptions, _receiverOptions, queueId);
         var receiver = new RedisStreamAdapterReceiver(_loggerFactory, _serializer, queue);
         return receiver;
     }
@@ -82,7 +82,7 @@ internal sealed class RedisStreamAdapter : IQueueAdapter
         {
             if (!_queues.TryGetValue(queueId, out var queue))
             {
-                queue = new RedisStreamStorage(_loggerFactory, _clusterOptions, _redisOptions, _receiverOptions, queueId);
+                queue = new RedisStreamStorage(_clusterOptions, _redisOptions, _receiverOptions, queueId);
                 await queue.ConnectAsync();
                 _queues[queueId] = queue;
             }
