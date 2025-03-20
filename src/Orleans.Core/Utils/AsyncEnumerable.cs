@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.Utilities
 {
@@ -136,12 +137,12 @@ namespace Orleans.Runtime.Utilities
 
         private sealed class AsyncEnumerator : IAsyncEnumerator<T>
         {
-            private readonly TaskCompletionSource _cancellation = new(TaskCreationOptions.RunContinuationsAsynchronously);
-            private readonly CancellationTokenRegistration _registration;
+            private readonly CancellationTokenSource _cts;
             private Element _current;
 
-            public AsyncEnumerator(Element initial, CancellationToken cancellation)
+            public AsyncEnumerator(Element initial, CancellationToken cancellationToken)
             {
+                _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 if (!initial.IsValid)
                 {
                     _current = initial;
@@ -152,38 +153,25 @@ namespace Orleans.Runtime.Utilities
                     result.SetNext(initial);
                     _current = result;
                 }
-
-                if (cancellation.CanBeCanceled)
-                {
-                    _registration = cancellation.Register(() => _cancellation.TrySetResult());
-                }
             }
 
             T IAsyncEnumerator<T>.Current => _current.Value;
 
             async ValueTask<bool> IAsyncEnumerator<T>.MoveNextAsync()
             {
-                if (_current.IsDisposed || _cancellation.Task.IsCompleted)
+                if (_current.IsDisposed)
                 {
                     return false;
                 }
 
-                var next = _current.NextAsync();
-                var cancellationTask = _cancellation.Task;
-                var result = await Task.WhenAny(cancellationTask, next);
-                if (ReferenceEquals(result, cancellationTask))
-                {
-                    return false;
-                }
-
-                _current = await next;
+                _current = await _current.NextAsync().WaitAsync(_cts.Token);
                 return _current.IsValid;
             }
 
             async ValueTask IAsyncDisposable.DisposeAsync()
             {
-                _cancellation.TrySetResult();
-                await _registration.DisposeAsync();
+                await _cts.CancelAsync().SuppressThrowing();
+                _cts.Dispose();
             }
         }
 

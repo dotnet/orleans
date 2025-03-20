@@ -94,7 +94,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<LifecycleSchedulingSystemTarget>();
 
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
-            
+
             services.TryAddSingleton<GrainRuntime>();
             services.TryAddSingleton<IGrainRuntime, GrainRuntime>();
             services.TryAddSingleton<IGrainCancellationTokenRuntime, GrainCancellationTokenRuntime>();
@@ -415,6 +415,11 @@ namespace Orleans.Hosting
             services.AddFromExisting<IActivationMigrationManager, ActivationMigrationManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationMigrationManager>();
             services.AddSingleton<GrainMigratabilityChecker>();
+
+            // Cancellation manager
+            services.AddSingleton<GrainCallCancellationManager>();
+            services.AddFromExisting<IGrainCallCancellationManager, GrainCallCancellationManager>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainCallCancellationManager>();
 
             ApplyConfiguration(builder);
         }

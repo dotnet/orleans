@@ -9,7 +9,8 @@ namespace UnitTests.GrainInterfaces
         ValueTask Fail();
         ValueTask Deactivate();
         ValueTask OnNext(string data);
-        IAsyncEnumerable<string> GetValues();
+        IAsyncEnumerable<string> GetValues(CancellationToken cancellationToken = default);
+        IAsyncEnumerable<int> GetValuesWithError(int errorIndex, bool waitAfterYield, string errorMessage, CancellationToken cancellationToken = default);
 
         ValueTask<List<(string InterfaceName, string MethodName)>> GetIncomingCalls();
     }
