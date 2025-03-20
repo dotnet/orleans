@@ -77,7 +77,7 @@
     <SystemSecurityCryptographyCngVersion>5.0.0</SystemSecurityCryptographyCngVersion>
 
     <!-- Microsoft packages -->
-    <MicrosoftBuildVersion>17.5.0</MicrosoftBuildVersion>
+    <MicrosoftBuildVersion>17.3.0</MicrosoftBuildVersion>
     <MicrosoftCodeAnalysisVersion>4.0.1</MicrosoftCodeAnalysisVersion>
     <MicrosoftWin32RegistryVersion>5.0.0</MicrosoftWin32RegistryVersion>
     <MicrosoftBclAsyncInterfacesVersion>6.0.0</MicrosoftBclAsyncInterfacesVersion>
