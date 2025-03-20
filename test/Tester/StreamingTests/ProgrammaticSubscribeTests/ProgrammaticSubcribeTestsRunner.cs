@@ -50,7 +50,7 @@ namespace Tester.StreamingTests
             var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             //set up subscription for 10 consumer grains
-            var subscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 10);
+            var subscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 5);
             var consumers = subscriptions.Select(sub => this.fixture.HostedCluster.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId.PrimaryKey)).ToList();
 
             var producer = this.fixture.HostedCluster.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
@@ -63,10 +63,11 @@ namespace Tester.StreamingTests
             await producer.StopPeriodicProducing();
             
             var tasks = new List<Task>();
+            int id = 1;
             foreach (var consumer in consumers)
             {
                 tasks.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters(new List<ITypedProducerGrain> { producer }, 
-                    consumer, lastTry, this.fixture.Logger), _timeout));
+                    consumer, lastTry, this.fixture.Logger, consumerId: id++), _timeout));
             }
             await Task.WhenAll(tasks);
 
@@ -150,7 +151,7 @@ namespace Tester.StreamingTests
             var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             //set up subscriptions
-            await subscriptionManager.SetupStreamingSubscriptionForStream<IJerk_ConsumerGrain>(streamId, 10);
+            await subscriptionManager.SetupStreamingSubscriptionForStream<IJerk_ConsumerGrain>(streamId, 5);
             //producer start producing 
             var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingInt>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
@@ -160,13 +161,19 @@ namespace Tester.StreamingTests
             int numProduced = 0;
             await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
             await producer.StopPeriodicProducing();
-            //wait for consumers to react
-            await Task.Delay(TimeSpan.FromMilliseconds(1000));
 
-            //get subscription count now, should be all removed/unsubscribed 
-            var subscriptions = await subscriptionManager.GetSubscriptions(streamId);
-            Assert.True( subscriptions.Count<Orleans.Streams.Core.StreamSubscription>()== 0);
-            // clean up tests
+            // wait until consumers react
+            // and check subscription count should be 0
+            await TestingUtils.WaitUntilAsync(async lastTry =>
+            {
+                var subscriptions = await subscriptionManager.GetSubscriptions(streamId);
+                if (lastTry)
+                {
+                    Assert.True(subscriptions.Count<Orleans.Streams.Core.StreamSubscription>() == 0);
+                }
+
+                return subscriptions.Count<Orleans.Streams.Core.StreamSubscription>() == 0;
+            }, _timeout);
         }
 
 
@@ -274,7 +281,7 @@ namespace Tester.StreamingTests
             }
         }
 
-        public static async Task<bool> CheckCounters(List<ITypedProducerGrain> producers, IPassive_ConsumerGrain consumer, bool assertIsTrue, ILogger logger)
+        public static async Task<bool> CheckCounters(List<ITypedProducerGrain> producers, IPassive_ConsumerGrain consumer, bool assertIsTrue, ILogger logger, int? consumerId = null)
         {
             int numProduced = 0;
             foreach (var p in producers)
@@ -282,7 +289,7 @@ namespace Tester.StreamingTests
                 numProduced += await p.GetNumberProduced();
             }
             var numConsumed = await consumer.GetNumberConsumed();
-            logger.Info("CheckCounters: numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
+            logger.Info("CheckCounters: numProduced = {0}, numConsumed = {1}, consumerId = {2}", numProduced, numConsumed, consumerId);
             if (assertIsTrue)
             {
                 Assert.Equal(numProduced, numConsumed);
