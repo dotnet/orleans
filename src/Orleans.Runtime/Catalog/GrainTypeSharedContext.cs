@@ -19,7 +19,7 @@ namespace Orleans.Runtime;
 /// <summary>
 /// Functionality which is shared between all instances of a grain type.
 /// </summary>
-public class GrainTypeSharedContext
+public sealed class GrainTypeSharedContext
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly Dictionary<Type, object> _components = new();

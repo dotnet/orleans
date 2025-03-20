@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
@@ -32,6 +31,7 @@ namespace Orleans
 
         private readonly MessagingTrace messagingTrace;
         private readonly InterfaceToImplementationMappingCache _interfaceToImplementationMapping;
+        private IGrainCallCancellationManager _cancellationManager;
         private IClusterConnectionStatusObserver[] _statusObservers;
 
         public IInternalGrainFactory InternalGrainFactory { get; private set; }
@@ -90,7 +90,10 @@ namespace Orleans
             this.sharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
-                this.clientMessagingOptions.ResponseTimeout);
+                this.clientMessagingOptions.ResponseTimeout,
+                this.clientMessagingOptions.CancelRequestOnTimeout,
+                this.clientMessagingOptions.WaitForCancellationAcknowledgement,
+                null);
         }
 
         internal void ConsumeServices()
@@ -101,6 +104,7 @@ namespace Orleans
                 _manifestProvider = ServiceProvider.GetRequiredService<ClientClusterManifestProvider>();
 
                 this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
+                _cancellationManager = sharedCallbackData.CancellationManager = ServiceProvider.GetRequiredService<IGrainCallCancellationManager>();
                 this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
                 this.localObjects = new InvokableObjectManager(
                     ServiceProvider.GetRequiredService<ClientGrainContext>(),
@@ -137,8 +141,6 @@ namespace Orleans
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            ConsumeServices();
-
             // Deliberately avoid capturing the current synchronization context during startup and execute on the default scheduler.
             // This helps to avoid any issues (such as deadlocks) caused by executing with the client's synchronization context/scheduler.
             await Task.Run(() => this.StartInternal(cancellationToken)).ConfigureAwait(false);
@@ -251,6 +253,8 @@ namespace Orleans
         public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource context, InvokeMethodOptions options)
         {
             ThrowIfDisposed();
+            var cancellationToken = request.GetCancellationToken();
+            cancellationToken.ThrowIfCancellationRequested();
             var message = this.messageFactory.CreateMessage(request, options);
             OrleansOutsideRuntimeClientEvent.Log.SendRequest(message);
 
@@ -277,6 +281,7 @@ namespace Orleans
             if (!oneWay)
             {
                 var callbackData = new CallbackData(this.sharedCallbackData, context, message);
+                callbackData.SubscribeForCancellation(cancellationToken);
                 callbacks.TryAdd(message.Id, callbackData);
             }
             else
@@ -311,6 +316,17 @@ namespace Orleans
                 }
                 else
                 {
+                    if (clientMessagingOptions.CancelRequestOnTimeout)
+                    {
+                        // Cancel the call since the caller has abandoned it.
+                        // Note that the target and sender arguments are swapped because this is a response to the original request.
+                        _cancellationManager?.SignalCancellation(
+                            response.SendingSilo,
+                            targetGrainId: response.SendingGrain,
+                            sendingGrainId: response.TargetGrain,
+                            messageId: response.Id);
+                    }
+
                     if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Information))
                     {
                         var diagnosticsString = string.Join("\n", status.Diagnostics);

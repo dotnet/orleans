@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -128,7 +129,7 @@ public abstract class AsyncEnumerableRequest<T> : RequestBase, IAsyncEnumerable<
     /// The target grain instance.
     /// </summary>
     [field: NonSerialized]
-    internal GrainReference TargetGrain { get; private set; }
+    internal GrainReference? TargetGrain { get; private set; }
 
     /// <inheritdoc/>
     [Id(0)]
@@ -161,6 +162,7 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
 {
     private readonly AsyncEnumerableRequest<T> _request;
     private readonly CancellationToken _cancellationToken;
+    private CancellationTokenSource? _cancellationTokenSource;
     private readonly IAsyncEnumerableGrainExtension _target;
     private readonly Guid _requestId;
     private (EnumerationResult State, object Value) _current;
@@ -179,7 +181,28 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
     public AsyncEnumeratorProxy(AsyncEnumerableRequest<T> request, CancellationToken cancellationToken)
     {
         _request = request;
-        _cancellationToken = cancellationToken;
+        var requestCancellationToken = request.GetCancellationToken();
+        if (requestCancellationToken == cancellationToken)
+        {
+            // The same token was passed to the request and the enumerator.
+            _cancellationToken = cancellationToken;
+        }
+        else if (requestCancellationToken.CanBeCanceled && cancellationToken.CanBeCanceled)
+        {
+            // Both are distinct, cancellable tokens.
+            _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(requestCancellationToken, cancellationToken);
+            _cancellationToken = _cancellationTokenSource.Token;
+        }
+        else if (cancellationToken.CanBeCanceled)
+        {
+            _cancellationToken = cancellationToken;
+        }
+        else
+        {
+            Debug.Assert(requestCancellationToken.CanBeCanceled);
+            _cancellationToken = requestCancellationToken;
+        }
+
         _requestId = Guid.NewGuid();
         _target = _request.TargetGrain.AsReference<IAsyncEnumerableGrainExtension>();
     }
@@ -227,6 +250,7 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
             }
         }
 
+        _cancellationTokenSource?.Dispose();
         _disposed = true;
     }
 
@@ -292,6 +316,13 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
 
 public static class AsyncEnumerableExtensions
 {
+    /// <summary>
+    /// Specifies the maximum batch size for an <see cref="IAsyncEnumerable{T}"/> request.
+    /// </summary>
+    /// <typeparam name="T">The underlying element type.</typeparam>
+    /// <param name="self">The instance to configure.</param>
+    /// <param name="maxBatchSize">The batch size.</param>
+    /// <returns>The original instance.</returns>
     public static IAsyncEnumerable<T> WithBatchSize<T>(this IAsyncEnumerable<T> self, int maxBatchSize)
     {
         if (self is AsyncEnumerableRequest<T> request)
