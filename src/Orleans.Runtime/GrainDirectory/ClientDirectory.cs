@@ -394,6 +394,7 @@ internal sealed class ClientDirectory : SystemTarget, ILocalClientDirectory, IRe
             catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
             {
                 // Ignore during shutdown.
+                break;
             }
             catch (Exception exception)
             {
@@ -492,7 +493,7 @@ internal sealed class ClientDirectory : SystemTarget, ILocalClientDirectory, IRe
                 {
                     // The target has already seen the latest version for this silo.
                     builder.Remove(silo);
-                } 
+                }
             }
         }
 

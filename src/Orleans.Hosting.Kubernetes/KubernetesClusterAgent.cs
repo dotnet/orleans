@@ -271,7 +271,10 @@ namespace Orleans.Hosting.Kubernetes
                         previous = update;
                     }
                 }
-                catch (Exception exception) when (!(_shutdownToken.IsCancellationRequested && (exception is TaskCanceledException || exception is OperationCanceledException)))
+                catch (OperationCanceledException) when (_shutdownToken.IsCancellationRequested)
+                {
+                }
+                catch (Exception exception)
                 {
                     if (_logger.IsEnabled(LogLevel.Debug))
                     {
