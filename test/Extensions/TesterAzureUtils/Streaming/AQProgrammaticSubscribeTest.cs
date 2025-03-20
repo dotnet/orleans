@@ -47,18 +47,19 @@ namespace Tester.AzureUtils.Streaming
                 }
             }
 
-            public override async Task DisposeAsync()
+            public override Task DisposeAsync()
             {
-                await base.DisposeAsync();
+                return Task.CompletedTask;
+                // await base.DisposeAsync();
 
-                // Only perform cleanup if this suite was not skipped.
-                if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
-                {
-                    await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                        AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), new AzureQueueOptions().ConfigureTestDefaults());
-                    await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                        AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount), new AzureQueueOptions().ConfigureTestDefaults());
-                }
+                //// Only perform cleanup if this suite was not skipped.
+                //if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+                //{
+                //    await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                //        AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), new AzureQueueOptions().ConfigureTestDefaults());
+                //    await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                //        AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount), new AzureQueueOptions().ConfigureTestDefaults());
+                //}
             }
         }
 
