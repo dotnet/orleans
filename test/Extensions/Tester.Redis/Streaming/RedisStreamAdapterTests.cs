@@ -81,7 +81,7 @@ public sealed class RedisStreamTests : TestClusterPerTest
     {
         var multiRunner = new MultipleStreamsTestRunner(InternalClient, STREAM_PROVIDER_NAME, 17, false);
         await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
-            HostedCluster.StartAdditionalSilo);
+            () => HostedCluster.StartAdditionalSilo());
     }
 
     public override async Task InitializeAsync()
