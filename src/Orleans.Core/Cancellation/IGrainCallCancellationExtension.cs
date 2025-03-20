@@ -1,6 +1,7 @@
 #nullable enable
 using System.Threading.Tasks;
 using Orleans.Concurrency;
+using Orleans.Internal;
 
 namespace Orleans.Runtime;
 
@@ -38,14 +39,6 @@ internal sealed class ExternalClientGrainCallCancellationManager(IInternalGrainF
     public void SignalCancellation(SiloAddress? targetSilo, GrainId targetGrainId, GrainId sendingGrainId, CorrelationId messageId)
     {
         var targetGrain = grainFactory.GetGrain<IGrainCallCancellationExtension>(targetGrainId);
-        var resultTask = targetGrain.CancelRequestAsync(sendingGrainId, messageId);
-        if (resultTask.IsCompletedSuccessfully)
-        {
-            resultTask.GetAwaiter().GetResult();
-        }
-        else
-        {
-            resultTask.AsTask().Ignore();
-        }
+        targetGrain.CancelRequestAsync(sendingGrainId, messageId).Ignore();
     }
 }

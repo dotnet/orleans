@@ -89,25 +89,14 @@ internal class GrainCallCancellationManager : SystemTarget, IGrainCallCancellati
         foreach (var request in cancellationRequests)
         {
             // Try to directly call the cancellation method locally
-            ValueTask cancellationTask;
             if (_activationDirectory.FindTarget(request.TargetGrainId) is IGrainCallCancellationExtension extension)
             {
-                cancellationTask = extension.CancelRequestAsync(request.SourceGrainId, request.MessageId);
+                extension.CancelRequestAsync(request.SourceGrainId, request.MessageId).Ignore();
             }
             else
             {
                 // Fall back to a regular grain call.
-                cancellationTask = GrainFactory.GetGrain<IGrainCallCancellationExtension>(request.TargetGrainId).CancelRequestAsync(request.SourceGrainId, request.MessageId);
-            }
-
-            if (cancellationTask.IsCompletedSuccessfully)
-            {
-                // Observe the completed task.
-                cancellationTask.GetAwaiter().GetResult();
-            }
-            else
-            {
-                cancellationTask.AsTask().Ignore();
+                GrainFactory.GetGrain<IGrainCallCancellationExtension>(request.TargetGrainId).CancelRequestAsync(request.SourceGrainId, request.MessageId).Ignore();
             }
         }
 
@@ -123,14 +112,7 @@ internal class GrainCallCancellationManager : SystemTarget, IGrainCallCancellati
         }
 
         var request = GrainFactory.GetGrain<IGrainCallCancellationExtension>(targetGrainId).CancelRequestAsync(sourceGrainId, messageId);
-        if (request.IsCompletedSuccessfully)
-        {
-            request.GetAwaiter().GetResult();
-        }
-        else
-        {
-            request.AsTask().Ignore();
-        }
+        request.Ignore();
     }
 
     private async Task ProcessMembershipUpdates()
