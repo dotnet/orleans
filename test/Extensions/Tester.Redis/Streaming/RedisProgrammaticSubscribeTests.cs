@@ -8,7 +8,7 @@ using Xunit;
 namespace Tester.Redis.Streaming;
 
 [TestCategory("Redis"), TestCategory("Streaming"), TestCategory("Functional")]
-public sealed class RedisProgrammaticSubcribeTests : ProgrammaticSubcribeTestsRunner, IClassFixture<RedisProgrammaticSubcribeTests.Fixture>
+public sealed class RedisProgrammaticSubscribeTests : ProgrammaticSubscribeTestsRunner, IClassFixture<RedisProgrammaticSubscribeTests.Fixture>
 {
     public class Fixture : BaseTestClusterFixture
     {
@@ -43,7 +43,7 @@ public sealed class RedisProgrammaticSubcribeTests : ProgrammaticSubcribeTestsRu
         }
     }
 
-    public RedisProgrammaticSubcribeTests(Fixture fixture) : base(fixture)
+    public RedisProgrammaticSubscribeTests(Fixture fixture) : base(fixture)
     {
         fixture.EnsurePreconditionsMet();
     }
