@@ -106,7 +106,7 @@ namespace Orleans.Storage
                 // Work out the remaining time to wait so that this operation exceeds the required Latency.
                 // Also adds an extra fudge factor to account for any system clock resolution edge cases.
                 var extraDelay = TimeSpan.FromTicks(
-                     5 * TimeSpan.TicksPerMillisecond + this.options.Latency.Ticks - sw.ElapsedTicks);
+                     5 * TimeSpan.TicksPerMillisecond + this.options.Latency.Ticks - sw.Elapsed.Ticks);
 
                 if (extraDelay > TimeSpan.Zero)
                 {
