@@ -69,14 +69,14 @@ namespace Orleans
         {
             try
             {
-                LogInformationClientShuttingDown(_logger);
+                LogClientShuttingDown(_logger);
 
                 await _clusterClientLifecycle.OnStop(cancellationToken).ConfigureAwait(false);
                 await _runtimeClient.StopAsync(cancellationToken).WaitAsync(cancellationToken);
             }
             finally
             {
-                LogInformationClientShutdownCompleted(_logger);
+                LogClientShutdownCompleted(_logger);
             }
         }
 
@@ -155,14 +155,14 @@ namespace Orleans
 
         [LoggerMessage(
             Level = LogLevel.Information,
-            Message = "Client shutting down"
+            Message = "Client shutting down."
         )]
-        private static partial void LogInformationClientShuttingDown(ILogger logger);
+        private static partial void LogClientShuttingDown(ILogger logger);
 
         [LoggerMessage(
             Level = LogLevel.Information,
-            Message = "Client shutdown completed"
+            Message = "Client shutdown completed."
         )]
-        private static partial void LogInformationClientShutdownCompleted(ILogger logger);
+        private static partial void LogClientShutdownCompleted(ILogger logger);
     }
 }

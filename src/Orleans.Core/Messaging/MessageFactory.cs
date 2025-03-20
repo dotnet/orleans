@@ -84,7 +84,7 @@ namespace Orleans.Runtime
                 RejectionInfo = info,
                 Exception = ex,
             };
-            LogDebugCreatingRejectionResponse(_logger, ex, type, info, new StacktraceLogValue());
+            LogCreatingRejectionResponse(_logger, ex, type, info);
             return response;
         }
 
@@ -94,20 +94,15 @@ namespace Orleans.Runtime
             response.Result = Message.ResponseTypes.Status;
             response.BodyObject = new StatusResponse(isExecuting, isWaiting, diagnostics);
 
-            LogDebugCreatingStatusUpdate(_logger, request, new(diagnostics));
+            LogCreatingStatusUpdate(_logger, request, new(diagnostics));
             return response;
-        }
-
-        private readonly struct StacktraceLogValue()
-        {
-            public override string ToString() => Utils.GetStackTrace(skipFrames: 1);
         }
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = "Creating {RejectionType} rejection with info '{Info}' at:\n{StackTrace}"
+            Message = "Creating '{RejectionType}' rejection with info '{Information}'."
         )]
-        private static partial void LogDebugCreatingRejectionResponse(ILogger logger, Exception ex, Message.RejectionTypes rejectionType, string info, StacktraceLogValue stacktrace);
+        private static partial void LogCreatingRejectionResponse(ILogger logger, Exception exception, Message.RejectionTypes rejectionType, string information);
 
         private readonly struct DiagnosticsLogValue(List<string> diagnostics)
         {
@@ -116,8 +111,8 @@ namespace Orleans.Runtime
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = "Creating {RequestMessage} status update with diagnostics {Diagnostics}"
+            Message = "Creating '{RequestMessage}' status update with diagnostics '{Diagnostics}'"
         )]
-        private static partial void LogDebugCreatingStatusUpdate(ILogger logger, Message requestMessage, DiagnosticsLogValue diagnostics);
+        private static partial void LogCreatingStatusUpdate(ILogger logger, Message requestMessage, DiagnosticsLogValue diagnostics);
     }
 }

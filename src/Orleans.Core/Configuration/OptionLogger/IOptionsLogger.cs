@@ -99,12 +99,11 @@ namespace Orleans
             try
             {
                 var stringBuilder = new StringBuilder();
-                stringBuilder.AppendLine($"Configuration {formatter.Name}: ");
                 foreach (var setting in formatter.Format())
                 {
                     stringBuilder.AppendLine($"{setting}");
                 }
-                LogInformationOptions(logger, stringBuilder);
+                LogInformationOptions(logger, formatter.Name, stringBuilder.ToString());
             }
             catch(Exception ex)
             {
@@ -115,14 +114,14 @@ namespace Orleans
 
         [LoggerMessage(
             Level = LogLevel.Information,
-            Message = "{Options}"
+            Message = "Configuration {Name}:\n{Options}"
         )]
-        private static partial void LogInformationOptions(ILogger logger, StringBuilder options);
+        private static partial void LogInformationOptions(ILogger logger, string name, string options);
 
         [LoggerMessage(
             Level = LogLevel.Error,
-            Message = "An error occurred while logging options {FormatterName}"
+            Message = "An error occurred while logging '{Name}' options."
         )]
-        private static partial void LogErrorOptions(ILogger logger, Exception exception, string formatterName);
+        private static partial void LogErrorOptions(ILogger logger, Exception exception, string name);
     }
 }
