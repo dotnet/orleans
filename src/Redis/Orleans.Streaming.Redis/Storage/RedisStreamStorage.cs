@@ -14,20 +14,17 @@ internal sealed class RedisStreamStorage
 {
     public const int MaxNumberOfMsgToGet = 1000;
 
-    private readonly ILogger _logger;
     private readonly RedisStreamingOptions _redisOptions;
     private readonly RedisStreamReceiverOptions _receiverOptions;
     private readonly RedisKey _key;
     private IDatabase _db;
 
     public RedisStreamStorage(
-        ILoggerFactory loggerFactory,
         ClusterOptions clusterOptions,
         RedisStreamingOptions redisOptions,
         RedisStreamReceiverOptions receiverOptions,
         QueueId queueId)
     {
-        _logger = loggerFactory.CreateLogger<RedisStreamStorage>();
         _redisOptions = redisOptions;
         _receiverOptions = receiverOptions;
         _key = $"{clusterOptions.ServiceId}/streaming/{queueId}";
@@ -118,7 +115,7 @@ internal sealed class RedisStreamStorage
         Array.Copy(messageIds, 0, args, 1, messageIds.Length);
         try
         {
-            await _db.ScriptEvaluateAsync(DeliveredScript, keys: new[] { _key }, values: args);
+            await _db.ScriptEvaluateAsync(DeliveredScript, keys: [_key], values: args);
         }
         catch (Exception ex)
         {

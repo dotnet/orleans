@@ -34,12 +34,4 @@ public class RedisStreamingException : Exception
         : base(message, inner)
     {
     }
-
-    /// <inheritdoc />
-    protected RedisStreamingException(
-        SerializationInfo info,
-        StreamingContext context)
-        : base(info, context)
-    {
-    }
 }
