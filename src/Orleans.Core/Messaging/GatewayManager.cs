@@ -391,7 +391,7 @@ namespace Orleans.Messaging
         [LoggerMessage(
             EventId = (int)ErrorCode.GatewayManager_FoundKnownGateways,
             Level = LogLevel.Information,
-            Message = "Found {'GatewayCount}' gateways: '{Gateways}'."
+            Message = "Found '{GatewayCount}' gateways: '{Gateways}'."
         )]
         private static partial void LogFoundGateways(ILogger logger, int gatewayCount, UrisLogValue gateways);
 
