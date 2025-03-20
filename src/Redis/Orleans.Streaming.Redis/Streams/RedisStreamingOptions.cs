@@ -12,7 +12,7 @@ public sealed class RedisStreamingOptions
     /// <summary>
     /// Gets or sets the Redis client options.
     /// </summary>
-    [RedactRedisConfigurationOptions]
+    [RedactRedisConfigurationOptionsAttribute]
     public ConfigurationOptions ConfigurationOptions { get; set; }
 
     /// <summary>
@@ -32,7 +32,7 @@ public sealed class RedisStreamingOptions
     public static async Task<IConnectionMultiplexer> DefaultCreateMultiplexer(RedisStreamingOptions options) => await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions);
 }
 
-internal sealed class RedactRedisConfigurationOptions : RedactAttribute
+internal sealed class RedactRedisConfigurationOptionsAttribute : RedactAttribute
 {
     public override string Redact(object value) => value is ConfigurationOptions cfg ? cfg.ToString(includePassword: false) : base.Redact(value);
 }

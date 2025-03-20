@@ -3,6 +3,9 @@ using Orleans.Configuration;
 
 namespace Orleans.Hosting;
 
+/// <summary>
+/// Extensions to <see cref="IClientBuilder"/> for configuring Redis streams.
+/// </summary>
 public static class ClientBuilderExtensions
 {
     /// <summary>

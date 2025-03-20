@@ -3,6 +3,9 @@ using Orleans.Configuration;
 
 namespace Orleans.Hosting;
 
+/// <summary>
+/// Extensions for <see cref="ISiloBuilder"/> to configure Redis streams.
+/// </summary>
 public static class SiloBuilderExtensions
 {
     /// <summary>
