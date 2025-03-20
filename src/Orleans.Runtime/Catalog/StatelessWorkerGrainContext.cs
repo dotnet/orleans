@@ -14,7 +14,7 @@ namespace Orleans.Runtime;
 
 internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IActivationLifecycleObserver
 {
-    private readonly GrainAddress _address;
+    private static readonly object CollectIdleWorkersSentinel = new();
     private readonly GrainTypeSharedContext _shared;
     private readonly IGrainContextActivator _innerActivator;
     private readonly int _maxWorkers;
@@ -35,20 +35,18 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
     private GrainReference? _grainReference;
 
     // Idle worker removal fields
-    private readonly Task? _inspectionTask;
-    private PeriodicTimer? _inspectionTimer;
+    private Timer? _inspectionTimer;
     private double _previousError = 0d;
     private double _integralTerm = 0d;
     private int _detectedIdleCyclesCount = 0;
     private readonly int _minIdleCyclesBeforeRemoval;
-    private static readonly object DummyObj = new();
 
     public StatelessWorkerGrainContext(
         GrainAddress address,
         GrainTypeSharedContext sharedContext,
         IGrainContextActivator innerActivator)
     {
-        _address = address;
+        Address = address;
         _shared = sharedContext;
         _innerActivator = innerActivator;
 
@@ -58,8 +56,11 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         if (strategy.RemoveIdleWorkers && options.RemoveIdleWorkers)
         {
             _minIdleCyclesBeforeRemoval = options.MinIdleCyclesBeforeRemoval > 0 ? options.MinIdleCyclesBeforeRemoval : 1;
-            _inspectionTimer = new(options.IdleWorkersInspectionPeriod);
-            _inspectionTask = PeriodicallyCollectIdleWorkers();
+            _inspectionTimer = new Timer(
+                static state => ((StatelessWorkerGrainContext)state!).EnqueueWorkItem(WorkItemType.CollectIdleWorkers, CollectIdleWorkersSentinel),
+                this,
+                options.IdleWorkersInspectionPeriod,
+                options.IdleWorkersInspectionPeriod);
         }
 
         _maxWorkers = strategy.MaxLocal;
@@ -68,13 +69,13 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
 
     public GrainReference GrainReference => _grainReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
 
-    public GrainId GrainId => _address.GrainId;
+    public GrainId GrainId => Address.GrainId;
 
     public object? GrainInstance => null;
 
-    public ActivationId ActivationId => _address.ActivationId;
+    public ActivationId ActivationId => Address.ActivationId;
 
-    public GrainAddress Address => _address;
+    public GrainAddress Address { get; }
 
     public IServiceProvider ActivationServices => throw new NotImplementedException();
 
@@ -194,15 +195,6 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         }
     }
 
-    private async Task PeriodicallyCollectIdleWorkers()
-    {
-        Debug.Assert(_inspectionTimer != null);
-        while (await _inspectionTimer.WaitForNextTickAsync())
-        {
-            EnqueueWorkItem(WorkItemType.CollectIdleWorkers, DummyObj);
-        }
-    }
-
     private void CollectIdleWorkers()
     {
         // These parameter values were tuned using a genetic algorithm, for potential re-tuning see:
@@ -306,7 +298,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
 
     private ActivationData CreateWorker(object? message)
     {
-        var address = GrainAddress.GetAddress(_address.SiloAddress, _address.GrainId, ActivationId.NewId());
+        var address = GrainAddress.GetAddress(Address.SiloAddress, Address.GrainId, ActivationId.NewId());
         var newWorker = (ActivationData)_innerActivator.CreateContext(address);
 
         // Observe the create/destroy lifecycle of the activation
@@ -347,21 +339,22 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
         {
             completion.TrySetException(exception);
         }
-
-        if (_inspectionTimer != null)
-        {
-            _inspectionTimer.Dispose();
-            _inspectionTimer = null;
-        }
-
-        if (_inspectionTask != null)
-        {
-            await _inspectionTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-        }
     }
 
     private async Task DisposeAsyncInternal(TaskCompletionSource completion)
     {
+        try
+        {
+            if (_inspectionTimer != null)
+            {
+                await _inspectionTimer.DisposeAsync();
+                _inspectionTimer = null;
+            }
+        }
+        catch
+        {
+        }
+
         try
         {
             var tasks = new List<Task>(_workers.Count);
