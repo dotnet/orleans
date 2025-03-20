@@ -38,8 +38,9 @@ namespace Tester.AzureUtils.Streaming
                             (options, dep) =>
                             {
                                 options.ConfigureTestDefaults();
-                                options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
-                        }));
+                                // options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
+                                options.QueueNames = AzureQueueUtilities.GenerateQueueNames("dmkorolevtest", queueCount);
+                            }));
                     hostBuilder
                         .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("PubSubStore");

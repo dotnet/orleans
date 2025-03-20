@@ -63,11 +63,10 @@ namespace Tester.StreamingTests
             await producer.StopPeriodicProducing();
             
             var tasks = new List<Task>();
-            int id = 1;
             foreach (var consumer in consumers)
             {
                 tasks.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters(new List<ITypedProducerGrain> { producer }, 
-                    consumer, lastTry, this.fixture.Logger, consumerId: id++), _timeout));
+                    consumer, lastTry, this.fixture.Logger), _timeout));
             }
             await Task.WhenAll(tasks);
 
@@ -281,7 +280,7 @@ namespace Tester.StreamingTests
             }
         }
 
-        public static async Task<bool> CheckCounters(List<ITypedProducerGrain> producers, IPassive_ConsumerGrain consumer, bool assertIsTrue, ILogger logger, int? consumerId = null)
+        public static async Task<bool> CheckCounters(List<ITypedProducerGrain> producers, IPassive_ConsumerGrain consumer, bool assertIsTrue, ILogger logger)
         {
             int numProduced = 0;
             foreach (var p in producers)
@@ -289,7 +288,7 @@ namespace Tester.StreamingTests
                 numProduced += await p.GetNumberProduced();
             }
             var numConsumed = await consumer.GetNumberConsumed();
-            logger.Info("CheckCounters: numProduced = {0}, numConsumed = {1}, consumerId = {2}", numProduced, numConsumed, consumerId);
+            logger.Info("CheckCounters: numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
             if (assertIsTrue)
             {
                 Assert.Equal(numProduced, numConsumed);
