@@ -13,7 +13,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Monitors runtime and component health periodically, reporting complaints.
     /// </summary>
-    internal class Watchdog(IOptions<ClusterMembershipOptions> clusterMembershipOptions, IEnumerable<IHealthCheckParticipant> participants, ILogger<Watchdog> logger) : IDisposable
+    internal partial class Watchdog(IOptions<ClusterMembershipOptions> clusterMembershipOptions, IEnumerable<IHealthCheckParticipant> participants, ILogger<Watchdog> logger) : IDisposable
     {
         private static readonly TimeSpan PlatformWatchdogHeartbeatPeriod = TimeSpan.FromMilliseconds(1000);
         private readonly CancellationTokenSource _cancellation = new();
@@ -32,10 +32,7 @@ namespace Orleans.Runtime
 
         public void Start()
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Starting silo watchdog");
-            }
+            LogDebugStartingSiloWatchdog(_logger);
 
             if (_platformWatchdogThread is not null)
             {
@@ -64,10 +61,7 @@ namespace Orleans.Runtime
 
             _componentWatchdogThread.Start();
 
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Silo watchdog started successfully.");
-            }
+            LogDebugSiloWatchdogStartedSuccessfully(_logger);
         }
 
         public void Stop()
@@ -85,7 +79,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exc)
                 {
-                    _logger.LogError((int)ErrorCode.Watchdog_InternalError, exc, "Platform watchdog encountered an internal error");
+                    LogErrorPlatformWatchdogInternalError(_logger, exc);
                 }
 
                 _platformWatchdogStopwatch.Restart();
@@ -101,24 +95,13 @@ namespace Orleans.Runtime
             if (timeSinceLastTick > PlatformWatchdogHeartbeatPeriod.Multiply(2))
             {
                 var gc = new[] { GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2) };
-                _logger.LogWarning(
-                    (int)ErrorCode.SiloHeartbeatTimerStalled,
-                    ".NET Runtime Platform stalled for {TimeSinceLastTick}. Total GC Pause duration during that period: {pauseDurationSinceLastTick}. We are now using a total of {TotalMemory}MB memory. Collection counts per generation: 0: {GCGen0Count}, 1: {GCGen1Count}, 2: {GCGen2Count}",
-                    timeSinceLastTick,
-                    pauseDurationSinceLastTick,
-                    GC.GetTotalMemory(false) / (1024 * 1024),
-                    gc[0],
-                    gc[1],
-                    gc[2]);
+                LogWarningSiloHeartbeatTimerStalled(_logger, timeSinceLastTick, pauseDurationSinceLastTick, GC.GetTotalMemory(false) / (1024 * 1024), gc[0], gc[1], gc[2]);
             }
 
             var timeSinceLastParticipantCheck = _componentWatchdogStopwatch.Elapsed;
             if (timeSinceLastParticipantCheck > _componentHealthCheckPeriod.Multiply(2))
             {
-                _logger.LogWarning(
-                    (int)ErrorCode.SiloHeartbeatTimerStalled,
-                    "Participant check thread has not completed for {TimeSinceLastTick}, potentially indicating lock contention or deadlock, CPU starvation, or another execution anomaly.",
-                    timeSinceLastParticipantCheck);
+                LogWarningParticipantCheckThreadStalled(_logger, timeSinceLastParticipantCheck);
             }
         }
 
@@ -132,7 +115,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exc)
                 {
-                    _logger.LogError((int)ErrorCode.Watchdog_InternalError, exc, "Component health check encountered an internal error");
+                    LogErrorComponentHealthCheckInternalError(_logger, exc);
                 }
 
                 _componentWatchdogStopwatch.Restart();
@@ -167,18 +150,14 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exc)
                 {
-                    _logger.LogWarning(
-                        (int)ErrorCode.Watchdog_ParticipantThrownException,
-                        exc,
-                        "Health check participant {Participant} has thrown an exception from its CheckHealth method.",
-                        participant.GetType());
+                    LogWarningHealthCheckParticipantException(_logger, exc, participant.GetType());
                 }
             }
 
             if (complaints != null)
             {
                 WatchdogInstruments.FailedHealthChecks.Add(1);
-                _logger.LogWarning((int)ErrorCode.Watchdog_HealthCheckFailure, "{FailedChecks} of {ParticipantCount} components reported issues. Complaints: {Complaints}", numFailedChecks, _participants.Count, complaints);
+                LogWarningHealthCheckFailure(_logger, numFailedChecks, _participants.Count, complaints);
             }
 
             _lastComponentHealthCheckTime = DateTime.UtcNow;
@@ -213,5 +192,64 @@ namespace Orleans.Runtime
                 // Ignore.
             }
         }
+
+        private readonly struct ParticipantTypeLogValue(Type participantType)
+        {
+            public override string ToString() => participantType.ToString();
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Starting silo watchdog"
+        )]
+        private static partial void LogDebugStartingSiloWatchdog(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Silo watchdog started successfully."
+        )]
+        private static partial void LogDebugSiloWatchdogStartedSuccessfully(ILogger logger);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Watchdog_InternalError,
+            Level = LogLevel.Error,
+            Message = "Platform watchdog encountered an internal error"
+        )]
+        private static partial void LogErrorPlatformWatchdogInternalError(ILogger logger, Exception exc);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.SiloHeartbeatTimerStalled,
+            Level = LogLevel.Warning,
+            Message = ".NET Runtime Platform stalled for {TimeSinceLastTick}. Total GC Pause duration during that period: {PauseDurationSinceLastTick}. We are now using a total of {TotalMemory}MB memory. Collection counts per generation: 0: {GCGen0Count}, 1: {GCGen1Count}, 2: {GCGen2Count}"
+        )]
+        private static partial void LogWarningSiloHeartbeatTimerStalled(ILogger logger, TimeSpan timeSinceLastTick, TimeSpan pauseDurationSinceLastTick, long totalMemory, int gcGen0Count, int gcGen1Count, int gcGen2Count);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.SiloHeartbeatTimerStalled,
+            Level = LogLevel.Warning,
+            Message = "Participant check thread has not completed for {TimeSinceLastTick}, potentially indicating lock contention or deadlock, CPU starvation, or another execution anomaly."
+        )]
+        private static partial void LogWarningParticipantCheckThreadStalled(ILogger logger, TimeSpan timeSinceLastTick);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Watchdog_InternalError,
+            Level = LogLevel.Error,
+            Message = "Component health check encountered an internal error"
+        )]
+        private static partial void LogErrorComponentHealthCheckInternalError(ILogger logger, Exception exc);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Watchdog_ParticipantThrownException,
+            Level = LogLevel.Warning,
+            Message = "Health check participant {Participant} has thrown an exception from its CheckHealth method."
+        )]
+        private static partial void LogWarningHealthCheckParticipantException(ILogger logger, Exception exc, Type participant);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Watchdog_HealthCheckFailure,
+            Level = LogLevel.Warning,
+            Message = "{FailedChecks} of {ParticipantCount} components reported issues. Complaints: {Complaints}"
+        )]
+        private static partial void LogWarningHealthCheckFailure(ILogger logger, int failedChecks, int participantCount, StringBuilder complaints);
     }
 }

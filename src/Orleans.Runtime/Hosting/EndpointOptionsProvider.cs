@@ -7,7 +7,7 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Configuration
 {
-    internal class EndpointOptionsProvider : IPostConfigureOptions<EndpointOptions>
+    internal partial class EndpointOptionsProvider : IPostConfigureOptions<EndpointOptions>
     {
         private readonly ILogger<EndpointOptionsProvider> logger;
 
@@ -28,31 +28,33 @@ namespace Orleans.Configuration
 
                     if (resolvedIP is null)
                     {
-                        if (logger.IsEnabled(LogLevel.Warning))
-                        {
-                            logger.LogWarning(
-                                $"Unable to find a suitable candidate for {nameof(EndpointOptions)}.{nameof(options.AdvertisedIPAddress)}. Falling back to {nameof(IPAddress.Loopback)} ({{AdvertisedIPAddress}})",
-                                advertisedIPAddress);
-                        }
+                        LogWarningUnableToFindSuitableCandidate(logger, nameof(EndpointOptions), nameof(options.AdvertisedIPAddress), nameof(IPAddress.Loopback), advertisedIPAddress);
                     }
                     else
-                    { 
+                    {
                         advertisedIPAddress = resolvedIP;
                     }
                 }
                 catch (Exception ex)
                 {
-                    if (logger.IsEnabled(LogLevel.Error))
-                    {
-                        logger.LogError(
-                            ex,
-                            $"Unable to find a suitable candidate for {nameof(EndpointOptions)}.{nameof(options.AdvertisedIPAddress)}. Falling back to {nameof(IPAddress.Loopback)} ({{AdvertisedIPAddress}})",
-                            advertisedIPAddress);
-                    }
-                }                
+                    LogErrorUnableToFindSuitableCandidate(logger, ex, nameof(EndpointOptions), nameof(options.AdvertisedIPAddress), nameof(IPAddress.Loopback), advertisedIPAddress);
+                }
 
                 options.AdvertisedIPAddress = advertisedIPAddress;
             }
         }
+
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Unable to find a suitable candidate for {OptionName}.{PropertyName}. Falling back to {Fallback} ({AdvertisedIPAddress})"
+        )]
+        private static partial void LogWarningUnableToFindSuitableCandidate(ILogger logger, string optionName, string propertyName, string fallback, IPAddress advertisedIPAddress);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Unable to find a suitable candidate for {OptionName}.{PropertyName}. Falling back to {Fallback} ({AdvertisedIPAddress})"
+        )]
+        private static partial void LogErrorUnableToFindSuitableCandidate(ILogger logger, Exception exception, string optionName, string propertyName, string fallback, IPAddress advertisedIPAddress);
     }
 }

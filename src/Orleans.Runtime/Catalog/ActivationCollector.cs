@@ -14,7 +14,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Identifies activations that have been idle long enough to be deactivated.
     /// </summary>
-    internal class ActivationCollector : IActivationWorkingSetObserver, ILifecycleParticipant<ISiloLifecycle>, IDisposable
+    internal partial class ActivationCollector : IActivationWorkingSetObserver, ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
         private readonly TimeSpan quantum;
         private readonly TimeSpan shortestAgeLimit;
@@ -441,7 +441,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exception)
                 {
-                    this.logger.LogError(exception, "Error while collecting activations.");
+                    LogErrorWhileCollectingActivations(exception);
                 }
             }
         }
@@ -452,45 +452,25 @@ namespace Orleans.Runtime
             var number = Interlocked.Increment(ref collectionNumber);
             long memBefore = GC.GetTotalMemory(false) / (1024 * 1024);
 
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                logger.LogDebug(
-                    (int)ErrorCode.Catalog_BeforeCollection,
-                    "Before collection #{CollectionNumber}: memory: {MemoryBefore}MB, #activations: {ActivationCount}, collector: {CollectorStatus}",
-                    number,
-                    memBefore,
-                    _activationCount,
-                    ToString());
-            }
+            LogBeforeCollection(number, memBefore, _activationCount, this);
 
             List<ICollectibleGrainContext> list = scanStale ? ScanStale() : ScanAll(ageLimit);
             CatalogInstruments.ActivationCollections.Add(1);
             if (list is { Count: > 0 })
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("CollectActivations {Activations}", list.ToStrings(d => d.GrainId.ToString() + d.ActivationId));
+                LogCollectActivations(new(list));
                 await DeactivateActivationsFromCollector(list, cancellationToken);
             }
 
             long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
             watch.Stop();
 
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                logger.LogDebug(
-                    (int)ErrorCode.Catalog_AfterCollection,
-                    "After collection #{CollectionNumber} memory: {MemoryAfter}MB, #activations: {ActivationCount}, collected {CollectedCount} activations, collector: {CollectorStatus}, collection time: {CollectionTime}",
-                    number,
-                    memAfter,
-                    _activationCount,
-                    list?.Count ?? 0,
-                    ToString(),
-                    watch.Elapsed);
-            }
+            LogAfterCollection(number, memAfter, _activationCount, list?.Count ?? 0, this, watch.Elapsed);
         }
 
         private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list, CancellationToken cancellationToken)
         {
-            logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "Deactivating '{Count}' idle activations.", list.Count);
+            LogDeactivateActivationsFromCollector(list.Count);
             CatalogInstruments.ActivationShutdownViaCollection();
 
             var reason = GetDeactivationReason();
@@ -567,5 +547,42 @@ namespace Orleans.Runtime
                 return result ?? nothing;
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error while collecting activations."
+        )]
+        private partial void LogErrorWhileCollectingActivations(Exception exception);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Catalog_BeforeCollection,
+            Level = LogLevel.Debug,
+            Message = "Before collection #{CollectionNumber}: memory: {MemoryBefore}MB, #activations: {ActivationCount}, collector: {CollectorStatus}"
+        )]
+        private partial void LogBeforeCollection(int collectionNumber, long memoryBefore, int activationCount, ActivationCollector collectorStatus);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "CollectActivations {Activations}"
+        )]
+        private partial void LogCollectActivations(ActivationsLogValue activations);
+        private struct ActivationsLogValue(List<ICollectibleGrainContext> list)
+        {
+            public override string ToString() => list.ToStrings(d => d.GrainId.ToString() + d.ActivationId);
+        }
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Catalog_AfterCollection,
+            Level = LogLevel.Debug,
+            Message =  "After collection #{CollectionNumber} memory: {MemoryAfter}MB, #activations: {ActivationCount}, collected {CollectedCount} activations, collector: {CollectorStatus}, collection time: {CollectionTime}"
+        )]
+        private partial void LogAfterCollection(int collectionNumber, long memoryAfter, int activationCount, int collectedCount, ActivationCollector collectorStatus, TimeSpan collectionTime);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Catalog_ShutdownActivations_1,
+            Level = LogLevel.Information,
+            Message = "Deactivating '{Count}' idle activations."
+        )]
+        private partial void LogDeactivateActivationsFromCollector(int count);
     }
 }

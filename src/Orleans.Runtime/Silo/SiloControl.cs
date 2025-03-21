@@ -24,7 +24,7 @@ using Orleans.Versions.Selector;
 
 namespace Orleans.Runtime
 {
-    internal class SiloControl : SystemTarget, ISiloControl
+    internal partial class SiloControl : SystemTarget, ISiloControl
     {
         private readonly ILogger logger;
         private readonly ILocalSiloDetails localSiloDetails;
@@ -88,33 +88,33 @@ namespace Orleans.Runtime
 
         public Task Ping(string message)
         {
-            logger.LogInformation("Ping");
+            LogInformationPing();
             return Task.CompletedTask;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods", MessageId = "System.GC.Collect")]
         public Task ForceGarbageCollection()
         {
-            logger.LogInformation("ForceGarbageCollection");
+            LogInformationForceGarbageCollection();
             GC.Collect();
             return Task.CompletedTask;
         }
 
         public Task ForceActivationCollection(TimeSpan ageLimit)
         {
-            logger.LogInformation("ForceActivationCollection");
+            LogInformationForceActivationCollection();
             return _activationCollector.CollectActivations(ageLimit, CancellationToken.None);
         }
 
         public Task ForceRuntimeStatisticsCollection()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("ForceRuntimeStatisticsCollection");
+            LogDebugForceRuntimeStatisticsCollection();
             return this.deploymentLoadPublisher.RefreshClusterStatistics();
         }
 
         public Task<SiloRuntimeStatistics> GetRuntimeStatistics()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetRuntimeStatistics");
+            LogDebugGetRuntimeStatistics();
             var activationCount = this.activationDirectory.Count;
             var stats = new SiloRuntimeStatistics(
                 activationCount,
@@ -127,7 +127,7 @@ namespace Orleans.Runtime
 
         public Task<List<Tuple<GrainId, string, int>>> GetGrainStatistics()
         {
-            logger.LogInformation("GetGrainStatistics");
+            LogInformationGetGrainStatistics();
             var counts = new Dictionary<string, Dictionary<GrainId, int>>();
             lock (activationDirectory)
             {
@@ -238,11 +238,7 @@ namespace Orleans.Runtime
 
             if (controllable == null)
             {
-                logger.LogError(
-                    (int)ErrorCode.Provider_ProviderNotFound,
-                    "Could not find a controllable service for type {ProviderTypeFullName} and name {ProviderName}.",
-                    typeof(IControllable).FullName,
-                    providerName);
+                LogErrorProviderNotFound(typeof(IControllable).FullName!, providerName);
                 throw new ArgumentException($"Could not find a controllable service for type {typeof(IControllable).FullName} and name {providerName}.");
             }
 
@@ -345,5 +341,48 @@ namespace Orleans.Runtime
             }
             return stats;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Ping"
+        )]
+        private partial void LogInformationPing();
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "ForceGarbageCollection"
+        )]
+        private partial void LogInformationForceGarbageCollection();
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "ForceActivationCollection"
+        )]
+        private partial void LogInformationForceActivationCollection();
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "ForceRuntimeStatisticsCollection"
+        )]
+        private partial void LogDebugForceRuntimeStatisticsCollection();
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "GetRuntimeStatistics"
+        )]
+        private partial void LogDebugGetRuntimeStatistics();
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "GetGrainStatistics"
+        )]
+        private partial void LogInformationGetGrainStatistics();
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Provider_ProviderNotFound,
+            Level = LogLevel.Error,
+            Message = "Could not find a controllable service for type {ProviderTypeFullName} and name {ProviderName}."
+        )]
+        private partial void LogErrorProviderNotFound(string providerTypeFullName, string providerName);
     }
 }
