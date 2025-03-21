@@ -28,8 +28,10 @@ namespace DefaultCluster.Tests.General
 
             for (int i = 0; i < 100; i++)
             {
-                var ex = await Assert.ThrowsAsync<Exception>(() => grain.Ping());
-                Assert.Equal("oops", ex.Message);
+                var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => grain.Ping());
+                Assert.Contains("Failed to create an instance of grain type", ex.Message);
+                var iex = Assert.IsType<Exception>(ex.InnerException);
+                Assert.Equal("oops", iex.Message);
             }
         }
 
