@@ -12,6 +12,7 @@ using Xunit.Abstractions;
 namespace Tester.Cassandra.Clustering;
 
 [TestCategory("Cassandra"), TestCategory("Clustering")]
+[Collection("Cassandra")]
 public sealed class CassandraClusteringTableTests : IClassFixture<CassandraContainer>
 {
     private readonly CassandraContainer _cassandraContainer;
@@ -279,6 +280,21 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
 
             Assert.Equal(i, tableData.Members.Count);
         }
+    }
+
+    [Fact]
+    public async Task MembershipTable_ManyMembershipTables()
+    {
+        var tasks = new List<Task>();
+        for (var i = 0; i < 50; i++)
+        {
+            tasks.Add(Task.Run(async () =>
+            {
+                await Task.Yield();
+                var (membershipTable, _) = await CreateNewMembershipTableAsync();
+            }));
+        }
+        await Task.WhenAll(tasks);
     }
 
     [Fact]
@@ -630,8 +646,6 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         string clusterId,
         bool cassandraTtl = false)
     {
-        var session = await CreateSession();
-
         var services = new ServiceCollection()
             .AddSingleton<CassandraClusteringTable>()
             .AddSingleton<CassandraGatewayListProvider>()
