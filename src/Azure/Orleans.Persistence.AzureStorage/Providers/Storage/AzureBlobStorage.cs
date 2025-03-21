@@ -203,8 +203,11 @@ namespace Orleans.Storage
                     ? new BlobRequestConditions { IfNoneMatch = ETag.All }
                     : new BlobRequestConditions { IfMatch = new ETag(grainState.ETag) };
 
-                await DoOptimisticUpdate(() => blob.DeleteIfExistsAsync(DeleteSnapshotsOption.None, conditions: conditions),
+                if (options.DeleteStateOnClear)
+                {
+                    await DoOptimisticUpdate(() => blob.DeleteIfExistsAsync(DeleteSnapshotsOption.None, conditions: conditions),
                     blob, grainState.ETag).ConfigureAwait(false);
+                }
 
                 grainState.ETag = null;
                 grainState.RecordExists = false;
