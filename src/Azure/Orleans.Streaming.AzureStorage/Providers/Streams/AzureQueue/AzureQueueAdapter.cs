@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils;
 using Orleans.Configuration;
+using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streaming.AzureStorage.Providers.Streams.AzureQueue;
 using Orleans.Streams;
@@ -13,11 +14,14 @@ namespace Orleans.Providers.Streams.AzureQueue
 {
     internal class AzureQueueAdapter : IQueueAdapter
     {
-        protected readonly string ServiceId;
-        private readonly SerializationManager serializationManager;
-        protected readonly AzureQueueOptions queueOptions;
         private readonly IAzureStreamQueueMapper streamQueueMapper;
+        private readonly SerializationManager serializationManager;
+
         private readonly ILoggerFactory loggerFactory;
+        private readonly ILogger logger;
+
+        protected readonly string ServiceId;
+        protected readonly AzureQueueOptions queueOptions;
         protected readonly ConcurrentDictionary<QueueId, AzureQueueDataManager> Queues = new ConcurrentDictionary<QueueId, AzureQueueDataManager>();
         protected readonly IQueueDataAdapter<string, IBatchContainer> dataAdapter;
 
@@ -42,6 +46,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             this.streamQueueMapper = streamQueueMapper;
             this.dataAdapter = dataAdapter;
             this.loggerFactory = loggerFactory;
+            this.logger = loggerFactory.CreateLogger<AzureQueueAdapter>();
         }
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
@@ -54,10 +59,13 @@ namespace Orleans.Providers.Streams.AzureQueue
         {
             if(token != null) throw new ArgumentException("AzureQueue stream provider currently does not support non-null StreamSequenceToken.", nameof(token));
             var queueId = streamQueueMapper.GetQueueForStream(streamGuid, streamNamespace);
+            this.logger.Info("QueueMessageBatch for streamGuid={0}, queueId={1}", streamGuid, queueId);
+
             AzureQueueDataManager queue;
             if (!Queues.TryGetValue(queueId, out queue))
             {
                 var tmpQueue = new AzureQueueDataManager(this.loggerFactory, this.streamQueueMapper.PartitionToAzureQueue(queueId), queueOptions);
+                this.logger.Info("Initializing queue {0}", tmpQueue.QueueName);
                 await tmpQueue.InitQueueAsync();
                 queue = Queues.GetOrAdd(queueId, tmpQueue);
             }

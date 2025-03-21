@@ -47,6 +47,7 @@ namespace Tester.StreamingTests
         [SkippableFact]
         public async Task StreamingTests_Consumer_Producer_Subscribe()
         {
+            this.fixture.Logger.Info("StreamingTests_Consumer_Producer_Subscribe");
             var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             //set up subscription for 10 consumer grains
@@ -55,18 +56,18 @@ namespace Tester.StreamingTests
 
             var producer = this.fixture.HostedCluster.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
-
-            await producer.StartPeriodicProducing();
+            await producer.StartPeriodicProducing(firePeriod: TimeSpan.FromDays(1)); // make sure only 1 item is produced for test stability
 
             int numProduced = 0;
             await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
             await producer.StopPeriodicProducing();
+            // now we know we are not producing anymore; we need to check consumers now
             
             var tasks = new List<Task>();
             foreach (var consumer in consumers)
             {
                 tasks.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters(new List<ITypedProducerGrain> { producer }, 
-                    consumer, lastTry, this.fixture.Logger), _timeout));
+                    consumer, lastTry, this.fixture.Logger), _timeout, delayOnFail: TimeSpan.FromSeconds(1)));
             }
             await Task.WhenAll(tasks);
 
