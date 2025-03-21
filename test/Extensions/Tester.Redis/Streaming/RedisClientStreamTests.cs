@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Tester.Redis.Streaming;
 
-[TestCategory("Redis"), TestCategory("Streaming"), TestCategory("Functional")]
+[TestCategory("Redis"), TestCategory("Streaming")]
 public sealed class RedisClientStreamTests : TestClusterPerTest
 {
     public const string STREAM_PROVIDER_NAME = "RedisProvider";
@@ -42,12 +42,22 @@ public sealed class RedisClientStreamTests : TestClusterPerTest
         }
     }
 
+    protected override void CheckPreconditionsOrThrow()
+    {
+        try
+        {
+            _ = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
+        }
+        catch (Exception exception)
+        {
+            throw new SkipException("Redis connection string not configured.", exception);
+        }
+
+        base.CheckPreconditionsOrThrow();
+    }
+
     protected override void ConfigureTestCluster(TestClusterBuilder builder)
     {
-        if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.RedisConnectionString))
-        {
-            throw new SkipException("Empty redis connection string");
-        }
         builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
         builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
     }

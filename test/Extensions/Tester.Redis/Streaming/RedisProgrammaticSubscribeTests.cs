@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Tester.Redis.Streaming;
 
-[TestCategory("Redis"), TestCategory("Streaming"), TestCategory("Functional")]
+[TestCategory("Redis"), TestCategory("Streaming")]
 public sealed class RedisProgrammaticSubscribeTests : ProgrammaticSubscribeTestsRunner, IClassFixture<RedisProgrammaticSubscribeTests.Fixture>
 {
     public class Fixture : BaseTestClusterFixture
@@ -40,6 +40,20 @@ public sealed class RedisProgrammaticSubscribeTests : ProgrammaticSubscribeTests
             }
 
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.AddStreaming();
+        }
+
+        protected override void CheckPreconditionsOrThrow()
+        {
+            try
+            {
+                _ = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
+            }
+            catch (Exception exception)
+            {
+                throw new SkipException("Redis connection string not configured.", exception);
+            }
+
+            base.CheckPreconditionsOrThrow();
         }
     }
 

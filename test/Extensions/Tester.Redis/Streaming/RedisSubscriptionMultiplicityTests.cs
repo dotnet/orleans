@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Tester.Redis.Streaming;
 
-[TestCategory("Redis"), TestCategory("Streaming"), TestCategory("Functional")]
+[TestCategory("Redis"), TestCategory("Streaming")]
 public sealed class RedisSubscriptionMultiplicityTests : TestClusterPerTest
 {
     public const string STREAM_PROVIDER_NAME = "RedisProvider";
@@ -34,7 +34,7 @@ public sealed class RedisSubscriptionMultiplicityTests : TestClusterPerTest
     public async Task Redis_ActiveSubscriptionTest() => await _runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
 
     [SkippableFact]
-    public async Task Redis_TwoIntermitentStreamTest() => await _runner.TwoIntermitentStreamTest(Guid.NewGuid());
+    public async Task Redis_TwoIntermittentStreamTest() => await _runner.TwoIntermittentStreamTest(Guid.NewGuid());
 
     [SkippableFact]
     public async Task Redis_SubscribeFromClientTest() => await _runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace);
@@ -62,12 +62,22 @@ public sealed class RedisSubscriptionMultiplicityTests : TestClusterPerTest
         }
     }
 
+    protected override void CheckPreconditionsOrThrow()
+    {
+        try
+        {
+            _ = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
+        }
+        catch (Exception exception)
+        {
+            throw new SkipException("Redis connection string not configured.", exception);
+        }
+
+        base.CheckPreconditionsOrThrow();
+    }
+
     protected override void ConfigureTestCluster(TestClusterBuilder builder)
     {
-        if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.RedisConnectionString))
-        {
-            throw new SkipException("Empty redis connection string");
-        }
         builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
         builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
     }
