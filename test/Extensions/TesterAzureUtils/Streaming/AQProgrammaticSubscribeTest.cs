@@ -15,7 +15,7 @@ namespace Tester.AzureUtils.Streaming
     [TestCategory("BVT"), TestCategory("Streaming"), TestCategory("AQStreaming")]
     public class AQProgrammaticSubscribeTest : ProgrammaticSubcribeTestsRunner, IClassFixture<AQProgrammaticSubscribeTest.Fixture>
     {
-        private const int queueCount = 8;
+        private const int queueCount = 4;
         public class Fixture : BaseAzureTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -39,7 +39,7 @@ namespace Tester.AzureUtils.Streaming
                             {
                                 options.ConfigureTestDefaults();
                                 // options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
-                                options.QueueNames = AzureQueueUtilities.GenerateQueueNames("dmkorolevtest", queueCount);
+                                options.QueueNames = AzureQueueUtilities.GenerateQueueNames("dmkorolevtestci", queueCount);
                             }));
                     hostBuilder
                         .AddMemoryGrainStorageAsDefault()
