@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -76,11 +77,14 @@ namespace Orleans.Runtime
             var overshoot = GetOvershootDelay(now, dueTime);
             if (overshoot > TimeSpan.Zero)
             {
-                this.log?.LogWarning(
-                    "Timer should have fired at {DueTime} but fired at {CurrentTime}, which is {Overshoot} longer than expected",
-                    dueTime,
-                    now,
-                    overshoot);
+                if (!Debugger.IsAttached)
+                {
+                    this.log?.LogWarning(
+                        "Timer should have fired at {DueTime} but fired at {CurrentTime}, which is {Overshoot} longer than expected",
+                        dueTime,
+                        now,
+                        overshoot);
+                }
             }
 
             expected = default;
@@ -103,7 +107,7 @@ namespace Orleans.Runtime
             var now = DateTime.UtcNow;
             var due = this.expected;
             var overshoot = GetOvershootDelay(now, due);
-            if (overshoot > TimeSpan.Zero)
+            if (overshoot > TimeSpan.Zero && !Debugger.IsAttached)
             {
                 reason = $"{this.name} timer should have fired at {due}, which is {overshoot} ago";
                 return false;

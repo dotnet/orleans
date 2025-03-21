@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -96,6 +97,11 @@ namespace Orleans.Runtime
 
         private void CheckRuntimeHealth()
         {
+            if (Debugger.IsAttached)
+            {
+                return;
+            }
+
             var pauseDurationSinceLastTick = GC.GetTotalPauseDuration() - _cumulativeGCPauseDuration;
             var timeSinceLastTick = _platformWatchdogStopwatch.Elapsed;
             if (timeSinceLastTick > PlatformWatchdogHeartbeatPeriod.Multiply(2))
@@ -178,7 +184,10 @@ namespace Orleans.Runtime
             if (complaints != null)
             {
                 WatchdogInstruments.FailedHealthChecks.Add(1);
-                _logger.LogWarning((int)ErrorCode.Watchdog_HealthCheckFailure, "{FailedChecks} of {ParticipantCount} components reported issues. Complaints: {Complaints}", numFailedChecks, _participants.Count, complaints);
+                if (!Debugger.IsAttached)
+                {
+                    _logger.LogWarning((int)ErrorCode.Watchdog_HealthCheckFailure, "{FailedChecks} of {ParticipantCount} components reported issues. Complaints: {Complaints}", numFailedChecks, _participants.Count, complaints);
+                }
             }
 
             _lastComponentHealthCheckTime = DateTime.UtcNow;
