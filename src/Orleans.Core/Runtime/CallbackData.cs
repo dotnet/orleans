@@ -1,4 +1,3 @@
-#define COOPERATIVE_CANCELLATION
 #nullable enable
 using System;
 using System.Diagnostics;
@@ -8,7 +7,7 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
-    internal sealed class CallbackData
+    internal sealed partial class CallbackData
     {
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
@@ -124,12 +123,7 @@ namespace Orleans.Runtime
 
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
             var timeout = GetResponseTimeout();
-            this.shared.Logger.LogWarning(
-                (int)ErrorCode.Runtime_Error_100157,
-                "Response did not arrive on time in {Timeout} for message: {Message}. {StatusMessage}. About to break its promise.",
-                timeout,
-                msg,
-                statusMessage);
+            LogTimeout(this.shared.Logger, timeout, msg, statusMessage);
 
             var exception = new TimeoutException($"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}");
             context.Complete(Response.FromException(exception));
@@ -150,12 +144,7 @@ namespace Orleans.Runtime
             OrleansCallBackDataEvent.Log.OnTargetSiloFail(this.Message);
             var msg = this.Message;
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
-            this.shared.Logger.LogWarning(
-                (int)ErrorCode.Runtime_Error_100157,
-                "The target silo became unavailable for message: {Message}. {StatusMessage}See {TroubleshootingHelpLink} for troubleshooting help. About to break its promise.",
-                msg,
-                statusMessage,
-                Constants.TroubleshootingHelpLink);
+            LogTargetSiloFail(this.shared.Logger, msg, statusMessage, Constants.TroubleshootingHelpLink);
             var exception = new SiloUnavailableException($"The target silo became unavailable for message: {msg}. {statusMessage}See {Constants.TroubleshootingHelpLink} for troubleshooting help.");
             this.context.Complete(Response.FromException(exception));
         }
@@ -212,5 +201,19 @@ namespace Orleans.Runtime
                 context.Complete(Response.FromException(exception));
             }
         }
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100157,
+            Level = LogLevel.Warning,
+            Message = "Response did not arrive on time in '{Timeout}' for message: '{Message}'. {StatusMessage}About to break its promise."
+        )]
+        private static partial void LogTimeout(ILogger logger, TimeSpan timeout, Message message, string statusMessage);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100157,
+            Level = LogLevel.Warning,
+            Message = "The target silo became unavailable for message: '{Message}'. {StatusMessage}See {TroubleshootingHelpLink} for troubleshooting help. About to break its promise."
+        )]
+        private static partial void LogTargetSiloFail(ILogger logger, Message message, string statusMessage, string troubleshootingHelpLink);
     }
 }
