@@ -17,6 +17,8 @@ namespace Orleans.Persistence.AdoNet.Storage
 namespace Orleans.Reminders.AdoNet.Storage
 #elif STREAMING_ADONET
 namespace Orleans.Streaming.AdoNet.Storage
+#elif GRAINDIRECTORY_ADONET
+namespace Orleans.GrainDirectory.AdoNet.Storage
 #elif TESTER_SQLUTILS
 namespace Orleans.Tests.SqlUtils
 #else
@@ -169,6 +171,30 @@ namespace Orleans.Tests.SqlUtils
         /// A query template to evict expired dead letters (by deleting them).
         /// </summary>
         internal string EvictStreamDeadLettersKey => queries[nameof(EvictStreamDeadLettersKey)];
+
+#endif
+
+#if GRAINDIRECTORY_ADONET || TESTER_SQLUTILS
+
+        /// <summary>
+        /// A query template to register a grain activation.
+        /// </summary>
+        internal string RegisterGrainActivationKey => queries[nameof(RegisterGrainActivationKey)];
+
+        /// <summary>
+        /// A query template to unregister a grain activation.
+        /// </summary>
+        internal string UnregisterGrainActivationKey => queries[nameof(UnregisterGrainActivationKey)];
+
+        /// <summary>
+        /// A query template to lookup a grain activation.
+        /// </summary>
+        internal string LookupGrainActivationKey => queries[nameof(LookupGrainActivationKey)];
+
+        /// <summary>
+        /// A query template to unregister all grain activations for a set of silos.
+        /// </summary>
+        internal string UnregisterGrainActivationsKey => queries[nameof(UnregisterGrainActivationsKey)];
 
 #endif
 
@@ -332,6 +358,19 @@ namespace Orleans.Tests.SqlUtils
                 }
             }
 
+            /// <summary>
+            /// Workaround for SiloAddress in the Grain Directory clashing with the existing property.
+            /// </summary>
+            internal string SiloAddressAsString
+            {
+                set => Add("SiloAddress", value);
+            }
+
+            internal string SiloAddresses
+            {
+                set => Add(nameof(SiloAddresses), value);
+            }
+
             internal int Generation
             {
                 set { Add(nameof(Generation), value); }
@@ -372,6 +411,11 @@ namespace Orleans.Tests.SqlUtils
                 set { Add(nameof(ServiceId), value); }
             }
 
+            internal string ClusterId
+            {
+                set { Add(nameof(ClusterId), value); }
+            }
+
             internal string DeploymentId
             {
                 set { Add(nameof(DeploymentId), value); }
@@ -400,6 +444,11 @@ namespace Orleans.Tests.SqlUtils
             internal string GrainId
             {
                 set { Add(nameof(GrainId), value, dbType: DbType.AnsiString); }
+            }
+
+            internal int GrainIdHash
+            {
+                set => Add(nameof(GrainIdHash), value);
             }
 
             internal string ReminderName
@@ -507,6 +556,11 @@ namespace Orleans.Tests.SqlUtils
             internal string Items
             {
                 set => Add(nameof(Items), value);
+            }
+
+            internal string ActivationId
+            {
+                set => Add(nameof(ActivationId), value);
             }
         }
     }
