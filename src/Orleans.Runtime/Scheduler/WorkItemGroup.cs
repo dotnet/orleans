@@ -246,18 +246,13 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private void LogTaskRunError(Task task, Exception ex)
-    {
-        _log.LogError(
-            (int)ErrorCode.SchedulerExceptionFromExecute,
-            ex,
-            "Worker thread caught an exception thrown from Execute by task {Task}",
-            task);
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
     private void LogLongRunningTurn(Task task, long taskDurationMs)
     {
+        if (Debugger.IsAttached)
+        {
+            return;
+        }
+
         var taskDuration = TimeSpan.FromMilliseconds(taskDurationMs);
         _log.LogWarning(
             (int)ErrorCode.SchedulerTurnTooLong3,

@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -124,7 +125,7 @@ namespace Orleans.Runtime.MembershipService
 
             if (_runTask is Task task)
             {
-                await task.WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                await task.WaitAsync(cancellationToken).SuppressThrowing();
             }
         }
 
@@ -147,7 +148,7 @@ namespace Orleans.Runtime.MembershipService
             Dispose();
             if (_runTask is Task task)
             {
-                await task.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                await task.SuppressThrowing();
             }
         }
 
@@ -234,6 +235,13 @@ namespace Orleans.Runtime.MembershipService
                 {
                     // Indirect probes need extra time to account for the additional hop.
                     additionalTimeout += 1;
+                }
+
+                // When the debugger is attached, extend probe times so that silos are not terminated
+                // due to debugging pauses.
+                if (Debugger.IsAttached)
+                {
+                    additionalTimeout += 25;
                 }
 
                 return options.ProbeTimeout.Multiply(1 + additionalTimeout);

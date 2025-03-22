@@ -92,8 +92,8 @@ namespace Orleans.Runtime.MembershipService
                     {
                         if (!newMonitoredSilos.ContainsKey(pair.Key))
                         {
-                            var cancellation = new CancellationTokenSource(this.clusterMembershipOptions.CurrentValue.ProbeTimeout).Token;
-                            await pair.Value.StopAsync(cancellation);
+                            using var cancellation = new CancellationTokenSource(this.clusterMembershipOptions.CurrentValue.ProbeTimeout);
+                            await pair.Value.StopAsync(cancellation.Token);
                         }
                     }
 
