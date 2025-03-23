@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.Serialization;
 
 #nullable enable
@@ -29,7 +30,7 @@ namespace Orleans.Runtime
 
         public static implicit operator StreamId(QualifiedStreamId internalStreamId) => internalStreamId.StreamId;
 
-        public bool Equals(QualifiedStreamId other) => StreamId.Equals(other) && ProviderName.Equals(other.ProviderName);
+        public bool Equals(QualifiedStreamId other) => StreamId.Equals(other) && EqualityComparer<string>.Default.Equals(ProviderName,other.ProviderName);
 
         public override bool Equals(object? obj) => obj is QualifiedStreamId other ? this.Equals(other) : false;
 
