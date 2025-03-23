@@ -13,6 +13,8 @@ namespace Orleans.Streaming.JsonConverters
 {
     internal sealed class QualifiedStreamIdJsonConverter : JsonConverter<QualifiedStreamId>
     {
+        readonly string? _qualifiedStreamIdType = typeof(QualifiedStreamId).AssemblyQualifiedName;
+
         public override QualifiedStreamId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType != JsonTokenType.StartObject)
@@ -59,7 +61,7 @@ namespace Orleans.Streaming.JsonConverters
         public override void Write(Utf8JsonWriter writer, QualifiedStreamId value, JsonSerializerOptions options)
         {
             writer.WriteStartObject();
-            writer.WriteString("$type",typeof(QualifiedStreamId).AssemblyQualifiedName);
+            writer.WriteString("$type", _qualifiedStreamIdType);
             writer.WriteString("pvn", value.ProviderName);
             writer.WritePropertyName("sid");
             JsonSerializer.Serialize(writer, value.StreamId, options);            
