@@ -1,3 +1,5 @@
+using Orleans.Concurrency;
+
 namespace UnitTests.GrainInterfaces
 {
     public interface IGenericGrainWithGenericState<TFirstTypeParam, TStateType, TLastTypeParam> : IGrainWithGuidKey
@@ -191,18 +193,29 @@ namespace UnitTests.GrainInterfaces
     {
         Task<string> GetRuntimeInstanceId();
         Task<string> GetRuntimeInstanceIdWithDelay(TimeSpan delay);
-
-        Task LongWait(GrainCancellationToken tc, TimeSpan delay);
         Task<T> LongRunningTask(T t, TimeSpan delay);
         Task<T> CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay);
         Task<T> FanOutOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay, int degreeOfParallelism);
-        Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, GrainCancellationToken tc, TimeSpan delay);
-        Task CallOtherLongRunningTaskWithLocalToken(ILongRunningTaskGrain<T> target, TimeSpan delay,
-            TimeSpan delayBeforeCancel);
-        Task<bool> CancellationTokenCallbackResolve(GrainCancellationToken tc);
-        Task<bool> CallOtherCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target);
-        Task CancellationTokenCallbackThrow(GrainCancellationToken tc);
+
+        Task LongWaitGrainCancellation(GrainCancellationToken tc, TimeSpan delay, Guid callId);
+        [AlwaysInterleave]
+        Task LongWaitGrainCancellationInterleaving(GrainCancellationToken tc, TimeSpan delay, Guid callId);
+        Task LongWait(CancellationToken tc, TimeSpan delay, Guid callId);
+        [AlwaysInterleave]
+        Task LongWaitInterleaving(CancellationToken tc, TimeSpan delay, Guid callId);
+        Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, CancellationToken tc, TimeSpan delay, Guid callId);
+        Task CallOtherLongRunningTaskGrainCancellation(ILongRunningTaskGrain<T> target, GrainCancellationToken tc, TimeSpan delay, Guid callId);
+        Task CallOtherLongRunningTaskWithLocalGrainCancellationToken(ILongRunningTaskGrain<T> target, TimeSpan delay, TimeSpan delayBeforeCancel, Guid callId);
+        Task CallOtherLongRunningTaskWithLocalCancellation(ILongRunningTaskGrain<T> target, TimeSpan delay, TimeSpan delayBeforeCancel, Guid callId);
+        Task<bool> GrainCancellationTokenCallbackResolve(GrainCancellationToken tc, Guid callId);
+        Task<bool> CancellationTokenCallbackResolve(CancellationToken tc, Guid callId);
+        Task<bool> CallOtherGrainCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target, Guid callId);
+        Task<bool> CallOtherCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target, Guid callId);
+        Task GrainCancellationTokenCallbackThrow(GrainCancellationToken tc, Guid callId);
+        Task CancellationTokenCallbackThrow(CancellationToken tc, Guid callId);
         Task<T> GetLastValue();
+
+        IAsyncEnumerable<(Guid CallId, Exception Error)> WatchCancellations(CancellationToken cancellationToken = default);
     }
 
     [Alias("IGenericGrainWithConstraints`3")]

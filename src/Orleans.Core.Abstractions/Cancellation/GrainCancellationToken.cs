@@ -43,7 +43,6 @@ namespace Orleans
             _targetGrainReferences = new ConcurrentDictionary<GrainId, GrainReference>();
         }
 
-
         /// <summary>
         /// Initializes the <see cref="T:Orleans.GrainCancellationToken"/>.
         /// </summary>

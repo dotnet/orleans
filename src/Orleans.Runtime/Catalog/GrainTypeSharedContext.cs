@@ -19,7 +19,7 @@ namespace Orleans.Runtime;
 /// <summary>
 /// Functionality which is shared between all instances of a grain type.
 /// </summary>
-public class GrainTypeSharedContext
+public sealed class GrainTypeSharedContext
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly Dictionary<Type, object> _components = new();
@@ -33,6 +33,7 @@ public class GrainTypeSharedContext
         IOptions<SiloMessagingOptions> messagingOptions,
         IOptions<GrainCollectionOptions> collectionOptions,
         IOptions<SchedulingOptions> schedulingOptions,
+        IOptions<StatelessWorkerOptions> statelessWorkerOptions,
         IGrainRuntime grainRuntime,
         ILoggerFactory loggerFactory,
         GrainReferenceActivator grainReferenceActivator,
@@ -56,6 +57,7 @@ public class GrainTypeSharedContext
         var grainDirectoryResolver = serviceProvider.GetRequiredService<GrainDirectoryResolver>();
         GrainDirectory = PlacementStrategy.IsUsingGrainDirectory ? grainDirectoryResolver.Resolve(grainType) : null;
         SchedulingOptions = schedulingOptions.Value;
+        StatelessWorkerOptions = statelessWorkerOptions.Value;
         Runtime = grainRuntime;
         MigrationManager = _serviceProvider.GetService<IActivationMigrationManager>();
 
@@ -180,6 +182,11 @@ public class GrainTypeSharedContext
     /// Gets the scheduling options.
     /// </summary>
     public SchedulingOptions SchedulingOptions { get; }
+
+    /// <summary>
+    /// Gets the stateless worker options.
+    /// </summary>
+    public StatelessWorkerOptions StatelessWorkerOptions { get; }
 
     /// <summary>
     /// Gets the grain runtime.

@@ -17,6 +17,8 @@ namespace Orleans.CodeGenerator
         string TypeNameIdentifier { get; }
         TypeSyntax GetTypeSyntax(ITypeSymbol typeSymbol);
         bool IsPrimaryConstructorParameter { get; } 
+        bool IsSerializable { get; }
+        bool IsCopyable { get; }
     }
 
     internal sealed class MemberDescriptionTypeComparer : IEqualityComparer<IMemberDescription>

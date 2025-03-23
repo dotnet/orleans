@@ -13,8 +13,8 @@ namespace Orleans.EventSourcing.LogStorage
     /// A log view adaptor that wraps around a traditional storage adaptor, and uses batching and e-tags
     /// to append entries.
     ///<para>
-    /// The log itself is transient, i.e. not actually saved to storage - only the latest view and some 
-    /// metadata (the log position, and write flags) are stored. 
+    /// The log itself is transient, i.e. not actually saved to storage - only the latest view and some
+    /// metadata (the log position, and write flags) are stored.
     /// </para>
     /// </summary>
     /// <typeparam name="TLogView">Type of log view</typeparam>
@@ -249,7 +249,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
-        protected internal sealed class UpdateNotificationMessage : INotificationMessage 
+        protected internal sealed class UpdateNotificationMessage : INotificationMessage
         {
             /// <inheritdoc/>
             [Id(0)]
@@ -326,10 +326,10 @@ namespace Orleans.EventSourcing.LogStorage
                 var updateNotification = notifications.ElementAt(0).Value;
                 notifications.RemoveAt(0);
 
-                // append all operations in pending 
+                // append all operations in pending
                 foreach (var u in updateNotification.Updates)
                     GlobalLog.StateAndMetaData.Log.Add(u);
-                  
+
                 GlobalLog.StateAndMetaData.FlipBit(updateNotification.Origin);
 
                 GlobalLog.ETag = updateNotification.ETag;
@@ -342,7 +342,7 @@ namespace Orleans.EventSourcing.LogStorage
             Services.Log(LogLevel.Trace, "unprocessed notifications in queue: {0}", notifications.Count);
 
             base.ProcessNotifications();
-         
+
         }
 
 

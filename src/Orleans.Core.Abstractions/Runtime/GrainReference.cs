@@ -10,6 +10,7 @@ using Orleans.CodeGeneration;
 using System.Text;
 using System.Diagnostics;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace Orleans.Runtime
 {
@@ -594,6 +595,10 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public virtual TimeSpan? GetDefaultResponseTimeout() => null;
+
+        public virtual bool TryCancel() => false;
+
+        public virtual CancellationToken GetCancellationToken() => default;
     }
 
     /// <summary>

@@ -1,6 +1,6 @@
 using System;
-using System.Collections;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,7 +18,7 @@ using static Orleans.Internal.StandardExtensions;
 
 namespace Orleans
 {
-    internal class OutsideRuntimeClient : IRuntimeClient, IDisposable, IClusterConnectionStatusListener
+    internal partial class OutsideRuntimeClient : IRuntimeClient, IDisposable, IClusterConnectionStatusListener
     {
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
 
@@ -32,6 +32,7 @@ namespace Orleans
 
         private readonly MessagingTrace messagingTrace;
         private readonly InterfaceToImplementationMappingCache _interfaceToImplementationMapping;
+        private IGrainCallCancellationManager _cancellationManager;
         private IClusterConnectionStatusObserver[] _statusObservers;
 
         public IInternalGrainFactory InternalGrainFactory { get; private set; }
@@ -90,7 +91,10 @@ namespace Orleans
             this.sharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
-                this.clientMessagingOptions.ResponseTimeout);
+                this.clientMessagingOptions.ResponseTimeout,
+                this.clientMessagingOptions.CancelRequestOnTimeout,
+                this.clientMessagingOptions.WaitForCancellationAcknowledgement,
+                null);
         }
 
         internal void ConsumeServices()
@@ -101,6 +105,7 @@ namespace Orleans
                 _manifestProvider = ServiceProvider.GetRequiredService<ClientClusterManifestProvider>();
 
                 this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
+                _cancellationManager = sharedCallbackData.CancellationManager = ServiceProvider.GetRequiredService<IGrainCallCancellationManager>();
                 this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
                 this.localObjects = new InvokableObjectManager(
                     ServiceProvider.GetRequiredService<ClientGrainContext>(),
@@ -116,7 +121,7 @@ namespace Orleans
                 this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
                 // Client init / sign-on message
-                logger.LogInformation((int)ErrorCode.ClientStarting, "Starting Orleans client with runtime version \"{RuntimeVersion}\", local address {LocalAddress} and client id {ClientId}", RuntimeVersion.Current, _localClientDetails.ClientAddress, _localClientDetails.ClientId);
+                LogStartingClient(logger, RuntimeVersion.Current, _localClientDetails.ClientAddress, _localClientDetails.ClientId);
 
                 if (TestOnlyThrowExceptionDuringInit)
                 {
@@ -125,7 +130,7 @@ namespace Orleans
             }
             catch (Exception exc)
             {
-                if (logger != null) logger.LogError((int)ErrorCode.Runtime_Error_100319, exc, "OutsideRuntimeClient constructor failed.");
+                LogConstructorException(logger, exc);
                 ConstructorReset();
                 throw;
             }
@@ -137,13 +142,11 @@ namespace Orleans
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            ConsumeServices();
-
             // Deliberately avoid capturing the current synchronization context during startup and execute on the default scheduler.
             // This helps to avoid any issues (such as deadlocks) caused by executing with the client's synchronization context/scheduler.
             await Task.Run(() => this.StartInternal(cancellationToken)).ConfigureAwait(false);
 
-            logger.LogInformation((int)ErrorCode.ProxyClient_StartDone, "Started client with address {ActivationAddress} and id {ClientId}", CurrentActivationAddress.ToString(), _localClientDetails.ClientId);
+            LogStartedClient(logger, CurrentActivationAddress, _localClientDetails.ClientId);
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
@@ -233,7 +236,7 @@ namespace Orleans
                         break;
                     }
                 default:
-                    logger.LogError((int)ErrorCode.Runtime_Error_100327, "Message not supported: {Message}.", message);
+                    LogMessageNotSupported(logger, message);
                     break;
             }
         }
@@ -251,6 +254,8 @@ namespace Orleans
         public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource context, InvokeMethodOptions options)
         {
             ThrowIfDisposed();
+            var cancellationToken = request.GetCancellationToken();
+            cancellationToken.ThrowIfCancellationRequested();
             var message = this.messageFactory.CreateMessage(request, options);
             OrleansOutsideRuntimeClientEvent.Log.SendRequest(message);
 
@@ -277,6 +282,7 @@ namespace Orleans
             if (!oneWay)
             {
                 var callbackData = new CallbackData(this.sharedCallbackData, context, message);
+                callbackData.SubscribeForCancellation(cancellationToken);
                 callbacks.TryAdd(message.Id, callbackData);
             }
             else
@@ -284,7 +290,7 @@ namespace Orleans
                 context?.Complete();
             }
 
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Send {Message}", message);
+            LogSendingMessage(logger, message);
             MessageCenter.SendMessage(message);
         }
 
@@ -292,29 +298,37 @@ namespace Orleans
         {
             OrleansOutsideRuntimeClientEvent.Log.ReceiveResponse(response);
 
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Received {Message}", response);
+            LogReceivedMessage(logger, response);
 
             if (response.Result is Message.ResponseTypes.Status)
             {
                 var status = (StatusResponse)response.BodyObject;
                 callbacks.TryGetValue(response.Id, out var callback);
                 var request = callback?.Message;
-                if (!(request is null))
+                if (request is not null)
                 {
                     callback.OnStatusUpdate(status);
-
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Information))
+                    if (status.Diagnostics != null && status.Diagnostics.Count > 0)
                     {
-                        var diagnosticsString = string.Join("\n", status.Diagnostics);
-                        this.logger.LogInformation("Received status update for pending request, Request: {RequestMessage}. Status: {Diagnostics}", request, diagnosticsString);
+                        LogReceivedStatusUpdateForPendingRequest(logger, request, new(status.Diagnostics));
                     }
                 }
                 else
                 {
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Information))
+                    if (clientMessagingOptions.CancelRequestOnTimeout)
                     {
-                        var diagnosticsString = string.Join("\n", status.Diagnostics);
-                        this.logger.LogInformation("Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}", response, diagnosticsString);
+                        // Cancel the call since the caller has abandoned it.
+                        // Note that the target and sender arguments are swapped because this is a response to the original request.
+                        _cancellationManager?.SignalCancellation(
+                            response.SendingSilo,
+                            targetGrainId: response.SendingGrain,
+                            sendingGrainId: response.TargetGrain,
+                            messageId: response.Id);
+                    }
+
+                    if (status.Diagnostics != null && status.Diagnostics.Count > 0)
+                    {
+                        LogReceivedStatusUpdateForUnknownRequest(logger, response, new(status.Diagnostics));
                     }
                 }
 
@@ -332,7 +346,7 @@ namespace Orleans
             }
             else
             {
-                logger.LogWarning((int)ErrorCode.Runtime_Error_100011, "No callback for response message {ResponseMessage}", response);
+                LogWarningNoCallbackForResponseMessage(logger, response);
             }
         }
 
@@ -429,7 +443,7 @@ namespace Orleans
                 }
                 catch (Exception ex)
                 {
-                    this.logger.LogError((int)ErrorCode.ClientError, ex, "Error sending cluster disconnection notification.");
+                    LogErrorSendingClusterDisconnectionNotification(logger, ex);
                 }
             }
         }
@@ -448,7 +462,7 @@ namespace Orleans
                 }
                 catch (Exception ex)
                 {
-                    this.logger.LogError((int)ErrorCode.ClientError, ex, "Error sending gateway count changed notification.");
+                    LogErrorSendingGatewayCountChangedNotification(logger, ex);
                 }
             }
         }
@@ -475,7 +489,7 @@ namespace Orleans
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Error while processing callback expiry.");
+                    LogErrorWhileProcessingCallbackExpiry(logger, ex);
                 }
             }
         }
@@ -489,5 +503,87 @@ namespace Orleans
 
             void ThrowObjectDisposedException() => throw new ObjectDisposedException(nameof(OutsideRuntimeClient));
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.ClientStarting,
+            Message = "Starting Orleans client with runtime version '{RuntimeVersion}', local address '{LocalAddress}' and client id '{ClientId}'."
+        )]
+        private static partial void LogStartingClient(ILogger logger, string runtimeVersion, SiloAddress localAddress, ClientGrainId clientId);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)ErrorCode.Runtime_Error_100319,
+            Message = "OutsideRuntimeClient constructor failed."
+        )]
+        private static partial void LogConstructorException(ILogger logger, Exception exc);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.ProxyClient_StartDone,
+            Message = "Started client with address '{ActivationAddress}' and id '{ClientId}'."
+        )]
+        private static partial void LogStartedClient(ILogger logger, GrainAddress activationAddress, ClientGrainId clientId);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Send '{Message}'."
+        )]
+        private static partial void LogSendingMessage(ILogger logger, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Received '{Message}'."
+        )]
+        private static partial void LogReceivedMessage(ILogger logger, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Message not supported: '{Message}'."
+        )]
+        private static partial void LogMessageNotSupported(ILogger logger, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Error sending cluster disconnection notification."
+        )]
+        private static partial void LogErrorSendingClusterDisconnectionNotification(ILogger logger, Exception ex);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Error sending gateway count changed notification."
+        )]
+        private static partial void LogErrorSendingGatewayCountChangedNotification(ILogger logger, Exception ex);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Error while processing callback expiry."
+        )]
+        private static partial void LogErrorWhileProcessingCallbackExpiry(ILogger logger, Exception ex);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.Runtime_Error_100011,
+            Message = "No callback for response message '{ResponseMessage}'"
+        )]
+        private static partial void LogWarningNoCallbackForResponseMessage(ILogger logger, Message responseMessage);
+
+        private readonly struct DiagnosticsLogData(List<string> diagnostics)
+        {
+            public override string ToString() => string.Join("\n", diagnostics);
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Received status update for pending request, Request: '{RequestMessage}'. Status: '{Diagnostics}'."
+        )]
+        private static partial void LogReceivedStatusUpdateForPendingRequest(ILogger logger, Message requestMessage, DiagnosticsLogData diagnostics);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Received status update for unknown request. Message: '{StatusMessage}'. Status: '{Diagnostics}'."
+        )]
+        private static partial void LogReceivedStatusUpdateForUnknownRequest(ILogger logger, Message statusMessage, DiagnosticsLogData diagnostics);
+
     }
 }

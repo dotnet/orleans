@@ -55,5 +55,28 @@ namespace Orleans.Configuration
         /// </summary>
         /// <value>The maximum message body size is 100 MB by default.</value>
         public int MaxMessageBodySize { get; set; } = 100 * 1024 * 1024;
+
+        /// <summary>
+        /// Gets the response timeout underlying the <see cref="ResponseTimeout"/> property, without debugger checks.
+        /// </summary>
+        internal TimeSpan ConfiguredResponseTimeout => _responseTimeout;
+
+        /// <summary>
+        /// Whether request cancellation should be attempted when a request times out.
+        /// </summary>
+        /// <remarks>
+        /// Request cancellation may involve sending a cancellation message to the silo which hosts the target grain.
+        /// Defaults to <see langword="true"/>.
+        /// </remarks>
+        public bool CancelRequestOnTimeout { get; set; } = true;
+
+        /// <summary>
+        /// Whether local calls should be cancelled immediately when cancellation is signaled (<see langword="false"/>)
+        /// rather than waiting for callees to acknowledge cancellation before a call is considered cancelled (<see langword="true"/>).
+        /// </summary>
+        /// <remarks>
+        /// Defaults to <see langword="false"/>.
+        /// </remarks>
+        public bool WaitForCancellationAcknowledgement { get; set; }
     }
 }

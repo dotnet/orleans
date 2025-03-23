@@ -290,7 +290,7 @@ namespace Orleans
         ApplicationError,
 
         /// <summary>
-        /// The application requested that this activation deactivate.
+        /// The application requested to deactivate this activation.
         /// </summary>
         ApplicationRequested,
 
@@ -298,6 +298,11 @@ namespace Orleans
         /// This activation is migrating to a new location.
         /// </summary>
         Migrating,
+
+        /// <summary>
+        /// The runtime requested to deactivate this activation.
+        /// </summary>
+        RuntimeRequested
     }
 
     internal static class DeactivationReasonCodeExtensions

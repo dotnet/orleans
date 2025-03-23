@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Linq;
 
 namespace Orleans.CodeGenerator
 {
@@ -205,6 +206,11 @@ namespace Orleans.CodeGenerator
         /// Gets the interface which this type is contained in.
         /// </summary>
         public INamedTypeSymbol ContainingInterface { get; }
+
+        /// <summary>
+        /// Gets a value indicating whether this method is cancellable.
+        /// </summary>
+        public bool IsCancellable => Method.Parameters.Any(parameterSymbol => SymbolEqualityComparer.Default.Equals(CodeGenerator.LibraryTypes.CancellationToken, parameterSymbol.Type));
 
         public bool Equals(InvokableMethodDescription other) => Key.Equals(other.Key);
         public override bool Equals(object obj) => obj is InvokableMethodDescription imd && Equals(imd);

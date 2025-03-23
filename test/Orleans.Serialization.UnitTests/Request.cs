@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Reflection;
 using System.Threading.Tasks;
 
@@ -22,7 +21,6 @@ namespace Orleans.Serialization.Invocation
         public abstract Type GetInterfaceType();
 
         public abstract MethodInfo GetMethod();
-        public virtual TimeSpan? GetDefaultResponseTimeout() => null;
     }
 
     [GenerateSerializer]

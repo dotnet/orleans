@@ -23,7 +23,7 @@ namespace DefaultCluster.Tests.General
         {
             writer = this.GrainFactory.GetGrain<IMultifacetWriter>(GetRandomGrainId());
             reader = writer.AsReference<IMultifacetReader>();
-            
+
             int x = 1234;
             await writer.SetValue(x).WaitAsync(timeout);
             int y = await reader.GetValue();
@@ -50,7 +50,7 @@ namespace DefaultCluster.Tests.General
             await writer.SetValue(5);
             int v = await reader.GetValue();
             Assert.Equal(5, v);
-            
+
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Cast")]

@@ -40,6 +40,11 @@ namespace Orleans.CodeGenerator
             var members = new List<ISerializableMember>();
             foreach (var member in type.Members)
             {
+                if (!member.IsCopyable)
+                {
+                    continue;
+                }
+
                 if (member is ISerializableMember serializable)
                 {
                     members.Add(serializable);
@@ -283,6 +288,11 @@ namespace Orleans.CodeGenerator
             var uniqueTypes = new HashSet<IMemberDescription>(MemberDescriptionTypeComparer.Default);
             foreach (var member in members)
             {
+                if (!member.IsCopyable)
+                {
+                    continue;
+                }
+
                 var t = member.Type;
 
                 if (LibraryTypes.IsShallowCopyable(t))

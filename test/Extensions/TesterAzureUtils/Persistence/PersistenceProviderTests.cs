@@ -252,8 +252,8 @@ namespace Tester.AzureUtils.Persistence
         public async Task PersistenceProvider_Memory_FixedLatency_WriteRead()
         {
             const string testName = nameof(PersistenceProvider_Memory_FixedLatency_WriteRead);
-            TimeSpan expectedLatency = TimeSpan.FromMilliseconds(200);
-            MemoryGrainStorageWithLatency store = new MemoryGrainStorageWithLatency(
+            var expectedLatency = TimeSpan.FromMilliseconds(200);
+            var store = new MemoryGrainStorageWithLatency(
                 testName,
                 new MemoryStorageWithLatencyOptions()
                 {
@@ -261,8 +261,8 @@ namespace Tester.AzureUtils.Persistence
                     MockCallsOnly = true
                 },
                 NullLoggerFactory.Instance,
-                this.providerRuntime.ServiceProvider.GetService<IGrainFactory>(),
-                this.providerRuntime.ServiceProvider.GetService<IGrainStorageSerializer>());
+                providerRuntime.ServiceProvider.GetService<IGrainFactory>(),
+                providerRuntime.ServiceProvider.GetService<IGrainStorageSerializer>());
 
             var reference = (GrainId)LegacyGrainId.NewId();
             var state = TestStoreGrainState.NewRandomState();
@@ -288,17 +288,6 @@ namespace Tester.AzureUtils.Persistence
             Type classType = new CachedTypeResolver().ResolveType(className);
             Assert.NotNull(classType); // Type
             Assert.True(typeof(IGrainStorage).IsAssignableFrom(classType), $"Is an IStorageProvider : {classType.FullName}");
-        }
-
-        private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(AzureTableStorageOptions options)
-        {
-            // TODO change test to include more serializer?
-            var serializer = new OrleansGrainStorageSerializer(this.providerRuntime.ServiceProvider.GetRequiredService<Serializer>());
-            AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(this.providerRuntime.ServiceProvider, options, serializer, "TestStorage");
-            ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this.providerRuntime.ServiceProvider);
-            store.Participate(lifecycle);
-            await lifecycle.OnStart();
-            return store;
         }
 
         private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(bool useJson = false, bool useFallback = true, bool useStringFormat = false, TypeNameHandling? typeNameHandling = null)

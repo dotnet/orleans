@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Orleans.CodeGenerator.Diagnostics;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using System.Linq.Expressions;
 
 namespace Orleans.CodeGenerator
 {
@@ -148,12 +149,14 @@ namespace Orleans.CodeGenerator
                     GenerateGetActivityName(method),
                     GenerateGetInterfaceType(method),
                     GenerateGetMethod(),
-                    GenerateSetTargetMethod(method, targetField),
+                    GenerateSetTargetMethod(method, targetField, fieldDescriptions),
                     GenerateGetTargetMethod(targetField),
                     GenerateDisposeMethod(fieldDescriptions, baseClassType),
                     GenerateGetArgumentMethod(method, fieldDescriptions),
                     GenerateSetArgumentMethod(method, fieldDescriptions),
-                    GenerateInvokeInnerMethod(method, fieldDescriptions, targetField));
+                    GenerateInvokeInnerMethod(method, fieldDescriptions, targetField),
+                    GenerateGetCancellationTokenMethod(method, fieldDescriptions),
+                    GenerateTryCancelMethod(method, fieldDescriptions));
 
             if (method.AllTypeParameters.Count > 0)
             {
@@ -182,7 +185,6 @@ namespace Orleans.CodeGenerator
                 .WithExpressionBody(ArrowExpressionClause(IdentifierName("_responseTimeoutValue")))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
                 .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword));
-;
             return new MemberDeclarationSyntax[] { timespanField, responseTimeoutProperty };
         }
 
@@ -276,7 +278,8 @@ namespace Orleans.CodeGenerator
 
         private MemberDeclarationSyntax GenerateSetTargetMethod(
             InvokableMethodDescription methodDescription,
-            TargetFieldDescription targetField)
+            TargetFieldDescription targetField,
+            List<InvokerFieldDescription> fieldDescriptions)
         {
             var holder = IdentifierName("holder");
             var holderParameter = holder.Identifier;
@@ -293,16 +296,29 @@ namespace Orleans.CodeGenerator
                                     SingletonSeparatedList(containingInterface.ToTypeSyntax())))))
                 .WithArgumentList(ArgumentList());
 
-            var body =
-                AssignmentExpression(
-                    SyntaxKind.SimpleAssignmentExpression,
-                    IdentifierName(targetField.FieldName),
-                    getTarget);
-            return MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "SetTarget")
+            var member =
+            MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "SetTarget")
                 .WithParameterList(ParameterList(SingletonSeparatedList(Parameter(holderParameter).WithType(LibraryTypes.ITargetHolder.ToTypeSyntax()))))
-                .WithExpressionBody(ArrowExpressionClause(body))
-                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
+
+            var assignmentExpression = AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(targetField.FieldName), getTarget);
+            if (!methodDescription.IsCancellable)
+            {
+                return member.WithExpressionBody(ArrowExpressionClause(assignmentExpression)).WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
+            }
+            else
+            {
+                var ctsField = fieldDescriptions.First(f => f is CancellationTokenSourceFieldDescription);
+                var cancellationTokenType = LibraryTypes.CancellationToken.ToTypeSyntax();
+                var ctField = fieldDescriptions.First(f => SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, f.FieldType));
+                return member.WithBody(Block(
+                    new List<StatementSyntax>()
+                    {
+                        ExpressionStatement(assignmentExpression),
+                        ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(ctsField.FieldName), ImplicitObjectCreationExpression())),
+                        ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(ctField.FieldName), IdentifierName(ctsField.FieldName).Member("Token")))
+                    }));
+            }
         }
 
         private MemberDeclarationSyntax GenerateGetTargetMethod(TargetFieldDescription targetField)
@@ -314,6 +330,47 @@ namespace Orleans.CodeGenerator
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
         }
 
+        private MemberDeclarationSyntax GenerateGetCancellationTokenMethod(InvokableMethodDescription method, List<InvokerFieldDescription> fields)
+        {
+            if (!method.IsCancellable)
+            {
+                return null;
+            }
+
+            // Method to get the cancellationToken argument
+            // C#: CancellationToken GetCancellationToken() => <fieldName>
+            var cancellationTokenType = LibraryTypes.CancellationToken.ToTypeSyntax();
+            var cancellationTokenField = fields.First(f => SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, f.FieldType));
+            var member = MethodDeclaration(cancellationTokenType, "GetCancellationToken")
+                 .WithExpressionBody(ArrowExpressionClause(cancellationTokenField.FieldName.ToIdentifierName()))
+                 .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword))
+                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
+            return member;
+        }
+
+        private MemberDeclarationSyntax GenerateTryCancelMethod(InvokableMethodDescription method, List<InvokerFieldDescription> fields)
+        {
+            if (!method.IsCancellable)
+            {
+                return null;
+            }
+
+            // Method to set the CancellationToken argument.
+            // C#:
+            // TryCancel()
+            // {
+            //   _cts.Cancel(false);
+            //   return true;
+            // }
+            var cancellationTokenField = fields.First(f => f is CancellationTokenSourceFieldDescription);
+            var member = MethodDeclaration(PredefinedType(Token(SyntaxKind.BoolKeyword)), "TryCancel")
+                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword))
+                .WithBody(Block(
+                            ExpressionStatement(InvocationExpression(IdentifierName(cancellationTokenField.FieldName).Member("Cancel")).WithArgumentList(ArgumentList(SeparatedList([Argument(LiteralExpression(SyntaxKind.FalseLiteralExpression))])))),
+                    ReturnStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression))));
+            return member;
+        }
+ 
         private MemberDeclarationSyntax GenerateGetArgumentMethod(
             InvokableMethodDescription methodDescription,
             List<InvokerFieldDescription> fields)
@@ -496,6 +553,18 @@ namespace Orleans.CodeGenerator
             var body = new List<StatementSyntax>();
             foreach (var field in fields)
             {
+                if (field is CancellationTokenSourceFieldDescription ctsField)
+                {
+                    // C#
+                    // _cts?.Dispose();
+                    body.Add(
+                        ExpressionStatement(
+                            ConditionalAccessExpression(
+                                ctsField.FieldName.ToIdentifierName(),
+                                InvocationExpression(
+                                    MemberBindingExpression(IdentifierName("Dispose"))))));
+                }
+
                 if (field.IsInstanceField)
                 {
                     body.Add(
@@ -708,16 +777,22 @@ namespace Orleans.CodeGenerator
         private List<InvokerFieldDescription> GetFieldDescriptions(InvokableMethodDescription method)
         {
             var fields = new List<InvokerFieldDescription>();
-
             uint fieldId = 0;
+
             foreach (var parameter in method.Method.Parameters)
             {
-                fields.Add(new MethodParameterFieldDescription(method.CodeGenerator, parameter, $"arg{fieldId}", fieldId, method.TypeParameterSubstitutions));
+                var isSerializable = !SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, parameter.Type);
+                fields.Add(new MethodParameterFieldDescription(method.CodeGenerator, parameter, $"arg{fieldId}", fieldId, method.TypeParameterSubstitutions, isSerializable));
                 fieldId++;
             }
 
             fields.Add(new TargetFieldDescription(method.Method.ContainingType));
             fields.Add(new MethodInfoFieldDescription(LibraryTypes.MethodInfo, "MethodBackingField"));
+
+            if (method.IsCancellable)
+            {
+                fields.Add(new CancellationTokenSourceFieldDescription(LibraryTypes));
+            }
 
             return fields;
         }
@@ -738,8 +813,20 @@ namespace Orleans.CodeGenerator
 
         internal sealed class TargetFieldDescription : InvokerFieldDescription
         {
-            public TargetFieldDescription(ITypeSymbol fieldType) : base(fieldType, "target") { }
+            public TargetFieldDescription(ITypeSymbol fieldType) : base(fieldType, "_target") { }
 
+            public override bool IsSerializable => false;
+            public override bool IsInstanceField => true;
+        }
+
+        internal sealed class CancellationTokenSourceFieldDescription(LibraryTypes libraryTypes) : InvokerFieldDescription(libraryTypes.CancellationTokenSource, "_cts")
+        {
+            public override bool IsSerializable => false;
+            public override bool IsInstanceField => true;
+        }
+
+        internal sealed class CancellationTokenFieldDescription(LibraryTypes libraryTypes) : InvokerFieldDescription(libraryTypes.CancellationToken, "_ct")
+        {
             public override bool IsSerializable => false;
             public override bool IsInstanceField => true;
         }
@@ -751,7 +838,8 @@ namespace Orleans.CodeGenerator
                 IParameterSymbol parameter,
                 string fieldName,
                 uint fieldId,
-                Dictionary<ITypeParameterSymbol, string> typeParameterSubstitutions)
+                Dictionary<ITypeParameterSymbol, string> typeParameterSubstitutions,
+                bool isSerializable)
                 : base(parameter.Type, fieldName)
             {
                 TypeParameterSubstitutions = typeParameterSubstitutions;
@@ -770,6 +858,7 @@ namespace Orleans.CodeGenerator
                 }
 
                 Symbol = parameter;
+                IsSerializable = isSerializable;
             }
 
             public CodeGenerator CodeGenerator { get; }
@@ -782,7 +871,8 @@ namespace Orleans.CodeGenerator
             public INamedTypeSymbol ContainingType => Parameter.ContainingType;
             public TypeSyntax TypeSyntax { get; }
             public IParameterSymbol Parameter { get; }
-            public override bool IsSerializable => true;
+            public override bool IsSerializable { get; }
+            public bool IsCopyable => true;
             public override bool IsInstanceField => true;
 
             public string AssemblyName => Parameter.Type.ContainingAssembly.ToDisplayName();

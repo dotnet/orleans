@@ -9,7 +9,7 @@ namespace Orleans.GrainDirectory
     /// <summary>
     /// Recursive distributed operations on grain directories.
     /// Each operation may forward the request to a remote owner, increasing the hopCount.
-    /// 
+    ///
     /// The methods here can be called remotely (where extended by IRemoteGrainDirectory) or
     /// locally (where extended by ILocalGrainDirectory)
     /// </summary>
@@ -88,7 +88,7 @@ namespace Orleans.GrainDirectory
         /// </summary>
         [Id(0)]
         public readonly GrainAddress? Address;
-       
+
         /// <summary>
         /// The version of this entry.
         /// </summary>

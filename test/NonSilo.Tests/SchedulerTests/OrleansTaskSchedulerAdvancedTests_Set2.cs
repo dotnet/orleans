@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime;
@@ -38,7 +39,7 @@ namespace UnitTests.SchedulerTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
-        public void ActivationSched_SimpleFifoTest()
+        public async Task ActivationSched_SimpleFifoTest()
         {
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
             // is completely and thoroughly broken and both closures are executed "simultaneously"
@@ -53,7 +54,7 @@ namespace UnitTests.SchedulerTests
             task2.Start(scheduler);
 
             // Pause to let things run
-            Thread.Sleep(1500);
+            await task2;
 
             // N should be 15, because the two tasks should execute in order
             Assert.True(n != 0, "Work items did not get executed");
@@ -90,12 +91,14 @@ namespace UnitTests.SchedulerTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
-        public void ActivationSched_SubTaskExecutionSequencing()
+        public async Task ActivationSched_SubTaskExecutionSequencing()
         {
             LogContext("Main-task " + Task.CurrentId);
 
             int n = 0;
 
+            var finished = new TaskCompletionSource();
+            int numCompleted = 0;
             void action()
             {
                 LogContext("WorkItem-task " + Task.CurrentId);
@@ -121,6 +124,10 @@ namespace UnitTests.SchedulerTests
                         LogContext("Sub-task " + id + "-ContinueWith");
 
                         this.output.WriteLine("Sub-task " + id + " Done");
+                        if (Interlocked.Increment(ref numCompleted) == 10)
+                        {
+                            finished.SetResult();
+                        }
                     });
                 }
             }
@@ -131,7 +138,7 @@ namespace UnitTests.SchedulerTests
 
             // Pause to let things run
             this.output.WriteLine("Main-task sleeping");
-            Thread.Sleep(TimeSpan.FromSeconds(2));
+            await finished.Task;
             this.output.WriteLine("Main-task awake");
 
             // N should be 10, because all tasks should execute serially

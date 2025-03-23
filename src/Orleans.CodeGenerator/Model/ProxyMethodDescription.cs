@@ -121,7 +121,8 @@ namespace Orleans.CodeGenerator
                         proxyMethodParameters[member.ParameterOrdinal],
                         member.FieldName,
                         member.FieldId,
-                        proxyMethod.TypeParameterSubstitutions));
+                        proxyMethod.TypeParameterSubstitutions,
+                        member.IsSerializable));
                 }
             }
 

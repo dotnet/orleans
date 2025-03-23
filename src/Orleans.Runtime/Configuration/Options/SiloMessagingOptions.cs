@@ -146,12 +146,20 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the period after which a currently executing request is deemed to be slow.
         /// </summary>
-        public TimeSpan RequestProcessingWarningTime { get; set; } = TimeSpan.FromSeconds(5);
+        /// <remarks>
+        /// This should be set to a value at least <see cref="GrainWorkloadAnalysisPeriod"/> shorter than <see cref="MessagingOptions.ResponseTimeout"/>
+        /// so that there is sufficient time for a long-running request to be detected and a status message to be sent to the client before the client times out.
+        /// </remarks>
+        public TimeSpan RequestProcessingWarningTime { get; set; } = TimeSpan.FromSeconds(20);
 
         /// <summary>
         /// Gets or sets the period after which an enqueued request is deemed to be delayed.
         /// </summary>
-        public TimeSpan RequestQueueDelayWarningTime { get; set; } = TimeSpan.FromSeconds(10);
+        /// <remarks>
+        /// This should be set to a value at least <see cref="GrainWorkloadAnalysisPeriod"/> shorter than <see cref="MessagingOptions.ResponseTimeout"/>
+        /// so that there is sufficient time for a delayed request to be detected and a status message to be sent to the client before the client times out.
+        /// </remarks>
+        public TimeSpan RequestQueueDelayWarningTime { get; set; } = TimeSpan.FromSeconds(20);
 
         /// <summary>
         /// Gets or sets the time to wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop.

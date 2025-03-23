@@ -35,6 +35,11 @@ namespace Orleans.CodeGenerator
             var members = new List<ISerializableMember>();
             foreach (var member in type.Members)
             {
+                if (!member.IsSerializable)
+                {
+                    continue;
+                }
+
                 if (member is ISerializableMember serializable)
                 {
                     members.Add(serializable);
@@ -247,6 +252,11 @@ namespace Orleans.CodeGenerator
             int typeIndex = 0;
             foreach (var member in serializableTypeDescription.Members.Distinct(MemberDescriptionTypeComparer.Default))
             {
+                if (!member.IsSerializable)
+                {
+                    continue;
+                }
+
                 // Add a codec field for any field in the target which does not have a static codec.
                 if (LibraryTypes.StaticCodecs.FindByUnderlyingType(member.Type) is not null)
                     continue;

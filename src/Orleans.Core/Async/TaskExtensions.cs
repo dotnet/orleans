@@ -14,6 +14,18 @@ namespace Orleans.Internal
         public static ConfiguredTaskAwaitable SuppressThrowing(this ValueTask task) => task.AsTask().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
         public static ConfiguredTaskAwaitable SuppressThrowing(this Task task) => task.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
+        public static void Ignore(this ValueTask valueTask)
+        {
+            if (valueTask.IsCompletedSuccessfully)
+            {
+                valueTask.GetAwaiter().GetResult();
+            }
+            else
+            {
+                valueTask.AsTask().Ignore();
+            }
+        }
+
         public static async Task LogException(this Task task, ILogger logger, ErrorCode errorCode, string message)
         {
             try

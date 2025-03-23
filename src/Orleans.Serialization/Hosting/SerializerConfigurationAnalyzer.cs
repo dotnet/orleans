@@ -3,6 +3,7 @@ using Orleans.Serialization.Serializers;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Serialization
@@ -84,7 +85,7 @@ namespace Orleans.Serialization
 
             bool IsEligibleType(Type type)
             {
-                if (type.IsGenericTypeParameter || type.IsGenericMethodParameter || type.ContainsGenericParameters)
+                if (type.IsGenericTypeParameter || type.IsGenericMethodParameter || type.ContainsGenericParameters || type.Equals(typeof(CancellationToken)))
                 {
                     return false;
                 }

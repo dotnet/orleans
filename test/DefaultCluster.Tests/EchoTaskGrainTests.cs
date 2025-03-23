@@ -52,7 +52,7 @@ namespace DefaultCluster.Tests.General
         public async Task EchoGrain_EchoError()
         {
             var grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
-        
+
             Task<string> promise = grain.EchoErrorAsync(expectedEchoError);
             await promise.ContinueWith(t =>
             {
@@ -69,7 +69,7 @@ namespace DefaultCluster.Tests.General
         public async Task EchoGrain_Timeout_ContinueWith()
         {
             var grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
-        
+
             TimeSpan delay5 = TimeSpan.FromSeconds(30); // grain call timeout (set in config)
             TimeSpan delay45 = TimeSpan.FromSeconds(45);
             TimeSpan delay60 = TimeSpan.FromSeconds(60);
@@ -94,7 +94,7 @@ namespace DefaultCluster.Tests.General
         public async Task EchoGrain_Timeout_Await()
         {
             var grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
-            
+
             TimeSpan delay5 = TimeSpan.FromSeconds(5);
             TimeSpan delay25 = TimeSpan.FromSeconds(25);
             Stopwatch sw = new Stopwatch();
@@ -118,7 +118,7 @@ namespace DefaultCluster.Tests.General
         public async Task EchoGrain_Timeout_Result()
         {
             var grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
-            
+
             TimeSpan delay5 = TimeSpan.FromSeconds(5);
             TimeSpan delay25 = TimeSpan.FromSeconds(25);
             Stopwatch sw = new Stopwatch();
@@ -197,7 +197,7 @@ namespace DefaultCluster.Tests.General
 
             what = "EchoGrain.Ping";
             clock.Restart();
-            
+
             await grain.PingAsync().WaitAsync(timeout);
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
         }

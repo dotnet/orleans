@@ -54,7 +54,7 @@ namespace UnitTests.Grains
             {
                 throw new ApplicationException("Not yet a producer on a stream.  Must call BecomeProducer first.");
             }
-            
+
             await _producer.OnNextAsync(_numProducedItems + 1);
 
             // update after send in case of error

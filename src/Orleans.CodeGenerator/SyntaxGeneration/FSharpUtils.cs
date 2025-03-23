@@ -198,6 +198,9 @@ namespace Orleans.CodeGenerator
 
                 public bool IsPrimaryConstructorParameter => false;
 
+                public bool IsSerializable => true;
+                public bool IsCopyable => true;
+
                 public TypeSyntax GetTypeSyntax(ITypeSymbol typeSymbol) => typeSymbol.ToTypeSyntax();
 
                 /// <summary>
@@ -310,6 +313,9 @@ namespace Orleans.CodeGenerator
                 public string TypeNameIdentifier => Type.GetValidIdentifier();
 
                 public bool IsPrimaryConstructorParameter => false;
+
+                public bool IsSerializable => true;
+                public bool IsCopyable => true;
 
                 public TypeSyntax GetTypeSyntax(ITypeSymbol typeSymbol) => typeSymbol.ToTypeSyntax();
 

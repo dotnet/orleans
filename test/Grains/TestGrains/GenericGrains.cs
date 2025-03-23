@@ -1,9 +1,9 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
+using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.ObjectPool;
 using Orleans.Concurrency;
 using Orleans.Providers;
-using Orleans.Runtime;
 using Orleans.Timers;
 using UnitTests.GrainInterfaces;
 
@@ -615,16 +615,29 @@ namespace UnitTests.Grains
 
     public class LongRunningTaskGrain<T> : Grain, ILongRunningTaskGrain<T>
     {
+        private readonly Channel<(Guid CallId, Exception Error)> _cancelledCalls = Channel.CreateUnbounded<(Guid, Exception)>();
         private T lastValue;
 
-        public Task CancellationTokenCallbackThrow(GrainCancellationToken tc)
+        public async Task GrainCancellationTokenCallbackThrow(GrainCancellationToken ct, Guid callId)
         {
-            tc.CancellationToken.Register(() =>
+            ct.CancellationToken.Register(() =>
             {
+                _cancelledCalls.Writer.TryWrite((callId, null));
                 throw new InvalidOperationException("From cancellation token callback");
             });
 
-            return Task.CompletedTask;
+            await Task.Delay(TimeSpan.FromSeconds(10), ct.CancellationToken);
+        }
+
+        public async Task CancellationTokenCallbackThrow(CancellationToken ct, Guid callId)
+        {
+            ct.Register(() =>
+            {
+                _cancelledCalls.Writer.TryWrite((callId, null));
+                throw new InvalidOperationException("From cancellation token callback");
+            });
+
+            await Task.Delay(TimeSpan.FromSeconds(10), ct);
         }
 
         public Task<T> GetLastValue()
@@ -632,16 +645,24 @@ namespace UnitTests.Grains
             return Task.FromResult(lastValue);
         }
 
-        public async Task<bool> CallOtherCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target)
+        public async Task<bool> CallOtherCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target, Guid callId)
         {
-            var tc = new GrainCancellationTokenSource();
-            var grainTask = target.CancellationTokenCallbackResolve(tc.Token);
-            await Task.Delay(300);
-            await tc.Cancel();
+            using var cts = new CancellationTokenSource();
+            var grainTask = target.CancellationTokenCallbackResolve(cts.Token, callId);
+            cts.CancelAfter(300);
             return await grainTask;
         }
 
-        public Task<bool> CancellationTokenCallbackResolve(GrainCancellationToken tc)
+        public async Task<bool> CallOtherGrainCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target, Guid callId)
+        {
+            using var cts = new GrainCancellationTokenSource();
+            var grainTask = target.GrainCancellationTokenCallbackResolve(cts.Token, callId);
+            await Task.Delay(300);
+            await cts.Cancel();
+            return await grainTask;
+        }
+
+        public Task<bool> GrainCancellationTokenCallbackResolve(GrainCancellationToken tc, Guid callId)
         {
             var tcs = new TaskCompletionSource<bool>();
             var orleansTs = TaskScheduler.Current;
@@ -649,10 +670,35 @@ namespace UnitTests.Grains
             {
                 if (TaskScheduler.Current != orleansTs)
                 {
-                    tcs.SetException(new Exception("Callback executed on wrong thread"));
+                    var exception = new Exception("Callback executed on wrong thread");
+                    _cancelledCalls.Writer.TryWrite((callId, exception));
+                    tcs.SetException(exception);
                 }
                 else
                 {
+                    _cancelledCalls.Writer.TryWrite((callId, null));
+                    tcs.SetResult(true);
+                }
+            });
+
+            return tcs.Task;
+        }
+
+        public Task<bool> CancellationTokenCallbackResolve(CancellationToken tc, Guid callId)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+            var orleansTs = TaskScheduler.Current;
+            tc.Register(() =>
+            {
+                if (TaskScheduler.Current != orleansTs)
+                {
+                    var exception = new Exception("Callback executed on wrong thread");
+                    _cancelledCalls.Writer.TryWrite((callId, exception));
+                    tcs.SetException(exception);
+                }
+                else
+                {
+                    _cancelledCalls.Writer.TryWrite((callId, null));
                     tcs.SetResult(true);
                 }
             });
@@ -676,23 +722,60 @@ namespace UnitTests.Grains
             return t;
         }
 
-        public async Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, GrainCancellationToken tc, TimeSpan delay)
+        public async Task CallOtherLongRunningTaskGrainCancellation(ILongRunningTaskGrain<T> target, GrainCancellationToken tc, TimeSpan delay, Guid callId)
         {
-            await target.LongWait(tc, delay);
+            await target.LongWaitGrainCancellation(tc, delay, callId);
         }
 
-        public async Task CallOtherLongRunningTaskWithLocalToken(ILongRunningTaskGrain<T> target, TimeSpan delay, TimeSpan delayBeforeCancel)
+        public async Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, CancellationToken tc, TimeSpan delay, Guid callId)
         {
-            var tcs = new GrainCancellationTokenSource();
-            var task = target.LongWait(tcs.Token, delay);
-            await Task.Delay(delayBeforeCancel);
-            await tcs.Cancel();
+            await target.LongWait(tc, delay, callId);
+        }
+
+        public async Task CallOtherLongRunningTaskWithLocalCancellation(ILongRunningTaskGrain<T> target, TimeSpan delay, TimeSpan delayBeforeCancel, Guid callId)
+        {
+            using var cts = new CancellationTokenSource();
+            var task = target.LongWait(cts.Token, delay, callId);
+            cts.CancelAfter(delayBeforeCancel);
             await task;
         }
 
-        public async Task LongWait(GrainCancellationToken tc, TimeSpan delay)
+        public async Task CallOtherLongRunningTaskWithLocalGrainCancellationToken(ILongRunningTaskGrain<T> target, TimeSpan delay, TimeSpan delayBeforeCancel, Guid callId)
         {
-            await Task.Delay(delay, tc.CancellationToken);
+            using var cts = new GrainCancellationTokenSource();
+            var task = target.LongWaitGrainCancellation(cts.Token, delay, callId);
+            await Task.Delay(delayBeforeCancel);
+            await cts.Cancel();
+            await task;
+        }
+
+        public Task LongWaitGrainCancellationInterleaving(GrainCancellationToken tc, TimeSpan delay, Guid callId) => LongWaitGrainCancellation(tc, delay, callId);
+
+        public async Task LongWaitGrainCancellation(GrainCancellationToken ct, TimeSpan delay, Guid callId)
+        {
+            try
+            {
+                await Task.Delay(delay, ct.CancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                _cancelledCalls.Writer.TryWrite((callId, null));
+                throw;
+            }
+        }
+
+        public Task LongWaitInterleaving(CancellationToken ct, TimeSpan delay, Guid callId) => LongWait(ct, delay, callId);
+        public async Task LongWait(CancellationToken ct, TimeSpan delay, Guid callId)
+        {
+            try
+            {
+                await Task.Delay(delay, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                _cancelledCalls.Writer.TryWrite((callId, null));
+                throw;
+            }
         }
 
         public async Task<T> LongRunningTask(T t, TimeSpan delay)
@@ -711,6 +794,14 @@ namespace UnitTests.Grains
         {
             await Task.Delay(delay);
             return RuntimeIdentity;
+        }
+
+        public async IAsyncEnumerable<(Guid CallId, Exception Error)> WatchCancellations([EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await foreach (var item in _cancelledCalls.Reader.ReadAllAsync(cancellationToken))
+            {
+                yield return item;
+            }
         }
     }
 

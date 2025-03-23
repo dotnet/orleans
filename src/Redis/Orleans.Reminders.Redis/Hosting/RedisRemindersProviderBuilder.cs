@@ -9,6 +9,7 @@ using Orleans.Configuration;
 using System.Threading.Tasks;
 
 [assembly: RegisterProvider("Redis", "Reminders", "Silo", typeof(RedisRemindersProviderBuilder))]
+[assembly: RegisterProvider("AzureRedisCache", "Reminders", "Silo", typeof(RedisRemindersProviderBuilder))]
 
 namespace Orleans.Hosting;
 

@@ -34,7 +34,8 @@ namespace Tester
 
             try
             {
-                await Task.WhenAll(host.StartAsync(), clientHost.StartAsync());
+                await host.StartAsync();
+                await clientHost.StartAsync();
                 var grain = client.GetGrain<IEchoGrain>(Guid.NewGuid());
                 var result = await grain.Echo("test");
                 Assert.Equal("test", result);

@@ -26,6 +26,7 @@ namespace Orleans.Runtime
         public static readonly GrainType StreamPullingAgentType = SystemTargetGrainId.CreateGrainType("stream.agent");
         public static readonly GrainType ManifestProviderType = SystemTargetGrainId.CreateGrainType("manifest");
         public static readonly GrainType ActivationMigratorType = SystemTargetGrainId.CreateGrainType("migrator");
+        public static readonly GrainType CancellationManagerType = SystemTargetGrainId.CreateGrainType("canceler");
         public static readonly GrainType ActivationRepartitionerType = SystemTargetGrainId.CreateGrainType("repartitioner");
         public static readonly GrainType ActivationRebalancerMonitorType = SystemTargetGrainId.CreateGrainType("rebalancer-monitor");
         public static readonly GrainType GrainDirectoryPartitionType = SystemTargetGrainId.CreateGrainType("dir.grain.part");
