@@ -86,6 +86,9 @@ namespace UnitTests.StorageTests
         public void ActivationIdConverter() => Roundtrip(new ActivationId(Guid.NewGuid()));
 
         [Fact]
+        public void AsyncStreamReferenceConverterTest() => Roundtrip(_testCluster.Silos.First().ServiceProvider.GetRequiredKeyedService<IStreamProvider>("test").GetStream<int>(StreamId.Create("Test_namespace", "Test_key")));
+
+        [Fact]
         public void SiloAddressJsonConverter() => Roundtrip(SiloAddress.New(IPEndPoint.Parse("127.0.0.1:499"), 42));
 
         [Fact]
@@ -146,49 +149,5 @@ namespace UnitTests.StorageTests
             originalValue.Should().Be(newValue);
         }
 
-        [Fact]
-        public async Task AsyncStreamReferenceConverterTest()
-        {
-            var streamProvider = _testCluster.Silos.First().ServiceProvider.GetRequiredKeyedService<IStreamProvider>("test");
-
-
-            var stream = streamProvider.GetStream<int>(StreamId.Create("Test_namespace", "Test_key"));
-
-            ConcurrentBag<int> values = new();
-            var handle = await stream.SubscribeAsync((x, t) =>
-            {
-                values.Add(x);
-                return Task.CompletedTask;
-            });
-
-            stream = _systemTextJson.Deserialize<IAsyncStream<int>>(_systemTextJson.Serialize(stream));
-
-            await stream.OnNextAsync(11);
-
-            stream = _newtonSoft.Deserialize<IAsyncStream<int>>(_systemTextJson.Serialize(stream));
-
-            await stream.OnNextAsync(22);
-
-            stream = _systemTextJson.Deserialize<IAsyncStream<int>>(_newtonSoft.Serialize(stream));
-
-            await stream.OnNextAsync(33);
-
-            stream = _newtonSoft.Deserialize<IAsyncStream<int>>(_newtonSoft.Serialize(stream));
-
-            await stream.OnNextAsync(44);
-        
-            values.Should().Contain(11);
-            values.Should().Contain(22);
-            values.Should().Contain(33);
-            values.Should().Contain(44);
-
-            await handle.UnsubscribeAsync();
-        }
-
-        class Observer : IAsyncObserver<int>
-        {
-            public Task OnErrorAsync(Exception ex) => throw new NotImplementedException();
-            public Task OnNextAsync(int item, StreamSequenceToken token = null) => throw new NotImplementedException();
-        }
     }
 }
