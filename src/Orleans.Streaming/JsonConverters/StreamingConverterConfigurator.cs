@@ -28,6 +28,7 @@ namespace Orleans.Streaming.JsonConverters
             options.JsonSerializerOptions.Converters.Add(new AsyncStreamConverter(runtimeClient));
             options.JsonSerializerOptions.Converters.Add(new StreamIdJsonConverter());
             options.JsonSerializerOptions.Converters.Add(new EventSequenceTokenJsonConverter());
+            options.JsonSerializerOptions.Converters.Add(new QualifiedStreamIdJsonConverter());
         }
     }
 }
