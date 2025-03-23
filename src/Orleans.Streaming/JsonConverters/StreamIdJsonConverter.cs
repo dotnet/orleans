@@ -24,6 +24,9 @@ namespace Orleans.Serialization
         // 2. To support reading the Newtonsoft format and the new format, but write using the preferred Key and Namespace format, which would allow a one-way migration, but prevent reverting to Newtonsoft.
         // 3. Add a Newtonsoft.JsonConverter for StreamId which supported the previous default Newtonsoft structure and also the preferred STJ Key and Namespace approach. This would make reverting Orleans a breaking change.
 
+        readonly string? _byteArrayType = typeof(byte[]).AssemblyQualifiedName;
+        readonly string? _streamIdType = typeof(StreamId).AssemblyQualifiedName;
+
         public override StreamId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType != JsonTokenType.StartObject)
@@ -83,9 +86,9 @@ namespace Orleans.Serialization
             writer.WriteStartObject();
             if (value != default)
             {
-                writer.WriteString("$type", "Orleans.Runtime.StreamId, Orleans.Streaming");
+                writer.WriteString("$type", _streamIdType);
                 writer.WriteStartObject("fk");
-                    writer.WriteString("$type","System.Byte[], System.Private.CoreLib");
+                    writer.WriteString("$type", _byteArrayType);
                     writer.WriteBase64String("$value", value.FullKey.Span);
                 writer.WriteEndObject();
                 writer.WriteNumber("ki", value.GetKeyIndex());
