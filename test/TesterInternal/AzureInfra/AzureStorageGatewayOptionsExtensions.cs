@@ -1,15 +1,15 @@
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
+using Orleans.Clustering.AzureStorage;
 using TestExtensions;
 
-namespace TesterInternal.AzureInfra
+namespace UnitTests.AzureInfra
 {
-    public static class AzureTableTransactionalStateOptionsExtensions
+    public static class AzureStorageGatewayOptionsExtensions
     {
-        public static void ConfigureTestDefaults(this OptionsBuilder<AzureTableTransactionalStateOptions> optionsBuilder)
+        public static void ConfigureTestDefaults(this OptionsBuilder<AzureStorageGatewayOptions> optionsBuilder)
             => optionsBuilder.Configure(options => options.ConfigureTestDefaults());
 
-        public static void ConfigureTestDefaults(this AzureTableTransactionalStateOptions options)
+        public static void ConfigureTestDefaults(this AzureStorageGatewayOptions options)
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {

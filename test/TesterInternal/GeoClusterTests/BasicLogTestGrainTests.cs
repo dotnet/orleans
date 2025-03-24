@@ -6,9 +6,7 @@ using Xunit;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
-using TestExtensions;
 using Tester;
-
 using Orleans.Configuration;
 using TesterInternal.AzureInfra;
 

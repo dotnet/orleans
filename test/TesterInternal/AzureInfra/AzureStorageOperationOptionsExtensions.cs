@@ -1,4 +1,3 @@
-using Orleans.Configuration;
 using TestExtensions;
 
 namespace TesterInternal.AzureInfra
