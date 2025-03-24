@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -6,18 +8,18 @@ using Orleans.Streams;
 
 namespace Orleans.Streaming.JsonConverters
 {
-    public sealed class EventSequenceTokenJsonConverter : JsonConverter<StreamSequenceToken>
+    internal sealed class EventSequenceTokenJsonConverter : JsonConverter<StreamSequenceToken>
     {
-        readonly Type eventSequenceTokenType = typeof(EventSequenceToken);
-        readonly Type eventSequenceTokenTypeV2 = typeof(EventSequenceTokenV2);
+        private readonly Type _eventSequenceTokenType = typeof(EventSequenceToken);
+        private readonly Type _eventSequenceTokenTypeV2 = typeof(EventSequenceTokenV2);
 
-        public override bool CanConvert(Type typeToConvert) => eventSequenceTokenType.Equals(typeToConvert)
-                                                               || eventSequenceTokenTypeV2.Equals(typeToConvert);
-        public override StreamSequenceToken Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override bool CanConvert(Type typeToConvert) => _eventSequenceTokenType.Equals(typeToConvert)
+                                                               || _eventSequenceTokenTypeV2.Equals(typeToConvert);
+        public override StreamSequenceToken? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType != JsonTokenType.StartObject)
             {
-                return default;
+                return null;
             }
 
             long? sequenceNumber = null;
@@ -47,8 +49,8 @@ namespace Orleans.Streaming.JsonConverters
 
             return sequenceNumber is null 
                 || eventIndex is null
-                ? default
-                : (StreamSequenceToken)Activator.CreateInstance(typeToConvert,[sequenceNumber.Value, eventIndex.Value]);
+                ? null
+                : (StreamSequenceToken?)Activator.CreateInstance(typeToConvert,[sequenceNumber.Value, eventIndex.Value]);
         }
 
         public override void Write(Utf8JsonWriter writer, StreamSequenceToken value, JsonSerializerOptions options) {
