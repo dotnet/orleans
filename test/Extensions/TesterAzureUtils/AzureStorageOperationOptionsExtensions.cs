@@ -1,4 +1,3 @@
-using Azure.Identity;
 using TestExtensions;
 
 namespace Tester.AzureUtils

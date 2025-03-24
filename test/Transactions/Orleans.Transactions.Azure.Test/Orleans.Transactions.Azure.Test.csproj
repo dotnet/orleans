@@ -19,7 +19,8 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)test\Transactions\Orleans.Transactions.Tests\Orleans.Transactions.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
-    <ProjectReference Include="..\..\..\src\Orleans.Transactions.TestKit.xUnit\Orleans.Transactions.TestKit.xUnit.csproj" />
+    <ProjectReference Include="$(SourceRoot)\src\Orleans.Transactions.TestKit.xUnit\Orleans.Transactions.TestKit.xUnit.csproj" />
+    <ProjectReference Include="$(SourceRoot)\test\Extensions\TesterAzureUtils\Tester.AzureUtils.csproj" />
   </ItemGroup>
 
   <ItemGroup>
