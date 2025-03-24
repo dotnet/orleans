@@ -1,18 +1,18 @@
-﻿using System;
+#nullable enable
+
+using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Orleans.GrainReferences;
 using Orleans.Runtime;
 
-#nullable enable
-
 namespace Orleans.Serialization
 {
-    public class GrainReferenceConverter(GrainReferenceActivator referenceActivator) : JsonConverter<IAddressable>
+    internal sealed class GrainReferenceConverter(GrainReferenceActivator referenceActivator) : JsonConverter<IAddressable>
     {
-        private static readonly Type AddressableType = typeof(IAddressable);
+        private readonly Type _addressableType = typeof(IAddressable);
 
-        public override bool CanConvert(Type typeToConvert) => AddressableType.IsAssignableFrom(typeToConvert);
+        public override bool CanConvert(Type typeToConvert) => _addressableType.IsAssignableFrom(typeToConvert);
 
         public override IAddressable? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {

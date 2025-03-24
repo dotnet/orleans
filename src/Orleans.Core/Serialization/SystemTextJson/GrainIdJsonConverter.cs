@@ -1,13 +1,13 @@
-﻿using System;
+#nullable enable
+
+using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Orleans.Runtime;
 
-#nullable enable
-
 namespace Orleans.Serialization
 {
-    public class GrainIdJsonConverter : JsonConverter<GrainId>
+    internal sealed class GrainIdJsonConverter : JsonConverter<GrainId>
     {
         public override GrainId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {

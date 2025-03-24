@@ -1,19 +1,15 @@
+#nullable enable
+
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Threading.Tasks;
 using Orleans.Runtime;
-
-#nullable enable
 
 namespace Orleans.Streaming.JsonConverters
 {
     internal sealed class QualifiedStreamIdJsonConverter : JsonConverter<QualifiedStreamId>
     {
-        readonly string? _qualifiedStreamIdType = typeof(QualifiedStreamId).AssemblyQualifiedName;
+        private readonly string? _qualifiedStreamIdType = typeof(QualifiedStreamId).AssemblyQualifiedName;
 
         public override QualifiedStreamId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {

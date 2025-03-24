@@ -1,13 +1,13 @@
-﻿using System;
+#nullable enable
+
+using System;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-#nullable enable
-
 namespace Orleans.Serialization
 {
-    public class IpAddressConverter : JsonConverter<IPAddress>
+    internal sealed class IpAddressConverter : JsonConverter<IPAddress>
     {
         public override void Write(Utf8JsonWriter writer, IPAddress value, JsonSerializerOptions options)
         {

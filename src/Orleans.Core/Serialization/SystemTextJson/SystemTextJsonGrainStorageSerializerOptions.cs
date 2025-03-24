@@ -1,13 +1,12 @@
+#nullable enable
+
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using Orleans.GrainReferences;
 
-#nullable enable
-
 namespace Orleans.Serialization
 {
-
     /// <summary>
     /// Configures <see cref="JsonSerializerOptions"/> for the System.Text.Json grain storage serialzier
     /// </summary>

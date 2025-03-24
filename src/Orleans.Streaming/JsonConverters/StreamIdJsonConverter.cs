@@ -1,13 +1,13 @@
+#nullable enable
+
 using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Orleans.Runtime;
 
-#nullable enable
-
 namespace Orleans.Serialization
 {
-    public sealed class StreamIdJsonConverter : JsonConverter<StreamId>
+    internal sealed class StreamIdJsonConverter : JsonConverter<StreamId>
     {
         // This is backward compatible with Newtonsoft.JsonSerializer
         // which didn't have a JsonConverter for StreamId.
@@ -24,8 +24,8 @@ namespace Orleans.Serialization
         // 2. To support reading the Newtonsoft format and the new format, but write using the preferred Key and Namespace format, which would allow a one-way migration, but prevent reverting to Newtonsoft.
         // 3. Add a Newtonsoft.JsonConverter for StreamId which supported the previous default Newtonsoft structure and also the preferred STJ Key and Namespace approach. This would make reverting Orleans a breaking change.
 
-        readonly string? _byteArrayType = typeof(byte[]).AssemblyQualifiedName;
-        readonly string? _streamIdType = typeof(StreamId).AssemblyQualifiedName;
+        private readonly string? _byteArrayType = typeof(byte[]).AssemblyQualifiedName;
+        private readonly string? _streamIdType = typeof(StreamId).AssemblyQualifiedName;
 
         public override StreamId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
