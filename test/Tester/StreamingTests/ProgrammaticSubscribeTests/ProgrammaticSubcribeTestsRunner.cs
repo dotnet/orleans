@@ -44,10 +44,31 @@ namespace Tester.StreamingTests
             await subscriptionManager.RemoveSubscription(streamId, subscriptions.First().SubscriptionId);
         }
 
+        void LogEnvVariablesExistence()
+        {
+            LogIfExists("AZURE_CLIENT_ID");
+            LogIfExists("AZURE_TENANT_ID");
+            LogIfExists("AZURE_CLIENT_SECRET");
+
+            void LogIfExists(string varName)
+            {
+                var value = Environment.GetEnvironmentVariable(varName);
+                if (value != null)
+                {
+                    this.fixture.Logger.LogInformation($"[DEBUG]: Environment variable {varName} exists.");
+                }
+                else
+                {
+                    this.fixture.Logger.LogWarning($"[DEBUG]: Environment variable {varName} does not exist.");
+                }
+            }
+        }
+
         [SkippableFact]
         public async Task StreamingTests_Consumer_Producer_Subscribe()
         {
-            this.fixture.Logger.Info("StreamingTests_Consumer_Producer_Subscribe");
+            LogEnvVariablesExistence();
+
             var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             //set up subscription for 10 consumer grains
