@@ -1,13 +1,13 @@
-﻿using System;
+#nullable enable
+
+using System;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-#nullable enable
-
 namespace Orleans.Serialization
 {
-    public class IpEndPointConverter : JsonConverter<IPEndPoint>
+    internal sealed class IpEndPointConverter : JsonConverter<IPEndPoint>
     {
         public override IPEndPoint? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {

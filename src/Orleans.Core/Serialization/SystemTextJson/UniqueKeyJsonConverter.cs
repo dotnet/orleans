@@ -1,13 +1,13 @@
-﻿using System;
+#nullable enable
+
+using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Orleans.Runtime;
 
-#nullable enable
-
 namespace Orleans.Serialization
 {
-    public class UniqueKeyJsonConverter : JsonConverter<UniqueKey>
+    internal sealed class UniqueKeyJsonConverter : JsonConverter<UniqueKey>
     {
         public override UniqueKey? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {

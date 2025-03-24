@@ -1,9 +1,9 @@
+#nullable enable
+
 using System;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization;
 using Orleans.Storage;
-
-#nullable enable
 
 namespace Orleans.Providers.StorageSerializer
 {
