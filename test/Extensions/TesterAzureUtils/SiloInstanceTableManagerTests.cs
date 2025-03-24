@@ -14,6 +14,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.Internal;
 using Orleans.Clustering.AzureStorage;
+using TesterInternal.AzureInfra;
 
 namespace Tester.AzureUtils
 {

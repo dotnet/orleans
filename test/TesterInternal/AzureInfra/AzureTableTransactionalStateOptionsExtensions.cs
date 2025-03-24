@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using TestExtensions;
 
-namespace Tester.AzureUtils
+namespace TesterInternal.AzureInfra
 {
     public static class AzureTableTransactionalStateOptionsExtensions
     {

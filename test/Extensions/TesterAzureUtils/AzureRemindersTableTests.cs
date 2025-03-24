@@ -12,6 +12,7 @@ using TestExtensions;
 using Xunit;
 using Orleans.Reminders.AzureStorage;
 using Tester.AzureUtils;
+using TesterInternal.AzureInfra;
 
 namespace UnitTests.RemindersTest
 {

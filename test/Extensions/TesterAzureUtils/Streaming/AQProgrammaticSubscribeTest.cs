@@ -9,6 +9,7 @@ using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
+using TesterInternal.AzureInfra;
 
 namespace Tester.AzureUtils.Streaming
 {

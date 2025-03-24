@@ -7,6 +7,7 @@ using Orleans.Clustering.AzureStorage;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime.MembershipService;
+using TesterInternal.AzureInfra;
 using TestExtensions;
 using UnitTests;
 using UnitTests.MembershipTests;

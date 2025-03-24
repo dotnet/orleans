@@ -4,6 +4,7 @@ using TestExtensions;
 using TestExtensions.Runners;
 using Orleans.Configuration;
 using Microsoft.Extensions.Options;
+using TesterInternal.AzureInfra;
 
 namespace Tester.AzureUtils.Lease
 {

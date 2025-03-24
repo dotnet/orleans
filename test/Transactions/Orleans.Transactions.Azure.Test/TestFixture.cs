@@ -8,6 +8,7 @@ using Orleans.Transactions.Tests;
 using Tester;
 using Tester.AzureUtils;
 using TestExtensions;
+using TesterInternal.AzureInfra;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {

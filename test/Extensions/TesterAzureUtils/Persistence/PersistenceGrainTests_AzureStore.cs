@@ -18,6 +18,7 @@ using Orleans.Internal;
 using TestExtensions;
 using TestExtensions.Runners;
 using UnitTests.GrainInterfaces;
+using TesterInternal.AzureInfra;
 using AzureStoragePolicyOptions = Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions;
 
 // ReSharper disable RedundantAssignment

@@ -10,6 +10,7 @@ using TestExtensions;
 using Tester;
 
 using Orleans.Configuration;
+using TesterInternal.AzureInfra;
 
 namespace Tests.GeoClusterTests
 {
@@ -38,11 +39,11 @@ namespace Tests.GeoClusterTests
                         .AddCustomStorageBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A")
                         .AddAzureTableGrainStorageAsDefault(builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
+                            options.ConfigureTestDefaults();
                         }))
                         .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
+                            options.ConfigureTestDefaults();
                         }))
                         .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("MemoryStore"); 

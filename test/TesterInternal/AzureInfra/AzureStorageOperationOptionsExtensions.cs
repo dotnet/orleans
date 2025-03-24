@@ -1,9 +1,24 @@
+using Orleans.Configuration;
 using TestExtensions;
 
-namespace Tester.AzureUtils
+namespace TesterInternal.AzureInfra
 {
     public static class AzureStorageOperationOptionsExtensions
     {
+        public static Orleans.Configuration.AzureTableStorageOptions ConfigureTestDefaults(this Orleans.Configuration.AzureTableStorageOptions options)
+        {
+            if (TestDefaultConfiguration.UseAadAuthentication)
+            {
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential);
+            }
+            else
+            {
+                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
+            }
+
+            return options;
+        }
+
         public static Orleans.Clustering.AzureStorage.AzureStorageOperationOptions ConfigureTestDefaults(this Orleans.Clustering.AzureStorage.AzureStorageOperationOptions options)
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
