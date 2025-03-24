@@ -16,7 +16,7 @@ namespace Tester.AzureUtils.Streaming
     [TestCategory("BVT"), TestCategory("Streaming"), TestCategory("AQStreaming")]
     public class AQProgrammaticSubscribeTest : ProgrammaticSubcribeTestsRunner, IClassFixture<AQProgrammaticSubscribeTest.Fixture>
     {
-        private const int queueCount = 4;
+        private const int queueCount = 8;
         public class Fixture : BaseAzureTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -39,8 +39,7 @@ namespace Tester.AzureUtils.Streaming
                             (options, dep) =>
                             {
                                 options.ConfigureTestDefaults();
-                                // options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
-                                options.QueueNames = AzureQueueUtilities.GenerateQueueNames("dmkorolevtestci", queueCount);
+                                options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                             }));
                     hostBuilder
                         .AddMemoryGrainStorageAsDefault()
@@ -48,19 +47,18 @@ namespace Tester.AzureUtils.Streaming
                 }
             }
 
-            public override Task DisposeAsync()
+            public override async Task DisposeAsync()
             {
-                return Task.CompletedTask;
-                // await base.DisposeAsync();
+                await base.DisposeAsync();
 
-                //// Only perform cleanup if this suite was not skipped.
-                //if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
-                //{
-                //    await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                //        AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), new AzureQueueOptions().ConfigureTestDefaults());
-                //    await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                //        AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount), new AzureQueueOptions().ConfigureTestDefaults());
-                //}
+                // Only perform cleanup if this suite was not skipped.
+                if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+                {
+                    await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                        AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), new AzureQueueOptions().ConfigureTestDefaults());
+                    await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                        AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount), new AzureQueueOptions().ConfigureTestDefaults());
+                }
             }
         }
 
