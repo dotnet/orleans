@@ -6,20 +6,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-
-#if NET7_0_OR_GREATER
-using Orleans.Persistence.Migration;
-
-#endif
-
-#if NET8_0_OR_GREATER
 using Orleans.Persistence.Cosmos;
-using Azure.Data.Tables;
 using Microsoft.Azure.Cosmos;
 using Newtonsoft.Json.Linq;
 using System.Globalization;
 using Tester.AzureUtils.Migration.Grains;
-#endif
+using Orleans.Persistence.Migration;
 
 namespace Tester.AzureUtils.Migration.Abstractions
 {
@@ -103,7 +95,6 @@ namespace Tester.AzureUtils.Migration.Abstractions
             }
         }
 
-#if NET7_0_OR_GREATER
         private IReminderMigrationTable? reminderTable;
         protected async Task<IReminderMigrationTable> GetAndInitReminderTableAsync()
         {
@@ -128,9 +119,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
                 return this.dataMigrator;
             }
         }
-#endif
 
-#if NET8_0_OR_GREATER
         private IDocumentIdProvider? cosmosDocumentIdProvider;
         protected IDocumentIdProvider DocumentIdProvider
         {
@@ -209,6 +198,5 @@ namespace Tester.AzureUtils.Migration.Abstractions
                 B = dataState["B"]!.Value<int>()
             };
         }
-#endif
     }
 }

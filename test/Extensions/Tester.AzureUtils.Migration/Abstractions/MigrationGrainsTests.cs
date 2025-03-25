@@ -4,10 +4,7 @@ using Orleans.Storage;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-
-#if NET7_0_OR_GREATER
 using Orleans.Persistence.Migration;
-#endif
 
 namespace Tester.AzureUtils.Migration.Abstractions
 {
@@ -100,7 +97,6 @@ namespace Tester.AzureUtils.Migration.Abstractions
             Assert.False(newGrainState2.RecordExists);
         }
 
-#if NET7_0_OR_GREATER
         [Fact]
         public async Task DataMigrator_SampleRun()
         {
@@ -123,7 +119,6 @@ namespace Tester.AzureUtils.Migration.Abstractions
                 return;
             }
         }
-#endif
 
         [Fact]
         public async Task GetAll_ReturnsAllListedReferences()

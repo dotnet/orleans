@@ -1,4 +1,3 @@
-#if NET8_0_OR_GREATER
 using Microsoft.Azure.Cosmos;
 using Orleans;
 using Orleans.Runtime;
@@ -129,4 +128,3 @@ namespace Tester.AzureUtils.Migration.Abstractions
         }
     }
 }
-#endif

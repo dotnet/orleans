@@ -1,4 +1,3 @@
-#if NET8_0_OR_GREATER
 using Orleans;
 using Orleans.Runtime;
 using Xunit;
@@ -136,4 +135,3 @@ namespace Tester.AzureUtils.Migration.Abstractions
         }
     }
 }
-#endif

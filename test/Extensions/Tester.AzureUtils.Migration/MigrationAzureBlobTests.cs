@@ -1,4 +1,3 @@
-#if NET7_0_OR_GREATER
 using Orleans.Hosting;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
@@ -52,4 +51,3 @@ namespace Tester.AzureUtils.Migration
         }
     }
 }
-#endif

@@ -1,4 +1,3 @@
-#if NET8_0_OR_GREATER
 using System.Globalization;
 using Azure.Identity;
 using Microsoft.Azure.Cosmos;
@@ -54,4 +53,3 @@ namespace Tester.AzureUtils.Migration.Helpers
         }
     }
 }
-#endif

@@ -1,13 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>$(TestTargetFrameworks);net7.0;net8.0</TargetFrameworks>
+    <TargetFrameworks>net6.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="  '$(TargetFramework)' == 'net7.0' ">
-    <DefineConstants>NET70</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,12 +15,7 @@
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="$(SystemConfigurationConfigurationManagerVersion)" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net7.0'">
-    <ProjectReference Include="..\..\..\src\Orleans.Persistence.Migration\Orleans.Persistence.Migration.csproj" />
-    <ProjectReference Include="..\..\..\src\Azure\Orleans.Persistence.AzureStorage.Migration\Orleans.Persistence.AzureStorage.Migration.csproj" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+  <ItemGroup>
     <ProjectReference Include="..\..\Grains\TestGrainsNet8\TestGrainsNet8.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Persistence.Migration\Orleans.Persistence.Migration.csproj" />
     <ProjectReference Include="..\..\..\src\Azure\Orleans.Persistence.Cosmos.Migration\Orleans.Persistence.Cosmos.Migration.csproj" />

@@ -1,5 +1,3 @@
-#if NET8_0_OR_GREATER
-
 using Microsoft.Azure.Cosmos.Linq;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -292,5 +290,3 @@ namespace Tester.AzureUtils.Migration.Units
         public Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState) => Task.CompletedTask;
     }
 }
-
-#endif

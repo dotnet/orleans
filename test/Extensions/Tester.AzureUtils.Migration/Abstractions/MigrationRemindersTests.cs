@@ -1,4 +1,3 @@
-#if NET7_0_OR_GREATER
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
@@ -143,5 +142,3 @@ namespace Tester.AzureUtils.Migration.Abstractions
         private TableClient GetTable(string tableName) => new Azure.Data.Tables.TableClient(TestDefaultConfiguration.DataConnectionString, tableName);
     }
 }
-
-#endif

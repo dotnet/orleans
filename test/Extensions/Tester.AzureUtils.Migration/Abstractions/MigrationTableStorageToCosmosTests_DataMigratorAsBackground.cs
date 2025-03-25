@@ -1,4 +1,3 @@
-#if NET8_0_OR_GREATER
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -61,7 +60,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             // it started, but we cant await it for sure. Lets add some artificial delay here
             // during this await DataMigrator should be started, and should already complete processing the grains
             // (only 1 inserted to source storage before)
-            await Task.Delay(TimeSpan.FromSeconds(10));
+            await Task.Delay(TimeSpan.FromSeconds(15));
 
             var cosmosGrainState = await GetGrainStateFromCosmosAsync(
                 _cosmosClient,
@@ -90,4 +89,3 @@ namespace Tester.AzureUtils.Migration.Abstractions
         }
     }
 }
-#endif
