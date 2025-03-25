@@ -1,6 +1,4 @@
-using System.Collections.Concurrent;
 using System.Net;
-using System.Runtime.InteropServices;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers.StorageSerializer;
@@ -30,8 +28,8 @@ namespace UnitTests.StorageTests
 
     public sealed class SystemTextJsonStorageSerializerTests
     {
-        readonly SystemTextJsonGrainStorageSerializer _systemTextJson;
-        readonly JsonGrainStorageSerializer _newtonSoft;
+        private readonly SystemTextJsonGrainStorageSerializer _systemTextJson;
+        private readonly JsonGrainStorageSerializer _newtonSoft;
         private readonly InProcessTestCluster _testCluster;
 
         public SystemTextJsonStorageSerializerTests()
@@ -54,19 +52,17 @@ namespace UnitTests.StorageTests
             _newtonSoft = ActivatorUtilities.CreateInstance<JsonGrainStorageSerializer>(_testCluster.Silos.First().ServiceProvider);
         }
 
-        private void Roundtrip<X>(X instance)
+        private void Roundtrip<T>(T instance)
         {
-            var ns = _newtonSoft.Serialize(instance);
-
-            _systemTextJson.Deserialize<X>(_systemTextJson.Serialize(instance)).Should().BeEquivalentTo(instance);
-            _newtonSoft.Deserialize<X>(ns).Should().BeEquivalentTo(instance);
+            _systemTextJson.Deserialize<T>(_systemTextJson.Serialize(instance)).Should().BeEquivalentTo(instance);
+            _newtonSoft.Deserialize<T>(_newtonSoft.Serialize(instance)).Should().BeEquivalentTo(instance);
             
-            _systemTextJson.Deserialize<X>(_newtonSoft.Serialize(instance)).Should().BeEquivalentTo(instance);
-            _newtonSoft.Deserialize<X>(_systemTextJson.Serialize(instance)).Should().BeEquivalentTo(instance);
+            _systemTextJson.Deserialize<T>(_newtonSoft.Serialize(instance)).Should().BeEquivalentTo(instance);
+            _newtonSoft.Deserialize<T>(_systemTextJson.Serialize(instance)).Should().BeEquivalentTo(instance);
 
-            _systemTextJson.Deserialize<X>(_systemTextJson.Serialize(default(X))).Should().BeEquivalentTo(default(X));
+            _systemTextJson.Deserialize<T>(_systemTextJson.Serialize(default(T))).Should().BeEquivalentTo(default(T));
 
-            // Looks like the Newtonsoft converts do not handle default or null values
+            // Looks like the Newtonsoft converts do not handle default or null values, so the below will often fail
 
             // newtonSoft.Deserialize<X>(newtonSoft.Serialize(default(X))).Should().BeEquivalentTo(default(X));
             // systemTextJson.Deserialize<X>(newtonSoft.Serialize(default(X))).Should().BeEquivalentTo(default(X));
@@ -148,6 +144,5 @@ namespace UnitTests.StorageTests
 
             originalValue.Should().Be(newValue);
         }
-
     }
 }
