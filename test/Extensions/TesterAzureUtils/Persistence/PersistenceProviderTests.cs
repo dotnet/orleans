@@ -20,6 +20,7 @@ using UnitTests.Persistence;
 using UnitTests.StorageTests;
 using Xunit;
 using Xunit.Abstractions;
+using TesterInternal.AzureInfra;
 
 namespace Tester.AzureUtils.Persistence
 {

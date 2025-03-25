@@ -1,0 +1,96 @@
+<!-- Licensed to the .NET Foundation under one or more agreements. The .NET Foundation licenses this file to you under the MIT license. -->
+<Project>
+
+  <PropertyGroup>
+    <!-- By default, search for sign aritfacts under the list of known directories. -->
+    <EnableDefaultArtifacts>true</EnableDefaultArtifacts>
+  </PropertyGroup>
+
+  <Import Project="..\Directory.Build.props" />
+
+  <!-- Repo extension point to sign and/or publish. Artifacts are shipping and blobs by default. -->
+  <ItemDefinitionGroup>
+    <Artifact>
+      <PublishFlatContainer>true</PublishFlatContainer>
+      <IsShipping>true</IsShipping>
+    </Artifact>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <!--
+      This is intended to hold information about the certificates used for signing.
+      For now the only information required is whether or not the certificate can be
+      used for signing already signed files - DualSigningAllowed==true.
+    -->
+    <CertificatesSignInfo Include="3PartyDual" DualSigningAllowed="true" />
+    <CertificatesSignInfo Include="3PartySHA2" DualSigningAllowed="true" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableDefaultArtifacts)' == 'true'">
+    <ItemsToSign Include="$(PackageOutputPath)\*.nupkg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Default certificate/strong-name to be used for all files with PKT=="31bf3856ad364e35". -->
+    <StrongNameSignInfo Include="MsSharedLib72" PublicKeyToken="31bf3856ad364e35" CertificateName="Microsoft400" />
+    <StrongNameSignInfo Include="SilverlightCert121" PublicKeyToken="7cec85d7bea7798e" CertificateName="Microsoft400" />
+    <StrongNameSignInfo Include="StrongName" PublicKeyToken="b77a5c561934e089" CertificateName="Microsoft400" />
+    <StrongNameSignInfo Include="StrongName" PublicKeyToken="b03f5f7f11d50a3a" CertificateName="Microsoft400" />
+    <StrongNameSignInfo Include="$(MSBuildThisFileDirectory)snk\Open.snk" PublicKeyToken="cc7b13ffcd2ddd51" CertificateName="Microsoft400" />
+
+    <!--
+      Map of file extensions to default certificate name. Files with these extensions are
+      signed with the specified certificate. Particularly useful for files that don't have
+      a public key token.
+      The certificate can be overriden using the StrongNameSignInfo or the FileSignInfo item group.
+    -->
+    <FileExtensionSignInfo Include=".jar" CertificateName="MicrosoftJARSHA2" />
+    <FileExtensionSignInfo Include=".js;.ps1;.psd1;.psm1;.psc1;.py" CertificateName="Microsoft400" />
+    <FileExtensionSignInfo Include=".dll;.exe;.mibc" CertificateName="Microsoft400" />
+    <FileExtensionSignInfo Include=".nupkg" CertificateName="NuGet" />
+    <FileExtensionSignInfo Include=".vsix" CertificateName="VsixSHA2" />
+    <FileExtensionSignInfo Include=".zip" CertificateName="None" />
+    <FileExtensionSignInfo Include=".tgz" CertificateName="None" />
+  </ItemGroup>
+
+  <!-- The name of the .NET specific certificate, which is a general replacement for Microsoft400
+       If UseDotNetCert is specific in a repo's eng/Signing.props, all usage of Microsoft400 is replaced
+       with MicrosoftDotNet500 -->
+  <PropertyGroup>
+    <DotNetCertificateName>MicrosoftDotNet500</DotNetCertificateName>
+    <UseDotNetCertificate>false</UseDotNetCertificate>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- Flags for controlling whether empty signing lists are detected for in build and post-build signing.
+         These flags are split (rather than just a single check based on PostBuildSign == true/false because
+         some repos may do both in-build and post-build signing. -->
+    <!-- Control whether an empty ItemsToSign item group is allowed when calling SignToolTask. -->
+    <AllowEmptySignList Condition="'$(PostBuildSign)' != 'true'">false</AllowEmptySignList>
+    <AllowEmptySignList Condition="'$(PostBuildSign)' == 'true'">true</AllowEmptySignList>
+    <!-- Control whether an empty ItemsToSignPostBuild item group is allowed during publishing -->
+    <AllowEmptySignPostBuildList Condition="'$(PostBuildSign)' != 'true'">true</AllowEmptySignPostBuildList>
+    <AllowEmptySignPostBuildList Condition="'$(PostBuildSign)' == 'true'">false</AllowEmptySignPostBuildList>
+
+    <NETCORE_ENGINEERING_TELEMETRY>Signing</NETCORE_ENGINEERING_TELEMETRY>
+  </PropertyGroup>
+
+  <!-- Sign tool parallelism limits. These may be overridden by a repo. -->
+  <PropertyGroup>
+    <!-- Number of containers to repack in parallel -->
+    <SignToolRepackParallelism>16</SignToolRepackParallelism>
+    <!-- Maximum size in MB that a file may be before it is repacked serially -->
+    <SignToolRepackMaximumParallelFileSize>128</SignToolRepackMaximumParallelFileSize>
+  </PropertyGroup>
+
+  <!-- Allow repository to customize signing configuration -->
+  <Import Project="$(RepositoryEngineeringDir)Signing.props" Condition="Exists('$(RepositoryEngineeringDir)Signing.props')" />
+
+  <!-- Respect Artifact item repo extension point -->
+  <ItemGroup Condition="'@(Artifact)' != ''">
+    <!-- If PostBuildSign == true, these are added to ItemsToSignPostBuild, otherwise these are added to ItemsToSign -->
+    <ItemsToSign Include="@(Artifact)" Condition="'$(PostBuildSign)' != 'true'" />
+    <ItemsToSignPostBuild Include="@(Artifact->'%(Filename)%(Extension)')" Condition="'$(PostBuildSign)' == 'true'" />
+  </ItemGroup>
+
+</Project>

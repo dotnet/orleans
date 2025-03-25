@@ -25,6 +25,7 @@ using UnitTests.StreamingTests;
 using Xunit;
 using Xunit.Abstractions;
 using Tester.AzureUtils;
+using TesterInternal.AzureInfra;
 
 // ReSharper disable ConvertToConstant.Local
 // ReSharper disable CheckNamespace

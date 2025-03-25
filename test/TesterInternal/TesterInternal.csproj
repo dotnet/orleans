@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>UnitTests</RootNamespace>
     <AssemblyName>TesterInternal</AssemblyName>
@@ -16,6 +16,8 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Reminders.AzureStorage\Orleans.Reminders.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition="$(TargetFramework.StartsWith('net4'))">

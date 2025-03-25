@@ -10,6 +10,7 @@ using System.Linq;
 using UnitTests.TimerTests;
 using Orleans.Hosting;
 using Orleans.Internal;
+using TesterInternal.AzureInfra;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable

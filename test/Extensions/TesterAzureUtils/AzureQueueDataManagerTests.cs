@@ -10,6 +10,7 @@ using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
+using TesterInternal.AzureInfra;
 
 namespace Tester.AzureUtils
 {

@@ -45,7 +45,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         {
             logger.Info("StartPeriodicProducing");
             var period = (firePeriod == null)? defaultFirePeriod : firePeriod;
-            producerTimer = base.RegisterTimer(TimerCallback, null, TimeSpan.Zero, period.Value);
+            producerTimer = base.RegisterTimer(TimerCallback, null, dueTime: TimeSpan.Zero, period: period.Value);
             return Task.CompletedTask;
         }
 

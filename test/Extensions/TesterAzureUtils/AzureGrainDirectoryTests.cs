@@ -9,6 +9,7 @@ using Orleans.GrainDirectory;
 using Orleans.GrainDirectory.AzureStorage;
 using Orleans.TestingHost.Utils;
 using Tester.Directories;
+using TesterInternal.AzureInfra;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;

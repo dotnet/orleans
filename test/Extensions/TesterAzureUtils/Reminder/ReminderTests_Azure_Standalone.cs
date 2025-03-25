@@ -15,6 +15,7 @@ using Orleans.Configuration;
 using Orleans.TestingHost.Utils;
 using Orleans.Internal;
 using Orleans.Reminders.AzureStorage;
+using TesterInternal.AzureInfra;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
