@@ -10,6 +10,7 @@ using Tester.AzureUtils.Migration.Helpers;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Persistence.Cosmos.DocumentIdProviders;
 using Orleans.Persistence.Cosmos;
+using TesterInternal.AzureInfra;
 
 namespace Tester.AzureUtils.Migration
 {

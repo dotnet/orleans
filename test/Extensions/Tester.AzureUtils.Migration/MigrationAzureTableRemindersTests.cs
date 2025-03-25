@@ -2,6 +2,7 @@ using Orleans.Hosting;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
 using Tester.AzureUtils.Migration.Abstractions;
+using TesterInternal.AzureInfra;
 using Xunit;
 
 namespace Tester.AzureUtils.Migration

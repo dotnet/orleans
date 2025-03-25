@@ -78,7 +78,7 @@
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>17.3.0</MicrosoftBuildVersion>
-    <MicrosoftCodeAnalysisVersion>4.0.1</MicrosoftCodeAnalysisVersion>
+    <MicrosoftCodeAnalysisVersion>4.5.0</MicrosoftCodeAnalysisVersion>
     <MicrosoftWin32RegistryVersion>5.0.0</MicrosoftWin32RegistryVersion>
     <MicrosoftBclAsyncInterfacesVersion>6.0.0</MicrosoftBclAsyncInterfacesVersion>
     <MicrosoftNETFrameworkReferenceAssembliesVersion>1.0.2</MicrosoftNETFrameworkReferenceAssembliesVersion>

@@ -8,6 +8,7 @@ using Orleans.TestingHost;
 using Tester.AzureUtils.Migration.Abstractions;
 using Tester.AzureUtils.Migration.Helpers;
 using Xunit;
+using TesterInternal.AzureInfra;
 
 namespace Tester.AzureUtils.Migration
 {
