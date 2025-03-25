@@ -1,4 +1,3 @@
-using Microsoft.Azure.Cosmos.Linq;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Orleans;
