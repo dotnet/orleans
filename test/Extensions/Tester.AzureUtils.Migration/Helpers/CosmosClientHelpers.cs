@@ -12,20 +12,14 @@ namespace Tester.AzureUtils.Migration.Helpers
 
         public static void ConfigureCosmosStorageOptions(this CosmosGrainStorageOptions options, CosmosConnection cosmosConnection)
         {
-            if (!string.IsNullOrEmpty(cosmosConnection.ConnectionString))
+            if (TestDefaultConfiguration.UseAadAuthentication)
+            {
+                options.ConfigureCosmosClient(cosmosConnection.AccountEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential);
+            }
+            else
             {
                 options.ConfigureCosmosClient(connectionString: cosmosConnection.ConnectionString);
-                return;
             }
-
-            if (!string.IsNullOrEmpty(cosmosConnection.AccountEndpoint))
-            {
-                var azureCredentials = new DefaultAzureCredential();
-                options.ConfigureCosmosClient(cosmosConnection.AccountEndpoint, tokenCredential: azureCredentials);
-                return;
-            }
-
-            throw new InvalidOperationException("No valid Cosmos connection established.");
         }
 
         public static CosmosClient BuildClient()
@@ -33,18 +27,9 @@ namespace Tester.AzureUtils.Migration.Helpers
 
         public static CosmosClient BuildClient(CosmosConnection cosmosConnection)
         {
-            if (!string.IsNullOrEmpty(cosmosConnection.ConnectionString))
-            {
-                return new CosmosClient(cosmosConnection.ConnectionString);
-            }
-
-            if (!string.IsNullOrEmpty(cosmosConnection.AccountEndpoint))
-            {
-                var azureCredentials = new DefaultAzureCredential();
-                return new CosmosClient(cosmosConnection.AccountEndpoint, tokenCredential: azureCredentials);
-            }
-
-            throw new InvalidOperationException("No valid Cosmos connection established.");
+            return TestDefaultConfiguration.UseAadAuthentication
+                ? new CosmosClient(cosmosConnection.AccountEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential)
+                : new CosmosClient(cosmosConnection.ConnectionString);
         }
     }
 }
