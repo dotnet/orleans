@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.TestingHost;
+using TesterInternal.AzureInfra;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;

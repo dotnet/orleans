@@ -9,6 +9,7 @@ using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
+using TesterInternal.AzureInfra;
 
 namespace Tester.AzureUtils.Streaming
 {
@@ -39,7 +40,7 @@ namespace Tester.AzureUtils.Streaming
                             {
                                 options.ConfigureTestDefaults();
                                 options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
-                        }));
+                            }));
                     hostBuilder
                         .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("PubSubStore");

@@ -14,6 +14,7 @@ using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using TesterInternal.AzureInfra;
 using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;

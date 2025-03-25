@@ -6,6 +6,7 @@ using Orleans.Clustering.AzureStorage;
 using Microsoft.Extensions.Logging.Abstractions;
 using Azure.Data.Tables;
 using Azure;
+using TesterInternal.AzureInfra;
 
 namespace Tester.AzureUtils
 {

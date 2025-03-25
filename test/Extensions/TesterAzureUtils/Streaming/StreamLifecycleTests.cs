@@ -20,6 +20,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.Internal;
 using Tester.AzureUtils;
+using TesterInternal.AzureInfra;
 
 namespace UnitTests.StreamingTests
 {

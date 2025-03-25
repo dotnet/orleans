@@ -14,6 +14,7 @@ using Orleans.TestingHost;
 using Tester;
 using Tester.AzureUtils;
 using Tester.AzureUtils.Streaming;
+using TesterInternal.AzureInfra;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;

@@ -8,6 +8,7 @@ using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
+using TesterInternal.AzureInfra;
 
 namespace Tester.AzureUtils
 {

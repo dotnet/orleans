@@ -13,6 +13,7 @@ using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
+using TesterInternal.AzureInfra;
 
 namespace Tester.AzureUtils.Streaming
 {

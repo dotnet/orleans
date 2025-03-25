@@ -51,7 +51,7 @@
   <PropertyGroup>
     <!-- System packages -->
     <SystemRuntimeVersion>4.3.1</SystemRuntimeVersion>
-    <SystemDataSqlClientVersion>4.8.3</SystemDataSqlClientVersion>
+    <SystemDataSqlClientVersion>4.8.6</SystemDataSqlClientVersion>
     <SystemDataCommonVersion>4.3.0</SystemDataCommonVersion>
     <SystemDiagnosticsEventLogVersion>6.0.0</SystemDiagnosticsEventLogVersion>
     <SystemConfigurationConfigurationManagerVersion>6.0.0</SystemConfigurationConfigurationManagerVersion>
@@ -68,7 +68,7 @@
     <SystemThreadingTasksExtensionsVersion>4.5.4</SystemThreadingTasksExtensionsVersion>
     <SystemThreadingChannelsVersion>6.0.0</SystemThreadingChannelsVersion>
     <SystemBuffersVersion>4.5.1</SystemBuffersVersion>
-    <SystemMemoryVersion>4.5.4</SystemMemoryVersion>
+    <SystemMemoryVersion>4.5.5</SystemMemoryVersion>
     <SystemIOPipelinesVersion>6.0.0</SystemIOPipelinesVersion>
     <SystemCodeDomVersion>6.0.0</SystemCodeDomVersion>
     <SystemSecurityPermissionsVersion>6.0.0</SystemSecurityPermissionsVersion>
@@ -77,7 +77,7 @@
     <SystemSecurityCryptographyCngVersion>5.0.0</SystemSecurityCryptographyCngVersion>
 
     <!-- Microsoft packages -->
-    <MicrosoftBuildVersion>17.0.0</MicrosoftBuildVersion>
+    <MicrosoftBuildVersion>17.3.0</MicrosoftBuildVersion>
     <MicrosoftCodeAnalysisVersion>4.0.1</MicrosoftCodeAnalysisVersion>
     <MicrosoftWin32RegistryVersion>5.0.0</MicrosoftWin32RegistryVersion>
     <MicrosoftBclAsyncInterfacesVersion>6.0.0</MicrosoftBclAsyncInterfacesVersion>
@@ -100,16 +100,16 @@
     <MicrosoftExtensionsHostingVersion>6.0.0</MicrosoftExtensionsHostingVersion>
 
     <MicrosoftApplicationInsightsVersion>2.19.0</MicrosoftApplicationInsightsVersion>
-    <AzureDataTablesVersion>12.3.0</AzureDataTablesVersion>
-    <AzureCoreVersion>1.21.0</AzureCoreVersion>
+    <AzureDataTablesVersion>12.10.0</AzureDataTablesVersion>
+    <AzureCoreVersion>1.44.1</AzureCoreVersion>
     <AzureCosmosDbVersion>3.41.0</AzureCosmosDbVersion>
     <AzureCosmosDbEncryptionVersion>2.1.0-preview4</AzureCosmosDbEncryptionVersion>
-    <AzureIdentityVersion>1.5.0</AzureIdentityVersion>
+    <AzureIdentityVersion>1.13.2</AzureIdentityVersion>
     <AzureMessagingEventHubs>5.6.2</AzureMessagingEventHubs>
-    <AzureStorageBlobsVersion>12.10.0</AzureStorageBlobsVersion>
-    <AzureStorageQueuesVersion>12.8.0</AzureStorageQueuesVersion>
+    <AzureStorageBlobsVersion>12.13.0</AzureStorageBlobsVersion>
+    <AzureStorageQueuesVersion>12.11.0</AzureStorageQueuesVersion>
     <MicrosoftDataSQLiteVersion>6.0.0</MicrosoftDataSQLiteVersion>
-    <MicrosoftDataSqlClientVersion>4.0.0</MicrosoftDataSqlClientVersion>
+    <MicrosoftDataSqlClientVersion>4.0.5</MicrosoftDataSqlClientVersion>
     <MicrosoftServiceFabricServicesVersion>5.2.1235</MicrosoftServiceFabricServicesVersion>
 
     <FSharpCoreVersion>6.0.1</FSharpCoreVersion>
@@ -117,7 +117,7 @@
     <!-- 3rd party packages -->
     <AWSSDKDynamoDBv2Version>3.7.0.97</AWSSDKDynamoDBv2Version>
     <AWSSDKSQSVersion>3.7.1.39</AWSSDKSQSVersion>
-    <BondCoreCSharpVersion>9.0.5</BondCoreCSharpVersion>
+    <BondCoreCSharpVersion>13.0.2</BondCoreCSharpVersion>
     <ConsulVersion>1.6.10.4</ConsulVersion>
     <GoogleCloudPubSubV1Version>1.0.0-beta13</GoogleCloudPubSubV1Version>
     <GoogleProtobufVersion>3.19.1</GoogleProtobufVersion>
@@ -127,7 +127,7 @@
     <MoqVersion>4.16.1</MoqVersion>
     <NewRelicAgentApiVersion>8.0.0.0</NewRelicAgentApiVersion>
     <NewtonsoftJsonVersion>13.0.1</NewtonsoftJsonVersion>
-    <NpgsqlVersion>6.0.0</NpgsqlVersion>
+    <NpgsqlVersion>6.0.13</NpgsqlVersion>
     <NSubstituteVersion>4.2.2</NSubstituteVersion>
     <NSubstituteAnalyzersCSharpVersion>1.0.14</NSubstituteAnalyzersCSharpVersion>
     <ZooKeeperNetExVersion>3.4.12.4</ZooKeeperNetExVersion>
@@ -147,7 +147,7 @@
     <AutofacExtensionsDependencyInjectionVersion>7.2.0</AutofacExtensionsDependencyInjectionVersion>
     <StructureMapMicrosoftDependencyInjectionVersion>2.0.0</StructureMapMicrosoftDependencyInjectionVersion>
     <CrankVersion>0.2.0-alpha.21457.1</CrankVersion>
-    <AzureKeyVaultVersion>4.2.0</AzureKeyVaultVersion>
+    <AzureKeyVaultVersion>4.7.0</AzureKeyVaultVersion>
     <SystemCommandLineVersion>2.0.0-beta1.21308.1</SystemCommandLineVersion>
 
     <!-- Tooling related packages -->

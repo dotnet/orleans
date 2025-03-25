@@ -1,11 +1,13 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Orleans.Clustering.AzureStorage;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using Orleans.Transactions.TestKit;
 using Orleans.Transactions.TestKit.xUnit;
 using Tester;
 using TestExtensions;
+using UnitTests.AzureInfra;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -63,8 +65,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
-                hostBuilder.UseAzureStorageClustering(options =>
-                    options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString));
+                hostBuilder.UseAzureStorageClustering((AzureStorageClusteringOptions options) => options.ConfigureTestDefaults());
             }
         }
 
@@ -72,8 +73,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.UseAzureStorageClustering(options =>
-                    options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString));
+                clientBuilder.UseAzureStorageClustering((AzureStorageGatewayOptions options) => options.ConfigureTestDefaults());
             }
         }
     }

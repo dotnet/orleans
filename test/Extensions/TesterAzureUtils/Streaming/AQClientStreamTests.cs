@@ -12,6 +12,7 @@ using Orleans.Runtime;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
 using Tester.TestStreamProviders;
+using TesterInternal.AzureInfra;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;

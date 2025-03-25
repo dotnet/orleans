@@ -14,6 +14,7 @@ using Orleans.TestingHost.Utils;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using TesterInternal.AzureInfra;
 using TestExtensions;
 using Xunit;
 

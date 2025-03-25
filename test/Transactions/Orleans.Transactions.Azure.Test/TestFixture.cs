@@ -1,11 +1,14 @@
-using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.Transactions.TestKit;
 using Orleans.Transactions.Tests;
-using TestExtensions;
 using Tester;
+using Tester.AzureUtils;
+using TestExtensions;
+using TesterInternal.AzureInfra;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
@@ -29,9 +32,9 @@ namespace Orleans.Transactions.AzureStorage.Tests
                 hostBuilder
                     .ConfigureServices(services => services.AddSingletonNamedService<IRemoteCommitService, RemoteCommitService>(TransactionTestConstants.RemoteCommitService))
                     .ConfigureTracingForTransactionTests()
-                    .AddAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
+                    .AddAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, (AzureTableTransactionalStateOptions options) =>
                     {
-                        options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
+                        options.ConfigureTestDefaults();
                     })
                     .UseTransactions();
             }
@@ -59,7 +62,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
                     .ConfigureTracingForTransactionTests()
                     .AddFaultInjectionAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
                     {
-                        options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
+                        options.ConfigureTestDefaults();
                     })
                     .UseControlledFaultInjectionTransactionState()
                     .UseTransactions()
@@ -99,7 +102,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
                     .ConfigureTracingForTransactionTests()
                     .AddFaultInjectionAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
                     {
-                        options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
+                        options.ConfigureTestDefaults();
                     })
                     .UseTransactions()
                     .ConfigureServices(services => services.AddSingleton<ITransactionFaultInjector>(sp => new RandomErrorInjector(probability)));

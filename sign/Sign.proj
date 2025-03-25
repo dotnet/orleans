@@ -1,0 +1,64 @@
+<!-- Licensed to the .NET Foundation under one or more agreements. The .NET Foundation licenses this file to you under the MIT license. -->
+<Project DefaultTargets="Sign">
+
+  <PropertyGroup>
+    <!-- Respect environment variable for the NuGet Packages Root if set; otherwise, use the current default location -->
+    <NuGetPackageRoot Condition="'$(NuGetPackageRoot)' != ''">$([MSBuild]::NormalizeDirectory('$(NuGetPackageRoot)'))</NuGetPackageRoot>
+    <NuGetPackageRoot Condition="'$(NuGetPackageRoot)' == '' and '$(NUGET_PACKAGES)' != ''">$([MSBuild]::NormalizeDirectory('$(NUGET_PACKAGES)'))</NuGetPackageRoot>
+    <NuGetPackageRoot Condition="'$(NuGetPackageRoot)' == '' and '$(OS)' == 'Windows_NT'">$([MSBuild]::NormalizeDirectory('$(UserProfile)', '.nuget', 'packages'))</NuGetPackageRoot>
+    <NuGetPackageRoot Condition="'$(NuGetPackageRoot)' == '' and '$(OS)' != 'Windows_NT'">$([MSBuild]::NormalizeDirectory('$(HOME)', '.nuget', 'packages'))</NuGetPackageRoot>
+    <ArtifactsTmpDir>$(MSBuildProjectDirectory)\..\bin\tmp\</ArtifactsTmpDir>
+    <ArtifactsLogDir>$(MSBuildProjectDirectory)\..\bin\logs\</ArtifactsLogDir>
+  </PropertyGroup>
+
+  <Import Project="$(NuGetPackageRoot)microsoft.dotnet.signtool\6.0.0-beta.20630.2\build\Microsoft.DotNet.SignTool.props" />
+
+  <Import Project="Sign.props" />
+
+  <Target Name="Sign">
+    <Error Text="The value of DotNetSignType is invalid: '$(DotNetSignType)'"
+           Condition="'$(DotNetSignType)' != 'real' and '$(DotNetSignType)' != 'test' and '$(DotNetSignType)' != ''" />
+
+    <PropertyGroup>
+      <_DryRun>false</_DryRun>
+      <_TestSign>false</_TestSign>
+      <_DesktopMSBuildRequired>false</_DesktopMSBuildRequired>
+      <_DesktopMSBuildRequired>true</_DesktopMSBuildRequired>
+      <DoStrongNameCheck>false</DoStrongNameCheck>
+    </PropertyGroup>
+
+    <Error Condition="'$(AllowEmptySignList)' != 'true' AND '@(ItemsToSign)' == ''" 
+           Text="List of files to sign is empty. Make sure that ItemsToSign is configured correctly." />
+
+    <!-- We only need this if we are going to use the executable version. -->
+    <Exec Command='"$(NuGetPackageRoot)vswhere\2.6.7\tools\vswhere.exe" -latest -prerelease -property installationPath -requires Microsoft.Component.MSBuild'
+          ConsoleToMsBuild="true"
+          StandardErrorImportance="high"
+          Condition="$(_DesktopMSBuildRequired)">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_VSInstallDir" />
+    </Exec>
+
+    <Message Text="Signing files" Importance="High"/>
+
+    <PropertyGroup Condition="$(_DesktopMSBuildRequired)">
+      <_DesktopMSBuildPath>$(_VSInstallDir)\MSBuild\Current\Bin\msbuild.exe</_DesktopMSBuildPath>
+      <_DesktopMSBuildPath Condition="!Exists('$(_DesktopMSBuildPath)')">$(_VSInstallDir)\MSBuild\15.0\Bin\msbuild.exe</_DesktopMSBuildPath>
+    </PropertyGroup>
+
+    <Microsoft.DotNet.SignTool.SignToolTask
+        DryRun="$(_DryRun)"
+        TestSign="$(_TestSign)"
+        DoStrongNameCheck="$(DoStrongNameCheck)"
+        AllowEmptySignList="$(AllowEmptySignList)"
+        CertificatesSignInfo="@(CertificatesSignInfo)"
+        ItemsToSign="@(ItemsToSign)"
+        StrongNameSignInfo="@(StrongNameSignInfo)"
+        FileSignInfo="@(FileSignInfo)"
+        FileExtensionSignInfo="@(FileExtensionSignInfo)"
+        TempDir="$(ArtifactsTmpDir)"
+        LogDir="$(ArtifactsLogDir)"
+        MSBuildPath="$(_DesktopMSBuildPath)"
+        SNBinaryPath="$(NuGetPackageRoot)sn\1.0.0\sn.exe"
+        MicroBuildCorePath="$(NuGetPackageRoot)microbuild.core\0.2.0"/>
+  </Target>
+</Project>

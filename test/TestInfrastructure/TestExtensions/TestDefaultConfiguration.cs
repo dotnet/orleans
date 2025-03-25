@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Azure.Core;
+using Azure.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Primitives;
@@ -43,6 +45,23 @@ namespace TestExtensions
         public static string EventHubFullyQualifiedNamespace => defaultConfiguration[nameof(EventHubFullyQualifiedNamespace)];
         public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
         public static string RedisConnectionString => defaultConfiguration[nameof(RedisConnectionString)];
+
+        public static TokenCredential TokenCredential
+        {
+            get
+            {
+                var systemAccessToken = Environment.GetEnvironmentVariable("SYSTEM_ACCESSTOKEN");
+                if (!string.IsNullOrEmpty(systemAccessToken))
+                {
+                    // If running in an AzDo pipeline with a SYSTEM_ACCESSTOKEN available, let's try to use AzurePipelinesCredential
+                    var tenantId = Environment.GetEnvironmentVariable("AZURE_TENANT_ID");
+                    var clientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
+                    var serviceConnectionId = Environment.GetEnvironmentVariable("SERVICE_CONNECTION_ID");
+                    return new AzurePipelinesCredential(tenantId, clientId, serviceConnectionId, systemAccessToken);
+                }
+                return new DefaultAzureCredential();
+            }
+        }
 
         private static CosmosConnection cosmosConnection;
         public static CosmosConnection CosmosConnectionData

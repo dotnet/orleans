@@ -50,23 +50,23 @@ namespace Tester.StreamingTests
             var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             //set up subscription for 10 consumer grains
-            var subscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 10);
+            var subscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 5);
             var consumers = subscriptions.Select(sub => this.fixture.HostedCluster.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId.PrimaryKey)).ToList();
 
             var producer = this.fixture.HostedCluster.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
-
-            await producer.StartPeriodicProducing();
+            await producer.StartPeriodicProducing(firePeriod: TimeSpan.FromDays(1)); // make sure only 1 item is produced for test stability
 
             int numProduced = 0;
             await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
             await producer.StopPeriodicProducing();
+            // now we know we are not producing anymore; we need to check consumers now
             
             var tasks = new List<Task>();
             foreach (var consumer in consumers)
             {
                 tasks.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters(new List<ITypedProducerGrain> { producer }, 
-                    consumer, lastTry, this.fixture.Logger), _timeout));
+                    consumer, lastTry, this.fixture.Logger), _timeout, delayOnFail: TimeSpan.FromSeconds(1)));
             }
             await Task.WhenAll(tasks);
 
@@ -150,7 +150,7 @@ namespace Tester.StreamingTests
             var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             //set up subscriptions
-            await subscriptionManager.SetupStreamingSubscriptionForStream<IJerk_ConsumerGrain>(streamId, 10);
+            await subscriptionManager.SetupStreamingSubscriptionForStream<IJerk_ConsumerGrain>(streamId, 5);
             //producer start producing 
             var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingInt>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
@@ -160,13 +160,19 @@ namespace Tester.StreamingTests
             int numProduced = 0;
             await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
             await producer.StopPeriodicProducing();
-            //wait for consumers to react
-            await Task.Delay(TimeSpan.FromMilliseconds(1000));
 
-            //get subscription count now, should be all removed/unsubscribed 
-            var subscriptions = await subscriptionManager.GetSubscriptions(streamId);
-            Assert.True( subscriptions.Count<Orleans.Streams.Core.StreamSubscription>()== 0);
-            // clean up tests
+            // wait until consumers react
+            // and check subscription count should be 0
+            await TestingUtils.WaitUntilAsync(async lastTry =>
+            {
+                var subscriptions = await subscriptionManager.GetSubscriptions(streamId);
+                if (lastTry)
+                {
+                    Assert.True(subscriptions.Count<Orleans.Streams.Core.StreamSubscription>() == 0);
+                }
+
+                return subscriptions.Count<Orleans.Streams.Core.StreamSubscription>() == 0;
+            }, _timeout);
         }
 
 

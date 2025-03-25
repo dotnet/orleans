@@ -29,19 +29,19 @@ namespace Orleans.Runtime.Membership
             switch (ev.getState())
             {
                 case KeeperState.AuthFailed:
-                    logger.LogError("ZooKeeper authentication failed", ev);
+                    logger.LogError("ZooKeeper authentication failed {error}", ev);
                     break;
                 case KeeperState.Expired:
-                    logger.LogError("ZooKeeper session expired", ev);
+                    logger.LogError("ZooKeeper session expired {error}", ev);
                     break;
                 case KeeperState.Disconnected:
-                    logger.LogError("ZooKeeper disconnected", ev);
+                    logger.LogError("ZooKeeper disconnected {error}", ev);
                     break;
                 case KeeperState.SyncConnected:
-                    logger.LogInformation("ZooKeeper connected", ev);
+                    logger.LogInformation("ZooKeeper connected {error}", ev);
                     break;
                 case KeeperState.ConnectedReadOnly:
-                    logger.LogInformation("ZooKeeper connected readonly", ev);
+                    logger.LogInformation("ZooKeeper connected readonly {error}", ev);
                     break;
             }
 
