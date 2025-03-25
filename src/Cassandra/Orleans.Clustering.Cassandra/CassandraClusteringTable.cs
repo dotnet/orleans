@@ -49,13 +49,10 @@ internal sealed class CassandraClusteringTable : IMembershipTable
 
         _queries = await OrleansQueries.CreateInstance(_session);
 
-        await _session.ExecuteAsync(_queries.EnsureTableExists(_ttlSeconds));
-        await _session.ExecuteAsync(_queries.EnsureIndexExists);
+        await _queries.EnsureTableExistsAsync(_options.InitializeRetryMaxDelay, _ttlSeconds);
 
-        if (!tryInitTableVersion)
-            return;
-
-        await _session.ExecuteAsync(await _queries.InsertMembershipVersion(_identifier));
+        if (tryInitTableVersion)
+            await _queries.EnsureClusterVersionExistsAsync(_options.InitializeRetryMaxDelay, _identifier);
     }
 
     async Task IMembershipTable.DeleteMembershipTableEntries(string clusterId)
@@ -204,7 +201,7 @@ internal sealed class CassandraClusteringTable : IMembershipTable
 
         foreach (var e in allEntries)
         {
-            if (e is not { Status: SiloStatus.Active } && new DateTime(Math.Max(e.IAmAliveTime.Ticks, e.StartTime.Ticks)) < beforeDate)
+            if (e is not { Status: SiloStatus.Active } && new DateTime(Math.Max(e.IAmAliveTime.Ticks, e.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
             {
                 await Session.ExecuteAsync(await Queries.DeleteMembershipEntry(_identifier, e));
             }

@@ -65,6 +65,24 @@ namespace Orleans.Runtime
         /// </summary>
         [Event(3, Level = EventLevel.Verbose)]
         private void DoCallback() => this.WriteEvent(3);
+
+        /// <summary>
+        /// Indicates that a request was canceled.
+        /// </summary>
+        [NonEvent]
+        public void OnCanceled(Message message)
+        {
+            if (this.IsEnabled())
+            {
+                this.OnCanceled();
+            }
+        }
+
+        /// <summary>
+        /// Indicates that a request was canceled.
+        /// </summary>
+        [Event(4, Level = EventLevel.Verbose)]
+        private void OnCanceled() => this.WriteEvent(4);
     }
 
     [EventSource(Name = "Microsoft-Orleans-OutsideRuntimeClient")]

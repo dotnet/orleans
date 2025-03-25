@@ -20,18 +20,14 @@ namespace UnitTests.Grains
         public static string CaptureRuntimeEnvironment()
         {
             var callStack = Utils.GetStackTrace(1); // Don't include this method in stack trace
-            return string.Format(
-                "   TaskScheduler={0}" + Environment.NewLine
-                + "   RuntimeContext={1}" + Environment.NewLine
-                + "   WorkerPoolThread={2}" + Environment.NewLine
-                + "   Thread.CurrentThread.ManagedThreadId={4}" + Environment.NewLine
-                + "   StackTrace=" + Environment.NewLine
-                + "   {5}",
-                TaskScheduler.Current,
-                RuntimeContext.Current,
-                Thread.CurrentThread.Name,
-                Thread.CurrentThread.ManagedThreadId,
-                callStack);
+            return
+                $"""
+                TaskScheduler={TaskScheduler.Current}
+                RuntimeContext={RuntimeContext.Current}
+                WorkerPoolThread={Thread.CurrentThread.Name}
+                Thread.CurrentThread.ManagedThreadId={Thread.CurrentThread.ManagedThreadId}
+                StackTrace={callStack}
+                """;
         }
     }
 
@@ -900,111 +896,112 @@ namespace UnitTests.Grains
             logger = loggerFactory.CreateLogger($"NonReentrantStressGrainWithoutState-{_id}");
 
             executing = false;
-            logger.LogDebug("--> OnActivateAsync");
-            logger.LogDebug("<-- OnActivateAsync");
+            logger.LogTrace("--> OnActivateAsync");
+            logger.LogTrace("<-- OnActivateAsync");
             return base.OnActivateAsync(cancellationToken);
         }
 
         private async Task SetOne(int iter, int level)
         {
-            if (logger.IsEnabled(LogLevel.Debug))
+            if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.LogDebug("---> SetOne {Iteration}-{Level}_0", iter, level);
+                logger.LogTrace("---> SetOne {Iteration}-{Level}_0", iter, level);
             }
 
-            CheckRuntimeEnvironment("SetOne");
+            CheckRuntimeEnvironment();
             if (level > 0)
             {
-                if (logger.IsEnabled(LogLevel.Debug))
+                if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.LogDebug("SetOne {Iteration}-{Level}_1. Before await Task.Done.", iter, level);
+                    logger.LogTrace("SetOne {Iteration}-{Level}_1. Before await Task.CompletedTask.", iter, level);
                 }
 
                 await Task.CompletedTask;
-                if (logger.IsEnabled(LogLevel.Debug))
+                if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.LogDebug("SetOne {Iteration}-{Level}_2. After await Task.Done.", iter, level);
+                    logger.LogTrace("SetOne {Iteration}-{Level}_2. After await Task.CompletedTask.", iter, level);
                 }
 
-                CheckRuntimeEnvironment($"SetOne {iter}-{level}_3");
-                if (logger.IsEnabled(LogLevel.Debug))
+                CheckRuntimeEnvironment();
+                if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.LogDebug("SetOne {Iteration}-{Level}_4. Before await Task.Delay.", iter, level);
+                    logger.LogTrace("SetOne {Iteration}-{Level}_4. Before yield.", iter, level);
                 }
 
-                await Task.Delay(TimeSpan.FromMilliseconds(10));
-                if (logger.IsEnabled(LogLevel.Debug))
+                await Task.Yield();
+                if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.LogDebug("SetOne {Iteration}-{Level}_5. After await Task.Delay.", iter, level);
+                    logger.LogTrace("SetOne {Iteration}-{Level}_5. After yield.", iter, level);
                 }
 
-                CheckRuntimeEnvironment($"SetOne {iter}-{level}_6");
+                CheckRuntimeEnvironment();
                 var nextLevel = level - 1;
                 await SetOne(iter, nextLevel);
-                if (logger.IsEnabled(LogLevel.Debug))
+                if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.LogDebug(
+                    logger.LogTrace(
                         "SetOne {Iteration}-{Level}_7 => {NextLevel}. After await SetOne call.",
                         iter,
                         level,
                         nextLevel);
                 }
 
-                CheckRuntimeEnvironment($"SetOne {iter}-{level}_8");
-                if (logger.IsEnabled(LogLevel.Debug))
+                CheckRuntimeEnvironment();
+                if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.LogDebug("SetOne {Iteration}-{Level}_9. Finished SetOne.", iter, level);
+                    logger.LogTrace("SetOne {Iteration}-{Level}_9. Finished SetOne.", iter, level);
                 }
             }
 
-            CheckRuntimeEnvironment($"SetOne {iter}-{level}_10");
-            logger.LogDebug("<--- SetOne {Iteration}-{Level}_11", iter, level);
+            CheckRuntimeEnvironment();
+            logger.LogTrace("<--- SetOne {Iteration}-{Level}_11", iter, level);
         }
 
         public async Task Test1()
         {
-            CheckRuntimeEnvironment("Test1.BeforeLoop");
-            if (logger.IsEnabled(LogLevel.Debug))
+            CheckRuntimeEnvironment();
+            if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.LogDebug("Test1.Start");
+                logger.LogTrace("Test1.Start");
             }
 
             var tasks = new List<Task>();
             for (var i = 0; i < Multiple; i++)
             {
-                CheckRuntimeEnvironment($"Test1_{i}_0");
-                if (logger.IsEnabled(LogLevel.Debug))
+                CheckRuntimeEnvironment();
+                if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.LogDebug("Test1_ ------> {CallNum}", i);
+                    logger.LogTrace("Test1_ ------> {CallNum}", i);
                 }
 
                 var task = SetOne(i, LEVEL);
-                CheckRuntimeEnvironment($"Test1_{i}_1");
-                if (logger.IsEnabled(LogLevel.Debug))
+                CheckRuntimeEnvironment();
+                if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.LogDebug("After SetOne call {CallNum}", i);
+                    logger.LogTrace("After SetOne call {CallNum}", i);
                 }
 
                 tasks.Add(task);
-                CheckRuntimeEnvironment($"Test1_{i}_2");
-                if (logger.IsEnabled(LogLevel.Debug))
+                CheckRuntimeEnvironment();
+                if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.LogDebug("Test1_ <------ {CallNum}", i);
+                    logger.LogTrace("Test1_ <------ {CallNum}", i);
                 }
             }
-            CheckRuntimeEnvironment("Test1.AfterLoop");
-            if (logger.IsEnabled(LogLevel.Debug))
+
+            CheckRuntimeEnvironment();
+            if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.LogDebug("Test1_About to WhenAll");
+                logger.LogTrace("Test1_About to WhenAll");
             }
 
             await Task.WhenAll(tasks);
-            if (logger.IsEnabled(LogLevel.Debug))
+            if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.LogDebug("Test1.Finish");
+                logger.LogTrace("Test1.Finish");
             }
 
-            CheckRuntimeEnvironment("Test1.Finish-CheckRuntimeEnvironment");
+           CheckRuntimeEnvironment();
 //#if DEBUG
 //            // HACK for testing
 //            Logger.SetTraceLevelOverrides(overridesOff.ToList());
@@ -1015,11 +1012,11 @@ namespace UnitTests.Grains
         {
             var wrapper = new Task<Task>(async () =>
             {
-                logger.LogDebug("Before Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
+                logger.LogTrace("Before Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
                 await DoDelay(1);
-                logger.LogDebug("After Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
+                logger.LogTrace("After Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
                 await DoDelay(2);
-                logger.LogDebug("After Task.Delay #2 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
+                logger.LogTrace("After Task.Delay #2 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
             });
 
             if (doStart)
@@ -1032,16 +1029,16 @@ namespace UnitTests.Grains
 
         private async Task DoDelay(int i)
         {
-            logger.LogDebug("Before Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
+            logger.LogTrace("Before Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
             await Task.Delay(1);
-            logger.LogDebug("After Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
+            logger.LogTrace("After Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
         }
 
-        private void CheckRuntimeEnvironment(string str)
+        private void CheckRuntimeEnvironment()
         {
-            var callStack = new StackTrace();
             if (executing)
             {
+                var callStack = new StackTrace();
                 var errorMsg = string.Format(
                     "Found out that grain {0} is already in the middle of execution."
                     + "\n Single threaded-ness violation!"
@@ -1054,7 +1051,8 @@ namespace UnitTests.Grains
             }
 
             executing = true;
-            Thread.Sleep(10);
+            var stopwatch = ValueStopwatch.StartNew();
+            SpinWait.SpinUntil(() => stopwatch.Elapsed > TimeSpan.FromMicroseconds(1));
             executing = false;
         }
     }

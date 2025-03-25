@@ -15,7 +15,7 @@ namespace Orleans
     /// <summary>
     /// Client for communicating with clusters of Orleans silos.
     /// </summary>
-    internal class ClusterClient : IInternalClusterClient, IHostedService
+    internal partial class ClusterClient : IInternalClusterClient, IHostedService
     {
         private readonly OutsideRuntimeClient _runtimeClient;
         private readonly ILogger<ClusterClient> _logger;
@@ -31,6 +31,7 @@ namespace Orleans
         public ClusterClient(IServiceProvider serviceProvider, OutsideRuntimeClient runtimeClient, ILoggerFactory loggerFactory, IOptions<ClientMessagingOptions> clientMessagingOptions)
         {
             ValidateSystemConfiguration(serviceProvider);
+            runtimeClient.ConsumeServices();
 
             _runtimeClient = runtimeClient;
             _logger = loggerFactory.CreateLogger<ClusterClient>();
@@ -68,14 +69,14 @@ namespace Orleans
         {
             try
             {
-                _logger.LogInformation("Client shutting down");
+                LogClientShuttingDown(_logger);
 
                 await _clusterClientLifecycle.OnStop(cancellationToken).ConfigureAwait(false);
                 await _runtimeClient.StopAsync(cancellationToken).WaitAsync(cancellationToken);
             }
             finally
             {
-                _logger.LogInformation("Client shutdown completed");
+                LogClientShutdownCompleted(_logger);
             }
         }
 
@@ -151,5 +152,17 @@ namespace Orleans
         /// <inheritdoc />
         public IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType)
             => _runtimeClient.InternalGrainFactory.GetGrain(grainId, interfaceType);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Client shutting down."
+        )]
+        private static partial void LogClientShuttingDown(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Client shutdown completed."
+        )]
+        private static partial void LogClientShutdownCompleted(ILogger logger);
     }
 }

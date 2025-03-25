@@ -4,6 +4,7 @@ using Orleans.Placement;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace Orleans.Concurrency
 {
@@ -57,11 +58,18 @@ namespace Orleans.Concurrency
         /// <summary>
         /// Initializes a new instance of the <see cref="StatelessWorkerAttribute"/> class.
         /// </summary>
-        /// <param name="maxLocalWorkers">
-        /// The maximum local workers.
-        /// </param>
+        /// <param name="maxLocalWorkers">The maximum local workers.</param>
         public StatelessWorkerAttribute(int maxLocalWorkers)
             : base(new StatelessWorkerPlacement(maxLocalWorkers))
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StatelessWorkerAttribute"/> class.
+        /// </summary>
+        /// <param name="maxLocalWorkers">The maximum local workers.</param>
+        public StatelessWorkerAttribute(int maxLocalWorkers, bool removeIdleWorkers)
+            : base(new StatelessWorkerPlacement(maxLocalWorkers, removeIdleWorkers))
         {
         }
 

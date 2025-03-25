@@ -40,9 +40,101 @@ internal sealed class OrleansQueries
         Session = session;
     }
 
+    internal async Task EnsureTableExistsAsync(TimeSpan maxRetryDelay, int? ttl)
+    {
+        if (!await DoesTableAlreadyExistAsync())
+        {
+            try
+            {
+                await MakeTableAsync(ttl);
+            }
+            catch (WriteTimeoutException) // If there's contention on table creation, backoff a bit and try once more
+            {
+                // Randomize the delay to avoid contention, preferring that more instances will wait longer
+                var nextSingle = Random.Shared.NextSingle();
+                await Task.Delay(maxRetryDelay * Math.Sqrt(nextSingle));
+
+                if (!await DoesTableAlreadyExistAsync())
+                {
+                    await MakeTableAsync(ttl);
+                }
+            }
+        }
+    }
+
+    internal async Task EnsureClusterVersionExistsAsync(TimeSpan maxRetryDelay, string clusterIdentifier)
+    {
+        if (!await DoesClusterVersionAlreadyExistAsync(clusterIdentifier))
+        {
+            try
+            {
+                await Session.ExecuteAsync(await InsertMembershipVersion(clusterIdentifier));
+            }
+            catch (WriteTimeoutException) // If there's contention on table creation, backoff a bit and try once more
+            {
+                // Randomize the delay to avoid contention, preferring that more instances will wait longer
+                var nextSingle = Random.Shared.NextSingle();
+                await Task.Delay(maxRetryDelay * Math.Sqrt(nextSingle));
+
+                if (!await DoesClusterVersionAlreadyExistAsync(clusterIdentifier))
+                {
+                    await Session.ExecuteAsync(await InsertMembershipVersion(clusterIdentifier));
+                }
+            }
+        }
+    }
+
+    private async Task<bool> DoesClusterVersionAlreadyExistAsync(string clusterIdentifier)
+    {
+        try
+        {
+            var resultSet = await Session.ExecuteAsync(CheckIfClusterVersionExists(clusterIdentifier, ConsistencyLevel.LocalOne));
+            return resultSet.Any();
+        }
+        catch (UnavailableException)
+        {
+            var resultSet = await Session.ExecuteAsync(CheckIfClusterVersionExists(clusterIdentifier, ConsistencyLevel.One));
+            return resultSet.Any();
+        }
+    }
+
+    private async Task<bool> DoesTableAlreadyExistAsync()
+    {
+        try
+        {
+            var resultSet = await Session.ExecuteAsync(CheckIfTableExists(Session.Keyspace, ConsistencyLevel.LocalOne));
+            return resultSet.Any();
+        }
+        catch (UnavailableException)
+        {
+            var resultSet = await Session.ExecuteAsync(CheckIfTableExists(Session.Keyspace, ConsistencyLevel.One));
+            return resultSet.Any();
+        }
+        catch (UnauthorizedException)
+        {
+            return false;
+        }
+    }
+
+    private async Task MakeTableAsync(int? ttlSeconds)
+    {
+        await Session.ExecuteAsync(EnsureTableExists(ttlSeconds));
+        await Session.ExecuteAsync(EnsureIndexExists);
+    }
+
     public ConsistencyLevel MembershipWriteConsistencyLevel { get; set; }
 
     public ConsistencyLevel MembershipReadConsistencyLevel { get; set; }
+
+    public IStatement CheckIfClusterVersionExists(string clusterIdentifier, ConsistencyLevel consistencyLevel) =>
+        new SimpleStatement(
+                $"SELECT version FROM membership WHERE partition_key = '{clusterIdentifier}';")
+            .SetConsistencyLevel(consistencyLevel);
+
+    public IStatement CheckIfTableExists(string keyspace, ConsistencyLevel consistencyLevel) =>
+        new SimpleStatement(
+                $"SELECT * FROM system_schema.tables WHERE keyspace_name = '{keyspace}' AND table_name = 'membership';")
+            .SetConsistencyLevel(consistencyLevel);
 
     /// <remarks>
     /// In Cassandra, a table-level <c>default_time_to_live</c> of <c>0</c> is treated as <c>disabled</c>.
@@ -71,7 +163,7 @@ internal sealed class OrleansQueries
           WITH compression = { 'class' : 'LZ4Compressor', 'enabled' : true }
             AND default_time_to_live = {{defaultTimeToLiveSeconds.GetValueOrDefault(0)}};
           """);
-
+    
     public IStatement EnsureIndexExists => new SimpleStatement("""
             CREATE INDEX IF NOT EXISTS ix_membership_status ON membership(status);
             """);
@@ -197,9 +289,10 @@ internal sealed class OrleansQueries
             IF
             	version = :expected_version;
             """,
+            // This is ignored because we're creating a LWT
             MembershipWriteConsistencyLevel);
 
-        return _updateIAmAliveWithTtlPreparedStatement.Bind(new
+        BoundStatement updateIAmAliveTimeWithTtL = _updateIAmAliveWithTtlPreparedStatement.Bind(new
         {
             partition_key = clusterIdentifier,
             // The same version still needs to be written, to update its cell-level TTL
@@ -217,6 +310,10 @@ internal sealed class OrleansQueries
             // But we still check that the version was the same during the update so we don't stomp on another update
             expected_version = existingVersion.Version,
         });
+
+        // To improve performance, we allow IAmAlive updates to be LocalSerial
+        updateIAmAliveTimeWithTtL.SetSerialConsistencyLevel(ConsistencyLevel.LocalSerial);
+        return updateIAmAliveTimeWithTtL;
     }
 
     public async ValueTask<IStatement> DeleteMembershipEntry(string clusterIdentifier, MembershipEntry membershipEntry)

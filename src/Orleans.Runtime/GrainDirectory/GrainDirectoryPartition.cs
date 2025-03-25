@@ -29,7 +29,7 @@ internal sealed partial class GrainDirectoryPartition(
     IInternalGrainFactory grainFactory)
     : SystemTarget(CreateGrainId(localSiloDetails.SiloAddress, partitionIndex), localSiloDetails.SiloAddress, loggerFactory), IGrainDirectoryPartition, IGrainDirectoryTestHooks
 {
-    internal static SystemTargetGrainId CreateGrainId(SiloAddress siloAddress, int partitionIndex) => SystemTargetGrainId.Create(Constants.GrainDirectoryPartition, siloAddress, partitionIndex.ToString(CultureInfo.InvariantCulture));
+    internal static SystemTargetGrainId CreateGrainId(SiloAddress siloAddress, int partitionIndex) => SystemTargetGrainId.Create(Constants.GrainDirectoryPartitionType, siloAddress, partitionIndex.ToString(CultureInfo.InvariantCulture));
     private readonly Dictionary<GrainId, GrainAddress> _directory = [];
     private readonly int _partitionIndex = partitionIndex;
     private readonly DistributedGrainDirectory _owner = owner;
@@ -665,7 +665,7 @@ internal sealed partial class GrainDirectoryPartition(
         async Task<List<GrainAddress>> GetRegisteredActivationsFromClusterMember(MembershipVersion version, RingRange range, SiloAddress siloAddress, bool isValidation)
         {
             var stopwatch = ValueStopwatch.StartNew();
-            var client = _grainFactory.GetSystemTarget<IGrainDirectoryClient>(Constants.GrainDirectory, siloAddress);
+            var client = _grainFactory.GetSystemTarget<IGrainDirectoryClient>(Constants.GrainDirectoryType, siloAddress);
             var result = await InvokeOnClusterMember(
                 siloAddress,
                 async () =>

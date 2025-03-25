@@ -1,6 +1,8 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -42,6 +44,16 @@ public enum EnumerationResult
     /// The attempt to enumerate failed because the enumerator was not found.
     /// </summary>
     MissingEnumeratorError = 1 << 4,
+
+    /// <summary>
+    /// The attempt to enumerate failed because the enumeration threw an exception.
+    /// </summary>
+    Error = 1 << 5,
+
+    /// <summary>
+    /// Enumeration was canceled.
+    /// </summary>
+    Canceled = 1 << 6,
 
     /// <summary>
     /// This result indicates that enumeration has completed and that no further results will be produced.
@@ -117,7 +129,7 @@ public abstract class AsyncEnumerableRequest<T> : RequestBase, IAsyncEnumerable<
     /// The target grain instance.
     /// </summary>
     [field: NonSerialized]
-    internal GrainReference TargetGrain { get; private set; }
+    internal GrainReference? TargetGrain { get; private set; }
 
     /// <inheritdoc/>
     [Id(0)]
@@ -150,6 +162,7 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
 {
     private readonly AsyncEnumerableRequest<T> _request;
     private readonly CancellationToken _cancellationToken;
+    private CancellationTokenSource? _cancellationTokenSource;
     private readonly IAsyncEnumerableGrainExtension _target;
     private readonly Guid _requestId;
     private (EnumerationResult State, object Value) _current;
@@ -168,7 +181,28 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
     public AsyncEnumeratorProxy(AsyncEnumerableRequest<T> request, CancellationToken cancellationToken)
     {
         _request = request;
-        _cancellationToken = cancellationToken;
+        var requestCancellationToken = request.GetCancellationToken();
+        if (requestCancellationToken == cancellationToken)
+        {
+            // The same token was passed to the request and the enumerator.
+            _cancellationToken = cancellationToken;
+        }
+        else if (requestCancellationToken.CanBeCanceled && cancellationToken.CanBeCanceled)
+        {
+            // Both are distinct, cancellable tokens.
+            _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(requestCancellationToken, cancellationToken);
+            _cancellationToken = _cancellationTokenSource.Token;
+        }
+        else if (cancellationToken.CanBeCanceled)
+        {
+            _cancellationToken = cancellationToken;
+        }
+        else
+        {
+            Debug.Assert(requestCancellationToken.CanBeCanceled);
+            _cancellationToken = requestCancellationToken;
+        }
+
         _requestId = Guid.NewGuid();
         _target = _request.TargetGrain.AsReference<IAsyncEnumerableGrainExtension>();
     }
@@ -216,6 +250,7 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
             }
         }
 
+        _cancellationTokenSource?.Dispose();
         _disposed = true;
     }
 
@@ -238,20 +273,25 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
         (EnumerationResult Status, object Value) result;
         while (true)
         {
-            if (_cancellationToken.IsCancellationRequested)
-            {
-                _current = default;
-                return false;
-            }
+            _cancellationToken.ThrowIfCancellationRequested();
 
             if (!_initialized)
             {
-                result = await _target.StartEnumeration(_requestId, _request);
+                result = await _target.StartEnumeration(_requestId, _request).AsTask().WaitAsync(_cancellationToken);
                 _initialized = true;
             }
             else
             {
-                result = await _target.MoveNext<T>(_requestId);
+                result = await _target.MoveNext<T>(_requestId).AsTask().WaitAsync(_cancellationToken);
+            }
+
+            if (result.Status is EnumerationResult.Error)
+            {
+                ExceptionDispatchInfo.Capture((Exception)result.Value).Throw();
+            }
+            else if (result.Status is EnumerationResult.Canceled)
+            {
+                throw new OperationCanceledException();
             }
 
             if (result.Status is not EnumerationResult.Heartbeat)
@@ -263,7 +303,7 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
         if (result.Status is EnumerationResult.MissingEnumeratorError)
         {
             throw new EnumerationAbortedException("Enumeration aborted: the remote target does not have a record of this enumerator."
-                + " This likely indicates that the remote grain was deactivated since enumeration begun.");
+                + " This likely indicates that the remote grain was deactivated since enumeration begun or that the enumerator was idle for longer than the expiration period.");
         }
 
         Debug.Assert((result.Status & (EnumerationResult.Element | EnumerationResult.Batch | EnumerationResult.Completed)) != 0);
@@ -276,6 +316,13 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
 
 public static class AsyncEnumerableExtensions
 {
+    /// <summary>
+    /// Specifies the maximum batch size for an <see cref="IAsyncEnumerable{T}"/> request.
+    /// </summary>
+    /// <typeparam name="T">The underlying element type.</typeparam>
+    /// <param name="self">The instance to configure.</param>
+    /// <param name="maxBatchSize">The batch size.</param>
+    /// <returns>The original instance.</returns>
     public static IAsyncEnumerable<T> WithBatchSize<T>(this IAsyncEnumerable<T> self, int maxBatchSize)
     {
         if (self is AsyncEnumerableRequest<T> request)

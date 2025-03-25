@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Diagnostics;
 using System.Threading;
@@ -6,13 +7,14 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
-    internal class CallbackData
+    internal sealed partial class CallbackData
     {
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
         private int completed;
-        private StatusResponse lastKnownStatus;
+        private StatusResponse? lastKnownStatus;
         private ValueStopwatch stopwatch;
+        private CancellationTokenRegistration _cancellationTokenRegistration;
 
         public CallbackData(
             SharedCallbackData shared,
@@ -28,6 +30,23 @@ namespace Orleans.Runtime
         public Message Message { get; } // might hold metadata used by response pipeline
 
         public bool IsCompleted => this.completed == 1;
+
+        public void SubscribeForCancellation(CancellationToken cancellationToken)
+        {
+            if (!cancellationToken.CanBeCanceled)
+            {
+                return;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            _cancellationTokenRegistration = cancellationToken.UnsafeRegister(static arg =>
+            {
+                var callbackData = (CallbackData)arg!;
+                callbackData.OnCancellation();
+            }, this);
+        }
+
+        private void SignalCancellation() => shared.CancellationManager.SignalCancellation(Message.TargetSilo, Message.TargetGrain, Message.SendingGrain, Message.Id);
 
         public void OnStatusUpdate(StatusResponse status)
         {
@@ -53,6 +72,33 @@ namespace Orleans.Runtime
 
         private TimeSpan GetResponseTimeout() => (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
 
+        private void OnCancellation()
+        {
+            // If waiting for acknowledgement is enabled, simply signal to the remote grain that cancellation
+            // is requested and return.
+            if (shared.WaitForCancellationAcknowledgement)
+            {
+                SignalCancellation();
+                return;
+            }
+
+            // Otherwise, cancel the request immediately, without waiting for the callee to acknowledge the
+            // cancellation request. The callee will still be signaled.
+            if (Interlocked.CompareExchange(ref completed, 1, 0) != 0)
+            {
+                return;
+            }
+
+            stopwatch.Stop();
+            SignalCancellation();
+            shared.Unregister(Message);
+            ApplicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
+            ApplicationRequestInstruments.OnAppRequestsTimedOut();
+            OrleansCallBackDataEvent.Log.OnCanceled(Message);
+            context.Complete(Response.FromException(new OperationCanceledException(_cancellationTokenRegistration.Token)));
+            _cancellationTokenRegistration.Dispose();
+        }
+
         public void OnTimeout()
         {
             if (Interlocked.CompareExchange(ref completed, 1, 0) != 0)
@@ -60,9 +106,14 @@ namespace Orleans.Runtime
                 return;
             }
 
-            this.shared.Unregister(this.Message);
-
             this.stopwatch.Stop();
+            if (shared.CancelRequestOnTimeout)
+            {
+                SignalCancellation();
+            }
+
+            this.shared.Unregister(this.Message);
+            _cancellationTokenRegistration.Dispose();
             ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
             ApplicationRequestInstruments.OnAppRequestsTimedOut();
 
@@ -72,12 +123,7 @@ namespace Orleans.Runtime
 
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
             var timeout = GetResponseTimeout();
-            this.shared.Logger.LogWarning(
-                (int)ErrorCode.Runtime_Error_100157,
-                "Response did not arrive on time in {Timeout} for message: {Message}. {StatusMessage}. About to break its promise.",
-                timeout,
-                msg,
-                statusMessage);
+            LogTimeout(this.shared.Logger, timeout, msg, statusMessage);
 
             var exception = new TimeoutException($"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}");
             context.Complete(Response.FromException(exception));
@@ -90,19 +136,15 @@ namespace Orleans.Runtime
                 return;
             }
 
-            this.shared.Unregister(this.Message);
             this.stopwatch.Stop();
+            this.shared.Unregister(this.Message);
+            _cancellationTokenRegistration.Dispose();
             ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             OrleansCallBackDataEvent.Log.OnTargetSiloFail(this.Message);
             var msg = this.Message;
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
-            this.shared.Logger.LogWarning(
-                (int)ErrorCode.Runtime_Error_100157,
-                "The target silo became unavailable for message: {Message}. {StatusMessage}See {TroubleshootingHelpLink} for troubleshooting help. About to break its promise.",
-                msg,
-                statusMessage,
-                Constants.TroubleshootingHelpLink);
+            LogTargetSiloFail(this.shared.Logger, msg, statusMessage, Constants.TroubleshootingHelpLink);
             var exception = new SiloUnavailableException($"The target silo became unavailable for message: {msg}. {statusMessage}See {Constants.TroubleshootingHelpLink} for troubleshooting help.");
             this.context.Complete(Response.FromException(exception));
         }
@@ -117,6 +159,7 @@ namespace Orleans.Runtime
             OrleansCallBackDataEvent.Log.DoCallback(this.Message);
 
             this.stopwatch.Stop();
+            _cancellationTokenRegistration.Dispose();
             ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
@@ -143,7 +186,7 @@ namespace Orleans.Runtime
                 context.Complete(Response.FromException(exc));
             }
 
-            static void HandleRejectionResponse(IResponseCompletionSource context, RejectionResponse rejection)
+            static void HandleRejectionResponse(IResponseCompletionSource context, RejectionResponse? rejection)
             {
                 Exception exception;
                 if (rejection?.RejectionType is Message.RejectionTypes.GatewayTooBusy)
@@ -158,5 +201,19 @@ namespace Orleans.Runtime
                 context.Complete(Response.FromException(exception));
             }
         }
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100157,
+            Level = LogLevel.Warning,
+            Message = "Response did not arrive on time in '{Timeout}' for message: '{Message}'. {StatusMessage}About to break its promise."
+        )]
+        private static partial void LogTimeout(ILogger logger, TimeSpan timeout, Message message, string statusMessage);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100157,
+            Level = LogLevel.Warning,
+            Message = "The target silo became unavailable for message: '{Message}'. {StatusMessage}See {TroubleshootingHelpLink} for troubleshooting help. About to break its promise."
+        )]
+        private static partial void LogTargetSiloFail(ILogger logger, Message message, string statusMessage, string troubleshootingHelpLink);
     }
 }

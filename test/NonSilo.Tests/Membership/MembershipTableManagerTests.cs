@@ -77,7 +77,8 @@ namespace NonSilo.Tests.Membership
         private async Task BasicScenarioTest(InMemoryMembershipTable membershipTable, bool gracefulShutdown = true)
         {
             var timers = new List<DelegateAsyncTimer>();
-            var timerCalls = new ConcurrentQueue<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)>();
+            var timerCalls = new BlockingCollection<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)>();
+
             var timerFactory = new DelegateAsyncTimerFactory(
                 (period, name) =>
                 {
@@ -85,7 +86,7 @@ namespace NonSilo.Tests.Membership
                         overridePeriod =>
                         {
                             var task = new TaskCompletionSource<bool>();
-                            timerCalls.Enqueue((overridePeriod, task));
+                            timerCalls.Add((overridePeriod, task));
                             return task.Task;
                         });
                     timers.Add(timer);
@@ -166,20 +167,25 @@ namespace NonSilo.Tests.Membership
             {
                 // Check that a timer is being requested and that after it expires a call to
                 // refresh the membership table is made.
-                Assert.True(timerCalls.TryDequeue(out var timer));
+                using var cts = new CancellationTokenSource();
+                cts.CancelAfter(TimeSpan.FromSeconds(10));
+                var (_, completion) = timerCalls.Take(cts.Token);
                 membershipTable.ClearCalls();
-                timer.Completion.TrySetResult(true);
+                completion.TrySetResult(true);
                 while (membershipTable.Calls.Count == 0) await Task.Delay(10);
                 Assert.Contains(membershipTable.Calls, c => c.Method.Equals(nameof(IMembershipTable.ReadAll)));
             }
 
-            var cts = new CancellationTokenSource();
-            if (!gracefulShutdown) cts.Cancel();
+            var shutdownCts = new CancellationTokenSource();
+            if (!gracefulShutdown) shutdownCts.Cancel();
             Assert.Equal(0, timers.First().DisposedCounter);
-            var stopped = this.lifecycle.OnStop(cts.Token);
+            var stopped = this.lifecycle.OnStop(shutdownCts.Token);
 
             // Complete any timers that were waiting.
-            while (timerCalls.TryDequeue(out var t)) t.Completion.TrySetResult(false);
+            while (timerCalls.TryTake(out var t))
+            {
+                t.Completion.TrySetResult(false);
+            }
 
             await stopped;
             Assert.Equal(1, timers.First().DisposedCounter);
@@ -456,6 +462,7 @@ namespace NonSilo.Tests.Membership
 
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
             await manager.TryToSuspectOrKill(otherSilos.First().SiloAddress);
+            manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
         }
 
@@ -520,6 +527,7 @@ namespace NonSilo.Tests.Membership
 
             var victim = otherSilos.First().SiloAddress;
             await manager.TryToSuspectOrKill(victim);
+            manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
             Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.GetSiloStatus(victim));
         }
 
@@ -632,14 +640,12 @@ namespace NonSilo.Tests.Membership
             await this.lifecycle.OnStart();
             await manager.UpdateStatus(SiloStatus.Active);
 
-            // Try to declare an unknown silo dead
-            await Assert.ThrowsAsync<KeyNotFoundException>(() => manager.TryToSuspectOrKill(Silo("123.123.123.123:1@1")));
-
             // Multiple votes from the same node should not result in the node being declared dead.
             var victim = otherSilos.First().SiloAddress;
             await manager.TryToSuspectOrKill(victim);
             await manager.TryToSuspectOrKill(victim);
             await manager.TryToSuspectOrKill(victim);
+            manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
             Assert.Equal(SiloStatus.Active, manager.MembershipTableSnapshot.GetSiloStatus(victim));
 
             // Manually remove our vote and add another silo's vote so we can be the one to kill the silo.
@@ -654,6 +660,7 @@ namespace NonSilo.Tests.Membership
             }
 
             await manager.TryToSuspectOrKill(victim);
+            manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
             Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.GetSiloStatus(victim));
 
             // One down, one to go. Now overshoot votes and kill ourselves instead (due to internal error).
@@ -672,6 +679,7 @@ namespace NonSilo.Tests.Membership
 
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
             await manager.TryToSuspectOrKill(victim);
+            manager.TestingSuspectOrKillIdle.WaitOne(TimeSpan.FromSeconds(45));
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
             // We killed ourselves and should not have marked the other silo as dead.
