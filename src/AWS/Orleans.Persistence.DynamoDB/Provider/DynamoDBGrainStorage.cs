@@ -384,6 +384,8 @@ namespace Orleans.Storage
                 throw new ArgumentOutOfRangeException("GrainState.Size", msg);
             }
         }
+
+        public IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 
     public static class DynamoDBGrainStorageFactory
