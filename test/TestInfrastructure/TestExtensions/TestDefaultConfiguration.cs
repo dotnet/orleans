@@ -40,6 +40,8 @@ namespace TestExtensions
         public static Uri TableEndpoint => new Uri(defaultConfiguration[nameof(TableEndpoint)]);
         public static Uri DataBlobUri => new Uri(defaultConfiguration[nameof(DataBlobUri)]);
         public static Uri DataQueueUri => new Uri(defaultConfiguration[nameof(DataQueueUri)]);
+        public static string OrleansCosmosDbEndpoint => defaultConfiguration[nameof(OrleansCosmosDbEndpoint)];
+        public static string CosmosDbConnectionString => defaultConfiguration[nameof(CosmosDbConnectionString)];
         public static string DataConnectionString => defaultConfiguration[nameof(DataConnectionString)];
         public static string EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
         public static string EventHubFullyQualifiedNamespace => defaultConfiguration[nameof(EventHubFullyQualifiedNamespace)];
@@ -62,30 +64,6 @@ namespace TestExtensions
                 return new DefaultAzureCredential();
             }
         }
-
-        private static CosmosConnection cosmosConnection;
-        public static CosmosConnection CosmosConnectionData
-        {
-            get
-            {
-                if (cosmosConnection is not null)
-                {
-                    return cosmosConnection;
-                }
-
-                try
-                {
-                    cosmosConnection = defaultConfiguration.GetSection(nameof(CosmosConnection)).Get<CosmosConnection>();
-                }
-                catch (Exception)
-                {
-                    cosmosConnection = CosmosConnection.LocalCosmosEmulator;
-                }
-
-                return cosmosConnection;
-            }
-        }
-        
 
         public static bool GetValue(string key, out string value)
         {
