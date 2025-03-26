@@ -110,7 +110,13 @@ namespace UnitTests.StorageTests
 
         [Fact]
         public void QualifiedStreamIdConverter() => Roundtrip(new QualifiedStreamId("provider", StreamId.Create("namespace", "key")));
-      
+
+        [Fact]
+        public void GuidIdRoundtrip() => Roundtrip(GuidId.GetNewGuidId());
+
+        [Fact]
+        public void PubSubSubscriptionStateRoundtrip() => new PubSubSubscriptionState(GuidId.GetNewGuidId(), new QualifiedStreamId("test", default), GrainId.Parse("test/test"));
+
         [Fact]
         public async Task GrainReferenceJsonConverter()
         {
