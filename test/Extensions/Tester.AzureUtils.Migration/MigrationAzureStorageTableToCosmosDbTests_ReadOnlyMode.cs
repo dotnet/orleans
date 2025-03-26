@@ -22,6 +22,7 @@ namespace Tester.AzureUtils.Migration
 
         public MigrationReadonlyAzureStorageTableToCosmosDbTests(Fixture fixture) : base(fixture)
         {
+            fixture.EnsurePreconditionsMet();
         }
 
         public class Fixture : BaseAzureTestClusterFixture

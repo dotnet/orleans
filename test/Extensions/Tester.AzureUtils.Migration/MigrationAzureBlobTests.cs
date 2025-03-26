@@ -12,6 +12,11 @@ namespace Tester.AzureUtils.Migration
     {
         public static Guid Guid = Guid.NewGuid();
 
+        public MigrationAzureBlobTests(Fixture fixture) : base(fixture)
+        {
+            fixture.EnsurePreconditionsMet();
+        }
+
         public class Fixture : BaseAzureTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -46,9 +51,5 @@ namespace Tester.AzureUtils.Migration
                     .AddDataMigrator(SourceStorageName, DestinationStorageName);
             }
         }   
-
-        public MigrationAzureBlobTests(Fixture fixture) : base(fixture)
-        {
-        }
     }
 }

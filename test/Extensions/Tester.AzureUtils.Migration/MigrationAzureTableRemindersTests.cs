@@ -12,6 +12,11 @@ namespace Tester.AzureUtils.Migration
     {
         public static Guid Guid = Guid.NewGuid();
 
+        public MigrationAzureTableRemindersTests(Fixture fixture) : base(fixture)
+        {
+            fixture.EnsurePreconditionsMet();
+        }
+
         public static string OldTableName => $"source{Guid.ToString().Replace("-", "")}";
         public static string DestinationTableName => $"destination{Guid.ToString().Replace("-", "")}";
 
@@ -60,10 +65,6 @@ namespace Tester.AzureUtils.Migration
                     )
                     .AddDataMigrator(SourceStorageName, DestinationStorageName);
             }
-        }
-
-        public MigrationAzureTableRemindersTests(Fixture fixture) : base(fixture)
-        {
         }
     }
 }
