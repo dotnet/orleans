@@ -12,8 +12,7 @@ namespace Tester.AzureUtils.Migration.Helpers
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                throw new Exception($"DEBUG for AAD: OrleansCosmosDbEndpoint='{TestDefaultConfiguration.OrleansCosmosDbEndpoint}'");
-                // options.ConfigureCosmosClient(accountEndpoint: TestDefaultConfiguration.OrleansCosmosDbEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential);
+                options.ConfigureCosmosClient(accountEndpoint: TestDefaultConfiguration.CosmosDbEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential);
             }
             else if (!string.IsNullOrEmpty(TestDefaultConfiguration.CosmosDbConnectionString))
             {
@@ -21,7 +20,7 @@ namespace Tester.AzureUtils.Migration.Helpers
             }
             else
             {
-                throw new ArgumentException($"CosmosDb connection is incorrectly configured. See {nameof(TestDefaultConfiguration.OrleansCosmosDbEndpoint)}", nameof(options));
+                throw new ArgumentException($"CosmosDb connection is incorrectly configured. See {nameof(TestDefaultConfiguration.CosmosDbEndpoint)}", nameof(options));
             }
         }
 
@@ -29,14 +28,14 @@ namespace Tester.AzureUtils.Migration.Helpers
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                return new CosmosClient(accountEndpoint: TestDefaultConfiguration.OrleansCosmosDbEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential);
+                return new CosmosClient(accountEndpoint: TestDefaultConfiguration.CosmosDbEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential);
             }
             else if (!string.IsNullOrEmpty(TestDefaultConfiguration.CosmosDbConnectionString))
             {
                 return new CosmosClient(connectionString: TestDefaultConfiguration.CosmosDbConnectionString);
             }
 
-            throw new ArgumentException($"CosmosDb connection is incorrectly configured. See {nameof(TestDefaultConfiguration.OrleansCosmosDbEndpoint)}");
+            throw new ArgumentException($"CosmosDb connection is incorrectly configured. See {nameof(TestDefaultConfiguration.CosmosDbEndpoint)}");
         }
     }
 }

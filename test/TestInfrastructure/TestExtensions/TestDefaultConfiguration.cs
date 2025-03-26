@@ -40,7 +40,7 @@ namespace TestExtensions
         public static Uri TableEndpoint => new Uri(defaultConfiguration[nameof(TableEndpoint)]);
         public static Uri DataBlobUri => new Uri(defaultConfiguration[nameof(DataBlobUri)]);
         public static Uri DataQueueUri => new Uri(defaultConfiguration[nameof(DataQueueUri)]);
-        public static string OrleansCosmosDbEndpoint => defaultConfiguration[nameof(OrleansCosmosDbEndpoint)];
+        public static string CosmosDbEndpoint => defaultConfiguration[nameof(CosmosDbEndpoint)];
         public static string CosmosDbConnectionString => defaultConfiguration[nameof(CosmosDbConnectionString)];
         public static string DataConnectionString => defaultConfiguration[nameof(DataConnectionString)];
         public static string EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
