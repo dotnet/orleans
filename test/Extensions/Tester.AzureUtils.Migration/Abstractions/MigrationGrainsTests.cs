@@ -17,7 +17,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         {
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task ReadFromSourceTest()
         {
             var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 1);
@@ -31,7 +31,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             Assert.Equal(grainState.State.A * grainState.State.B, await grain.GetAxB());
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task ReadFromTargetTest()
         {
             var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 2);
@@ -47,7 +47,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             Assert.Equal(newGrainState.State.A * newGrainState.State.B, await grain.GetAxB());
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task ReadFromSourceThenWriteToTargetTest()
         {
             var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 3);
@@ -71,7 +71,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             Assert.Equal(newGrainState.State.A * newGrainState.State.B, await grain.GetAxB());
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task ClearAllTest()
         {
             var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 4);
@@ -97,7 +97,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             Assert.False(newGrainState2.RecordExists);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task DataMigrator_SampleRun()
         {
             var originalEntries = await GenerateGrainsAndSaveAsync(n: 5);
@@ -120,7 +120,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             }
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task GetAll_ReturnsAllListedReferences()
         {
             var originalEntries = await GenerateGrainsAndSaveAsync();

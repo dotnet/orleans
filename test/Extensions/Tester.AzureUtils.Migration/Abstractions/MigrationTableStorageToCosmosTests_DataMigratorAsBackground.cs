@@ -30,7 +30,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             _hostedCluster = this.fixture.HostedCluster;
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task DataMigrator_MovesDataToDestinationStorage()
         {
             var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(baseId + 1);

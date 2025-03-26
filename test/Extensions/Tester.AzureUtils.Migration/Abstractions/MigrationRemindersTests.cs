@@ -35,7 +35,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         {
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task UpsertRow_WritesIntoTwoTables()
         {
             var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 1);
@@ -72,7 +72,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             Assert.Equal(defaultEntryBuilder.GetGrainReference(grainReference), oldFetchedEntry!.GrainReference);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Read_ReturnsOriginalGrainReferenceAndReminder()
         {
             var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 2);
@@ -101,7 +101,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             Assert.Equal(reminderName, readEntry.ReminderName);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task DataMigrator_ProperlyMigratesData()
         {
             var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 3);

@@ -25,7 +25,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             _cosmosClient = CosmosClientHelpers.BuildClient();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task ReadFromSourceTest()
         {
             var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(baseId + 1);
@@ -39,7 +39,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             Assert.Equal(grainState.State.A * grainState.State.B, await grain.GetAxB());
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task UpdatesStatesInBothStorages()
         {
             var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(baseId + 2);
@@ -95,7 +95,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             Assert.Equal(cosmosGrainState.A * cosmosGrainState.B, await grain.GetAxB());
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task DataMigrator_MovesDataToDestinationStorage()
         {
             var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(baseId + 3);
