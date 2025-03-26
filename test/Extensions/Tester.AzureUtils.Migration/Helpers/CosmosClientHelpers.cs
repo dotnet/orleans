@@ -1,5 +1,6 @@
 using Azure.Identity;
 using Microsoft.Azure.Cosmos;
+using Microsoft.Extensions.Options;
 using Orleans.Persistence.Cosmos;
 using TestExtensions;
 
@@ -13,14 +14,28 @@ namespace Tester.AzureUtils.Migration.Helpers
             {
                 options.ConfigureCosmosClient(accountEndpoint: TestDefaultConfiguration.OrleansCosmosDbEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential);
             }
-            else
+            else if (!string.IsNullOrEmpty(TestDefaultConfiguration.CosmosDbConnectionString))
             {
                 options.ConfigureCosmosClient(connectionString: TestDefaultConfiguration.CosmosDbConnectionString);
             }
+            else
+            {
+                throw new ArgumentException($"CosmosDb connection is incorrectly configured. See {nameof(TestDefaultConfiguration.OrleansCosmosDbEndpoint)}", nameof(options));
+            }
         }
 
-        public static CosmosClient BuildClient() => TestDefaultConfiguration.UseAadAuthentication
-            ? new CosmosClient(accountEndpoint: TestDefaultConfiguration.OrleansCosmosDbEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential)
-            : new CosmosClient(connectionString: TestDefaultConfiguration.CosmosDbConnectionString);
+        public static CosmosClient BuildClient()
+        {
+            if (TestDefaultConfiguration.UseAadAuthentication)
+            {
+                return new CosmosClient(accountEndpoint: TestDefaultConfiguration.OrleansCosmosDbEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential);
+            }
+            else if (!string.IsNullOrEmpty(TestDefaultConfiguration.CosmosDbConnectionString))
+            {
+                return new CosmosClient(connectionString: TestDefaultConfiguration.CosmosDbConnectionString);
+            }
+
+            throw new ArgumentException($"CosmosDb connection is incorrectly configured. See {nameof(TestDefaultConfiguration.OrleansCosmosDbEndpoint)}");
+        }
     }
 }
