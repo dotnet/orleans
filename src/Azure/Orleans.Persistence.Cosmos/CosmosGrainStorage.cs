@@ -392,7 +392,6 @@ internal sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<
         try
         {
             this.client = await this.options.CreateClient(this.serviceProvider).ConfigureAwait(false);
-
             this.container = this.client.GetContainer(this.options.DatabaseName, this.options.ContainerName);
         }
         catch (Exception ex)

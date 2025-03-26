@@ -12,7 +12,8 @@ namespace Tester.AzureUtils.Migration.Helpers
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.ConfigureCosmosClient(accountEndpoint: TestDefaultConfiguration.OrleansCosmosDbEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential);
+                throw new Exception($"DEBUG for AAD: OrleansCosmosDbEndpoint='{TestDefaultConfiguration.OrleansCosmosDbEndpoint}'");
+                // options.ConfigureCosmosClient(accountEndpoint: TestDefaultConfiguration.OrleansCosmosDbEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential);
             }
             else if (!string.IsNullOrEmpty(TestDefaultConfiguration.CosmosDbConnectionString))
             {
