@@ -139,6 +139,16 @@ namespace Tester.AzureUtils.Migration.Abstractions
 
         private TableClient GetOldTableClient() => GetTable(MigrationAzureTableRemindersTests.OldTableName);
         private TableClient GetMigratedTableClient() => GetTable(MigrationAzureTableRemindersTests.DestinationTableName);
-        private TableClient GetTable(string tableName) => new Azure.Data.Tables.TableClient(TestDefaultConfiguration.DataConnectionString, tableName);
+        private TableClient GetTable(string tableName)
+        {
+            if (TestDefaultConfiguration.UseAadAuthentication)
+            {
+                return new Azure.Data.Tables.TableClient(TestDefaultConfiguration.TableEndpoint, tableName, TestDefaultConfiguration.TokenCredential);
+            }
+            else
+            {
+                return new Azure.Data.Tables.TableClient(TestDefaultConfiguration.DataConnectionString, tableName);
+            }
+        } 
     }
 }

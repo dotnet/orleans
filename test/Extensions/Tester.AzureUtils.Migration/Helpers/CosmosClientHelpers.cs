@@ -17,15 +17,10 @@ namespace Tester.AzureUtils.Migration.Helpers
             {
                 options.ConfigureCosmosClient(connectionString: TestDefaultConfiguration.CosmosDbConnectionString);
             }
-
-            throw new ArgumentNullException(nameof(options), "CosmosDb connection is not correctly configured");
         }
 
-        public static CosmosClient BuildClient()
-        {
-            return TestDefaultConfiguration.UseAadAuthentication
-                ? new CosmosClient(accountEndpoint: TestDefaultConfiguration.OrleansCosmosDbEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential)
-                : new CosmosClient(connectionString: TestDefaultConfiguration.CosmosDbConnectionString);
-        }
+        public static CosmosClient BuildClient() => TestDefaultConfiguration.UseAadAuthentication
+            ? new CosmosClient(accountEndpoint: TestDefaultConfiguration.OrleansCosmosDbEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential)
+            : new CosmosClient(connectionString: TestDefaultConfiguration.CosmosDbConnectionString);
     }
 }
