@@ -14,7 +14,7 @@ namespace Orleans.Serialization
     {
         public JsonSerializerOptions JsonSerializerOptions { get; } = new JsonSerializerOptions()
         {
-            ReferenceHandler = ReferenceHandler.Preserve,
+            //ReferenceHandler = ReferenceHandler.,
             WriteIndented = true,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault | JsonIgnoreCondition.WhenWritingNull,
         };
