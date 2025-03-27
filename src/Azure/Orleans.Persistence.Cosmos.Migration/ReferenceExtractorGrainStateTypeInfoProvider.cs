@@ -38,12 +38,7 @@ namespace Orleans.Persistence.Cosmos.Migration
                 // grainState.Type does not have a proper type -> we need to separately call extractor to find out a proper type
                 var grainClass = grainReferenceExtractor.ExtractType(grainReference);
 
-                var grainTypeAttr = grainClass.GetCustomAttribute<GrainTypeAttribute>();
-                if (grainTypeAttr is null)
-                {
-                    throw new InvalidOperationException($"All grain classes must specify a grain type name using the [GrainType(type)] attribute. Grain class '{grainClass}' does not.");
-                }
-                var grainTypeName = grainTypeAttr.GrainType;
+                var grainTypeName = GrainTypeResolver.GetGrainTypeByConvention(grainClass, forceGrainTypeAttribute: options?.ForceGrainTypeAttribute);
                 var grainKeyFormatter = GrainStateTypeInfo.GetGrainKeyFormatter(grainClass);
 
                 var readStateFunc = CosmosGrainStorage.ReadStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(grainStorage);

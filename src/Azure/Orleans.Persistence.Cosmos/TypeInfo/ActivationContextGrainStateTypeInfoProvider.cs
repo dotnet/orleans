@@ -7,10 +7,14 @@ namespace Orleans.Persistence.Cosmos.TypeInfo
     {
         private readonly ConcurrentDictionary<(ulong grainTypeCode, Type stateType), GrainStateTypeInfo> grainStateTypeInfo = new();
         private readonly IGrainActivationContextAccessor contextAccessor;
+        private readonly CosmosGrainStorageOptions options;
 
-        public ActivationContextGrainStateTypeInfoProvider(IGrainActivationContextAccessor contextAccessor)
+        public ActivationContextGrainStateTypeInfoProvider(
+            IGrainActivationContextAccessor contextAccessor,
+            CosmosGrainStorageOptions options)
         {
             this.contextAccessor = contextAccessor;
+            this.options = options;
         }
 
         public GrainStateTypeInfo GetGrainStateTypeInfo(CosmosGrainStorage grainStorage, GrainReference grainReference, IGrainState grainState)
@@ -32,14 +36,7 @@ namespace Orleans.Persistence.Cosmos.TypeInfo
                 }
 
                 var grainClass = grainContext.GrainType;
-                var grainTypeAttr = grainClass.GetCustomAttribute<GrainTypeAttribute>();
-                if (grainTypeAttr is null)
-                {
-                    throw new InvalidOperationException($"All grain classes must specify a grain type name using the [GrainType(type)] attribute. Grain class '{grainClass}' does not.");
-                }
-
-                // Work out how to format the grain id.
-                var grainTypeName = grainTypeAttr.GrainType;
+                var grainTypeName = GrainTypeResolver.GetGrainTypeByConvention(grainClass, forceGrainTypeAttribute: options?.ForceGrainTypeAttribute);
                 var grainKeyFormatter = GrainStateTypeInfo.GetGrainKeyFormatter(grainClass);
 
                 // Create methods for reading/writing/clearing the state based on the grain state type.

@@ -40,4 +40,10 @@ public class CosmosGrainStorageOptions : CosmosOptions
     /// </notes>
     [Experimental("OrleansCosmosExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9351")]
     public bool UseExperimentalFormat { get; set; } = false;
+
+    /// <summary>
+    /// If true, will only determine the grain type from the <see cref="GrainTypeAttribute"/> attribute.
+    /// Otherwise it will fallback to default grain type resolver algorithm (see <see cref="GrainTypeResolver"/>)
+    /// </summary>
+    public bool ForceGrainTypeAttribute { get; set; } = false;
 }
