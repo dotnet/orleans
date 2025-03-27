@@ -62,7 +62,6 @@ namespace Tester.AzureUtils.Migration
                     {
                         options.ConfigureCosmosStorageOptions();
 
-                        // options.ContainerName = $"destination{RandomIdentifier}";
                         options.ContainerName = OrleansContainer;
                         options.DatabaseName = OrleansDatabase;
                     })

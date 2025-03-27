@@ -63,11 +63,10 @@ namespace Tester.AzureUtils.Migration
                     {
                         options.ConfigureCosmosStorageOptions();
 
-                        // options.ContainerName = $"destination{RandomIdentifier}";
                         options.ContainerName = OrleansContainer;
                         options.DatabaseName = OrleansDatabase;
 
-                        // which writes in non-orleans-8 compatible format
+                        // which writes in non-orleans-8 compatible format (yet)
 #pragma warning disable OrleansCosmosExperimental
                         options.UseExperimentalFormat = true;
 #pragma warning restore OrleansCosmosExperimental

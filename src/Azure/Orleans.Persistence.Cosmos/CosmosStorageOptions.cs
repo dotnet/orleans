@@ -31,7 +31,6 @@ public class CosmosGrainStorageOptions : CosmosOptions
     /// </summary>
     public bool DeleteStateOnClear { get; set; } = true;
 
-
     /// <summary>
     /// If true, will use a <see cref="ExperimentalGrainStateEntity{TState}"/> for saving grain data in CosmosDb storage.
     /// </summary>
