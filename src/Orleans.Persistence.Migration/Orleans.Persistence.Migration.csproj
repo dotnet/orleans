@@ -1,6 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Persistence.Migration</PackageId>
+    <Title>Microsoft Orleans Persistence Migration</Title>
+    <Description>Microsoft Orleans migration tooling</Description>
     <OutputType>Library</OutputType>
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

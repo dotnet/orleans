@@ -1,6 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Persistence.AzureStorage.Migration</PackageId>
+    <Title>Microsoft Orleans Persistence Azure Storage Migration</Title>
+    <Description>Microsoft Orleans persistence migration providers for Azure Storage</Description>
     <TargetFrameworks>net6.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>

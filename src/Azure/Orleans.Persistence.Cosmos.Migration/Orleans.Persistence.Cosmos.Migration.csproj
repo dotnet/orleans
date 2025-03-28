@@ -1,6 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Persistence.Cosmos.Migration</PackageId>
+    <Title>Microsoft Orleans Persistence Azure Cosmos DB Migration</Title>
+    <Description>Microsoft Orleans persistence migration providers for Azure Cosmos DB</Description>
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
   </PropertyGroup>
