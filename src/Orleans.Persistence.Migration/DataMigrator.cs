@@ -20,6 +20,7 @@ namespace Orleans.Persistence.Migration
         private readonly IGrainStorage _destinationStorage;
         private readonly IReminderMigrationTable _reminderMigrationStorage;
 
+        private Task _executeBackgroundMigrationTask;
         private readonly CancellationTokenSource _backgroundWorkCts = new();
         private object _lastProcessedGrainCursor;
 
@@ -38,7 +39,7 @@ namespace Orleans.Persistence.Migration
             _clusterMembershipService = clusterMembershipService;
             _localSiloDetails = localSiloDetails;
 
-            // instead of doing re-registrations of same storage, we can just check if it's already IGrainStorageEntriesController
+            // instead of doing re-registrations of same storage, we can just check if it's already IExtendedGrainStorage
             // if not - we simply fail fast with an explicit error message 
             _sourceStorage = (sourceStorage is IExtendedGrainStorage oldStorageEntriesController)
                 ? oldStorageEntriesController
@@ -48,11 +49,11 @@ namespace Orleans.Persistence.Migration
             _reminderMigrationStorage = reminderMigrationTable;
         }
 
-        public Task StartAsync(CancellationToken cancellationToken) => ExecuteBackgroundMigrationAsync(_backgroundWorkCts.Token);
-        public Task StopAsync(CancellationToken cancellationToken)
+        public Task StartAsync(CancellationToken cancellationToken) => _executeBackgroundMigrationTask = ExecuteBackgroundMigrationAsync(_backgroundWorkCts.Token);
+        public async Task StopAsync(CancellationToken cancellationToken)
         {
             _backgroundWorkCts.Cancel();
-            return Task.CompletedTask;
+            await _executeBackgroundMigrationTask;
         }
 
         private async Task ExecuteBackgroundMigrationAsync(CancellationToken stoppingToken)
@@ -255,6 +256,9 @@ namespace Orleans.Persistence.Migration
             return migrationStats;
         }
 
+        /// <summary>
+        /// Represents migration statistics for a single migration operation.
+        /// </summary>
         public class MigrationStats
         {
             /// <summary>
@@ -283,6 +287,10 @@ namespace Orleans.Persistence.Migration
         }
     }
 
+    /// <summary>
+    /// Options for data migration, including whether to process already migrated entries, batch size for reminders, and
+    /// initial delay for background tasks.
+    /// </summary>
     public class DataMigratorOptions
     {
         /// <summary>

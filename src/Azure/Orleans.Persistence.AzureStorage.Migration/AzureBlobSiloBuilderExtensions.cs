@@ -17,8 +17,6 @@ namespace Orleans.Hosting
 {
     public static class AzureBlobSiloBuilderExtensions
     {
-        #region Grains
-
         /// <summary>
         /// Configure silo to use azure blob storage as the default grain storage.
         /// </summary>
@@ -124,10 +122,6 @@ namespace Orleans.Hosting
                            .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
         }
 
-        #endregion
-
-        #region Reminders
-
         /// <summary>
         /// Use Azure Table Storage for migrated Reminder's data and current data.
         /// </summary>
@@ -154,7 +148,5 @@ namespace Orleans.Hosting
 
             return services;
         }
-
-        #endregion
     }
 }

@@ -103,7 +103,6 @@
     <AzureDataTablesVersion>12.10.0</AzureDataTablesVersion>
     <AzureCoreVersion>1.44.1</AzureCoreVersion>
     <AzureCosmosDbVersion>3.41.0</AzureCosmosDbVersion>
-    <AzureCosmosDbEncryptionVersion>2.1.0-preview4</AzureCosmosDbEncryptionVersion>
     <AzureIdentityVersion>1.13.2</AzureIdentityVersion>
     <AzureMessagingEventHubs>5.6.2</AzureMessagingEventHubs>
     <AzureStorageBlobsVersion>12.13.0</AzureStorageBlobsVersion>
