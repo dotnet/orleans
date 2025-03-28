@@ -43,7 +43,7 @@ namespace Orleans.Persistence.Migration
             // if not - we simply fail fast with an explicit error message 
             _sourceStorage = (sourceStorage is IExtendedGrainStorage oldStorageEntriesController)
                 ? oldStorageEntriesController
-                : throw new ArgumentException($"Implement {nameof(IExtendedGrainStorage)} on grainStorage to support data migration.", paramName: nameof(sourceStorage));
+                : throw new ArgumentException($"Implement {nameof(IExtendedGrainStorage)} on grain storage to support data migration.", paramName: nameof(sourceStorage));
             _destinationStorage = destinationStorage;
 
             _reminderMigrationStorage = reminderMigrationTable;
