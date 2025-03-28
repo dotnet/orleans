@@ -278,5 +278,7 @@ namespace UnitTests.StorageTests
                     return Task.FromResult<object>(true); 
             }
         }
+
+        public IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 }

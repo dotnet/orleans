@@ -27,4 +27,8 @@
     <PackageReference Include="Azure.Data.Tables" Version="$(AzureDataTablesVersion)" />
     <PackageReference Include="System.Net.NameResolution" Version="$(SystemNetNameResolutionVersion)" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tester.AzureUtils.Migration"/>
+  </ItemGroup>
 </Project>

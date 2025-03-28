@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net6.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
+    <PackageReference Include="xunit" Version="$(xUnitVersion)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitRunnerVersion)" />
+    <PackageReference Include="Xunit.SkippableFact" Version="$(XunitSkippableFactVersion)" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Orleans.Persistence.Migration\Orleans.Persistence.Migration.csproj" />
+    <ProjectReference Include="..\..\DefaultCluster.Tests\DefaultCluster.Tests.csproj" />
+    <ProjectReference Include="..\..\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="..\..\Grains\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="..\..\Grains\TestInternalGrains\TestInternalGrains.csproj" />
+    <ProjectReference Include="..\..\Misc\TestInterfaces\TestInterfaces.csproj" />
+    <ProjectReference Include="..\..\Tester\Tester.csproj" />
+    <ProjectReference Include="..\..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="grain-references.csv">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
