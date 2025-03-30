@@ -380,7 +380,7 @@ namespace Orleans.CodeGenerator
 
             if (namespaces.Count > 0)
             {
-                namespaces[0] = namespaces[0]
+                namespaces[namespaces.Count - 1] = namespaces[namespaces.Count - 1]
                     .WithTrailingTrivia(
                        SyntaxFactory.TriviaList(
                            new List<SyntaxTrivia>
