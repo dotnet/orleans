@@ -8,7 +8,6 @@ using Newtonsoft.Json;
 using System.Linq;
 using Microsoft.Extensions.Options;
 using System.Globalization;
-using System.Text;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Clustering.Redis
@@ -28,7 +27,7 @@ namespace Orleans.Clustering.Redis
         {
             _redisOptions = redisOptions.Value;
             _clusterOptions = clusterOptions.Value;
-            _clusterKey = Encoding.UTF8.GetBytes($"{_clusterOptions.ServiceId}/members/{_clusterOptions.ClusterId}");
+            _clusterKey = _redisOptions.CreateRedisKey(_clusterOptions);
             _jsonSerializerSettings = JsonSettings.JsonSerializerSettings;
         }
 
