@@ -6,13 +6,14 @@
   <Import Project="$(_ParentDirectoryBuildTargetsPath)" Condition="Exists('$(_ParentDirectoryBuildTargetsPath)')"/>
 
   <ItemGroup Condition="'$(IsPackable)'=='true' and '$(SourceLinkCreate)'=='true' and '$(IncludeBuildOutput)'=='true'">
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="$(SourceLinkVersion)" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.SourceLink.AzureRepos.Git" PrivateAssets="All"/>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all" />
   </ItemGroup>
 
   <PropertyGroup>
     <!-- Set DisableSourceLinkUrlTranslation to true when building a tool for internal use where sources only come from internal URIs -->
     <DisableSourceLinkUrlTranslation Condition="'$(DisableSourceLinkUrlTranslation)' == ''">false</DisableSourceLinkUrlTranslation>
-    <_TranslateUrlPattern>https://.*\.visualstudio\.com/.*/_git/[^/]*</_TranslateUrlPattern>
+    <_TranslateUrlPattern>(https://.*\.visualstudio\.com/.*/_git/[^/]*)|(https://dev\.azure\.com/.*/_git/[^/]*)</_TranslateUrlPattern>
     <_TranslateUrlReplacement>$(PublicRepositoryUrl)</_TranslateUrlReplacement>
   </PropertyGroup>
 
