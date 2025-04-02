@@ -19,6 +19,14 @@ namespace Tester.AdoNet.Persistence
         public static string ConnectionStringKey = "AdoNetConnectionString";
         public class Fixture : BaseTestClusterFixture
         {
+            protected override void CheckPreconditionsOrThrow()
+            {
+                if (string.IsNullOrEmpty(TestDefaultConfiguration.MsSqlConnectionString))
+                {
+                    throw new SkipException("SQL Server connection string is not specified.");
+                }
+            }
+
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 4;
@@ -58,12 +66,10 @@ namespace Tester.AdoNet.Persistence
             }
         }
 
-        private readonly Fixture fixture;
-
         public PersistenceGrainTests_SqlServer(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {
-            this.fixture = fixture;
-            this.fixture.EnsurePreconditionsMet();
+            DistinguishesGenericGrainTypeParameters = false;
+            fixture.EnsurePreconditionsMet();
         }
     }
 }

@@ -103,7 +103,7 @@ namespace UnitTests.General
                 return testStorage;
             }
 
-            Console.WriteLine("Dropping and recreating database '{0}' with connectionstring '{1}'", testDatabaseName, testStorage.CurrentConnectionString);
+            Console.WriteLine("Dropping and recreating database '{0}' with ConnectionString '{1}'", testDatabaseName, testStorage.CurrentConnectionString);
 
             if (await testStorage.ExistsDatabaseAsync(testDatabaseName))
             {
@@ -150,6 +150,10 @@ namespace UnitTests.General
             if (!string.IsNullOrEmpty(connectionString))
             {
                 Storage = RelationalStorage.CreateInstance(invariantName, connectionString);
+            }
+            else
+            {
+                throw new SkipException("ConnectionString not provided.");
             }
         }
 

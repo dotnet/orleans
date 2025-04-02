@@ -1,7 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Providers;
-using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -10,11 +9,12 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
 using static Orleans.Storage.DynamoDBGrainStorage;
+using TestExtensions.Runners;
 
 namespace AWSUtils.Tests.StorageTests
 {
     [TestCategory("Persistence"), TestCategory("AWS"), TestCategory("DynamoDb")]
-    public class PersistenceGrainTests_AWSDynamoDBStore : Base_PersistenceGrainTests_AWSStore, IClassFixture<PersistenceGrainTests_AWSDynamoDBStore.Fixture>
+    public class PersistenceGrainTests_AWSDynamoDBStore : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_AWSDynamoDBStore.Fixture>
     {
         public class Fixture : TestExtensions.BaseTestClusterFixture
         {
@@ -33,96 +33,18 @@ namespace AWSUtils.Tests.StorageTests
                 {
                     hostBuilder.AddMemoryGrainStorage("MemoryStore");
                     hostBuilder.AddMemoryGrainStorage("test1");
-                    hostBuilder.AddDynamoDBGrainStorage("DDBStore", options => options.Service = AWSTestConstants.DynamoDbService);
+                    hostBuilder.AddDynamoDBGrainStorage("GrainStorageForTest", options => options.Service = AWSTestConstants.DynamoDbService);
                 }
             }
         }
 
-        public PersistenceGrainTests_AWSDynamoDBStore(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
+        public PersistenceGrainTests_AWSDynamoDBStore(ITestOutputHelper output, Fixture fixture) : base(output, fixture, grainNamespace: "UnitTests.Grains")
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
             {
                 output.WriteLine("Unable to connect to AWS DynamoDB simulator");
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
             }
-        }
-
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_AWSDynamoDBStore_Delete()
-        {
-            await base.Grain_AWSStore_Delete();
-        }
-
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_AWSDynamoDBStore_Read()
-        {
-            await base.Grain_AWSStore_Read();
-        }
-
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_GuidKey_AWSDynamoDBStore_Read_Write()
-        {
-            await base.Grain_GuidKey_AWSStore_Read_Write();
-        }
-
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_LongKey_AWSDynamoDBStore_Read_Write()
-        {
-            await base.Grain_LongKey_AWSStore_Read_Write();
-        }
-
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_LongKeyExtended_AWSDynamoDBStore_Read_Write()
-        {
-            await base.Grain_LongKeyExtended_AWSStore_Read_Write();
-        }
-
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_GuidKeyExtended_AWSDynamoDBStore_Read_Write()
-        {
-            await base.Grain_GuidKeyExtended_AWSStore_Read_Write();
-        }
-
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_Generic_AWSDynamoDBStore_Read_Write()
-        {
-            await base.Grain_Generic_AWSStore_Read_Write();
-        }
-
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_Generic_AWSDynamoDBStore_DiffTypes()
-        {
-            await base.Grain_Generic_AWSStore_DiffTypes();
-        }
-
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_AWSDynamoDBStore_SiloRestart()
-        {
-            await base.Grain_AWSStore_SiloRestart();
-        }
-
-        [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
-        public void Persistence_Perf_Activate_AWSDynamoDBStore()
-        {
-            base.Persistence_Perf_Activate();
-        }
-
-        [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
-        public void Persistence_Perf_Write_AWSDynamoDBStore()
-        {
-            base.Persistence_Perf_Write();
-        }
-
-        [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
-        public void Persistence_Perf_Write_Reread_AWSDynamoDBStore()
-        {
-            base.Persistence_Perf_Write_Reread();
-        }
-
-        [SkippableFact, TestCategory("Functional")]
-        public Task Persistence_Silo_StorageProvider_AWSDynamoDBStore()
-        {
-            return base.Persistence_Silo_StorageProvider_AWS("DDBStore");
         }
 
         [SkippableFact, TestCategory("Functional")]

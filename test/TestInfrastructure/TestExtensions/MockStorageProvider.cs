@@ -234,6 +234,7 @@ namespace UnitTests.StorageTests
                 LastState = null;
             }
             grainState.RecordExists = false;
+            grainState.State = Activator.CreateInstance<T>();
             return Task.CompletedTask;
         }
 

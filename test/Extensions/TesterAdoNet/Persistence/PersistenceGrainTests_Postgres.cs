@@ -20,6 +20,14 @@ namespace Tester.AdoNet.Persistence
 
         public class Fixture : BaseTestClusterFixture
         {
+            protected override void CheckPreconditionsOrThrow()
+            {
+                if (string.IsNullOrEmpty(TestDefaultConfiguration.PostgresConnectionString))
+                {
+                    throw new SkipException("Postgres connection string is not specified.");
+                }
+            }
+
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 4;
@@ -40,6 +48,7 @@ namespace Tester.AdoNet.Persistence
                 public void Configure(IHostBuilder hostBuilder)
                 {
                     var connectionString = hostBuilder.GetConfiguration()[ConnectionStringKey];
+
                     hostBuilder.UseOrleans((ctx, siloBuilder) =>
                     {
                         siloBuilder
@@ -59,12 +68,10 @@ namespace Tester.AdoNet.Persistence
             }
         }
 
-        private readonly Fixture fixture;
-
         public PersistenceGrainTests_Postgres(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {
-            this.fixture = fixture;
-            this.fixture.EnsurePreconditionsMet();
+            DistinguishesGenericGrainTypeParameters = false;
+            fixture.EnsurePreconditionsMet();
         }
     }
 }

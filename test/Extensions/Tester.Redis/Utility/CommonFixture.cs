@@ -7,6 +7,7 @@ using Orleans.Persistence;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using StackExchange.Redis;
 using Tester;
@@ -53,7 +54,14 @@ public class CommonFixture : TestEnvironmentFixture
             ServiceId = Guid.NewGuid().ToString()
         };
 
-        var storageProvider = new RedisGrainStorage(string.Empty, options, grainStorageSerializer, Options.Create(clusterOptions), DefaultProviderRuntime.ServiceProvider.GetService<ILogger<RedisGrainStorage>>());
+        var serviceProvider = DefaultProviderRuntime.ServiceProvider;
+        var storageProvider = new RedisGrainStorage(
+            string.Empty,
+            options,
+            grainStorageSerializer,
+            Options.Create(clusterOptions),
+            serviceProvider.GetRequiredService<IActivatorProvider>(),
+            serviceProvider.GetRequiredService<ILogger<RedisGrainStorage>>());
         ISiloLifecycleSubject siloLifeCycle = new SiloLifecycleSubject(NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
         storageProvider.Participate(siloLifeCycle);
         await siloLifeCycle.OnStart(CancellationToken.None);

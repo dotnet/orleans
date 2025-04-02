@@ -20,6 +20,14 @@ namespace Tester.AdoNet.Persistence
 
         public class Fixture : BaseTestClusterFixture
         {
+            protected override void CheckPreconditionsOrThrow()
+            {
+                if (string.IsNullOrEmpty(TestDefaultConfiguration.MySqlConnectionString))
+                {
+                    throw new SkipException("MySQL connection string is not specified.");
+                }
+            }
+
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 4;
@@ -59,12 +67,10 @@ namespace Tester.AdoNet.Persistence
             }
         }
 
-        private readonly Fixture fixture;
-
         public PersistenceGrainTests_MySql(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {
-            this.fixture = fixture;
-            this.fixture.EnsurePreconditionsMet();
+            DistinguishesGenericGrainTypeParameters = false;
+            fixture.EnsurePreconditionsMet();
         }
     }
 }

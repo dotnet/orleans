@@ -79,14 +79,14 @@ namespace Tester
             return multiple > 1.0 ? multiple : 1.0;
         }
 
-        public static TimeSpan TimeRun(int numIterations, TimeSpan baseline, string what, Action action)
+        public static async Task<TimeSpan> TimeRunAsync(int numIterations, TimeSpan baseline, string what, Func<Task> action)
         {
             var stopwatch = new Stopwatch();
 
             long startMem = GC.GetTotalMemory(true);
             stopwatch.Start();
 
-            action();
+            await action();
 
             stopwatch.Stop();
             long stopMem = GC.GetTotalMemory(false);

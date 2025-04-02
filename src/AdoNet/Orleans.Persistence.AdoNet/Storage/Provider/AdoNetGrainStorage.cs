@@ -16,6 +16,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration.Overrides;
 using Orleans.Configuration;
 using Orleans.Runtime.Configuration;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Storage
 {
@@ -69,7 +70,7 @@ namespace Orleans.Storage
     /// </para>
     /// </remarks>
     [DebuggerDisplay("Name = {Name}, ConnectionString = {Storage.ConnectionString}")]
-    public class AdoNetGrainStorage: IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
+    public class AdoNetGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
         public IGrainStorageSerializer Serializer { get; set; }
 
@@ -90,7 +91,7 @@ namespace Orleans.Storage
         /// The Service ID for which this relational provider is used.
         /// </summary>
         private readonly string serviceId;
-
+        private readonly IActivatorProvider _activatorProvider;
         private readonly ILogger logger;
 
         /// <summary>
@@ -121,29 +122,29 @@ namespace Orleans.Storage
         public IStorageHasherPicker HashPicker { get; set; }
 
         private readonly AdoNetGrainStorageOptions options;
-        private readonly IProviderRuntime providerRuntime;
         private readonly string name;
 
         public AdoNetGrainStorage(
+            IActivatorProvider activatorProvider,
             ILogger<AdoNetGrainStorage> logger,
-            IProviderRuntime providerRuntime,
             IOptions<AdoNetGrainStorageOptions> options,
             IOptions<ClusterOptions> clusterOptions,
             string name)
         {
             this.options = options.Value;
-            this.providerRuntime = providerRuntime;
             this.name = name;
+            _activatorProvider = activatorProvider;
             this.logger = logger;
             this.serviceId = clusterOptions.Value.ServiceId;
             this.Serializer = options.Value.GrainStorageSerializer;
-            this.HashPicker = options.Value.HashPicker ?? new StorageHasherPicker(new[] { new OrleansDefaultHasher() });;
+            this.HashPicker = options.Value.HashPicker ?? new StorageHasherPicker(new[] { new OrleansDefaultHasher() });
         }
 
         public void Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe(OptionFormattingUtilities.Name<AdoNetGrainStorage>(this.name), this.options.InitStage, Init, Close);
         }
+
         /// <summary>Clear state data function for this storage provider.</summary>
         /// <see cref="IGrainStorage.ClearStateAsync{T}"/>.
         public async Task ClearStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
@@ -152,7 +153,7 @@ namespace Orleans.Storage
             //even if not as clear as when using explicitly checked parameters.
             var grainId = GrainIdAndExtensionAsString(grainReference);
             var baseGrainType = ExtractBaseClass(grainType);
-            if(logger.IsEnabled(LogLevel.Trace))
+            if (logger.IsEnabled(LogLevel.Trace))
             {
                 logger.LogTrace(
                     (int)RelationalStorageProviderCodes.RelationalProviderClearing,
@@ -162,6 +163,15 @@ namespace Orleans.Storage
                     baseGrainType,
                     grainId,
                     grainState.ETag);
+            }
+
+            if (!grainState.RecordExists)
+            {
+                await ReadStateAsync(grainType, grainReference, grainState).ConfigureAwait(false);
+                if (!grainState.RecordExists)
+                {
+                    return;
+                }
             }
 
             string storageVersion = null;
@@ -182,7 +192,7 @@ namespace Orleans.Storage
                 }, (selector, resultSetCount, token) => Task.FromResult(selector.GetValue(0).ToString()), cancellationToken: CancellationToken.None).ConfigureAwait(false));
                 storageVersion = clearRecord.SingleOrDefault();
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 logger.LogError(
                     (int)RelationalStorageProviderCodes.RelationalProviderDeleteError,
@@ -198,7 +208,7 @@ namespace Orleans.Storage
 
             const string OperationString = "ClearState";
             var inconsistentStateException = CheckVersionInconsistency(OperationString, serviceId, this.name, storageVersion, grainState.ETag, baseGrainType, grainId.ToString());
-            if(inconsistentStateException != null)
+            if (inconsistentStateException != null)
             {
                 throw inconsistentStateException;
             }
@@ -206,7 +216,8 @@ namespace Orleans.Storage
             //No errors found, the version of the state held by the grain can be updated and also the state.
             grainState.ETag = storageVersion;
             grainState.RecordExists = false;
-            if(logger.IsEnabled(LogLevel.Trace))
+            grainState.State = CreateInstance<T>();
+            if (logger.IsEnabled(LogLevel.Trace))
             {
                 logger.LogTrace(
                     (int)RelationalStorageProviderCodes.RelationalProviderCleared,
@@ -273,20 +284,24 @@ namespace Orleans.Storage
                     },
                     commandBehavior, CancellationToken.None).ConfigureAwait(false)).SingleOrDefault();
 
-                T state = readRecords != null ? (T) readRecords.Item1 : default;
+                T state = readRecords != null ? (T)readRecords.Item1 : default;
                 string etag = readRecords != null ? readRecords.Item2 : null;
                 bool recordExists = readRecords != null;
-                if(state == null)
+                if (state == null)
                 {
-                    logger.LogInformation(
-                        (int)RelationalStorageProviderCodes.RelationalProviderNoStateFound,
-                        "Null grain state read (default will be instantiated): ServiceId={ServiceId} ProviderName={Name} GrainType={BaseGrainType} GrainId={GrainId} ETag={ETag}.",
-                        serviceId,
-                        name,
-                        baseGrainType,
-                        grainId,
-                        grainState.ETag);
-                    state = Activator.CreateInstance<T>();
+                    if (logger.IsEnabled(LogLevel.Trace))
+                    {
+                        logger.LogTrace(
+                            (int)RelationalStorageProviderCodes.RelationalProviderNoStateFound,
+                            "Null grain state read (default will be instantiated): ServiceId={ServiceId} ProviderName={Name} GrainType={BaseGrainType} GrainId={GrainId} ETag={ETag}.",
+                            serviceId,
+                            name,
+                            baseGrainType,
+                            grainId,
+                            grainState.ETag);
+                    }
+
+                    state = CreateInstance<T>();
                 }
 
                 grainState.State = state;
@@ -304,7 +319,7 @@ namespace Orleans.Storage
                         grainState.ETag);
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 logger.LogError(
                     (int)RelationalStorageProviderCodes.RelationalProviderReadError,
@@ -363,7 +378,7 @@ namespace Orleans.Storage
                 { return Task.FromResult(selector.GetNullableInt32("NewGrainStateVersion").ToString()); }, cancellationToken: CancellationToken.None).ConfigureAwait(false);
                 storageVersion = writeRecord.SingleOrDefault();
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 logger.LogError(
                     (int)RelationalStorageProviderCodes.RelationalProviderWriteError,
@@ -379,7 +394,7 @@ namespace Orleans.Storage
 
             const string OperationString = "WriteState";
             var inconsistentStateException = CheckVersionInconsistency(OperationString, serviceId, this.name, storageVersion, grainState.ETag, baseGrainType, grainId.ToString());
-            if(inconsistentStateException != null)
+            if (inconsistentStateException != null)
             {
                 throw inconsistentStateException;
             }
@@ -424,7 +439,6 @@ namespace Orleans.Storage
                 ConfigUtilities.RedactConnectionStringInfo(Storage.ConnectionString));
         }
 
-
         /// <summary>
         /// Close this provider
         /// </summary>
@@ -432,7 +446,6 @@ namespace Orleans.Storage
         {
             return Task.CompletedTask;
         }
-
 
         /// <summary>
         /// Checks for version inconsistency as defined in the database scripts.
@@ -455,7 +468,7 @@ namespace Orleans.Storage
             //it means two grains were activated an the other one succeeded in writing its state.
             //
             //NOTE: the storage could return also the new and old ETag (Version), but currently it doesn't.
-            if(storageVersion == grainVersion || storageVersion == string.Empty)
+            if (storageVersion == grainVersion || storageVersion == string.Empty)
             {
                 //TODO: Note that this error message should be canonical across back-ends.
                 return new InconsistentStateException($"Version conflict ({operation}): ServiceId={serviceId} ProviderName={providerName} GrainType={normalizedGrainType} GrainId={grainId} ETag={grainVersion}.");
@@ -545,5 +558,7 @@ namespace Orleans.Storage
                 return 0;
             }
         }
+
+        private T CreateInstance<T>() => _activatorProvider.GetActivator<T>().Create();
     }
 }
