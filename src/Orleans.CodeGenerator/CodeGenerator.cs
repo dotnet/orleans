@@ -601,7 +601,7 @@ namespace Orleans.CodeGenerator
                 Attribute(ParseName("global::System.ComponentModel.EditorBrowsableAttribute"))
                     .AddArgumentListArguments(
                         AttributeArgument(ParseName("global::System.ComponentModel.EditorBrowsableState").Member("Never"))),
-                Attribute(ParseName("global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute"))
+                        Attribute(ParseName("global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute"))
             );
 
         internal static AttributeSyntax GetMethodImplAttributeSyntax() => MethodImplAttributeSyntax;
