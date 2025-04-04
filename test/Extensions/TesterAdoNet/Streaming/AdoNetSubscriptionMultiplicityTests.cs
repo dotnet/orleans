@@ -40,6 +40,7 @@ public abstract class AdoNetSubscriptionMultiplicityTests : TestClusterPerTest
     protected AdoNetSubscriptionMultiplicityTests(string invariant)
     {
         _invariant = invariant;
+        RelationalStorageForTesting.CheckPreconditionsOrThrow(_invariant);
     }
 
     public override async Task InitializeAsync()

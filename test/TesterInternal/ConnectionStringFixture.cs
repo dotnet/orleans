@@ -22,7 +22,7 @@ namespace UnitTests
                         $"{nameof(InitializeConnectionStringAccessor)} was not called before accessing the connection string");
                 }
 
-                var connString = this.connectionStringLazy.Value.Result;
+                var connString = this.connectionStringLazy.Value.GetAwaiter().GetResult();
                 if (connString != null)
                 {
                     return connString;

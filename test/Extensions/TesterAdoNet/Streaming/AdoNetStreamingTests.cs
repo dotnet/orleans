@@ -49,6 +49,7 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
     protected AdoNetStreamingTests(string invariant)
     {
         _invariant = invariant;
+        RelationalStorageForTesting.CheckPreconditionsOrThrow(_invariant);
     }
 
     private static RelationalStorageForTesting _testing;
