@@ -31,6 +31,7 @@ public class PersistenceStateTests_AzureBlobStore : Base_PersistenceGrainTests_A
                 hostBuilder.AddAzureBlobGrainStorage("GrainStorageForTest", (AzureBlobStorageOptions options) =>
                 {
                     options.ConfigureTestDefaults();
+                    options.DeleteStateOnClear = false;
                 });
             }
         }
@@ -43,7 +44,7 @@ public class PersistenceStateTests_AzureBlobStore : Base_PersistenceGrainTests_A
 }
 
 [TestCategory("Persistence"), TestCategory("AzureStorage")]
-public class PersistenceStateTests_AzureBlobStore_NoDeleteStateOnClear : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceStateTests_AzureBlobStore_NoDeleteStateOnClear.Fixture>
+public class PersistenceStateTests_AzureBlobStore_DeleteStateOnClear : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceStateTests_AzureBlobStore_DeleteStateOnClear.Fixture>
 {
     public class Fixture : BaseAzureTestClusterFixture
     {
@@ -63,13 +64,13 @@ public class PersistenceStateTests_AzureBlobStore_NoDeleteStateOnClear : Base_Pe
                 hostBuilder.AddAzureBlobGrainStorage("GrainStorageForTest", (AzureBlobStorageOptions options) =>
                 {
                     options.ConfigureTestDefaults();
-                    options.DeleteStateOnClear = false;
+                    options.DeleteStateOnClear = true;
                 });
             }
         }
     }
 
-    public PersistenceStateTests_AzureBlobStore_NoDeleteStateOnClear(ITestOutputHelper output, Fixture fixture) : base(output, fixture, "UnitTests.PersistentState.Grains")
+    public PersistenceStateTests_AzureBlobStore_DeleteStateOnClear(ITestOutputHelper output, Fixture fixture) : base(output, fixture, "UnitTests.PersistentState.Grains")
     {
         fixture.EnsurePreconditionsMet();
     }
