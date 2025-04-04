@@ -5,7 +5,6 @@ using Orleans.Runtime.ReminderService;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
-using Xunit;
 
 namespace UnitTests.RemindersTest
 {
@@ -50,7 +49,6 @@ namespace UnitTests.RemindersTest
         public void RemindersTable_PostgreSql_Init()
         {
         }
-
 
         [SkippableFact]
         public async Task RemindersTable_PostgreSql_RemindersRange()

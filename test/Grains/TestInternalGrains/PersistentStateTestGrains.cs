@@ -38,6 +38,16 @@ namespace UnitTests.PersistentState.Grains
         {
             return this.persistentState.ClearStateAsync();
         }
+
+        public ValueTask<GrainState<PersistenceTestGrainState>> GetStateAsync()
+        {
+            return new(new GrainState<PersistenceTestGrainState>
+            {
+                RecordExists = persistentState.RecordExists,
+                State = persistentState.State,
+                ETag = persistentState.Etag
+            });
+        }
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "GrainStorageForTest")]
@@ -73,6 +83,42 @@ namespace UnitTests.PersistentState.Grains
         }
 
         public async Task<int> DoRead()
+        {
+            await this.persistentState.ReadStateAsync(); // Re-read state from store
+            return this.persistentState.State.Field1;
+        }
+
+        public Task DoDelete()
+        {
+            return this.persistentState.ClearStateAsync();
+        }
+    }
+
+    [GrainType("new-test-storage-generic-grain`1")]
+    public class GrainStorageGenericGrain<T> : Grain,
+        IGrainStorageGenericGrain<T>
+    {
+        private readonly IPersistentState<PersistenceGenericGrainState<T>> persistentState;
+
+        public GrainStorageGenericGrain(
+            [PersistentState("state", "GrainStorageForTest")]
+            IPersistentState<PersistenceGenericGrainState<T>> persistentState)
+        {
+            this.persistentState = persistentState;
+        }
+
+        public Task<T> GetValue()
+        {
+            return Task.FromResult(this.persistentState.State.Field1);
+        }
+
+        public Task DoWrite(T val)
+        {
+            this.persistentState.State.Field1 = val;
+            return this.persistentState.WriteStateAsync();
+        }
+
+        public async Task<T> DoRead()
         {
             await this.persistentState.ReadStateAsync(); // Re-read state from store
             return this.persistentState.State.Field1;

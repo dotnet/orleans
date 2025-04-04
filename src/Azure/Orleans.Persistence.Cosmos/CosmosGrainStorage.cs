@@ -4,10 +4,11 @@ using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Storage;
 using static Orleans.Persistence.Cosmos.CosmosIdSanitizer;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Persistence.Cosmos;
 
-public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
+public sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
 {
     private const string ANY_ETAG = "*";
     private const string KEY_STRING_SEPARATOR = "__";
@@ -19,6 +20,7 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
     private readonly string _serviceId;
     private string _partitionKeyPath;
     private readonly IPartitionKeyProvider _partitionKeyProvider;
+    private readonly IActivatorProvider _activatorProvider;
     private readonly ICosmosOperationExecutor _executor;
     private CosmosClient _client = default!;
     private Container _container = default!;
@@ -29,8 +31,8 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
         ILoggerFactory loggerFactory,
         IServiceProvider serviceProvider,
         IOptions<ClusterOptions> clusterOptions,
-        IPartitionKeyProvider partitionKeyProvider
-    )
+        IPartitionKeyProvider partitionKeyProvider,
+        IActivatorProvider activatorProvider)
     {
         _logger = loggerFactory.CreateLogger<CosmosGrainStorage>();
         _options = options;
@@ -38,6 +40,7 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
         _serviceProvider = serviceProvider;
         _serviceId = clusterOptions.Value.ServiceId;
         _partitionKeyProvider = partitionKeyProvider;
+        _activatorProvider = activatorProvider;
         _executor = options.OperationExecutor;
         _partitionKeyPath = _options.PartitionKeyPath;
     }
@@ -75,7 +78,7 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
             }
             else
             {
-                grainState.State = Activator.CreateInstance<T>();
+                grainState.State = CreateInstance<T>();
                 grainState.RecordExists = false;
             }
 
@@ -85,9 +88,8 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
         {
             if (dce.StatusCode == HttpStatusCode.NotFound)
             {
-                // State is new, just activate a default and return
-                grainState.State = Activator.CreateInstance<T>();
-                grainState.RecordExists = false;
+                // State is new, just activate a default and return.
+                ResetGrainState(grainState);
                 return;
             }
 
@@ -144,8 +146,6 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
                         return self._container.CreateItemAsync(entity, pk);
                     },
                     (this, entity, pk)).ConfigureAwait(false);
-
-                grainState.ETag = response.Resource.ETag;
             }
             else if (grainState.ETag == ANY_ETAG)
             {
@@ -157,7 +157,6 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
                         return self._container.UpsertItemAsync(entity, pk, requestOptions);
                     },
                     (this, entity, pk, requestOptions)).ConfigureAwait(false);
-                grainState.ETag = response.Resource.ETag;
             }
             else
             {
@@ -169,12 +168,12 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
                         return self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions);
                     },
                     (this, entity, pk, requestOptions)).ConfigureAwait(false);
-                grainState.ETag = response.Resource.ETag;
             }
 
+            grainState.ETag = response.Resource.ETag;
             grainState.RecordExists = true;
         }
-        catch (CosmosException dce) when (dce.StatusCode == HttpStatusCode.PreconditionFailed)
+        catch (CosmosException ex) when (ex.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.Conflict or HttpStatusCode.NotFound)
         {
             throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, "Unknown", grainState.ETag);
         }
@@ -217,20 +216,18 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
                         // State exists but the current activation has not observed state creation. Therefore, we have inconsistent state and should throw to give the grain a chance to deactivate and recover.
                         throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, grainState.ETag, "None");
                     }
-
-                    // State does not exist.
-                    return;
+                }
+                else
+                {
+                    await _executor.ExecuteOperation(static args =>
+                    {
+                        var (self, id, pk, requestOptions) = args;
+                        return self._container.DeleteItemAsync<GrainStateEntity<T>>(id, pk, requestOptions);
+                    },
+                    (this, id, pk, requestOptions));
                 }
 
-                await _executor.ExecuteOperation(static args =>
-                {
-                    var (self, id, pk, requestOptions) = args;
-                    return self._container.DeleteItemAsync<GrainStateEntity<T>>(id, pk, requestOptions);
-                },
-                (this, id, pk, requestOptions));
-
-                grainState.ETag = null;
-                grainState.RecordExists = false;
+                ResetGrainState(grainState);
             }
             else
             {
@@ -256,8 +253,13 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
                 (this, grainState, entity, pk, requestOptions)).ConfigureAwait(false);
 
                 grainState.ETag = response.Resource.ETag;
-                grainState.RecordExists = true;
+                grainState.RecordExists = false;
+                grainState.State = CreateInstance<T>();
             }
+        }
+        catch (CosmosException ex) when (ex.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.Conflict or HttpStatusCode.NotFound)
+        {
+            throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, "Unknown", grainState?.ETag ?? "Unknown");
         }
         catch (Exception exc)
         {
@@ -407,6 +409,15 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
             throw;
         }
     }
+
+    private void ResetGrainState<T>(IGrainState<T> grainState)
+    {
+        grainState.State = CreateInstance<T>();
+        grainState.ETag = null;
+        grainState.RecordExists = false;
+    }
+
+    private T CreateInstance<T>() => _activatorProvider.GetActivator<T>().Create();
 }
 
 public static class CosmosStorageFactory
@@ -418,12 +429,14 @@ public static class CosmosStorageFactory
             ?? services.GetRequiredService<IPartitionKeyProvider>();
         var loggerFactory = services.GetRequiredService<ILoggerFactory>();
         var clusterOptions = services.GetRequiredService<IOptions<ClusterOptions>>();
+        var activatorProvider = services.GetRequiredService<IActivatorProvider>();
         return new CosmosGrainStorage(
             name,
             optionsMonitor.Get(name),
             loggerFactory,
             services,
             clusterOptions,
-            partitionKeyProvider);
+            partitionKeyProvider,
+            activatorProvider);
     }
 }

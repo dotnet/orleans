@@ -9,6 +9,7 @@ using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Storage;
 using Samples.StorageProviders;
@@ -261,7 +262,8 @@ namespace Tester.AzureUtils.Persistence
                     MockCallsOnly = true
                 },
                 NullLoggerFactory.Instance,
-                providerRuntime.ServiceProvider.GetService<IGrainFactory>(),
+                providerRuntime.ServiceProvider.GetRequiredService<IGrainFactory>(),
+                providerRuntime.ServiceProvider.GetRequiredService<IActivatorProvider>(),
                 providerRuntime.ServiceProvider.GetService<IGrainStorageSerializer>());
 
             var reference = (GrainId)LegacyGrainId.NewId();

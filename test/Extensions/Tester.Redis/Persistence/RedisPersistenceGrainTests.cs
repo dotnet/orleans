@@ -13,7 +13,7 @@ using Xunit.Abstractions;
 
 namespace Tester.Redis.Persistence
 {
-    [TestCategory("Redis"), TestCategory("Persistence"), TestCategory("Functional")]
+    [TestCategory("Redis"), TestCategory("Persistence")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class RedisPersistenceGrainTests : GrainPersistenceTestsRunner, IClassFixture<RedisPersistenceGrainTests.Fixture>
     {

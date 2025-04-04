@@ -12,7 +12,7 @@ using Xunit.Abstractions;
 
 namespace UnitTests.MembershipTests
 {
-    public class LivenessTestsBase : TestClusterPerTest
+    public abstract class LivenessTestsBase : TestClusterPerTest
     {
         private readonly ITestOutputHelper output;
         private const int numAdditionalSilos = 1;

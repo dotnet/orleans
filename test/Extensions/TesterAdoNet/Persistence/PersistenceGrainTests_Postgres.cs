@@ -15,24 +15,27 @@ namespace Tester.AdoNet.Persistence
     {
         public const string TestDatabaseName = "OrleansTest_Postgres_Storage";
         public static string AdoInvariant = AdoNetInvariants.InvariantNamePostgreSql;
-        public static Guid ServiceId = Guid.NewGuid();
         public static string ConnectionStringKey = "AdoNetConnectionString";
 
         public class Fixture : BaseTestClusterFixture
         {
+            protected override void CheckPreconditionsOrThrow()
+            {
+                if (string.IsNullOrEmpty(TestDefaultConfiguration.PostgresConnectionString))
+                {
+                    throw new SkipException("Postgres connection string is not specified.");
+                }
+            }
+
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.Options.InitialSilosCount = 4;
-                builder.Options.UseTestClusterMembership = false;
                 var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName).Result;
                 builder.ConfigureHostConfiguration(configBuilder => configBuilder.AddInMemoryCollection(
                     new Dictionary<string, string>
                     {
                         {ConnectionStringKey, relationalStorage.CurrentConnectionString}
                     }));
-                builder.Options.ServiceId = ServiceId.ToString();
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-                builder.AddClientBuilderConfigurator<GatewayConnectionTests.ClientBuilderConfigurator>();
             }
 
             private class MySiloBuilderConfigurator : IHostConfigurator
@@ -40,17 +43,13 @@ namespace Tester.AdoNet.Persistence
                 public void Configure(IHostBuilder hostBuilder)
                 {
                     var connectionString = hostBuilder.GetConfiguration()[ConnectionStringKey];
+
                     hostBuilder.UseOrleans((ctx, siloBuilder) =>
                     {
                         siloBuilder
-                            .UseAdoNetClustering(options =>
-                            {
-                                options.ConnectionString = connectionString;
-                                options.Invariant = AdoInvariant;
-                            })
                             .AddAdoNetGrainStorage("GrainStorageForTest", options =>
                             {
-                                options.ConnectionString = (string)connectionString;
+                                options.ConnectionString = connectionString;
                                 options.Invariant = AdoInvariant;
                             })
                             .AddMemoryGrainStorage("MemoryStore");
@@ -59,12 +58,10 @@ namespace Tester.AdoNet.Persistence
             }
         }
 
-        private readonly Fixture fixture;
-
         public PersistenceGrainTests_Postgres(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {
-            this.fixture = fixture;
-            this.fixture.EnsurePreconditionsMet();
+            DistinguishesGenericGrainTypeParameters = false;
+            fixture.EnsurePreconditionsMet();
         }
     }
 }

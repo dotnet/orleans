@@ -1,6 +1,7 @@
 using System.Data.Common;
 using Orleans.Tests.SqlUtils;
 using Tester.RelationalUtilities;
+using TestExtensions;
 
 namespace UnitTests.General
 {
@@ -12,6 +13,14 @@ namespace UnitTests.General
                 {AdoNetInvariants.InvariantNameSqlServer, cs => new SqlServerStorageForTesting(cs)},
                 {AdoNetInvariants.InvariantNameMySql, cs => new MySqlStorageForTesting(cs)},
                 {AdoNetInvariants.InvariantNamePostgreSql, cs => new PostgreSqlStorageForTesting(cs)}
+            };
+
+        private static readonly Dictionary<string, string> ConnectionStringsByInvariant =
+            new()
+            {
+                {AdoNetInvariants.InvariantNameSqlServer, TestDefaultConfiguration.MsSqlConnectionString},
+                {AdoNetInvariants.InvariantNameMySql, TestDefaultConfiguration.MySqlConnectionString},
+                {AdoNetInvariants.InvariantNamePostgreSql, TestDefaultConfiguration.PostgresConnectionString}
             };
 
         public IRelationalStorage Storage { get; private set; }
@@ -80,8 +89,19 @@ namespace UnitTests.General
         /// <param name="databaseName">the name of the database</param>
         protected abstract IEnumerable<string> ConvertToExecutableBatches(string setupScript, string databaseName);
 
+        public static void CheckPreconditionsOrThrow(string invariantName, string connectionString = null)
+        {
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                Skip.IfNot(ConnectionStringsByInvariant.TryGetValue(invariantName, out connectionString), $"Unknown ADO.NET invariant, '{invariantName}'");
+            }
+
+            Skip.If(string.IsNullOrEmpty(connectionString), "Connection string not provided.");
+        }
+
         public static async Task<RelationalStorageForTesting> SetupInstance(string invariantName, string testDatabaseName, string connectionString = null)
         {
+            CheckPreconditionsOrThrow(invariantName, connectionString);
             if (string.IsNullOrWhiteSpace(invariantName))
             {
                 throw new ArgumentException("The name of invariant must contain characters", nameof(invariantName));
@@ -103,7 +123,7 @@ namespace UnitTests.General
                 return testStorage;
             }
 
-            Console.WriteLine("Dropping and recreating database '{0}' with connectionstring '{1}'", testDatabaseName, testStorage.CurrentConnectionString);
+            Console.WriteLine("Dropping and recreating database '{0}' with ConnectionString '{1}'", testDatabaseName, testStorage.CurrentConnectionString);
 
             if (await testStorage.ExistsDatabaseAsync(testDatabaseName))
             {
@@ -150,6 +170,10 @@ namespace UnitTests.General
             if (!string.IsNullOrEmpty(connectionString))
             {
                 Storage = RelationalStorage.CreateInstance(invariantName, connectionString);
+            }
+            else
+            {
+                throw new SkipException("ConnectionString not provided.");
             }
         }
 

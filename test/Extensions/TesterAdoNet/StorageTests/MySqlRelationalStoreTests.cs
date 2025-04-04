@@ -1,4 +1,6 @@
+using System.Runtime.ExceptionServices;
 using Orleans.Tests.SqlUtils;
+using TestExtensions;
 using UnitTests.General;
 using Xunit;
 
@@ -14,16 +16,32 @@ namespace UnitTests.StorageTests.AdoNet
 
         public class Fixture
         {
+            private readonly ExceptionDispatchInfo preconditionsException;
+
+            public void EnsurePreconditionsMet()
+            {
+                this.preconditionsException?.Throw();
+            }
+
             public Fixture()
             {
-                Storage = RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName).GetAwaiter().GetResult();
+                try
+                {
+                    Storage = RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName).GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    this.preconditionsException = ExceptionDispatchInfo.Capture(ex);
+                    return;
+                }
             }
 
             public RelationalStorageForTesting Storage { get; private set; }
         }
 
-        public MySqlRelationalStoreTests(Fixture fixture)
+        public MySqlRelationalStoreTests(Fixture fixture) : base(AdoNetInvariantName)
         {
+            fixture.EnsurePreconditionsMet();
             _storage = fixture.Storage;
         }
 

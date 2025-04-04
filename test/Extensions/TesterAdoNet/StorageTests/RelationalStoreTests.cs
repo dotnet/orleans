@@ -22,6 +22,11 @@ namespace UnitTests.StorageTests.AdoNet
         protected const int StreamSizeToBeInsertedInBytes = MiB * 2;
         protected const int NumberOfParallelStreams = 5;
 
+        protected RelationalStoreTestsBase(string adoNetInvariantName)
+        {
+            RelationalStorageForTesting.CheckPreconditionsOrThrow(adoNetInvariantName);
+        }
+
         protected static Task<bool>[] InsertAndReadStreamsAndCheckMatch(RelationalStorageForTesting sut, int streamSize, int countOfStreams, CancellationToken cancellationToken)
         {
             Skip.If(string.IsNullOrEmpty(sut.CurrentConnectionString), "Database was not initialized correctly");

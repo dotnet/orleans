@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Storage
 {
@@ -52,9 +53,16 @@ namespace Orleans.Storage
             MemoryStorageWithLatencyOptions options,
             ILoggerFactory loggerFactory,
             IGrainFactory grainFactory,
+            IActivatorProvider activatorProvider,
             IGrainStorageSerializer defaultGrainStorageSerializer)
         {
-            this.baseGranStorage = new MemoryGrainStorage(name, options, loggerFactory.CreateLogger<MemoryGrainStorage>(), grainFactory, defaultGrainStorageSerializer);
+            this.baseGranStorage = new MemoryGrainStorage(
+                name,
+                options,
+                loggerFactory.CreateLogger<MemoryGrainStorage>(),
+                grainFactory,
+                defaultGrainStorageSerializer,
+                activatorProvider);
             this.options = options;
         }
 
