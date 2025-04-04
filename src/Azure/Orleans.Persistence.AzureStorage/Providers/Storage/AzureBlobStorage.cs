@@ -90,19 +90,19 @@ namespace Orleans.Storage
                     return;
                 }
 
+                object loadedState;
                 if (contents == null || contents.Length == 0)
                 {
                     if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace((int)AzureProviderErrorCode.AzureBlobProvider_BlobEmpty, "BlobEmpty reading: GrainType={0} Grainid={1} ETag={2} from BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
-                    grainState.RecordExists = false;
-                    return;
+                    loadedState = null;
                 }
                 else
                 {
-                    grainState.RecordExists = true;
+                    loadedState = this.ConvertFromStorageFormat(contents, grainState.Type);
                 }
 
-                var loadedState = this.ConvertFromStorageFormat(contents, grainState.Type);
                 grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
+                grainState.RecordExists = loadedState is not null;
 
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_DataRead, "Read: GrainType={0} Grainid={1} ETag={2} from BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
             }
@@ -168,6 +168,7 @@ namespace Orleans.Storage
 
                 grainState.ETag = null;
                 grainState.RecordExists = false;
+                grainState.State = Activator.CreateInstance(grainState.Type);
 
                 if (this.logger.IsEnabled(LogLevel.Trace))
                 {

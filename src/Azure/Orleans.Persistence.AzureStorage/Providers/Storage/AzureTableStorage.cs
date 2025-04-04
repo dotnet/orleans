@@ -89,8 +89,12 @@ namespace Orleans.Storage
                 grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
                 grainState.ETag = entity.ETag.ToString();
             }
-
-            // Else leave grainState in previous default condition
+            else
+            {
+                grainState.RecordExists = false;
+                grainState.ETag = null;
+                grainState.State = Activator.CreateInstance(grainState.Type);
+            }
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
@@ -148,14 +152,16 @@ namespace Orleans.Storage
                 {
                     operation = "Deleting";
                     await DoOptimisticUpdate(() => tableDataManager.Delete(entity), grainType, grainReference, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                    grainState.ETag = null;
                 }
                 else
                 {
                     await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainReference, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                    grainState.ETag = entity.ETag.ToString(); // Update in-memory data to the new ETag
                 }
 
-                grainState.ETag = entity.ETag.ToString(); // Update in-memory data to the new ETag
                 grainState.RecordExists = false;
+                grainState.State = Activator.CreateInstance(grainState.Type);
             }
             catch (Exception exc)
             {
