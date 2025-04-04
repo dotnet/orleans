@@ -16,7 +16,6 @@ namespace Tester.AdoNet.Persistence
         public const string TestDatabaseName = "OrleansTest_MySql_Storage";
         public const string AdoInvariant = AdoNetInvariants.InvariantNameMySql;
         public const string ConnectionStringKey = "AdoNetConnectionString";
-        public static readonly Guid ServiceId = Guid.NewGuid();
 
         public class Fixture : BaseTestClusterFixture
         {
@@ -30,17 +29,13 @@ namespace Tester.AdoNet.Persistence
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.Options.InitialSilosCount = 4;
-                builder.Options.UseTestClusterMembership = false;
                 var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName).Result;
                 builder.ConfigureHostConfiguration(configBuilder => configBuilder.AddInMemoryCollection(
                     new Dictionary<string, string>
                     {
                         {ConnectionStringKey, relationalStorage.CurrentConnectionString}
                     }));
-                builder.Options.ServiceId = ServiceId.ToString();
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-                builder.AddClientBuilderConfigurator<GatewayConnectionTests.ClientBuilderConfigurator>();
             }
 
             private class MySiloBuilderConfigurator : IHostConfigurator
@@ -51,14 +46,9 @@ namespace Tester.AdoNet.Persistence
                     hostBuilder.UseOrleans((ctx, siloBuilder) =>
                     {
                         siloBuilder
-                            .UseAdoNetClustering(options =>
-                            {
-                                options.ConnectionString = connectionString;
-                                options.Invariant = AdoInvariant;
-                            })
                             .AddAdoNetGrainStorage("GrainStorageForTest", options =>
                             {
-                                options.ConnectionString = (string)connectionString;
+                                options.ConnectionString = connectionString;
                                 options.Invariant = AdoInvariant;
                             })
                             .AddMemoryGrainStorage("MemoryStore");
