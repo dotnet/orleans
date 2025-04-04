@@ -223,13 +223,28 @@ namespace Orleans.Storage
                     ? new BlobRequestConditions { IfNoneMatch = ETag.All }
                     : new BlobRequestConditions { IfMatch = new ETag(grainState.ETag) };
 
-                await DoOptimisticUpdate(
-                    static state => state.blob.DeleteIfExistsAsync(DeleteSnapshotsOption.None, conditions: state.conditions),
-                    (blob, conditions),
-                    blob,
-                    grainState.ETag).ConfigureAwait(false);
+                if (options.DeleteStateOnClear)
+                {
+                    await DoOptimisticUpdate(
+                        static state => state.blob.DeleteIfExistsAsync(DeleteSnapshotsOption.None, conditions: state.conditions),
+                        (blob, conditions),
+                        blob,
+                        grainState.ETag).ConfigureAwait(false);
+                    grainState.ETag = null;
+                }
+                else
+                {
+                    var options = new BlobUploadOptions { Conditions = conditions };
+                    var response = await DoOptimisticUpdate(
+                        static state => state.blob.UploadAsync(BinaryData.Empty, state.options),
+                        (blob, options, conditions),
+                        blob,
+                        grainState.ETag).ConfigureAwait(false);
+                    grainState.ETag = response.Value.ETag.ToString();
+                }
 
-                ResetGrainState(grainState);
+                grainState.RecordExists = false;
+                grainState.State = CreateInstance<T>();
                 if (this.logger.IsEnabled(LogLevel.Trace))
                 {
                     var properties = await blob.GetPropertiesAsync();
