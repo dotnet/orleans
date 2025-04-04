@@ -335,14 +335,24 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
 
         output.WriteLine("ClusterId={0} ServiceId={1}", HostedCluster.Options.ClusterId, initialServiceId);
 
-        var id = Guid.NewGuid();
-        var grain = GrainFactory.GetGrain<IGrainStorageTestGrain>(id, grainNamespace);
+        var id1 = Guid.NewGuid();
+        var grain1 = GrainFactory.GetGrain<IGrainStorageTestGrain>(id1, grainNamespace);
+        var id2 = Guid.NewGuid();
+        var grain2 = GrainFactory.GetGrain<IGrainStorageTestGrain>(id2, grainNamespace);
 
-        var val = await grain.GetValue();
-
+        var val = await grain1.GetValue();
         Assert.Equal(0, val);  // "Initial value"
 
-        await grain.DoWrite(1);
+        await grain1.DoWrite(1);
+
+        await grain2.DoWrite(1);
+
+        val = await grain1.GetValue();
+        Assert.Equal(1, val);
+        val = await grain2.GetValue();
+        Assert.Equal(1, val);
+
+        await grain2.DoDelete();
 
         var serviceId = await GrainFactory.GetGrain<IServiceIdGrain>(Guid.Empty).GetServiceId();
         Assert.Equal(initialServiceId, serviceId);  // "ServiceId same before restart."
@@ -358,18 +368,22 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
         output.WriteLine("Silos restarted");
 
         serviceId = await GrainFactory.GetGrain<IServiceIdGrain>(Guid.Empty).GetServiceId();
-        grain = GrainFactory.GetGrain<IGrainStorageTestGrain>(id, grainNamespace);
+        grain1 = GrainFactory.GetGrain<IGrainStorageTestGrain>(id1, grainNamespace);
+        grain2 = GrainFactory.GetGrain<IGrainStorageTestGrain>(id2, grainNamespace);
         output.WriteLine("ClusterId={0} ServiceId={1}", HostedCluster.Options.ClusterId, serviceId);
         Assert.Equal(initialServiceId, serviceId);  // "ServiceId same after restart."
 
-        val = await grain.GetValue();
+        val = await grain1.GetValue();
         Assert.Equal(1, val);  // "Value after Write-1"
 
-        await grain.DoWrite(2);
-        val = await grain.GetValue();
+        val = await grain2.GetValue();
+        Assert.Equal(0, val);  // State should be cleared.
+
+        await grain1.DoWrite(2);
+        val = await grain1.GetValue();
         Assert.Equal(2, val);  // "Value after Write-2"
 
-        val = await grain.DoRead();
+        val = await grain1.DoRead();
 
         Assert.Equal(2, val);  // "Value after Re-Read"
     }
