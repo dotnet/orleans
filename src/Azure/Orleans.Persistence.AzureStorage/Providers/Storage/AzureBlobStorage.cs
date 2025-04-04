@@ -247,12 +247,11 @@ namespace Orleans.Storage
                 grainState.State = CreateInstance<T>();
                 if (this.logger.IsEnabled(LogLevel.Trace))
                 {
-                    var properties = await blob.GetPropertiesAsync();
                     this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Cleared,
                         "Cleared: GrainType={GrainType} GrainId={GrainId} ETag={ETag} BlobName={BlobName} in Container={ContainerName}",
                         grainType,
                         grainId,
-                        properties.Value.ETag,
+                        grainState.ETag,
                         blobName,
                         container.Name);
                 }
