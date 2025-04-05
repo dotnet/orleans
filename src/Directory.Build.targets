@@ -32,4 +32,15 @@
       </SourceRoot>
     </ItemGroup>
   </Target>
+
+  <PropertyGroup>
+    <!-- If the project is packable, we generate its API surface in a separate file to be used by the API review process. -->
+    <GenAPITargetDirectory Condition="'$(IsPackable)' == 'true'">$(MSBuildThisFileDirectory)/api/$([MSBuild]::MakeRelative($(MSBuildThisFileDirectory), $(MSBuildProjectDirectory)))/</GenAPITargetDirectory>
+    <GenAPITargetPath Condition="'$(IsPackable)' == 'true'">$(GenAPITargetDirectory)$(AssemblyName).cs</GenAPITargetPath>
+  </PropertyGroup>
+
+  <Target Name="CreateGenAPITargetPathFolder" BeforeTargets="GenAPIGenerateReferenceAssemblySource">
+    <MakeDir Directories="$(GenAPITargetDirectory)" Condition="!Exists('$(GenAPITargetDirectory)')" />
+  </Target>
+
 </Project>

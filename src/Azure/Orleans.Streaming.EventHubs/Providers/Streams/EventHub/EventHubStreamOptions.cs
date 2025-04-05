@@ -217,7 +217,7 @@ namespace Orleans.Configuration
         /// In cases where no checkpoint is found, this indicates if service should read from the most recent data, or from the beginning of a partition.
         /// </summary>
         public bool StartFromNow { get; set; } = DEFAULT_START_FROM_NOW;
-        public const bool DEFAULT_START_FROM_NOW = true;
+        private const bool DEFAULT_START_FROM_NOW = true;
     }
 
     public class EventHubStreamCachePressureOptions
@@ -237,7 +237,6 @@ namespace Orleans.Configuration
         /// User can turn it off by setting this value to null
         /// </summary>
         public double? AveragingCachePressureMonitorFlowControlThreshold { get; set; } = DEFAULT_AVERAGING_CACHE_PRESSURE_MONITORING_THRESHOLD;
-        public const double AVERAGING_CACHE_PRESSURE_MONITORING_OFF = 1.0;
-        public const double DEFAULT_AVERAGING_CACHE_PRESSURE_MONITORING_THRESHOLD = 1.0 / 3.0;
+        internal const double DEFAULT_AVERAGING_CACHE_PRESSURE_MONITORING_THRESHOLD = 1.0 / 3.0;
     }
 }
