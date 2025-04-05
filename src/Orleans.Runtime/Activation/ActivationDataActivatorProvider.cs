@@ -13,6 +13,7 @@ namespace Orleans.Runtime
         private readonly IServiceProvider _serviceProvider;
         private readonly IActivationWorkingSet _activationWorkingSet;
         private readonly ILogger<WorkItemGroup> _workItemGroupLogger;
+        private readonly ILogger<Grain> _grainLogger;
         private readonly ILogger<ActivationTaskScheduler> _activationTaskSchedulerLogger;
         private readonly IOptions<SchedulingOptions> _schedulingOptions;
         private readonly GrainTypeSharedContextResolver _sharedComponentsResolver;
@@ -27,12 +28,14 @@ namespace Orleans.Runtime
             GrainReferenceActivator grainReferenceActivator,
             GrainTypeSharedContextResolver sharedComponentsResolver,
             IActivationWorkingSet activationWorkingSet,
+            ILogger<Grain> grainLogger,
             ILogger<WorkItemGroup> workItemGroupLogger,
             ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
             IOptions<SchedulingOptions> schedulingOptions)
         {
             _activationWorkingSet = activationWorkingSet;
             _workItemGroupLogger = workItemGroupLogger;
+            _grainLogger = grainLogger;
             _activationTaskSchedulerLogger = activationTaskSchedulerLogger;
             _schedulingOptions = schedulingOptions;
             _sharedComponentsResolver = sharedComponentsResolver;
@@ -61,6 +64,7 @@ namespace Orleans.Runtime
                 instanceActivator,
                 _serviceProvider,
                 sharedContext,
+                _grainLogger,
                 _workItemGroupLogger,
                 _activationTaskSchedulerLogger,
                 _schedulingOptions);
@@ -85,12 +89,14 @@ namespace Orleans.Runtime
             private readonly IGrainActivator _grainActivator;
             private readonly IServiceProvider _serviceProvider;
             private readonly GrainTypeSharedContext _sharedComponents;
+            private readonly ILogger<Grain> _grainLogger;
             private readonly Func<IGrainContext, WorkItemGroup> _createWorkItemGroup;
 
             public ActivationDataActivator(
                 IGrainActivator grainActivator,
                 IServiceProvider serviceProvider,
                 GrainTypeSharedContext sharedComponents,
+                ILogger<Grain> grainLogger,
                 ILogger<WorkItemGroup> workItemGroupLogger,
                 ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
                 IOptions<SchedulingOptions> schedulingOptions)
@@ -101,6 +107,7 @@ namespace Orleans.Runtime
                 _grainActivator = grainActivator;
                 _serviceProvider = serviceProvider;
                 _sharedComponents = sharedComponents;
+                _grainLogger = grainLogger;
                 _createWorkItemGroup = context => new WorkItemGroup(
                     context,
                     _workItemGroupLogger,
@@ -123,6 +130,11 @@ namespace Orleans.Runtime
                     // Instantiate the grain itself
                     var instance = _grainActivator.CreateInstance(context);
                     context.SetGrainInstance(instance);
+                }
+                catch (Exception exception)
+                {
+                    _grainLogger.LogError(exception, "Failed to construct grain '{GrainId}'.", activationAddress.GrainId);
+                    throw;
                 }
                 finally
                 {

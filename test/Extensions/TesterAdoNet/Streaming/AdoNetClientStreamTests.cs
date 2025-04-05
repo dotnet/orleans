@@ -33,6 +33,7 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
     protected AdoNetClientStreamTests(string invariant, ITestOutputHelper output)
     {
         _invariant = invariant;
+        RelationalStorageForTesting.CheckPreconditionsOrThrow(_invariant);
         _output = output;
     }
 

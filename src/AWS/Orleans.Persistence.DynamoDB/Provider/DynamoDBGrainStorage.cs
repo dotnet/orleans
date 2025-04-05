@@ -32,9 +32,8 @@ namespace Orleans.Storage
         private const string CURRENT_ETAG_ALIAS = ":currentETag";
 
         private readonly DynamoDBStorageOptions options;
+        private readonly IActivatorProvider _activatorProvider;
         private readonly ILogger logger;
-        private readonly IServiceProvider serviceProvider;
-        private readonly IActivatorProvider activatorProvider;
         private readonly string name;
 
         private DynamoDBStorage storage;
@@ -45,14 +44,13 @@ namespace Orleans.Storage
         public DynamoDBGrainStorage(
             string name,
             DynamoDBStorageOptions options,
-            IServiceProvider serviceProvider,
+            IActivatorProvider activatorProvider,
             ILogger<DynamoDBGrainStorage> logger)
         {
             this.name = name;
             this.logger = logger;
             this.options = options;
-            this.serviceProvider = serviceProvider;
-            this.activatorProvider = this.serviceProvider.GetRequiredService<IActivatorProvider>();
+            _activatorProvider = activatorProvider;
         }
 
         public void Participate(ISiloLifecycle lifecycle)
@@ -152,17 +150,13 @@ namespace Orleans.Storage
             {
                 var loadedState = ConvertFromStorageFormat<T>(record);
                 grainState.RecordExists = loadedState != null;
-                grainState.State = loadedState ?? Activator.CreateInstance<T>();
+                grainState.State = loadedState ?? CreateInstance<T>();
                 grainState.ETag = record.ETag.ToString();
             }
             else
             {
-                grainState.RecordExists = false;
-                grainState.ETag = null;
-                grainState.State = this.activatorProvider.GetActivator<T>().Create();
+                ResetGrainState(grainState);
             }
-
-            // Else leave grainState in previous default condition
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
@@ -190,7 +184,7 @@ namespace Orleans.Storage
                 this.logger.LogError(
                     (int)ErrorCode.StorageProviderBase,
                     exc,
-                    "Error Writing: GrainType={GrainType} Grainid={GrainId} ETag={ETag} to Table={TableName}",
+                    "Error Writing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to Table={TableName}",
                     grainType,
                     grainId,
                     grainState.ETag,
@@ -298,12 +292,13 @@ namespace Orleans.Storage
                     keys.Add(GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType));
 
                     await this.storage.DeleteEntryAsync(this.options.TableName, keys).ConfigureAwait(false);
-                    grainState.ETag = null;
+                    ResetGrainState(grainState);
                 }
                 else
                 {
                     await WriteStateInternal(grainState, record, true);
-                    grainState.State = this.activatorProvider.GetActivator<T>().Create();
+                    grainState.State = CreateInstance<T>();
+                    grainState.RecordExists = false;
                 }
             }
             catch (Exception exc)
@@ -381,6 +376,15 @@ namespace Orleans.Storage
                 throw new ArgumentOutOfRangeException("GrainState.Size", msg);
             }
         }
+
+        private void ResetGrainState<T>(IGrainState<T> grainState)
+        {
+            grainState.RecordExists = false;
+            grainState.ETag = null;
+            grainState.State = CreateInstance<T>();
+        }
+
+        private T CreateInstance<T>() => _activatorProvider.GetActivator<T>().Create();
     }
 
     public static class DynamoDBGrainStorageFactory

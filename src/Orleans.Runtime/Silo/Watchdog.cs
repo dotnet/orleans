@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -90,6 +91,11 @@ namespace Orleans.Runtime
 
         private void CheckRuntimeHealth()
         {
+            if (Debugger.IsAttached)
+            {
+                return;
+            }
+
             var pauseDurationSinceLastTick = GC.GetTotalPauseDuration() - _cumulativeGCPauseDuration;
             var timeSinceLastTick = _platformWatchdogStopwatch.Elapsed;
             if (timeSinceLastTick > PlatformWatchdogHeartbeatPeriod.Multiply(2))

@@ -10,6 +10,7 @@ using Orleans.Storage;
 using TestExtensions;
 using UnitTests.General;
 using Orleans.Serialization;
+using Orleans.Serialization.Serializers;
 
 namespace UnitTests.StorageTests.Relational
 {
@@ -94,7 +95,12 @@ namespace UnitTests.StorageTests.Relational
                             {
                                 ServiceId = Guid.NewGuid().ToString()
                             };
-                            var storageProvider = new AdoNetGrainStorage(DefaultProviderRuntime.ServiceProvider.GetService<ILogger<AdoNetGrainStorage>>(), DefaultProviderRuntime, Options.Create(options), Options.Create(clusterOptions), storageInvariant + "_StorageProvider");
+                            var storageProvider = new AdoNetGrainStorage(
+                                DefaultProviderRuntime.ServiceProvider.GetRequiredService<IActivatorProvider>(),
+                                DefaultProviderRuntime.ServiceProvider.GetRequiredService<ILogger<AdoNetGrainStorage>>(),
+                                Options.Create(options),
+                                Options.Create(clusterOptions),
+                                storageInvariant + "_StorageProvider");
                             ISiloLifecycleSubject siloLifeCycle = new SiloLifecycleSubject(NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
                             storageProvider.Participate(siloLifeCycle);
                             await siloLifeCycle.OnStart(CancellationToken.None);

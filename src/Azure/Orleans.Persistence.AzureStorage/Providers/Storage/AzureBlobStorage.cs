@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Diagnostics;
 using System.Threading;
@@ -11,6 +12,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers.Azure;
 using Orleans.Runtime;
+using Orleans.Serialization.Serializers;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace Orleans.Storage
@@ -23,6 +25,7 @@ namespace Orleans.Storage
         private readonly ILogger logger;
         private readonly string name;
         private readonly IBlobContainerFactory blobContainerFactory;
+        private readonly IActivatorProvider _activatorProvider;
         private readonly AzureBlobStorageOptions options;
         private readonly IGrainStorageSerializer grainStorageSerializer;
 
@@ -31,12 +34,14 @@ namespace Orleans.Storage
             string name,
             AzureBlobStorageOptions options,
             IBlobContainerFactory blobContainerFactory,
+            IActivatorProvider activatorProvider,
             ILogger<AzureBlobGrainStorage> logger)
         {
             this.name = name;
             this.options = options;
             this.blobContainerFactory = blobContainerFactory;
-            this.grainStorageSerializer = options.GrainStorageSerializer;
+            _activatorProvider = activatorProvider;
+            this.grainStorageSerializer = options.GrainStorageSerializer; 
             this.logger = logger;
         }
 
@@ -59,63 +64,71 @@ namespace Orleans.Storage
             {
                 var blob = container.GetBlobClient(blobName);
 
-                BinaryData contents;
-                try
+                var response = await blob.DownloadContentAsync();
+                grainState.ETag = response.Value.Details.ETag.ToString();
+                var contents = response.Value.Content;
+                T? loadedState;
+                if (contents is null || contents.IsEmpty)
                 {
-                    var response = await blob.DownloadContentAsync();
-                    grainState.ETag = response.Value.Details.ETag.ToString();
-                    contents = response.Value.Content;
-                }
-                catch (RequestFailedException exception) when (exception.IsBlobNotFound())
-                {
-                    if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_BlobNotFound,
-                        "BlobNotFound reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
-                        grainType,
-                        grainId,
-                        grainState.ETag,
-                        blobName,
-                        container.Name);
-                    return;
-                }
-                catch (RequestFailedException exception) when (exception.IsContainerNotFound())
-                {
-                    if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_ContainerNotFound,
-                        "ContainerNotFound reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
-                        grainType,
-                        grainId,
-                        grainState.ETag,
-                        blobName,
-                        container.Name);
-                    return;
-                }
-
-                if (contents == null) // TODO bpetit
-                {
-                    if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_BlobEmpty,
+                    loadedState = default;
+                    if (this.logger.IsEnabled(LogLevel.Trace))
+                    {
+                        this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_BlobEmpty,
                         "BlobEmpty reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
                         grainType,
                         grainId,
                         grainState.ETag,
                         blobName,
                         container.Name);
-                    grainState.RecordExists = false;
-                    return;
+                    }
                 }
                 else
                 {
-                    grainState.RecordExists = true;
+                    loadedState = this.ConvertFromStorageFormat<T>(contents);
+                    if (this.logger.IsEnabled(LogLevel.Trace))
+                    {
+                        this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_DataRead,
+                        "Read: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
+                        grainType,
+                        grainId,
+                        grainState.ETag,
+                        blobName,
+                        container.Name);
+                    }
                 }
 
-                var loadedState = this.ConvertFromStorageFormat<T>(contents);
-                grainState.State = loadedState ?? Activator.CreateInstance<T>();
-
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_DataRead,
-                    "Read: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
-                    grainType,
-                    grainId,
-                    grainState.ETag,
-                    blobName,
-                    container.Name);
+                grainState.State = loadedState ?? CreateInstance<T>();
+                grainState.RecordExists = loadedState is not null;
+            }
+            catch (RequestFailedException ex) when (ex.IsNotFound())
+            {
+                ResetGrainState(grainState);
+                if (ex.IsBlobNotFound())
+                {
+                    if (this.logger.IsEnabled(LogLevel.Trace))
+                    {
+                        this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_BlobNotFound,
+                        "BlobNotFound reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
+                        grainType,
+                        grainId,
+                        grainState.ETag,
+                        blobName,
+                        container.Name);
+                    }
+                }
+                else if (ex.IsContainerNotFound())
+                {
+                    if (this.logger.IsEnabled(LogLevel.Trace))
+                    {
+                        this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_ContainerNotFound,
+                        "ContainerNotFound reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
+                        grainType,
+                        grainId,
+                        grainState.ETag,
+                        blobName,
+                        container.Name);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -130,6 +143,13 @@ namespace Orleans.Storage
 
                 throw;
             }
+        }
+
+        private void ResetGrainState<T>(IGrainState<T> grainState)
+        {
+            grainState.ETag = null;
+            grainState.RecordExists = false;
+            grainState.State = CreateInstance<T>();
         }
 
         private static string GetBlobName(string grainType, GrainId grainId) => $"{grainType}-{grainId}.json";
@@ -203,20 +223,35 @@ namespace Orleans.Storage
                     ? new BlobRequestConditions { IfNoneMatch = ETag.All }
                     : new BlobRequestConditions { IfMatch = new ETag(grainState.ETag) };
 
-                await DoOptimisticUpdate(() => blob.DeleteIfExistsAsync(DeleteSnapshotsOption.None, conditions: conditions),
-                    blob, grainState.ETag).ConfigureAwait(false);
+                if (options.DeleteStateOnClear)
+                {
+                    await DoOptimisticUpdate(
+                        static state => state.blob.DeleteIfExistsAsync(DeleteSnapshotsOption.None, conditions: state.conditions),
+                        (blob, conditions),
+                        blob,
+                        grainState.ETag).ConfigureAwait(false);
+                    grainState.ETag = null;
+                }
+                else
+                {
+                    var options = new BlobUploadOptions { Conditions = conditions };
+                    var response = await DoOptimisticUpdate(
+                        static state => state.blob.UploadAsync(BinaryData.Empty, state.options),
+                        (blob, options, conditions),
+                        blob,
+                        grainState.ETag).ConfigureAwait(false);
+                    grainState.ETag = response.Value.ETag.ToString();
+                }
 
-                grainState.ETag = null;
                 grainState.RecordExists = false;
-
+                grainState.State = CreateInstance<T>();
                 if (this.logger.IsEnabled(LogLevel.Trace))
                 {
-                    var properties = await blob.GetPropertiesAsync();
                     this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Cleared,
                         "Cleared: GrainType={GrainType} GrainId={GrainId} ETag={ETag} BlobName={BlobName} in Container={ContainerName}",
                         grainType,
                         grainId,
-                        properties.Value.ETag,
+                        grainState.ETag,
                         blobName,
                         container.Name);
                 }
@@ -253,7 +288,8 @@ namespace Orleans.Storage
                 };
 
                 var result = await DoOptimisticUpdate(
-                    () => blob.UploadAsync(contents, options),
+                    static state => state.blob.UploadAsync(state.contents, state.options),
+                    (blob, contents, options),
                     blob,
                     grainState.ETag)
                         .ConfigureAwait(false);
@@ -277,15 +313,15 @@ namespace Orleans.Storage
             }
         }
 
-        private static async Task<TResult> DoOptimisticUpdate<TResult>(Func<Task<TResult>> updateOperation, BlobClient blob, string currentETag)
+        private static async Task<TResult> DoOptimisticUpdate<TState, TResult>(Func<TState, Task<TResult>> updateOperation, TState state, BlobClient blob, string currentETag)
         {
             try
             {
-                return await updateOperation.Invoke().ConfigureAwait(false);
+                return await updateOperation(state).ConfigureAwait(false);
             }
-            catch (RequestFailedException ex) when (ex.IsPreconditionFailed() || ex.IsConflict())
+            catch (RequestFailedException ex) when (ex.IsPreconditionFailed() || ex.IsConflict() || ex.IsNotFound())
             {
-                throw new InconsistentStateException($"Blob storage condition not Satisfied.  BlobName: {blob.Name}, Container: {blob.BlobContainerName}, CurrentETag: {currentETag}", "Unknown", currentETag, ex);
+                throw new InconsistentStateException($"Blob storage condition not Satisfied. BlobName: {blob.Name}, Container: {blob.BlobContainerName}, CurrentETag: {currentETag}", "Unknown", currentETag, ex);
             }
         }
 
@@ -342,7 +378,9 @@ namespace Orleans.Storage
         /// Deserialize from the configured storage format
         /// </summary>
         /// <param name="contents">The serialized contents.</param>
-        private T ConvertFromStorageFormat<T>(BinaryData contents) => this.grainStorageSerializer.Deserialize<T>(contents);
+        private T? ConvertFromStorageFormat<T>(BinaryData contents) => this.grainStorageSerializer.Deserialize<T>(contents);
+
+        private T CreateInstance<T>() => _activatorProvider.GetActivator<T>().Create();
     }
 
     public static class AzureBlobGrainStorageFactory

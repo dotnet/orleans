@@ -49,6 +49,8 @@ namespace Orleans.Core
         private GrainState<TState> GrainState => _grainState ??= new GrainState<TState>(_shared.Activator.Create());
         internal bool IsStateInitialized { get; private set; }
 
+        internal string Name => _shared.Name;
+
         /// <inheritdoc/>
         public string? Etag { get => _grainState?.ETag; set => GrainState.ETag = value; }
 
@@ -120,12 +122,9 @@ namespace Orleans.Core
 
                 var sw = ValueStopwatch.StartNew();
 
-                // Clear (most likely Delete) state from external storage
+                // Clear state in external storage
                 await _shared.Store.ClearStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
                 sw.Stop();
-
-                // Reset the in-memory copy of the state
-                GrainState.State = _shared.Activator.Create();
 
                 // Update counters
                 StorageInstruments.OnStorageDelete(sw.Elapsed);

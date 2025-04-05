@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Diagnostics;
 using System.Text;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Serialization.Serializers;
 using Orleans.Storage.Internal;
 
 namespace Orleans.Storage
@@ -25,6 +27,7 @@ namespace Orleans.Storage
     {
         private Lazy<IMemoryStorageGrain>[] storageGrains;
         private readonly ILogger logger;
+        private readonly IActivatorProvider _activatorProvider;
         private readonly IGrainStorageSerializer storageSerializer;
 
         /// <summary> Name of this storage provider instance. </summary>
@@ -38,10 +41,17 @@ namespace Orleans.Storage
         /// <param name="logger">The logger.</param>
         /// <param name="grainFactory">The grain factory.</param>
         /// <param name="defaultGrainStorageSerializer">The default grain storage serializer.</param>
-        public MemoryGrainStorage(string name, MemoryGrainStorageOptions options, ILogger<MemoryGrainStorage> logger, IGrainFactory grainFactory, IGrainStorageSerializer defaultGrainStorageSerializer)
+        public MemoryGrainStorage(
+            string name,
+            MemoryGrainStorageOptions options,
+            ILogger<MemoryGrainStorage> logger,
+            IGrainFactory grainFactory,
+            IGrainStorageSerializer defaultGrainStorageSerializer,
+            IActivatorProvider activatorProvider)
         {
             this.name = name;
             this.logger = logger;
+            _activatorProvider = activatorProvider;
             this.storageSerializer = options.GrainStorageSerializer ?? defaultGrainStorageSerializer;
 
 
@@ -71,8 +81,14 @@ namespace Orleans.Storage
             {
                 var loadedState = ConvertFromStorageFormat<T>(state.State);
                 grainState.ETag = state.ETag;
-                grainState.State = loadedState ?? Activator.CreateInstance<T>();
-                grainState.RecordExists = true;
+                grainState.State = loadedState ?? CreateInstance<T>();
+                grainState.RecordExists = loadedState != null;
+            }
+            else
+            {
+                grainState.ETag = null;
+                grainState.State = CreateInstance<T>();
+                grainState.RecordExists = false;
             }
         }
 
@@ -109,6 +125,7 @@ namespace Orleans.Storage
                 await storageGrain.DeleteStateAsync<ReadOnlyMemory<byte>>(key, grainState.ETag);
                 grainState.ETag = null;
                 grainState.RecordExists = false;
+                grainState.State = CreateInstance<T>();
             }
             catch (MemoryStorageEtagMismatchException e)
             {
@@ -125,15 +142,15 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public void Dispose() => storageGrains = null;
+        public void Dispose() { }
 
         /// <summary>
         /// Deserialize from binary data
         /// </summary>
         /// <param name="data">The serialized stored data</param>
-        internal T ConvertFromStorageFormat<T>(ReadOnlyMemory<byte> data)
+        internal T? ConvertFromStorageFormat<T>(ReadOnlyMemory<byte> data)
         {
-            T dataValue = default;
+            T? dataValue = default;
             try
             {
                 dataValue = this.storageSerializer.Deserialize<T>(data);
@@ -172,6 +189,8 @@ namespace Orleans.Storage
             // Convert to binary format
             return this.storageSerializer.Serialize<T>(grainState);
         }
+
+        private T CreateInstance<T>() => _activatorProvider.GetActivator<T>().Create();
     }
 
     /// <summary>

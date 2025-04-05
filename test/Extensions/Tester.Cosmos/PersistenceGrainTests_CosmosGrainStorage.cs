@@ -12,10 +12,46 @@ namespace Tester.Cosmos.Persistence;
 /// PersistenceGrainTests using Cosmos DB - Requires access to Cosmos DB
 /// </summary>
 [TestCategory("Persistence"), TestCategory("Cosmos")]
-public class PersistenceGrainTests_CosmosGrainStorage : OrleansTestingBase, IClassFixture<PersistenceGrainTests_CosmosGrainStorage.Fixture>
+public class PersistenceGrainTests_CosmosGrainStorage : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_CosmosGrainStorage.Fixture>
 {
-    private readonly GrainPersistenceTestsRunner _runner;
+    public class Fixture : BaseTestClusterFixture
+    {
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            builder.Options.InitialSilosCount = 4;
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        }
 
+        private class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder
+                    .AddCosmosGrainStorage("GrainStorageForTest", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
+                    {
+                        options.ConfigureTestDefaults();
+                    }))
+                    .AddMemoryGrainStorage("MemoryStore");
+            }
+        }
+
+        protected override void CheckPreconditionsOrThrow()
+        {
+            base.CheckPreconditionsOrThrow();
+            CosmosTestUtils.CheckCosmosStorage();
+        }
+    }
+
+    public PersistenceGrainTests_CosmosGrainStorage(ITestOutputHelper output, Fixture fixture, string grainNamespace = "UnitTests.Grains")
+        : base(output, fixture, grainNamespace)
+    {
+        fixture.EnsurePreconditionsMet();
+    }
+}
+
+[TestCategory("Persistence"), TestCategory("Cosmos")]
+public class PersistenceGrainTests_CosmosGrainStorage_DeleteStateOnClear : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_CosmosGrainStorage_DeleteStateOnClear.Fixture>
+{
     public class Fixture : BaseTestClusterFixture
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -45,36 +81,9 @@ public class PersistenceGrainTests_CosmosGrainStorage : OrleansTestingBase, ICla
         }
     }
 
-    public PersistenceGrainTests_CosmosGrainStorage(ITestOutputHelper output, Fixture fixture, string grainNamespace = "UnitTests.Grains")
+    public PersistenceGrainTests_CosmosGrainStorage_DeleteStateOnClear(ITestOutputHelper output, Fixture fixture, string grainNamespace = "UnitTests.Grains")
+        : base(output, fixture, grainNamespace)
     {
         fixture.EnsurePreconditionsMet();
-        _runner = new GrainPersistenceTestsRunner(output, fixture, grainNamespace);
     }
-
-    [SkippableFact, TestCategory("Functional")]
-    public async Task Grain_CosmosGrainStorage_Delete() => await _runner.Grain_GrainStorage_Delete();
-
-    [SkippableFact, TestCategory("Functional")]
-    public async Task Grain_CosmosGrainStorage_Read() => await _runner.Grain_GrainStorage_Read();
-
-    [SkippableFact, TestCategory("Functional")]
-    public async Task Grain_GuidKey_CosmosGrainStorage_Read_Write() => await _runner.Grain_GuidKey_GrainStorage_Read_Write();
-
-    [SkippableFact, TestCategory("Functional")]
-    public async Task Grain_LongKey_CosmosGrainStorage_Read_Write() => await _runner.Grain_LongKey_GrainStorage_Read_Write();
-
-    [SkippableFact, TestCategory("Functional")]
-    public async Task Grain_LongKeyExtended_CosmosGrainStorage_Read_Write() => await _runner.Grain_LongKeyExtended_GrainStorage_Read_Write();
-
-    [SkippableFact, TestCategory("Functional")]
-    public async Task Grain_GuidKeyExtended_CosmosGrainStorage_Read_Write() => await _runner.Grain_GuidKeyExtended_GrainStorage_Read_Write();
-
-    [SkippableFact, TestCategory("Functional")]
-    public async Task Grain_Generic_CosmosGrainStorage_Read_Write() => await _runner.Grain_Generic_GrainStorage_Read_Write();
-
-    [SkippableFact, TestCategory("Functional")]
-    public async Task Grain_Generic_CosmosGrainStorage_DiffTypes() => await _runner.Grain_Generic_GrainStorage_DiffTypes();
-
-    [SkippableFact, TestCategory("Functional")]
-    public async Task Grain_CosmosGrainStorage_SiloRestart() => await _runner.Grain_GrainStorage_SiloRestart();
 }

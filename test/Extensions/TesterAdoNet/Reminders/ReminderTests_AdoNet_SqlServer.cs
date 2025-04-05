@@ -25,6 +25,11 @@ namespace Tester.AdoNet.Reminders
 
         public class Fixture : BaseTestClusterFixture
         {
+            protected override void CheckPreconditionsOrThrow()
+            {
+                RelationalStorageForTesting.CheckPreconditionsOrThrow(AdoInvariant);
+            }
+
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 string connectionString = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName)

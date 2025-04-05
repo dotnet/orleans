@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -29,10 +30,9 @@ namespace Orleans.Storage
         private readonly AzureTableStorageOptions options;
         private readonly ClusterOptions clusterOptions;
         private readonly IGrainStorageSerializer storageSerializer;
-        private readonly IActivatorProvider activatorProvider;
         private readonly ILogger logger;
-
-        private GrainStateTableDataManager tableDataManager;
+        private readonly IActivatorProvider _activatorProvider;
+        private GrainStateTableDataManager? tableDataManager;
 
         // each property can hold 64KB of data and each entity can take 1MB in total, so 15 full properties take
         // 15 * 64 = 960 KB leaving room for the primary key, timestamp etc
@@ -50,15 +50,15 @@ namespace Orleans.Storage
             string name,
             AzureTableStorageOptions options,
             IOptions<ClusterOptions> clusterOptions,
-            IServiceProvider services,
-            ILogger<AzureTableGrainStorage> logger)
+            ILogger<AzureTableGrainStorage> logger,
+            IActivatorProvider activatorProvider)
         {
             this.options = options;
             this.clusterOptions = clusterOptions.Value;
             this.name = name;
             this.storageSerializer = options.GrainStorageSerializer;
-            this.activatorProvider = services.GetRequiredService<IActivatorProvider>();
             this.logger = logger;
+            _activatorProvider = activatorProvider;
         }
 
         /// <summary> Read state data function for this storage provider. </summary>
@@ -69,7 +69,7 @@ namespace Orleans.Storage
 
             string pk = GetKeyString(grainId);
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_ReadingData,
-                "Reading: GrainType={GrainType} Pk={PartitionKey} Grainid={GrainId} from Table={TableName}",
+                "Reading: GrainType={GrainType} Pk={PartitionKey} GrainId={GrainId} from Table={TableName}",
                 grainType,
                 pk,
                 grainId,
@@ -81,16 +81,15 @@ namespace Orleans.Storage
             {
                 var loadedState = ConvertFromStorageFormat<T>(entity);
                 grainState.RecordExists = loadedState != null;
-                grainState.State = loadedState ?? Activator.CreateInstance<T>();
+                grainState.State = loadedState ?? CreateInstance<T>();
                 grainState.ETag = entity.ETag.ToString();
             }
             else
             {
                 grainState.RecordExists = false;
                 grainState.ETag = null;
-                grainState.State = this.activatorProvider.GetActivator<T>().Create();
+                grainState.State = CreateInstance<T>();
             }
-            // Else leave grainState in previous default condition
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
@@ -102,7 +101,7 @@ namespace Orleans.Storage
             string pk = GetKeyString(grainId);
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_WritingData,
-                    "Writing: GrainType={GrainType} Pk={PartitionKey} Grainid={GrainId} ETag={ETag} to Table={TableName}",
+                    "Writing: GrainType={GrainType} Pk={PartitionKey} GrainId={GrainId} ETag={ETag} to Table={TableName}",
                     grainType,
                     pk,
                     grainId,
@@ -146,7 +145,7 @@ namespace Orleans.Storage
 
             string pk = GetKeyString(grainId);
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_WritingData,
-                "Clearing: GrainType={GrainType} Pk={PartitionKey} Grainid={GrainId} ETag={ETag} DeleteStateOnClear={DeleteStateOnClear} from Table={TableName}",
+                "Clearing: GrainType={GrainType} Pk={PartitionKey} GrainId={GrainId} ETag={ETag} DeleteStateOnClear={DeleteStateOnClear} from Table={TableName}",
                 grainType,
                 pk,
                 grainId,
@@ -165,21 +164,22 @@ namespace Orleans.Storage
                 {
                     operation = "Deleting";
                     await DoOptimisticUpdate(() => tableDataManager.Delete(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                    grainState.ETag = null;
                 }
                 else
                 {
                     await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
-                    grainState.State = this.activatorProvider.GetActivator<T>().Create();
+                    grainState.ETag = entity.ETag.ToString(); // Update in-memory data to the new ETag
                 }
 
-                grainState.ETag = entity.ETag.ToString(); // Update in-memory data to the new ETag
                 grainState.RecordExists = false;
+                grainState.State = CreateInstance<T>();
             }
             catch (Exception exc)
             {
                 logger.LogError((int)AzureProviderErrorCode.AzureTableProvider_DeleteError,
                     exc,
-                    "Error {Operation}: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from Table={TableName}",
+                    "Error {Operation}: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from Table={TableName}",
                     operation,
                     grainType,
                     grainId,
@@ -332,7 +332,7 @@ namespace Orleans.Storage
             {
                 if (entity.TryGetValue(stringDataPropertyName, out var dataProperty))
                 {
-                    if (dataProperty is string {Length: > 0 } data)
+                    if (dataProperty is string { Length: > 0 } data)
                     {
                         yield return data;
                     }
@@ -349,19 +349,19 @@ namespace Orleans.Storage
         /// Deserialize from Azure storage format
         /// </summary>
         /// <param name="entity">The Azure table entity the stored data</param>
-        internal T ConvertFromStorageFormat<T>(TableEntity entity)
+        internal T? ConvertFromStorageFormat<T>(TableEntity entity)
         {
             // Read from both column type for backward compatibility
             var binaryData = ReadBinaryData(entity);
             var stringData = ReadStringData(entity);
 
-            T dataValue = default;
+            T? dataValue = default;
             try
             {
                 var input = binaryData.Length > 0
                     ? new BinaryData(binaryData)
                     : new BinaryData(stringData);
-                if(input.Length > 0)
+                if (input.Length > 0)
                     dataValue = this.storageSerializer.Deserialize<T>(input);
             }
             catch (Exception exc)
@@ -412,7 +412,7 @@ namespace Orleans.Storage
                 return tableManager.InitTableAsync();
             }
 
-            public async Task<TableEntity> Read(string partitionKey, string rowKey)
+            public async Task<TableEntity?> Read(string partitionKey, string rowKey)
             {
                 if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_Storage_Reading,
                     "Reading: PartitionKey={PartitionKey} RowKey={RowKey} from Table={TableName}",
@@ -431,13 +431,13 @@ namespace Orleans.Storage
                             TableName);
                         return default;
                     }
-                    TableEntity stateEntity = data.Entity;
-                    var record = stateEntity;
+
+                    var record = data.Entity;
                     record.ETag = new ETag(data.ETag);
                     if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_Storage_DataRead,
                         "Read: PartitionKey={PartitionKey} RowKey={RowKey} from Table={TableName} with ETag={ETag}",
-                        stateEntity.PartitionKey,
-                        stateEntity.RowKey,
+                        record.PartitionKey,
+                        record.RowKey,
                         TableName,
                         record.ETag);
 
@@ -547,6 +547,8 @@ namespace Orleans.Storage
         {
             lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableGrainStorage>(this.name), this.options.InitStage, Init, Close);
         }
+
+        private T CreateInstance<T>() => _activatorProvider.GetActivator<T>().Create();
     }
 
     public static class AzureTableGrainStorageFactory

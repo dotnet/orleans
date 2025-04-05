@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -11,6 +11,7 @@ namespace Orleans.Runtime
     {
         private readonly ObjectFactory _grainInstanceFactory;
         private readonly GrainConstructorArgumentFactory _argumentFactory;
+        private readonly Type _grainClass;
 
         /// <summary>
         /// Initializes a new <see cref="DefaultGrainActivator"/> instance.
@@ -21,13 +22,23 @@ namespace Orleans.Runtime
         {
             _argumentFactory = new GrainConstructorArgumentFactory(serviceProvider, grainClass);
             _grainInstanceFactory = ActivatorUtilities.CreateFactory(grainClass, _argumentFactory.ArgumentTypes);
+            _grainClass = grainClass;
         }
 
         /// <inheritdoc/>
         public object CreateInstance(IGrainContext context)
         {
-            var args = _argumentFactory.CreateArguments(context);
-            return _grainInstanceFactory(context.ActivationServices, args);
+            try
+            {
+                var args = _argumentFactory.CreateArguments(context);
+                return _grainInstanceFactory(context.ActivationServices, args);
+            }
+            catch (Exception exception)
+            {
+                throw new InvalidOperationException(
+                    $"Failed to create an instance of grain type '{_grainClass}'. See {nameof(Exception.InnerException)} for details.",
+                    exception);
+            }
         }
 
         /// <inheritdoc/>

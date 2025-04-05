@@ -240,18 +240,32 @@ public class Grain<TGrainState> : Grain
 
     private class LifecycleObserver : ILifecycleObserver, IGrainMigrationParticipant
     {
+        private const string StorageMigratedKey = "grain-state-migrated";
         private readonly Grain<TGrainState> _grain;
+        private bool _isInitialized;
 
         public LifecycleObserver(Grain<TGrainState> grain) => _grain = grain;
 
         private void SetupStorage() => _grain._storage ??= _grain.Runtime.GetStorage<TGrainState>(_grain.GrainContext);
 
-        public void OnDehydrate(IDehydrationContext dehydrationContext) => (_grain._storage as IGrainMigrationParticipant)?.OnDehydrate(dehydrationContext);
+        public void OnDehydrate(IDehydrationContext dehydrationContext)
+        {
+            var storage = _grain._storage;
+            if (storage is IGrainMigrationParticipant migrationParticipant)
+            {
+                dehydrationContext.TryAddValue(StorageMigratedKey, true);
+                migrationParticipant.OnDehydrate(dehydrationContext);
+            }
+        }
 
         public void OnRehydrate(IRehydrationContext rehydrationContext)
         {
             SetupStorage();
-            (_grain._storage as IGrainMigrationParticipant)?.OnRehydrate(rehydrationContext);
+            if (_grain._storage is IGrainMigrationParticipant migrationParticipant)
+            {
+                _isInitialized = rehydrationContext.TryGetValue(StorageMigratedKey, out bool isMigrated) && isMigrated;
+                migrationParticipant.OnRehydrate(rehydrationContext);
+            }
         }
 
         public Task OnStart(CancellationToken cancellationToken = default)
@@ -262,7 +276,7 @@ public class Grain<TGrainState> : Grain
             }
 
             // Avoid reading the state if it is already present because of rehydration
-            if (_grain._storage?.Etag is not null)
+            if (_isInitialized || _grain._storage?.Etag is not null)
             {
                 return Task.CompletedTask;
             }

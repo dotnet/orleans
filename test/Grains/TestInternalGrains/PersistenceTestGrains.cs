@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Concurrency;
 using Orleans.Configuration;
+using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
@@ -29,23 +30,6 @@ namespace UnitTests.Grains
                 StackTrace={callStack}
                 """;
         }
-    }
-
-    [Serializable]
-    [GenerateSerializer]
-    public class PersistenceTestGrainState
-    {
-        public PersistenceTestGrainState()
-        {
-            SortedDict = new SortedDictionary<int, int>();
-        }
-
-        [Id(0)]
-        public int Field1 { get; set; }
-        [Id(1)]
-        public string Field2 { get; set; }
-        [Id(2)]
-        public SortedDictionary<int, int> SortedDict { get; set; }
     }
 
     [Serializable]
@@ -349,6 +333,18 @@ namespace UnitTests.Grains
         {
             return ClearStateAsync();
         }
+
+        public ValueTask<GrainState<PersistenceTestGrainState>> GetStateAsync()
+        {
+            var field = GetType().BaseType.GetField("_storage", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var storage = (IStorage<PersistenceTestGrainState>)field.GetValue(this);
+            return new(new GrainState<PersistenceTestGrainState>
+            {
+                RecordExists = storage.RecordExists,
+                State = storage.State,
+                ETag = storage.Etag
+            });
+        }
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "GrainStorageForTest")]
@@ -386,113 +382,6 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "GrainStorageForTest")]
     public class GrainStorageTestGrainExtendedKey : Grain<PersistenceTestGrainState>,
         IGrainStorageTestGrain_GuidExtendedKey, IGrainStorageTestGrain_LongExtendedKey
-    {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
-
-        public Task<string> GetExtendedKeyValue()
-        {
-            string extKey;
-            _ = this.GetPrimaryKey(out extKey);
-            return Task.FromResult(extKey);
-        }
-
-        public Task DoWrite(int val)
-        {
-            State.Field1 = val;
-            return WriteStateAsync();
-        }
-
-        public async Task<int> DoRead()
-        {
-            await ReadStateAsync(); // Re-read state from store
-            return State.Field1;
-        }
-
-        public Task DoDelete()
-        {
-            return ClearStateAsync();
-        }
-    }
-
-    [Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
-    public class AWSStorageTestGrain : Grain<PersistenceTestGrainState>,
-        IAWSStorageTestGrain, IAWSStorageTestGrain_LongKey
-    {
-        private readonly string _id = Guid.NewGuid().ToString();
-
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
-
-        public Task DoWrite(int val)
-        {
-            State.Field1 = val;
-            return WriteStateAsync();
-        }
-
-        public async Task<int> DoRead()
-        {
-            await ReadStateAsync(); // Re-read state from store
-            return State.Field1;
-        }
-
-        public Task<string> GetActivationId() => Task.FromResult(_id);
-
-        public Task DoDelete()
-        {
-            return ClearStateAsync();
-        }
-    }
-
-    [Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
-    public class AWSStorageGenericGrain<T> : Grain<PersistenceGenericGrainState<T>>,
-        IAWSStorageGenericGrain<T>
-    {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task<T> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
-
-        public Task DoWrite(T val)
-        {
-            State.Field1 = val;
-            return WriteStateAsync();
-        }
-
-        public async Task<T> DoRead()
-        {
-            await ReadStateAsync(); // Re-read state from store
-            return State.Field1;
-        }
-
-        public Task DoDelete()
-        {
-            return ClearStateAsync();
-        }
-    }
-
-    [Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
-    public class AWSStorageTestGrainExtendedKey : Grain<PersistenceTestGrainState>,
-        IAWSStorageTestGrain_GuidExtendedKey, IAWSStorageTestGrain_LongExtendedKey
     {
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {

@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Storage
 {
@@ -52,9 +53,16 @@ namespace Orleans.Storage
             MemoryStorageWithLatencyOptions options,
             ILoggerFactory loggerFactory,
             IGrainFactory grainFactory,
-            IGrainStorageSerializer defaultGrainStorageSerialzier)
+            IActivatorProvider activatorProvider,
+            IGrainStorageSerializer defaultGrainStorageSerializer)
         {
-            this.baseGranStorage = new MemoryGrainStorage(name, options, loggerFactory.CreateLogger<MemoryGrainStorage>(), grainFactory, defaultGrainStorageSerialzier);
+            this.baseGranStorage = new MemoryGrainStorage(
+                name,
+                options,
+                loggerFactory.CreateLogger<MemoryGrainStorage>(),
+                grainFactory,
+                defaultGrainStorageSerializer,
+                activatorProvider);
             this.options = options;
         }
 
@@ -101,16 +109,24 @@ namespace Orleans.Storage
                 error = exc;
             }
 
-            if (sw.Elapsed < this.options.Latency)
+            do
             {
                 // Work out the remaining time to wait so that this operation exceeds the required Latency.
                 // Also adds an extra fudge factor to account for any system clock resolution edge cases.
                 var extraDelay = TimeSpan.FromTicks(
-                    this.options.Latency.Ticks - sw.Elapsed.Ticks + TimeSpan.TicksPerMillisecond /* round up */ );
+                     5 * TimeSpan.TicksPerMillisecond + this.options.Latency.Ticks - sw.Elapsed.Ticks);
 
-                await Task.Delay(extraDelay);
-            }
+                if (extraDelay > TimeSpan.Zero)
+                {
+                    await Task.Delay(extraDelay);
+                }
+                else
+                {
+                    break;
+                }
+            } while (true);
 
+            Debug.Assert(sw.Elapsed >= this.options.Latency, "sw.Elapsed >= this.options.Latency");
             if (error != null)
             {
                 // Wrap in AggregateException so that the original error stack trace is preserved.

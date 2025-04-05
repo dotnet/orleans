@@ -15,23 +15,26 @@ namespace Tester.AdoNet.Persistence
     {
         public const string TestDatabaseName = "OrleansTest_SqlServer_Storage";
         public static string AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
-        public static Guid ServiceId = Guid.NewGuid();
         public static string ConnectionStringKey = "AdoNetConnectionString";
         public class Fixture : BaseTestClusterFixture
         {
+            protected override void CheckPreconditionsOrThrow()
+            {
+                if (string.IsNullOrEmpty(TestDefaultConfiguration.MsSqlConnectionString))
+                {
+                    throw new SkipException("SQL Server connection string is not specified.");
+                }
+            }
+
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.Options.InitialSilosCount = 4;
-                builder.Options.UseTestClusterMembership = false;
                 var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName).Result;
                 builder.ConfigureHostConfiguration(configBuilder => configBuilder.AddInMemoryCollection(
                     new Dictionary<string, string>
                     {
                         {ConnectionStringKey, relationalStorage.CurrentConnectionString}
                     }));
-                builder.Options.ServiceId = ServiceId.ToString();
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-                builder.AddClientBuilderConfigurator<GatewayConnectionTests.ClientBuilderConfigurator>();
             }
 
             private class MySiloBuilderConfigurator : IHostConfigurator
@@ -42,14 +45,9 @@ namespace Tester.AdoNet.Persistence
                     hostBuilder.UseOrleans((ctx, siloBuilder) =>
                     {
                         siloBuilder
-                            .UseAdoNetClustering(options =>
-                            {
-                                options.ConnectionString = connectionString;
-                                options.Invariant = AdoInvariant;
-                            })
                             .AddAdoNetGrainStorage("GrainStorageForTest", options =>
                             {
-                                options.ConnectionString = (string)connectionString;
+                                options.ConnectionString = connectionString;
                                 options.Invariant = AdoInvariant;
                             })
                             .AddMemoryGrainStorage("MemoryStore");
@@ -58,12 +56,10 @@ namespace Tester.AdoNet.Persistence
             }
         }
 
-        private readonly Fixture fixture;
-
         public PersistenceGrainTests_SqlServer(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {
-            this.fixture = fixture;
-            this.fixture.EnsurePreconditionsMet();
+            DistinguishesGenericGrainTypeParameters = false;
+            fixture.EnsurePreconditionsMet();
         }
     }
 }
