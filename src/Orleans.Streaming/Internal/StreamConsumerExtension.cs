@@ -21,14 +21,14 @@ namespace Orleans.Streams
 
     /// <summary>
     /// The extension multiplexes all stream related messages to this grain between different streams and their stream observers.
-    /// 
-    /// On the silo, we have one extension object per activation and this extension multiplexes all streams on this activation 
+    ///
+    /// On the silo, we have one extension object per activation and this extension multiplexes all streams on this activation
     ///     (streams of all types and ids: different stream ids and different stream providers).
     /// On the client, we have one extension per stream (we bind an extension for every StreamConsumer, therefore every stream has its own extension).
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    internal sealed class StreamConsumerExtension : IStreamConsumerExtension
+    internal sealed partial class StreamConsumerExtension : IStreamConsumerExtension
     {
         [Id(0)]
         private readonly IStreamProviderRuntime providerRuntime;
@@ -61,7 +61,7 @@ namespace Orleans.Streams
 
             try
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("{Grain} AddObserver for stream {StreamId}", providerRuntime.ExecutingEntityIdentity(), stream.InternalStreamId);
+                LogDebugAddObserver(providerRuntime.ExecutingEntityIdentity(), stream.InternalStreamId);
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
                 var handle = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, batchObserver, stream, token, filterData);
@@ -70,10 +70,7 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.LogError(
-                    (int)ErrorCode.StreamProvider_AddObserverException,
-                    exc,
-                    "{Grain} StreamConsumerExtension.AddObserver({StreamId}) caught exception.", providerRuntime.ExecutingEntityIdentity(), stream.InternalStreamId);
+                LogErrorAddObserver(providerRuntime.ExecutingEntityIdentity(), stream.InternalStreamId, exc);
                 throw;
             }
         }
@@ -90,12 +87,7 @@ namespace Orleans.Streams
 
         public async Task<StreamHandshakeToken> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
         {
-            if (logger.IsEnabled(LogLevel.Trace))
-            {
-                var itemString = item.ToString();
-                itemString = (itemString.Length > MAXIMUM_ITEM_STRING_LOG_LENGTH) ? itemString[..MAXIMUM_ITEM_STRING_LOG_LENGTH] + "..." : itemString;
-                logger.LogTrace("DeliverItem {Item} for subscription {Subscription}", itemString, subscriptionId);
-            }
+            LogTraceDeliverItem(new(item), subscriptionId);
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
             {
@@ -116,9 +108,7 @@ namespace Orleans.Streams
                 }
             }
 
-            logger.LogWarning(
-                (int)ErrorCode.StreamProvider_NoStreamForItem,
-                "{Grain} got an item for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.",
+            LogWarningNoStreamForItem(
                 providerRuntime.ExecutingEntityIdentity(),
                 subscriptionId);
 
@@ -129,7 +119,7 @@ namespace Orleans.Streams
 
         public async Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer batch, StreamHandshakeToken handshakeToken)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("DeliverBatch {Batch} for subscription {Subscription}", batch, subscriptionId);
+            LogTraceDeliverBatch(batch, subscriptionId);
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
@@ -151,9 +141,7 @@ namespace Orleans.Streams
                 }
             }
 
-            logger.LogWarning(
-                (int)ErrorCode.StreamProvider_NoStreamForBatch,
-                "{Grain} got an item for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.",
+            LogWarningNoStreamForBatch(
                 providerRuntime.ExecutingEntityIdentity(),
                 subscriptionId);
 
@@ -164,15 +152,13 @@ namespace Orleans.Streams
 
         public Task CompleteStream(GuidId subscriptionId)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("CompleteStream for subscription {SubscriptionId}", subscriptionId);
+            LogTraceCompleteStream(subscriptionId);
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
                 return observer.CompleteStream();
 
-            logger.LogWarning(
-                (int)ErrorCode.StreamProvider_NoStreamForItem,
-                "{Grain} got a Complete for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.",
+            LogWarningNoStreamForComplete(
                 providerRuntime.ExecutingEntityIdentity(),
                 subscriptionId);
 
@@ -183,18 +169,16 @@ namespace Orleans.Streams
 
         public Task ErrorInStream(GuidId subscriptionId, Exception exc)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace(exc, "Error in stream for subscription {Subscription}", subscriptionId);
+            LogTraceErrorInStream(subscriptionId, exc);
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
                 return observer.ErrorInStream(exc);
 
-            logger.LogWarning(
-                (int)ErrorCode.StreamProvider_NoStreamForItem,
-                exc,
-                "{Grain} got an error for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.",
+            LogWarningNoStreamForError(
                 providerRuntime.ExecutingEntityIdentity(),
-                subscriptionId);
+                subscriptionId,
+                exc);
 
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
@@ -221,5 +205,70 @@ namespace Orleans.Streams
             }
             return ls;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "{Grain} AddObserver for stream {StreamId}")]
+        private partial void LogDebugAddObserver(string grain, StreamId streamId);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)ErrorCode.StreamProvider_AddObserverException,
+            Message = "{Grain} StreamConsumerExtension.AddObserver({StreamId}) caught exception."
+        )]
+        private partial void LogErrorAddObserver(string grain, StreamId streamId, Exception exception);
+
+        private struct ItemWithMaxLength(object item)
+        {
+            public override string ToString()
+            {
+                var itemString = item.ToString();
+                return (itemString.Length > MAXIMUM_ITEM_STRING_LOG_LENGTH) ? itemString[..MAXIMUM_ITEM_STRING_LOG_LENGTH] + "..." : itemString;
+            }
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "DeliverItem {Item} for subscription {Subscription}")]
+        private partial void LogTraceDeliverItem(ItemWithMaxLength item, GuidId subscription);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.StreamProvider_NoStreamForItem,
+            Message = "{Grain} got an item for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.")]
+        private partial void LogWarningNoStreamForItem(string grain, GuidId subscription);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "DeliverBatch {Batch} for subscription {Subscription}")]
+        private partial void LogTraceDeliverBatch(IBatchContainer batch, GuidId subscription);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.StreamProvider_NoStreamForBatch,
+            Message = "{Grain} got an item for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.")]
+        private partial void LogWarningNoStreamForBatch(string grain, GuidId subscription);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "CompleteStream for subscription {SubscriptionId}")]
+        private partial void LogTraceCompleteStream(GuidId subscriptionId);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.StreamProvider_NoStreamForItem,
+            Message = "{Grain} got a Complete for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.")]
+        private partial void LogWarningNoStreamForComplete(string grain, GuidId subscription);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Error in stream for subscription {Subscription}")]
+        private partial void LogTraceErrorInStream(GuidId subscription, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.StreamProvider_NoStreamForItem,
+            Message = "{Grain} got an error for subscription {Subscription}, but I don't have any subscriber for that stream. Dropping on the floor.")]
+        private partial void LogWarningNoStreamForError(string grain, GuidId subscription, Exception exception);
     }
 }

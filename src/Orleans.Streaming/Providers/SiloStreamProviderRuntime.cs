@@ -10,7 +10,7 @@ using Orleans.Internal;
 
 namespace Orleans.Runtime.Providers
 {
-    internal class SiloStreamProviderRuntime : ISiloSideStreamProviderRuntime
+    internal partial class SiloStreamProviderRuntime : ISiloSideStreamProviderRuntime
     {
         private readonly IConsistentRingProvider consistentRingProvider;
         private readonly InsideRuntimeClient runtimeClient;
@@ -115,10 +115,7 @@ namespace Orleans.Runtime.Providers
                 var balancer = this.ServiceProvider.GetKeyedService<IStreamQueueBalancer>(streamProviderName) ??this.ServiceProvider.GetService<IStreamQueueBalancer>();
                 if (balancer == null)
                     throw new ArgumentOutOfRangeException("balancerType", $"Cannot create stream queue balancer for StreamProvider: {streamProviderName}.Please configure your stream provider with a queue balancer.");
-                this.logger.LogInformation(
-                    "Successfully created queue balancer of type {BalancerType} for stream provider {StreamProviderName}",
-                    balancer.GetType(),
-                    streamProviderName);
+                LogInfoSuccessfullyCreatedQueueBalancer(balancer.GetType(), streamProviderName);
                 return balancer;
             }
             catch (Exception e)
@@ -160,5 +157,11 @@ namespace Orleans.Runtime.Providers
 
             return this.grainContextAccessor.GrainContext.GetComponent<IGrainExtensionBinder>().GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Successfully created queue balancer of type {BalancerType} for stream provider {StreamProviderName}"
+        )]
+        private partial void LogInfoSuccessfullyCreatedQueueBalancer(Type balancerType, string streamProviderName);
     }
 }
