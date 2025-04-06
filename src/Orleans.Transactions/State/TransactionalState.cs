@@ -16,7 +16,7 @@ namespace Orleans.Transactions
     /// <summary>
     /// Stateful facet that respects Orleans transaction semantics
     /// </summary>
-    public class TransactionalState<TState> : ITransactionalState<TState>, ILifecycleParticipant<IGrainLifecycle>
+    public partial class TransactionalState<TState> : ITransactionalState<TState>, ILifecycleParticipant<IGrainLifecycle>
         where TState : class, new()
     {
         private readonly TransactionalStateConfiguration config;
@@ -34,8 +34,8 @@ namespace Orleans.Transactions
         private bool detectReentrancy;
 
         public TransactionalState(
-            TransactionalStateConfiguration transactionalStateConfiguration, 
-            IGrainContextAccessor contextAccessor, 
+            TransactionalStateConfiguration transactionalStateConfiguration,
+            IGrainContextAccessor contextAccessor,
             ITransactionDataCopier<TState> copier,
             IGrainRuntime grainRuntime,
             ILogger<TransactionalState<TState>> logger)
@@ -61,54 +61,49 @@ namespace Orleans.Transactions
             }
 
             var info = TransactionContext.GetRequiredTransactionInfo();
-
-            if (logger.IsEnabled(LogLevel.Trace))
-                logger.LogTrace("StartRead {Info}", info);
+            LogTraceStartRead(info);
 
             info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
 
             // schedule read access to happen under the lock
             return this.queue.RWLock.EnterLock<TResult>(info.TransactionId, info.Priority, recordedaccesses, true,
-                 () =>
-                 {
-                     // check if our record is gone because we expired while waiting
-                     if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState> record))
-                     {
-                         throw new OrleansCascadingAbortException(info.TransactionId.ToString());
-                     }
+                () =>
+                {
+                    // check if our record is gone because we expired while waiting
+                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState> record))
+                    {
+                        throw new OrleansCascadingAbortException(info.TransactionId.ToString());
+                    }
 
-                     // merge the current clock into the transaction time stamp
-                     record.Timestamp = this.queue.Clock.MergeUtcNow(info.TimeStamp);
+                    // merge the current clock into the transaction time stamp
+                    record.Timestamp = this.queue.Clock.MergeUtcNow(info.TimeStamp);
 
-                     if (record.State == null)
-                     {
-                         this.queue.GetMostRecentState(out record.State, out record.SequenceNumber);
-                     }
+                    if (record.State == null)
+                    {
+                        this.queue.GetMostRecentState(out record.State, out record.SequenceNumber);
+                    }
 
-                     if (logger.IsEnabled(LogLevel.Debug))
-                         logger.LogDebug("Update-lock read v{SequenceNumber} {TransactionId} {Timestamp}", record.SequenceNumber, record.TransactionId, record.Timestamp.ToString("o"));
+                    LogDebugUpdateLockRead(record.SequenceNumber, record.TransactionId, new(record.Timestamp));
 
-                     // record this read in the transaction info data structure
-                     info.RecordRead(this.participantId, record.Timestamp);
+                    // record this read in the transaction info data structure
+                    info.RecordRead(this.participantId, record.Timestamp);
 
-                     // perform the read 
-                     TResult result = default;
-                     try
-                     {
-                         detectReentrancy = true;
+                    // perform the read
+                    TResult result = default;
+                    try
+                    {
+                        detectReentrancy = true;
 
-                         result = CopyResult(operation(record.State));
-                     }
-                     finally
-                     {
-                         if (logger.IsEnabled(LogLevel.Trace))
-                             logger.LogTrace("EndRead {Info} {Result} {State}", info, result, record.State);
+                        result = CopyResult(operation(record.State));
+                    }
+                    finally
+                    {
+                        LogTraceEndRead(info, result, record.State);
+                        detectReentrancy = false;
+                    }
 
-                         detectReentrancy = false;
-                     }
-
-                     return result;
-                 });
+                    return result;
+                });
         }
 
         /// <inheritdoc/>
@@ -120,10 +115,9 @@ namespace Orleans.Transactions
                 throw new LockRecursionException("Cannot perform an update operation from within another operation");
             }
 
-            var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo();
+            var info = TransactionContext.GetRequiredTransactionInfo();
 
-            if (logger.IsEnabled(LogLevel.Trace))
-                logger.LogTrace("StartWrite {Info}", info);
+            LogTraceStartWrite(info);
 
             if (info.IsReadOnly)
             {
@@ -158,14 +152,7 @@ namespace Orleans.Transactions
                         record.HasCopiedState = true;
                     }
 
-                    if (logger.IsEnabled(LogLevel.Debug))
-                    {
-                        logger.LogDebug(
-                            "Update-lock write v{SequenceNumber} {TransactionId} {Timestamp}",
-                            record.SequenceNumber,
-                            record.TransactionId,
-                            record.Timestamp.ToString("o"));
-                    }
+                    LogDebugUpdateLockWrite(record.SequenceNumber, record.TransactionId, new(record.Timestamp));
 
                     // record this write in the transaction info data structure
                     info.RecordWrite(this.participantId, record.Timestamp);
@@ -179,9 +166,7 @@ namespace Orleans.Transactions
                     }
                     finally
                     {
-                        if (logger.IsEnabled(LogLevel.Trace))
-                            logger.LogTrace("EndWrite {Info} {TransactionId} {Timestamp}", info, record.TransactionId, record.Timestamp);
-
+                        LogTraceEndWrite(info, record.TransactionId, new(record.Timestamp));
                         detectReentrancy = false;
                     }
                 }
@@ -238,5 +223,46 @@ namespace Orleans.Transactions
             }
             return resultCopier.DeepCopy(result);
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "StartRead {Info}"
+        )]
+        private partial void LogTraceStartRead(TransactionInfo info);
+
+        private readonly struct DateTimeLogRecord(DateTime ts)
+        {
+            public override string ToString() => ts.ToString("o");
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Update-lock read v{SequenceNumber} {TransactionId} {Timestamp}"
+        )]
+        private partial void LogDebugUpdateLockRead(long sequenceNumber, Guid transactionId, DateTimeLogRecord timestamp);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "EndRead {Info} {Result} {State}"
+        )]
+        private partial void LogTraceEndRead(TransactionInfo info, object result, TState state);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "StartWrite {Info}"
+        )]
+        private partial void LogTraceStartWrite(TransactionInfo info);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Update-lock write v{SequenceNumber} {TransactionId} {Timestamp}"
+        )]
+        private partial void LogDebugUpdateLockWrite(long sequenceNumber, Guid transactionId, DateTimeLogRecord timestamp);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "EndWrite {Info} {TransactionId} {Timestamp}"
+        )]
+        private partial void LogTraceEndWrite(TransactionInfo info, Guid transactionId, DateTimeLogRecord timestamp);
     }
 }

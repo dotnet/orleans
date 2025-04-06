@@ -335,7 +335,7 @@ namespace Orleans.Transactions.State
                             currentGroup.Deadline = now + this.options.LockTimeout;
 
                             // discard expired waiters that have no chance to succeed
-                            // because they have been waiting for the lock for a longer timespan than the 
+                            // because they have been waiting for the lock for a longer timespan than the
                             // total transaction timeout
                             foreach (var kvp in currentGroup)
                             {
@@ -373,7 +373,7 @@ namespace Orleans.Transactions.State
                 }
             }
         }
-       
+
         private bool Find(Guid guid, bool isRead, out LockGroup group, out TransactionRecord<TState> record)
         {
             if (currentGroup == null)
