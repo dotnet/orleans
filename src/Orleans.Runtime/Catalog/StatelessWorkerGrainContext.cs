@@ -178,21 +178,22 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
                                 }
                                 break;
                             }
-                        case WorkItemType.CollectIdleWorkers: CollectIdleWorkers();
+                        case WorkItemType.CollectIdleWorkers:
+                            CollectIdleWorkers();
                             break;
                         default:
                             throw new NotSupportedException($"Work item of type {workItem.Type} is not supported");
                     }
                 }
 
-                    await _workSignal.WaitAsync();
-                }
-                catch (Exception exception)
-                {
-                    LogErrorInMessageLoop(_shared.Logger, exception);
-                }
+                await _workSignal.WaitAsync();
+            }
+            catch (Exception exception)
+            {
+                LogErrorInMessageLoop(_shared.Logger, exception);
             }
         }
+    }
 
     private void CollectIdleWorkers()
     {
@@ -407,15 +408,14 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
         CollectIdleWorkers
     }
 
-        private record ActivateWorkItemState(Dictionary<string, object>? RequestContext, CancellationToken CancellationToken);
-        private record DeactivateWorkItemState(DeactivationReason DeactivationReason, CancellationToken CancellationToken);
-        private record DeactivatedTaskWorkItemState(TaskCompletionSource<bool> Completion);
-        private record DisposeAsyncWorkItemState(TaskCompletionSource<bool> Completion);
+    private record ActivateWorkItemState(Dictionary<string, object>? RequestContext, CancellationToken CancellationToken);
+    private record DeactivateWorkItemState(DeactivationReason DeactivationReason, CancellationToken CancellationToken);
+    private record DeactivatedTaskWorkItemState(TaskCompletionSource<bool> Completion);
+    private record DisposeAsyncWorkItemState(TaskCompletionSource<bool> Completion);
 
-        [LoggerMessage(
-            Level = LogLevel.Error,
-            Message = "Error in stateless worker message loop"
-        )]
-        private static partial void LogErrorInMessageLoop(ILogger logger, Exception exception);
-    }
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error in stateless worker message loop"
+    )]
+    private static partial void LogErrorInMessageLoop(ILogger logger, Exception exception);
 }
