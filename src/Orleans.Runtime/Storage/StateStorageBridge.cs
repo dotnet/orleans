@@ -174,7 +174,8 @@ namespace Orleans.Core
 
             var grainId = _grainContext.GrainId;
             var providerName = _shared.Store.GetType().Name;
-            LogErrorOnError(_shared.Logger, (int)id, exception, providerName, _shared.Name, operation, grainId, errorString);
+            // cannot use LoggerMessage here because we need to pass the eventId as an argument
+            _shared.Logger.LogError((int)id, exception, "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}", providerName, _shared.Name, operation, grainId, errorString);
 
             // If error is not specialization of OrleansException, wrap it
             if (exception is not OrleansException)
@@ -186,29 +187,17 @@ namespace Orleans.Core
             ExceptionDispatchInfo.Throw(exception);
         }
 
-        private readonly struct GrainIdLogValue(GrainId grainId)
-        {
-            public override string ToString() => grainId.ToString();
-        }
-
         [LoggerMessage(
             Level = LogLevel.Error,
             Message = "Failed to dehydrate state named {StateName} for grain {GrainId}"
         )]
-        private static partial void LogErrorOnDehydrate(ILogger logger, Exception exception, string stateName, GrainIdLogValue grainId);
+        private static partial void LogErrorOnDehydrate(ILogger logger, Exception exception, string stateName, GrainId grainId);
 
         [LoggerMessage(
             Level = LogLevel.Error,
             Message = "Failed to rehydrate state named {StateName} for grain {GrainId}"
         )]
-        private static partial void LogErrorOnRehydrate(ILogger logger, Exception exception, string stateName, GrainIdLogValue grainId);
-
-        [LoggerMessage(
-            EventId = 0, // Replace with actual EventId if available
-            Level = LogLevel.Error,
-            Message = "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}"
-        )]
-        private static partial void LogErrorOnError(ILogger logger, int eventId, Exception exception, string providerName, string stateName, string operation, GrainIdLogValue grainId, string? errorCode);
+        private static partial void LogErrorOnRehydrate(ILogger logger, Exception exception, string stateName, GrainId grainId);
     }
 
     internal sealed class StateStorageBridgeSharedMap(ILoggerFactory loggerFactory, IActivatorProvider activatorProvider)

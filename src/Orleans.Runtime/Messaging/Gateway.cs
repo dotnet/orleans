@@ -401,7 +401,7 @@ namespace Orleans.Runtime.Messaging
                     }
                     catch (Exception exception)
                     {
-                        LogWarningGatewayClientMessageLoopException(_gateway.logger, Id);
+                        LogWarningGatewayClientMessageLoopException(_gateway.logger, exception, Id);
                     }
                 }
             }
@@ -519,6 +519,6 @@ namespace Orleans.Runtime.Messaging
             Level = LogLevel.Warning,
             Message = "Exception in message loop for client {ClientId}"
         )]
-        private static partial void LogWarningGatewayClientMessageLoopException(ILogger logger, ClientGrainId clientId);
+        private static partial void LogWarningGatewayClientMessageLoopException(ILogger logger, Exception exception, ClientGrainId clientId);
     }
 }

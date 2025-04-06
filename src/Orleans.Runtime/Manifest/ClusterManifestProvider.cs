@@ -171,7 +171,7 @@ namespace Orleans.Runtime.Metadata
                     fetchSuccess = false;
                     if (exception is not OperationCanceledException)
                     {
-                        LogWarningErrorRetrievingSiloManifest(exception, new(result.Key));
+                        LogWarningErrorRetrievingSiloManifest(exception, result.Key);
                     }
                 }
                 else

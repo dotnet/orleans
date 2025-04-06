@@ -430,7 +430,8 @@ namespace Orleans.Runtime
 
                     if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Debug))
                     {
-                        LogDebugReceivedStatusUpdateUnknownRequest(this.logger, message, new(status.Diagnostics));
+                        var diagnosticsString = string.Join("\n", status.Diagnostics);
+                        this.logger.LogDebug("Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}", message, diagnosticsString);
                     }
                 }
 

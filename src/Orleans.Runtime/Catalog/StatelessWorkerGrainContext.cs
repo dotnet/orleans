@@ -410,8 +410,8 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     private record ActivateWorkItemState(Dictionary<string, object>? RequestContext, CancellationToken CancellationToken);
     private record DeactivateWorkItemState(DeactivationReason DeactivationReason, CancellationToken CancellationToken);
-    private record DeactivatedTaskWorkItemState(TaskCompletionSource<bool> Completion);
-    private record DisposeAsyncWorkItemState(TaskCompletionSource<bool> Completion);
+    private record DeactivatedTaskWorkItemState(TaskCompletionSource Completion);
+    private record DisposeAsyncWorkItemState(TaskCompletionSource Completion);
 
     [LoggerMessage(
         Level = LogLevel.Error,
