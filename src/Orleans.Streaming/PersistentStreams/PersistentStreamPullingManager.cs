@@ -16,7 +16,7 @@ using System.Diagnostics.Metrics;
 
 namespace Orleans.Streams
 {
-    internal class PersistentStreamPullingManager : SystemTarget, IPersistentStreamPullingManager, IStreamQueueBalanceListener
+    internal partial class PersistentStreamPullingManager : SystemTarget, IPersistentStreamPullingManager, IStreamQueueBalanceListener
     {
         private static readonly TimeSpan QUEUES_PRINT_PERIOD = TimeSpan.FromMinutes(5);
 
@@ -88,28 +88,20 @@ namespace Orleans.Streams
             _queueReaderBackoffProvider = queueReaderBackoffProvider;
             queueAdapterCache = adapterFactory.GetQueueAdapterCache();
             logger = loggerFactory.CreateLogger($"{GetType().FullName}.{streamProviderName}");
-            logger.LogInformation(
-                (int)ErrorCode.PersistentStreamPullingManager_01,
-                "Created {Name} for Stream Provider {StreamProvider}.",
-                GetType().Name,
-                streamProviderName);
+            LogInfoCreated(GetType().Name, streamProviderName);
             this.loggerFactory = loggerFactory;
             StreamInstruments.RegisterPersistentStreamPullingAgentsObserve(() => new Measurement<int>(queuesToAgentsMap.Count, new KeyValuePair<string, object>("name", streamProviderName)));
         }
 
         public async Task Initialize()
         {
-            logger.LogInformation((int)ErrorCode.PersistentStreamPullingManager_02, "Init.");
+            LogInfoInit();
 
             await this.queueBalancer.Initialize(this.adapterFactory.GetStreamQueueMapper());
             queueBalancer.SubscribeToQueueDistributionChangeEvents(this);
 
             List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
-            logger.LogInformation(
-                (int)ErrorCode.PersistentStreamPullingManager_03,
-                "Initialize: I am now responsible for {QueueCount} queues: {Queues}.",
-                myQueues.Count,
-                PrintQueues(myQueues));
+            LogInfoInitialized(myQueues.Count, new(myQueues));
 
             queuePrintTimer = this.RegisterTimer(AsyncTimerCallback, null, QUEUES_PRINT_PERIOD, QUEUES_PRINT_PERIOD);
             managerState = RunState.Initialized;
@@ -132,22 +124,18 @@ namespace Orleans.Streams
             managerState = RunState.AgentsStarted;
             List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
 
-            logger.LogInformation(
-                (int)ErrorCode.PersistentStreamPullingManager_Starting,
-                "Starting agents for {QueueCount} queues: {Queues}",
-                myQueues.Count,
-                PrintQueues(myQueues));
+            LogInfoStarting(myQueues.Count, new(myQueues));
             await AddNewQueues(myQueues, true);
-            logger.LogInformation((int)ErrorCode.PersistentStreamPullingManager_Started, "Started agents.");
+            LogInfoStarted();
         }
 
         public async Task StopAgents()
         {
             managerState = RunState.AgentsStopped;
             List<QueueId> queuesToRemove = queuesToAgentsMap.Keys.ToList();
-            logger.LogInformation((int)ErrorCode.PersistentStreamPullingManager_Stopping, "Stopping agents for {RemovedCount} queues: {RemovedQueues}",  queuesToRemove.Count, PrintQueues(queuesToRemove) );
+            LogInfoStopping(queuesToRemove.Count, new(queuesToRemove));
             await RemoveQueues(queuesToRemove);
-            logger.LogInformation((int)ErrorCode.PersistentStreamPullingManager_Stopped, "Stopped agents.");
+            LogInfoStopped();
         }
 
         /// <summary>
@@ -166,12 +154,7 @@ namespace Orleans.Streams
         {
             latestRingNotificationSequenceNumber++;
             int notificationSeqNumber = latestRingNotificationSequenceNumber;
-            logger.LogInformation(
-                (int)ErrorCode.PersistentStreamPullingManager_04,
-                "Got QueueChangeNotification number {NotificationSequenceNumber} from the queue balancer. managerState = {ManagerState}",
-                notificationSeqNumber,
-                managerState);
-
+            LogInfoGotQueueChangeNotification(notificationSeqNumber, managerState);
             if (managerState == RunState.AgentsStopped)
             {
                 return Task.CompletedTask; // if agents not running, no need to rebalance the queues among them.
@@ -182,12 +165,7 @@ namespace Orleans.Streams
                 // skip execution of an older/previous notification since already got a newer range update notification.
                 if (notificationSeqNumber < latestRingNotificationSequenceNumber)
                 {
-                    logger.LogInformation(
-                        (int)ErrorCode.PersistentStreamPullingManager_05,
-                        "Skipping execution of QueueChangeNotification number {NotificationSequenceNumber} from the queue allocator since already received a later notification "
-                        + "(already have notification number {LatestNotificationNumber}).",
-                        notificationSeqNumber,
-                        latestRingNotificationSequenceNumber);
+                    LogInfoSkipQueueChangeNotification(notificationSeqNumber, latestRingNotificationSequenceNumber);
                     return Task.CompletedTask;
                 }
                 if (managerState == RunState.AgentsStopped)
@@ -201,12 +179,10 @@ namespace Orleans.Streams
         private async Task QueueDistributionChangeNotification(int notificationSeqNumber)
         {
             HashSet<QueueId> currentQueues = queueBalancer.GetMyQueues().ToSet();
-            logger.LogInformation(
-                (int)ErrorCode.PersistentStreamPullingManager_06,
-                "Executing QueueChangeNotification number {NotificationSequenceNumber}. Queue balancer says I should now own {QueueCount} queues: {Queues}",
+            LogInfoExecutingQueueChangeNotification(
                 notificationSeqNumber,
                 currentQueues.Count,
-                PrintQueues(currentQueues));
+                new(currentQueues));
 
             try
             {
@@ -219,12 +195,10 @@ namespace Orleans.Streams
             }
             finally
             {
-                logger.LogInformation(
-                    (int)ErrorCode.PersistentStreamPullingManager_16,
-                    "Done Executing QueueChangeNotification number {NotificationSequenceNumber}. I now own {QueueCount} queues: {Queues}",
+                LogInfoDoneExecutingQueueChangeNotification(
                     notificationSeqNumber,
                     NumberRunningAgents,
-                    PrintQueues(queuesToAgentsMap.Keys));
+                    new(queuesToAgentsMap.Keys));
             }
         }
 
@@ -271,11 +245,7 @@ namespace Orleans.Streams
                     }
                     catch (Exception exc)
                     {
-                        logger.LogError(
-                            (int)ErrorCode.PersistentStreamPullingManager_07,
-                            exc,
-                            "Exception while creating PersistentStreamPullingAgent.");
-
+                        LogErrorCreatingAgent(exc);
                         // What should we do? This error is not recoverable and considered a bug. But we don't want to bring the silo down.
                         // If this is when silo is starting and agent is initializing, fail the silo startup. Otherwise, just swallow to limit impact on other receivers.
                         if (failOnInit) throw;
@@ -299,13 +269,11 @@ namespace Orleans.Streams
             }
             if (agents.Count > 0)
             {
-                logger.LogInformation(
-                    (int)ErrorCode.PersistentStreamPullingManager_08,
-                    "Added {AddedCount} new queues: {AddedQueues}. Now own total of {QueueCount} queues: {Queues}",
+                LogInfoAddedQueues(
                     agents.Count,
-                    Utils.EnumerableToString(agents, agent => agent.QueueId.ToString()),
+                    new(agents),
                     NumberRunningAgents,
-                    PrintQueues(queuesToAgentsMap.Keys));
+                    new(queuesToAgentsMap.Keys));
             }
         }
 
@@ -321,7 +289,7 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.LogError((int)ErrorCode.PersistentStreamPullingManager_09, exc, "PersistentStreamPullingAgent {QueueId} failed to Initialize.", agent.QueueId);
+                LogErrorInitializingAgent(agent.QueueId, exc);
             }
         }
 
@@ -332,13 +300,8 @@ namespace Orleans.Streams
                 return;
             }
             // Stop the agents that for queues that are not in my range anymore.
+            LogInfoRemovingAgents(queuesToRemove.Count, new(queuesToRemove));
             var agents = new List<PersistentStreamPullingAgent>(queuesToRemove.Count);
-            logger.LogInformation(
-                (int)ErrorCode.PersistentStreamPullingManager_10,
-                "About to remove {RemovedCount} agents from my responsibility: {RemovedQueues}",
-                queuesToRemove.Count,
-                Utils.EnumerableToString(queuesToRemove));
-
             var removeTasks = new List<Task>();
             foreach (var queueId in queuesToRemove)
             {
@@ -367,13 +330,11 @@ namespace Orleans.Streams
 
             if (agents.Count > 0)
             {
-                logger.LogInformation(
-                    (int)ErrorCode.PersistentStreamPullingManager_10,
-                    "Removed {RemovedCount} queues: {RemovedQueues}. Now own total of {QueueCount} queues: {Queues}",
+                LogInfoRemovedQueues(
                     agents.Count,
-                    Utils.EnumerableToString(agents, agent => agent.QueueId.ToString()),
+                    new(agents),
                     NumberRunningAgents,
-                    PrintQueues(queuesToAgentsMap.Keys));
+                    new(queuesToAgentsMap.Keys));
             }
         }
 
@@ -384,9 +345,7 @@ namespace Orleans.Streams
 
             try
             {
-                logger.LogInformation(
-                    (int)ErrorCode.PersistentStreamPullingManager_13,
-                    "Got command {Command}{ArgString}: commandSeqNumber = {CommandSequenceNumber}, managerState = {ManagerState}.",
+                LogInfoGotCommand(
                     command,
                     arg != null ? " with arg " + arg : string.Empty,
                     commandSeqNumber,
@@ -408,9 +367,7 @@ namespace Orleans.Streams
             }
             finally
             {
-                logger.LogInformation(
-                    (int)ErrorCode.PersistentStreamPullingManager_15,
-                    "Done executing command {Command}: commandSeqNumber = {CommandSequenceNumber}, managerState = {ManagerState}, num running agents = {NumRunningAgents}.",
+                LogInfoDoneExecutingCommand(
                     command,
                     commandSeqNumber,
                     managerState,
@@ -428,9 +385,7 @@ namespace Orleans.Streams
                 // skip execution of an older/previous command since already got a newer command.
                 if (commandSeqNumber < latestCommandNumber)
                 {
-                    logger.LogInformation(
-                        (int)ErrorCode.PersistentStreamPullingManager_15,
-                        "Skipping execution of command number {CommandNumber} since already received a later command (already have command number {LatestCommandNumber}).",
+                    LogInfoSkipCommandExecution(
                         commandSeqNumber,
                         latestCommandNumber);
                     return Task.CompletedTask;
@@ -452,11 +407,160 @@ namespace Orleans.Streams
         // Just print our queue assignment periodicaly, for easy monitoring.
         private Task AsyncTimerCallback(object state)
         {
-            logger.LogInformation(
-                (int)ErrorCode.PersistentStreamPullingManager_PeriodicPrint,
-                "I am responsible for a total of {QueueCount} queues on stream provider {StreamProviderName}: {Queues}.",
-                NumberRunningAgents, streamProviderName, PrintQueues(queuesToAgentsMap.Keys));
+            LogInfoPeriodicPrint(NumberRunningAgents, streamProviderName, new(queuesToAgentsMap.Keys));
             return Task.CompletedTask;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_01,
+            Message = "Created {Name} for Stream Provider {StreamProvider}."
+        )]
+        private partial void LogInfoCreated(string name, string streamProvider);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_02,
+            Message = "Init."
+        )]
+        private partial void LogInfoInit();
+
+        private readonly struct QueueIdsLogRecord(ICollection<QueueId> queues)
+        {
+            public override string ToString() => PrintQueues(queues);
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_03,
+            Message = "Initialize: I am now responsible for {QueueCount} queues: {Queues}."
+        )]
+        private partial void LogInfoInitialized(int queueCount, QueueIdsLogRecord queues);
+
+        //
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_Starting,
+            Message = "Starting agents for {QueueCount} queues: {Queues}."
+        )]
+        private partial void LogInfoStarting(int queueCount, QueueIdsLogRecord queues);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_Started,
+            Message = "Started agents."
+        )]
+        private partial void LogInfoStarted();
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_Stopping,
+            Message = "Stopping agents for {RemovedCount} queues: {RemovedQueues}."
+        )]
+        private partial void LogInfoStopping(int removedCount, QueueIdsLogRecord removedQueues);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_Stopped,
+            Message = "Stopped agents."
+        )]
+        private partial void LogInfoStopped();
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_04,
+            Message = "Got QueueChangeNotification number {NotificationSequenceNumber} from the queue balancer. managerState = {ManagerState}."
+        )]
+        private partial void LogInfoGotQueueChangeNotification(int notificationSequenceNumber, RunState managerState);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_05,
+            Message = "Skipping execution of QueueChangeNotification number {NotificationSequenceNumber} from the queue allocator since already received a later notification (already have notification number {LatestNotificationNumber})."
+        )]
+        private partial void LogInfoSkipQueueChangeNotification(int notificationSequenceNumber, int latestNotificationNumber);
+
+        //  "Executing QueueChangeNotification number {NotificationSequenceNumber}. Queue balancer says I should now own {QueueCount} queues: {Queues}"
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_06,
+            Message = "Executing QueueChangeNotification number {NotificationSequenceNumber}. Queue balancer says I should now own {QueueCount} queues: {Queues}."
+        )]
+        private partial void LogInfoExecutingQueueChangeNotification(int notificationSequenceNumber, int queueCount, QueueIdsLogRecord queues);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_16,
+            Message = "Done Executing QueueChangeNotification number {NotificationSequenceNumber}. I now own {QueueCount} queues: {Queues}."
+        )]
+        private partial void LogInfoDoneExecutingQueueChangeNotification(int notificationSequenceNumber, int queueCount, QueueIdsLogRecord queues);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_07,
+            Message = "Exception while creating PersistentStreamPullingAgent."
+        )]
+        private partial void LogErrorCreatingAgent(Exception exc);
+
+        private readonly struct AgentsLogRecord(List<PersistentStreamPullingAgent> agents)
+        {
+            public override string ToString() => Utils.EnumerableToString(agents, agent => agent.QueueId.ToString());
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_08,
+            Message = "Added {AddedCount} new queues: {AddedQueues}. Now own total of {QueueCount} queues: {Queues}."
+        )]
+        private partial void LogInfoAddedQueues(int addedCount, AgentsLogRecord addedQueues, int queueCount, QueueIdsLogRecord queues);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_09,
+            Message = "PersistentStreamPullingAgent {QueueId} failed to Initialize."
+        )]
+        private partial void LogErrorInitializingAgent(QueueId queueId, Exception exc);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_10,
+            Message = "About to remove {RemovedCount} agents from my responsibility: {RemovedQueues}."
+        )]
+        private partial void LogInfoRemovingAgents(int removedCount, QueueIdsLogRecord removedQueues);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_10,
+            Message = "Removed {RemovedCount} queues: {RemovedQueues}. Now own total of {QueueCount} queues: {Queues}."
+        )]
+        private partial void LogInfoRemovedQueues(int removedCount, AgentsLogRecord removedQueues, int queueCount, QueueIdsLogRecord queues);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_13,
+            Message = "Got command {Command}{ArgString}: commandSeqNumber = {CommandSequenceNumber}, managerState = {ManagerState}."
+        )]
+        private partial void LogInfoGotCommand(PersistentStreamProviderCommand command, string argString, int commandSequenceNumber, RunState managerState);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_15,
+            Message = "Done executing command {Command}: commandSeqNumber = {CommandSequenceNumber}, managerState = {ManagerState}, num running agents = {NumRunningAgents}."
+        )]
+        private partial void LogInfoDoneExecutingCommand(PersistentStreamProviderCommand command, int commandSequenceNumber, RunState managerState, int numRunningAgents);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_15,
+            Message = "Skipping execution of command number {CommandNumber} since already received a later command (already have command number {LatestCommandNumber})."
+        )]
+        private partial void LogInfoSkipCommandExecution(int commandNumber, int latestCommandNumber);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.PersistentStreamPullingManager_PeriodicPrint,
+            Message = "I am responsible for a total of {QueueCount} queues on stream provider {StreamProviderName}: {Queues}."
+        )]
+        private partial void LogInfoPeriodicPrint(int queueCount, string streamProviderName, QueueIdsLogRecord queues);
     }
 }
