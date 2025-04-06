@@ -342,8 +342,8 @@ namespace Orleans.CodeGenerator
             var cancellationTokenType = LibraryTypes.CancellationToken.ToTypeSyntax();
             var cancellationTokenField = fields.First(f => SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, f.FieldType));
             var member = MethodDeclaration(cancellationTokenType, "GetCancellationToken")
-                 .WithExpressionBody(ArrowExpressionClause(cancellationTokenField.FieldName.ToIdentifierName()))
-                 .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword))
+                .WithExpressionBody(ArrowExpressionClause(cancellationTokenField.FieldName.ToIdentifierName()))
+                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
             return member;
         }
@@ -359,18 +359,21 @@ namespace Orleans.CodeGenerator
             // C#:
             // TryCancel()
             // {
-            //   _cts.Cancel(false);
+            //   _cts?.Cancel(false);
             //   return true;
             // }
             var cancellationTokenField = fields.First(f => f is CancellationTokenSourceFieldDescription);
             var member = MethodDeclaration(PredefinedType(Token(SyntaxKind.BoolKeyword)), "TryCancel")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword))
                 .WithBody(Block(
-                            ExpressionStatement(InvocationExpression(IdentifierName(cancellationTokenField.FieldName).Member("Cancel")).WithArgumentList(ArgumentList(SeparatedList([Argument(LiteralExpression(SyntaxKind.FalseLiteralExpression))])))),
+                    ExpressionStatement(ConditionalAccessExpression(
+                        IdentifierName(cancellationTokenField.FieldName),
+                        InvocationExpression(MemberBindingExpression(IdentifierName("Cancel")))
+                            .WithArgumentList(ArgumentList(SeparatedList([Argument(LiteralExpression(SyntaxKind.FalseLiteralExpression))]))))),
                     ReturnStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression))));
             return member;
         }
- 
+
         private MemberDeclarationSyntax GenerateGetArgumentMethod(
             InvokableMethodDescription methodDescription,
             List<InvokerFieldDescription> fields)
