@@ -9,7 +9,7 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Cursor into a simple queue cache.
     /// </summary>
-    public class SimpleQueueCacheCursor : IQueueCacheCursor
+    public partial class SimpleQueueCacheCursor : IQueueCacheCursor
     {
         private readonly StreamId streamId;
         private readonly SimpleQueueCache cache;
@@ -58,19 +58,13 @@ namespace Orleans.Providers.Streams.Common
             this.streamId = streamId;
             this.logger = logger;
             current = null;
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                logger.LogDebug("SimpleQueueCacheCursor New Cursor for {StreamId}", streamId);
-            }
+            LogDebugNewCursor(streamId);
         }
 
         /// <inheritdoc />
         public virtual IBatchContainer GetCurrent(out Exception exception)
         {
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                logger.LogDebug("SimpleQueueCacheCursor.GetCurrent: {Current}", current);
-            }
+            LogDebugGetCurrent(current);
 
             exception = null;
             return current;
@@ -146,5 +140,17 @@ namespace Orleans.Providers.Streams.Common
         {
             return $"<SimpleQueueCacheCursor: Element={Element?.Value.Batch.ToString() ?? "null"}, SequenceToken={SequenceToken?.ToString() ?? "null"}>";
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "SimpleQueueCacheCursor New Cursor for {StreamId}"
+        )]
+        private partial void LogDebugNewCursor(StreamId streamId);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "SimpleQueueCacheCursor.GetCurrent: {Current}"
+        )]
+        private partial void LogDebugGetCurrent(IBatchContainer current);
     }
 }

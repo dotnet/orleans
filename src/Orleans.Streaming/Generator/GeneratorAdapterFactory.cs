@@ -28,7 +28,7 @@ namespace Orleans.Providers.Streams.Generator
     /// This factory acts as the adapter and the adapter factory.  It creates receivers that use configurable generator
     ///   to generate event streams, rather than reading them from storage.
     /// </summary>
-    public class GeneratorAdapterFactory : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache, IControllable
+    public partial class GeneratorAdapterFactory : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache, IControllable
     {
         /// <summary>
         /// Configuration property name for generator configuration type
@@ -72,7 +72,7 @@ namespace Orleans.Providers.Streams.Generator
         /// Return a IQueueAdapterReceiverMonitor
         /// </summary>
         protected Func<ReceiverMonitorDimensions, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
-        
+
         public GeneratorAdapterFactory(
             string providerName,
             HashRingStreamQueueMapperOptions queueMapperOptions,
@@ -105,7 +105,7 @@ namespace Orleans.Providers.Streams.Generator
             generatorConfig = this.serviceProvider.GetKeyedService<IStreamGeneratorConfig>(this.Name);
             if(generatorConfig == null)
             {
-                this.logger.LogInformation("No generator configuration found for stream provider {StreamProvider}.  Inactive until provided with configuration by command.", this.Name);
+                LogInfoNoGeneratorConfigurationFound(this.Name);
             }
         }
 
@@ -282,5 +282,12 @@ namespace Orleans.Providers.Streams.Generator
             factory.Init();
             return factory;
         }
+
+        // "No generator configuration found for stream provider {StreamProvider}.  Inactive until provided with configuration by command."
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "No generator configuration found for stream provider {StreamProvider}.  Inactive until provided with configuration by command."
+        )]
+        private partial void LogInfoNoGeneratorConfigurationFound(string streamProvider);
     }
 }
