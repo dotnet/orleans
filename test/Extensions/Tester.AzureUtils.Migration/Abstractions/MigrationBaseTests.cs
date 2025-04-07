@@ -100,7 +100,13 @@ namespace Tester.AzureUtils.Migration.Abstractions
         {
             if (reminderTable == null)
             {
-                reminderTable = ServiceProvider.GetRequiredService<IReminderMigrationTable>();
+                var tmp = ServiceProvider.GetRequiredService<IReminderTable>();
+                if (tmp is not IReminderMigrationTable reminderMigrationTable)
+                {
+                    throw new ArgumentException("Not a reminder migration table");
+                }
+
+                reminderTable = reminderMigrationTable;
                 await reminderTable.Init();
             }
 

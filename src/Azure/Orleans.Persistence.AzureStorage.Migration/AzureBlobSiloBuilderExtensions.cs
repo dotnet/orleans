@@ -141,7 +141,7 @@ namespace Orleans.Hosting
             Action<AzureTableReminderStorageOptions> configureStorageOptions,
             Action<AzureTableMigrationReminderStorageOptions> configureMigratedStorageOptions)
         {
-            services.AddSingleton<IReminderMigrationTable, MigrationAzureTableReminderStorage>();
+            services.AddSingleton<IReminderTable, MigrationAzureTableReminderStorage>();
             services.Configure<AzureTableReminderStorageOptions>(configureStorageOptions);
             services.Configure<AzureTableMigrationReminderStorageOptions>(configureMigratedStorageOptions);
             services.ConfigureFormatter<AzureTableReminderStorageOptions>();

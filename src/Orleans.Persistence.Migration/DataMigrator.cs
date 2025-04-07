@@ -30,7 +30,7 @@ namespace Orleans.Persistence.Migration
             ILocalSiloDetails localSiloDetails,
             IGrainStorage sourceStorage,
             IGrainStorage destinationStorage,
-            IReminderMigrationTable reminderMigrationTable,
+            IReminderTable reminderTable,
             DataMigratorOptions options)
         {
             _logger = logger;
@@ -46,7 +46,9 @@ namespace Orleans.Persistence.Migration
                 : throw new ArgumentException($"Implement {nameof(IExtendedGrainStorage)} on grain storage to support data migration.", paramName: nameof(sourceStorage));
             _destinationStorage = destinationStorage;
 
-            _reminderMigrationStorage = reminderMigrationTable;
+            _reminderMigrationStorage = (reminderTable is IReminderMigrationTable reminderMigrationTable)
+                ? reminderMigrationTable
+                : null!;
         }
 
         public Task StartAsync(CancellationToken cancellationToken) => _executeBackgroundMigrationTask = ExecuteBackgroundMigrationAsync(_backgroundWorkCts.Token);
