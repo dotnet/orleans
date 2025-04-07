@@ -10,7 +10,7 @@ using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.State
 {
-    internal class ConfirmationWorker<TState>
+    internal partial class ConfirmationWorker<TState>
         where TState : class, new()
     {
         private readonly TransactionalStateOptions options;
@@ -125,10 +125,7 @@ namespace Orleans.Transactions.State
                 storageBatch.Collect(transactionId);
                 storageBatch.FollowUpAction(() =>
                 {
-                    if (this.logger.IsEnabled(LogLevel.Trace))
-                    {
-                        this.logger.LogTrace("Collection completed. TransactionId:{TransactionId}", transactionId);
-                    }
+                    LogTraceCollectionCompleted(transactionId);
                     this.pending.Remove(transactionId);
                     storeComplete.TrySetResult(true);
                 });
@@ -140,7 +137,7 @@ namespace Orleans.Transactions.State
             }
             catch(Exception ex)
             {
-                this.logger.LogWarning(ex, "Error occured while cleaning up transaction {TransactionId} from commit log.  Will retry.", transactionId);
+                LogWarnCollectingTransaction(transactionId, ex);
             }
 
             return false;
@@ -180,10 +177,29 @@ namespace Orleans.Transactions.State
                 catch (Exception ex)
                 {
                     this.pending = null;
-                    logger.LogWarning(ex, "Confirmation of transaction {TransactionId} with timestamp {Timestamp} to participant {Participant} failed.  Retrying", this.transactionId, this.timestamp, this.participant);
+                    LogWarningConfirmationFailed(this.logger, this.transactionId, this.timestamp, this.participant, ex);
                 }
                 return this.complete;
             }
+
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Collection completed. TransactionId:{TransactionId}"
+        )]
+        private partial void LogTraceCollectionCompleted(Guid transactionId);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Error occured while cleaning up transaction {TransactionId} from commit log.  Will retry."
+        )]
+        private partial void LogWarnCollectingTransaction(Guid transactionId, Exception ex);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Confirmation of transaction {TransactionId} with timestamp {Timestamp} to participant {Participant} failed.  Retrying"
+        )]
+        private static partial void LogWarningConfirmationFailed(ILogger logger, Guid transactionId, DateTime timestamp, ParticipantId participant, Exception ex);
     }
 }
