@@ -8,7 +8,7 @@ using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
-    internal class StreamConsumer<T> : IInternalAsyncObservable<T>
+    internal partial class StreamConsumer<T> : IInternalAsyncObservable<T>
     {
         internal bool                               IsRewindable { get; private set; }
 
@@ -87,24 +87,23 @@ namespace Orleans.Streams
 
             using var _ = RequestContext.SuppressCallChainReentrancy();
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Subscribe Token={Token}", token);
+            LogDebugSubscribeToken(token);
             await BindExtensionLazy();
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Subscribe - Connecting to Rendezvous {PubSub} My GrainRef={GrainReference} Token={Token}",
-                pubSub, myGrainReference, token);
+            LogDebugSubscribeRendezvous(pubSub, myGrainReference, token);
 
             GuidId subscriptionId = pubSub.CreateSubscriptionId(stream.InternalStreamId, myGrainReference.GetGrainId());
 
-            // Optimistic Concurrency: 
+            // Optimistic Concurrency:
             // In general, we should first register the subsription with the pubsub (pubSub.RegisterConsumer)
-            // and only if it succeeds store it locally (myExtension.SetObserver). 
+            // and only if it succeeds store it locally (myExtension.SetObserver).
             // Basicaly, those 2 operations should be done as one atomic transaction - either both or none and isolated from concurrent reads.
-            // BUT: there is a distributed race here: the first msg may arrive before the call is awaited 
+            // BUT: there is a distributed race here: the first msg may arrive before the call is awaited
             // (since the pubsub notifies the producer that may immideately produce)
-            // and will thus not find the subriptionHandle in the extension, basically violating "isolation". 
-            // Therefore, we employ Optimistic Concurrency Control here to guarantee isolation: 
+            // and will thus not find the subriptionHandle in the extension, basically violating "isolation".
+            // Therefore, we employ Optimistic Concurrency Control here to guarantee isolation:
             // we optimisticaly store subscriptionId in the handle first before calling pubSub.RegisterConsumer
-            // and undo it in the case of failure. 
+            // and undo it in the case of failure.
             // There is no problem with that we call myExtension.SetObserver too early before the handle is registered in pub sub,
             // since this subscriptionId is unique (random Guid) and no one knows it anyway, unless successfully subscribed in the pubsub.
             var subriptionHandle = myExtension.SetObserver(subscriptionId, stream, observer, batchObserver, token, filterData);
@@ -150,15 +149,14 @@ namespace Orleans.Streams
             if (token != null && !IsRewindable)
                 throw new ArgumentNullException(nameof(token), "Passing a non-null token to a non-rewindable IAsyncObservable.");
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Resume Token={Token}", token);
+            LogDebugResumeToken(token);
             await BindExtensionLazy();
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Resume - Connecting to Rendezvous {PubSub} My GrainRef={GrainReference} Token={Token}",
-                pubSub, myGrainReference, token);
+            LogDebugResumeRendezvous(pubSub, myGrainReference, token);
 
             StreamSubscriptionHandle<T> newHandle = myExtension.SetObserver(oldHandleImpl.SubscriptionId, stream, observer, batchObserver, token, null);
 
-            // On failure caller should be able to retry using the original handle, so invalidate old handle only if everything succeeded.  
+            // On failure caller should be able to retry using the original handle, so invalidate old handle only if everything succeeded.
             oldHandleImpl.Invalidate();
 
             return newHandle;
@@ -172,13 +170,12 @@ namespace Orleans.Streams
 
             StreamSubscriptionHandleImpl<T> handleImpl = CheckHandleValidity(handle);
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Unsubscribe StreamSubscriptionHandle={Handle}", handle);
+            LogDebugUnsubscribe(handle);
 
             myExtension.RemoveObserver(handleImpl.SubscriptionId);
             // UnregisterConsumer from pubsub even if does not have this handle locally, to allow UnsubscribeAsync retries.
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Unsubscribe - Disconnecting from Rendezvous {PubSub} My GrainRef={GrainReference}",
-                pubSub, myGrainReference);
+            LogDebugUnsubscribeRendezvous(pubSub, myGrainReference);
 
             await pubSub.UnregisterConsumer(handleImpl.SubscriptionId, stream.InternalStreamId);
 
@@ -200,7 +197,7 @@ namespace Orleans.Streams
         {
             using var _ = RequestContext.SuppressCallChainReentrancy();
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Cleanup() called");
+            LogDebugCleanup();
             if (myExtension == null)
                 return;
 
@@ -214,13 +211,10 @@ namespace Orleans.Streams
             try
             {
                 await Task.WhenAll(tasks);
-
-            } catch (Exception exc)
+            }
+            catch (Exception exc)
             {
-                logger.LogWarning(
-                    (int)ErrorCode.StreamProvider_ConsumerFailedToUnregister,
-                    exc,
-                    "Ignoring unhandled exception during PubSub.UnregisterConsumer");
+                LogWarningUnregisterConsumer(exc);
             }
             myExtension = null;
         }
@@ -244,9 +238,9 @@ namespace Orleans.Streams
                 {
                     if (myExtension == null)
                     {
-                        if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("BindExtensionLazy - Binding local extension to stream runtime={ProviderRuntime}", providerRuntime);
+                        LogDebugBindExtensionLazy(providerRuntime);
                         (myExtension, myGrainReference) = providerRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(() => new StreamConsumerExtension(providerRuntime));
-                        if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("BindExtensionLazy - Connected Extension={Extension} GrainRef={GrainReference}", myExtension, myGrainReference);                        
+                        LogDebugBindExtension(myExtension, myGrainReference);
                     }
                 }
             }
@@ -265,5 +259,66 @@ namespace Orleans.Streams
                 throw new ArgumentException("Handle is no longer valid.  It has been used to unsubscribe or resume.", nameof(handle));
             return handleImpl;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Subscribe Token={Token}"
+        )]
+        private partial void LogDebugSubscribeToken(StreamSequenceToken token);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Subscribe - Connecting to Rendezvous {PubSub} My GrainRef={GrainReference} Token={Token}"
+        )]
+        private partial void LogDebugSubscribeRendezvous(IStreamPubSub pubSub, IStreamConsumerExtension grainReference, StreamSequenceToken token);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Resume Token={Token}"
+        )]
+        private partial void LogDebugResumeToken(StreamSequenceToken token);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Resume - Connecting to Rendezvous {PubSub} My GrainRef={GrainReference} Token={Token}"
+        )]
+        private partial void LogDebugResumeRendezvous(IStreamPubSub pubSub, IStreamConsumerExtension grainReference, StreamSequenceToken token);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Unsubscribe StreamSubscriptionHandle={Handle}"
+        )]
+        private partial void LogDebugUnsubscribe(StreamSubscriptionHandle<T> handle);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Unsubscribe - Disconnecting from Rendezvous {PubSub} My GrainRef={GrainReference}"
+        )]
+        private partial void LogDebugUnsubscribeRendezvous(IStreamPubSub pubSub, IStreamConsumerExtension grainReference);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Cleanup() called"
+        )]
+        private partial void LogDebugCleanup();
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.StreamProvider_ConsumerFailedToUnregister,
+            Message = "Ignoring unhandled exception during PubSub.UnregisterConsumer"
+        )]
+        private partial void LogWarningUnregisterConsumer(Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "BindExtensionLazy - Binding local extension to stream runtime={ProviderRuntime}"
+        )]
+        private partial void LogDebugBindExtensionLazy(IStreamProviderRuntime providerRuntime);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "BindExtensionLazy - Connected Extension={Extension} GrainRef={GrainReference}"
+        )]
+        private partial void LogDebugBindExtension(IStreamConsumerExtension extension, IStreamConsumerExtension grainReference);
     }
 }

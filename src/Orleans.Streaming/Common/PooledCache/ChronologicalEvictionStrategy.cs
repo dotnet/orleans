@@ -7,7 +7,7 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Eviction strategy that evicts data based off of age.
     /// </summary>
-    public class ChronologicalEvictionStrategy : IEvictionStrategy
+    public partial class ChronologicalEvictionStrategy : IEvictionStrategy
     {
         private readonly ILogger logger;
         private readonly TimePurgePredicate timePurge;
@@ -21,7 +21,7 @@ namespace Orleans.Providers.Streams.Common
         private readonly ICacheMonitor cacheMonitor;
         private readonly PeriodicAction periodicMonitoring;
         private long cacheSizeInByte;
-        
+
         /// <summary>
         /// Initializes a new instance of the <see cref="ChronologicalEvictionStrategy"/> class.
         /// </summary>
@@ -119,7 +119,7 @@ namespace Orleans.Providers.Streams.Common
             if (itemsPurged == 0)
                 return;
 
-            //items got purged, time to conduct follow up actions 
+            //items got purged, time to conduct follow up actions
             this.cacheMonitor?.TrackMessagesPurged(itemsPurged);
             OnPurged?.Invoke(lastMessagePurged, this.PurgeObservable.Newest);
             FreePurgedBuffers(lastMessagePurged, this.PurgeObservable.Oldest);
@@ -134,7 +134,7 @@ namespace Orleans.Providers.Streams.Common
             object IdOfLastPurgedBufferId = lastMessagePurged?.Segment.Array;
             // IdOfLastBufferInCache will be null if cache is empty after purge
             object IdOfLastBufferInCacheId = oldestMessageInCache?.Segment.Array;
-            //all buffers older than LastPurgedBuffer should be purged 
+            //all buffers older than LastPurgedBuffer should be purged
             while (this.inUseBuffers.Peek().Id != IdOfLastPurgedBufferId)
             {
                 var purgedBuffer = this.inUseBuffers.Dequeue();
@@ -171,9 +171,24 @@ namespace Orleans.Providers.Streams.Common
             var itemCountBeforePurge = itemCountAfterPurge + itemsPurged;
             if (itemCountAfterPurge == 0)
             {
-                logger.LogDebug("BlockPurged: cache empty");
+                LogBlockPurgedCacheEmpty(logger);
             }
-            logger.LogDebug("BlockPurged: PurgeCount: {PurgeCount}, CacheSize: {ItemCountAfterPurge}", itemCountBeforePurge - itemCountAfterPurge, itemCountAfterPurge);
+            else
+            {
+                LogBlockPurged(logger, itemCountBeforePurge - itemCountAfterPurge, itemCountAfterPurge);
+            }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "BlockPurged: cache empty"
+        )]
+        private static partial void LogBlockPurgedCacheEmpty(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "BlockPurged: PurgeCount: {PurgeCount}, CacheSize: {ItemCountAfterPurge}"
+        )]
+        private static partial void LogBlockPurged(ILogger logger, int purgeCount, int itemCountAfterPurge);
     }
 }

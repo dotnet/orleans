@@ -8,7 +8,7 @@ using Orleans.Serialization;
 
 namespace Orleans.Streams
 {
-    internal class PersistentStreamProducer<T> : IInternalAsyncBatchObserver<T>
+    internal partial class PersistentStreamProducer<T> : IInternalAsyncBatchObserver<T>
     {
         private readonly StreamImpl<T> stream;
         private readonly IQueueAdapter queueAdapter;
@@ -23,15 +23,14 @@ namespace Orleans.Streams
             this.deepCopier = deepCopier;
             IsRewindable = isRewindable;
             var logger = providerUtilities.ServiceProvider.GetRequiredService<ILogger<PersistentStreamProducer<T>>>();
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Created PersistentStreamProducer for stream {StreamId}, of type {ElementType}, and with Adapter: {QueueAdapterName}.",
-                stream.ToString(), typeof (T), this.queueAdapter.Name);
+            LogCreatedPersistentStreamProducer(logger, stream, typeof(T), this.queueAdapter.Name);
         }
 
         public Task OnNextAsync(T item, StreamSequenceToken token)
         {
             return this.queueAdapter.QueueMessageAsync(this.stream.StreamId, item, token, RequestContextExtensions.Export(this.deepCopier));
         }
-        
+
         public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token)
         {
             return this.queueAdapter.QueueMessageBatchAsync(this.stream.StreamId, batch, token, RequestContextExtensions.Export(this.deepCopier));
@@ -54,5 +53,11 @@ namespace Orleans.Streams
         {
             return Task.CompletedTask;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Created PersistentStreamProducer for stream {StreamId}, of type {ElementType}, and with Adapter: {QueueAdapterName}."
+        )]
+        private static partial void LogCreatedPersistentStreamProducer(ILogger logger, StreamImpl<T> streamId, Type elementType, string queueAdapterName);
     }
 }
