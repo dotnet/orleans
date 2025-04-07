@@ -1,4 +1,5 @@
 using Orleans.Hosting;
+using Orleans.Persistence.AzureStorage.Migration.Reminders;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
 using Tester.AzureUtils.Migration.Abstractions;
@@ -61,6 +62,8 @@ namespace Tester.AzureUtils.Migration
                         {
                             migrationOptions.ConfigureTestDefaults();
                             migrationOptions.TableName = DestinationTableName;
+
+                            migrationOptions.ReminderMigrationMode = ReminderMigrationMode.ReadDestinationWithFallback_WriteBoth;
                         }
                     )
                     .AddDataMigrator(SourceStorageName, DestinationStorageName);

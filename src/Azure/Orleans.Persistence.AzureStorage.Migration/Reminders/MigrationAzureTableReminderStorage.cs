@@ -147,13 +147,13 @@ namespace Orleans.Persistence.AzureStorage.Migration.Reminders
                 case ReminderMigrationMode.ReadDestinationWithFallback_WriteBoth:
                 case ReminderMigrationMode.ReadDestinationWithFallback_WriteDestination:
                 {
-                    try
+                    var entry = await DestinationReminderTable.ReadRow(grainRef, reminderName);
+                    if (entry is not null)
                     {
-                        return await DestinationReminderTable.ReadRow(grainRef, reminderName);
+                        return entry;
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        _logger.LogWarning(ex, "ReadRow error on destination reminder storage");
                         return await SourceReminderTable.ReadRow(grainRef, reminderName);
                     }
                 }
@@ -175,17 +175,17 @@ namespace Orleans.Persistence.AzureStorage.Migration.Reminders
 
                 case ReminderMigrationMode.ReadDestinationWithFallback_WriteBoth:
                 case ReminderMigrationMode.ReadDestinationWithFallback_WriteDestination:
+                {
+                    var entry = await DestinationReminderTable.ReadRows(key);
+                    if (entry is not null)
                     {
-                        try
-                        {
-                            return await DestinationReminderTable.ReadRows(key);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "ReadRows error on destination reminder storage [key={0}]", key);
-                            return await SourceReminderTable.ReadRows(key);
-                        }
+                        return entry;
                     }
+                    else
+                    {
+                        return await SourceReminderTable.ReadRows(key);
+                    }
+                }
 
                 case ReminderMigrationMode.ReadWriteDestination:
                     return await DestinationReminderTable.ReadRows(key);
@@ -204,17 +204,17 @@ namespace Orleans.Persistence.AzureStorage.Migration.Reminders
 
                 case ReminderMigrationMode.ReadDestinationWithFallback_WriteBoth:
                 case ReminderMigrationMode.ReadDestinationWithFallback_WriteDestination:
+                {
+                    var entry = await DestinationReminderTable.ReadRows(begin, end);
+                    if (entry is not null)
                     {
-                        try
-                        {
-                            return await DestinationReminderTable.ReadRows(begin, end);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "ReadRows error on destination reminder storage [begin={0};end={1}]", begin, end);
-                            return await SourceReminderTable.ReadRows(begin, end);
-                        }
+                        return entry;
                     }
+                    else
+                    {
+                        return await SourceReminderTable.ReadRows(begin, end);
+                    }
+                }
 
                 case ReminderMigrationMode.ReadWriteDestination:
                     return await DestinationReminderTable.ReadRows(begin, end);
