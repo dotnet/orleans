@@ -25,7 +25,7 @@ jobs:
           set +e
 
           # Find all csproj files excluding specific paths
-          find src -name '*.csproj' | while read proj; do
+          find src -name '*.csproj' | egrep -v 'Orleans.Analyzers|Orleans.CodeGenerator' | while read proj; do
             export CI=false && dotnet build "$proj" -f net8.0 --configuration Release --no-incremental /t:"Build;GenAPIGenerateReferenceAssemblySource"
           done
         continue-on-error: true
