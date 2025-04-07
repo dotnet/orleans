@@ -9,7 +9,7 @@ using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.State
 {
-    internal class ReadWriteLock<TState>
+    internal partial class ReadWriteLock<TState>
        where TState : class, new()
     {
         private readonly TransactionalStateOptions options;
@@ -110,9 +110,7 @@ namespace Orleans.Transactions.State
                 if (group == currentGroup)
                 {
                     group.Deadline = DateTime.UtcNow + this.options.LockTimeout;
-
-                    if (logger.IsEnabled(LogLevel.Trace))
-                        logger.LogTrace("Set lock expiration at {Deadline}", group.Deadline.Value.ToString("o"));
+                    LogTraceSetLockExpiration(new(group.Deadline));
                 }
 
                 // create a new record for this transaction
@@ -126,13 +124,10 @@ namespace Orleans.Transactions.State
                 group.Add(transactionId, record);
                 group.FillCount++;
 
-                if (logger.IsEnabled(LogLevel.Trace))
-                {
-                    if (group == currentGroup)
-                        logger.LogTrace("Enter-lock {TransactionId} Fill count={FillCount}", transactionId, group.FillCount);
-                    else
-                        logger.LogTrace("Enter-lock-queue {TransactionId} Fill count={FillCount}", transactionId, group.FillCount);
-                }
+                if (group == currentGroup)
+                    LogTraceEnterLock(transactionId, group.FillCount);
+                else
+                    LogTraceEnterLockQueue(transactionId, group.FillCount);
             }
 
             var result =
@@ -227,9 +222,7 @@ namespace Orleans.Transactions.State
 
         private Task BreakLock(Guid transactionId, TransactionRecord<TState> entry, Exception exception)
         {
-            if (logger.IsEnabled(LogLevel.Trace))
-                logger.LogTrace("Break-lock for transaction {TransactionId}", transactionId);
-
+            LogTraceBreakLock(transactionId);
             return this.queue.NotifyOfAbort(entry, TransactionalStatus.BrokenLock, exception);
         }
 
@@ -303,16 +296,14 @@ namespace Orleans.Transactions.State
                             if (currentGroup.Deadline.Value < now)
                             {
                                 // the lock group has timed out.
-                                string txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
                                 TimeSpan late = now - currentGroup.Deadline.Value;
-                                logger.LogWarning("Break-lock timeout for transactions {TransactionIds}. {Late}ms late", txlist, Math.Floor(late.TotalMilliseconds));
+                                LogTraceBreakLockTimeout(new(currentGroup.Keys), Math.Floor(late.TotalMilliseconds)));
                                 await AbortExecutingTransactions(exception: null);
                                 lockWorker.Notify();
                             }
                             else
                             {
-                                if (logger.IsEnabled(LogLevel.Trace))
-                                    logger.LogTrace("Recheck lock expiration at {Deadline}", currentGroup.Deadline.Value.ToString("o"));
+                                LogTraceRecheckLockExpiration(new(currentGroup.Deadline));
 
                                 // check again when the group expires
                                 lockWorker.Notify(currentGroup.Deadline.Value);
@@ -320,8 +311,7 @@ namespace Orleans.Transactions.State
                         }
                         else
                         {
-                            string txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
-                            logger.LogWarning("Deadline not set for transactions {TransactionIds}", txlist);
+                            LogWarningDeadlineNotSet(new(currentGroup.Keys));
                         }
                     }
 
@@ -342,20 +332,15 @@ namespace Orleans.Transactions.State
                                 if (now > kvp.Value.Deadline)
                                 {
                                     currentGroup.Remove(kvp.Key);
-
-                                    if (logger.IsEnabled(LogLevel.Trace))
-                                        logger.LogTrace("Expire-lock-waiter {Key}", kvp.Key);
+                                    LogTraceExpireLockWaiter(kvp.Key);
                                 }
                             }
 
+                            LogTraceLockGroupSize(currentGroup.Count, new(currentGroup.Deadline));
                             if (logger.IsEnabled(LogLevel.Trace))
                             {
-                                logger.LogTrace(
-                                    "Lock group size={Count} deadline={Deadline}",
-                                    currentGroup.Count,
-                                    currentGroup.Deadline is { } deadline ? deadline.ToString("O") : "none");
                                 foreach (var kvp in currentGroup)
-                                    logger.LogTrace("Enter-lock {Key}", kvp.Key);
+                                    LogTraceEnterLockKey(kvp.Key);
                             }
 
                             // execute all the read and update tasks
@@ -479,15 +464,7 @@ namespace Orleans.Transactions.State
                     single = kvp.Value;
 
                     currentGroup.Remove(single.TransactionId);
-
-                    if (logger.IsEnabled(LogLevel.Debug))
-                    {
-                        logger.LogDebug(
-                            "Exit-lock {TransactionId} {Timestamp}",
-                            single.TransactionId,
-                            single.Timestamp.ToString("o"));
-                    }
-
+                    LogDebugExitLock(single.TransactionId, new(single.Timestamp));
                     return true;
                 }
             }
@@ -540,16 +517,7 @@ namespace Orleans.Transactions.State
                     for (int i = 0; i < multiple.Count; i++)
                     {
                         currentGroup.Remove(multiple[i].TransactionId);
-
-                        if (logger.IsEnabled(LogLevel.Debug))
-                        {
-                            logger.LogDebug(
-                                "Exit-lock ({Current}/{Count}) {TransactionId} {Timestamp}",
-                                i,
-                                multiple.Count,
-                                multiple[i].TransactionId,
-                                multiple[i].Timestamp.ToString("o"));
-                        }
+                        LogDebugExitLockProgress(i, multiple.Count, multiple[i].TransactionId, new(multiple[i].Timestamp));
                     }
 
                     return true;
@@ -561,5 +529,89 @@ namespace Orleans.Transactions.State
         {
             return a.Timestamp.CompareTo(b.Timestamp);
         }
+
+        private readonly struct DateTimeLogRecord(DateTime? ts)
+        {
+            public override string ToString() => ts?.ToString("o") ?? "none";
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Set lock expiration at {Deadline}"
+        )]
+        private partial void LogTraceSetLockExpiration(DateTimeLogRecord deadline);
+
+        /
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Enter-lock {TransactionId} Fill count={FillCount}"
+        )]
+        private partial void LogTraceEnterLock(Guid transactionId, int fillCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Enter-lock-queue {TransactionId} Fill count={FillCount}"
+        )]
+        private partial void LogTraceEnterLockQueue(Guid transactionId, int fillCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Break-lock for transaction {TransactionId}"
+        )]
+        private partial void LogTraceBreakLock(Guid transactionId);
+
+        private readonly struct TransactionIdsLogRecord(IEnumerable<Guid> guids)
+        {
+            public override string ToString() => string.Join(",", guids);
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Break-lock timeout for transactions {TransactionIds}. {Late}ms late"
+        )]
+        private partial void LogTraceBreakLockTimeout(TransactionIdsLogRecord transactionIds, double late);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Recheck lock expiration at {Deadline}"
+        )]
+        private partial void LogTraceRecheckLockExpiration(DateTimeLogRecord deadline);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Deadline not set for transactions {TransactionIds}"
+        )]
+        private partial void LogWarningDeadlineNotSet(TransactionIdsLogRecord transactionIds);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Expire-lock-waiter {Key}"
+        )]
+        private partial void LogTraceExpireLockWaiter(Guid key);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Lock group size={Count} deadline={Deadline}"
+        )]
+        private partial void LogTraceLockGroupSize(int count, DateTimeLogRecord deadline);
+
+        // "Enter-lock {Key}"
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Enter-lock {Key}"
+        )]
+        private partial void LogTraceEnterLockKey(Guid key);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Exit-lock {TransactionId} {Timestamp}"
+        )]
+        private partial void LogDebugExitLock(Guid transactionId, DateTimeLogRecord timestamp);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Exit-lock ({Current}/{Count}) {TransactionId} {Timestamp}"
+        )]
+        private partial void LogDebugExitLockProgress(int current, int count, Guid transactionId, DateTimeLogRecord timestamp);
     }
 }
