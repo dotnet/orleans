@@ -39,7 +39,7 @@ public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/>.
 /// </summary>
-[TestCategory("AdoNet"), TestCategory("GrainDirectory")]
+[TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
 public abstract class RelationalOrleansQueriesTests(string invariant, int concurrency = 100) : IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansGrainDirectoryTest";
