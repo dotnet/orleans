@@ -19,7 +19,7 @@ namespace Orleans.Runtime.Placement
     /// <summary>
     /// Central point for placement decisions.
     /// </summary>
-    internal class PlacementService : IPlacementContext
+    internal partial class PlacementService : IPlacementContext
     {
         private const int PlacementWorkerCount = 16;
         private readonly PlacementStrategyResolver _strategyResolver;
@@ -83,20 +83,12 @@ namespace Orleans.Runtime.Placement
             var grainId = message.TargetGrain;
             if (_grainLocator.TryLookupInCache(grainId, out var result) && CachedAddressIsValid(message, result))
             {
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug("Found address {Address} for grain {GrainId} in cache for message {Message}", result, grainId, message);
-                }
-
+                LogDebugFoundAddress(result, grainId, message);
                 SetMessageTargetPlacement(message, result.SiloAddress);
                 return Task.CompletedTask;
             }
 
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Looking up address for grain {GrainId} for message {Message}", grainId, message);
-            }
-
+            LogDebugLookingUpAddress(grainId, message);
             var worker = _workers[grainId.GetUniformHashCode() % PlacementWorkerCount];
             return worker.AddressMessage(message);
 
@@ -163,7 +155,7 @@ namespace Orleans.Runtime.Placement
                 var result = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToArray();
                 if (result.Length > 0) return result;
 
-                _logger.LogWarning((int)ErrorCode.Catalog_GetApproximateSiloStatuses, "AllActiveSilos SiloStatusOracle.GetApproximateSiloStatuses empty");
+                LogWarningAllActiveSilos();
                 return new SiloAddress[] { LocalSilo };
             }
         }
@@ -197,10 +189,7 @@ namespace Orleans.Runtime.Placement
             bool CachedAddressIsValidCore(Message message, GrainAddress cachedAddress, List<GrainAddressCacheUpdate> cacheUpdates)
             {
                 var resultIsValid = true;
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug("Invalidating {Count} cached entries for message {Message}", cacheUpdates.Count, message);
-                }
+                LogDebugInvalidatingCachedEntries(cacheUpdates.Count, message);
 
                 foreach (var update in cacheUpdates)
                 {
@@ -412,5 +401,30 @@ namespace Orleans.Runtime.Placement
                 public Task<SiloAddress> Result { get; set; }
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Found address {Address} for grain {GrainId} in cache for message {Message}"
+        )]
+        private partial void LogDebugFoundAddress(GrainAddress address, GrainId grainId, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Looking up address for grain {GrainId} for message {Message}"
+        )]
+        private partial void LogDebugLookingUpAddress(GrainId grainId, Message message);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Catalog_GetApproximateSiloStatuses,
+            Level = LogLevel.Warning,
+            Message = "AllActiveSilos SiloStatusOracle.GetApproximateSiloStatuses empty"
+        )]
+        private partial void LogWarningAllActiveSilos();
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Invalidating {Count} cached entries for message {Message}"
+        )]
+        private partial void LogDebugInvalidatingCachedEntries(int count, Message message);
     }
 }

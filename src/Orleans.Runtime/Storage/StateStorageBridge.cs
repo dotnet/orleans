@@ -19,7 +19,7 @@ namespace Orleans.Core
     /// </summary>
     /// <typeparam name="TState">The underlying state type.</typeparam>
     /// <seealso cref="IStorage{TState}" />
-    public class StateStorageBridge<TState> : IStorage<TState>, IGrainMigrationParticipant
+    public partial class StateStorageBridge<TState> : IStorage<TState>, IGrainMigrationParticipant
     {
         private readonly IGrainContext _grainContext;
         private readonly StateStorageBridgeShared<TState> _shared;
@@ -144,9 +144,7 @@ namespace Orleans.Core
             }
             catch (Exception exception)
             {
-                _shared.Logger.LogError(exception, "Failed to dehydrate state named {StateName} for grain {GrainId}", _shared.Name, _grainContext.GrainId);
-
-                // We must throw here since we do not know that the dehydration context is in a clean state after this.
+                LogErrorOnDehydrate(_shared.Logger, exception, _shared.Name, _grainContext.GrainId);
                 throw;
             }
         }
@@ -163,8 +161,7 @@ namespace Orleans.Core
             }
             catch (Exception exception)
             {
-                // It is ok to swallow this exception, since state rehydration is best-effort.
-                _shared.Logger.LogError(exception, "Failed to rehydrate state named {StateName} for grain {GrainId}", _shared.Name, _grainContext.GrainId);
+                LogErrorOnRehydrate(_shared.Logger, exception, _shared.Name, _grainContext.GrainId);
             }
         }
 
@@ -177,6 +174,7 @@ namespace Orleans.Core
 
             var grainId = _grainContext.GrainId;
             var providerName = _shared.Store.GetType().Name;
+            // cannot use LoggerMessage here because we need to pass the eventId as an argument
             _shared.Logger.LogError((int)id, exception, "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}", providerName, _shared.Name, operation, grainId, errorString);
 
             // If error is not specialization of OrleansException, wrap it
@@ -188,6 +186,18 @@ namespace Orleans.Core
 
             ExceptionDispatchInfo.Throw(exception);
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Failed to dehydrate state named {StateName} for grain {GrainId}"
+        )]
+        private static partial void LogErrorOnDehydrate(ILogger logger, Exception exception, string stateName, GrainId grainId);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Failed to rehydrate state named {StateName} for grain {GrainId}"
+        )]
+        private static partial void LogErrorOnRehydrate(ILogger logger, Exception exception, string stateName, GrainId grainId);
     }
 
     internal sealed class StateStorageBridgeSharedMap(ILoggerFactory loggerFactory, IActivatorProvider activatorProvider)

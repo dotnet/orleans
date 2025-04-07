@@ -12,7 +12,7 @@ namespace Orleans.Runtime.MembershipService;
 /// <summary>
 /// Manages <see cref="ISiloStatusListener"/> instances.
 /// </summary>
-internal class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
+internal partial class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
 {
     private readonly object _listenersLock = new();
     private readonly CancellationTokenSource _cancellation = new();
@@ -77,7 +77,7 @@ internal class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
         ClusterMembershipSnapshot? previous = default;
         try
         {
-            if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Starting to process membership updates.");
+            LogDebugStartingToProcessMembershipUpdates();
             await foreach (var tableSnapshot in _membershipTableManager.MembershipTableUpdates.WithCancellation(_cancellation.Token))
             {
                 var snapshot = tableSnapshot.CreateClusterMembershipSnapshot();
@@ -93,12 +93,12 @@ internal class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
         }
         catch (Exception exception) when (_fatalErrorHandler.IsUnexpected(exception))
         {
-            _logger.LogError(exception, "Error processing membership updates.");
+            LogErrorProcessingMembershipUpdates(exception);
             _fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
         }
         finally
         {
-            if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Stopping membership update processor.");
+            LogDebugStoppingMembershipUpdateProcessor();
         }
     }
 
@@ -125,10 +125,7 @@ internal class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
                 }
                 catch (Exception exception)
                 {
-                    _logger.LogError(
-                        exception,
-                        "Exception while calling " + nameof(ISiloStatusListener.SiloStatusChangeNotification) + " on listener '{Listener}'.",
-                        listener);
+                    LogErrorCallingSiloStatusChangeNotification(exception, listener);
                 }
             }
         }
@@ -166,4 +163,28 @@ internal class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
             }
         }
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Starting to process membership updates."
+    )]
+    private partial void LogDebugStartingToProcessMembershipUpdates();
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error processing membership updates."
+    )]
+    private partial void LogErrorProcessingMembershipUpdates(Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Stopping membership update processor."
+    )]
+    private partial void LogDebugStoppingMembershipUpdateProcessor();
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Exception while calling " + nameof(ISiloStatusListener.SiloStatusChangeNotification) + " on listener '{Listener}'."
+    )]
+    private partial void LogErrorCallingSiloStatusChangeNotification(Exception exception, ISiloStatusListener listener);
 }

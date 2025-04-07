@@ -13,10 +13,7 @@ internal sealed partial class GrainDirectoryPartition
     async ValueTask<DirectoryResult<GrainAddress>> IGrainDirectoryPartition.RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration)
     {
         ArgumentNullException.ThrowIfNull(address);
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace("RegisterAsync('{Version}', '{Address}', '{ExistingAddress}')", version, address, currentRegistration);
-        }
+        LogRegisterAsync(version, address, currentRegistration);
 
         // Ensure that the current membership version is new enough.
         await WaitForRange(address.GrainId, version);
@@ -31,10 +28,7 @@ internal sealed partial class GrainDirectoryPartition
 
     async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryPartition.LookupAsync(MembershipVersion version, GrainId grainId)
     {
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace("LookupAsync('{Version}', '{GrainId}')", version, grainId);
-        }
+        LogLookupAsync(version, grainId);
 
         // Ensure we can serve the request.
         await WaitForRange(grainId, version);
@@ -49,10 +43,7 @@ internal sealed partial class GrainDirectoryPartition
     async ValueTask<DirectoryResult<bool>> IGrainDirectoryPartition.DeregisterAsync(MembershipVersion version, GrainAddress address)
     {
         ArgumentNullException.ThrowIfNull(address);
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace("DeregisterAsync('{Version}', '{Address}')", version, address);
-        }
+        LogDeregisterAsync(version, address);
 
         await WaitForRange(address.GrainId, version);
         if (!IsOwner(CurrentView, address.GrainId))
@@ -109,4 +100,22 @@ internal sealed partial class GrainDirectoryPartition
     }
 
     private bool IsSiloDead(GrainAddress existing) => _owner.ClusterMembershipSnapshot.GetSiloStatus(existing.SiloAddress) == SiloStatus.Dead;
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "RegisterAsync('{Version}', '{Address}', '{ExistingAddress}')"
+    )]
+    private partial void LogRegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? existingAddress);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "LookupAsync('{Version}', '{GrainId}')"
+    )]
+    private partial void LogLookupAsync(MembershipVersion version, GrainId grainId);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "DeregisterAsync('{Version}', '{Address}')"
+    )]
+    private partial void LogDeregisterAsync(MembershipVersion version, GrainAddress address);
 }

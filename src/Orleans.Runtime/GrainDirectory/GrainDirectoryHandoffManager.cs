@@ -13,7 +13,7 @@ namespace Orleans.Runtime.GrainDirectory
     /// Most methods of this class are synchronized since they might be called both
     /// from LocalGrainDirectory on CacheValidator.SchedulingContext and from RemoteGrainDirectory.
     /// </summary>
-    internal sealed class GrainDirectoryHandoffManager
+    internal sealed partial class GrainDirectoryHandoffManager
     {
         private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(250);
         private const int MAX_OPERATION_DEQUEUE = 2;
@@ -43,7 +43,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lock (this)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Processing silo add event for {AddedSilo}", addedSilo);
+                LogDebugProcessingSiloAddEvent(logger, addedSilo);
 
                 // check if this is our immediate successor (i.e., if I should hold this silo's copy)
                 // (if yes, adjust local and/or copied directory partitions by splitting them between old successors and the new one)
@@ -51,12 +51,12 @@ namespace Orleans.Runtime.GrainDirectory
                 var successor = localDirectory.FindSuccessor(localDirectory.MyAddress);
                 if (successor is null || !successor.Equals(addedSilo))
                 {
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("{AddedSilo} is not my immediate successor.", addedSilo);
+                    LogDebugNotImmediateSuccessor(logger, addedSilo);
                     return;
                 }
 
                 // split my local directory and send to my new immediate successor his share
-                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Splitting my partition between me and {AddedSilo}", addedSilo);
+                LogDebugSplittingPartition(logger, addedSilo);
                 var splitPartListSingle = localDirectory.DirectoryPartition.Split(
                     grain =>
                     {
@@ -77,20 +77,20 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 if (splitPartListSingle.Count > 0)
                 {
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Sending {Count} single activation entries to {AddedSilo}", splitPartListSingle.Count, addedSilo);
+                    LogDebugSendingEntries(logger, splitPartListSingle.Count, addedSilo);
                 }
 
                 await localDirectory.GetDirectoryReference(addedSilo).AcceptSplitPartition(splitPartListSingle);
             }
             else
             {
-                if (logger.IsEnabled(LogLevel.Warning)) logger.LogWarning("Silo " + addedSilo + " is no longer active and therefore cannot receive this partition split");
+                LogWarningSiloNotActive(logger, addedSilo);
                 return;
             }
 
             if (splitPartListSingle.Count > 0)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Removing {Count} single activation after partition split", splitPartListSingle.Count);
+                LogDebugRemovingEntries(logger, splitPartListSingle.Count);
 
                 foreach (var activationAddress in splitPartListSingle)
                 {
@@ -110,10 +110,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             if (!this.localDirectory.Running) return;
 
-            if (this.logger.IsEnabled(LogLevel.Debug))
-            {
-                this.logger.LogDebug($"{nameof(AcceptExistingRegistrations)}: accepting {{Count}} single-activation registrations", singleActivations.Count);
-            }
+            LogDebugAcceptingRegistrations(logger, singleActivations.Count);
 
             var tasks = singleActivations.Select(addr => this.localDirectory.RegisterAsync(addr, previousAddress: null, 1)).ToArray();
             try
@@ -122,8 +119,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
             catch (Exception exception)
             {
-                if (this.logger.IsEnabled(LogLevel.Warning))
-                    this.logger.LogWarning(exception, $"Exception registering activations in {nameof(AcceptExistingRegistrations)}");
+                LogWarningExceptionRegistering(logger, exception);
                 throw;
             }
             finally
@@ -165,14 +161,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var pair = duplicates.FirstOrDefault();
                 if (this.siloStatusOracle.GetApproximateSiloStatus(pair.Key) == SiloStatus.Active)
                 {
-                    if (this.logger.IsEnabled(LogLevel.Debug))
-                    {
-                        this.logger.LogDebug(
-                            $"{nameof(DestroyDuplicateActivations)} will destroy {{Count}} duplicate activations on silo {{SiloAddress}}: {{Duplicates}}",
-                            duplicates.Count,
-                            pair.Key,
-                            string.Join("\n * ", pair.Value.Select(_ => _)));
-                    }
+                    LogDebugDestroyingDuplicates(logger, duplicates.Count, pair.Key, new(pair.Value));
 
                     var remoteCatalog = this.grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogType, pair.Key);
                     await remoteCatalog.DeleteActivations(pair.Value, DeactivationReasonCode.DuplicateActivation, "This grain has been activated elsewhere");
@@ -222,14 +211,12 @@ namespace Orleans.Runtime.GrainDirectory
                     {
                         if (dequeueCount < MAX_OPERATION_DEQUEUE)
                         {
-                            if (this.logger.IsEnabled(LogLevel.Warning))
-                                this.logger.LogWarning(exception, "{Operation} failed, will be retried", op.Name);
+                            LogWarningOperationFailedRetry(logger, exception, op.Name);
                             await Task.Delay(RetryDelay);
                         }
                         else
                         {
-                            if (this.logger.IsEnabled(LogLevel.Warning))
-                                this.logger.LogWarning(exception, "{Operation} failed, will NOT be retried", op.Name);
+                            LogWarningOperationFailedNoRetry(logger, exception, op.Name);
                         }
                     }
                     if (dequeueCount == 0 || dequeueCount >= MAX_OPERATION_DEQUEUE)
@@ -244,5 +231,76 @@ namespace Orleans.Runtime.GrainDirectory
                 }
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Processing silo add event for {AddedSilo}"
+        )]
+        private static partial void LogDebugProcessingSiloAddEvent(ILogger logger, SiloAddress addedSilo);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "{AddedSilo} is not my immediate successor."
+        )]
+        private static partial void LogDebugNotImmediateSuccessor(ILogger logger, SiloAddress addedSilo);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Splitting my partition between me and {AddedSilo}"
+        )]
+        private static partial void LogDebugSplittingPartition(ILogger logger, SiloAddress addedSilo);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Sending {Count} single activation entries to {AddedSilo}"
+        )]
+        private static partial void LogDebugSendingEntries(ILogger logger, int count, SiloAddress addedSilo);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Silo {AddedSilo} is no longer active and therefore cannot receive this partition split"
+        )]
+        private static partial void LogWarningSiloNotActive(ILogger logger, SiloAddress addedSilo);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Removing {Count} single activation after partition split"
+        )]
+        private static partial void LogDebugRemovingEntries(ILogger logger, int count);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = $"{nameof(AcceptExistingRegistrations)}: accepting {{Count}} single-activation registrations"
+        )]
+        private static partial void LogDebugAcceptingRegistrations(ILogger logger, int count);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = $"Exception registering activations in {nameof(AcceptExistingRegistrations)}"
+        )]
+        private static partial void LogWarningExceptionRegistering(ILogger logger, Exception exception);
+
+        private readonly struct GrainAddressesLogValue(List<GrainAddress> grainAddresses)
+        {
+            public override string ToString() => string.Join("\n * ", grainAddresses.Select(_ => _));
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = $"{nameof(DestroyDuplicateActivations)} will destroy {{Count}} duplicate activations on silo {{SiloAddress}}: {{Duplicates}}"
+        )]
+        private static partial void LogDebugDestroyingDuplicates(ILogger logger, int count, SiloAddress siloAddress, GrainAddressesLogValue duplicates);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "{Operation} failed, will be retried"
+        )]
+        private static partial void LogWarningOperationFailedRetry(ILogger logger, Exception exception, string operation);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "{Operation} failed, will NOT be retried"
+        )]
+        private static partial void LogWarningOperationFailedNoRetry(ILogger logger, Exception exception, string operation);
     }
 }

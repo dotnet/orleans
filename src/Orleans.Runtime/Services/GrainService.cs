@@ -9,7 +9,7 @@ using Orleans.Services;
 namespace Orleans.Runtime
 {
     /// <summary>Base class for implementing a grain-like partitioned service with per silo instances of it automatically instantiated and started by silo runtime</summary>
-    public abstract class GrainService : SystemTarget, IRingRangeListener, IGrainService
+    public abstract partial class GrainService : SystemTarget, IRingRangeListener, IGrainService
     {
         private readonly IConsistentRingProvider ring;
         private readonly string typeName;
@@ -88,13 +88,7 @@ namespace Orleans.Runtime
         public virtual Task Start()
         {
             RingRange = ring.GetMyRange();
-            Logger.LogInformation(
-                (int)ErrorCode.RS_ServiceStarting,
-                "Starting {TypeName} grain service on: {Silo} x{HashCode}, with range {RingRange}",
-                this.typeName,
-                Silo,
-                Silo.GetConsistentHashCode().ToString("X8"),
-                RingRange);
+            LogInformationServiceStarting(Logger, this.typeName, Silo, new(Silo), RingRange);
             StartInBackground().Ignore();
 
             return Task.CompletedTask;
@@ -117,10 +111,7 @@ namespace Orleans.Runtime
         {
             StoppedCancellationTokenSource.Cancel();
 
-            Logger.LogInformation(
-                (int)ErrorCode.RS_ServiceStopping,
-                "Stopping {TypeName} grain service",
-                typeName);
+            LogInformationServiceStopping(Logger, typeName);
             Status = GrainServiceStatus.Stopped;
 
             return Task.CompletedTask;
@@ -141,17 +132,38 @@ namespace Orleans.Runtime
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         public virtual Task OnRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
         {
-            Logger.LogInformation(
-                (int)ErrorCode.RS_RangeChanged,
-                "My range changed from {OldRange} to {NewRange} increased = {Increased}",
-                oldRange,
-                newRange,
-                increased);
+            LogInformationRangeChanged(Logger, oldRange, newRange, increased);
             RingRange = newRange;
             RangeSerialNumber++;
 
             return Task.CompletedTask;
         }
+
+        private readonly struct SiloAddressHashCodeLogValue(SiloAddress silo)
+        {
+            public override string ToString() => silo.GetConsistentHashCode().ToString("X8");
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.RS_ServiceStarting,
+            Message = "Starting {TypeName} grain service on: {Silo} x{HashCode}, with range {RingRange}"
+        )]
+        private static partial void LogInformationServiceStarting(ILogger logger, string typeName, SiloAddress silo, SiloAddressHashCodeLogValue hashCode, IRingRange ringRange);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.RS_ServiceStopping,
+            Message = "Stopping {TypeName} grain service"
+        )]
+        private static partial void LogInformationServiceStopping(ILogger logger, string typeName);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.RS_RangeChanged,
+            Message = "My range changed from {OldRange} to {NewRange} increased = {Increased}"
+        )]
+        private static partial void LogInformationRangeChanged(ILogger logger, IRingRange oldRange, IRingRange newRange, bool increased);
 
         /// <summary>Possible statuses of a grain service</summary>
         protected enum GrainServiceStatus

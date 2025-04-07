@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime;
 
-internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IActivationLifecycleObserver
+internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IActivationLifecycleObserver
 {
     private static readonly object CollectIdleWorkersSentinel = new();
     private readonly GrainTypeSharedContext _shared;
@@ -178,7 +178,8 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
                                 }
                                 break;
                             }
-                        case WorkItemType.CollectIdleWorkers: CollectIdleWorkers();
+                        case WorkItemType.CollectIdleWorkers:
+                            CollectIdleWorkers();
                             break;
                         default:
                             throw new NotSupportedException($"Work item of type {workItem.Type} is not supported");
@@ -189,7 +190,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
             }
             catch (Exception exception)
             {
-                _shared.Logger.LogError(exception, "Error in stateless worker message loop");
+                LogErrorInMessageLoop(_shared.Logger, exception);
             }
         }
     }
@@ -387,7 +388,7 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
 
     public void OnDestroyActivation(IGrainContext grainContext) =>
         EnqueueWorkItem(WorkItemType.OnDestroyActivation, grainContext);
-    
+
     public void Rehydrate(IRehydrationContext context) =>
         // Migration is not supported, but we need to dispose of the context if it's provided
         (context as IDisposable)?.Dispose();
@@ -411,4 +412,10 @@ internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IA
     private record DeactivateWorkItemState(DeactivationReason DeactivationReason, CancellationToken CancellationToken);
     private record DeactivatedTaskWorkItemState(TaskCompletionSource Completion);
     private record DisposeAsyncWorkItemState(TaskCompletionSource Completion);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error in stateless worker message loop"
+    )]
+    private static partial void LogErrorInMessageLoop(ILogger logger, Exception exception);
 }
