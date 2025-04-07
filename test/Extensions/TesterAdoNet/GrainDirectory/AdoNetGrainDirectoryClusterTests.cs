@@ -41,7 +41,7 @@ public class MySqlAdoNetGrainDirectoryClusterTests : AdoNetGrainDirectoryCluster
 /// <summary>
 /// Cluster tests base class for ADO.NET Grain Directory.
 /// </summary>
-[TestCategory("AdoNet"), TestCategory("GrainDirectory")]
+[TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
 public abstract class AdoNetGrainDirectoryClusterTests : MultipleGrainDirectoriesTests
 {
     private const string TestDatabaseName = "OrleansGrainDirectoryTest";
