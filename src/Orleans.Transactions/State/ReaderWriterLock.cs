@@ -297,7 +297,7 @@ namespace Orleans.Transactions.State
                             {
                                 // the lock group has timed out.
                                 TimeSpan late = now - currentGroup.Deadline.Value;
-                                LogTraceBreakLockTimeout(new(currentGroup.Keys), Math.Floor(late.TotalMilliseconds)));
+                                LogTraceBreakLockTimeout(new(currentGroup.Keys), Math.Floor(late.TotalMilliseconds));
                                 await AbortExecutingTransactions(exception: null);
                                 lockWorker.Notify();
                             }
@@ -541,7 +541,6 @@ namespace Orleans.Transactions.State
         )]
         private partial void LogTraceSetLockExpiration(DateTimeLogRecord deadline);
 
-        /
         [LoggerMessage(
             Level = LogLevel.Trace,
             Message = "Enter-lock {TransactionId} Fill count={FillCount}"
