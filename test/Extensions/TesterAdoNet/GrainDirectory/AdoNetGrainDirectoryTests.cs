@@ -16,6 +16,7 @@ namespace Tester.AdoNet.GrainDirectory;
 /// <summary>
 /// Tests for <see cref="AdoNetGrainDirectory"/> against SQL Server.
 /// </summary>
+[TestCategory("SqlServer")]
 public class SqlServerAdoNetGrainDirectoryTests() : AdoNetGrainDirectoryTests(AdoNetInvariants.InvariantNameSqlServer, 90)
 {
 }
@@ -23,6 +24,7 @@ public class SqlServerAdoNetGrainDirectoryTests() : AdoNetGrainDirectoryTests(Ad
 /// <summary>
 /// Tests for <see cref="AdoNetGrainDirectory"/> against PostgreSQL.
 /// </summary>
+[TestCategory("PostgreSql")]
 public class PostgreSqlAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
 {
     public PostgreSqlAdoNetGrainDirectoryTests() : base(AdoNetInvariants.InvariantNamePostgreSql, 90)
@@ -34,6 +36,7 @@ public class PostgreSqlAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
 /// <summary>
 /// Tests for <see cref="AdoNetGrainDirectory"/> against MySQL.
 /// </summary>
+[TestCategory("MySql")]
 public class MySqlAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
 {
     public MySqlAdoNetGrainDirectoryTests() : base(AdoNetInvariants.InvariantNameMySql, 90)
