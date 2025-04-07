@@ -65,7 +65,7 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Persistent stream provider that uses an adapter for persistence
     /// </summary>
-    public class PersistentStreamProvider : IStreamProvider, IInternalStreamProvider, IControllable, IStreamSubscriptionManagerRetriever, ILifecycleParticipant<ILifecycleObservable>
+    public partial class PersistentStreamProvider : IStreamProvider, IInternalStreamProvider, IControllable, IStreamSubscriptionManagerRetriever, ILifecycleParticipant<ILifecycleObservable>
     {
         private readonly ILogger logger;
         private readonly IStreamProviderRuntime runtime;
@@ -100,13 +100,13 @@ namespace Orleans.Providers.Streams.Common
             this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        private async Task Init(CancellationToken token) 
+        private async Task Init(CancellationToken token)
         {
             if(!this.stateManager.PresetState(ProviderState.Initialized)) return;
             this.adapterFactory = this.runtime.ServiceProvider.GetRequiredKeyedService<IQueueAdapterFactory>(this.Name);
             this.queueAdapter = await adapterFactory.CreateAdapter();
 
-            if (this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit 
+            if (this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit
                 || this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
             {
                 this.streamSubscriptionManager = this.runtime.ServiceProvider
@@ -142,7 +142,7 @@ namespace Orleans.Providers.Streams.Common
         private async Task Close(CancellationToken token)
         {
             if (!stateManager.PresetState(ProviderState.Closed)) return;
-            
+
             var manager = this.pullingAgentManager;
             if (manager != null)
             {
@@ -193,14 +193,13 @@ namespace Orleans.Providers.Streams.Common
             {
                 return ((IControllable)adapterFactory).ExecuteCommand(command, arg);
             }
-            
+
             if (pullingAgentManager != null)
             {
                 return pullingAgentManager.ExecuteCommand((PersistentStreamProviderCommand)command, arg);
             }
 
-            logger.LogWarning(
-                "Got command {Command} with arg {Argument}, but PullingAgentManager is not initialized yet. Ignoring the command.",
+            LogWarningGotCommand(
                 (PersistentStreamProviderCommand)command,
                 arg);
             throw new ArgumentException("PullingAgentManager is not initialized yet.");
@@ -225,5 +224,11 @@ namespace Orleans.Providers.Streams.Common
             var provider = (PersistentStreamProvider)serviceProvider.GetRequiredKeyedService<IStreamProvider>(name);
             return provider.ParticipateIn<TLifecycle>();
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Got command {Command} with arg {Argument}, but PullingAgentManager is not initialized yet. Ignoring the command."
+        )]
+        private partial void LogWarningGotCommand(PersistentStreamProviderCommand command, object argument);
     }
 }
