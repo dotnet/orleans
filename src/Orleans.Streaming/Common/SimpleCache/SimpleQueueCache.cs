@@ -38,7 +38,7 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// A queue cache that keeps items in memory.
     /// </summary>
-    public class SimpleQueueCache : IQueueCache
+    public partial class SimpleQueueCache : IQueueCache
     {
         private readonly LinkedList<SimpleQueueCacheItem> cachedMessages;
         private readonly int maxCacheSize;
@@ -67,7 +67,7 @@ namespace Orleans.Providers.Streams.Common
         {
             cachedMessages = new LinkedList<SimpleQueueCacheItem>();
             maxCacheSize = cacheSize;
-            
+
             this.logger = logger;
             cacheCursorHistogram = new List<CacheBucket>();
             CACHE_HISTOGRAM_MAX_BUCKET_SIZE = Math.Max(cacheSize / NUM_CACHE_HISTOGRAM_BUCKETS, 1); // we have 10 buckets
@@ -97,10 +97,7 @@ namespace Orleans.Providers.Streams.Common
             }
             purgedItems = allItems;
 
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                logger.LogDebug("TryPurgeFromCache: purged {PurgedItemsCount} items from cache.", purgedItems.Count);
-            }
+            LogDebugTryPurgeFromCache(allItems.Count);
 
             return true;
         }
@@ -136,11 +133,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if (msgs == null) throw new ArgumentNullException(nameof(msgs));
 
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                logger.LogDebug("AddToCache: added {ItemCount} items to cache.", msgs.Count);
-            }
-
+            LogDebugAddToCache(msgs.Count);
             foreach (var message in msgs)
             {
                 Add(message, message.SequenceToken);
@@ -157,10 +150,7 @@ namespace Orleans.Providers.Streams.Common
 
         internal void InitializeCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken sequenceToken)
         {
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                logger.LogDebug("InitializeCursor: {Cursor} to sequenceToken {SequenceToken}", cursor, sequenceToken);
-            }
+            LogDebugInitializeCursor(cursor, sequenceToken);
 
             // Nothing in cache, unset token, and wait for more data.
             if (cachedMessages.Count == 0)
@@ -210,10 +200,7 @@ namespace Orleans.Providers.Streams.Common
 
         internal void RefreshCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken sequenceToken)
         {
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                logger.LogDebug("RefreshCursor: {RefreshCursor} to sequenceToken {SequenceToken}", cursor, sequenceToken);
-            }
+            LogDebugRefreshCursor(cursor, sequenceToken);
 
             // set if unset
             if (!cursor.IsSet)
@@ -230,10 +217,7 @@ namespace Orleans.Providers.Streams.Common
         /// <returns></returns>
         internal bool TryGetNextMessage(SimpleQueueCacheCursor cursor, out IBatchContainer batch)
         {
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                logger.LogDebug("TryGetNextMessage: {Cursor}", cursor);
-            }
+            LogDebugTryGetNextMessage(cursor);
 
             batch = null;
             if (!cursor.IsSet) return false;
@@ -254,10 +238,7 @@ namespace Orleans.Providers.Streams.Common
 
         private void AdvanceCursor(SimpleQueueCacheCursor cursor, LinkedListNode<SimpleQueueCacheItem> item)
         {
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                logger.LogDebug("UpdateCursor: {Cursor} to item {Item}", cursor, item.Value.Batch);
-            }
+            LogDebugUpdateCursor(cursor, item.Value.Batch);
 
             cursor.Element.Value.CacheBucket.UpdateNumCursors(-1); // remove from prev bucket
             cursor.Set(item);
@@ -266,10 +247,7 @@ namespace Orleans.Providers.Streams.Common
 
         internal void SetCursor(SimpleQueueCacheCursor cursor, LinkedListNode<SimpleQueueCacheItem> item)
         {
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                logger.LogDebug("SetCursor: {Cursor} to item {Item}", cursor, item.Value.Batch);
-            }
+            LogDebugSetCursor(cursor, item.Value.Batch);
 
             cursor.Set(item);
             cursor.Element.Value.CacheBucket.UpdateNumCursors(1);  // add to next bucket
@@ -277,10 +255,7 @@ namespace Orleans.Providers.Streams.Common
 
         internal void UnsetCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken token)
         {
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                logger.LogDebug("UnsetCursor: {Cursor}", cursor);
-            }
+            LogDebugUnsetCursor(cursor);
 
             if (cursor.IsSet)
             {
@@ -323,5 +298,53 @@ namespace Orleans.Providers.Streams.Common
             cachedMessages.AddFirst(new LinkedListNode<SimpleQueueCacheItem>(item));
             cacheBucket.UpdateNumItems(1);
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "TryPurgeFromCache: purged {PurgedItemsCount} items from cache."
+        )]
+        private partial void LogDebugTryPurgeFromCache(int purgedItemsCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "AddToCache: added {ItemCount} items to cache."
+        )]
+        private partial void LogDebugAddToCache(int itemCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "InitializeCursor: {Cursor} to sequenceToken {SequenceToken}"
+        )]
+        private partial void LogDebugInitializeCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken sequenceToken);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "RefreshCursor: {RefreshCursor} to sequenceToken {SequenceToken}"
+        )]
+        private partial void LogDebugRefreshCursor(SimpleQueueCacheCursor refreshCursor, StreamSequenceToken sequenceToken);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "TryGetNextMessage: {Cursor}"
+        )]
+        private partial void LogDebugTryGetNextMessage(SimpleQueueCacheCursor cursor);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "UpdateCursor: {Cursor} to item {Item}"
+        )]
+        private partial void LogDebugUpdateCursor(SimpleQueueCacheCursor cursor, IBatchContainer item);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "SetCursor: {Cursor} to item {Item}"
+        )]
+        private partial void LogDebugSetCursor(SimpleQueueCacheCursor cursor, IBatchContainer item);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "UnsetCursor: {Cursor}"
+        )]
+        private partial void LogDebugUnsetCursor(SimpleQueueCacheCursor cursor);
     }
 }
