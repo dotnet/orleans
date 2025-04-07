@@ -46,7 +46,7 @@ public class MySqlAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
 /// Tests for <see cref="AdoNetGrainDirectory"/>.
 /// </summary>
 [Collection(TestEnvironmentFixture.DefaultCollection)]
-[TestCategory("AdoNet"), TestCategory("GrainDirectory")]
+[TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
 public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrency = 100) : IAsyncLifetime
 {
     private RelationalStorageForTesting _testing;
