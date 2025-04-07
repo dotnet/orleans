@@ -225,6 +225,9 @@ namespace Orleans.Persistence.Migration
         public GrainMigrationMode Mode { get; set; } = GrainMigrationMode.Disabled;
     }
 
+    /// <summary>
+    /// Controls the grain migration mode of the underlying grain storage
+    /// </summary>
     public enum GrainMigrationMode
     {
         /// <summary>
