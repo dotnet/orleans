@@ -6,7 +6,6 @@
     <Description>Microsoft Orleans persistence providers for Azure Cosmos DB</Description>
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
-    <IsPackable>false</IsPackable> <!-- explicitly is not packable: maybe will be released later -->
   </PropertyGroup>
 
   <ItemGroup>
