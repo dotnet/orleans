@@ -160,7 +160,7 @@ namespace Orleans.Persistence.Migration
                     sp.GetRequiredService<ILocalSiloDetails>(),
                     sp.GetRequiredServiceByName<IGrainStorage>(oldStorageName),
                     sp.GetRequiredServiceByName<IGrainStorage>(newStorageName),
-                    sp.GetService<IReminderMigrationTable>(),
+                    sp.GetService<IReminderTable>(),
                     options);
             });
 

@@ -7,5 +7,6 @@ namespace Orleans.Persistence.AzureStorage.Migration.Reminders.Storage
     /// </summary>
     public class AzureTableMigrationReminderStorageOptions : AzureTableReminderStorageOptions
     {
+        public ReminderMigrationMode ReminderMigrationMode { get; set; } = ReminderMigrationMode.Disabled;
     }
 }
