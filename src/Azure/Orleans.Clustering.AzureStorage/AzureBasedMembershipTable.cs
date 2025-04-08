@@ -109,12 +109,12 @@ namespace Orleans.Runtime.MembershipService
                     tableEntry, versionEntry, tableVersion.VersionEtag);
 
                 if (result == false)
-                    LogWarningAzureTable_22(entry, tableVersion);
+                    LogWarningTableContention(entry, tableVersion);
                 return result;
             }
             catch (Exception exc)
             {
-                LogWarningAzureTable_23(exc,
+                LogWarningInsertingMembershipEntry(exc,
                     entry,
                     tableVersion is null ? "null" : tableVersion.ToString(),
                     tableManager.TableName);
@@ -132,12 +132,12 @@ namespace Orleans.Runtime.MembershipService
 
                 bool result = await tableManager.UpdateSiloEntryConditionally(siloEntry, etag, versionEntry, tableVersion.VersionEtag);
                 if (result == false)
-                    LogWarningAzureTable_24(entry, etag, tableVersion);
+                    LogWarningTableContentionEtag(entry, etag, tableVersion);
                 return result;
             }
             catch (Exception exc)
             {
-                LogWarningAzureTable_25(exc,
+                LogWarningUpdatingMembershipEntry(exc,
                     entry,
                     tableVersion is null ? "null" : tableVersion.ToString(),
                     tableManager.TableName);
@@ -155,7 +155,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                LogWarningAzureTable_26(exc,
+                LogWarningUpdatingMembershipEntry(exc,
                     entry,
                     tableManager.TableName);
                 throw;
@@ -185,7 +185,7 @@ namespace Orleans.Runtime.MembershipService
                         }
                         catch (Exception exc)
                         {
-                            LogErrorAzureTable_61(exc, tableEntry);
+                            LogErrorParsingMembershipTableDataIgnoring(exc, tableEntry);
                         }
                     }
                 }
@@ -194,7 +194,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                LogErrorAzureTable_60(exc, new(entries));
+                LogErrorParsingMembershipTableData(exc, new(entries));
                 throw;
             }
         }
@@ -381,14 +381,14 @@ namespace Orleans.Runtime.MembershipService
             Level = LogLevel.Warning,
             Message = "Insert failed due to contention on the table. Will retry. Entry {Data}, table version = {TableVersion}"
         )]
-        private partial void LogWarningAzureTable_22(MembershipEntry data, TableVersion tableVersion);
+        private partial void LogWarningTableContention(MembershipEntry data, TableVersion tableVersion);
 
         [LoggerMessage(
             EventId = (int)TableStorageErrorCode.AzureTable_23,
             Level = LogLevel.Warning,
             Message = "Intermediate error inserting entry {Data} tableVersion {TableVersion} to the table {TableName}"
         )]
-        private partial void LogWarningAzureTable_23(Exception ex, MembershipEntry data, string tableVersion, string tableName);
+        private partial void LogWarningInsertingMembershipEntry(Exception ex, MembershipEntry data, string tableVersion, string tableName);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
@@ -401,14 +401,14 @@ namespace Orleans.Runtime.MembershipService
             Level = LogLevel.Warning,
             Message = "Update failed due to contention on the table. Will retry. Entry {Data}, eTag {ETag}, table version = {TableVersion}"
         )]
-        private partial void LogWarningAzureTable_24(MembershipEntry data, string eTag, TableVersion tableVersion);
+        private partial void LogWarningTableContentionEtag(MembershipEntry data, string eTag, TableVersion tableVersion);
 
         [LoggerMessage(
             EventId = (int)TableStorageErrorCode.AzureTable_25,
             Level = LogLevel.Warning,
             Message = "Intermediate error updating entry {Data} tableVersion {TableVersion} to the table {TableName}"
         )]
-        private partial void LogWarningAzureTable_25(Exception ex, MembershipEntry data, string tableVersion, string tableName);
+        private partial void LogWarningUpdatingMembershipEntry(Exception ex, MembershipEntry data, string tableVersion, string tableName);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
@@ -421,20 +421,20 @@ namespace Orleans.Runtime.MembershipService
             Level = LogLevel.Warning,
             Message = "Intermediate error updating IAmAlive field for entry {Data} to the table {TableName}."
         )]
-        private partial void LogWarningAzureTable_26(Exception ex, MembershipEntry data, string tableName);
+        private partial void LogWarningUpdatingMembershipEntry(Exception ex, MembershipEntry data, string tableName);
 
         [LoggerMessage(
             EventId = (int)TableStorageErrorCode.AzureTable_61,
             Level = LogLevel.Error,
             Message = "Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Data}. Ignoring this entry."
         )]
-        private partial void LogErrorAzureTable_61(Exception ex, SiloInstanceTableEntry data);
+        private partial void LogErrorParsingMembershipTableDataIgnoring(Exception ex, SiloInstanceTableEntry data);
 
         [LoggerMessage(
             EventId = (int)TableStorageErrorCode.AzureTable_60,
             Level = LogLevel.Error,
             Message = "Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Data}."
         )]
-        private partial void LogErrorAzureTable_60(Exception ex, UtilsEnumerableToStringLogValue data);
+        private partial void LogErrorParsingMembershipTableData(Exception ex, UtilsEnumerableToStringLogValue data);
     }
 }
