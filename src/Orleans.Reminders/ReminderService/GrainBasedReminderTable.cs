@@ -56,7 +56,7 @@ namespace Orleans.Runtime.ReminderService
                 if (range.InRange(e.Key))
                     list.AddRange(e.Value.Values);
 
-            LogTraceSelectedReminders(list.Count, new(_reminderTable), range.ToString(), new(list));
+            LogTraceSelectedReminders(list.Count, new(_reminderTable), range, new(list));
 
             var result = new ReminderTableData(list);
             LogDebugReadReminders(result.Reminders.Count, new(result.Reminders));
@@ -164,7 +164,7 @@ namespace Orleans.Runtime.ReminderService
             Level = LogLevel.Trace,
             Message = "Selected {SelectCount} out of {TotalCount} reminders from memory for {Range}. Selected: {Reminders}"
         )]
-        private partial void LogTraceSelectedReminders(int selectCount, TotalCountLogRecord totalCount, string range, RemindersLogRecord reminders);
+        private partial void LogTraceSelectedReminders(int selectCount, TotalCountLogRecord totalCount, IRingRange range, RemindersLogRecord reminders);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
