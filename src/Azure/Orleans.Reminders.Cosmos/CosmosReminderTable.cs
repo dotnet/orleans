@@ -4,7 +4,7 @@ using Orleans.Reminders.Cosmos.Models;
 
 namespace Orleans.Reminders.Cosmos;
 
-internal class CosmosReminderTable : IReminderTable
+internal partial class CosmosReminderTable : IReminderTable
 {
     private const HttpStatusCode TooManyRequests = (HttpStatusCode)429;
     private const string PARTITION_KEY_PATH = "/PartitionKey";
@@ -37,13 +37,7 @@ internal class CosmosReminderTable : IReminderTable
 
         try
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug(
-                    "Azure Cosmos DB Reminder Storage CosmosReminderTable is initializing: Name=CosmosReminderTable ServiceId={ServiceId} Collection={Container}",
-                    _clusterOptions.ServiceId,
-                    _options.ContainerName);
-            }
+            LogDebugInitializingCosmosReminderTable(_clusterOptions.ServiceId, _options.ContainerName);
 
             await InitializeCosmosClient();
 
@@ -61,16 +55,12 @@ internal class CosmosReminderTable : IReminderTable
 
             stopWatch.Stop();
 
-            if (_logger.IsEnabled(LogLevel.Trace))
-            {
-                _logger.LogTrace(
-                    "Initializing CosmosReminderTable took {Elapsed} milliseconds", stopWatch.ElapsedMilliseconds);
-            }
+            LogTraceInitializingCosmosReminderTableTook(stopWatch.ElapsedMilliseconds);
         }
         catch (Exception exc)
         {
             stopWatch.Stop();
-            _logger.LogError(exc, "Initialization failed for provider CosmosReminderTable in {Elapsed} milliseconds", stopWatch.ElapsedMilliseconds);
+            LogErrorInitializationFailedForProviderCosmosReminderTable(exc, stopWatch.ElapsedMilliseconds);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
@@ -109,7 +99,7 @@ internal class CosmosReminderTable : IReminderTable
         }
         catch (Exception exc)
         {
-            _logger.LogError(exc, "Failure reading reminders for grain {GrainId} in container {Container}", grainId, _container.Id);
+            LogErrorFailureReadingRemindersForGrain(exc, grainId, _container.Id);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
@@ -152,12 +142,7 @@ internal class CosmosReminderTable : IReminderTable
         }
         catch (Exception exc)
         {
-            _logger.LogError(
-                exc,
-                "Failure reading reminders for service {Service} for range {Begin} to {End}",
-                _clusterOptions.ServiceId,
-                begin.ToString("X"),
-                end.ToString("X"));
+            LogErrorFailureReadingRemindersForService(exc, _clusterOptions.ServiceId, new(begin), new(end));
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
@@ -188,7 +173,7 @@ internal class CosmosReminderTable : IReminderTable
         }
         catch (Exception exc)
         {
-            _logger.LogError(exc, "Failure reading reminder {Name} for service {ServiceId} and grain {GrainId}", reminderName, _clusterOptions.ServiceId, grainId);
+            LogErrorFailureReadingReminder(exc, reminderName, _clusterOptions.ServiceId, grainId);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
@@ -214,7 +199,7 @@ internal class CosmosReminderTable : IReminderTable
         }
         catch (Exception exc)
         {
-            _logger.LogError(exc, "Failure to upsert reminder for service {ServiceId}", _clusterOptions.ServiceId);
+            LogErrorFailureToUpsertReminder(exc, _clusterOptions.ServiceId);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
@@ -242,12 +227,7 @@ internal class CosmosReminderTable : IReminderTable
         }
         catch (Exception exc)
         {
-            _logger.LogError(
-                exc,
-                "Failure removing reminders for service {ServiceId} with GrainId {GrainId} and name {ReminderName}",
-                _clusterOptions.ServiceId,
-                grainId,
-                reminderName);
+            LogErrorFailureRemovingReminders(exc, _clusterOptions.ServiceId, grainId, reminderName);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
@@ -294,7 +274,7 @@ internal class CosmosReminderTable : IReminderTable
         }
         catch (Exception exc)
         {
-            _logger.LogError(exc, "Failure to clear reminders for service {ServiceId}", _clusterOptions.ServiceId);
+            LogErrorFailureToClearReminders(exc, _clusterOptions.ServiceId);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
@@ -308,7 +288,7 @@ internal class CosmosReminderTable : IReminderTable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error initializing Azure Cosmos DB client for membership table provider");
+            LogErrorInitializingAzureCosmosDbClient(ex);
             WrappedException.CreateAndRethrow(ex);
             throw;
         }
@@ -326,7 +306,7 @@ internal class CosmosReminderTable : IReminderTable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting Azure Cosmos DB database");
+            LogErrorDeletingAzureCosmosDBDatabase(ex);
             WrappedException.CreateAndRethrow(ex);
             throw;
         }
@@ -385,4 +365,75 @@ internal class CosmosReminderTable : IReminderTable
             Period = entry.Period
         };
     }
+
+    private readonly struct UIntLogValue(uint value)
+    {
+        public override string ToString() => value.ToString("X");
+    }
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Azure Cosmos DB Reminder Storage CosmosReminderTable is initializing: Name=CosmosReminderTable ServiceId={ServiceId} Collection={Container}"
+    )]
+    private partial void LogDebugInitializingCosmosReminderTable(string serviceId, string container);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Initializing CosmosReminderTable took {Elapsed} milliseconds"
+    )]
+    private partial void LogTraceInitializingCosmosReminderTableTook(long elapsed);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Initialization failed for provider CosmosReminderTable in {Elapsed} milliseconds"
+    )]
+    private partial void LogErrorInitializationFailedForProviderCosmosReminderTable(Exception ex, long elapsed);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Failure reading reminders for grain {GrainId} in container {Container}"
+    )]
+    private partial void LogErrorFailureReadingRemindersForGrain(Exception ex, GrainId grainId, string container);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Failure reading reminders for service {Service} for range {Begin} to {End}"
+    )]
+    private partial void LogErrorFailureReadingRemindersForService(Exception ex, string service, UIntLogValue begin, UIntLogValue end);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Failure reading reminder {Name} for service {ServiceId} and grain {GrainId}"
+    )]
+    private partial void LogErrorFailureReadingReminder(Exception ex, string name, string serviceId, GrainId grainId);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Failure to upsert reminder for service {ServiceId}"
+    )]
+    private partial void LogErrorFailureToUpsertReminder(Exception ex, string serviceId);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Failure removing reminders for service {ServiceId} with GrainId {GrainId} and name {ReminderName}"
+    )]
+    private partial void LogErrorFailureRemovingReminders(Exception ex, string serviceId, GrainId grainId, string reminderName);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Failure to clear reminders for service {ServiceId}"
+    )]
+    private partial void LogErrorFailureToClearReminders(Exception ex, string serviceId);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error initializing Azure Cosmos DB client for membership table provider"
+    )]
+    private partial void LogErrorInitializingAzureCosmosDbClient(Exception ex);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error deleting Azure Cosmos DB database"
+    )]
+    private partial void LogErrorDeletingAzureCosmosDBDatabase(Exception ex);
 }
