@@ -35,7 +35,7 @@ public sealed class ReminderOptions
 /// <summary>
 /// Validator for <see cref="ReminderOptions"/>.
 /// </summary>
-internal sealed class ReminderOptionsValidator : IConfigurationValidator
+internal sealed partial class ReminderOptionsValidator : IConfigurationValidator
 {
     private readonly ILogger<ReminderOptionsValidator> logger;
     private readonly IOptions<ReminderOptions> options;
@@ -65,8 +65,14 @@ internal sealed class ReminderOptionsValidator : IConfigurationValidator
 
         if (options.Value.MinimumReminderPeriod.TotalMinutes < ReminderOptionsDefaults.MinimumReminderPeriodMinutes)
         {
-            logger.LogWarning((int)RSErrorCode.RS_FastReminderInterval,
-                    $"{nameof(ReminderOptions)}.{nameof(ReminderOptions.MinimumReminderPeriod)} is {options.Value.MinimumReminderPeriod:g} (default {ReminderOptionsDefaults.MinimumReminderPeriodMinutes:g}. High-Frequency reminders are unsuitable for production use.");
+            LogWarnFastReminderInterval(options.Value.MinimumReminderPeriod, ReminderOptionsDefaults.MinimumReminderPeriodMinutes);
         }
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        EventId = (int)RSErrorCode.RS_FastReminderInterval,
+        Message = $"{nameof(ReminderOptions)}.{nameof(ReminderOptions.MinimumReminderPeriod)} is {{MinimumReminderPeriod}} (default {{MinimumReminderPeriodMinutes}}. High-Frequency reminders are unsuitable for production use."
+    )]
+    private partial void LogWarnFastReminderInterval(TimeSpan minimumReminderPeriod, uint minimumReminderPeriodMinutes);
 }

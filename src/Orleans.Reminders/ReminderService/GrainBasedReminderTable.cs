@@ -12,7 +12,7 @@ namespace Orleans.Runtime.ReminderService
 {
     [Reentrant]
     [KeepAlive]
-    internal sealed class ReminderTableGrain : Grain, IReminderTableGrain, IGrainMigrationParticipant
+    internal sealed partial class ReminderTableGrain : Grain, IReminderTableGrain, IGrainMigrationParticipant
     {
         private readonly ILogger _logger;
         private Dictionary<GrainId, Dictionary<string, ReminderEntry>> _reminderTable = new();
@@ -24,31 +24,19 @@ namespace Orleans.Runtime.ReminderService
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Activated");
-            }
-
+            LogDebugActivated();
             return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Deactivated");
-            }
-
+            LogDebugDeactivated();
             return Task.CompletedTask;
         }
 
         public Task TestOnlyClearTable()
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("TestOnlyClearTable");
-            }
-
+            LogDebugTestOnlyClearTable();
             _reminderTable.Clear();
             return Task.CompletedTask;
         }
@@ -68,22 +56,10 @@ namespace Orleans.Runtime.ReminderService
                 if (range.InRange(e.Key))
                     list.AddRange(e.Value.Values);
 
-            if (_logger.IsEnabled(LogLevel.Trace))
-            {
-                _logger.LogTrace(
-                    "Selected {SelectCount} out of {TotalCount} reminders from memory for {Range}. Selected: {Reminders}",
-                    list.Count,
-                    _reminderTable.Values.Sum(r => r.Count),
-                    range.ToString(),
-                    Utils.EnumerableToString(list));
-            }
+            LogTraceSelectedReminders(list.Count, new(_reminderTable), range, new(list));
 
             var result = new ReminderTableData(list);
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Read {ReminderCount} reminders from memory: {Reminders}", result.Reminders.Count, Utils.EnumerableToString(result.Reminders));
-            }
-
+            LogDebugReadReminders(result.Reminders.Count, new(result.Reminders));
             return Task.FromResult(result);
         }
 
@@ -95,16 +71,13 @@ namespace Orleans.Runtime.ReminderService
                 reminders.TryGetValue(reminderName, out result);
             }
 
-            if (_logger.IsEnabled(LogLevel.Trace))
+            if (result is null)
             {
-                if (result is null)
-                {
-                    _logger.LogTrace("Reminder not found for grain {Grain} reminder {ReminderName} ", grainId, reminderName);
-                }
-                else
-                {
-                    _logger.LogTrace("Read for grain {Grain} reminder {ReminderName} row {Reminder}", grainId, reminderName, result.ToString());
-                }
+                LogTraceReminderNotFound(grainId, reminderName);
+            }
+            else
+            {
+                LogTraceReadRow(grainId, reminderName, result);
             }
 
             return Task.FromResult(result);
@@ -118,21 +91,14 @@ namespace Orleans.Runtime.ReminderService
 
             var old = entryRef; // tracing purposes only
             entryRef = entry;
-            if (_logger.IsEnabled(LogLevel.Trace))
-            {
-                _logger.LogTrace("Upserted entry {Updated}, replaced {Replaced}", entry, old);
-            }
+            LogTraceUpsertedEntry(entry, old);
 
             return Task.FromResult(entry.ETag);
         }
 
         public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("RemoveRow Grain = {Grain}, ReminderName = {ReminderName}, eTag = {ETag}", grainId, reminderName, eTag);
-            }
-
+            LogDebugRemoveRow(grainId, reminderName, eTag);
             if (_reminderTable.TryGetValue(grainId, out var data)
                 && data.TryGetValue(reminderName, out var e)
                 && e.ETag == eTag)
@@ -149,14 +115,7 @@ namespace Orleans.Runtime.ReminderService
                 return Task.FromResult(true);
             }
 
-            _logger.LogWarning(
-                (int)RSErrorCode.RS_Table_Remove,
-                "RemoveRow failed for Grain = {Grain}, ReminderName = {ReminderName}, eTag = {ETag}. Table now is: {NewValues}",
-                grainId,
-                reminderName,
-                eTag,
-                Utils.EnumerableToString(_reminderTable.Values.SelectMany(x => x.Values)));
-
+            LogWarningRemoveRow(grainId, reminderName, eTag, new(_reminderTable));
             return Task.FromResult(false);
         }
 
@@ -172,5 +131,81 @@ namespace Orleans.Runtime.ReminderService
                 _reminderTable = table;
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Activated"
+        )]
+        private partial void LogDebugActivated();
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Deactivated"
+        )]
+        private partial void LogDebugDeactivated();
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "TestOnlyClearTable"
+        )]
+        private partial void LogDebugTestOnlyClearTable();
+
+        private readonly struct TotalCountLogRecord(Dictionary<GrainId, Dictionary<string, ReminderEntry>> reminderTable)
+        {
+            public override string ToString() => reminderTable.Values.Sum(r => r.Count).ToString();
+        }
+
+        private readonly struct RemindersLogRecord(IEnumerable<ReminderEntry> reminders)
+        {
+            public override string ToString() => Utils.EnumerableToString(reminders);
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Selected {SelectCount} out of {TotalCount} reminders from memory for {Range}. Selected: {Reminders}"
+        )]
+        private partial void LogTraceSelectedReminders(int selectCount, TotalCountLogRecord totalCount, IRingRange range, RemindersLogRecord reminders);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Read {ReminderCount} reminders from memory: {Reminders}"
+        )]
+        private partial void LogDebugReadReminders(int reminderCount, RemindersLogRecord reminders);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Reminder not found for grain {Grain} reminder {ReminderName}"
+        )]
+        private partial void LogTraceReminderNotFound(GrainId grain, string reminderName);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Read for grain {Grain} reminder {ReminderName} row {Reminder}"
+        )]
+        private partial void LogTraceReadRow(GrainId grain, string reminderName, ReminderEntry reminder);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Upserted entry {Updated}, replaced {Replaced}"
+        )]
+        private partial void LogTraceUpsertedEntry(ReminderEntry updated, ReminderEntry replaced);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "RemoveRow Grain = {Grain}, ReminderName = {ReminderName}, eTag = {ETag}"
+        )]
+        private partial void LogDebugRemoveRow(GrainId grain, string reminderName, string eTag);
+
+        private readonly struct NewValuesLogRecord(Dictionary<GrainId, Dictionary<string, ReminderEntry>> reminderTable)
+        {
+            public override string ToString() => Utils.EnumerableToString(reminderTable.Values.SelectMany(x => x.Values));
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)RSErrorCode.RS_Table_Remove,
+            Message = "RemoveRow failed for Grain = {Grain}, ReminderName = {ReminderName}, eTag = {ETag}. Table now is: {NewValues}"
+        )]
+        private partial void LogWarningRemoveRow(GrainId grain, string reminderName, string eTag, NewValuesLogRecord newValues);
     }
 }
