@@ -11,9 +11,9 @@ namespace Orleans.Storage
     /// <c>Orleans.Storage.MemoryStorage</c>
     /// </summary>
     [KeepAlive]
-    internal class MemoryStorageGrain : Grain, IMemoryStorageGrain
+    internal partial class MemoryStorageGrain : Grain, IMemoryStorageGrain
     {
-        private readonly Dictionary<string, object> _store = new(); 
+        private readonly Dictionary<string, object> _store = new();
         private readonly ILogger _logger;
 
         public MemoryStorageGrain(ILogger<MemoryStorageGrain> logger)
@@ -23,31 +23,31 @@ namespace Orleans.Storage
 
         public Task<IGrainState<T>> ReadStateAsync<T>(string grainStoreKey)
         {
-            if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("ReadStateAsync for grain: {GrainStoreKey}", grainStoreKey);
+            LogDebugReadState(grainStoreKey);
             _store.TryGetValue(grainStoreKey, out var entry);
             return Task.FromResult((IGrainState<T>)entry);
         }
 
         public Task<string> WriteStateAsync<T>(string grainStoreKey, IGrainState<T> grainState)
         {
-            if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("WriteStateAsync for grain: {GrainStoreKey} eTag: {ETag}", grainStoreKey, grainState.ETag);
+            LogDebugWriteState(grainStoreKey, grainState.ETag);
             var currentETag = GetETagFromStorage<T>(grainStoreKey);
             ValidateEtag(currentETag, grainState.ETag, grainStoreKey, "Update");
             grainState.ETag = NewEtag();
             _store[grainStoreKey] = grainState;
-            if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Done WriteStateAsync for grain: {GrainStoreKey} eTag: {ETag}", grainStoreKey, grainState.ETag);
+            LogDebugDoneWriteState(grainStoreKey, grainState.ETag);
             return Task.FromResult(grainState.ETag);
         }
 
         public Task DeleteStateAsync<T>(string grainStoreKey, string etag)
         {
-            if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("DeleteStateAsync for grain: {GrainStoreKey} eTag: {ETag}", grainStoreKey, etag);
+            LogDebugDeleteState(grainStoreKey, etag);
 
             var currentETag = GetETagFromStorage<T>(grainStoreKey);
             ValidateEtag(currentETag, etag, grainStoreKey, "Delete");
             // Do not remove it from the dictionary, just set the value to null to remember that this item
             // was once in the store, and now is deleted
-            _store[grainStoreKey] = null; 
+            _store[grainStoreKey] = null;
             return Task.CompletedTask;
         }
 
@@ -83,12 +83,39 @@ namespace Orleans.Storage
                 return;
 
             // else we have an etag mismatch
-            if (_logger.IsEnabled(LogLevel.Warning))
-            {
-                _logger.LogWarning(0, "Etag mismatch during {Operation} for grain {GrainStoreKey}: Expected = {Expected} Received = {Received}", operation, grainStoreKey, currentETag, receivedEtag);
-            }
-
+            LogWarningEtagMismatch(operation, grainStoreKey, currentETag, receivedEtag);
             throw new MemoryStorageEtagMismatchException(currentETag, receivedEtag);
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "ReadStateAsync for grain: {GrainStoreKey}"
+        )]
+        private partial void LogDebugReadState(string grainStoreKey);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "WriteStateAsync for grain: {GrainStoreKey} eTag: {ETag}"
+        )]
+        private partial void LogDebugWriteState(string grainStoreKey, string etag);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Done WriteStateAsync for grain: {GrainStoreKey} eTag: {ETag}"
+        )]
+        private partial void LogDebugDoneWriteState(string grainStoreKey, string etag);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "DeleteStateAsync for grain: {GrainStoreKey} eTag: {ETag}"
+        )]
+        private partial void LogDebugDeleteState(string grainStoreKey, string etag);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = 0,
+            Message = "Etag mismatch during {Operation} for grain {GrainStoreKey}: Expected = {Expected} Received = {Received}"
+        )]
+        private partial void LogWarningEtagMismatch(string operation, string grainStoreKey, string expected, string received);
     }
 }
