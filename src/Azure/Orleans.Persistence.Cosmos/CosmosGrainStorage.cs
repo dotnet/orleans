@@ -210,11 +210,23 @@ public sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<IS
             {
                 if (string.IsNullOrWhiteSpace(grainState.ETag))
                 {
-                    await ReadStateAsync<T>(grainType, grainId, grainState);
-                    if (grainState.RecordExists)
+                    try
                     {
-                        // State exists but the current activation has not observed state creation. Therefore, we have inconsistent state and should throw to give the grain a chance to deactivate and recover.
-                        throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, grainState.ETag, "None");
+                        var entity = await _executor.ExecuteOperation(static args =>
+                        {
+                            var (self, id, pk) = args;
+                            return self._container.ReadItemAsync<GrainStateEntity<T>>(id, pk);
+                        },
+                        (this, id, pk)).ConfigureAwait(false);
+
+                        // State exists but the current activation has not observed state creation. Therefore, we have inconsistent
+                        // state and should throw to give the grain a chance to deactivate and recover.
+                        throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, "None", entity.ETag);
+                    }
+                    catch (CosmosException dce) when (dce.StatusCode == HttpStatusCode.NotFound)
+                    {
+                        // Ignore, since this is the expected outcome.
+                        // All other exceptions will be handled by the outer catch blocks.
                     }
                 }
                 else
