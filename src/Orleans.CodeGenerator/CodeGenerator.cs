@@ -33,7 +33,7 @@ namespace Orleans.CodeGenerator
         private readonly Dictionary<string, List<MemberDeclarationSyntax>> _namespacedMembers = new();
         private readonly Dictionary<InvokableMethodId, InvokableMethodDescription> _invokableMethodDescriptions = new();
         private readonly HashSet<INamedTypeSymbol> _visitedInterfaces = new(SymbolEqualityComparer.Default);
-        private readonly List<string> DisabledWarnings = new() { "CS1591" };
+        private readonly List<string> DisabledWarnings = new() { "CS1591", "RS0016", "RS0041" };
 
         public CodeGenerator(Compilation compilation, CodeGeneratorOptions options)
         {

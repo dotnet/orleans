@@ -118,5 +118,6 @@
     <!-- Tooling related packages -->
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="8.0.0" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.DotNet.GenAPI.Task" Version="9.0.103-servicing.25065.25" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,40 @@
+name: Generate API Diffs
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 16 * * *' # 8am PST (16:00 UTC)
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  generate-and-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: |
+            8.0.x
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Restore and build
+        run: |
+          set +e
+
+          # Find all csproj files excluding specific paths
+          find src -name '*.csproj' | egrep -v 'Orleans.Analyzers|Orleans.CodeGenerator' | while read proj; do
+            export CI=false && dotnet build "$proj" -f net8.0 --configuration Release --no-incremental /t:"Build;GenAPIGenerateReferenceAssemblySource"
+          done
+        continue-on-error: true
+
+      - name: Create or update pull request
+        uses: dotnet/actions-create-pull-request@e8d799aa1f8b17f324f9513832811b0a62f1e0b1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: update-api-diffs
+          base: main
+          title: "[Automated] Update API Surface Area"
+          body: "Auto-generated update to the API surface to compare current surface vs latest release. This should only be merged once this surface area ships in a new release."
