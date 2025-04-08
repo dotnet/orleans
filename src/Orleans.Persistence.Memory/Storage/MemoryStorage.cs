@@ -18,12 +18,12 @@ namespace Orleans.Storage
     /// </summary>
     /// <remarks>
     /// This storage provider is ONLY intended for simple in-memory Development / Unit Test scenarios.
-    /// This class should NOT be used in Production environment, 
-    ///  because [by-design] it does not provide any resilience 
+    /// This class should NOT be used in Production environment,
+    ///  because [by-design] it does not provide any resilience
     ///  or long-term persistence capabilities.
     /// </remarks>
     [DebuggerDisplay("MemoryStore:{" + nameof(name) + "}")]
-    public class MemoryGrainStorage : IGrainStorage, IDisposable
+    public partial class MemoryGrainStorage : IGrainStorage, IDisposable
     {
         private Lazy<IMemoryStorageGrain>[] storageGrains;
         private readonly ILogger logger;
@@ -54,12 +54,7 @@ namespace Orleans.Storage
             _activatorProvider = activatorProvider;
             this.storageSerializer = options.GrainStorageSerializer ?? defaultGrainStorageSerializer;
 
-
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                logger.LogDebug("Init: Name={Name} NumStorageGrains={NumStorageGrains}", name, options.NumStorageGrains);
-            }
-
+            LogDebugInit(name, options.NumStorageGrains);
             storageGrains = new Lazy<IMemoryStorageGrain>[options.NumStorageGrains];
             for (int i = 0; i < storageGrains.Length; i++)
             {
@@ -73,8 +68,7 @@ namespace Orleans.Storage
         {
             var key = MakeKey(grainType, grainId);
 
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Read Keys={Keys}", key);
-
+            LogTraceRead(key);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             var state = await storageGrain.ReadStateAsync<ReadOnlyMemory<byte>>(key);
             if (state != null)
@@ -96,7 +90,7 @@ namespace Orleans.Storage
         public virtual async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             var key = MakeKey(grainType, grainId);
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Write Keys={Keys} Data={Data} Etag={Etag}", key, grainState.State, grainState.ETag);
+            LogTraceWrite(key, grainState.State!, grainState.ETag);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
             {
@@ -118,7 +112,7 @@ namespace Orleans.Storage
         public virtual async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             var key = MakeKey(grainType, grainId);
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Delete Keys={Keys} Etag={Etag}", key, grainState.ETag);
+            LogTraceDelete(key, grainState.ETag);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
             {
@@ -167,8 +161,7 @@ namespace Orleans.Storage
                 {
                     sb.AppendFormat("Data Value={0} Type={1}", dataValue, dataValue.GetType());
                 }
-
-                logger.LogError(exc, "{Message}", sb.ToString());
+                LogError(sb, exc);
                 throw new AggregateException(sb.ToString(), exc);
             }
 
@@ -191,6 +184,36 @@ namespace Orleans.Storage
         }
 
         private T CreateInstance<T>() => _activatorProvider.GetActivator<T>().Create();
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Init: Name={Name} NumStorageGrains={NumStorageGrains}"
+        )]
+        private partial void LogDebugInit(string name, int numStorageGrains);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Read Keys={Keys}"
+        )]
+        private partial void LogTraceRead(string keys);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Write Keys={Keys} Data={Data} Etag={Etag}"
+        )]
+        private partial void LogTraceWrite(string keys, object data, string etag);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Delete Keys={Keys} Etag={Etag}"
+        )]
+        private partial void LogTraceDelete(string keys, string etag);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "{Message}"
+        )]
+        private partial void LogError(StringBuilder message, Exception exception);
     }
 
     /// <summary>
