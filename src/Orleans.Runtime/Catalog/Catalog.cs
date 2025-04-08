@@ -5,24 +5,21 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
-    internal sealed partial class Catalog : SystemTarget, ICatalog
+    internal sealed partial class Catalog : SystemTarget, ICatalog, ILifecycleParticipant<ISiloLifecycle>
     {
-        public SiloAddress LocalSilo { get; private set; }
-        internal ISiloStatusOracle SiloStatusOracle { get; set; }
+        private readonly SiloAddress _siloAddress;
         private readonly ActivationCollector activationCollector;
         private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly ActivationDirectory activations;
         private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
         private readonly GrainContextActivator grainActivator;
+        private ISiloStatusOracle _siloStatusOracle;
 
         public Catalog(
             ILocalSiloDetails localSiloDetails,
@@ -31,17 +28,17 @@ namespace Orleans.Runtime
             ActivationCollector activationCollector,
             IServiceProvider serviceProvider,
             ILoggerFactory loggerFactory,
-            GrainContextActivator grainActivator)
-            : base(Constants.CatalogType, localSiloDetails.SiloAddress, loggerFactory)
+            GrainContextActivator grainActivator,
+            SystemTargetShared shared)
+            : base(Constants.CatalogType, shared)
         {
-            this.LocalSilo = localSiloDetails.SiloAddress;
+            this._siloAddress = localSiloDetails.SiloAddress;
             this.grainDirectoryResolver = grainDirectoryResolver;
             this.activations = activationDirectory;
             this.serviceProvider = serviceProvider;
             this.grainActivator = grainActivator;
             this.logger = loggerFactory.CreateLogger<Catalog>();
             this.activationCollector = activationCollector;
-            this.RuntimeClient = serviceProvider.GetRequiredService<InsideRuntimeClient>();
 
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
@@ -58,7 +55,7 @@ namespace Orleans.Runtime
 
                 return counter;
             });
-            RegisterSystemTarget(this);
+            shared.ActivationDirectory.RecordNewTarget(this);
         }
 
         /// <summary>
@@ -93,29 +90,6 @@ namespace Orleans.Runtime
             UnregisterMessageTarget(activation);
             return 1;
         }
-
-        public void RegisterSystemTarget(ISystemTarget target)
-        {
-            var systemTarget = target as SystemTarget;
-            if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
-            systemTarget.RuntimeClient = this.RuntimeClient;
-            var sp = this.serviceProvider;
-            systemTarget.WorkItemGroup = new WorkItemGroup(
-                systemTarget,
-                sp.GetRequiredService<ILogger<WorkItemGroup>>(),
-                sp.GetRequiredService<ILogger<ActivationTaskScheduler>>(),
-                sp.GetRequiredService<IOptions<SchedulingOptions>>());
-            activations.RecordNewTarget(systemTarget);
-        }
-
-        public void UnregisterSystemTarget(ISystemTarget target)
-        {
-            var systemTarget = target as SystemTarget;
-            if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
-            activations.RemoveTarget(systemTarget);
-        }
-
-        public int ActivationCount { get { return activations.Count; } }
 
         /// <summary>
         /// If activation already exists, return it.
@@ -154,7 +128,7 @@ namespace Orleans.Runtime
                     return result;
                 }
 
-                if (!SiloStatusOracle.CurrentStatus.IsTerminating())
+                if (!_siloStatusOracle.CurrentStatus.IsTerminating())
                 {
                     var address = new GrainAddress
                     {
@@ -191,7 +165,7 @@ namespace Orleans.Runtime
             static IGrainContext UnableToCreateActivation(Catalog self, GrainId grainId)
             {
                 // Did not find and did not start placing new
-                var isTerminating = self.SiloStatusOracle.CurrentStatus.IsTerminating();
+                var isTerminating = self._siloStatusOracle.CurrentStatus.IsTerminating();
                 if (isTerminating)
                 {
                     self.LogDebugUnableToCreateActivationTerminating(grainId);
@@ -292,14 +266,6 @@ namespace Orleans.Runtime
             }).WaitAsync(cancellationToken);
         }
 
-        public SiloStatus LocalSiloStatus
-        {
-            get
-            {
-                return SiloStatusOracle.CurrentStatus;
-            }
-        }
-
         public async Task DeleteActivations(List<GrainAddress> addresses, DeactivationReasonCode reasonCode, string reasonText)
         {
             var tasks = new List<Task>(addresses.Count);
@@ -320,7 +286,7 @@ namespace Orleans.Runtime
         internal void OnSiloStatusChange(ILocalGrainDirectory directory, SiloAddress updatedSilo, SiloStatus status)
         {
             // ignore joining events and also events on myself.
-            if (updatedSilo.Equals(LocalSilo)) return;
+            if (updatedSilo.Equals(_siloAddress)) return;
 
             // We deactivate those activations when silo goes either of ShuttingDown/Stopping/Dead states,
             // since this is what Directory is doing as well. Directory removes a silo based on all those 3 statuses,
@@ -384,6 +350,12 @@ namespace Orleans.Runtime
                     activation.Deactivate(reason, cancellationToken);
                 }
             }
+        }
+
+        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+        {
+            // Do nothing, just ensure that this instance is created so that it can register itself in the activation directory.
+            _siloStatusOracle = serviceProvider.GetRequiredService<ISiloStatusOracle>();
         }
 
         private readonly struct SiloAddressLogValue(SiloAddress silo)

@@ -80,14 +80,10 @@ namespace Orleans.Runtime.Providers
                 queueBalancer,
                 filter,
                 pullingAgentOptions,
-                this.loggerFactory,
-                this.siloDetails.SiloAddress,
                 queueAdapter,
                 deliveryProvider,
-                queueReaderProvider);
-
-            var catalog = this.ServiceProvider.GetRequiredService<Catalog>();
-            catalog.RegisterSystemTarget(manager);
+                queueReaderProvider,
+                ServiceProvider.GetRequiredService<SystemTargetShared>());
 
             // Init the manager only after it was registered locally.
             var pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();

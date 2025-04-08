@@ -77,25 +77,28 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     // for each recovery version.
     private long _recoveryMembershipVersion;
     private Task _runTask = Task.CompletedTask;
+    private ActivationDirectory _localActivations;
+    private GrainDirectoryResolver? _grainDirectoryResolver;
 
     public DistributedGrainDirectory(
         DirectoryMembershipService membershipService,
         ILogger<DistributedGrainDirectory> logger,
-        ILocalSiloDetails localSiloDetails,
-        ILoggerFactory loggerFactory,
         IServiceProvider serviceProvider,
-        IInternalGrainFactory grainFactory) : base(Constants.GrainDirectoryType, localSiloDetails.SiloAddress, loggerFactory)
+        IInternalGrainFactory grainFactory,
+        SystemTargetShared shared) : base(Constants.GrainDirectoryType, shared)
     {
+        _localActivations = shared.ActivationDirectory;
         _serviceProvider = serviceProvider;
         _membershipService = membershipService;
         _logger = logger;
         var partitions = ImmutableArray.CreateBuilder<GrainDirectoryPartition>(DirectoryMembershipSnapshot.PartitionsPerSilo);
         for (var i = 0; i < DirectoryMembershipSnapshot.PartitionsPerSilo; i++)
         {
-            partitions.Add(new GrainDirectoryPartition(i, this, localSiloDetails, loggerFactory, serviceProvider, grainFactory));
+            partitions.Add(new GrainDirectoryPartition(i, this, grainFactory, shared));
         }
 
         _partitions = partitions.ToImmutable();
+        shared.ActivationDirectory.RecordNewTarget(this);
     }
 
     public async Task<GrainAddress?> Lookup(GrainId grainId) => await InvokeAsync(
@@ -219,16 +222,15 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             Interlocked.CompareExchange(ref _recoveryMembershipVersion, membershipVersion.Value, recoveryMembershipVersion);
         }
 
-        var localActivations = _serviceProvider.GetRequiredService<ActivationDirectory>();
-        var grainDirectoryResolver = _serviceProvider.GetRequiredService<GrainDirectoryResolver>();
         List<GrainAddress> result = [];
         List<Task> deactivationTasks = [];
         var stopwatch = CoarseStopwatch.StartNew();
         using var cts = new CancellationTokenSource();
         cts.Cancel();
-        foreach (var (grainId, activation) in localActivations)
+        
+        foreach (var (grainId, activation) in _localActivations)
         {
-            var directory = GetGrainDirectory(activation, grainDirectoryResolver);
+            var directory = GetGrainDirectory(activation, _grainDirectoryResolver!);
             if (directory == this)
             {
                 var address = activation.Address;
@@ -301,6 +303,8 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle observer)
     {
+        _grainDirectoryResolver = _serviceProvider.GetRequiredService<GrainDirectoryResolver>();
+
         observer.Subscribe(nameof(DistributedGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
 
         // Transition into 'ShuttingDown'/'Stopping' stage, removing ourselves from directory membership, but allow some time for hand-off before transitioning to 'Dead'.
@@ -308,13 +312,6 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
         Task OnRuntimeInitializeStart(CancellationToken cancellationToken)
         {
-            var catalog = _serviceProvider.GetRequiredService<Catalog>();
-            catalog.RegisterSystemTarget(this);
-            foreach (var partition in _partitions)
-            {
-                catalog.RegisterSystemTarget(partition);
-            }
-
             using var _ = new ExecutionContextSuppressor();
             WorkItemGroup.QueueAction(() => _runTask = ProcessMembershipUpdates());
 

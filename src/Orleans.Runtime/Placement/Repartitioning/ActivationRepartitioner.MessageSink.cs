@@ -1,7 +1,5 @@
 #nullable enable
 using System;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -10,7 +8,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime.Placement.Repartitioning;
 
-internal partial class ActivationRepartitioner : IMessageStatisticsSink
+internal sealed partial class ActivationRepartitioner : IMessageStatisticsSink
 {
     private readonly CancellationTokenSource _shutdownCts = new();
 

@@ -190,9 +190,7 @@ namespace Orleans.TestingHost
 
         private static void InitializeTestHooksSystemTarget(IHost host)
         {
-            var testHook = host.Services.GetRequiredService<TestHooksSystemTarget>();
-            var catalog = host.Services.GetRequiredService<Catalog>();
-            catalog.RegisterSystemTarget(testHook);
+            _ = host.Services.GetRequiredService<TestHooksSystemTarget>();
         }
     }
 }

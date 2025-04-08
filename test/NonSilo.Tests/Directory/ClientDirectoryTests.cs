@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Threading.Channels;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -11,6 +12,7 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
+using Orleans.Runtime.Scheduler;
 using UnitTests.Directory;
 using Xunit;
 
@@ -71,6 +73,14 @@ namespace NonSilo.Tests.Directory
             _grainFactory = Substitute.For<IInternalGrainFactory>();
             _grainFactory.GetSystemTarget<IRemoteClientDirectory>(default, default)
                 .ReturnsForAnyArgs(info => _remoteDirectories.GetOrAdd(info.ArgAt<SiloAddress>(1), k => Substitute.For<IRemoteClientDirectory>()));
+            var systemTargetShared = new SystemTargetShared(
+                runtimeClient: null!,
+                localSiloDetails: _localSiloDetails,
+                loggerFactory: _loggerFactory,
+                schedulingOptions: Options.Create(new SchedulingOptions()),
+                grainReferenceActivator: null,
+                timerRegistry: null,
+                activations: new ActivationDirectory());
 
             _directory = new ClientDirectory(
                 grainFactory: _grainFactory,
@@ -80,7 +90,7 @@ namespace NonSilo.Tests.Directory
                 clusterMembershipService: _clusterMembershipService,
                 timerFactory: _timerFactory,
                 connectedClients: _connectedClientCollection,
-                catalog: null);
+                shared: systemTargetShared);
             _testAccessor = new ClientDirectory.TestAccessor(_directory);
 
             // Disable automatic publishing to simplify testing.

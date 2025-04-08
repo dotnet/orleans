@@ -103,11 +103,5 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="silo">the address of the silo</param>
         /// <returns>true if the silo is known to be part of this cluster</returns>
         bool IsSiloInCluster(SiloAddress silo);
-
-        /// <summary>
-        /// Sets the callback to <see cref="Catalog"/> which is called when a silo is removed from membership.
-        /// </summary>
-        /// <param name="catalogOnSiloRemoved">The callback.</param>
-        void SetSiloRemovedCatalogCallback(Action<ILocalGrainDirectory, SiloAddress, SiloStatus> catalogOnSiloRemoved);
     }
 }

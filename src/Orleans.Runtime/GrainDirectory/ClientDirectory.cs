@@ -65,8 +65,8 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         IClusterMembershipService clusterMembershipService,
         IAsyncTimerFactory timerFactory,
         IConnectedClientCollection connectedClients,
-        Catalog catalog)
-        : base(Constants.ClientDirectoryType, siloDetails.SiloAddress, loggerFactory)
+        SystemTargetShared shared)
+        : base(Constants.ClientDirectoryType, shared)
     {
         _consistentRing = new SimpleConsistentRingProvider(siloDetails, clusterMembershipService);
         _grainFactory = grainFactory;
@@ -78,7 +78,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         _connectedClients = connectedClients;
         _localHostedClientId = HostedClient.CreateHostedClientGrainId(_localSilo).GrainId;
         _schedulePublishUpdate = SchedulePublishUpdates;
-        catalog?.RegisterSystemTarget(this);
+        shared.ActivationDirectory.RecordNewTarget(this);
     }
 
     public ValueTask<List<GrainAddress>> Lookup(GrainId grainId)

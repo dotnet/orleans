@@ -61,17 +61,17 @@ internal class GrainCallCancellationManager : SystemTarget, IGrainCallCancellati
         IServiceProvider serviceProvider,
         Catalog catalog,
         ActivationDirectory activationDirectory,
-        IClusterMembershipService clusterMembershipService) : base(Constants.CancellationManagerType, localSiloDetails.SiloAddress, loggerFactory)
+        IClusterMembershipService clusterMembershipService,
+        SystemTargetShared shared) : base(Constants.CancellationManagerType, shared)
     {
         _serviceProvider = serviceProvider;
         _logger = loggerFactory.CreateLogger<GrainCallCancellationManager>();
         _catalog = catalog;
         _activationDirectory = activationDirectory;
         _clusterMembershipService = clusterMembershipService;
-        _catalog.RegisterSystemTarget(this);
 
+        using (new ExecutionContextSuppressor())
         {
-            using var _ = new ExecutionContextSuppressor();
             _membershipUpdatesTask = Task.Factory.StartNew(
                 state => ((GrainCallCancellationManager)state!).ProcessMembershipUpdates(),
                 this,
@@ -80,6 +80,8 @@ internal class GrainCallCancellationManager : SystemTarget, IGrainCallCancellati
                 WorkItemGroup.TaskScheduler).Unwrap();
             _membershipUpdatesTask.Ignore();
         }
+
+        shared.ActivationDirectory.RecordNewTarget(this);
     }
 
     private IInternalGrainFactory GrainFactory => _grainFactory ??= _serviceProvider.GetRequiredService<IInternalGrainFactory>();

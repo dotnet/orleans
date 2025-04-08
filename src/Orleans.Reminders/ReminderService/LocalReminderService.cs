@@ -37,18 +37,15 @@ namespace Orleans.Runtime.ReminderService
         public LocalReminderService(
             GrainReferenceActivator referenceActivator,
             GrainInterfaceTypeResolver interfaceTypeResolver,
-            ILocalSiloDetails localSiloDetails,
             IReminderTable reminderTable,
-            ILoggerFactory loggerFactory,
             IAsyncTimerFactory asyncTimerFactory,
             IOptions<ReminderOptions> reminderOptions,
             IConsistentRingProvider ringProvider,
-            Catalog catalog)
+            SystemTargetShared shared)
             : base(
-                  SystemTargetGrainId.CreateGrainServiceGrainId(GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)), null, localSiloDetails.SiloAddress),
-                  localSiloDetails.SiloAddress,
-                  loggerFactory,
-                  ringProvider)
+                  SystemTargetGrainId.CreateGrainServiceGrainId(GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)), null, shared.SiloAddress),
+                  ringProvider,
+                  shared)
         {
             _referenceActivator = referenceActivator;
             _grainInterfaceType = interfaceTypeResolver.GetGrainInterfaceType(typeof(IRemindable));
@@ -57,9 +54,9 @@ namespace Orleans.Runtime.ReminderService
             this.asyncTimerFactory = asyncTimerFactory;
             ReminderInstruments.RegisterActiveRemindersObserve(() => localReminders.Count);
             startedTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            this.logger = loggerFactory.CreateLogger<LocalReminderService>();
+            this.logger = shared.LoggerFactory.CreateLogger<LocalReminderService>();
             this.listRefreshTimer = asyncTimerFactory.Create(this.reminderOptions.RefreshReminderListPeriod, "ReminderService.ReminderListRefresher");
-            catalog.RegisterSystemTarget(this);
+            shared.ActivationDirectory.RecordNewTarget(this);
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle observer)

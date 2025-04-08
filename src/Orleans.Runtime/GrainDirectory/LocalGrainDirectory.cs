@@ -23,13 +23,13 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly IInternalGrainFactory grainFactory;
         private readonly object writeLock = new object();
         private readonly IServiceProvider _serviceProvider;
-        private Action<ILocalGrainDirectory, SiloAddress, SiloStatus>? catalogOnSiloRemoved;
         private DirectoryMembership directoryMembership = DirectoryMembership.Default;
 
         // Consider: move these constants into an appropriate place
         internal const int HOP_LIMIT = 6; // forward a remote request no more than 5 times
         public static readonly TimeSpan RETRY_DELAY = TimeSpan.FromMilliseconds(200); // Pause 200ms between forwards to let the membership directory settle down
         internal bool Running;
+        private Catalog? _catalog;
 
         internal SiloAddress MyAddress { get; }
 
@@ -49,7 +49,8 @@ namespace Orleans.Runtime.GrainDirectory
             Factory<LocalGrainDirectoryPartition> grainDirectoryPartitionFactory,
             IOptions<DevelopmentClusterMembershipOptions> developmentClusterMembershipOptions,
             IOptions<GrainDirectoryOptions> grainDirectoryOptions,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            SystemTargetShared systemTargetShared)
         {
             this.log = loggerFactory.CreateLogger<LocalGrainDirectory>();
 
@@ -75,12 +76,8 @@ namespace Orleans.Runtime.GrainDirectory
             DirectoryPartition = grainDirectoryPartitionFactory();
             HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, grainDirectoryPartitionFactory, loggerFactory);
 
-            RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceType, loggerFactory);
-            CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorType, loggerFactory);
-            var catalog = serviceProvider.GetRequiredService<Catalog>();
-            catalog.RegisterSystemTarget(RemoteGrainDirectory);
-            catalog.RegisterSystemTarget(CacheValidator);
-            SetSiloRemovedCatalogCallback(catalog.OnSiloStatusChange);
+            RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceType, systemTargetShared);
+            CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorType, systemTargetShared);
 
             // add myself to the list of members
             AddServer(MyAddress);
@@ -138,16 +135,6 @@ namespace Orleans.Runtime.GrainDirectory
             DirectoryCache.Clear();
         }
 
-        /// <inheritdoc />
-        public void SetSiloRemovedCatalogCallback(Action<ILocalGrainDirectory, SiloAddress, SiloStatus> callback)
-        {
-            if (callback == null) throw new ArgumentNullException(nameof(callback));
-            lock (this.writeLock)
-            {
-                this.catalogOnSiloRemoved = callback;
-            }
-        }
-
         private void AddServer(SiloAddress silo)
         {
             lock (this.writeLock)
@@ -187,7 +174,8 @@ namespace Orleans.Runtime.GrainDirectory
                 try
                 {
                     // Only notify the catalog once. Order is important: call BEFORE updating membershipRingList.
-                    this.catalogOnSiloRemoved?.Invoke(this, silo, status);
+                    _catalog = _serviceProvider.GetRequiredService<Catalog>();
+                    _catalog.OnSiloStatusChange(this, silo, status);
                 }
                 catch (Exception exc)
                 {

@@ -37,13 +37,6 @@ namespace Orleans.Runtime.MembershipService
 
             var siloDetails = this.serviceProvider.GetService<ILocalSiloDetails>();
             bool isPrimarySilo = siloDetails.SiloAddress.Endpoint.Equals(options.PrimarySiloEndpoint);
-            if (isPrimarySilo)
-            {
-                LogInformationCreatingInMemoryMembershipTable(logger);
-                var catalog = serviceProvider.GetRequiredService<Catalog>();
-                catalog.RegisterSystemTarget(ActivatorUtilities.CreateInstance<MembershipTableSystemTarget>(serviceProvider));
-            }
-
             var grainFactory = this.serviceProvider.GetRequiredService<IInternalGrainFactory>();
             var result = grainFactory.GetSystemTarget<IMembershipTableSystemTarget>(Constants.SystemMembershipTableType, SiloAddress.New(options.PrimarySiloEndpoint, 0));
             if (isPrimarySilo)
@@ -136,21 +129,20 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILogger logger;
 
         public MembershipTableSystemTarget(
-            ILocalSiloDetails localSiloDetails,
-            ILoggerFactory loggerFactory,
+            ILogger<MembershipTableSystemTarget> logger,
             DeepCopier deepCopier,
-            Catalog catalog)
-            : base(CreateId(localSiloDetails), localSiloDetails.SiloAddress, loggerFactory)
+            SystemTargetShared shared)
+            : base(CreateId(shared.SiloAddress), shared)
         {
-            logger = loggerFactory.CreateLogger<MembershipTableSystemTarget>();
+            this.logger = logger;
             table = new InMemoryMembershipTable(deepCopier);
             LogInformationGrainBasedMembershipTableActivated(logger);
-            catalog.RegisterSystemTarget(this);
+            shared.ActivationDirectory.RecordNewTarget(this);
         }
 
-        private static SystemTargetGrainId CreateId(ILocalSiloDetails localSiloDetails)
+        private static SystemTargetGrainId CreateId(SiloAddress siloAddress)
         {
-            return SystemTargetGrainId.Create(Constants.SystemMembershipTableType, SiloAddress.New(localSiloDetails.SiloAddress.Endpoint, 0));
+            return SystemTargetGrainId.Create(Constants.SystemMembershipTableType, SiloAddress.New(siloAddress.Endpoint, 0));
         }
 
         public Task InitializeMembershipTable(bool tryInitTableVersion)

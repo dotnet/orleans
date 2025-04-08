@@ -203,8 +203,6 @@ namespace Orleans.Runtime.Metadata
         private Task Initialize(CancellationToken cancellationToken)
         {
             _grainFactory = _services.GetRequiredService<IInternalGrainFactory>();
-            var catalog = _services.GetRequiredService<Catalog>();
-            catalog.RegisterSystemTarget(ActivatorUtilities.CreateInstance<ClusterManifestSystemTarget>(_services));
             return Task.CompletedTask;
         }
 

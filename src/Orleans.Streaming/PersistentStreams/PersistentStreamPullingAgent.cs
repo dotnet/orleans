@@ -14,7 +14,7 @@ using Orleans.Streams.Filtering;
 
 namespace Orleans.Streams
 {
-    internal partial class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
+    internal sealed partial class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
         private const int ReadLoopRetryMax = 6;
         private const int StreamInactivityCheckFrequency = 10;
@@ -44,18 +44,17 @@ namespace Orleans.Streams
         internal PersistentStreamPullingAgent(
             SystemTargetGrainId id,
             string strProviderName,
-            ILoggerFactory loggerFactory,
             IStreamPubSub streamPubSub,
             IStreamFilter streamFilter,
             QueueId queueId,
             StreamPullingAgentOptions options,
-            SiloAddress siloAddress,
             IQueueAdapter queueAdapter,
             IQueueAdapterCache queueAdapterCache,
             IStreamFailureHandler streamFailureHandler,
             IBackoffProvider deliveryBackoffProvider,
-            IBackoffProvider queueReaderBackoffProvider)
-            : base(id, siloAddress, loggerFactory)
+            IBackoffProvider queueReaderBackoffProvider,
+            SystemTargetShared shared)
+            : base(id, shared)
         {
             if (strProviderName == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: strProviderName should not be null");
 
@@ -72,8 +71,9 @@ namespace Orleans.Streams
             this.queueReaderBackoffProvider = queueReaderBackoffProvider;
             numMessages = 0;
 
-            logger = loggerFactory.CreateLogger($"{this.GetType().Namespace}.{streamProviderName}");
+            logger = shared.LoggerFactory.CreateLogger($"{this.GetType().Namespace}.{streamProviderName}");
             LogInfoCreated(GetType().Name, GrainId, strProviderName, Silo, new(QueueId));
+            shared.ActivationDirectory.RecordNewTarget(this);
         }
 
         /// <summary>

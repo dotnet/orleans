@@ -8,27 +8,21 @@ using Microsoft.Extensions.Options;
 #nullable enable
 namespace Orleans.Runtime.MembershipService.SiloMetadata;
 
-internal sealed class SiloMetadataSystemTarget(
-    IOptions<SiloMetadata> siloMetadata,
-    ILocalSiloDetails localSiloDetails,
-    ILoggerFactory loggerFactory,
-    IServiceProvider serviceProvider)
-    : SystemTarget(Constants.SiloMetadataType, localSiloDetails.SiloAddress, loggerFactory), ISiloMetadataSystemTarget, ILifecycleParticipant<ISiloLifecycle>
+internal sealed class SiloMetadataSystemTarget : SystemTarget, ISiloMetadataSystemTarget, ILifecycleParticipant<ISiloLifecycle>
 {
-    private readonly SiloMetadata _siloMetadata = siloMetadata.Value;
+    private readonly SiloMetadata _siloMetadata;
+
+    public SiloMetadataSystemTarget(
+        IOptions<SiloMetadata> siloMetadata,
+        SystemTargetShared shared) : base(Constants.SiloMetadataType, shared)
+    {
+        _siloMetadata = siloMetadata.Value;
+        shared.ActivationDirectory.RecordNewTarget(this);
+    }
 
     public Task<SiloMetadata> GetSiloMetadata() => Task.FromResult(_siloMetadata);
-
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
     {
-        lifecycle.Subscribe(nameof(SiloMetadataSystemTarget), ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
-
-        Task OnRuntimeInitializeStart(CancellationToken token)
-        {
-            serviceProvider.GetRequiredService<Catalog>().RegisterSystemTarget(this);
-            return Task.CompletedTask;
-        }
-
-        Task OnRuntimeInitializeStop(CancellationToken token) => Task.CompletedTask;
+        // We don't participate in any lifecycle stages: activating this instance is all that is necessary.
     }
 }

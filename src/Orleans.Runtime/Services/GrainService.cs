@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Scheduler;
@@ -39,17 +40,18 @@ namespace Orleans.Runtime
 
         /// <summary>Only to make Reflection happy. Do not use it in your implementation</summary>
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        [Obsolete("Do not call the empty constructor.")]
         protected GrainService() : base()
         {
             throw new Exception("This should not be constructed by client code.");
         }
 
         /// <summary>Constructor to use for grain services</summary>
-        internal GrainService(GrainId grainId, SiloAddress siloAddress, ILoggerFactory loggerFactory, IConsistentRingProvider ringProvider)
-            : base(SystemTargetGrainId.Create(grainId.Type, siloAddress), siloAddress, loggerFactory: loggerFactory)
+        internal GrainService(GrainId grainId, IConsistentRingProvider ringProvider, SystemTargetShared shared)
+            : base(SystemTargetGrainId.Create(grainId.Type, shared.SiloAddress), shared)
         {
             typeName = this.GetType().FullName;
-            Logger = loggerFactory.CreateLogger(typeName);
+            Logger = shared.LoggerFactory.CreateLogger(typeName);
 
             ring = ringProvider;
             StoppedCancellationTokenSource = new CancellationTokenSource();
@@ -57,7 +59,7 @@ namespace Orleans.Runtime
 
         /// <summary>Constructor to use for grain services</summary>
         protected GrainService(GrainId grainId, Silo silo, ILoggerFactory loggerFactory)
-            : this(grainId, silo.SiloAddress, loggerFactory, silo.RingProvider)
+            : this(grainId, silo.RingProvider, silo.Services.GetRequiredService<SystemTargetShared>())
         {
         }
 

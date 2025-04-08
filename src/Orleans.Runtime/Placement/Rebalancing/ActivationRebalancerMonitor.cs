@@ -20,7 +20,6 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
 
     private readonly TimeProvider _timeProvider;
     private readonly ActivationDirectory _activationDirectory;
-    private readonly ISiloStatusOracle _siloStatusOracle;
     private readonly IActivationRebalancerWorker _rebalancerGrain;
     private readonly ILogger<ActivationRebalancerMonitor> _logger;
     private readonly List<IActivationRebalancerReportListener> _statusListeners = [];
@@ -29,23 +28,18 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     private readonly static TimeSpan TimerPeriod = 2 * IActivationRebalancerMonitor.WorkerReportPeriod;
 
     public ActivationRebalancerMonitor(
-        Catalog catalog,
         TimeProvider timeProvider,
         ActivationDirectory activationDirectory,
         ILoggerFactory loggerFactory,
         IGrainFactory grainFactory,
-        ILocalSiloDetails localSiloDetails,
-        ISiloStatusOracle siloStatusOracle)
-            : base(Constants.ActivationRebalancerMonitorType, localSiloDetails.SiloAddress, loggerFactory)
+        SystemTargetShared shared)
+        : base(Constants.ActivationRebalancerMonitorType, shared)
     {
         _timeProvider = timeProvider;
         _activationDirectory = activationDirectory;
-        _siloStatusOracle = siloStatusOracle;
         _logger = loggerFactory.CreateLogger<ActivationRebalancerMonitor>();
         _rebalancerGrain = grainFactory.GetGrain<IActivationRebalancerWorker>(0);
         _lastHeartbeatTimestamp = _timeProvider.GetTimestamp();
-
-        catalog.RegisterSystemTarget(this);
 
         _latestReport = new()
         {
@@ -55,6 +49,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
             SuspensionDuration = Timeout.InfiniteTimeSpan,
             Statistics = []
         };
+        shared.ActivationDirectory.RecordNewTarget(this);
     }
 
     public void Participate(ISiloLifecycle observer)
