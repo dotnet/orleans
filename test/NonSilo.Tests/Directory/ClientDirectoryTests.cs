@@ -77,11 +77,8 @@ namespace NonSilo.Tests.Directory
                 runtimeClient: null!,
                 localSiloDetails: _localSiloDetails,
                 loggerFactory: _loggerFactory,
-                workItemGroupLogger: _loggerFactory.CreateLogger<WorkItemGroup>(),
-                activationTaskSchedulerLogger: _loggerFactory.CreateLogger<ActivationTaskScheduler>(),
                 schedulingOptions: Options.Create(new SchedulingOptions()),
                 grainReferenceActivator: null,
-                messagingTrace: new RuntimeMessagingTrace(_loggerFactory),
                 timerRegistry: null,
                 activations: new ActivationDirectory());
 
