@@ -44,7 +44,7 @@ namespace Orleans.AzureUtils
     /// <remarks>
     /// Used by Azure queue streaming provider.
     /// </remarks>
-    public class AzureQueueDataManager
+    public partial class AzureQueueDataManager
     {
         /// <summary> Name of the table queue instance is managing. </summary>
         public string QueueName { get; private set; }
@@ -117,7 +117,7 @@ namespace Orleans.AzureUtils
                 // Create the queue if it doesn't already exist.
                 var client = await GetQueueClient();
                 var response = await client.CreateIfNotExistsAsync();
-                logger.LogInformation((int)AzureQueueErrorCode.AzureQueue_01, "Connected to Azure storage queue {QueueName}", QueueName);
+                LogInfoAzureQueueConnection(QueueName);
             }
             catch (Exception exc)
             {
@@ -135,14 +135,14 @@ namespace Orleans.AzureUtils
         public async Task DeleteQueue()
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Deleting queue: {QueueName}", QueueName);
+            LogTraceDeletingQueue(QueueName);
             try
             {
                 // that way we don't have first to create the queue to be able later to delete it.
                 var client = await GetQueueClient();
                 if (await client.DeleteIfExistsAsync())
                 {
-                    logger.LogInformation((int)AzureQueueErrorCode.AzureQueue_03, "Deleted Azure Queue {QueueName}", QueueName);
+                    LogInfoAzureQueueDeleted(QueueName);
                 }
             }
             catch (Exception exc)
@@ -161,13 +161,13 @@ namespace Orleans.AzureUtils
         public async Task ClearQueue()
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Clearing a queue: {QueueName}", QueueName);
+            LogTraceClearingAQueue(QueueName);
             try
             {
                 // that way we don't have first to create the queue to be able later to delete it.
                 var client = await GetQueueClient();
                 await client.ClearMessagesAsync();
-                logger.LogInformation((int)AzureQueueErrorCode.AzureQueue_05, "Cleared Azure Queue {QueueName}", QueueName);
+                LogInfoAzureQueueClear(QueueName);
             }
             catch (RequestFailedException exc)
             {
@@ -193,7 +193,7 @@ namespace Orleans.AzureUtils
         public async Task AddQueueMessage(string message)
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Adding message {Data} to queue: {QueueName}", message, QueueName);
+            LogTraceAddingMessage(message, QueueName);
             try
             {
                 var client = await GetQueueClient();
@@ -215,7 +215,7 @@ namespace Orleans.AzureUtils
         public async Task<PeekedMessage> PeekQueueMessage()
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Peeking a message from queue: {QueueName}", QueueName);
+            LogTracePeekingMessage(QueueName);
             try
             {
                 var client = await GetQueueClient();
@@ -241,7 +241,7 @@ namespace Orleans.AzureUtils
         public async Task<QueueMessage> GetQueueMessage()
         {
                var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Getting a message from queue: {QueueName}", QueueName);
+            LogTraceGettingMessage(QueueName);
             try
             {
                 //BeginGetMessage and EndGetMessage is not supported in netstandard, may be use GetMessageAsync
@@ -274,7 +274,7 @@ namespace Orleans.AzureUtils
                 count = null;
             }
 
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Getting up to {MessageCount} messages from queue: {QueueName}", count, QueueName);
+            LogTraceGettingUpToMessages(count, QueueName);
             try
             {
                 var client = await GetQueueClient();
@@ -299,7 +299,7 @@ namespace Orleans.AzureUtils
         public async Task DeleteQueueMessage(QueueMessage message)
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Deleting a message from queue: {QueueName}", QueueName);
+            LogTraceDeletingAMessage(QueueName);
             try
             {
                 var client = await GetQueueClient();
@@ -335,7 +335,7 @@ namespace Orleans.AzureUtils
         public async Task<int> GetApproximateMessageCount()
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("GetApproximateMessageCount a message from queue: {QueueName}", QueueName);
+            LogTraceGetApproximateMessageCount(QueueName);
             try
             {
                 var client = await GetQueueClient();
@@ -359,7 +359,7 @@ namespace Orleans.AzureUtils
             var timeSpan = DateTime.UtcNow - startOperation;
             if (timeSpan > AzureQueueDefaultPolicies.QueueOperationTimeout)
             {
-                logger.LogWarning((int)AzureQueueErrorCode.AzureQueue_13, "Slow access to Azure queue {QueueName} for {Operation}, which took {TimeSpan}.", QueueName, operation, timeSpan);
+                LogWarningSlowAzureQueueAccess(QueueName, operation, timeSpan);
             }
         }
 
@@ -381,7 +381,7 @@ namespace Orleans.AzureUtils
             }
             catch (Exception exc)
             {
-                logger.LogError((int)AzureQueueErrorCode.AzureQueue_14, exc, "Error creating Azure Storage Queues client");
+                LogErrorCreatingAzureQueueClient(exc);
                 throw;
             }
         }
@@ -443,5 +443,88 @@ namespace Orleans.AzureUtils
                 throw new ArgumentException(string.Format("All letters in a queue name must be lowercase, while your queueName is {0}.", queueName), queueName);
             }
         }
+
+        [LoggerMessage(
+            EventId = (int)AzureQueueErrorCode.AzureQueue_01,
+            Level = LogLevel.Information,
+            Message = "Connected to Azure storage queue {QueueName}"
+        )]
+        private partial void LogInfoAzureQueueConnection(string queueName);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Deleting queue: {QueueName}"
+        )]
+        private partial void LogTraceDeletingQueue(string queueName);
+
+        [LoggerMessage(
+            EventId = (int)AzureQueueErrorCode.AzureQueue_03,
+            Level = LogLevel.Information,
+            Message = "Deleted Azure Queue {QueueName}"
+        )]
+        private partial void LogInfoAzureQueueDeleted(string queueName);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Clearing a queue: {QueueName}"
+        )]
+        private partial void LogTraceClearingAQueue(string queueName);
+
+        [LoggerMessage(
+            EventId = (int)AzureQueueErrorCode.AzureQueue_05,
+            Level = LogLevel.Information,
+            Message = "Cleared Azure Queue {QueueName}"
+        )]
+        private partial void LogInfoAzureQueueClear(string queueName);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Adding message {Data} to queue: {QueueName}"
+        )]
+        private partial void LogTraceAddingMessage(string data, string queueName);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Peeking a message from queue: {QueueName}"
+        )]
+        private partial void LogTracePeekingMessage(string queueName);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Getting a message from queue: {QueueName}"
+        )]
+        private partial void LogTraceGettingMessage(string queueName);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Getting up to {MessageCount} messages from queue: {QueueName}"
+        )]
+        private partial void LogTraceGettingUpToMessages(int? messageCount, string queueName);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Deleting a message from queue: {QueueName}"
+        )]
+        private partial void LogTraceDeletingAMessage(string queueName);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "GetApproximateMessageCount a message from queue: {QueueName}"
+        )]
+        private partial void LogTraceGetApproximateMessageCount(string queueName);
+
+        [LoggerMessage(
+            EventId = (int)AzureQueueErrorCode.AzureQueue_13,
+            Level = LogLevel.Warning,
+            Message = "Slow access to Azure queue {QueueName} for {Operation}, which took {TimeSpan}."
+        )]
+        private partial void LogWarningSlowAzureQueueAccess(string queueName, string operation, TimeSpan timeSpan);
+
+        [LoggerMessage(
+            EventId = (int)AzureQueueErrorCode.AzureQueue_14,
+            Level = LogLevel.Error,
+            Message = "Error creating Azure Storage Queues client"
+        )]
+        private partial void LogErrorCreatingAzureQueueClient(Exception exception);
     }
 }

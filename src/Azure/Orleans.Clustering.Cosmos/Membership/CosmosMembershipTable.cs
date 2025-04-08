@@ -3,7 +3,7 @@ using Orleans.Clustering.Cosmos.Models;
 
 namespace Orleans.Clustering.Cosmos;
 
-internal class CosmosMembershipTable : IMembershipTable
+internal partial class CosmosMembershipTable : IMembershipTable
 {
     private const string PARTITION_KEY = "/ClusterId";
     private const string CLUSTER_VERSION_ID = "ClusterVersion";
@@ -67,9 +67,9 @@ internal class CosmosMembershipTable : IMembershipTable
 
                 var response = await _container.CreateItemAsync(versionEntity, _partitionKey).ConfigureAwait(false);
 
-                if (response.StatusCode == HttpStatusCode.Created && _logger.IsEnabled(LogLevel.Debug))
+                if (response.StatusCode == HttpStatusCode.Created)
                 {
-                    _logger.LogDebug("Created new Cluster Version entity.");
+                    LogDebugCreatedNewClusterVersionEntity();
                 }
             }
         }
@@ -94,7 +94,7 @@ internal class CosmosMembershipTable : IMembershipTable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting membership table entries.");
+            LogErrorDeletingMembershipTableEntries(ex);
             WrappedException.CreateAndRethrow(ex);
         }
     }
@@ -120,7 +120,7 @@ internal class CosmosMembershipTable : IMembershipTable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error cleaning up defunct silo entries.");
+            LogErrorCleaningUpDefunctSiloEntries(ex);
             WrappedException.CreateAndRethrow(ex);
         }
     }
@@ -158,7 +158,7 @@ internal class CosmosMembershipTable : IMembershipTable
         }
         catch (Exception exc)
         {
-            _logger.LogWarning(exc, "Failure reading silo entry {Key} for cluster {Cluster}", key, _clusterId);
+            LogWarningFailureReadingSiloEntry(exc, key, _clusterId);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
@@ -183,7 +183,7 @@ internal class CosmosMembershipTable : IMembershipTable
             }
             else
             {
-                _logger.LogError("Initial ClusterVersionEntity entity does not exist.");
+                LogErrorClusterVersionEntityDoesNotExist();
             }
 
             var memEntries = new List<Tuple<MembershipEntry, string>>();
@@ -196,7 +196,7 @@ internal class CosmosMembershipTable : IMembershipTable
                 }
                 catch (Exception exc)
                 {
-                    _logger.LogError(exc, "Failure reading all membership records.");
+                    LogErrorReadingAllMembershipRecords(exc);
                     WrappedException.CreateAndRethrow(exc);
                     throw;
                 }
@@ -206,7 +206,7 @@ internal class CosmosMembershipTable : IMembershipTable
         }
         catch (Exception exc)
         {
-            _logger.LogWarning(exc, "Failure reading entries for cluster {Cluster}", _clusterId);
+            LogWarningReadingEntries(exc, _clusterId);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
@@ -268,8 +268,8 @@ internal class CosmosMembershipTable : IMembershipTable
 
             if (response.StatusCode != HttpStatusCode.OK)
             {
-                _logger.LogWarning((int)ErrorCode.MembershipBase, "Unable to query entry {Entry}", entry.ToFullString());
-                throw new OrleansException((string?)$"Unable to query for SiloEntity {entry.ToFullString()}");
+                LogWarningUnableToQueryEntry(new(entry));
+                throw new OrleansException($"Unable to query for SiloEntity {entry.ToFullString()}");
             }
 
             _self = selfRow = response.Resource;
@@ -302,7 +302,7 @@ internal class CosmosMembershipTable : IMembershipTable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error initializing Azure Cosmos DB Client for membership table provider.");
+            LogErrorInitializingCosmosClient(ex);
             WrappedException.CreateAndRethrow(ex);
             throw;
         }
@@ -320,7 +320,7 @@ internal class CosmosMembershipTable : IMembershipTable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting Azure Cosmos DB database.");
+            LogErrorDeletingCosmosDBDatabase(ex);
             WrappedException.CreateAndRethrow(ex);
             throw;
         }
@@ -375,7 +375,7 @@ internal class CosmosMembershipTable : IMembershipTable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error reading Cluster Version entity.");
+            LogErrorReadingClusterVersionEntity(ex);
             WrappedException.CreateAndRethrow(ex);
             throw;
         }
@@ -407,7 +407,7 @@ internal class CosmosMembershipTable : IMembershipTable
         }
         catch (Exception exc)
         {
-            _logger.LogError(exc, "Error reading Silo entities.");
+            LogErrorReadingSiloEntities(exc);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
@@ -499,4 +499,82 @@ internal class CosmosMembershipTable : IMembershipTable
             ETag = tableVersion.VersionEtag
         };
     }
+
+    private readonly struct MembershipEntryLogValue(MembershipEntry membershipEntry)
+    {
+        public override string ToString() => membershipEntry.ToFullString();
+    }
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Created new Cluster Version entity."
+    )]
+    private partial void LogDebugCreatedNewClusterVersionEntity();
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error deleting membership table entries."
+    )]
+    private partial void LogErrorDeletingMembershipTableEntries(Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error cleaning up defunct silo entries."
+    )]
+    private partial void LogErrorCleaningUpDefunctSiloEntries(Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Failure reading silo entry {Key} for cluster {Cluster}"
+    )]
+    private partial void LogWarningFailureReadingSiloEntry(Exception exception, SiloAddress key, string cluster);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Initial ClusterVersionEntity entity does not exist."
+    )]
+    private partial void LogErrorClusterVersionEntityDoesNotExist();
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Failure reading all membership records."
+    )]
+    private partial void LogErrorReadingAllMembershipRecords(Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Failure reading entries for cluster {Cluster}"
+    )]
+    private partial void LogWarningReadingEntries(Exception exception, string cluster);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error initializing Azure Cosmos DB Client for membership table provider."
+    )]
+    private partial void LogErrorInitializingCosmosClient(Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error deleting Azure Cosmos DB database."
+    )]
+    private partial void LogErrorDeletingCosmosDBDatabase(Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error reading Cluster Version entity."
+    )]
+    private partial void LogErrorReadingClusterVersionEntity(Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error reading Silo entities."
+    )]
+    private partial void LogErrorReadingSiloEntities(Exception exception);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.MembershipBase,
+        Level = LogLevel.Warning,
+        Message = "Unable to query entry {Entry}"
+    )]
+    private partial void LogWarningUnableToQueryEntry(MembershipEntryLogValue entry);
 }
