@@ -88,7 +88,7 @@ namespace Orleans.Streaming.EventHubs
 
         public Task Initialize(TimeSpan timeout)
         {
-            this.logger.LogInformation("Initializing EventHub partition {EventHubName}-{Partition}.", this.settings.Hub.EventHubName, this.settings.Partition);
+            LogInfoInitializingEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition);
 
             // if receiver was already running, do nothing
             return ReceiverRunning == Interlocked.Exchange(ref this.receiverState, ReceiverRunning)
@@ -342,6 +342,12 @@ namespace Orleans.Streaming.EventHubs
             {
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Initializing EventHub partition {EventHubName}-{Partition}."
+        )]
+        private partial void LogInfoInitializingEventHubPartition(string eventHubName, string partition);
 
         [LoggerMessage(
             Level = LogLevel.Information,

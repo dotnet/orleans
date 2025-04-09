@@ -13,7 +13,7 @@ namespace Orleans.Streaming.EventHubs.Testing
     /// <summary>
     /// Generate data for one stream
     /// </summary>
-    public class SimpleStreamEventDataGenerator : IStreamDataGenerator<EventData>
+    public partial class SimpleStreamEventDataGenerator : IStreamDataGenerator<EventData>
     {
         /// <inheritdoc />
         public StreamId StreamId { get; set; }
@@ -65,8 +65,7 @@ namespace Orleans.Streaming.EventHubs.Testing
                     sequenceNumber: this.SequenceNumberCounter.Value);
 
                 eventDataList.Add(wrapper);
-
-                this.logger.LogInformation("Generate data of SequenceNumber {SequenceNumber} for stream {StreamId}", SequenceNumberCounter.Value, this.StreamId);
+                LogInfoGenerateData(this.SequenceNumberCounter.Value, this.StreamId);
             }
 
             events = eventDataList;
@@ -92,6 +91,12 @@ namespace Orleans.Streaming.EventHubs.Testing
             {
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Generate data of SequenceNumber {SequenceNumber} for stream {StreamId}"
+        )]
+        private partial void LogInfoGenerateData(int sequenceNumber, StreamId streamId);
     }
 
     /// <summary>
