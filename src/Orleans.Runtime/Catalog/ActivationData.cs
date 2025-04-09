@@ -528,7 +528,7 @@ internal sealed partial class ActivationData :
         }
         catch (Exception exception)
         {
-            LogErrorSelectingMigrationDestination(_shared.Logger, GrainId, exception);
+            LogErrorSelectingMigrationDestination(_shared.Logger, exception, GrainId);
             return;
         }
     }
@@ -2203,7 +2203,7 @@ internal sealed partial class ActivationData :
         Level = LogLevel.Error,
         Message = "Error while selecting a migration destination for {GrainId}"
     )]
-    private static partial void LogErrorSelectingMigrationDestination(ILogger logger, GrainId grainId, Exception exception);
+    private static partial void LogErrorSelectingMigrationDestination(ILogger logger, Exception exception, GrainId grainId);
 
     [LoggerMessage(
         Level = LogLevel.Debug,

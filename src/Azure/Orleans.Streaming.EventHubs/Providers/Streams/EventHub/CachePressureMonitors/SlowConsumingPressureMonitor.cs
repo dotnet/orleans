@@ -7,7 +7,7 @@ namespace Orleans.Streaming.EventHubs
     /// <summary>
     /// Pressure monitor which is in favor of the slow consumer in the cache
     /// </summary>
-    public class SlowConsumingPressureMonitor : ICachePressureMonitor
+    public partial class SlowConsumingPressureMonitor : ICachePressureMonitor
     {
         /// <summary>
         /// DefaultPressureWindowSize
@@ -101,15 +101,11 @@ namespace Orleans.Streaming.EventHubs
 
             if (underPressure && !this.wasUnderPressure)
             {
-                //if under pressure, extend the nextCheckedTime, make sure wasUnderPressure is true for a whole window  
+                //if under pressure, extend the nextCheckedTime, make sure wasUnderPressure is true for a whole window
                 this.wasUnderPressure = underPressure;
                 this.nextCheckedTime = utcNow + this.PressureWindowSize;
                 this.CacheMonitor?.TrackCachePressureMonitorStatusChange(this.GetType().Name, underPressure, null, biggestPressureInCurrentWindow, this.FlowControlThreshold);
-                if(logger.IsEnabled(LogLevel.Debug))
-                    logger.LogDebug(
-                        "Ingesting messages too fast. Throttling message reading. BiggestPressureInCurrentPeriod: {BiggestPressureInCurrentWindow}, Threshold: {FlowControlThreshold}",
-                        biggestPressureInCurrentWindow,
-                        FlowControlThreshold);
+                LogDebugIngestingMessagesTooFast(biggestPressureInCurrentWindow, FlowControlThreshold);
                 this.biggestPressureInCurrentWindow = 0;
             }
 
@@ -122,16 +118,24 @@ namespace Orleans.Streaming.EventHubs
                 if (this.wasUnderPressure && !underPressure)
                 {
                     this.CacheMonitor?.TrackCachePressureMonitorStatusChange(this.GetType().Name, underPressure, null, biggestPressureInCurrentWindow, this.FlowControlThreshold);
-                    if (logger.IsEnabled(LogLevel.Debug))
-                        logger.LogDebug(
-                            "Message ingestion is healthy. BiggestPressureInCurrentPeriod: {BiggestPressureInCurrentWindow}, Threshold: {FlowControlThreshold}",
-                            biggestPressureInCurrentWindow,
-                            FlowControlThreshold);
+                    LogDebugMessageIngestionIsHealthy(biggestPressureInCurrentWindow, FlowControlThreshold);
                 }
                 this.wasUnderPressure = underPressure;
             }
 
             return this.wasUnderPressure;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Ingesting messages too fast. Throttling message reading. BiggestPressureInCurrentPeriod: {BiggestPressureInCurrentWindow}, Threshold: {FlowControlThreshold}"
+        )]
+        private partial void LogDebugIngestingMessagesTooFast(double biggestPressureInCurrentWindow, double flowControlThreshold);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Message ingestion is healthy. BiggestPressureInCurrentPeriod: {BiggestPressureInCurrentWindow}, Threshold: {FlowControlThreshold}"
+        )]
+        private partial void LogDebugMessageIngestionIsHealthy(double biggestPressureInCurrentWindow, double flowControlThreshold);
     }
 }

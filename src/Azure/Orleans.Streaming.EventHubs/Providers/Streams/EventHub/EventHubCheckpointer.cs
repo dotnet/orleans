@@ -40,7 +40,7 @@ namespace Orleans.Streaming.EventHubs
     /// <summary>
     /// This class stores EventHub partition checkpointer information (a partition offset) in azure table storage.
     /// </summary>
-    public class EventHubCheckpointer : IStreamQueueCheckpointer<string>
+    public partial class EventHubCheckpointer : IStreamQueueCheckpointer<string>
     {
         private readonly AzureTableDataManager<EventHubPartitionCheckpointEntity> dataManager;
         private readonly TimeSpan persistInterval;
@@ -86,11 +86,7 @@ namespace Orleans.Streaming.EventHubs
                 throw new ArgumentNullException(nameof(partition));
             }
             this.logger = loggerFactory.CreateLogger<EventHubCheckpointer>();
-            this.logger.LogInformation(
-                "Creating EventHub checkpointer for partition {Partition} of stream provider {StreamProviderName} with serviceId {ServiceId}.",
-                partition,
-                streamProviderName,
-                serviceId);
+            LogCreatingEventHubCheckpointer(partition, streamProviderName, serviceId);
             persistInterval = options.PersistInterval;
             dataManager = new AzureTableDataManager<EventHubPartitionCheckpointEntity>(
                 options,
@@ -142,5 +138,11 @@ namespace Orleans.Streaming.EventHubs
             inProgressSave = dataManager.UpsertTableEntryAsync(entity);
             inProgressSave.Ignore();
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Creating EventHub checkpointer for partition {Partition} of stream provider {StreamProviderName} with serviceId {ServiceId}."
+        )]
+        private partial void LogCreatingEventHubCheckpointer(string partition, string streamProviderName, string serviceId);
     }
 }

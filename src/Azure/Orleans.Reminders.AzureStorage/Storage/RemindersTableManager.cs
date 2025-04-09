@@ -60,7 +60,7 @@ namespace Orleans.Runtime.ReminderService
         public override string ToString() => $"Reminder [PartitionKey={PartitionKey} RowKey={RowKey} GrainId={GrainReference} ReminderName={ReminderName} Deployment={DeploymentId} ServiceId={ServiceId} StartAt={StartAt} Period={Period} GrainRefConsistentHash={GrainRefConsistentHash}]";
     }
 
-    internal sealed class RemindersTableManager : AzureTableDataManager<ReminderTableEntry>
+    internal sealed partial class RemindersTableManager : AzureTableDataManager<ReminderTableEntry>
     {
         private readonly string _serviceId;
         private readonly string _clusterId;
@@ -106,8 +106,7 @@ namespace Orleans.Runtime.ReminderService
                 }
             }
 
-            var queryResults = await ReadTableEntriesAndEtagsAsync(query);
-            return queryResults.ToList();
+            return await ReadTableEntriesAndEtagsAsync(query);
         }
 
         internal async Task<List<(ReminderTableEntry Entity, string ETag)>> FindReminderEntries(GrainId grainId)
@@ -115,8 +114,7 @@ namespace Orleans.Runtime.ReminderService
             var partitionKey = ReminderTableEntry.ConstructPartitionKey(_serviceId, grainId);
             var (rowKeyLowerBound, rowKeyUpperBound) = ReminderTableEntry.ConstructRowKeyBounds(grainId);
             var query = TableClient.CreateQueryFilter($"(PartitionKey eq {partitionKey}) and ((RowKey gt {rowKeyLowerBound}) and (RowKey le {rowKeyUpperBound}))");
-            var queryResults = await ReadTableEntriesAndEtagsAsync(query);
-            return queryResults.ToList();
+            return await ReadTableEntriesAndEtagsAsync(query);
         }
 
         internal async Task<(ReminderTableEntry Entity, string ETag)> FindReminderEntry(GrainId grainId, string reminderName)
@@ -140,11 +138,9 @@ namespace Orleans.Runtime.ReminderService
             }
             catch(Exception exc)
             {
-                HttpStatusCode httpStatusCode;
-                string restStatus;
-                if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus))
+                if (AzureTableUtils.EvaluateException(exc, out var httpStatusCode, out var restStatus))
                 {
-                    if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("UpsertRow failed with HTTP status code: {HttpStatusCode}, REST status: {RestStatus}", httpStatusCode, restStatus);
+                    LogTraceUpsertRowFailed(Logger, httpStatusCode, restStatus);
                     if (AzureTableUtils.IsContentionError(httpStatusCode)) return null; // false;
                 }
                 throw;
@@ -161,15 +157,9 @@ namespace Orleans.Runtime.ReminderService
             }
             catch(Exception exc)
             {
-                HttpStatusCode httpStatusCode;
-                string restStatus;
-                if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus))
+                if (AzureTableUtils.EvaluateException(exc, out var httpStatusCode, out var restStatus))
                 {
-                    if (Logger.IsEnabled(LogLevel.Trace))
-                        Logger.LogTrace(
-                            "DeleteReminderEntryConditionally failed with HTTP status code: {HttpStatusCode}, REST status: {RestStatus}",
-                            httpStatusCode,
-                            restStatus);
+                    LogTraceDeleteReminderEntryConditionallyFailed(Logger, httpStatusCode, restStatus);
                     if (AzureTableUtils.IsContentionError(httpStatusCode)) return false;
                 }
                 throw;
@@ -189,7 +179,7 @@ namespace Orleans.Runtime.ReminderService
 
             foreach (var entriesPerPartition in groupedByHash.Values)
             {
-                    foreach (var batch in entriesPerPartition.BatchIEnumerable(this.StoragePolicyOptions.MaxBulkUpdateRows))
+                foreach (var batch in entriesPerPartition.BatchIEnumerable(this.StoragePolicyOptions.MaxBulkUpdateRows))
                 {
                     tasks.Add(DeleteTableEntriesAsync(batch));
                 }
@@ -197,5 +187,17 @@ namespace Orleans.Runtime.ReminderService
 
             await Task.WhenAll(tasks);
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "UpsertRow failed with HTTP status code: {HttpStatusCode}, REST status: {RestStatus}"
+        )]
+        private static partial void LogTraceUpsertRowFailed(ILogger logger, HttpStatusCode httpStatusCode, string restStatus);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "DeleteReminderEntryConditionally failed with HTTP status code: {HttpStatusCode}, REST status: {RestStatus}"
+        )]
+        private static partial void LogTraceDeleteReminderEntryConditionallyFailed(ILogger logger, HttpStatusCode httpStatusCode, string restStatus);
     }
 }
