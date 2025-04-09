@@ -89,12 +89,12 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
             catch (TimeoutException te)
             {
-                LogErrorTableCreationInTimeout(StoragePolicyOptions.CreationTimeout, te);
+                LogErrorTableCreationInTimeout(te, StoragePolicyOptions.CreationTimeout);
                 throw new OrleansException($"Unable to create or connect to the Azure table in {StoragePolicyOptions.CreationTimeout}", te);
             }
             catch (Exception exc)
             {
-                LogErrorTableCreation(TableName, exc);
+                LogErrorTableCreation(exc, TableName);
                 throw;
             }
             finally
@@ -123,7 +123,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
             catch (Exception exc)
             {
-                LogErrorTableDeletion(TableName, exc);
+                LogErrorTableDeletion(exc, TableName);
                 throw;
             }
             finally
@@ -196,7 +196,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    LogWarningUpsertTableEntry(data, TableName, exc);
+                    LogWarningUpsertTableEntry(exc, data, TableName);
                     throw;
                 }
             }
@@ -229,7 +229,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    LogWarningInsertTableEntry(data, TableName, exc);
+                    LogWarningInsertTableEntry(exc, data, TableName);
                     throw;
                 }
             }
@@ -269,7 +269,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    LogWarningMergeTableEntry(data, TableName, exc);
+                    LogWarningMergeTableEntry(exc, data, TableName);
                     throw;
                 }
             }
@@ -357,7 +357,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    LogWarningDeleteTableEntry(data, TableName, exc);
+                    LogWarningDeleteTableEntry(exc, data, TableName);
                     throw;
                 }
             }
@@ -469,7 +469,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    LogWarningDeleteTableEntries(new(collection), TableName, exc);
+                    LogWarningDeleteTableEntries(exc, new(collection), TableName);
                     throw;
                 }
             }
@@ -526,7 +526,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                     // Out of retries...
                     if (!AzureTableUtils.TableStorageDataNotFound(exc))
                     {
-                        LogWarningReadTable(TableName, exc);
+                        LogWarningReadTable(exc, TableName);
                     }
 
                     throw new OrleansException($"Failed to read Azure Storage table {TableName}", exc);
@@ -575,7 +575,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    LogWarningBulkInsertTableEntries(collection.Count, TableName, exc);
+                    LogWarningBulkInsertTableEntries(exc, collection.Count, TableName);
                 }
             }
             finally
@@ -686,7 +686,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
             else
             {
-                LogErrorTableWrite(operation, TableName, data1, exc);
+                LogErrorTableWrite(exc, operation, TableName, data1);
             }
         }
 
@@ -711,14 +711,14 @@ namespace Orleans.GrainDirectory.AzureStorage
             EventId = (int)Utilities.ErrorCode.AzureTable_TableNotCreated,
             Message = "Unable to create or connect to the Azure table in {CreationTimeout}"
         )]
-        private partial void LogErrorTableCreationInTimeout(TimeSpan creationTimeout, TimeoutException exception);
+        private partial void LogErrorTableCreationInTimeout(TimeoutException exception, TimeSpan creationTimeout);
 
         [LoggerMessage(
             Level = LogLevel.Error,
             EventId = (int)Utilities.ErrorCode.AzureTable_02,
             Message = "Could not initialize connection to storage table {TableName}"
         )]
-        private partial void LogErrorTableCreation(string tableName, Exception exception);
+        private partial void LogErrorTableCreation(Exception exception, string tableName);
 
         [LoggerMessage(
             Level = LogLevel.Information,
@@ -732,7 +732,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             EventId = (int)Utilities.ErrorCode.AzureTable_04,
             Message = "Could not delete storage table {TableName}"
         )]
-        private partial void LogErrorTableDeletion(string tableName, Exception exception);
+        private partial void LogErrorTableDeletion(Exception exception, string tableName);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
@@ -751,28 +751,28 @@ namespace Orleans.GrainDirectory.AzureStorage
             EventId = (int)Utilities.ErrorCode.AzureTable_06,
             Message = "Intermediate error upserting entry {Data} to the table {TableName}"
         )]
-        private partial void LogWarningUpsertTableEntry(T data, string tableName, Exception exception);
+        private partial void LogWarningUpsertTableEntry(Exception exception, T data, string tableName);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
             EventId = (int)Utilities.ErrorCode.AzureTable_06,
             Message = "Intermediate error inserting entry {Data} to the table {TableName}"
         )]
-        private partial void LogWarningInsertTableEntry(T data, string tableName, Exception exception);
+        private partial void LogWarningInsertTableEntry(Exception exception, T data, string tableName);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
             EventId = (int)Utilities.ErrorCode.AzureTable_07,
             Message = "Intermediate error merging entry {Data} to the table {TableName}"
         )]
-        private partial void LogWarningMergeTableEntry(T data, string tableName, Exception exception);
+        private partial void LogWarningMergeTableEntry(Exception exception, T data, string tableName);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
             EventId = (int)Utilities.ErrorCode.AzureTable_08,
             Message = "Intermediate error deleting entry {Data} from the table {TableName}."
         )]
-        private partial void LogWarningDeleteTableEntry(T data, string tableName, Exception exception);
+        private partial void LogWarningDeleteTableEntry(Exception exception, T data, string tableName);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
@@ -802,14 +802,14 @@ namespace Orleans.GrainDirectory.AzureStorage
             EventId = (int)Utilities.ErrorCode.AzureTable_08,
             Message = "Intermediate error deleting entries {Data} from the table {TableName}."
         )]
-        private partial void LogWarningDeleteTableEntries(CollectionLogEntry data, string tableName, Exception exception);
+        private partial void LogWarningDeleteTableEntries(Exception exception, CollectionLogEntry data, string tableName);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
             EventId = (int)Utilities.ErrorCode.AzureTable_09,
             Message = "Failed to read Azure Storage table {TableName}"
         )]
-        private partial void LogWarningReadTable(string tableName, Exception exception);
+        private partial void LogWarningReadTable(Exception exception, string tableName);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
@@ -822,7 +822,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             EventId = (int)Utilities.ErrorCode.AzureTable_37,
             Message = "Intermediate error bulk inserting {Count} entries in the table {TableName}"
         )]
-        private partial void LogWarningBulkInsertTableEntries(int count, string tableName, Exception exception);
+        private partial void LogWarningBulkInsertTableEntries(Exception exception, int count, string tableName);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
@@ -848,7 +848,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             EventId = (int)Utilities.ErrorCode.AzureTable_14,
             Message = "Azure table access write error {Operation} to table {TableName} entry {Data1}"
         )]
-        private partial void LogErrorTableWrite(string operation, string tableName, object data1, Exception exception);
+        private partial void LogErrorTableWrite(Exception exception, string operation, string tableName, object data1);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
