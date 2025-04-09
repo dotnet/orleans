@@ -11,7 +11,7 @@ namespace Orleans.Streaming.EventHubs
     /// <summary>
     /// EventHub queue cache
     /// </summary>
-    public class EventHubQueueCache : IEventHubQueueCache
+    public partial class EventHubQueueCache : IEventHubQueueCache
     {
         public string Partition { get; private set; }
 
@@ -161,14 +161,13 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="newestItem"></param>
         private void OnPurge(CachedMessage? lastItemPurged, CachedMessage? newestItem)
         {
-            if (logger.IsEnabled(LogLevel.Debug) && lastItemPurged.HasValue && newestItem.HasValue)
+            if (lastItemPurged.HasValue && newestItem.HasValue)
             {
-                logger.LogDebug(
-                    "CachePeriod: EnqueueTimeUtc: {OldestEnqueueTimeUtc} to {NewestEnqueueTimeUtc}, DequeueTimeUtc: {OldestDequeueTimeUtc} to {NewestDequeueTimeUtc}",
-                    LogFormatter.PrintDate(lastItemPurged.Value.EnqueueTimeUtc),
-                    LogFormatter.PrintDate(newestItem.Value.EnqueueTimeUtc),
-                    LogFormatter.PrintDate(lastItemPurged.Value.DequeueTimeUtc),
-                    LogFormatter.PrintDate(newestItem.Value.DequeueTimeUtc));
+                LogDebugCachePeriod(
+                    new(lastItemPurged.Value.EnqueueTimeUtc),
+                    new(newestItem.Value.EnqueueTimeUtc),
+                    new(lastItemPurged.Value.DequeueTimeUtc),
+                    new(newestItem.Value.DequeueTimeUtc));
             }
             if (lastItemPurged.HasValue)
             {
@@ -220,5 +219,20 @@ namespace Orleans.Streaming.EventHubs
             }
             return segment;
         }
+
+        private readonly struct DateTimeLogRecord(DateTime ts)
+        {
+            public override string ToString() => LogFormatter.PrintDate(ts);
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "CachePeriod: EnqueueTimeUtc: {OldestEnqueueTimeUtc} to {NewestEnqueueTimeUtc}, DequeueTimeUtc: {OldestDequeueTimeUtc} to {NewestDequeueTimeUtc}"
+        )]
+        private partial void LogDebugCachePeriod(
+            DateTimeLogRecord oldestEnqueueTimeUtc,
+            DateTimeLogRecord newestEnqueueTimeUtc,
+            DateTimeLogRecord oldestDequeueTimeUtc,
+            DateTimeLogRecord newestDequeueTimeUtc);
     }
 }

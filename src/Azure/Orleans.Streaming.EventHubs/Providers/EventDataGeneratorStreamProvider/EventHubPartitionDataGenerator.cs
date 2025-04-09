@@ -97,7 +97,7 @@ namespace Orleans.Streaming.EventHubs.Testing
     /// <summary>
     /// EHPartitionDataGenerator generate data for a EH partition, which can include data from different streams
     /// </summary>
-    public class EventHubPartitionDataGenerator : IDataGenerator<EventData>, IStreamDataGeneratingController
+    public partial class EventHubPartitionDataGenerator : IDataGenerator<EventData>, IStreamDataGeneratingController
     {
         //differnt stream in the same partition should use the same sequenceNumberCounter
         private readonly EventDataGeneratorStreamOptions options;
@@ -124,7 +124,7 @@ namespace Orleans.Streaming.EventHubs.Testing
         {
             var generator =  this.generatorFactory(streamId);
             generator.SequenceNumberCounter = sequenceNumberCounter;
-            this.logger.LogInformation("Data generator set up on stream {StreamId}.", streamId);
+            LogInfoOnStreamSetup(streamId);
             this.generators.Add(generator);
         }
         /// <inheritdoc />
@@ -134,7 +134,7 @@ namespace Orleans.Streaming.EventHubs.Testing
                 if (generator.StreamId.Equals(streamId))
                 {
                     generator.ShouldProduce = false;
-                    this.logger.LogInformation("Stop producing data on stream {StreamId}.", streamId);
+                    LogInfoOnStreamStop(streamId);
                 }
             });
         }
@@ -173,5 +173,17 @@ namespace Orleans.Streaming.EventHubs.Testing
             events = eventDataList.AsEnumerable();
             return eventDataList.Count > 0;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Data generator set up on stream {StreamId}."
+        )]
+        private partial void LogInfoOnStreamSetup(StreamId streamId);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Stop producing data on stream {StreamId}."
+        )]
+        private partial void LogInfoOnStreamStop(StreamId streamId);
     }
 }
