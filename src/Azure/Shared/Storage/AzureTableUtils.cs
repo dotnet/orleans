@@ -228,51 +228,26 @@ namespace Orleans.GrainDirectory.AzureStorage
             if (we != null)
             {
                 isLastErrorRetriable = true;
-                var statusCode = we.Status;
-                logger.LogWarning((int)Utilities.ErrorCode.AzureTable_10,
-                    exc,
-                    "Intermediate issue reading Azure storage table {TableName}: HTTP status code={StatusCode}",
-                    tableName,
-                    statusCode);
+                LogWarningIntermediateIssue(logger, tableName, we.Status, exc);
             }
             else
             {
-                HttpStatusCode httpStatusCode;
-                string restStatus;
-                if (EvaluateException(exc, out httpStatusCode, out restStatus, true))
+                if (EvaluateException(exc, out var httpStatusCode, out var restStatus, true))
                 {
-                    if (TableErrorCode.ResourceNotFound.ToString().Equals(restStatus))
+                    if (nameof(TableErrorCode.ResourceNotFound).Equals(restStatus))
                     {
-                        if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)Utilities.ErrorCode.AzureTable_DataNotFound,
-                            exc,
-                            "DataNotFound reading Azure storage table {TableName}:{Retry} HTTP status code={StatusCode} REST status code={RESTStatusCode}",
-                            tableName,
-                            iteration == 0 ? string.Empty : (" Repeat=" + iteration),
-                            httpStatusCode,
-                            restStatus);
-
+                        LogDebugDataNotFound(logger, tableName, iteration == 0 ? string.Empty : (" Repeat=" + iteration), httpStatusCode, restStatus, exc);
                         isLastErrorRetriable = false;
                     }
                     else
                     {
                         isLastErrorRetriable = IsRetriableHttpError(httpStatusCode, restStatus);
-
-                        logger.LogWarning((int)Utilities.ErrorCode.AzureTable_11,
-                            exc,
-                            "Intermediate issue reading Azure storage table {TableName}:{Retry} IsRetriable={IsLastErrorRetriable} HTTP status code={StatusCode} REST status code={RestStatusCode}",
-                            tableName,
-                            iteration == 0 ? "" : (" Repeat=" + iteration),
-                            isLastErrorRetriable,
-                            httpStatusCode,
-                            restStatus);
+                        LogWarningIntermediateIssueWithRestStatusCode(logger, tableName, iteration == 0 ? "" : (" Repeat=" + iteration), isLastErrorRetriable, httpStatusCode, restStatus, exc);
                     }
                 }
                 else
                 {
-                    logger.LogError((int)Utilities.ErrorCode.AzureTable_12,
-                        exc,
-                        "Unexpected issue reading Azure storage table {TableName}",
-                        tableName);
+                    LogErrorUnexpectedIssue(logger, tableName, exc);
                     isLastErrorRetriable = false;
                 }
             }
@@ -298,5 +273,33 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             return TableClient.CreateQueryFilter($"((PartitionKey eq {partitionKey}) and (RowKey ge {minRowKey})) and (RowKey le {maxRowKey})");
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)Utilities.ErrorCode.AzureTable_10,
+            Message = "Intermediate issue reading Azure storage table {TableName}: HTTP status code={StatusCode}"
+        )]
+        private static partial void LogWarningIntermediateIssue(ILogger logger, string tableName, WebExceptionStatus statusCode, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            EventId = (int)Utilities.ErrorCode.AzureTable_DataNotFound,
+            Message = "DataNotFound reading Azure storage table {TableName}:{Retry} HTTP status code={StatusCode} REST status code={RESTStatusCode}"
+        )]
+        private static partial void LogDebugDataNotFound(ILogger logger, string tableName, string retry, HttpStatusCode statusCode, string restStatusCode, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)Utilities.ErrorCode.AzureTable_11,
+            Message = "Intermediate issue reading Azure storage table {TableName}:{Retry} IsRetriable={IsLastErrorRetriable} HTTP status code={StatusCode} REST status code={RestStatusCode}"
+        )]
+        private static partial void LogWarningIntermediateIssueWithRestStatusCode(ILogger logger, string tableName, string retry, bool isLastErrorRetriable, HttpStatusCode statusCode, string restStatusCode, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)Utilities.ErrorCode.AzureTable_12,
+            Message = "Unexpected issue reading Azure storage table {TableName}"
+        )]
+        private static partial void LogErrorUnexpectedIssue(ILogger logger, string tableName, Exception exception);
     }
 }
