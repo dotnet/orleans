@@ -146,7 +146,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
             }
             else
             {
-                _logger.LogError("Initial ClusterVersionEntity entity does not exist.");
+                LogErrorClusterVersionEntityDoesNotExist();
             }
 
             var memEntries = new List<Tuple<MembershipEntry, string>>
