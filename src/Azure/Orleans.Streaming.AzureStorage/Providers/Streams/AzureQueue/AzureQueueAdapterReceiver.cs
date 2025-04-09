@@ -131,7 +131,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 }
                 catch (Exception exc)
                 {
-                    LogWarningOnDeleteQueueMessage(this.azureQueueName, exc);
+                    LogWarningOnDeleteQueueMessage(exc, this.azureQueueName);
                 }
             }
             finally
@@ -145,7 +145,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             EventId = (int)AzureQueueErrorCode.AzureQueue_15,
             Message = "Exception upon DeleteQueueMessage on queue {QueueName}. Ignoring."
         )]
-        private partial void LogWarningOnDeleteQueueMessage(string queueName, Exception exception);
+        private partial void LogWarningOnDeleteQueueMessage(Exception exception, string queueName);
 
         private class PendingDelivery
         {
