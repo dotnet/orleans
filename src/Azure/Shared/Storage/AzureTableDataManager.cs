@@ -38,7 +38,7 @@ namespace Orleans.GrainDirectory.AzureStorage
     /// Utility class to encapsulate row-based access to Azure table storage.
     /// </summary>
     /// <typeparam name="T">Table data entry used by this table / manager.</typeparam>
-    internal class AzureTableDataManager<T> where T : class, ITableEntity
+    internal partial class AzureTableDataManager<T> where T : class, ITableEntity
     {
         private readonly AzureStorageOperationOptions options;
 
@@ -84,22 +84,17 @@ namespace Orleans.GrainDirectory.AzureStorage
                 var tableItem = await table.CreateIfNotExistsAsync();
                 var didCreate = tableItem is not null;
 
-                Logger.LogInformation((int)Utilities.ErrorCode.AzureTable_01, "{Action} Azure storage table {TableName}", (didCreate ? "Created" : "Attached to"), TableName);
-
+                LogInfoTableCreation(didCreate ? "Created" : "Attached to", TableName);
                 Table = table;
             }
             catch (TimeoutException te)
             {
-                Logger.LogError(
-                    (int)Utilities.ErrorCode.AzureTable_TableNotCreated,
-                    te,
-                    "Unable to create or connect to the Azure table in {CreationTimeout}",
-                    StoragePolicyOptions.CreationTimeout);
+                LogErrorTableCreationInTimeout(StoragePolicyOptions.CreationTimeout, te);
                 throw new OrleansException($"Unable to create or connect to the Azure table in {StoragePolicyOptions.CreationTimeout}", te);
             }
             catch (Exception exc)
             {
-                Logger.LogError((int)Utilities.ErrorCode.AzureTable_02, exc, "Could not initialize connection to storage table {TableName}", TableName);
+                LogErrorTableCreation(TableName, exc);
                 throw;
             }
             finally
@@ -123,12 +118,12 @@ namespace Orleans.GrainDirectory.AzureStorage
                 var response = await tableCreationClient.DeleteTableAsync(TableName);
                 if (response.Status == 204)
                 {
-                    Logger.LogInformation((int)Utilities.ErrorCode.AzureTable_03, "Deleted Azure storage table {TableName}", TableName);
+                    LogInfoTableDeletion(TableName);
                 }
             }
             catch (Exception exc)
             {
-                Logger.LogError((int)Utilities.ErrorCode.AzureTable_04, exc, "Could not delete storage table {TableName}", TableName);
+                LogErrorTableDeletion(TableName, exc);
                 throw;
             }
             finally
@@ -161,8 +156,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             const string operation = "CreateTableEntry";
             var startTime = DateTime.UtcNow;
 
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("Creating {TableName} table entry: {Data}", TableName, data);
-
+            LogTraceTableEntryCreation(TableName, data);
             try
             {
                 try
@@ -192,8 +186,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             const string operation = "UpsertTableEntry";
             var startTime = DateTime.UtcNow;
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} entry {Data} into table {TableName}", operation, data, TableName);
-
+            LogTraceTableEntry(operation, data, TableName);
             try
             {
                 try
@@ -203,8 +196,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_06, exc,
-                        "Intermediate error upserting entry {Data} to the table {TableName}", data == null ? "null" : data.ToString(), TableName);
+                    LogWarningUpsertTableEntry(data, TableName, exc);
                     throw;
                 }
             }
@@ -223,8 +215,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             const string operation = "InsertTableEntry";
             var startTime = DateTime.UtcNow;
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} entry {Data} into table {TableName}", operation, data, TableName);
-
+            LogTraceTableEntry(operation, data, TableName);
             try
             {
                 try
@@ -238,8 +229,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_06, exc,
-                        "Intermediate error inserting entry {Data} to the table {TableName}", data == null ? "null" : data.ToString(), TableName);
+                    LogWarningInsertTableEntry(data, TableName, exc);
                     throw;
                 }
             }
@@ -267,11 +257,9 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             const string operation = "MergeTableEntry";
             var startTime = DateTime.UtcNow;
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} entry {Data} into table {TableName}", operation, data, TableName);
-
+            LogTraceTableEntry(operation, data, TableName);
             try
             {
-
                 try
                 {
                     // Merge requires an ETag (which may be the '*' wildcard).
@@ -281,8 +269,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_07, exc,
-                        "Intermediate error merging entry {Data} to the table {TableName}", data == null ? "null" : data.ToString(), TableName);
+                    LogWarningMergeTableEntry(data, TableName, exc);
                     throw;
                 }
             }
@@ -312,7 +299,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             const string operation = "UpdateTableEntryAsync";
             var startTime = DateTime.UtcNow;
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} entry {Data} into table {TableName}", operation, data, TableName);
+            LogTraceTableEntry(operation, data, TableName);
 
             try
             {
@@ -356,12 +343,10 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             const string operation = "DeleteTableEntryAsync";
             var startTime = DateTime.UtcNow;
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} entry {Data} table {TableName}", operation, data, TableName);
-
+            LogTraceTableEntry(operation, data, TableName);
             try
             {
                 data.ETag = eTag;
-
                 try
                 {
                     var response = await Table.DeleteEntityAsync(data.PartitionKey, data.RowKey, data.ETag);
@@ -372,8 +357,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_08, exc,
-                        "Intermediate error deleting entry {Data} from the table {TableName}.", data, TableName);
+                    LogWarningDeleteTableEntry(data, TableName, exc);
                     throw;
                 }
             }
@@ -393,8 +377,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             const string operation = "ReadSingleTableEntryAsync";
             var startTime = DateTime.UtcNow;
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} table {TableName} partitionKey {PartitionKey} rowKey {RowKey}", operation, TableName, partitionKey, rowKey);
-
+            LogTraceTableOperation(operation, TableName, partitionKey, rowKey);
             try
             {
                 try
@@ -414,7 +397,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                     }
                 }
 
-                if (Logger.IsEnabled(LogLevel.Debug)) Logger.LogDebug("Could not find table entry for PartitionKey={PartitionKey} RowKey={RowKey}", partitionKey, rowKey);
+                LogDebugTableEntryNotFound(partitionKey, rowKey);
                 return (default, default);  // No data
             }
             finally
@@ -455,7 +438,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             const string operation = "DeleteTableEntries";
             var startTime = DateTime.UtcNow;
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} entries: {Data} table {TableName}", operation, Utils.EnumerableToString(collection), TableName);
+            LogTraceTableEntries(operation, new(collection), TableName);
 
             if (collection == null) throw new ArgumentNullException(nameof(collection));
 
@@ -475,8 +458,8 @@ namespace Orleans.GrainDirectory.AzureStorage
                 var entityBatch = new List<TableTransactionAction>();
                 foreach (var tuple in collection)
                 {
-                    T item = tuple.Item1;
-                    item.ETag = new ETag(tuple.Item2);
+                    T item = tuple.Entity;
+                    item.ETag = new ETag(tuple.ETag);
                     entityBatch.Add(new TableTransactionAction(TableTransactionActionType.Delete, item, item.ETag));
                 }
 
@@ -486,8 +469,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_08, exc,
-                        "Intermediate error deleting entries {Data} from the table {TableName}.", Utils.EnumerableToString(collection), TableName);
+                    LogWarningDeleteTableEntries(new(collection), TableName, exc);
                     throw;
                 }
             }
@@ -509,7 +491,6 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             try
             {
-
                 try
                 {
                     async Task<List<(T Entity, string ETag)>> executeQueryHandleContinuations()
@@ -545,7 +526,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                     // Out of retries...
                     if (!AzureTableUtils.TableStorageDataNotFound(exc))
                     {
-                        Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_09, exc, "Failed to read Azure Storage table {TableName}", TableName);
+                        LogWarningReadTable(TableName, exc);
                     }
 
                     throw new OrleansException($"Failed to read Azure Storage table {TableName}", exc);
@@ -579,11 +560,9 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
 
             var startTime = DateTime.UtcNow;
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} {Count} entries table {TableName}", operation, collection.Count, TableName);
-
+            LogTraceTableEntriesCount(operation, collection.Count, TableName);
             try
             {
-
                 var entityBatch = new List<TableTransactionAction>(collection.Count);
                 foreach (T entry in collection)
                 {
@@ -596,8 +575,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_37, exc,
-                        "Intermediate error bulk inserting {Count} entries in the table {TableName}", collection.Count, TableName);
+                    LogWarningBulkInsertTableEntries(collection.Count, TableName, exc);
                 }
             }
             finally
@@ -609,11 +587,10 @@ namespace Orleans.GrainDirectory.AzureStorage
         internal async Task<(string, string)> InsertTwoTableEntriesConditionallyAsync(T data1, T data2, string data2Etag)
         {
             const string operation = "InsertTableEntryConditionally";
-            string data2Str = (data2 == null ? "null" : data2.ToString());
+            string data2Str = data2 == null ? "null" : data2.ToString();
             var startTime = DateTime.UtcNow;
 
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} data1 {Data1} data2 {Data2} table {TableName}", operation, data1, data2Str, TableName);
-
+            LogTraceTableEntries(operation, data1, data2Str, TableName);
             try
             {
                 try
@@ -647,9 +624,9 @@ namespace Orleans.GrainDirectory.AzureStorage
         internal async Task<(string, string)> UpdateTwoTableEntriesConditionallyAsync(T data1, string data1Etag, T data2, string data2Etag)
         {
             const string operation = "UpdateTableEntryConditionally";
-            string data2Str = (data2 == null ? "null" : data2.ToString());
+            string data2Str = data2 == null ? "null" : data2.ToString();
             var startTime = DateTime.UtcNow;
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} data1 {Data1} data2 {Data2} table {TableName}", operation, data1, data2Str, TableName);
+            LogTraceTableEntries(operation, data1, data2Str, TableName);
 
             try
             {
@@ -694,7 +671,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
             catch (Exception exc)
             {
-                Logger.LogError((int)Utilities.ErrorCode.AzureTable_18, exc, "Error creating TableServiceClient.");
+                LogErrorTableServiceClientCreation(exc);
                 throw;
             }
         }
@@ -705,14 +682,11 @@ namespace Orleans.GrainDirectory.AzureStorage
             if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out _) && AzureTableUtils.IsContentionError(httpStatusCode))
             {
                 // log at Verbose, since failure on conditional is not not an error. Will analyze and warn later, if required.
-                if (Logger.IsEnabled(LogLevel.Debug)) Logger.LogDebug((int)Utilities.ErrorCode.AzureTable_13, exc,
-                     "Intermediate Azure table write error {Operation} to table {TableName} data1 {Data1} data2 {Data2}", operation, TableName, (data1 ?? "null"), (data2 ?? "null"));
-
+                LogWarningTableWrite(operation, TableName, data1 ?? "null", data2 ?? "null");
             }
             else
             {
-                Logger.LogError((int)Utilities.ErrorCode.AzureTable_14, exc,
-                    "Azure table access write error {Operation} to table {TableName} entry {Data1}", operation, TableName, data1);
+                LogErrorTableWrite(operation, TableName, data1, exc);
             }
         }
 
@@ -721,9 +695,167 @@ namespace Orleans.GrainDirectory.AzureStorage
             var timeSpan = DateTime.UtcNow - startOperation;
             if (timeSpan > this.StoragePolicyOptions.OperationTimeout)
             {
-                Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_15, "Slow access to Azure Table {TableName} for {Operation}, which took {Duration}", TableName, operation, timeSpan);
+                LogWarningSlowAccess(operation, TableName, timeSpan);
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)Utilities.ErrorCode.AzureTable_01,
+            Message = "{Action} Azure storage table {TableName}"
+        )]
+        private partial void LogInfoTableCreation(string action, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)Utilities.ErrorCode.AzureTable_TableNotCreated,
+            Message = "Unable to create or connect to the Azure table in {CreationTimeout}"
+        )]
+        private partial void LogErrorTableCreationInTimeout(TimeSpan creationTimeout, TimeoutException exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)Utilities.ErrorCode.AzureTable_02,
+            Message = "Could not initialize connection to storage table {TableName}"
+        )]
+        private partial void LogErrorTableCreation(string tableName, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)Utilities.ErrorCode.AzureTable_03,
+            Message = "Deleted Azure storage table {TableName}"
+        )]
+        private partial void LogInfoTableDeletion(string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)Utilities.ErrorCode.AzureTable_04,
+            Message = "Could not delete storage table {TableName}"
+        )]
+        private partial void LogErrorTableDeletion(string tableName, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Creating {TableName} table entry: {Data}"
+        )]
+        private partial void LogTraceTableEntryCreation(string tableName, T data);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{Operation} entry {Data} into table {TableName}"
+        )]
+        private partial void LogTraceTableEntry(string operation, T data, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)Utilities.ErrorCode.AzureTable_06,
+            Message = "Intermediate error upserting entry {Data} to the table {TableName}"
+        )]
+        private partial void LogWarningUpsertTableEntry(T data, string tableName, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)Utilities.ErrorCode.AzureTable_06,
+            Message = "Intermediate error inserting entry {Data} to the table {TableName}"
+        )]
+        private partial void LogWarningInsertTableEntry(T data, string tableName, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)Utilities.ErrorCode.AzureTable_07,
+            Message = "Intermediate error merging entry {Data} to the table {TableName}"
+        )]
+        private partial void LogWarningMergeTableEntry(T data, string tableName, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)Utilities.ErrorCode.AzureTable_08,
+            Message = "Intermediate error deleting entry {Data} from the table {TableName}."
+        )]
+        private partial void LogWarningDeleteTableEntry(T data, string tableName, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{Operation} table {TableName} partitionKey {PartitionKey} rowKey {RowKey}"
+        )]
+        private partial void LogTraceTableOperation(string operation, string tableName, string partitionKey, string rowKey);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Could not find table entry for PartitionKey={PartitionKey} RowKey={RowKey}"
+        )]
+        private partial void LogDebugTableEntryNotFound(string partitionKey, string rowKey);
+
+        private readonly struct CollectionLogEntry(List<(T Entity, string ETag)> collection)
+        {
+            public override string ToString() => Utils.EnumerableToString(collection);
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{Operation} entries: {Data} table {TableName}"
+        )]
+        private partial void LogTraceTableEntries(string operation, CollectionLogEntry data, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)Utilities.ErrorCode.AzureTable_08,
+            Message = "Intermediate error deleting entries {Data} from the table {TableName}."
+        )]
+        private partial void LogWarningDeleteTableEntries(CollectionLogEntry data, string tableName, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)Utilities.ErrorCode.AzureTable_09,
+            Message = "Failed to read Azure Storage table {TableName}"
+        )]
+        private partial void LogWarningReadTable(string tableName, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{Operation} {Count} entries table {TableName}"
+        )]
+        private partial void LogTraceTableEntriesCount(string operation, int count, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)Utilities.ErrorCode.AzureTable_37,
+            Message = "Intermediate error bulk inserting {Count} entries in the table {TableName}"
+        )]
+        private partial void LogWarningBulkInsertTableEntries(int count, string tableName, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{Operation} data1 {Data1} data2 {Data2} table {TableName}"
+        )]
+        private partial void LogTraceTableEntries(string operation, T data1, string data2, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error creating TableServiceClient."
+        )]
+        private partial void LogErrorTableServiceClientCreation(Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            EventId = (int)Utilities.ErrorCode.AzureTable_13,
+            Message = "Intermediate Azure table write error {Operation} to table {TableName} data1 {Data1} data2 {Data2}"
+        )]
+        private partial void LogWarningTableWrite(string operation, string tableName, object data1, object data2);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)Utilities.ErrorCode.AzureTable_14,
+            Message = "Azure table access write error {Operation} to table {TableName} entry {Data1}"
+        )]
+        private partial void LogErrorTableWrite(string operation, string tableName, object data1, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)Utilities.ErrorCode.AzureTable_15,
+            Message = "Slow access to Azure Table {TableName} for {Operation}, which took {Duration}"
+        )]
+        private partial void LogWarningSlowAccess(string tableName, string operation, TimeSpan duration);
     }
 
     internal static class TableDataManagerInternalExtensions
