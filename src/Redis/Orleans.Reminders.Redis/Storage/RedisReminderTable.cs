@@ -175,7 +175,7 @@ namespace Orleans.Reminders.Redis
 
             try
             {
-                LogDebugUpsertRow(entry, entry.ETag);
+                LogDebugUpsertRow(new(entry), entry.ETag);
 
                 var (newETag, value) = ConvertFromEntry(entry);
                 var (from, to) = GetFilter(entry.GrainId, entry.ReminderName);
