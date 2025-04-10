@@ -8,7 +8,7 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
-    internal class ActivationDataActivatorProvider : IGrainContextActivatorProvider
+    internal partial class ActivationDataActivatorProvider : IGrainContextActivatorProvider
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly IActivationWorkingSet _activationWorkingSet;
@@ -81,7 +81,7 @@ namespace Orleans.Runtime
             return true;
         }
 
-        private class ActivationDataActivator : IGrainContextActivator
+        private partial class ActivationDataActivator : IGrainContextActivator
         {
             private readonly ILogger<WorkItemGroup> _workItemGroupLogger;
             private readonly ILogger<ActivationTaskScheduler> _activationTaskSchedulerLogger;
@@ -133,7 +133,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exception)
                 {
-                    _grainLogger.LogError(exception, "Failed to construct grain '{GrainId}'.", activationAddress.GrainId);
+                    LogErrorFailedToConstructGrain(_grainLogger, exception, activationAddress.GrainId);
                     throw;
                 }
                 finally
@@ -143,6 +143,12 @@ namespace Orleans.Runtime
 
                 return context;
             }
+
+            [LoggerMessage(
+                Level = LogLevel.Error,
+                Message = "Failed to construct grain '{GrainId}'."
+            )]
+            private static partial void LogErrorFailedToConstructGrain(ILogger logger, Exception exception, GrainId grainId);
         }
     }
 

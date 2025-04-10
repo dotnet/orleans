@@ -130,7 +130,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An unexpected error occurred while notifying rebalancer listener.");
+                LogErrorWhileNotifyingListener(ex);
             }
         }
 
@@ -161,4 +161,10 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
         "I will attempt to migrate the rebalancer to another silo."
     )]
     private partial void LogMigratingRebalancer(SiloAddress silo);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "An unexpected error occurred while notifying rebalancer listener."
+    )]
+    private partial void LogErrorWhileNotifyingListener(Exception exception);
 }
