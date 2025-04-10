@@ -498,7 +498,7 @@ namespace Orleans.Runtime.Messaging
         [LoggerMessage(
             EventId = (int)ErrorCode.GatewayClientClosedSocket,
             Level = LogLevel.Information,
-            Message = "Recorded closed socket from endpoint {Endpoint}, client ID {clientId}."
+            Message = "Recorded closed socket from endpoint {Endpoint}, client ID {ClientId}."
         )]
         private static partial void LogInformationGatewayClientClosedSocket(ILogger logger, string endpoint, ClientGrainId clientId);
 
