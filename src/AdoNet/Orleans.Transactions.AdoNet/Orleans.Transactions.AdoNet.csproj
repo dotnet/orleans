@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Transactions.AdoNet</PackageId>
+    <Title>Microsoft Orleans ADO.NET Transactions Provider</Title>
+    <Description>Microsoft Orleans Transactions provider backed by ADO.NET</Description>
+    <PackageTags>$(PackageTags) ADO.NET SQL MySQL PostgreSQL Oracle</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Transactions.AdoNet</AssemblyName>
+    <RootNamespace>Orleans.Transactions.AdoNet</RootNamespace>
+    <DefineConstants>$(DefineConstants);TRANSACTIONS_ADONET</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Storage\*.cs" LinkBase="Storage" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="..\..\Orleans.Transactions\Orleans.Transactions.csproj" />
+  </ItemGroup>
+</Project>

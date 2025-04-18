@@ -15,6 +15,8 @@ namespace Orleans.Persistence.AdoNet.Storage
 namespace Orleans.Reminders.AdoNet.Storage
 #elif STREAMING_ADONET
 namespace Orleans.Streaming.AdoNet.Storage
+#elif TRANSACTIONS_ADONET
+namespace Orleans.Transactions.AdoNet.Storage
 #elif TESTER_SQLUTILS
 namespace Orleans.Tests.SqlUtils
 #else
@@ -282,6 +284,54 @@ namespace Orleans.Tests.SqlUtils
                     }
 
                     return await ret.ConfigureAwait(continueOnCapturedContext: false);
+                }
+            }
+        }
+
+        /// <summary>
+        /// execute with transaction
+        /// </summary>
+        /// <typeparam name="TResult"></typeparam>
+        /// <param name="query"></param>
+        /// <param name="parameterProvider"></param>
+        /// <param name="executor"></param>
+        /// <param name="selector"></param>
+        /// <param name="commandBehavior"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        private async Task<Tuple<IEnumerable<TResult>, int>> ExecuteTransactionAsync<TResult>(
+          string query,
+          Action<DbCommand> parameterProvider,
+          Func<DbCommand, Func<IDataRecord, int, CancellationToken, Task<TResult>>, CommandBehavior, CancellationToken, Task<Tuple<IEnumerable<TResult>, int>>> executor,
+          Func<IDataRecord, int, CancellationToken, Task<TResult>> selector,
+          CommandBehavior commandBehavior,
+          CancellationToken cancellationToken)
+        {
+            using (var connection = DbConnectionFactory.CreateConnection(_invariantName, _connectionString))
+            {
+                await connection.OpenAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+                using (var transaction = connection.BeginTransaction())
+                {
+                    using (var command = connection.CreateCommand())
+                    {
+                        parameterProvider?.Invoke(command);
+                        command.CommandText = query;
+                        command.Transaction = transaction;
+
+                        _databaseCommandInterceptor.Intercept(command);
+
+                        Task<Tuple<IEnumerable<TResult>, int>> ret;
+                        if (_isSynchronousAdoNetImplementation)
+                        {
+                            ret = Task.Run(() => executor(command, selector, commandBehavior, cancellationToken), cancellationToken);
+                        }
+                        else
+                        {
+                            ret = executor(command, selector, commandBehavior, cancellationToken);
+                        }
+
+                        return await ret.ConfigureAwait(continueOnCapturedContext: false);
+                    }
                 }
             }
         }
