@@ -17,6 +17,8 @@ namespace Orleans.Reminders.AdoNet.Storage
 namespace Orleans.Streaming.AdoNet.Storage
 #elif GRAINDIRECTORY_ADONET
 namespace Orleans.GrainDirectory.AdoNet.Storage
+#elif TRANSACTIONS_ADONET
+namespace Orleans.Transactions.AdoNet.Storage
 #elif TESTER_SQLUTILS
 namespace Orleans.Tests.SqlUtils
 #else
@@ -353,6 +355,30 @@ namespace Orleans.Tests.SqlUtils
                 connection.Dispose();
                 throw;
             }
+        }
+
+        private async Task<Tuple<IEnumerable<TResult>, int>> ExecuteTransactionAsync<TResult>(
+            string query,
+            Action<DbCommand>? parameterProvider,
+            Func<DbCommand, Func<IDataRecord, int, CancellationToken, Task<TResult>>, CommandBehavior, CancellationToken, Task<Tuple<IEnumerable<TResult>, int>>> executor,
+            Func<IDataRecord, int, CancellationToken, Task<TResult>> selector,
+            CommandBehavior commandBehavior,
+            CancellationToken cancellationToken)
+        {
+            using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+            using var transaction = connection.BeginTransaction();
+            using var command = connection.CreateCommand();
+            parameterProvider?.Invoke(command);
+            command.CommandText = query;
+            command.Transaction = transaction;
+
+            _databaseCommandInterceptor.Intercept(command);
+
+            var result = _isSynchronousAdoNetImplementation
+                ? Task.Run(() => executor(command, selector, commandBehavior, cancellationToken), cancellationToken)
+                : executor(command, selector, commandBehavior, cancellationToken);
+
+            return await result.ConfigureAwait(continueOnCapturedContext: false);
         }
 
 
