@@ -11,7 +11,7 @@ using Orleans.Configuration;
 #nullable enable
 namespace Orleans.Runtime.MembershipService.SiloMetadata;
 
-internal class SiloMetadataCache(
+internal partial class SiloMetadataCache(
     ISiloMetadataClient siloMetadataClient,
     MembershipTableManager membershipTableManager,
     IOptions<ClusterMembershipOptions> clusterMembershipOptions,
@@ -29,7 +29,7 @@ internal class SiloMetadataCache(
         Task OnStart(CancellationToken _)
         {
             // This gives time for the cluster to be voted Dead and for membership updates to propagate that out
-            negativeCachePeriod = clusterMembershipOptions.Value.ProbeTimeout * clusterMembershipOptions.Value.NumMissedProbesLimit 
+            negativeCachePeriod = clusterMembershipOptions.Value.ProbeTimeout * clusterMembershipOptions.Value.NumMissedProbesLimit
                                   + (2 * clusterMembershipOptions.Value.TableRefreshTimeout);
             task = Task.Run(() => this.ProcessMembershipUpdates(_cts.Token));
             return Task.CompletedTask;
@@ -55,7 +55,7 @@ internal class SiloMetadataCache(
     {
         try
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Starting to process membership updates.");
+            LogDebugStartProcessingMembershipUpdates(logger);
             await foreach (var update in membershipTableManager.MembershipTableUpdates.WithCancellation(ct))
             {
                 // Add entries for members that aren't already in the cache
@@ -80,7 +80,7 @@ internal class SiloMetadataCache(
                         catch(Exception exception)
                         {
                             _negativeCache.TryAdd(membershipEntry.Key, now + negativeCachePeriod);
-                            logger.LogError(exception, "Error fetching metadata for silo {Silo}", membershipEntry.Key);
+                            LogErrorFetchingSiloMetadata(logger, exception, membershipEntry.Key);
                         }
                     }
                 }
@@ -111,11 +111,11 @@ internal class SiloMetadataCache(
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Error processing membership updates");
+            LogErrorProcessingMembershipUpdates(logger, exception);
         }
         finally
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Stopping membership update processor");
+            LogDebugStoppingMembershipProcessor(logger);
         }
     }
 
@@ -124,5 +124,25 @@ internal class SiloMetadataCache(
     public void SetMetadata(SiloAddress siloAddress, SiloMetadata metadata) => _metadata.TryAdd(siloAddress, metadata);
 
     public void Dispose() => _cts.Cancel();
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Starting to process membership updates.")]
+    private static partial void LogDebugStartProcessingMembershipUpdates(ILogger logger);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error fetching metadata for silo {Silo}")]
+    private static partial void LogErrorFetchingSiloMetadata(ILogger logger, Exception exception, SiloAddress silo);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error processing membership updates")]
+    private static partial void LogErrorProcessingMembershipUpdates(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Stopping membership update processor")]
+    private static partial void LogDebugStoppingMembershipProcessor(ILogger logger);
 }
 

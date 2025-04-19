@@ -239,7 +239,7 @@ internal abstract partial class GrainTimer : IGrainTimer
         }
         catch (Exception exception)
         {
-            Logger.LogWarning(exception, "Error cancelling timer callback.");
+            LogErrorCancellingCallback(Logger, exception);
         }
 
         _timer.Dispose();
@@ -319,6 +319,12 @@ internal abstract partial class GrainTimer : IGrainTimer
         Message = "Caught and ignored exception thrown from timer callback for timer '{Timer}'."
     )]
     private static partial void LogWarningCallbackException(ILogger logger, Exception exception, GrainTimer timer);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error cancelling timer callback."
+    )]
+    private static partial void LogErrorCancellingCallback(ILogger logger, Exception exception);
 }
 
 internal sealed class GrainTimer<T> : GrainTimer

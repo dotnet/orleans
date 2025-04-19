@@ -357,9 +357,7 @@ namespace Orleans.Runtime.Messaging
             {
                 _pendingToSend.Enqueue(msg);
                 _signal.Signal();
-#if DEBUG
-                if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.LogTrace("Queued message {Message} for client {TargetGrain}", msg, msg.TargetGrain);
-#endif
+                LogTraceQueuedMessage(_gateway.logger, msg, msg.TargetGrain);
             }
 
             private async Task RunMessageLoop()
@@ -387,9 +385,7 @@ namespace Orleans.Runtime.Messaging
                         {
                             if (TrySend(connection, message))
                             {
-#if DEBUG
-                                if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.LogTrace("Sent queued message {Message} to client {ClientId}", message, Id);
-#endif
+                                LogTraceSentQueuedMessage(_gateway.logger, message, Id);
                             }
                             else
                             {
@@ -514,6 +510,18 @@ namespace Orleans.Runtime.Messaging
             Message = "Client {ClientId} received new connection ({NewConnection}) before the previous connection ({PreviousConnection}) had been removed"
         )]
         private static partial void LogWarningGatewayClientReceivedNewConnectionBeforePreviousConnectionRemoved(ILogger logger, ClientGrainId clientId, GatewayInboundConnection newConnection, GatewayInboundConnection previousConnection);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Queued message {Message} for client {TargetGrain}"
+        )]
+        private static partial void LogTraceQueuedMessage(ILogger logger, object message, GrainId targetGrain);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Sent queued message {Message} to client {ClientId}"
+        )]
+        private static partial void LogTraceSentQueuedMessage(ILogger logger, object message, ClientGrainId clientId);
 
         [LoggerMessage(
             Level = LogLevel.Warning,

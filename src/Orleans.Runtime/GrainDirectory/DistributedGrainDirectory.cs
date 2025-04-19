@@ -227,7 +227,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         var stopwatch = CoarseStopwatch.StartNew();
         using var cts = new CancellationTokenSource();
         cts.Cancel();
-        
+
         foreach (var (grainId, activation) in _localActivations)
         {
             var directory = GetGrainDirectory(activation, _grainDirectoryResolver!);
