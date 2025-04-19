@@ -138,7 +138,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         var version = reader.ReadByte();
         if (version != SupportedVersion)
         {
-            throw new NotSupportedException($"This instance of {nameof(DurableValue<T>)} supports version {(uint)SupportedVersion} and not version {(uint)version}.");
+            throw new NotSupportedException($"This instance of {nameof(DurableTaskCompletionSource<T>)} supports version {(uint)SupportedVersion} and not version {(uint)version}.");
         }
 
         _status = (DurableTaskCompletionSourceStatus)reader.ReadVarUInt32();
