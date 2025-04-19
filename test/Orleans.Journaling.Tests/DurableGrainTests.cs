@@ -3,6 +3,7 @@ using Xunit;
 
 namespace Orleans.Journaling.Tests;
 
+[TestCategory("BVT")]
 public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<IntegrationTestFixture>
 {
     private IGrainFactory Client => fixture.Client;

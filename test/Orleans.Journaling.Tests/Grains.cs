@@ -3,13 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Orleans.Journaling.Tests;
 
 [GenerateSerializer]
-public sealed class TestDurableGrainState
-{
-    [Id(0)]
-    public string Name { get; set; } = string.Empty;
-    [Id(1)]
-    public int Counter { get; set; }
-}
+public sealed record TestDurableGrainState(string Name, int Counter);
 
 public class TestDurableGrain(
     [FromKeyedServices("state")] IPersistentState<TestDurableGrainState> state) : DurableGrain, ITestDurableGrain
@@ -20,8 +14,7 @@ public class TestDurableGrain(
 
     public async Task SetTestValues(string name, int counter)
     {
-        state.State.Name = name;
-        state.State.Counter = counter;
+        state.State = new(name, counter);
         await WriteStateAsync();
     }
 

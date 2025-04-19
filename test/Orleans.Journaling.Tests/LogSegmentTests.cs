@@ -12,6 +12,7 @@ using Xunit;
 
 namespace Orleans.Journaling.Tests;
 
+[TestCategory("AzureStorage"), TestCategory("Functional")]
 public sealed class AzureStorageLogSegmentTests : LogSegmentTests
 {
     public AzureStorageLogSegmentTests()
