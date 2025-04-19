@@ -55,7 +55,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
         var version = reader.ReadByte();
         if (version != VersionByte)
         {
-            throw new NotSupportedException($"This instance of {nameof(DurableValue<T>)} supports version {(uint)VersionByte} and not version {(uint)version}.");
+            throw new NotSupportedException($"This instance of {nameof(DurableState<T>)} supports version {(uint)VersionByte} and not version {(uint)version}.");
         }
 
         var commandType = (CommandType)reader.ReadVarUInt32();
