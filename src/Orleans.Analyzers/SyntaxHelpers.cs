@@ -223,5 +223,24 @@ namespace Orleans.Analyzers
             attributeLists
                 .SelectMany(attributeList => attributeList.Attributes)
                 .Where(attribute => attribute.IsAttribute(attributeName));
+
+        public static string GetArgumentValue(this AttributeSyntax attribute, SemanticModel semanticModel)
+        {
+            if (attribute?.ArgumentList == null || attribute.ArgumentList.Arguments.Count == 0)
+            {
+                return null;
+            }
+
+            var symbolInfo = semanticModel.GetSymbolInfo(attribute);
+            if (symbolInfo.Symbol == null && symbolInfo.CandidateSymbols.Length == 0)
+            {
+                return null;
+            }
+
+            var argumentExpression = attribute.ArgumentList.Arguments[0].Expression;
+            var constant = semanticModel.GetConstantValue(argumentExpression);
+
+            return constant.HasValue ? constant.Value?.ToString() : null;
+        }
     }
 }
