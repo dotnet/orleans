@@ -147,7 +147,7 @@ namespace Orleans.GrainDirectory.Redis
                     keys: new RedisKey[] { GetKey(address.GrainId) },
                     values: new RedisValue[] { address.ActivationId.ToString() });
 
-                LogDebugUnregister(address.GrainId, JsonSerializer.Serialize(address), (result != 0) ? "OK" : "Conflict");
+                LogDebugUnregister(address.GrainId, new(address), (result != 0) ? "OK" : "Conflict");
             }
             catch (Exception ex)
             {
@@ -241,11 +241,16 @@ namespace Orleans.GrainDirectory.Redis
         )]
         private partial void LogErrorRegisterFailed(Exception exception, GrainId grainId, string address);
 
+        private readonly struct GrainAddressLogRecord(GrainAddress address)
+        {
+            public override string ToString() => JsonSerializer.Serialize(address);
+        }
+
         [LoggerMessage(
             Level = LogLevel.Debug,
             Message = "Unregister {GrainId} ({Address}): {Result}"
         )]
-        private partial void LogDebugUnregister(GrainId grainId, string address, string result);
+        private partial void LogDebugUnregister(GrainId grainId, GrainAddressLogRecord address, string result);
 
         [LoggerMessage(
             Level = LogLevel.Error,
