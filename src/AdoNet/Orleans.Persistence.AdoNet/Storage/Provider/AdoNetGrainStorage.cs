@@ -335,13 +335,11 @@ namespace Orleans.Storage
                 queries.Single(i => i.Item1 == "ReadFromStorageKey").Item2,
                 queries.Single(i => i.Item1 == "ClearStorageKey").Item2);
 
-            logger.LogInformation(
-                (int)RelationalStorageProviderCodes.RelationalProviderInitProvider,
-                "Initialized storage provider: ServiceId={ServiceId} ProviderName={Name} Invariant={InvariantName} ConnectionString={ConnectionString}.",
+            LogInfoInitializedStorageProvider(
                 serviceId,
                 name,
                 Storage.InvariantName,
-                ConfigUtilities.RedactConnectionStringInfo(Storage.ConnectionString));
+                new(Storage.ConnectionString));
         }
 
         /// <summary>
@@ -535,5 +533,17 @@ namespace Orleans.Storage
             Message = "Wrote grain state: ServiceId={ServiceId} ProviderName={Name} GrainType={BaseGrainType} GrainId={GrainId} ETag={ETag}."
         )]
         private partial void LogTraceWroteGrainState(string serviceId, string name, string baseGrainType, AdoGrainKey grainId, string etag);
+
+        private readonly struct ConnectionStringLogRecord(string connectionString)
+        {
+            public override string ToString() => ConfigUtilities.RedactConnectionStringInfo(connectionString);
+        }
+
+        [LoggerMessage(
+            EventId = (int)RelationalStorageProviderCodes.RelationalProviderInitProvider,
+            Level = LogLevel.Information,
+            Message = "Initialized storage provider: ServiceId={ServiceId} ProviderName={Name} Invariant={InvariantName} ConnectionString={ConnectionString}."
+        )]
+        private partial void LogInfoInitializedStorageProvider(string serviceId, string name, string invariantName, ConnectionStringLogRecord connectionString);
     }
 }
