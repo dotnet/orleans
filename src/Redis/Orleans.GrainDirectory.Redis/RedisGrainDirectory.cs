@@ -151,12 +151,10 @@ namespace Orleans.GrainDirectory.Redis
             }
             catch (Exception ex)
             {
-                var value = JsonSerializer.Serialize(address);
-
-                LogErrorUnregisterFailed(ex, address.GrainId, value);
+                LogErrorUnregisterFailed(ex, address.GrainId, new(address));
 
                 if (IsRedisException(ex))
-                    throw new OrleansException($"Unregister failed for {address.GrainId} ({value}) : {ex}");
+                    throw new OrleansException($"Unregister failed for {address.GrainId} ({JsonSerializer.Serialize(address)}) : {ex}");
                 else
                     throw;
             }
@@ -256,7 +254,7 @@ namespace Orleans.GrainDirectory.Redis
             Level = LogLevel.Error,
             Message = "Unregister failed for {GrainId} ({Address})"
         )]
-        private partial void LogErrorUnregisterFailed(Exception exception, GrainId grainId, string address);
+        private partial void LogErrorUnregisterFailed(Exception exception, GrainId grainId, GrainAddressLogRecord address);
 
         [LoggerMessage(
             Level = LogLevel.Information,
