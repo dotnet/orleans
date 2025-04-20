@@ -12,9 +12,9 @@ using SQSMessage = Amazon.SQS.Model.Message;
 namespace OrleansAWSUtils.Streams
 {
     /// <summary>
-    /// Receives batches of messages from a single partition of a message queue.  
+    /// Receives batches of messages from a single partition of a message queue.
     /// </summary>
-    internal class SQSAdapterReceiver : IQueueAdapterReceiver
+    internal partial class SQSAdapterReceiver : IQueueAdapterReceiver
     {
         private SQSStorage queue;
         private long lastReadMessage;
@@ -74,7 +74,7 @@ namespace OrleansAWSUtils.Streams
         {
             try
             {
-                var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.    
+                var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
                 if (queueRef == null) return new List<IBatchContainer>();
 
                 int count = maxCount < 0 || maxCount == QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG ?
@@ -99,7 +99,7 @@ namespace OrleansAWSUtils.Streams
         {
             try
             {
-                var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.  
+                var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
                 if (messages.Count == 0 || queueRef == null) return;
                 List<SQSMessage> cloudQueueMessages = messages.Cast<SQSBatchContainer>().Select(b => b.Message).ToList();
                 outstandingTask = Task.WhenAll(cloudQueueMessages.Select(queueRef.DeleteMessage));
@@ -109,7 +109,7 @@ namespace OrleansAWSUtils.Streams
                 }
                 catch (Exception exc)
                 {
-                    logger.LogWarning(exc, "Exception upon DeleteMessage on queue {Id}. Ignoring.", Id);
+                    LogWarningDeleteMessageException(logger, exc, Id);
                 }
             }
             finally
@@ -117,5 +117,11 @@ namespace OrleansAWSUtils.Streams
                 outstandingTask = null;
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Exception upon DeleteMessage on queue {Id}. Ignoring."
+        )]
+        private static partial void LogWarningDeleteMessageException(ILogger logger, Exception exception, QueueId id);
     }
 }
