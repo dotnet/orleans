@@ -516,7 +516,7 @@ namespace Orleans.Runtime
         [LoggerMessage(
             Level = LogLevel.Warning,
             EventId = (int)ErrorCode.SiloGcWarning,
-            Message = $"A verbose logging level ({{highestLogLevel}}) is configured. This will impact performance. The recommended log level is {nameof(LogLevel.Information)}."
+            Message = $"A verbose logging level ({{HighestLogLevel}}) is configured. This will impact performance. The recommended log level is {nameof(LogLevel.Information)}."
         )]
         private static partial void LogWarningSiloGcVerboseLOggingConfigured(ILogger logger, string highestLogLevel);
 
@@ -627,13 +627,13 @@ namespace Orleans.Runtime
 
         [LoggerMessage(
             EventId = (int)ErrorCode.SiloShuttingDown,
-            Message = "Silo shutdown initiated ({gracefully})."
+            Message = "Silo shutdown initiated ({Gracefully})."
         )]
         private static partial void LogSiloShuttingDown(ILogger logger, LogLevel logLevel, string gracefully);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.SiloShutDown,
-            Message = "Silo shutdown completed ({gracefully})."
+            Message = "Silo shutdown completed ({Gracefully})."
         )]
         private static partial void LogSiloShutDown(ILogger logger, LogLevel logLevel, string gracefully);
 

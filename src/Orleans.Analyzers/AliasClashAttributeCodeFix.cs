@@ -22,13 +22,21 @@ public class AliasClashAttributeCodeFix : CodeFixProvider
     {
         var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
         var diagnostic = context.Diagnostics.First();
+
         if (root.FindNode(diagnostic.Location.SourceSpan) is not AttributeSyntax attribute)
         {
             return;
         }
 
-        var aliasName = diagnostic.Properties["AliasName"];
-        var aliasSuffix = diagnostic.Properties["AliasSuffix"];
+        if (!diagnostic.Properties.TryGetValue("AliasName", out var aliasName))
+        {
+            return;
+        }
+
+        if (!diagnostic.Properties.TryGetValue("AliasSuffix", out var aliasSuffix))
+        {
+            return;
+        }
 
         context.RegisterCodeFix(
             CodeAction.Create(

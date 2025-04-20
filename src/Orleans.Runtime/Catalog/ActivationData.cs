@@ -1973,10 +1973,16 @@ internal sealed partial class ActivationData :
             }
             catch (Exception exception)
             {
-                Shared.Logger.LogWarning(exception, "One or more cancellation callbacks failed.");
+                LogErrorCancellationCallbackFailed(Shared.Logger, exception);
             }
         }
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "One or more cancellation callbacks failed."
+    )]
+    private static partial void LogErrorCancellationCallbackFailed(ILogger logger, Exception exception);
 
     #endregion
 
