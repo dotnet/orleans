@@ -9,7 +9,7 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.Membership
 {
-    public class AdoNetGatewayListProvider : IGatewayListProvider
+    public partial class AdoNetGatewayListProvider : IGatewayListProvider
     {
         private readonly ILogger _logger;
         private readonly string _clusterId;
@@ -19,7 +19,7 @@ namespace Orleans.Runtime.Membership
         private readonly TimeSpan _maxStaleness;
 
         public AdoNetGatewayListProvider(
-            ILogger<AdoNetGatewayListProvider> logger, 
+            ILogger<AdoNetGatewayListProvider> logger,
             IServiceProvider serviceProvider,
             IOptions<AdoNetClusteringClientOptions> options,
             IOptions<GatewayOptions> gatewayOptions,
@@ -44,22 +44,40 @@ namespace Orleans.Runtime.Membership
 
         public async Task InitializeGatewayListProvider()
         {
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("AdoNetClusteringTable.InitializeGatewayListProvider called.");
+            LogTraceInitializeGatewayListProvider();
             _orleansQueries = await RelationalOrleansQueries.CreateInstance(_options.Invariant, _options.ConnectionString);
         }
 
         public async Task<IList<Uri>> GetGateways()
         {
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("AdoNetClusteringTable.GetGateways called.");
+            LogTraceGetGateways();
             try
             {
                 return await _orleansQueries.ActiveGatewaysAsync(this._clusterId);
             }
             catch (Exception ex)
             {
-                if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug(ex, "AdoNetClusteringTable.Gateways failed");
+                LogDebugGatewaysFailed(ex);
                 throw;
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = $"{nameof(AdoNetGatewayListProvider)}.{nameof(InitializeGatewayListProvider)} called."
+        )]
+        private partial void LogTraceInitializeGatewayListProvider();
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = $"{nameof(AdoNetGatewayListProvider)}.{nameof(GetGateways)} called."
+        )]
+        private partial void LogTraceGetGateways();
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = $"{nameof(AdoNetGatewayListProvider)}.{nameof(GetGateways)} failed"
+        )]
+        private partial void LogDebugGatewaysFailed(Exception exception);
     }
 }
