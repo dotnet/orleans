@@ -20,10 +20,4 @@
     <InternalsVisibleTo Include="Orleans.Journaling.Tests" />
   </ItemGroup>
 
-  <ItemGroup>
-    <AssemblyAttribute Include="System.Diagnostics.CodeAnalysis.ExperimentalAttribute">
-      <_Parameter1>ORLEANSEXP005</_Parameter1>
-    </AssemblyAttribute>
-  </ItemGroup>
-
 </Project>

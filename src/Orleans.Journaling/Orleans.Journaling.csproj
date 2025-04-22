@@ -27,10 +27,4 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <AssemblyAttribute Include="System.Diagnostics.CodeAnalysis.ExperimentalAttribute">
-      <_Parameter1>ORLEANSEXP005</_Parameter1>
-    </AssemblyAttribute>
-  </ItemGroup>
-
 </Project>

@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Journaling;
 
-internal sealed class AzureAppendBlobLogStorage : IStateMachineStorage
+internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
 {
     private static readonly AppendBlobCreateOptions CreateOptions = new() { Conditions = new() { IfNoneMatch = ETag.All } };
     private readonly AppendBlobClient _client;
@@ -172,4 +172,5 @@ internal sealed class AzureAppendBlobLogStorage : IStateMachineStorage
         // Delete the blob snapshot.
         await _client.WithSnapshot(blobSnapshot.Value.Snapshot).DeleteAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
     }
+
 }

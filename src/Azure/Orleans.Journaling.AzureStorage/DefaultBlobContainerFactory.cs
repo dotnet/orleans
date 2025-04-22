@@ -1,4 +1,6 @@
-﻿using Azure.Storage.Blobs;
+using Azure.Storage.Blobs;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Runtime;
 
 namespace Orleans.Journaling;
@@ -10,7 +12,9 @@ namespace Orleans.Journaling;
 /// Initializes a new instance of the <see cref="DefaultBlobContainerFactory"/> class.
 /// </remarks>
 /// <param name="options">The blob storage options</param>
-internal sealed class DefaultBlobContainerFactory(AzureAppendBlobStateMachineStorageOptions options) : IBlobContainerFactory
+internal sealed class DefaultBlobContainerFactory(
+    IOptions<ClusterOptions> clusterOptions,
+    AzureAppendBlobStateMachineStorageOptions options) : IBlobContainerFactory
 {
     private BlobContainerClient _defaultContainer = null!;
 
@@ -20,7 +24,8 @@ internal sealed class DefaultBlobContainerFactory(AzureAppendBlobStateMachineSto
     /// <inheritdoc/>
     public async Task InitializeAsync(BlobServiceClient client, CancellationToken cancellationToken)
     {
-        _defaultContainer = client.GetBlobContainerClient(options.ContainerName);
+        var prefix = clusterOptions.Value.ServiceId;
+        _defaultContainer = client.GetBlobContainerClient($"{prefix}/{options.ContainerName}");
         await _defaultContainer.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
     }
 }

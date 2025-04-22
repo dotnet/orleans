@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Collections;
 using Orleans.Serialization.Buffers;
 using System.Diagnostics;
@@ -26,14 +26,14 @@ public sealed class LogExtent(ArcBuffer buffer) : IDisposable
 
     internal struct EntryEnumerator : IEnumerable<Entry>, IEnumerator<Entry>, IDisposable
     {
-        private LogExtent _logSegment;
+        private LogExtent _logExtent;
         private ReadOnlySequence<byte> _current;
         private int _length;
 
-        private EntryEnumerator(LogExtent logSegment)
+        private EntryEnumerator(LogExtent logExtent)
         {
-            _logSegment = logSegment;
-            _current = logSegment._buffer.AsReadOnlySequence();
+            _logExtent = logExtent;
+            _current = logExtent._buffer.AsReadOnlySequence();
             _length = -2;
         }
 
@@ -90,7 +90,7 @@ public sealed class LogExtent(ArcBuffer buffer) : IDisposable
 
         readonly object? IEnumerator.Current => Current;
 
-        public void Reset() => this = new(_logSegment);
+        public void Reset() => this = new(_logExtent);
 
         public void Dispose() => _length = -1;
 
