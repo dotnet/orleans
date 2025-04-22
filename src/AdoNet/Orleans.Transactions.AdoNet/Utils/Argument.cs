@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Orleans.Transactions.AdoNet.TransactionalState;
+namespace Orleans.Transactions.AdoNet.Utils;
 internal static class Argument
 {
     public static void AssertNotNull<T>(T value, string name)
@@ -41,7 +41,7 @@ internal static class Argument
             throw new ArgumentException("Value cannot be an empty collection.", name);
         }
 
-        using IEnumerator<T> enumerator = value.GetEnumerator();
+        using var enumerator = value.GetEnumerator();
         if (!enumerator.MoveNext())
         {
             throw new ArgumentException("Value cannot be an empty collection.", name);
@@ -76,7 +76,7 @@ internal static class Argument
 
     public static void AssertNotDefault<T>(ref T value, string name) where T : struct, IEquatable<T>
     {
-        if (value.Equals(default(T)))
+        if (value.Equals(default))
         {
             throw new ArgumentException("Value cannot be empty.", name);
         }
