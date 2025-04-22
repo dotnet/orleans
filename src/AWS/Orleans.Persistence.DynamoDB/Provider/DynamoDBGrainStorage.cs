@@ -353,14 +353,12 @@ namespace Orleans.Storage
         private T CreateInstance<T>() => _activatorProvider.GetActivator<T>().Create();
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Information,
             Message = "AWS DynamoDB Grain Storage {Name} is initializing: {InitMsg}"
         )]
         private static partial void LogInformationInitializingDynamoDBGrainStorage(ILogger logger, string name, string initMsg);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Information,
             Message = "Initializing provider {Name} of type {Type} in stage {Stage} took {ElapsedMilliseconds} Milliseconds."
         )]
@@ -374,28 +372,24 @@ namespace Orleans.Storage
         private static partial void LogErrorProviderInitFailed(ILogger logger, string name, string type, int stage, long elapsedMilliseconds, Exception exception);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Trace,
             Message = "Reading: GrainType={GrainType} Pk={PartitionKey} GrainId={GrainId} from Table={TableName}"
         )]
         private static partial void LogTraceReadingGrainState(ILogger logger, string grainType, string partitionKey, GrainId grainId, string tableName);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Error,
             Message = "Error Writing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to Table={TableName}"
         )]
         private static partial void LogErrorWritingGrainState(ILogger logger, Exception exception, string grainType, GrainId grainId, string eTag, string tableName);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Trace,
             Message = "Clearing: GrainType={GrainType} Pk={PartitionKey} GrainId={GrainId} ETag={ETag} DeleteStateOnClear={DeleteStateOnClear} from Table={TableName}"
         )]
         private static partial void LogTraceClearingGrainState(ILogger logger, string grainType, string partitionKey, GrainId grainId, string eTag, bool deleteStateOnClear, string tableName);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Error,
             Message = "Error {Operation}: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from Table={TableName}"
         )]

@@ -953,63 +953,54 @@ namespace Orleans.Transactions.DynamoDB
         }
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Information,
             Message = "The config values for 'createIfNotExists' and 'updateIfExists' are false. The table '{TableName}' will not be created or updated."
         )]
         private static partial void LogInformationTableNotCreatedOrUpdated(ILogger logger, string tableName);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Error,
             Message = "Could not initialize connection to storage table {TableName}"
         )]
         private static partial void LogErrorCouldNotInitializeTable(ILogger logger, Exception exception, string tableName);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Warning,
             Message = "The config value 'createIfNotExists' is false. The table '{TableName}' does not exist and it will not get created."
         )]
         private static partial void LogWarningTableNotCreated(ILogger logger, string tableName);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Error,
             Message = "Could not create table {TableName}"
         )]
         private static partial void LogErrorCouldNotCreateTable(ILogger logger, Exception exception, string tableName);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Warning,
             Message = "The config value 'updateIfExists' is false. The table structure for table '{TableName}' will not be updated."
         )]
         private static partial void LogWarningTableNotUpdated(ILogger logger, string tableName);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Error,
             Message = "Could not update table {TableName}"
         )]
         private static partial void LogErrorCouldNotUpdateTable(ILogger logger, Exception exception, string tableName);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Error,
             Message = "TTL is not DISABLED. Cannot update table TTL for table {TableName}. Please update manually."
         )]
         private static partial void LogErrorTtlNotDisabled(ILogger logger, string tableName);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Error,
             Message = "Exception occured while updating table {TableName} TTL attribute to {TtlAttributeName}. Please update manually."
         )]
         private static partial void LogErrorUpdateTtlException(ILogger logger, Exception exception, string tableName, string ttlAttributeName);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Error,
             Message = "Could not delete table {TableName}"
         )]
@@ -1022,7 +1013,6 @@ namespace Orleans.Transactions.DynamoDB
         private static partial void LogTraceCreatingTableEntry(ILogger logger, string tableName, DictionaryLogRecord tableEntry);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Error,
             Message = "Unable to create item to table {TableName}"
         )]
@@ -1035,7 +1025,6 @@ namespace Orleans.Transactions.DynamoDB
         private static partial void LogTraceUpsertingEntry(ILogger logger, DictionaryLogRecord entry, DictionaryLogRecord keys, string tableName);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Warning,
             Message = "Intermediate error upserting to the table {TableName}"
         )]
@@ -1048,7 +1037,6 @@ namespace Orleans.Transactions.DynamoDB
         private static partial void LogTraceDeletingTableEntry(ILogger logger, string tableName, DictionaryLogRecord keys);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Warning,
             Message = "Intermediate error deleting entry from the table {TableName}."
         )]
@@ -1061,7 +1049,6 @@ namespace Orleans.Transactions.DynamoDB
         private static partial void LogTraceDeletingTableEntries(ILogger logger, string tableName);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Warning,
             Message = "Intermediate error deleting entries from the table {TableName}."
         )]
@@ -1074,7 +1061,6 @@ namespace Orleans.Transactions.DynamoDB
         private static partial void LogTracePutEntries(ILogger logger, string tableName);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Warning,
             Message = "Intermediate error bulk inserting entries to table {TableName}."
         )]
@@ -1098,7 +1084,6 @@ namespace Orleans.Transactions.DynamoDB
         private static partial void LogDebugUnableToFindTableEntries(ILogger logger, DictionariesLogRecord keys);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.StorageProviderBase,
             Level = LogLevel.Warning,
             Message = "Failed to read table {TableName}"
         )]
