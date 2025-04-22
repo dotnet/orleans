@@ -30,6 +30,11 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
         public string KeyEntityTableName { get; set; } = "orleanstransactionkeyentity";
 
         /// <summary>
+        ///  the database parameter dot
+        /// </summary>
+        public string SqlParameterDot { get; set; } = "@";
+
+        /// <summary>
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
         /// </summary>
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
