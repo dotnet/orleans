@@ -16,8 +16,12 @@ public class ArcBufferWriterTests
 #else
     private readonly Random Random = new Random();
 #endif
+
+    /// <summary>
+    /// Verifies that writing data larger than a single page results in correct multi-page buffer management and correct data retrieval.
+    /// </summary>
     [Fact]
-    public void TestMultiPageBuffer()
+    public void MultiPageBuffer_CorrectlyHandlesLargeWritesAndRetrieval()
     {
         using var bufferWriter = new ArcBufferWriter();
         var randomData = new byte[PageSize * 3];
@@ -97,8 +101,11 @@ public class ArcBufferWriterTests
         Assert.Equal(randomData.Length - 6000, bufferWriter.Length);
     }
 
+    /// <summary>
+    /// Verifies that page reference counts and versions are managed correctly as slices are consumed and disposed.
+    /// </summary>
     [Fact]
-    public void TestMultiPageBufferManagement()
+    public void PageBufferManagement_TracksReferenceCountsAndVersions()
     {
         var bufferWriter = new ArcBufferWriter();
         var randomData = new byte[PageSize * 12];
@@ -166,8 +173,11 @@ public class ArcBufferWriterTests
         }
     }
 
+    /// <summary>
+    /// Verifies that ReplenishBuffers provides correct buffer segments for socket-like reads and that all pages are eventually freed.
+    /// </summary>
     [Fact]
-    public void TestReplenishBuffers()
+    public void ReplenishBuffers_ProvidesSegmentsAndFreesPages()
     {
         var bufferWriter = new ArcBufferWriter();
         var randomData = new byte[PageSize * 16];
@@ -266,8 +276,11 @@ public class ArcBufferWriterTests
         }
     }
 
+    /// <summary>
+    /// Verifies that writing a buffer of a given size results in the correct reported length.
+    /// </summary>
     [Fact]
-    public void TestWritingBuffers()
+    public void WriteBuffer_UpdatesLengthCorrectly()
     {
         using var buffer = new ArcBufferWriter();
         var data = new byte[1024];
@@ -278,8 +291,11 @@ public class ArcBufferWriterTests
         Assert.Equal(data.Length, buffer.Length);
     }
 
+    /// <summary>
+    /// Verifies that peeking at a slice returns the correct data without consuming it.
+    /// </summary>
     [Fact]
-    public void TestPeekingAtSlices()
+    public void PeekSlice_ReturnsCorrectDataWithoutConsuming()
     {
         using var buffer = new ArcBufferWriter();
         var data = new byte[1024];
@@ -292,8 +308,11 @@ public class ArcBufferWriterTests
         Assert.Equal(data.AsSpan(0, 512).ToArray(), peeked.ToArray());
     }
 
+    /// <summary>
+    /// Verifies that consuming a slice returns the correct data and updates the buffer length.
+    /// </summary>
     [Fact]
-    public void TestConsumingSlices()
+    public void ConsumeSlice_ReturnsCorrectDataAndUpdatesLength()
     {
         using var buffer = new ArcBufferWriter();
         var data = new byte[1024];
@@ -309,8 +328,11 @@ public class ArcBufferWriterTests
         Assert.Equal(data.Length - slice.Length, buffer.Length);
     }
 
+    /// <summary>
+    /// Verifies that using a slice after it has been unpinned throws an exception.
+    /// </summary>
     [Fact]
-    public void TestUseAfterFreeViolation()
+    public void UseAfterFree_ThrowsException()
     {
         using var buffer = new ArcBufferWriter();
         var data = new byte[1024];
@@ -324,8 +346,11 @@ public class ArcBufferWriterTests
         Assert.Throws<InvalidOperationException>(() => slice.ToArray());
     }
 
+    /// <summary>
+    /// Verifies that double unpinning a slice throws, and that buffer can be reset and disposed safely.
+    /// </summary>
     [Fact]
-    public void TestDoubleFreeViolation()
+    public void DoubleFree_ThrowsAndBufferCanBeResetAndDisposed()
     {
         var buffer = new ArcBufferWriter();
         var data = new byte[1024];
@@ -345,8 +370,11 @@ public class ArcBufferWriterTests
         buffer.Dispose();
     }
 
+    /// <summary>
+    /// Verifies that a new buffer is empty.
+    /// </summary>
     [Fact]
-    public void TestEmptyBuffer()
+    public void NewBuffer_IsEmpty()
     {
         using var buffer = new ArcBufferWriter();
 
@@ -354,8 +382,11 @@ public class ArcBufferWriterTests
         Assert.Equal(0, buffer.Length);
     }
 
+    /// <summary>
+    /// Verifies that writing an empty buffer does not change the buffer length.
+    /// </summary>
     [Fact]
-    public void TestWritingEmptyBuffer()
+    public void WriteEmptyBuffer_DoesNotChangeLength()
     {
         using var buffer = new ArcBufferWriter();
         var data = new byte[0];
@@ -366,8 +397,11 @@ public class ArcBufferWriterTests
         Assert.Equal(0, buffer.Length);
     }
 
+    /// <summary>
+    /// Verifies that peeking at an empty buffer returns empty segments and throws when peeking past end.
+    /// </summary>
     [Fact]
-    public void TestPeekingAtEmptyBuffer()
+    public void PeekEmptyBuffer_ReturnsEmptyAndThrowsOnOverflow()
     {
         using var buffer = new ArcBufferWriter();
         using var peeked = buffer.PeekSlice(0);
@@ -388,8 +422,11 @@ public class ArcBufferWriterTests
         Assert.Throws<ArgumentOutOfRangeException>(() => buffer.PeekSlice(1));
     }
 
+    /// <summary>
+    /// Verifies that consuming an empty buffer returns empty segments and throws when consuming past end.
+    /// </summary>
     [Fact]
-    public void TestConsumingEmptyBuffer()
+    public void ConsumeEmptyBuffer_ReturnsEmptyAndThrowsOnOverflow()
     {
         using var buffer = new ArcBufferWriter();
         using var slice = buffer.ConsumeSlice(0);
@@ -414,11 +451,14 @@ public class ArcBufferWriterTests
         Assert.Throws<ArgumentOutOfRangeException>(() => buffer.ConsumeSlice(1));
     }
 
+    /// <summary>
+    /// Verifies that disposing a slice after consuming a full page increments the page version.
+    /// </summary>
     [Fact]
-    public void TestDisposalReturnsPagesToPoolAndIncrementsVersion()
+    public void DisposeSliceAfterFullPageConsumption_IncrementsPageVersion()
     {
         using var bufferWriter = new ArcBufferWriter();
-        
+
         var data = new byte[ArcBufferPagePool.MinimumPageSize + 1];
         Random.NextBytes(data);
         bufferWriter.Write(data);
@@ -440,11 +480,14 @@ public class ArcBufferWriterTests
         }
     }
 
+    /// <summary>
+    /// Verifies that after writing and then advancing the read head, the page version is incremented as expected.
+    /// </summary>
     [Fact]
-    public void TestDisposalReturnsPagesToPoolAndIncrementsVersionReverseOrdered()
+    public void PageVersionIncrementAfterWriteAndReadHeadAdvance()
     {
         using var bufferWriter = new ArcBufferWriter();
-        
+
         var data = new byte[ArcBufferPagePool.MinimumPageSize];
         Random.NextBytes(data);
         bufferWriter.Write(data);
@@ -464,9 +507,11 @@ public class ArcBufferWriterTests
             Assert.False(page.First.Version > page.Second);
         }
 
-        // Write one more byte, moving the write head to the second page,
-        // causing it to free the first.
+        // Write one more byte, moving the write head to the second page.
         bufferWriter.Write([0]);
+
+        // Advance the read head to trigger unpinning and version increment.
+        bufferWriter.AdvanceReader(1);
 
         // Assert
         foreach (var page in pages.Zip(initialVersions))
@@ -476,8 +521,11 @@ public class ArcBufferWriterTests
         }
     }
 
+    /// <summary>
+    /// Verifies that all operations throw ObjectDisposedException after the buffer is disposed.
+    /// </summary>
     [Fact]
-    public void TestDisposedStateThrows()
+    public void DisposedBuffer_ThrowsOnAllOperations()
     {
         var buffer = new ArcBufferWriter();
         buffer.Dispose();
@@ -492,8 +540,11 @@ public class ArcBufferWriterTests
         Assert.Throws<ObjectDisposedException>(() => buffer.ReplenishBuffers(new List<ArraySegment<byte>>(1)));
     }
 
+    /// <summary>
+    /// Verifies that double-disposing an ArcBuffer slice is safe and does not throw.
+    /// </summary>
     [Fact]
-    public void TestDoubleDisposeArcBuffer()
+    public void DoubleDisposeArcBuffer_IsSafe()
     {
         using var buffer = new ArcBufferWriter();
         buffer.Write(new byte[100]);
@@ -503,8 +554,11 @@ public class ArcBufferWriterTests
         slice.Dispose();
     }
 
+    /// <summary>
+    /// Verifies that peeking with a stack-allocated span does not cause stack overflow.
+    /// </summary>
     [Fact]
-    public void TestPeekRecursionBug()
+    public void PeekWithStackSpan_DoesNotStackOverflow()
     {
         using var buffer = new ArcBufferWriter();
         buffer.Write(new byte[32]);
@@ -514,23 +568,32 @@ public class ArcBufferWriterTests
         Assert.True(span.Length == 32);
     }
 
+    /// <summary>
+    /// Verifies that resetting a disposed buffer throws ObjectDisposedException.
+    /// </summary>
     [Fact]
-    public void TestResetAfterDisposeThrows()
+    public void ResetAfterDispose_Throws()
     {
         var buffer = new ArcBufferWriter();
         buffer.Dispose();
         Assert.Throws<ObjectDisposedException>(() => buffer.Reset());
     }
 
+    /// <summary>
+    /// Verifies that advancing the writer by a negative value throws ArgumentOutOfRangeException.
+    /// </summary>
     [Fact]
-    public void TestAdvanceWriterNegativeThrows()
+    public void AdvanceWriterNegative_Throws()
     {
         using var buffer = new ArcBufferWriter();
         Assert.Throws<ArgumentOutOfRangeException>(() => buffer.AdvanceWriter(-1));
     }
 
+    /// <summary>
+    /// Verifies that advancing the reader by a negative or too-large value throws ArgumentOutOfRangeException.
+    /// </summary>
     [Fact]
-    public void TestAdvanceReaderNegativeOrTooLargeThrows()
+    public void AdvanceReaderNegativeOrTooLarge_Throws()
     {
         using var buffer = new ArcBufferWriter();
         buffer.Write(new byte[10]);
