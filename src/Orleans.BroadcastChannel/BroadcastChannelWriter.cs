@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.BroadcastChannel.SubscriberTable;
+using Orleans.Runtime;
 
 namespace Orleans.BroadcastChannel
 {
@@ -21,7 +22,7 @@ namespace Orleans.BroadcastChannel
     }
 
     /// <inheritdoc />
-    internal class BroadcastChannelWriter<T> : IBroadcastChannelWriter<T>
+    internal partial class BroadcastChannelWriter<T> : IBroadcastChannelWriter<T>
     {
         private static readonly string LoggingCategory = typeof(BroadcastChannelWriter<>).FullName;
 
@@ -52,11 +53,11 @@ namespace Orleans.BroadcastChannel
 
             if (subscribers.Count == 0)
             {
-                if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("No consumer found for {Item}", item);
+                LogDebugNoConsumerFound(_logger, item);
                 return;
             }
 
-            if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Publishing item {Item} to {ConsumerCount} consumers", item, subscribers.Count);
+            LogDebugPublishingItem(_logger, item, subscribers.Count);
 
             if (_fireAndForgetDelivery)
             {
@@ -91,13 +92,31 @@ namespace Orleans.BroadcastChannel
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Exception when sending item to {GrainId}", consumer.GetGrainId());
+                LogErrorExceptionWhenSendingItem(_logger, ex, consumer.GetGrainId());
                 if (!_fireAndForgetDelivery)
                 {
                     throw;
                 }
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "No consumer found for {Item}"
+        )]
+        private static partial void LogDebugNoConsumerFound(ILogger logger, T item);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Publishing item {Item} to {ConsumerCount} consumers"
+        )]
+        private static partial void LogDebugPublishingItem(ILogger logger, T item, int consumerCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Exception when sending item to {GrainId}"
+        )]
+        private static partial void LogErrorExceptionWhenSendingItem(ILogger logger, Exception exception, GrainId grainId);
     }
 }
 
