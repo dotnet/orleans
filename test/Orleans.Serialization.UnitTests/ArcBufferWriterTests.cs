@@ -771,4 +771,130 @@ public class ArcBufferWriterTests
         var page2 = pool.Rent();
         Assert.True(page2.Version > version1 || page2 != page1);
     }
+
+    /// <summary>
+    /// Verifies boundary values for slicing, peeking, and consuming.
+    /// </summary>
+    [Fact]
+    public void BoundaryValue_SlicePeekConsume()
+    {
+        using var buffer = new ArcBufferWriter();
+        var data = new byte[PageSize * 2];
+        Random.NextBytes(data);
+        buffer.Write(data);
+
+        // Slice at start
+        using (var s = buffer.PeekSlice(0))
+            Assert.Equal(0, s.Length);
+        using (var s = buffer.PeekSlice(1))
+            Assert.Equal(data[0], s.ToArray()[0]);
+        using (var s = buffer.PeekSlice(data.Length))
+            Assert.Equal(data, s.ToArray());
+
+        // Slice at page boundary
+        using (var s = buffer.PeekSlice(PageSize))
+            Assert.Equal(data.Take(PageSize).ToArray(), s.ToArray());
+        using (var s = buffer.PeekSlice(PageSize + 1))
+            Assert.Equal(data.Take(PageSize + 1).ToArray(), s.ToArray());
+
+        // Consume at boundaries
+        using (var s = buffer.ConsumeSlice(0))
+            Assert.Equal(0, s.Length);
+        using (var s = buffer.ConsumeSlice(1))
+            Assert.Equal(data[0], s.ToArray()[0]);
+        using (var s = buffer.ConsumeSlice(PageSize - 1))
+            Assert.Equal(data.Skip(1).Take(PageSize - 1).ToArray(), s.ToArray());
+        using (var s = buffer.ConsumeSlice(PageSize))
+            Assert.Equal(data.Skip(PageSize).Take(PageSize).ToArray(), s.ToArray());
+    }
+
+    /// <summary>
+    /// Verifies that double-free and use-after-free are guarded.
+    /// </summary>
+    [Fact]
+    public void DoubleFree_And_UseAfterFree_Guards()
+    {
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(new byte[100]);
+        var slice = buffer.PeekSlice(50);
+        slice.Dispose();
+        // Double dispose is safe
+        slice.Dispose();
+        // Unpin after dispose throws
+        Assert.Throws<InvalidOperationException>(() => slice.Unpin());
+        // Use after dispose throws
+        Assert.Throws<InvalidOperationException>(() => slice.ToArray());
+    }
+
+    /// <summary>
+    /// Verifies that memory is not leaked (reference count returns to zero) after all slices are disposed.
+    /// </summary>
+    [Fact]
+    public void NoMemoryLeak_ReferenceCountReturnsToZero()
+    {
+        var buffer = new ArcBufferWriter();
+        buffer.Write(new byte[PageSize * 2]);
+        var slices = new List<ArcBuffer>();
+        for (int i = 0; i < 10; i++)
+            slices.Add(buffer.PeekSlice(PageSize));
+        var pages = slices[0].Pages.ToList();
+        foreach (var s in slices)
+            s.Dispose();
+        foreach (var p in pages)
+            Assert.Equal(1, p.ReferenceCount); // Only the buffer's own pin remains
+        buffer.Dispose();
+        foreach (var p in pages)
+            Assert.Equal(0, p.ReferenceCount);
+    }
+
+    /// <summary>
+    /// Verifies that slicing and peeking with zero-length and full-length works for empty and full buffers.
+    /// </summary>
+    [Fact]
+    public void EmptyAndFullBuffer_SlicePeek()
+    {
+        using var buffer = new ArcBufferWriter();
+        using (var s = buffer.PeekSlice(0))
+            Assert.Equal(0, s.Length);
+        buffer.Write(new byte[PageSize]);
+        using (var s = buffer.PeekSlice(PageSize))
+            Assert.Equal(PageSize, s.Length);
+        using (var s = buffer.ConsumeSlice(PageSize))
+            Assert.Equal(PageSize, s.Length);
+        Assert.Equal(0, buffer.Length);
+    }
+
+    /// <summary>
+    /// Verifies that slicing at the very end of the buffer returns an empty slice.
+    /// </summary>
+    [Fact]
+    public void SliceAtEnd_ReturnsEmpty()
+    {
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(new byte[10]);
+        buffer.ConsumeSlice(10).Dispose();
+        using (var s = buffer.PeekSlice(0))
+            Assert.Equal(0, s.Length);
+        Assert.Throws<ArgumentOutOfRangeException>(() => buffer.PeekSlice(1));
+    }
+
+    /// <summary>
+    /// Verifies that pin/unpin on different slices to the same page does not leak memory.
+    /// </summary>
+    [Fact]
+    public void MultipleSlices_SamePage_NoLeak()
+    {
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(new byte[PageSize]);
+        var s1 = buffer.PeekSlice(PageSize / 2);
+        var s2 = buffer.PeekSlice(PageSize / 2);
+        var page = s1.First;
+        Assert.True(page.ReferenceCount >= 2);
+        s1.Dispose();
+        Assert.True(page.ReferenceCount >= 1);
+        s2.Dispose();
+        Assert.Equal(1, page.ReferenceCount); // Only buffer's own pin remains
+        buffer.Dispose();
+        Assert.Equal(0, page.ReferenceCount);
+    }
 }
