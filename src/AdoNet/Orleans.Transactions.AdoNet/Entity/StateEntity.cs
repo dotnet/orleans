@@ -6,9 +6,8 @@ using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Transactions.Abstractions;
-using Orleans.Transactions.AdoNet.Entity;
 
-namespace Orleans.Transactions.AdoNet.TransactionalState
+namespace Orleans.Transactions.AdoNet.Entity
 {
     internal class StateEntity: IEntity
     {
