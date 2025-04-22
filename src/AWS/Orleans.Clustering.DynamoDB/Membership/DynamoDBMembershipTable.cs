@@ -567,7 +567,6 @@ namespace Orleans.Clustering.DynamoDB
         }
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipBase,
             Level = LogLevel.Information,
             Message = "Initializing AWS DynamoDB Membership Table"
         )]
@@ -580,7 +579,6 @@ namespace Orleans.Clustering.DynamoDB
         private partial void LogInformationCreatedNewTableVersionRow();
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipBase,
             Level = LogLevel.Error,
             Message = "Unable to delete membership records on table {TableName} for ClusterId {ClusterId}"
         )]
@@ -593,14 +591,12 @@ namespace Orleans.Clustering.DynamoDB
         private partial void LogTraceReadMyEntry(SiloAddress siloAddress, MembershipTableData tableData);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipBase,
             Level = LogLevel.Warning,
             Message = "Intermediate error reading silo entry for key {SiloAddress} from the table {TableName}"
         )]
         private partial void LogWarningIntermediateErrorReadingSiloEntry(Exception exception, SiloAddress siloAddress, string tableName);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipBase,
             Level = LogLevel.Warning,
             Message = "Found an inconsistency while reading all silo entries"
         )]
@@ -613,7 +609,6 @@ namespace Orleans.Clustering.DynamoDB
         private partial void LogTraceReadAllTable(MembershipTableData table);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipBase,
             Level = LogLevel.Warning,
             Message = "Intermediate error reading all silo entries {TableName}."
         )]
@@ -626,21 +621,18 @@ namespace Orleans.Clustering.DynamoDB
         private partial void LogDebugInsertRow(MembershipEntry entry);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipBase,
             Level = LogLevel.Warning,
             Message = "Insert failed. Invalid ETag value. Will retry. Entry {Entry}, eTag {ETag}"
         )]
         private partial void LogWarningInsertFailedInvalidETag(MembershipEntry entry, string etag);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipBase,
             Level = LogLevel.Warning,
             Message = "Insert failed due to contention on the table. Will retry. Entry {Entry}"
         )]
         private partial void LogWarningInsertFailedDueToContention(MembershipEntry entry);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipBase,
             Level = LogLevel.Warning,
             Message = "Intermediate error inserting entry {Entry} to the table {TableName}."
         )]
@@ -653,21 +645,18 @@ namespace Orleans.Clustering.DynamoDB
         private partial void LogDebugUpdateRow(MembershipEntry entry, string etag);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipBase,
             Level = LogLevel.Warning,
             Message = "Update failed. Invalid ETag value. Will retry. Entry {Entry}, eTag {ETag}"
         )]
         private partial void LogWarningUpdateFailedInvalidETag(MembershipEntry entry, string etag);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipBase,
             Level = LogLevel.Warning,
             Message = "Update failed due to contention on the table. Will retry. Entry {Entry}, eTag {ETag}"
         )]
         private partial void LogWarningUpdateFailedDueToContention(Exception exception, MembershipEntry entry, string etag);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipBase,
             Level = LogLevel.Warning,
             Message = "Intermediate error updating entry {Entry} to the table {TableName}."
         )]
@@ -680,28 +669,24 @@ namespace Orleans.Clustering.DynamoDB
         private partial void LogDebugMergeEntry(MembershipEntry entry);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipBase,
             Level = LogLevel.Warning,
             Message = "Intermediate error updating IAmAlive field for entry {Entry} to the table {TableName}."
         )]
         private partial void LogWarningIntermediateErrorUpdatingIAmAlive(Exception exception, MembershipEntry entry, string tableName);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipBase,
             Level = LogLevel.Error,
             Message = "Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {TableEntry}. Ignoring this entry."
         )]
         private partial void LogErrorIntermediateErrorParsingSiloInstanceTableEntry(Exception exception, SiloInstanceRecord tableEntry);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipBase,
             Level = LogLevel.Error,
             Message = "Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Entries}."
         )]
         private partial void LogErrorIntermediateErrorParsingSiloInstanceTableEntries(Exception exception, IEnumerable<SiloInstanceRecord> entries);
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.MembershipBase,
             Level = LogLevel.Error,
             Message = "Unable to clean up defunct membership records on table {TableName} for ClusterId {ClusterId}"
         )]
