@@ -24,8 +24,11 @@ namespace Orleans.Persistence.Migration
         private readonly CancellationTokenSource _backgroundWorkCts = new();
         private object _lastProcessedGrainCursor;
 
+        public string Name { get; }
+
         public DataMigrator(
             ILogger<DataMigrator> logger,
+            string name,
             IClusterMembershipService clusterMembershipService,
             ILocalSiloDetails localSiloDetails,
             IGrainStorage sourceStorage,
@@ -35,6 +38,7 @@ namespace Orleans.Persistence.Migration
         {
             _logger = logger;
             _options = options ?? new();
+            Name = name;
 
             _clusterMembershipService = clusterMembershipService;
             _localSiloDetails = localSiloDetails;

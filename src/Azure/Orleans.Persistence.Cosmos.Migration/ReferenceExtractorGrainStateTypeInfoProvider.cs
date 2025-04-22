@@ -73,14 +73,14 @@ namespace Orleans.Persistence.Cosmos.Migration
             }
 
             var baseType = grainClass.BaseType;
-            if (baseType is null)
+            while (baseType != null)
             {
-                return null;
-            }
+                if (baseType.IsGenericType && baseType.GetGenericTypeDefinition() == typeof(Grain<>))
+                {
+                    return "state";
+                }
 
-            if (baseType.IsGenericType && baseType.GetGenericTypeDefinition() == typeof(Grain<>))
-            {
-                return "state";
+                baseType = baseType.BaseType;
             }
 
             return null;

@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
+using Orleans.Providers;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
@@ -19,6 +20,24 @@ namespace Tester.AzureUtils.Migration.Grains
     {
         public int A { get; set; }
         public int B { get; set; }
+    }
+
+    [StorageProvider(ProviderName = "migration1")]
+    [Orleans.Persistence.Cosmos.GrainType("migrationtestgrain")]
+    public class MigrationTestGrainStorage1 : MigrationTestGrain
+    {
+        public MigrationTestGrainStorage1(ILoggerFactory loggerFactory) : base(loggerFactory)
+        {
+        }
+    }
+
+    [StorageProvider(ProviderName = "migration2")]
+    [Orleans.Persistence.Cosmos.GrainType("migrationtestgrain")]
+    public class MigrationTestGrainStorage2 : MigrationTestGrain
+    {
+        public MigrationTestGrainStorage2(ILoggerFactory loggerFactory) : base(loggerFactory)
+        {
+        }
     }
 
     /// <summary>

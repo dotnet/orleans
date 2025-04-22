@@ -26,6 +26,16 @@ namespace Tester.AzureUtils.Migration.Abstractions
             this.fixture = fixture;
         }
 
+        protected ISimplePersistentMigrationGrain GetMigrationGrain(long id, Type? customType = null)
+        {
+            if (customType is not null)
+            {
+                return this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(id, grainClassNamePrefix: customType.FullName);
+            }
+
+            return this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(id);
+        }
+
         private IServiceProvider? serviceProvider;
         protected IServiceProvider ServiceProvider
         {
@@ -65,9 +75,9 @@ namespace Tester.AzureUtils.Migration.Abstractions
                 return this.sourceStorage;
             }
         }
+        protected IExtendedGrainStorage? SourceExtendedStorage => (SourceStorage as IExtendedGrainStorage) ?? null;
 
-        protected IExtendedGrainStorage? SourceExtendedStorage
-            => (SourceStorage as IExtendedGrainStorage) ?? null;
+        protected IGrainStorage GetStorage(string name) => ServiceProvider.GetRequiredServiceByName<IGrainStorage>(name);
 
         private IGrainStorage? destinationStorage;
         protected IGrainStorage DestinationStorage
@@ -125,6 +135,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
                 return this.dataMigrator;
             }
         }
+        protected DataMigrator GetDataMigrator(string name) => ServiceProvider.GetRequiredServiceByName<DataMigrator>(name);
 
         private IDocumentIdProvider? cosmosDocumentIdProvider;
         protected IDocumentIdProvider DocumentIdProvider
