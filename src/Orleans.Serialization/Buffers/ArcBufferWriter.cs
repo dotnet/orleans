@@ -658,6 +658,7 @@ public sealed class ArcBufferPage
     /// <param name="bytes">The number of bytes to increase the length of this page by.</param>
     public void Advance(int bytes)
     {
+        Debug.Assert(bytes >= 0, "Advance called with negative bytes");
         Length += bytes;
         Debug.Assert(Length <= Array.Length);
     }
@@ -671,6 +672,8 @@ public sealed class ArcBufferPage
     {
         Debug.Assert(Next is null);
         CheckValidity(token);
+        Debug.Assert(next is not null, "SetNext called with null next page");
+        Debug.Assert(next != this, "SetNext called with self as next page");
         Next = next;
     }
 
@@ -1184,11 +1187,11 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
         /// <returns><see langword="true"/> if the enumerator was successfully advanced to the next element; <see langword="false"/> if the enumerator has passed the end of the collection.</returns>
         public bool MoveNext()
         {
-            Debug.Assert(_position <= Length);
+            Debug.Assert(_position <= Length, "Enumerator position exceeds slice length");
             if (_page is null || _position == Length)
             {
                 Current = default;
-                Debug.Assert(_position == Length);
+                Debug.Assert(_position == Length, "Enumerator ended before reaching full length");
                 return false;
             }
 
@@ -1198,6 +1201,7 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
                 Slice.CheckValidity();
                 var offset = Offset;
                 var length = Math.Min(Length, _page.Length - offset);
+                Debug.Assert(length >= 0, "Calculated negative length for first segment");
                 _position += length;
                 Current = new PageSegment(_page, offset, length);
                 _page = _page.Next;
@@ -1206,6 +1210,7 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
 
             {
                 var length = Math.Min(Length - _position, _page.Length);
+                Debug.Assert(length >= 0, "Calculated negative length for subsequent segment");
                 _position += length;
                 Current = new PageSegment(_page, 0, length);
                 _page = _page.Next;
