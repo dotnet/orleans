@@ -3,32 +3,24 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Orleans.Transactions.AdoNet.Entity;
 
 namespace Orleans.Transactions.AdoNet.TransactionalState
 {
-    public enum TableTransactionActionType
+    internal enum TableTransactionActionType
     {
 
         Add,
 
-       // UpdateMerge,
-
         UpdateReplace,
 
         Delete,
-
-        //UpsertMerge,
-
-        //UpsertReplace
     }
 
-    public class TableTransactionAction
+    internal class TableTransactionAction
     {
         public TableTransactionAction(TableTransactionActionType action, StateEntity state) : this(action, state, default)
         {
-            ActionType = action;
-            State = state;
-            ETag = state.ETag;
         }
 
         public TableTransactionAction(TableTransactionActionType action, StateEntity state,string eTag)
@@ -38,10 +30,8 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             ETag = eTag;
         }
 
-        public TableTransactionAction(TableTransactionActionType action, KeyEntity key) : this(action, key, default)
+        public TableTransactionAction(TableTransactionActionType action, KeyEntity key) : this(action, key, key.ETag)
         {
-            ActionType = action;
-            Key = key;
         }
 
         public TableTransactionAction(TableTransactionActionType action, KeyEntity key,string eTag)
