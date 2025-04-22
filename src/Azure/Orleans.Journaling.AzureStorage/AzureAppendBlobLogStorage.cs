@@ -161,19 +161,16 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
     }
 
     [LoggerMessage(
-        EventId = 1,
         Level = LogLevel.Debug,
         Message = "Appended {Length} bytes to blob \"{ContainerName}/{BlobName}\"")]
     private static partial void LogAppend(ILogger logger, long length, string containerName, string blobName);
 
     [LoggerMessage(
-        EventId = 2,
         Level = LogLevel.Debug,
         Message = "Read {Length} bytes from blob \"{ContainerName}/{BlobName}\"")]
     private static partial void LogRead(ILogger logger, long length, string containerName, string blobName);
 
     [LoggerMessage(
-        EventId = 3,
         Level = LogLevel.Debug,
         Message = "Replaced blob \"{ContainerName}/{BlobName}\", writing {Length} bytes")]
     private static partial void LogReplace(ILogger logger, string containerName, string blobName, long length);

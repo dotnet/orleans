@@ -451,7 +451,6 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     }
 
     [LoggerMessage(
-        EventId = 1,
         Level = LogLevel.Error,
         Message = "Error processing work items.")]
     private static partial void LogErrorProcessingWorkItems(ILogger logger, Exception exception);
