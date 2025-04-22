@@ -10,6 +10,7 @@ using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.AdoNet.Storage;
 
 namespace Orleans.Transactions.AdoNet.TransactionalState
 {
@@ -33,6 +34,11 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             this.clusterOptions = clusterOptions.Value;
             this.jsonSettings = TransactionalStateFactory.GetJsonSerializerSettings(services);
             this.loggerFactory = loggerFactory;
+            //now just oracle sqlparameter dot is different
+            if (this.options.Invariant == AdoNetInvariants.InvariantNameOracleDatabase)
+            {
+                this.options.SqlParameterDot = ":";
+            }
         }
 
         public static ITransactionalStateStorageFactory Create(IServiceProvider services, string name)
@@ -46,7 +52,6 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             IGrainContext context) where TState : class, new()
         {
             string partitionKey = MakePartitionKey(context, stateName);
-            // TODO
             return ActivatorUtilities.CreateInstance<TransactionalStateStorage<TState>>(context.ActivationServices, partitionKey, this.jsonSettings, this.options);
         }
 
@@ -81,8 +86,6 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
         private  Task Init(CancellationToken cancellationToken)
         {
            return Task.CompletedTask;
-            //var dbOperator = new DbOperator(options);
-            //await dbOperator.EnsureCreateTable();
         }
     }
 }
