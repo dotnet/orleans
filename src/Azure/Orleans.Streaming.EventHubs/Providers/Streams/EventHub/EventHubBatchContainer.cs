@@ -107,7 +107,7 @@ namespace Orleans.Streaming.EventHubs
         }
 
         /// <summary>
-        ///   Updates the event data with the events list and its context.
+        /// Updates the event data with the events list and its context.
         /// </summary>
         /// <param name="eventData">The <see cref="EventData"/> instance to update with a new body and context.</param>
         /// <param name="bodySerializer">The serializer to use for creating the event body payload.</param>
