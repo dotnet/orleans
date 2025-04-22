@@ -1,8 +1,11 @@
-﻿using Azure;
+using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage;
 using Azure.Core;
 using Orleans.Runtime;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Journaling;
 
@@ -60,7 +63,7 @@ public sealed class AzureAppendBlobStateMachineStorageOptions
     /// A function for building container factory instances.
     /// </summary>
     public Func<IServiceProvider, AzureAppendBlobStateMachineStorageOptions, IBlobContainerFactory> BuildContainerFactory { get; set; }
-        = static (provider, options) => new DefaultBlobContainerFactory(options);
+        = static (provider, options) => new DefaultBlobContainerFactory(provider.GetRequiredService<IOptions<ClusterOptions>>(), options);
 
     /// <summary>
     /// Configures the <see cref="BlobServiceClient"/> using a connection string.

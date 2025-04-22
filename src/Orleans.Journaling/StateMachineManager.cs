@@ -8,7 +8,7 @@ using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
-internal sealed class StateMachineManager : IStateMachineManager, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal sealed partial class StateMachineManager : IStateMachineManager, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const int MinApplicationStateMachineId = 8;
     private static readonly StringCodec StringCodec = new();
@@ -256,12 +256,12 @@ internal sealed class StateMachineManager : IStateMachineManager, ILifecyclePart
                     return;
                 }
 
-                _logger.LogError(exception, "Error processing work items.");
+                LogErrorProcessingWorkItems(_logger, exception);
             }
         }
     }
 
-    private static void AppendUpdatesOrSnapshotStateMachine(LogExtentBuilder logSegment, bool isSnapshot, ulong id, IDurableStateMachine stateMachine)  
+    private static void AppendUpdatesOrSnapshotStateMachine(LogExtentBuilder logSegment, bool isSnapshot, ulong id, IDurableStateMachine stateMachine)
     {
         var writer = logSegment.CreateLogWriter(new(id));
         if (isSnapshot)
@@ -449,5 +449,10 @@ internal sealed class StateMachineManager : IStateMachineManager, ILifecyclePart
 
         protected override void OnSet(string key, ulong value) => _manager.OnSetStateMachineId(key, value);
     }
-}
 
+    [LoggerMessage(
+        EventId = 1,
+        Level = LogLevel.Error,
+        Message = "Error processing work items.")]
+    private static partial void LogErrorProcessingWorkItems(ILogger logger, Exception exception);
+}

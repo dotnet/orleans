@@ -42,11 +42,7 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
 
         _stream.SetBuilder(value);
         var result = await _client.AppendBlockAsync(_stream, _appendOptions, cancellationToken).ConfigureAwait(false);
-        if (_logger.IsEnabled(LogLevel.Debug))
-        {
-            var length = value.Length;
-            _logger.LogDebug("Appended {Length} bytes to blob \"{ContainerName}/{BlobName}\"", length, _client.BlobContainerName, _client.Name);
-        }
+        LogAppend(_logger, value.Length, _client.BlobContainerName, _client.Name);
 
         _stream.Reset();
         _appendOptions.Conditions.IfNoneMatch = default;
@@ -105,12 +101,7 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
             {
                 if (buffer.Length > 0)
                 {
-                    if (_logger.IsEnabled(LogLevel.Debug))
-                    {
-                        var length = buffer.Length;
-                        _logger.LogDebug("Read {Length} bytes from blob \"{ContainerName}/{BlobName}\"", length, _client.BlobContainerName, _client.Name);
-                    }
-
+                    LogRead(_logger, buffer.Length, _client.BlobContainerName, _client.Name);
                     yield return new LogExtent(buffer.ConsumeSlice(buffer.Length));
                 }
 
@@ -123,7 +114,7 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
 
     private async Task<Response<BlobDownloadStreamingResult>> CopyFromSnapshotAsync(ETag eTag, string snapshotDetail, CancellationToken cancellationToken)
     {
-        // Read snapshot and append it to the blob. 
+        // Read snapshot and append it to the blob.
         var snapshot = _client.WithSnapshot(snapshotDetail);
         var uri = snapshot.GenerateSasUri(permissions: BlobSasPermissions.Read, expiresOn: DateTimeOffset.UtcNow.AddHours(1));
         var copyResult = await _client.SyncCopyFromUriAsync(
@@ -158,11 +149,7 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
         // Write the state machine snapshot.
         _stream.SetBuilder(value);
         var result = await _client.AppendBlockAsync(_stream, _appendOptions, cancellationToken).ConfigureAwait(false);
-        if (_logger.IsEnabled(LogLevel.Debug))
-        {
-            var length = value.Length;
-            _logger.LogDebug("Replaced blob \"{ContainerName}/{BlobName}\", writing {Length} bytes", _client.BlobContainerName, _client.Name, length);
-        }
+        LogReplace(_logger, _client.BlobContainerName, _client.Name, value.Length);
 
         _stream.Reset();
         _appendOptions.Conditions.IfNoneMatch = default;
@@ -172,5 +159,23 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
         // Delete the blob snapshot.
         await _client.WithSnapshot(blobSnapshot.Value.Snapshot).DeleteAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
     }
+
+    [LoggerMessage(
+        EventId = 1,
+        Level = LogLevel.Debug,
+        Message = "Appended {Length} bytes to blob \"{ContainerName}/{BlobName}\"")]
+    private static partial void LogAppend(ILogger logger, long length, string containerName, string blobName);
+
+    [LoggerMessage(
+        EventId = 2,
+        Level = LogLevel.Debug,
+        Message = "Read {Length} bytes from blob \"{ContainerName}/{BlobName}\"")]
+    private static partial void LogRead(ILogger logger, long length, string containerName, string blobName);
+
+    [LoggerMessage(
+        EventId = 3,
+        Level = LogLevel.Debug,
+        Message = "Replaced blob \"{ContainerName}/{BlobName}\", writing {Length} bytes")]
+    private static partial void LogReplace(ILogger logger, string containerName, string blobName, long length);
 
 }
