@@ -13,6 +13,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.AdoNet.Entity;
 using Orleans.Transactions.AdoNet.Storage;
 using IsolationLevel = System.Transactions.IsolationLevel;
 
@@ -49,13 +50,10 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             keyEntity = await ReadKey();
             stateEntityList = await ReadStates();
 
-            if (keyEntity == null)
+            keyEntity = keyEntity ?? new KeyEntity()
             {
-                keyEntity = new KeyEntity()
-                {
-                    StateId = stateId,
-                };
-            }
+                StateId = stateId,
+            };
 
             if (string.IsNullOrEmpty(keyEntity.ETag))
             {
@@ -79,7 +77,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                     throw new InvalidOperationException(error);
                 }
 
-                committedState = JsonConvert.DeserializeObject<TState>(JsonConvert.SerializeObject(stateEntityList[pos].Value, jsonSettings));
+                committedState = JsonConvert.DeserializeObject<TState>(stateEntityList[pos].Value.StateJson);
             }
 
             var prepareRecordsToRecover = new List<PendingTransactionState<TState>>();
@@ -99,9 +97,9 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
 
                 prepareRecordsToRecover.Add(new PendingTransactionState<TState>()
                 {
-                    State = JsonConvert.DeserializeObject<TState>(JsonConvert.SerializeObject(kvp.Value, jsonSettings)),
+                    State = JsonConvert.DeserializeObject<TState>(kvp.Value.StateJson),
                     SequenceId = kvp.Key,
-                    TimeStamp = Convert.ToDateTime( kvp.Value.Timestamp.Value),
+                    TimeStamp = kvp.Value.TransactionTimestamp,
                     TransactionId = kvp.Value.TransactionId,
                     TransactionManager = tm
                 });
@@ -133,7 +131,8 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             long? commitUpTo,
             long? abortAfter)
         {
-            if ((!string.IsNullOrWhiteSpace(keyEntity.ETag) || !string.IsNullOrWhiteSpace(expectedETag)) && keyEntity.ETag != expectedETag)
+            var keyETag = keyEntity.ETag;
+            if ((!string.IsNullOrWhiteSpace(keyETag) || !string.IsNullOrWhiteSpace(expectedETag)) && keyETag != expectedETag)
             {
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");
             }
@@ -147,7 +146,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                 {
                     var entity = stateEntityList[stateEntityList.Count - 1];
                     await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.Delete, entity.Value,entity.Value.ETag));
-                    keyEntity.ETag = batchOperation.KeyETag;
+                    keyETag = batchOperation.KeyETag;
                     stateEntityList.RemoveAt(stateEntityList.Count - 1);
 
                     if (logger.IsEnabled(LogLevel.Trace))
@@ -171,9 +170,9 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                             existing.TransactionTimestamp = s.TimeStamp;
                             existing.TransactionManager = JsonConvert.SerializeObject(s.TransactionManager, jsonSettings);
                             existing.StateJson = JsonConvert.SerializeObject(s.State, jsonSettings);
-
+                            existing.Timestamp = DateTime.Now;
                             await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.UpdateReplace, existing,existing.ETag)).ConfigureAwait(false);
-                            keyEntity.ETag = batchOperation.KeyETag;
+                            keyETag = batchOperation.KeyETag;
                             if (logger.IsEnabled(LogLevel.Trace))
                                 logger.LogTrace($"{stateId} Update {existing.TransactionId}");
                         }
@@ -181,7 +180,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                         {
                             var entity = StateEntity.Create(this.jsonSettings, this.stateId, s);
                             await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.Add, entity)).ConfigureAwait(false);
-                            keyEntity.ETag = batchOperation.KeyETag;
+                            keyETag = entity.ETag;
                             stateEntityList.Insert(pos, new KeyValuePair<long, StateEntity>(s.SequenceId, entity));
 
                             if (logger.IsEnabled(LogLevel.Trace))
@@ -200,19 +199,18 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             }
             if (string.IsNullOrEmpty(keyEntity.ETag))
             {
-                keyEntity.ETag = Guid.NewGuid().ToString();
-                //TODO
+                keyEntity.ETag = keyETag ?? Guid.NewGuid().ToString();
+                keyEntity.Timestamp = DateTime.Now;
                 await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.Add, keyEntity)).ConfigureAwait(false);
-                //keyEntity.ETag = batchOperation.KeyETag;
 
                 if (logger.IsEnabled(LogLevel.Trace))
                     logger.LogTrace($"{stateId} Insert. v{keyEntity.CommittedSequenceId}, {metadata.CommitRecords.Count}c");
             }
             else
             {
-                //TODO
+                keyEntity.Timestamp = DateTime.Now;
                 await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.UpdateReplace, keyEntity,keyEntity.ETag)).ConfigureAwait(false);
-                //keyEntity.ETag = batchOperation.KeyETag;
+                keyEntity.ETag = batchOperation.KeyETag;
                 if (logger.IsEnabled(LogLevel.Trace))
                     logger.LogTrace($"{stateId} Update. v{keyEntity.CommittedSequenceId}, {metadata.CommitRecords.Count}c");
             }
@@ -223,7 +221,6 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                 FindState(obsoleteBefore, out var pos);
                 for (var i = 0; i < pos; i++)
                 {
-                    //TODO
                     await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.Delete, stateEntityList[i].Value, stateEntityList[i].Value.ETag)).ConfigureAwait(false);
                     keyEntity.ETag = batchOperation.KeyETag;
 
@@ -286,11 +283,11 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
         {
             var keyEntity = new KeyEntity()
             {
-                CommittedSequenceId = record.GetInt64(nameof(KeyEntity.CommittedSequenceId)),
-                Metadata = record.GetValueOrDefault<string>(nameof(KeyEntity.Metadata)),
                 StateId = record.GetValue<string>(nameof(KeyEntity.StateId)),
-                Timestamp = record.GetDateTimeValueOrDefault(nameof(KeyEntity.Timestamp)),
                 ETag = record.GetValueOrDefault<string>(nameof(KeyEntity.ETag)),
+                CommittedSequenceId = record.GetInt64(nameof(KeyEntity.CommittedSequenceId)),
+                Timestamp = record.GetDateTimeValueOrDefault(nameof(KeyEntity.Timestamp)),
+                Metadata = record.GetValueOrDefault<string>(nameof(KeyEntity.Metadata)),
             };
             return keyEntity;
         }
@@ -298,7 +295,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
 
         private async Task<List<KeyValuePair<long, StateEntity>>> ReadStates()
         {
-            string myquert = $"SELECT * FROM {this.options.StateEntityTableName} WHERE StateId=@StateId Order By SequenceId";
+            string myquert = $"SELECT * FROM {this.options.StateEntityTableName} WHERE StateId=@StateId Order By RowKey";
             var queryResult = await this.storage.ReadAsync<StateEntity>(myquert, command =>
             {
                 command.AddParameter("StateId", stateId);
@@ -308,18 +305,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             var results = new List<KeyValuePair<long, StateEntity>>();
             foreach (var entity in queryResult)
             {
-                //var state = new StateEntity()
-                //{
-                //    StateId = entity.StateId,
-                //    SequenceId = entity.SequenceId,
-                //    TransactionId = entity.TransactionId,
-                //    TransactionTimestamp = entity.TransactionTimestamp,
-                //    TransactionManager = entity.TransactionManager,
-                //    StateJson = entity.StateJson,
-                //    RowKey = entity.RowKey,
-                //    Timestamp = entity.Timestamp,
-                //    ETag = entity.ETag,
-                //};
+                entity.SequenceId = StateEntity.GetSequenceId(entity.RowKey);
                 results.Add(new KeyValuePair<long, StateEntity>(entity.SequenceId, entity));
             };
             return results;
@@ -330,7 +316,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             var stateEntity = new StateEntity()
             {
                 StateId = record.GetValue<string>(nameof(StateEntity.StateId)),
-                SequenceId = record.GetInt64(nameof(StateEntity.SequenceId)),
+                //SequenceId = record.GetInt64(nameof(StateEntity.SequenceId)),
                 TransactionId = record.GetValue<string>(nameof(StateEntity.TransactionId)),
                 TransactionTimestamp = record.GetDateTimeValueOrDefault(nameof(StateEntity.TransactionTimestamp)).Value,
                 TransactionManager = record.GetValue<string>(nameof(StateEntity.TransactionManager)),
@@ -346,7 +332,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
 
     }
 
-    public class DbBatchOperation
+    internal class DbBatchOperation
     {
         private readonly IRelationalStorage storage;
         readonly TransactionalStateStorageOptions options;
@@ -386,9 +372,10 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
 
             if (!BatchHasKey && operation.Key != null && operation.Key.RowKey == key.RowKey &&  operation.Key.StateId == stateId)
             {
-                key = (KeyEntity)operation.Key;
+                key = operation.Key;
                 keyIndex = batchOperation.Count;
             }
+
 
             batchOperation.Add(operation);
 
@@ -401,14 +388,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                 if (!BatchHasKey)
                 {
                     keyIndex = batchOperation.Count;
-                    if (string.IsNullOrEmpty(key.ETag))
-                    {
-                        batchOperation.Add(new TableTransactionAction(TableTransactionActionType.Add, key));
-                    }
-                    else
-                    {
-                        batchOperation.Add(new TableTransactionAction(TableTransactionActionType.UpdateReplace, key, key.ETag));
-                    }
+                    batchOperation.Add(new TableTransactionAction(operation.ActionType, key, key.ETag));
                 }
 
                 await Flush().ConfigureAwait(false);
@@ -421,14 +401,6 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             {
                 try
                 {
-                    //var batchResponse = await table.SubmitTransactionAsync(batchOperation).ConfigureAwait(false);
-                    //if (batchResponse?.Value is { Count: > 0 } responses)
-                    //{
-                    //    if (BatchHasKey && responses.Count >= keyIndex && responses[keyIndex].Headers.ETag is { } etag)
-                    //    {
-                    //        key.ETag = etag;
-                    //    }
-                    //}
 
                     await SubmitTransactionAsync(batchOperation).ConfigureAwait(false);
 
@@ -517,11 +489,11 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                         switch (transaction.ActionType)
                         {
                             case TableTransactionActionType.Add:
-                                string myquert = $"INSERT INTO {this.options.StateEntityTableName} (StateId,SequenceId,TransactionId,TransactionTimestamp,TransactionManager,StateJson,RowKey,Timestamp,ETag) VALUES (@StateId,@SequenceId,@TransactionId,@TransactionTimestamp,@TransactionManager,@StateJson,@RowKey,@Timestamp,@ETag);";
+                                string myquert = $"INSERT INTO {this.options.StateEntityTableName} (StateId,TransactionId,TransactionTimestamp,TransactionManager,StateJson,RowKey,Timestamp,ETag) VALUES (@StateId,@TransactionId,@TransactionTimestamp,@TransactionManager,@StateJson,@RowKey,@Timestamp,@ETag);";
                                 int affectedRowsCount = await storage.ExecuteAsync(myquert, command =>
                                 {
                                     command.AddParameter("StateId", transaction.State.StateId);
-                                    command.AddParameter("SequenceId", transaction.State.SequenceId);
+                                   // command.AddParameter("SequenceId", transaction.State.SequenceId);
                                     command.AddParameter("TransactionId", transaction.State.TransactionId);
                                     command.AddParameter("TransactionTimestamp", transaction.State.TransactionTimestamp);
                                     command.AddParameter("TransactionManager", transaction.State.TransactionManager);
@@ -532,11 +504,12 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                                 }).ConfigureAwait(continueOnCapturedContext: false);
                                 break;
                             case TableTransactionActionType.UpdateReplace:
-                                string myquert2 = $"UPDATE {this.options.StateEntityTableName} SET TransactionId=@TransactionId,TransactionTimestamp=@TransactionTimestamp,TransactionManager=@TransactionManager,StateJson=@StateJson,Timestamp=@Timestamp,ETag=@ETag WHERE StateId=@StateId AND SequenceId=@SequenceId;";
+                                string myquert2 = $"UPDATE {this.options.StateEntityTableName} SET TransactionId=@TransactionId,TransactionTimestamp=@TransactionTimestamp,TransactionManager=@TransactionManager,StateJson=@StateJson,Timestamp=@Timestamp,ETag=@ETag WHERE StateId=@StateId AND RowKey=@RowKey;";
                                 int affectedRowsCount2 = await storage.ExecuteAsync(myquert2, command =>
                                 {
                                     command.AddParameter("StateId", transaction.State.StateId);
-                                    command.AddParameter("SequenceId", transaction.State.SequenceId);
+                                    command.AddParameter("RowKey", transaction.State.RowKey);
+                                    // command.AddParameter("SequenceId", transaction.State.SequenceId);
                                     command.AddParameter("TransactionId", transaction.State.TransactionId);
                                     command.AddParameter("TransactionTimestamp", transaction.State.TransactionTimestamp);
                                     command.AddParameter("TransactionManager", transaction.State.TransactionManager);
@@ -546,11 +519,12 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                                 }).ConfigureAwait(continueOnCapturedContext: false);
                                 break;
                             case TableTransactionActionType.Delete:
-                                string myquert3 = $"DELETE FROM {this.options.StateEntityTableName} WHERE StateId=@StateId AND SequenceId=@SequenceId;";
+                                string myquert3 = $"DELETE FROM {this.options.StateEntityTableName} WHERE StateId=@StateId AND RowKey=@RowKey;";
                                 int affectedRowsCount3 = await storage.ExecuteAsync(myquert3, command =>
                                 {
                                     command.AddParameter("StateId", transaction.State.StateId);
-                                    command.AddParameter("SequenceId", transaction.State.SequenceId);
+                                    command.AddParameter("RowKey", transaction.State.RowKey);
+                                    //command.AddParameter("SequenceId", transaction.State.SequenceId);
                                 }).ConfigureAwait(continueOnCapturedContext: false);
                                 break;
                             default:

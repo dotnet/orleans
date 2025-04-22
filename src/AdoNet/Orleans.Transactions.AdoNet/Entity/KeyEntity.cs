@@ -4,28 +4,29 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Orleans.Transactions.AdoNet.TransactionalState
+namespace Orleans.Transactions.AdoNet.Entity
 {
     /// <summary>
     /// 
     /// </summary>
-    public class KeyEntity
+    internal class KeyEntity : IEntity
     {
         public const string RK = "k";
 
         public KeyEntity()
         {
-            this.RowKey = RK;
+            RowKey = RK;
         }
+
+        public string ETag { get; set; }
+        public string StateId { get; set; }
+
+        public string RowKey { get; set; }
+
+        public DateTimeOffset? Timestamp { get; set; }
 
         public long CommittedSequenceId { get; set; }
         public string Metadata { get; set; }
-        public string StateId { get; set; }// 同PartitionKey
-        public DateTimeOffset? Timestamp { get; set; }
-
-        public string ETag { get; set; }
-
-        public string RowKey { get; set; }
     }
 
 }
