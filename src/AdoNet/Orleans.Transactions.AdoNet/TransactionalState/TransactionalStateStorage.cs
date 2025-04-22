@@ -200,7 +200,6 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             if (string.IsNullOrEmpty(keyEntity.ETag))
             {
                 keyEntity.ETag = keyETag ?? Guid.NewGuid().ToString();
-                keyEntity.Timestamp = DateTime.Now;
                 await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.Add, keyEntity)).ConfigureAwait(false);
 
                 if (logger.IsEnabled(LogLevel.Trace))
@@ -208,7 +207,6 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             }
             else
             {
-                keyEntity.Timestamp = DateTime.Now;
                 await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.UpdateReplace, keyEntity,keyEntity.ETag)).ConfigureAwait(false);
                 keyEntity.ETag = batchOperation.KeyETag;
                 if (logger.IsEnabled(LogLevel.Trace))
@@ -259,11 +257,11 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
 
         private async Task<KeyEntity> ReadKey()
         {
-            string myquert = $"SELECT * FROM {this.options.KeyEntityTableName} WHERE StateId=@StateId";
+            string myquert = $"SELECT * FROM {this.options.KeyEntityTableName} WHERE {nameof(keyEntity.StateId)}={this.options.SqlParameterDot}{nameof(keyEntity.StateId)}";
 
             var queryResult = await this.storage.ReadAsync<KeyEntity>(myquert, command =>
               {
-                  command.AddParameter("StateId", stateId);
+                  command.AddParameter(nameof(keyEntity.StateId), stateId);
               }, (selector, resultSetCount, token) => Task.FromResult(GetConvertKeyRecord(selector)),
               cancellationToken: CancellationToken.None).ConfigureAwait(false);
 
@@ -295,10 +293,10 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
 
         private async Task<List<KeyValuePair<long, StateEntity>>> ReadStates()
         {
-            string myquert = $"SELECT * FROM {this.options.StateEntityTableName} WHERE StateId=@StateId Order By RowKey";
+            string myquert = $"SELECT * FROM {this.options.StateEntityTableName} WHERE {nameof(StateEntity.StateId)}={this.options.SqlParameterDot}{nameof(StateEntity.StateId)} Order By {nameof(StateEntity.RowKey)}";
             var queryResult = await this.storage.ReadAsync<StateEntity>(myquert, command =>
             {
-                command.AddParameter("StateId", stateId);
+                command.AddParameter(nameof(StateEntity.StateId), stateId);
             }, (selector, resultSetCount, token) => Task.FromResult(GetConvertStateRecord(selector)),
            cancellationToken: CancellationToken.None).ConfigureAwait(false);
 
@@ -315,15 +313,14 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
         {
             var stateEntity = new StateEntity()
             {
+                ETag = record.GetValueOrDefault<string>(nameof(StateEntity.ETag)),
                 StateId = record.GetValue<string>(nameof(StateEntity.StateId)),
-                //SequenceId = record.GetInt64(nameof(StateEntity.SequenceId)),
                 TransactionId = record.GetValue<string>(nameof(StateEntity.TransactionId)),
                 TransactionTimestamp = record.GetDateTimeValueOrDefault(nameof(StateEntity.TransactionTimestamp)).Value,
                 TransactionManager = record.GetValue<string>(nameof(StateEntity.TransactionManager)),
                 StateJson = record.GetValue<string>(nameof(StateEntity.StateJson)),
                 RowKey = record.GetValueOrDefault<string>(nameof(StateEntity.RowKey)),
                 Timestamp = record.GetDateTimeValueOrDefault(nameof(StateEntity.Timestamp)).Value,
-                ETag = record.GetValueOrDefault<string>(nameof(StateEntity.ETag)),
             };
             return stateEntity;
         }
@@ -437,6 +434,13 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             {
                 return;
             }
+            var addKeySql =  $"INSERT INTO {this.options.KeyEntityTableName} ({nameof(KeyEntity.StateId)},{nameof(KeyEntity.RowKey)},{nameof(KeyEntity.CommittedSequenceId)},{nameof(KeyEntity.Metadata)},{nameof(KeyEntity.Timestamp)},{nameof(KeyEntity.ETag)}) VALUES ({this.options.SqlParameterDot}{nameof(KeyEntity.StateId)},{this.options.SqlParameterDot}{nameof(KeyEntity.RowKey)},{this.options.SqlParameterDot}{nameof(KeyEntity.CommittedSequenceId)},{this.options.SqlParameterDot}{nameof(KeyEntity.Metadata)},{this.options.SqlParameterDot}{nameof(KeyEntity.Timestamp)},{this.options.SqlParameterDot}{nameof(KeyEntity.ETag)});";
+            string updateKeySql = $"UPDATE {this.options.KeyEntityTableName} SET {nameof(KeyEntity.CommittedSequenceId)}={this.options.SqlParameterDot}{nameof(KeyEntity.CommittedSequenceId)},{nameof(KeyEntity.Metadata)}={this.options.SqlParameterDot}{nameof(KeyEntity.Metadata)},{nameof(KeyEntity.Timestamp)}={this.options.SqlParameterDot}{nameof(KeyEntity.Timestamp)} WHERE {nameof(KeyEntity.StateId)}={this.options.SqlParameterDot}{nameof(KeyEntity.StateId)} AND {nameof(KeyEntity.ETag)}={this.options.SqlParameterDot}{nameof(KeyEntity.ETag)};";
+            string delKeySql = $"DELETE FROM {this.options.KeyEntityTableName} WHERE {nameof(KeyEntity.StateId)}={this.options.SqlParameterDot}{nameof(KeyEntity.StateId)};";
+
+            string addStateSql= $"INSERT INTO {this.options.StateEntityTableName} ({nameof(StateEntity.StateId)},{nameof(StateEntity.TransactionId)},{nameof(StateEntity.TransactionTimestamp)},{nameof(StateEntity.TransactionManager)},{nameof(StateEntity.StateJson)},{nameof(StateEntity.RowKey)},{nameof(StateEntity.Timestamp)},{nameof(StateEntity.ETag)}) VALUES ({this.options.SqlParameterDot}{nameof(StateEntity.StateId)},{this.options.SqlParameterDot}{nameof(StateEntity.TransactionId)},{this.options.SqlParameterDot}{nameof(StateEntity.TransactionTimestamp)},{this.options.SqlParameterDot}{nameof(StateEntity.TransactionManager)},{this.options.SqlParameterDot}{nameof(StateEntity.StateJson)},{this.options.SqlParameterDot}{nameof(StateEntity.RowKey)},{this.options.SqlParameterDot}{nameof(StateEntity.Timestamp)},{this.options.SqlParameterDot}{nameof(StateEntity.ETag)});";
+            string updateStateSql = $"UPDATE {this.options.StateEntityTableName} SET {nameof(StateEntity.TransactionId)}={this.options.SqlParameterDot}{nameof(StateEntity.TransactionId)},{nameof(StateEntity.TransactionTimestamp)}={this.options.SqlParameterDot}{nameof(StateEntity.TransactionTimestamp)},{nameof(StateEntity.TransactionManager)}={this.options.SqlParameterDot}{nameof(StateEntity.TransactionManager)},{nameof(StateEntity.StateJson)}={this.options.SqlParameterDot}{nameof(StateEntity.StateJson)},{nameof(StateEntity.Timestamp)}={this.options.SqlParameterDot}{nameof(StateEntity.Timestamp)} WHERE {nameof(StateEntity.StateId)}={this.options.SqlParameterDot}{nameof(StateEntity.StateId)} AND {nameof(StateEntity.RowKey)}={this.options.SqlParameterDot}{nameof(StateEntity.RowKey)};";
+            string delStateSql = $"DELETE FROM {this.options.StateEntityTableName} WHERE {nameof(StateEntity.StateId)}={this.options.SqlParameterDot}{nameof(StateEntity.StateId)} AND {nameof(StateEntity.RowKey)}={this.options.SqlParameterDot}{nameof(StateEntity.RowKey)};";
             //  this.storage.wx
             using (TransactionScope scope = new TransactionScope(TransactionScopeOption.Required,
                    new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
@@ -447,37 +451,34 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                 {
                     if (transaction.Key != null)
                     {
+                        transaction.Key.Timestamp = DateTime.Now;
                         switch (transaction.ActionType)
                         {
                             case TableTransactionActionType.Add:
-                                 string myquert = $"INSERT INTO {this.options.KeyEntityTableName} (StateId,RowKey,CommittedSequenceId,Metadata,Timestamp,ETag) VALUES (@StateId,@RowKey,@CommittedSequenceId,@Metadata,@Timestamp,@ETag);";
-                                 int affectedRowsCount = await storage.ExecuteAsync(myquert, command =>
+                                 int affectedRowsCount = await storage.ExecuteAsync(addKeySql, command =>
                                  {
-                                     command.AddParameter("StateId", transaction.Key.StateId);
-                                     command.AddParameter("RowKey", transaction.Key.RowKey);
-                                     command.AddParameter("CommittedSequenceId", transaction.Key.CommittedSequenceId);
-                                     command.AddParameter("Metadata", transaction.Key.Metadata);
-                                     command.AddParameter("Timestamp", transaction.Key.Timestamp);
-                                     command.AddParameter("ETag", transaction.Key.ETag);
+                                     command.AddParameter(nameof(KeyEntity.StateId), transaction.Key.StateId);
+                                     command.AddParameter(nameof(KeyEntity.RowKey), transaction.Key.RowKey);
+                                     command.AddParameter(nameof(KeyEntity.CommittedSequenceId), transaction.Key.CommittedSequenceId);
+                                     command.AddParameter(nameof(KeyEntity.Metadata), transaction.Key.Metadata);
+                                     command.AddParameter(nameof(KeyEntity.Timestamp), transaction.Key.Timestamp);
+                                     command.AddParameter(nameof(KeyEntity.ETag), transaction.Key.ETag);
                                  }).ConfigureAwait(continueOnCapturedContext: false);
                                 break;
                             case TableTransactionActionType.UpdateReplace:
-                                string myquert2 = $"UPDATE {this.options.KeyEntityTableName} SET CommittedSequenceId=@CommittedSequenceId,Metadata=@Metadata,ETag=@ETag,Timestamp=@Timestamp WHERE StateId=@StateId AND ETag=@ETag;";
-                                int affectedRowsCount2 = await storage.ExecuteAsync(myquert2, command =>
-                                {                            
-                                    command.AddParameter("CommittedSequenceId", transaction.Key.CommittedSequenceId);
-                                    command.AddParameter("Metadata", transaction.Key.Metadata);
-                                    command.AddParameter("Timestamp", transaction.Key.Timestamp);
-                                    command.AddParameter("StateId", transaction.Key.StateId);
-                                    command.AddParameter("ETag", transaction.Key.ETag);
-                                    // command.AddParameter("RowKey", transaction.Key.RowKey);
+                                int affectedRowsCount2 = await storage.ExecuteAsync(updateKeySql, command =>
+                                {
+                                    command.AddParameter(nameof(KeyEntity.CommittedSequenceId), transaction.Key.CommittedSequenceId);
+                                    command.AddParameter(nameof(KeyEntity.Metadata), transaction.Key.Metadata);
+                                    command.AddParameter(nameof(KeyEntity.Timestamp), transaction.Key.Timestamp);
+                                    command.AddParameter(nameof(KeyEntity.StateId), transaction.Key.StateId);
+                                    command.AddParameter(nameof(KeyEntity.ETag), transaction.Key.ETag);
                                 }).ConfigureAwait(continueOnCapturedContext: false);
                                 break;
                             case TableTransactionActionType.Delete:
-                                string myquert3 = $"DELETE FROM {this.options.KeyEntityTableName} WHERE StateId=@StateId;";
-                                int affectedRowsCount3 = await storage.ExecuteAsync(myquert3, command =>
+                                int affectedRowsCount3 = await storage.ExecuteAsync(delKeySql, command =>
                                 {
-                                    command.AddParameter("StateId", transaction.Key.StateId);
+                                    command.AddParameter(nameof(KeyEntity.StateId), transaction.Key.StateId);
                                 }).ConfigureAwait(continueOnCapturedContext: false);
                                 break;
                             default:
@@ -489,42 +490,35 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                         switch (transaction.ActionType)
                         {
                             case TableTransactionActionType.Add:
-                                string myquert = $"INSERT INTO {this.options.StateEntityTableName} (StateId,TransactionId,TransactionTimestamp,TransactionManager,StateJson,RowKey,Timestamp,ETag) VALUES (@StateId,@TransactionId,@TransactionTimestamp,@TransactionManager,@StateJson,@RowKey,@Timestamp,@ETag);";
-                                int affectedRowsCount = await storage.ExecuteAsync(myquert, command =>
+                                int affectedRowsCount = await storage.ExecuteAsync(addStateSql, command =>
                                 {
-                                    command.AddParameter("StateId", transaction.State.StateId);
-                                   // command.AddParameter("SequenceId", transaction.State.SequenceId);
-                                    command.AddParameter("TransactionId", transaction.State.TransactionId);
-                                    command.AddParameter("TransactionTimestamp", transaction.State.TransactionTimestamp);
-                                    command.AddParameter("TransactionManager", transaction.State.TransactionManager);
-                                    command.AddParameter("StateJson", transaction.State.StateJson);
-                                    command.AddParameter("RowKey", transaction.State.RowKey);
-                                    command.AddParameter("Timestamp", transaction.State.Timestamp);
-                                    command.AddParameter("ETag", transaction.State.ETag);
+                                    command.AddParameter(nameof(StateEntity.StateId), transaction.State.StateId);
+                                    command.AddParameter(nameof(StateEntity.TransactionId), transaction.State.TransactionId);
+                                    command.AddParameter(nameof(StateEntity.TransactionTimestamp), transaction.State.TransactionTimestamp);
+                                    command.AddParameter(nameof(StateEntity.TransactionManager), transaction.State.TransactionManager);
+                                    command.AddParameter(nameof(StateEntity.StateJson), transaction.State.StateJson);
+                                    command.AddParameter(nameof(StateEntity.RowKey), transaction.State.RowKey);
+                                    command.AddParameter(nameof(StateEntity.Timestamp), transaction.State.Timestamp);
+                                    command.AddParameter(nameof(StateEntity.ETag), transaction.State.ETag);
                                 }).ConfigureAwait(continueOnCapturedContext: false);
                                 break;
-                            case TableTransactionActionType.UpdateReplace:
-                                string myquert2 = $"UPDATE {this.options.StateEntityTableName} SET TransactionId=@TransactionId,TransactionTimestamp=@TransactionTimestamp,TransactionManager=@TransactionManager,StateJson=@StateJson,Timestamp=@Timestamp,ETag=@ETag WHERE StateId=@StateId AND RowKey=@RowKey;";
-                                int affectedRowsCount2 = await storage.ExecuteAsync(myquert2, command =>
+                            case TableTransactionActionType.UpdateReplace:               
+                                int affectedRowsCount2 = await storage.ExecuteAsync(updateStateSql, command =>
                                 {
-                                    command.AddParameter("StateId", transaction.State.StateId);
-                                    command.AddParameter("RowKey", transaction.State.RowKey);
-                                    // command.AddParameter("SequenceId", transaction.State.SequenceId);
-                                    command.AddParameter("TransactionId", transaction.State.TransactionId);
-                                    command.AddParameter("TransactionTimestamp", transaction.State.TransactionTimestamp);
-                                    command.AddParameter("TransactionManager", transaction.State.TransactionManager);
-                                    command.AddParameter("StateJson", transaction.State.StateJson);
-                                    command.AddParameter("Timestamp", transaction.State.Timestamp);
-                                    command.AddParameter("ETag", transaction.State.ETag);
+                                    command.AddParameter(nameof(StateEntity.StateId), transaction.State.StateId);
+                                    command.AddParameter(nameof(StateEntity.RowKey), transaction.State.RowKey);
+                                    command.AddParameter(nameof(StateEntity.TransactionId), transaction.State.TransactionId);
+                                    command.AddParameter(nameof(StateEntity.TransactionTimestamp), transaction.State.TransactionTimestamp);
+                                    command.AddParameter(nameof(StateEntity.TransactionManager), transaction.State.TransactionManager);
+                                    command.AddParameter(nameof(StateEntity.StateJson), transaction.State.StateJson);
+                                    command.AddParameter(nameof(StateEntity.Timestamp), transaction.State.Timestamp);
                                 }).ConfigureAwait(continueOnCapturedContext: false);
                                 break;
-                            case TableTransactionActionType.Delete:
-                                string myquert3 = $"DELETE FROM {this.options.StateEntityTableName} WHERE StateId=@StateId AND RowKey=@RowKey;";
-                                int affectedRowsCount3 = await storage.ExecuteAsync(myquert3, command =>
+                            case TableTransactionActionType.Delete: 
+                                int affectedRowsCount3 = await storage.ExecuteAsync(delStateSql, command =>
                                 {
-                                    command.AddParameter("StateId", transaction.State.StateId);
-                                    command.AddParameter("RowKey", transaction.State.RowKey);
-                                    //command.AddParameter("SequenceId", transaction.State.SequenceId);
+                                    command.AddParameter(nameof(StateEntity.StateId), transaction.State.StateId);
+                                    command.AddParameter(nameof(StateEntity.RowKey), transaction.State.RowKey);
                                 }).ConfigureAwait(continueOnCapturedContext: false);
                                 break;
                             default:
