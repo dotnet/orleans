@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -14,7 +15,7 @@ using StackExchange.Redis;
 
 namespace Orleans.GrainDirectory.Redis
 {
-    public class RedisGrainDirectory : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle>
+    public partial class RedisGrainDirectory : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly RedisGrainDirectoryOptions _directoryOptions;
         private readonly ClusterOptions _clusterOptions;
@@ -44,8 +45,7 @@ namespace Orleans.GrainDirectory.Redis
             {
                 var result = (string?)await _database.StringGetAsync(GetKey(grainId));
 
-                if (_logger.IsEnabled(LogLevel.Debug))
-                    _logger.LogDebug("Lookup {GrainId}: {Result}", grainId, string.IsNullOrWhiteSpace(result) ? "null" : result);
+                LogDebugLookup(grainId, string.IsNullOrWhiteSpace(result) ? "null" : result);
 
                 if (string.IsNullOrWhiteSpace(result))
                     return default;
@@ -54,7 +54,7 @@ namespace Orleans.GrainDirectory.Redis
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Lookup failed for {GrainId}", grainId);
+                LogErrorLookupFailed(ex, grainId);
 
                 if (IsRedisException(ex))
                     throw new OrleansException($"Lookup failed for {grainId} : {ex}");
@@ -64,12 +64,12 @@ namespace Orleans.GrainDirectory.Redis
         }
 
         public Task<GrainAddress?> Register(GrainAddress address) => Register(address, null);
-        
+
         public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress)
         {
             const string RegisterScript =
                 """
-                local cur = redis.call('GET', KEYS[1]) 
+                local cur = redis.call('GET', KEYS[1])
                 local success = true
                 if cur ~= false then
                     local typedCur = cjson.decode(cur)
@@ -82,7 +82,7 @@ namespace Orleans.GrainDirectory.Redis
                     redis.call('SET', KEYS[1], ARGV[1])
                     if ARGV[3] ~= '-1' then
                         redis.call('EXPIRE', KEYS[1], ARGV[3])
-                    end 
+                    end
                     return nil
                 end
 
@@ -101,24 +101,18 @@ namespace Orleans.GrainDirectory.Redis
 
                 if (entryString is null)
                 {
-                    if (_logger.IsEnabled(LogLevel.Debug))
-                    {
-                        _logger.LogDebug("Registered {GrainId} ({Address})", address.GrainId, value);
-                    }
+                    LogDebugRegistered(address.GrainId, value);
 
                     return address;
                 }
 
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug("Failed to register {GrainId} ({Address}) in directory: Conflicted with existing value, {Result}", address.GrainId, value, entryString);
-                }
+                LogDebugRegisterFailed(address.GrainId, value, entryString);
 
                 return JsonSerializer.Deserialize<GrainAddress>(entryString);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to register {GrainId} ({Address}) in directory", address.GrainId, value);
+                LogErrorRegisterFailed(ex, address.GrainId, value);
 
                 if (IsRedisException(ex))
                 {
@@ -135,7 +129,7 @@ namespace Orleans.GrainDirectory.Redis
         {
             const string DeleteScript =
                 """
-                local cur = redis.call('GET', KEYS[1]) 
+                local cur = redis.call('GET', KEYS[1])
                 if cur ~= false then
                     local typedCur = cjson.decode(cur)
                     if typedCur.ActivationId == ARGV[1] then
@@ -153,19 +147,14 @@ namespace Orleans.GrainDirectory.Redis
                     keys: new RedisKey[] { GetKey(address.GrainId) },
                     values: new RedisValue[] { address.ActivationId.ToString() });
 
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, JsonSerializer.Serialize(address), (result != 0) ? "OK" : "Conflict");
-                }
+                LogDebugUnregister(address.GrainId, new(address), (result != 0) ? "OK" : "Conflict");
             }
             catch (Exception ex)
             {
-                var value = JsonSerializer.Serialize(address);
-
-                _logger.LogError(ex, "Unregister failed for {GrainId} ({Address})", address.GrainId, value);
+                LogErrorUnregisterFailed(ex, address.GrainId, new(address));
 
                 if (IsRedisException(ex))
-                    throw new OrleansException($"Unregister failed for {address.GrainId} ({value}) : {ex}");
+                    throw new OrleansException($"Unregister failed for {address.GrainId} ({JsonSerializer.Serialize(address)}) : {ex}");
                 else
                     throw;
             }
@@ -209,16 +198,87 @@ namespace Orleans.GrainDirectory.Redis
 
         #region Logging
         private void LogConnectionRestored(object? sender, ConnectionFailedEventArgs e)
-            => _logger.LogInformation(e.Exception, "Connection to {EndPoint} failed: {FailureType}", e.EndPoint, e.FailureType);
+            => LogInfoConnectionRestored(e.Exception, e.EndPoint, e.FailureType);
 
         private void LogConnectionFailed(object? sender, ConnectionFailedEventArgs e)
-            => _logger.LogError(e.Exception, "Connection to {EndPoint} failed: {FailureType}", e.EndPoint, e.FailureType);
+            => LogErrorConnectionFailed(e.Exception, e.EndPoint, e.FailureType);
 
         private void LogErrorMessage(object? sender, RedisErrorEventArgs e)
-            => _logger.LogError(e.Message);
+            => LogErrorRedisMessage(e.Message);
 
         private void LogInternalError(object? sender, InternalErrorEventArgs e)
-            => _logger.LogError(e.Exception, "Internal error");
+            => LogErrorInternalError(e.Exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Lookup {GrainId}: {Result}"
+        )]
+        private partial void LogDebugLookup(GrainId grainId, string result);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Lookup failed for {GrainId}"
+        )]
+        private partial void LogErrorLookupFailed(Exception exception, GrainId grainId);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Registered {GrainId} ({Address})"
+        )]
+        private partial void LogDebugRegistered(GrainId grainId, string address);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Failed to register {GrainId} ({Address}) in directory: Conflicted with existing value, {Result}"
+        )]
+        private partial void LogDebugRegisterFailed(GrainId grainId, string address, string result);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Failed to register {GrainId} ({Address}) in directory"
+        )]
+        private partial void LogErrorRegisterFailed(Exception exception, GrainId grainId, string address);
+
+        private readonly struct GrainAddressLogRecord(GrainAddress address)
+        {
+            public override string ToString() => JsonSerializer.Serialize(address);
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Unregister {GrainId} ({Address}): {Result}"
+        )]
+        private partial void LogDebugUnregister(GrainId grainId, GrainAddressLogRecord address, string result);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Unregister failed for {GrainId} ({Address})"
+        )]
+        private partial void LogErrorUnregisterFailed(Exception exception, GrainId grainId, GrainAddressLogRecord address);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Connection to {EndPoint} restored: {FailureType}"
+        )]
+        private partial void LogInfoConnectionRestored(Exception? exception, EndPoint? endPoint, ConnectionFailureType failureType);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Connection to {EndPoint} failed: {FailureType}"
+        )]
+        private partial void LogErrorConnectionFailed(Exception? exception, EndPoint? endPoint, ConnectionFailureType failureType);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "{Message}"
+        )]
+        private partial void LogErrorRedisMessage(string message);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Internal error"
+        )]
+        private partial void LogErrorInternalError(Exception? exception);
         #endregion
 
         // These exceptions are not serializable by the client
