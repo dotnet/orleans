@@ -459,7 +459,7 @@ public partial class LeaseBasedQueueBalancer(
 
     [LoggerMessage(
         Level = LogLevel.Debug,
-        Message = "Released leases for {QueueCount} queues. Holding leases for {QueueCount} of an expected {MinQueueCount} queues."
+        Message = "Released leases for {QueueCount} queues. Holding leases for {HoldingQueueCount} of an expected {MinQueueCount} queues."
     )]
     private static partial void LogDebugReleasedLeases(ILogger logger, int queueCount, int holdingQueueCount, int minQueueCount);
 
