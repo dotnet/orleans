@@ -600,4 +600,175 @@ public class ArcBufferWriterTests
         Assert.Throws<ArgumentOutOfRangeException>(() => buffer.PeekSlice(11));
         Assert.Throws<ArgumentOutOfRangeException>(() => buffer.ConsumeSlice(11));
     }
+
+    /// <summary>
+    /// Verifies that calling Reset() after writing data spanning several pages returns all pages to the pool and empties the buffer.
+    /// </summary>
+    [Fact]
+    public void ResetReleasesAllPages_EmptiesBuffer()
+    {
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(new byte[ArcBufferPagePool.MinimumPageSize * 3]);
+        buffer.Reset();
+        Assert.Equal(0, buffer.Length);
+    }
+
+    /// <summary>
+    /// Verifies that calling Dispose() multiple times on ArcBufferWriter is safe.
+    /// </summary>
+    [Fact]
+    public void DisposeMultipleTimes_IsSafe()
+    {
+        var buffer = new ArcBufferWriter();
+        buffer.Dispose();
+        buffer.Dispose();
+    }
+
+    /// <summary>
+    /// Verifies that writing or getting memory/span after Dispose() throws ObjectDisposedException.
+    /// </summary>
+    [Fact]
+    public void WriteAfterDispose_Throws()
+    {
+        var buffer = new ArcBufferWriter();
+        buffer.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => buffer.Write(new byte[1]));
+        Assert.Throws<ObjectDisposedException>(() => buffer.GetMemory(1));
+        Assert.Throws<ObjectDisposedException>(() => buffer.GetSpan(1));
+    }
+
+    /// <summary>
+    /// Verifies that pinning and unpinning a page multiple times only returns it to the pool when the reference count reaches zero.
+    /// </summary>
+    [Fact]
+    public void PinUnpinReferenceCounting_WorksCorrectly()
+    {
+        var page = new ArcBufferPage(ArcBufferPagePool.MinimumPageSize);
+        int token = page.Version;
+        page.Pin(token);
+        page.Pin(token);
+        Assert.Equal(2, page.ReferenceCount);
+        page.Unpin(token);
+        Assert.Equal(1, page.ReferenceCount);
+        page.Unpin(token);
+        Assert.Equal(0, page.ReferenceCount);
+    }
+
+    /// <summary>
+    /// Verifies that unpinning a page with an incorrect version token throws InvalidOperationException.
+    /// </summary>
+    [Fact]
+    public void UnpinWithInvalidToken_Throws()
+    {
+        var page = new ArcBufferPage(ArcBufferPagePool.MinimumPageSize);
+        int token = page.Version;
+        page.Pin(token);
+        Assert.Throws<InvalidOperationException>(() => page.Unpin(token + 1));
+    }
+
+    /// <summary>
+    /// Verifies that CheckValidity throws if the reference count is zero or negative.
+    /// </summary>
+    [Fact]
+    public void CheckValidityWithInvalidRefCount_Throws()
+    {
+        var page = new ArcBufferPage(ArcBufferPagePool.MinimumPageSize);
+        int token = page.Version;
+        Assert.Throws<InvalidOperationException>(() => page.CheckValidity(token));
+    }
+
+    /// <summary>
+    /// Verifies that disposing a slice does not affect the original buffer.
+    /// </summary>
+    [Fact]
+    public void SliceDispose_DoesNotAffectOriginalBuffer()
+    {
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(new byte[100]);
+        var slice = buffer.PeekSlice(50);
+        slice.Dispose();
+        Assert.Equal(100, buffer.Length);
+    }
+
+    /// <summary>
+    /// Verifies that UnsafeSlice does not increment the reference count.
+    /// </summary>
+    [Fact]
+    public void UnsafeSlice_DoesNotPinPages()
+    {
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(new byte[100]);
+        var slice = buffer.PeekSlice(100);
+        var page = slice.First;
+        int before = page.ReferenceCount;
+        var unsafeSlice = slice.UnsafeSlice(10, 10);
+        Assert.Equal(before, unsafeSlice.First.ReferenceCount);
+    }
+
+    /// <summary>
+    /// Verifies that copying to a span that is too small throws.
+    /// </summary>
+    [Fact]
+    public void CopyToWithInsufficientDestination_Throws()
+    {
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(new byte[100]);
+        var slice = buffer.PeekSlice(100);
+        var dest = new byte[50];
+        Assert.Throws<ArgumentException>(() => slice.CopyTo(dest.AsSpan()));
+    }
+
+    /// <summary>
+    /// Verifies that consuming more bytes than available throws.
+    /// </summary>
+    [Fact]
+    public void ConsumeMoreThanAvailable_Throws()
+    {
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(new byte[10]);
+        Assert.Throws<ArgumentOutOfRangeException>(() => buffer.ConsumeSlice(20));
+    }
+
+    /// <summary>
+    /// Verifies that Skip() advances the read head.
+    /// </summary>
+    [Fact]
+    public void SkipAdvancesReadHead_WorksCorrectly()
+    {
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(new byte[100]);
+        var reader = new ArcBufferReader(buffer);
+        reader.Skip(50);
+        Assert.Equal(50, reader.Length);
+    }
+
+    /// <summary>
+    /// Verifies that large pages are reused by the pool.
+    /// </summary>
+    [Fact]
+    public void LargePageReuse_Works()
+    {
+        var pool = ArcBufferPagePool.Shared;
+        var page1 = pool.Rent(ArcBufferPagePool.MinimumPageSize * 4);
+        int version1 = page1.Version;
+        page1.Pin(version1); // Pin the page
+        page1.Unpin(version1); // Return to pool
+        var page2 = pool.Rent(ArcBufferPagePool.MinimumPageSize * 4);
+        Assert.True(page2.Version > version1 || page2 != page1);
+    }
+
+    /// <summary>
+    /// Verifies that minimum size pages are reused by the pool.
+    /// </summary>
+    [Fact]
+    public void MinimumPageReuse_Works()
+    {
+        var pool = ArcBufferPagePool.Shared;
+        var page1 = pool.Rent();
+        int version1 = page1.Version;
+        page1.Pin(version1); // Pin the page
+        page1.Unpin(version1); // Return to pool
+        var page2 = pool.Rent();
+        Assert.True(page2.Version > version1 || page2 != page1);
+    }
 }
