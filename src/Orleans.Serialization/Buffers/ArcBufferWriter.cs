@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System;
 using System.Buffers;
 using System.Collections.Concurrent;
@@ -41,6 +41,9 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     // The total length of the buffer.
     private int _totalLength;
 
+    // Indicates whether the writer has been disposed.
+    private bool _disposed;
+
     /// <summary>
     /// Gets the minimum page size.
     /// </summary>
@@ -59,7 +62,14 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// <summary>
     /// Gets the number of unconsumed bytes.
     /// </summary>
-    public int Length => _totalLength - _readIndex;
+    public int Length
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return _totalLength - _readIndex;
+        }
+    }
 
     /// <summary>
     /// Adds additional buffers to the destination list until the list has reached its capacity.
@@ -68,6 +78,8 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ReplenishBuffers(List<ArraySegment<byte>> buffers)
     {
+        ThrowIfDisposed();
+
         // Skip half-full pages in an attempt to minimize the number of buffers added to the destination
         // at the expense of under-utilized memory. This could be tweaked up to increase page utilization.
         const int MinimumUsablePageSize = MinimumPageSize / 2;
@@ -96,6 +108,13 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AdvanceWriter(int count)
     {
+        ThrowIfDisposed();
+
+#if NET5_0_OR_GREATER
+        ArgumentOutOfRangeException.ThrowIfLessThan(count, 0);
+#else
+        if (count < 0) throw new ArgumentOutOfRangeException(nameof(count), "Length must be greater than or equal to 0.");
+#endif
         _totalLength += count;
         while (true)
         {
@@ -119,6 +138,8 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// </summary>
     public void Reset()
     {
+        ThrowIfDisposed();
+
         UnpinAll();
         _totalLength = _readIndex = 0;
         _readPage = _writePage = _tail = ArcBufferPagePool.Shared.Rent();
@@ -129,15 +150,20 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
+        if (_disposed) return;
+
         UnpinAll();
         _totalLength = _readIndex = 0;
         _readPage = _writePage = _tail = null!;
+        _disposed = true;
     }
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Memory<byte> GetMemory(int sizeHint = 0)
     {
+        ThrowIfDisposed();
+
         if (sizeHint >= _writePage.WriteCapacity)
         {
             return GetMemorySlow(sizeHint);
@@ -150,6 +176,8 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Span<byte> GetSpan(int sizeHint = 0)
     {
+        ThrowIfDisposed();
+
         if (sizeHint >= _writePage.WriteCapacity)
         {
             return GetSpanSlow(sizeHint);
@@ -165,6 +193,8 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// <returns>A span of either zero length, if the data is unavailable, or at least the requested length if the data is available.</returns>
     public ReadOnlySpan<byte> Peek(scoped in Span<byte> destination)
     {
+        ThrowIfDisposed();
+
         // Single span.
         var firstSpan = _readPage.AsSpan(_readIndex, _readPage.Length - _readIndex);
         if (firstSpan.Length >= destination.Length)
@@ -181,6 +211,8 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// <remarks>This method does not advance the read cursor.</remarks>
     public int Peek(Span<byte> output)
     {
+        ThrowIfDisposed();
+
         var bytesCopied = 0;
         var current = _readPage;
         var offset = _readIndex;
@@ -206,6 +238,8 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Write(ReadOnlySequence<byte> input)
     {
+        ThrowIfDisposed();
+
         foreach (var segment in input)
         {
             Write(segment.Span);
@@ -219,6 +253,8 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Write(ReadOnlySpan<byte> value)
     {
+        ThrowIfDisposed();
+
         var destination = GetSpan();
 
         // Fast path, try copying to the available memory directly
@@ -274,6 +310,8 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// <returns>A slice of unconsumed data.</returns>
     public ArcBuffer PeekSlice(int count)
     {
+        ThrowIfDisposed();
+
 #if NET6_0_OR_GREATER
         ArgumentOutOfRangeException.ThrowIfLessThan(count, 0);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(count, Length);
@@ -296,6 +334,8 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// <returns>A buffer representing the consumed data.</returns>
     public ArcBuffer ConsumeSlice(int count)
     {
+        ThrowIfDisposed();
+
         var result = PeekSlice(count);
 
         // Advance the cursor so that subsequent slice calls will return the next slice.
@@ -310,6 +350,8 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// <param name="count">The number of bytes to advance the reader.</param>
     public void AdvanceReader(int count)
     {
+        ThrowIfDisposed();
+
         Debug.Assert(count >= 0);
         Debug.Assert(count <= Length);
 
@@ -362,6 +404,12 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
 
         _writePage = next;
         return next;
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(ArcBufferWriter));
     }
 }
 
@@ -925,7 +973,7 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
         ArgumentOutOfRangeException.ThrowIfLessThan(length, 0);
         ArgumentOutOfRangeException.ThrowIfLessThan(offset, 0);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(length + offset, Length);
-#else 
+#else
         if (length < 0) throw new ArgumentOutOfRangeException(nameof(length), "Length must be greater than or equal to 0.");
         if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset), "Offset must be greater than or equal to 0.");
         if (length + offset > Length) throw new ArgumentOutOfRangeException($"{nameof(length)} + {nameof(offset)}", "Length plus offset must be less than or equal to the length of the buffer.");
@@ -933,7 +981,7 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
 
         CheckValidity();
         Debug.Assert(offset >= 0);
-        Debug.Assert(length >= 0); 
+        Debug.Assert(length >= 0);
         Debug.Assert(offset + length <= Length);
         ArcBuffer result;
 
@@ -1006,7 +1054,16 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
     }
 
     /// <inheritdoc/>
-    public void Dispose() => Unpin();
+    public void Dispose()
+    {
+        if (_firstPageToken == -1)
+        {
+            // Already disposed.
+            return;
+        }
+
+        Unpin();
+    }
 
     /// <summary>
     /// Returns an enumerator which can be used to enumerate the span segments referenced by this instance.
