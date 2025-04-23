@@ -218,12 +218,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
                             {
                                 if (_state is not ManagerState.Unknown)
                                 {
-                                    throw new InvalidOperationException("Registering a state machine after activation is invalid");
-                                    /*
-                                    // Re-enqueue the work item without completing it, while waiting for the state machine manager to be initialized.
-                                    _workQueue.Enqueue(workItem);
-                                    continue;
-                                    */
+                                    throw new NotSupportedException("Registering a state machine after activation is not supported.");
                                 }
 
                                 var name = (string)workItem.Context!;
