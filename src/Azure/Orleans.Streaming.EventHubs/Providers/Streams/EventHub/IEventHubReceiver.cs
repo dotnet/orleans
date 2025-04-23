@@ -32,7 +32,7 @@ namespace Orleans.Streaming.EventHubs
     /// <summary>
     /// pass through decorator class for EventHubReceiver
     /// </summary>
-    internal class EventHubReceiverProxy : IEventHubReceiver
+    internal partial class EventHubReceiverProxy : IEventHubReceiver
     {
         private readonly PartitionReceiver client;
 
@@ -61,20 +61,20 @@ namespace Orleans.Streaming.EventHubs
                         throw new InvalidOperationException("Offset must be a number.");
                     }
 
-                    logger.LogInformation("Starting to read from EventHub partition {0}-{1} at offset {2}", options.EventHubName, partitionSettings.Partition, offset);
+                    LogInfoStartingRead(logger, options.EventHubName, partitionSettings.Partition, offset);
                     eventPosition = EventPosition.FromOffset(longOffset, true);
                 }
                 // else, if configured to start from now, start reading from most recent data
                 else if (partitionSettings.ReceiverOptions.StartFromNow)
                 {
                     eventPosition = EventPosition.Latest;
-                    logger.LogInformation("Starting to read latest messages from EventHub partition {0}-{1}.", options.EventHubName, partitionSettings.Partition);
+                    LogInfoStartingReadLatest(logger, options.EventHubName, partitionSettings.Partition);
                 }
                 else
                 // else, start reading from begining of the partition
                 {
                     eventPosition = EventPosition.Earliest;
-                    logger.LogInformation("Starting to read messages from begining of EventHub partition {0}-{1}.", options.EventHubName, partitionSettings.Partition);
+                    LogInfoStartingReadBegin(logger, options.EventHubName, partitionSettings.Partition);
                 }
 
                 return eventPosition;
@@ -90,5 +90,23 @@ namespace Orleans.Streaming.EventHubs
         {
             await client.CloseAsync();
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Starting to read from EventHub partition {EventHubName}-{Partition} at offset {Offset}"
+        )]
+        private static partial void LogInfoStartingRead(ILogger logger, string eventHubName, string partition, string offset);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Starting to read latest messages from EventHub partition {EventHubName}-{Partition}."
+        )]
+        private static partial void LogInfoStartingReadLatest(ILogger logger, string eventHubName, string partition);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Starting to read messages from begining of EventHub partition {EventHubName}-{Partition}."
+        )]
+        private static partial void LogInfoStartingReadBegin(ILogger logger, string eventHubName, string partition);
     }
 }

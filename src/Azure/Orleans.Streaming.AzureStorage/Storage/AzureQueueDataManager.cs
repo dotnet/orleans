@@ -102,7 +102,7 @@ namespace Orleans.AzureUtils
             }
 
             return GetQueueClientAsync();
-            async ValueTask<QueueClient> GetQueueClientAsync() => _queueClient ??= await GetCloudQueueClient(options, logger);
+            async ValueTask<QueueClient> GetQueueClientAsync() => _queueClient ??= await GetCloudQueueClient(options);
         }
 
         /// <summary>
@@ -368,11 +368,11 @@ namespace Orleans.AzureUtils
             var errMsg = string.Format(
                 "Error doing {0} for Azure storage queue {1} " + Environment.NewLine
                 + "Exception = {2}", operation, QueueName, exc);
-            logger.LogError((int)errorCode, exc, "{Message}", errMsg);
+            logger.LogError((int)errorCode, exc, "{Message}", errMsg); // TODO: pending on https://github.com/dotnet/runtime/issues/110570
             throw new AggregateException(errMsg, exc);
         }
 
-        private async Task<QueueClient> GetCloudQueueClient(AzureQueueOptions options, ILogger logger)
+        private async Task<QueueClient> GetCloudQueueClient(AzureQueueOptions options)
         {
             try
             {

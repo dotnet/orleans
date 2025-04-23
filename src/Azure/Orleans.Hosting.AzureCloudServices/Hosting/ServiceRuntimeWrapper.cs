@@ -9,7 +9,7 @@ using Orleans.Streams;
 namespace Orleans.Runtime.Host
 {
     /// <summary>
-    /// Interface exposed by ServiceRuntimeWrapper for functionality provided 
+    /// Interface exposed by ServiceRuntimeWrapper for functionality provided
     /// by Microsoft.WindowsAzure.ServiceRuntime.
     ///  </summary>
     public interface IServiceRuntimeWrapper
@@ -33,7 +33,7 @@ namespace Orleans.Runtime.Host
         /// Update domain of the role instance
         /// </summary>
         int UpdateDomain { get; }
-        
+
         /// <summary>
         /// Fault domain of the role instance
         /// </summary>
@@ -75,16 +75,16 @@ namespace Orleans.Runtime.Host
 
 
     /// <summary>
-    /// The purpose of this class is to wrap the functionality provided 
+    /// The purpose of this class is to wrap the functionality provided
     /// by Microsoft.WindowsAzure.ServiceRuntime.dll, so that we can access it via Reflection,
     /// and not have a compile-time dependency on it.
     /// Microsoft.WindowsAzure.ServiceRuntime.dll doesn't have an official NuGet package.
-    /// By loading it via Reflection we solve this problem, and do not need an assembly 
+    /// By loading it via Reflection we solve this problem, and do not need an assembly
     /// binding redirect for it, as we can call any compatible version.
     /// Microsoft.WindowsAzure.ServiceRuntime.dll hasn't changed in years, so the chance of a breaking change
     /// is relatively low.
     /// </summary>
-    internal class ServiceRuntimeWrapper : IServiceRuntimeWrapper, IDeploymentConfiguration
+    internal partial class ServiceRuntimeWrapper : IServiceRuntimeWrapper, IDeploymentConfiguration
     {
         private readonly ILogger logger;
         private Assembly assembly;
@@ -130,7 +130,7 @@ namespace Orleans.Runtime.Host
             var list = new List<string>();
             foreach(dynamic instance in instances)
                 list.Add(ExtractInstanceName(instance.Id,DeploymentId));
-            
+
             return list;
         }
 
@@ -145,15 +145,8 @@ namespace Orleans.Runtime.Host
             }
             catch (Exception exc)
             {
-                var endpointNames = (string)string.Join(", ", instanceEndpoints);
-                logger.LogError(
-                    (int)ErrorCode.SiloEndpointConfigError,
-                    exc,
-                    "Unable to obtain endpoint info for role {RoleName} from role config parameter {EndpointName} -- Endpoints defined = [{EndpointNames}]",
-                    RoleName,
-                    endpointName,
-                    endpointNames);
-
+                var endpointNames = string.Join(", ", instanceEndpoints);
+                LogErrorUnableToObtainEndpointInfo(RoleName, endpointName, endpointNames);
                 throw new OrleansException(
                     $"Unable to obtain endpoint info for role {RoleName} from role config parameter {endpointName} -- Endpoints defined = [{endpointNames}]",
                     exc);
@@ -169,7 +162,7 @@ namespace Orleans.Runtime.Host
         {
             var handlerDelegate = handler.GetMethodInfo().CreateDelegate(stoppingEvent.EventHandlerType, handlerObject);
             stoppingEventAdd.Invoke(null, new object[] { handlerDelegate });
-            
+
         }
 
         public void UnsubscribeFromStoppingNotification(object handlerObject, EventHandler<object> handler)
@@ -187,8 +180,7 @@ namespace Orleans.Runtime.Host
             // If we are runing within a worker role Microsoft.WindowsAzure.ServiceRuntime should already be loaded
             if (assembly == null)
             {
-                const string msg1 = "Microsoft.WindowsAzure.ServiceRuntime is not loaded. Trying to load it with Assembly.LoadWithPartialName().";
-                logger.LogWarning((int)ErrorCode.AzureServiceRuntime_NotLoaded, msg1);
+                LogWarningAzureServiceRuntimeNotLoaded();
 
                 // Microsoft.WindowsAzure.ServiceRuntime isn't loaded. We may be running within a web role or not in Azure.
 #pragma warning disable 618
@@ -196,9 +188,8 @@ namespace Orleans.Runtime.Host
 #pragma warning restore 618
                 if (assembly == null)
                 {
-                    const string msg2 = "Failed to find or load Microsoft.WindowsAzure.ServiceRuntime.";
-                    logger.LogError((int)ErrorCode.AzureServiceRuntime_FailedToLoad, msg2);
-                    throw new OrleansException(msg2);
+                    LogErrorAzureServiceRuntimeFailedToLoad();
+                    throw new OrleansException("Failed to find or load Microsoft.WindowsAzure.ServiceRuntime.");
                 }
             }
 
@@ -231,5 +222,26 @@ namespace Orleans.Runtime.Host
                 ? instanceId[(deploymentId.Length + 1)..]
                 : instanceId;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)ErrorCode.SiloEndpointConfigError,
+            Message = "Unable to obtain endpoint info for role {RoleName} from role config parameter {EndpointName} -- Endpoints defined = [{EndpointNames}]"
+        )]
+        private partial void LogErrorUnableToObtainEndpointInfo(string roleName, string endpointName, string endpointNames);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.AzureServiceRuntime_NotLoaded,
+            Message = "Microsoft.WindowsAzure.ServiceRuntime is not loaded. Trying to load it with Assembly.LoadWithPartialName()."
+        )]
+        private partial void LogWarningAzureServiceRuntimeNotLoaded();
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)ErrorCode.AzureServiceRuntime_FailedToLoad,
+            Message = "Failed to find or load Microsoft.WindowsAzure.ServiceRuntime."
+        )]
+        private partial void LogErrorAzureServiceRuntimeFailedToLoad();
     }
 }

@@ -14,7 +14,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     /// <summary>
     /// Receives batches of messages from a single partition of a message queue.
     /// </summary>
-    internal class AzureQueueAdapterReceiver : IQueueAdapterReceiver
+    internal partial class AzureQueueAdapterReceiver : IQueueAdapterReceiver
     {
         private AzureQueueDataManager queue;
         private long lastReadMessage;
@@ -131,9 +131,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 }
                 catch (Exception exc)
                 {
-                    logger.LogWarning((int)AzureQueueErrorCode.AzureQueue_15,
-                        exc,
-                        "Exception upon DeleteQueueMessage on queue {QueueName}. Ignoring.", this.azureQueueName);
+                    LogWarningOnDeleteQueueMessage(exc, this.azureQueueName);
                 }
             }
             finally
@@ -141,6 +139,13 @@ namespace Orleans.Providers.Streams.AzureQueue
                 outstandingTask = null;
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)AzureQueueErrorCode.AzureQueue_15,
+            Message = "Exception upon DeleteQueueMessage on queue {QueueName}. Ignoring."
+        )]
+        private partial void LogWarningOnDeleteQueueMessage(Exception exception, string queueName);
 
         private class PendingDelivery
         {

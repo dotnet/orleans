@@ -18,7 +18,7 @@ using static System.FormattableString;
 
 namespace Orleans.Reminders.Redis
 {
-    internal class RedisReminderTable : IReminderTable
+    internal partial class RedisReminderTable : IReminderTable
     {
         private readonly RedisKey _hashSetKey;
         private readonly RedisReminderTableOptions _redisOptions;
@@ -175,10 +175,7 @@ namespace Orleans.Reminders.Redis
 
             try
             {
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug("UpsertRow entry = {Entry}, ETag = {ETag}", entry.ToString(), entry.ETag);
-                }
+                LogDebugUpsertRow(new(entry), entry.ETag);
 
                 var (newETag, value) = ConvertFromEntry(entry);
                 var (from, to) = GetFilter(entry.GrainId, entry.ReminderName);
@@ -247,5 +244,16 @@ namespace Orleans.Reminders.Redis
 
             return (eTag, JsonConvert.SerializeObject(segments, _jsonSettings)[1..^1]);
         }
+
+        private readonly struct ReminderEntryLogValue(ReminderEntry entry)
+        {
+            public override string ToString() => entry.ToString();
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "UpsertRow entry = {Entry}, ETag = {ETag}"
+        )]
+        private partial void LogDebugUpsertRow(ReminderEntryLogValue entry, string eTag);
     }
 }

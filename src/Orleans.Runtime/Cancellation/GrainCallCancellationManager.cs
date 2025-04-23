@@ -41,7 +41,7 @@ internal struct GrainCallCancellationRequest(GrainId targetGrainId, GrainId sour
 /// <summary>
 /// Cancels grain calls issued to remote hosts and handles cancellation requests from other hosts.
 /// </summary>
-internal class GrainCallCancellationManager : SystemTarget, IGrainCallCancellationManagerSystemTarget, IGrainCallCancellationManager, ILifecycleParticipant<ISiloLifecycle>
+internal partial class GrainCallCancellationManager : SystemTarget, IGrainCallCancellationManagerSystemTarget, IGrainCallCancellationManager, ILifecycleParticipant<ISiloLifecycle>
 {
     private const int MaxBatchSize = 1_000;
     private readonly ConcurrentDictionary<SiloAddress, (Task PumpTask, Channel<GrainCallCancellationRequest> WorkItemChannel, CancellationTokenSource Cts)> _workers = new();
@@ -123,10 +123,7 @@ internal class GrainCallCancellationManager : SystemTarget, IGrainCallCancellati
 
         try
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Monitoring cluster membership updates");
-            }
+            LogDebugMonitoringClusterMembershipUpdates(_logger);
 
             var previousSnapshot = _clusterMembershipService.CurrentSnapshot;
             await foreach (var snapshot in _clusterMembershipService.MembershipUpdates.WithCancellation(_shuttingDownCts.Token))
@@ -153,16 +150,13 @@ internal class GrainCallCancellationManager : SystemTarget, IGrainCallCancellati
                 }
                 catch (Exception exception)
                 {
-                    _logger.LogError(exception, "Error processing cluster membership updates");
+                    LogErrorProcessingClusterMembershipUpdates(_logger, exception);
                 }
             }
         }
         finally
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("No longer monitoring cluster membership updates");
-            }
+            LogDebugNoLongerMonitoringClusterMembershipUpdates(_logger);
         }
     }
 
@@ -173,10 +167,7 @@ internal class GrainCallCancellationManager : SystemTarget, IGrainCallCancellati
             var remote = GrainFactory.GetSystemTarget<IGrainCallCancellationManagerSystemTarget>(Constants.CancellationManagerType, targetSilo);
             await Task.Yield();
 
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Starting cancellation worker for target silo {SiloAddress}", targetSilo);
-            }
+            LogDebugStartingCancellationWorker(_logger, targetSilo);
 
             var batch = new List<GrainCallCancellationRequest>();
             var reader = workItems.Reader;
@@ -193,10 +184,7 @@ internal class GrainCallCancellationManager : SystemTarget, IGrainCallCancellati
                     // Attempt to cancel the batch.
                     await remote.CancelCallsAsync(batch).AsTask().WaitAsync(cancellationToken);
 
-                    if (_logger.IsEnabled(LogLevel.Debug))
-                    {
-                        _logger.LogDebug("Cancelled {Count} requests to target silo {SiloAddress}", batch.Count, targetSilo);
-                    }
+                    LogDebugCancelledRequests(_logger, batch.Count, targetSilo);
 
                     batch.Clear();
                 }
@@ -207,7 +195,7 @@ internal class GrainCallCancellationManager : SystemTarget, IGrainCallCancellati
                         break;
                     }
 
-                    _logger.LogError(exception, "Error while cancelling {Count} requests to {SiloAddress}", batch.Count, targetSilo);
+                    LogErrorCancellingRequests(_logger, exception, batch.Count, targetSilo);
                     await Task.Delay(5_000, cancellationToken);
                 }
             }
@@ -223,10 +211,7 @@ internal class GrainCallCancellationManager : SystemTarget, IGrainCallCancellati
         {
             // Remove ourselves and clean up.
             RemoveWorker(targetSilo);
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Exiting cancellation worker for target silo {SiloAddress}", targetSilo);
-            }
+            LogDebugExitingCancellationWorker(_logger, targetSilo);
         }
     }
 
@@ -262,11 +247,7 @@ internal class GrainCallCancellationManager : SystemTarget, IGrainCallCancellati
     {
         if (_workers.TryRemove(targetSilo, out var entry))
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Target silo '{SiloAddress}' is no longer active, so this cancellation activation worker is terminating", targetSilo);
-            }
-
+            LogDebugTargetSiloNoLongerActive(_logger, targetSilo);
             entry.Cts.Dispose();
         }
     }
@@ -299,7 +280,7 @@ internal class GrainCallCancellationManager : SystemTarget, IGrainCallCancellati
         }
         catch (Exception exception)
         {
-            _logger.LogWarning(exception, "Error signaling shutdown.");
+            LogWarningErrorSignalingShutdown(_logger, exception);
         }
 
         await Task.WhenAll(tasks).WaitAsync(cancellationToken).SuppressThrowing();
@@ -314,4 +295,58 @@ internal class GrainCallCancellationManager : SystemTarget, IGrainCallCancellati
                 ct => this.RunOrQueueTask(() => StartAsync(ct)),
                 ct => this.RunOrQueueTask(() => StopAsync(ct)));
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Monitoring cluster membership updates"
+    )]
+    private static partial void LogDebugMonitoringClusterMembershipUpdates(ILogger logger);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Starting cancellation worker for target silo {SiloAddress}"
+    )]
+    private static partial void LogDebugStartingCancellationWorker(ILogger logger, SiloAddress siloAddress);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Cancelled {Count} requests to target silo {SiloAddress}"
+    )]
+    private static partial void LogDebugCancelledRequests(ILogger logger, int count, SiloAddress siloAddress);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error while cancelling {Count} requests to {SiloAddress}"
+    )]
+    private static partial void LogErrorCancellingRequests(ILogger logger, Exception exception, int count, SiloAddress siloAddress);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Exiting cancellation worker for target silo {SiloAddress}"
+    )]
+    private static partial void LogDebugExitingCancellationWorker(ILogger logger, SiloAddress siloAddress);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Target silo '{SiloAddress}' is no longer active, so this cancellation activation worker is terminating"
+    )]
+    private static partial void LogDebugTargetSiloNoLongerActive(ILogger logger, SiloAddress siloAddress);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Error signaling shutdown."
+    )]
+    private static partial void LogWarningErrorSignalingShutdown(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "No longer monitoring cluster membership updates"
+    )]
+    private static partial void LogDebugNoLongerMonitoringClusterMembershipUpdates(ILogger logger);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error processing cluster membership updates"
+    )]
+    private static partial void LogErrorProcessingClusterMembershipUpdates(ILogger logger, Exception exception);
 }
