@@ -58,7 +58,7 @@ namespace Orleans.Transactions.AdoNet.Entity
                 StateJson = JsonConvert.SerializeObject(pendingState.State, JsonSettings),
                 Timestamp = DateTime.Now,
                 RowKey = rowKey,
-                ETag = Guid.NewGuid().ToString(),
+              //  ETag = Guid.NewGuid().ToString(),
             };
 
             return result;
