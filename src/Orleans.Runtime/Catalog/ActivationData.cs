@@ -1537,16 +1537,13 @@ internal sealed partial class ActivationData :
                             CatalogInstruments.ActivationConcurrentRegistrationAttempts.Add(1);
                             // If this was a duplicate, it's not an error, just a race.
                             // Forward on all of the pending messages, and then forget about this activation.
-                            if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                            {
-                                LogDuplicateActivation(
-                                    _shared.Logger,
-                                    Address,
-                                    ForwardingAddress,
-                                    GrainInstance?.GetType(),
-                                    Address.ToFullString(),
-                                    WaitingCount);
-                            }
+                            LogDuplicateActivation(
+                                _shared.Logger,
+                                Address,
+                                ForwardingAddress,
+                                GrainInstance?.GetType(),
+                                new(Address),
+                                WaitingCount);
                         }
 
                         break;
@@ -2379,6 +2376,11 @@ internal sealed partial class ActivationData :
         Message = "Failed to migrate activation '{Activation}'")]
     private static partial void LogFailedToMigrateActivation(ILogger logger, Exception exception, ActivationData activation);
 
+    private readonly struct FullAddressLogRecord(GrainAddress address)
+    {
+        public override string ToString() => address.ToFullString();
+    }
+
     [LoggerMessage(
         EventId = (int)ErrorCode.Catalog_DuplicateActivation,
         Level = LogLevel.Debug,
@@ -2388,7 +2390,7 @@ internal sealed partial class ActivationData :
         GrainAddress address,
         SiloAddress? forwardingAddress,
         Type? grainInstanceType,
-        string fullAddress,
+        FullAddressLogRecord fullAddress,
         int waitingCount);
 
     [LoggerMessage(
