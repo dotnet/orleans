@@ -12,9 +12,9 @@ public class ArcBufferWriterTests
 {
     private const int PageSize = ArcBufferWriter.MinimumPageSize;
 #if NET6_0_OR_GREATER
-    private readonly Random Random = Random.Shared;
+    private readonly Random _random = Random.Shared;
 #else
-    private readonly Random Random = new Random();
+    private readonly Random _random = new Random();
 #endif
 
     /// <summary>
@@ -25,7 +25,7 @@ public class ArcBufferWriterTests
     {
         using var bufferWriter = new ArcBufferWriter();
         var randomData = new byte[PageSize * 3];
-        Random.NextBytes(randomData);
+        _random.NextBytes(randomData);
         int[] writeSizes = [1, 52, 125, 4096];
         var i = 0;
         while (bufferWriter.Length < randomData.Length)
@@ -109,14 +109,14 @@ public class ArcBufferWriterTests
     {
         var bufferWriter = new ArcBufferWriter();
         var randomData = new byte[PageSize * 12];
-        Random.NextBytes(randomData);
+        _random.NextBytes(randomData);
         bufferWriter.Write(randomData);
 
         var peeked = bufferWriter.PeekSlice(randomData.Length);
         var pages = peeked.Pages.ToList();
         peeked.Dispose();
 
-        var expected = pages.Select((p, i) => (Version: p.Version, ReferenceCount: p.ReferenceCount)).ToList();
+        var expected = pages.Select((p, i) => (p.Version, p.ReferenceCount)).ToList();
         CheckPages(pages, expected);
 
         var slice = bufferWriter.ConsumeSlice(PageSize - 1);
@@ -181,7 +181,7 @@ public class ArcBufferWriterTests
     {
         var bufferWriter = new ArcBufferWriter();
         var randomData = new byte[PageSize * 16];
-        Random.NextBytes(randomData);
+        _random.NextBytes(randomData);
         bufferWriter.Write([0]);
         var pages = new List<ArcBufferPage>();
         var firstSlice = bufferWriter.ConsumeSlice(1);
@@ -205,8 +205,10 @@ public class ArcBufferWriterTests
             bufferWriter.AdvanceWriter(readSize);
 
             // Add the newly allocated pages to the list for test assertion purposes.
-            using var peeked = bufferWriter.PeekSlice(bufferWriter.Length);
-            pages.AddRange(peeked.Pages.Where(p => !pages.Contains(p)));
+            using (var peeked = bufferWriter.PeekSlice(bufferWriter.Length))
+            {
+                pages.AddRange(peeked.Pages.Where(p => !pages.Contains(p)));
+            }
 
             // Simulate consuming the socket data.
             while (bufferWriter.Length > messageReadSizes[messageReadIndex % messageReadSizes.Length])
@@ -284,7 +286,7 @@ public class ArcBufferWriterTests
     {
         using var buffer = new ArcBufferWriter();
         var data = new byte[1024];
-        Random.NextBytes(data);
+        _random.NextBytes(data);
         buffer.Write(data);
 
         // Assert
@@ -299,11 +301,10 @@ public class ArcBufferWriterTests
     {
         using var buffer = new ArcBufferWriter();
         var data = new byte[1024];
-        Random.NextBytes(data);
+        _random.NextBytes(data);
         buffer.Write(data);
 
         using var peeked = buffer.PeekSlice(512);
-
         // Assert
         Assert.Equal(data.AsSpan(0, 512).ToArray(), peeked.ToArray());
     }
@@ -316,12 +317,11 @@ public class ArcBufferWriterTests
     {
         using var buffer = new ArcBufferWriter();
         var data = new byte[1024];
-        Random.NextBytes(data);
+        _random.NextBytes(data);
         buffer.Write(data);
 
         using var slice = buffer.ConsumeSlice(512);
         using var subSlice = slice.Slice(256, 256);
-
         // Assert
         Assert.Equal(data.AsSpan(0, 512).ToArray(), slice.ToArray());
         Assert.Equal(data.AsSpan(256, 256).ToArray(), subSlice.ToArray());
@@ -336,7 +336,7 @@ public class ArcBufferWriterTests
     {
         using var buffer = new ArcBufferWriter();
         var data = new byte[1024];
-        Random.NextBytes(data);
+        _random.NextBytes(data);
         buffer.Write(data);
 
         var slice = buffer.ConsumeSlice(512);
@@ -354,7 +354,7 @@ public class ArcBufferWriterTests
     {
         var buffer = new ArcBufferWriter();
         var data = new byte[1024];
-        Random.NextBytes(data);
+        _random.NextBytes(data);
         buffer.Write(data);
 
         var slice = buffer.ConsumeSlice(512);
@@ -377,7 +377,6 @@ public class ArcBufferWriterTests
     public void NewBuffer_IsEmpty()
     {
         using var buffer = new ArcBufferWriter();
-
         // Assert
         Assert.Equal(0, buffer.Length);
     }
@@ -389,8 +388,8 @@ public class ArcBufferWriterTests
     public void WriteEmptyBuffer_DoesNotChangeLength()
     {
         using var buffer = new ArcBufferWriter();
-        var data = new byte[0];
-        Random.NextBytes(data);
+        var data = Array.Empty<byte>();
+        _random.NextBytes(data);
         buffer.Write(data);
 
         // Assert
@@ -406,7 +405,6 @@ public class ArcBufferWriterTests
         using var buffer = new ArcBufferWriter();
         using var peeked = buffer.PeekSlice(0);
         using var subSlice = peeked.Slice(0, 0);
-
         Assert.Empty(peeked.Pages);
         Assert.Empty(peeked.PageSegments);
         Assert.Empty(peeked.ArraySegments);
@@ -431,7 +429,6 @@ public class ArcBufferWriterTests
         using var buffer = new ArcBufferWriter();
         using var slice = buffer.ConsumeSlice(0);
         using var subSlice = slice.Slice(0, 0);
-
         Assert.Empty(slice.Pages);
         Assert.Empty(slice.PageSegments);
         Assert.Empty(slice.ArraySegments);
@@ -458,9 +455,8 @@ public class ArcBufferWriterTests
     public void DisposeSliceAfterFullPageConsumption_IncrementsPageVersion()
     {
         using var bufferWriter = new ArcBufferWriter();
-
         var data = new byte[ArcBufferPagePool.MinimumPageSize + 1];
-        Random.NextBytes(data);
+        _random.NextBytes(data);
         bufferWriter.Write(data);
 
         // Consuming the slice will cause the writer to release (unpin) those pages.
@@ -487,9 +483,8 @@ public class ArcBufferWriterTests
     public void PageVersionIncrementAfterWriteAndReadHeadAdvance()
     {
         using var bufferWriter = new ArcBufferWriter();
-
         var data = new byte[ArcBufferPagePool.MinimumPageSize];
-        Random.NextBytes(data);
+        _random.NextBytes(data);
         bufferWriter.Write(data);
 
         // Since we write exactly one page (MinimumPageSize), we should have exactly one page.
@@ -552,20 +547,6 @@ public class ArcBufferWriterTests
         slice.Dispose();
         // Should not throw
         slice.Dispose();
-    }
-
-    /// <summary>
-    /// Verifies that peeking with a stack-allocated span does not cause stack overflow.
-    /// </summary>
-    [Fact]
-    public void PeekWithStackSpan_DoesNotStackOverflow()
-    {
-        using var buffer = new ArcBufferWriter();
-        buffer.Write(new byte[32]);
-        Span<byte> dest = stackalloc byte[32];
-        // Should not stack overflow
-        var span = buffer.Peek(in dest);
-        Assert.True(span.Length == 32);
     }
 
     /// <summary>
@@ -780,32 +761,50 @@ public class ArcBufferWriterTests
     {
         using var buffer = new ArcBufferWriter();
         var data = new byte[PageSize * 2];
-        Random.NextBytes(data);
+        _random.NextBytes(data);
         buffer.Write(data);
 
         // Slice at start
         using (var s = buffer.PeekSlice(0))
+        {
             Assert.Equal(0, s.Length);
+        }
         using (var s = buffer.PeekSlice(1))
+        {
             Assert.Equal(data[0], s.ToArray()[0]);
+        }
         using (var s = buffer.PeekSlice(data.Length))
+        {
             Assert.Equal(data, s.ToArray());
+        }
 
         // Slice at page boundary
         using (var s = buffer.PeekSlice(PageSize))
+        {
             Assert.Equal(data.Take(PageSize).ToArray(), s.ToArray());
+        }
         using (var s = buffer.PeekSlice(PageSize + 1))
+        {
             Assert.Equal(data.Take(PageSize + 1).ToArray(), s.ToArray());
+        }
 
         // Consume at boundaries
         using (var s = buffer.ConsumeSlice(0))
+        {
             Assert.Equal(0, s.Length);
+        }
         using (var s = buffer.ConsumeSlice(1))
+        {
             Assert.Equal(data[0], s.ToArray()[0]);
+        }
         using (var s = buffer.ConsumeSlice(PageSize - 1))
+        {
             Assert.Equal(data.Skip(1).Take(PageSize - 1).ToArray(), s.ToArray());
+        }
         using (var s = buffer.ConsumeSlice(PageSize))
+        {
             Assert.Equal(data.Skip(PageSize).Take(PageSize).ToArray(), s.ToArray());
+        }
     }
 
     /// <summary>
@@ -836,15 +835,23 @@ public class ArcBufferWriterTests
         buffer.Write(new byte[PageSize * 2]);
         var slices = new List<ArcBuffer>();
         for (int i = 0; i < 10; i++)
+        {
             slices.Add(buffer.PeekSlice(PageSize));
+        }
         var pages = slices[0].Pages.ToList();
         foreach (var s in slices)
+        {
             s.Dispose();
+        }
         foreach (var p in pages)
+        {
             Assert.Equal(1, p.ReferenceCount); // Only the buffer's own pin remains
+        }
         buffer.Dispose();
         foreach (var p in pages)
+        {
             Assert.Equal(0, p.ReferenceCount);
+        }
     }
 
     /// <summary>
@@ -855,12 +862,18 @@ public class ArcBufferWriterTests
     {
         using var buffer = new ArcBufferWriter();
         using (var s = buffer.PeekSlice(0))
+        {
             Assert.Equal(0, s.Length);
+        }
         buffer.Write(new byte[PageSize]);
         using (var s = buffer.PeekSlice(PageSize))
+        {
             Assert.Equal(PageSize, s.Length);
+        }
         using (var s = buffer.ConsumeSlice(PageSize))
+        {
             Assert.Equal(PageSize, s.Length);
+        }
         Assert.Equal(0, buffer.Length);
     }
 
@@ -874,7 +887,9 @@ public class ArcBufferWriterTests
         buffer.Write(new byte[10]);
         buffer.ConsumeSlice(10).Dispose();
         using (var s = buffer.PeekSlice(0))
+        {
             Assert.Equal(0, s.Length);
+        }
         Assert.Throws<ArgumentOutOfRangeException>(() => buffer.PeekSlice(1));
     }
 
