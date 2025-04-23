@@ -169,11 +169,6 @@ namespace Orleans.Persistence.Migration
         {
             configureOptions?.Invoke(services.AddOptions<DataMigratorOptions>(name));
 
-            if (services.Any(sd => sd.ImplementationInstance is DataMigrator dm && string.Equals(dm.Name, name, StringComparison.InvariantCultureIgnoreCase)))
-            {
-                throw new InvalidOperationException($"A DataMigrator with the name '{name}' is already registered.");
-            }
-
             services.AddSingletonNamedService(name, (sp, name) =>
             {
                 var options = sp.GetRequiredService<IOptionsMonitor<DataMigratorOptions>>().Get(name);
