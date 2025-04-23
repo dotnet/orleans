@@ -19,34 +19,15 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
 
     internal class TableTransactionAction
     {
-        public TableTransactionAction(TableTransactionActionType action, StateEntity state) : this(action, state, default)
+        public TableTransactionAction(TableTransactionActionType action, IEntity tableEntity) 
         {
-        }
-
-        public TableTransactionAction(TableTransactionActionType action, StateEntity state,string eTag)
-        {
-            ActionType = action;
-            State = state;
-            ETag = eTag;
-        }
-
-        public TableTransactionAction(TableTransactionActionType action, KeyEntity key) : this(action, key, key.ETag)
-        {
-        }
-
-        public TableTransactionAction(TableTransactionActionType action, KeyEntity key,string eTag)
-        {
-            ActionType = action;
-            Key = key;
-            ETag = eTag;
+            this.ActionType = action;
+            this.TableEntity = tableEntity;
         }
 
 
         public TableTransactionActionType ActionType { get; }
-        public StateEntity State { get; }
-        public KeyEntity Key { get; }
-
-        public string ETag { get; set; }
+        public IEntity TableEntity { get; }
 
     }
 }
