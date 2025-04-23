@@ -24,7 +24,10 @@ namespace Orleans.Persistence.Migration
         private readonly CancellationTokenSource _backgroundWorkCts = new();
         private object _lastProcessedGrainCursor;
 
-        public string Name { get; }
+        /// <summary>
+        /// Registration name
+        /// </summary>
+        internal string Name { get; }
 
         public DataMigrator(
             ILogger<DataMigrator> logger,

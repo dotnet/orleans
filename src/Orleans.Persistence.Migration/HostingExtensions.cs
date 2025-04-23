@@ -110,25 +110,26 @@ namespace Orleans.Persistence.Migration
         /// <summary>
         /// Configure a component to migrate inner data in storages.
         /// Should be registered once per each source-destination migration storage pair.
+        /// Method registers DataMigrator with "default" name.
         /// </summary>
-        /// <param name="builder">DI of the app</param>
-        /// <param name="oldStorage">source storage (one you were already using)</param>
-        /// <param name="newStorage">(one you would like to migrate to)</param>
-        /// <param name="configureOptions">options of data migrator configuration</param>
-        /// <param name="runAsBackgroundService">if true, the migrator will be started as a background service</param>
+        /// <param name="builder">The silo builder</param>
+        /// <param name="oldStorage">Source storage (one you were already using)</param>
+        /// <param name="newStorage">Destination storage (one you would like to migrate to)</param>
+        /// <param name="configureOptions">Options of data migrator configuration</param>
+        /// <param name="runAsBackgroundService">If true, the migrator will be started as a background service</param>
         public static ISiloBuilder AddDataMigrator(this ISiloBuilder builder, string oldStorage, string newStorage, Action<DataMigratorOptions> configureOptions, bool runAsBackgroundService = false)
-            => builder.ConfigureServices(services => services.AddDataMigrator(oldStorage, newStorage, "dataMigrator", configureOptions, runAsBackgroundService));
+            => builder.ConfigureServices(services => services.AddDataMigrator(oldStorage, newStorage, "default", configureOptions, runAsBackgroundService));
 
         /// <summary>
         /// Configure a component to migrate inner data in storages.
         /// Should be registered once per each source-destination migration storage pair.
         /// </summary>
-        /// <param name="builder">DI of the app</param>
-        /// <param name="oldStorage">source storage (one you were already using)</param>
-        /// <param name="newStorage">(one you would like to migrate to)</param>
-        /// <param name="name">this data migrator registration name</param>
-        /// <param name="configureOptions">options of data migrator configuration</param>
-        /// <param name="runAsBackgroundService">if true, the migrator will be started as a background service</param>
+        /// <param name="builder">The silo builder</param>
+        /// <param name="oldStorage">Source storage (one you were already using)</param>
+        /// <param name="newStorage">Destination storage (one you would like to migrate to)</param>
+        /// <param name="name">This data migrator registration name. Should be unique for each pair of source/destination storages</param>
+        /// <param name="configureOptions">Options of data migrator configuration</param>
+        /// <param name="runAsBackgroundService">If true, the migrator will be started as a background service</param>
         public static ISiloBuilder AddDataMigrator(this ISiloBuilder builder, string oldStorage, string newStorage, string name, Action<DataMigratorOptions> configureOptions, bool runAsBackgroundService = false)
             => builder.ConfigureServices(services => services.AddDataMigrator(oldStorage, newStorage, name, configureOptions, runAsBackgroundService));
 
@@ -136,33 +137,33 @@ namespace Orleans.Persistence.Migration
         /// Configure a component to migrate inner data in storages.
         /// Should be registered once per each source-destination migration storage pair.
         /// </summary>
-        /// <param name="builder">DI of the app</param>
-        /// <param name="oldStorage">source storage (one you were already using)</param>
-        /// <param name="newStorage">(one you would like to migrate to)</param>
-        /// <param name="name">this data migrator registration name</param>
-        /// <param name="configureOptions">options of data migrator configuration</param>
-        /// <param name="runAsBackgroundService">if true, the migrator will be started as a background service</param>
-        public static ISiloBuilder AddDataMigrator(this ISiloBuilder builder, string oldStorage, string newStorage, string name = "dataMigrator", Action<OptionsBuilder<DataMigratorOptions>> configureOptions = null, bool runAsBackgroundService = false)
+        /// <param name="builder">The silo builder</param>
+        /// <param name="oldStorage">Source storage (one you were already using)</param>
+        /// <param name="newStorage">Destination storage (one you would like to migrate to)</param>
+        /// <param name="name">This data migrator registration name. Should be unique for each pair of source/destination storages</param>
+        /// <param name="configureOptions">Options of data migrator configuration</param>
+        /// <param name="runAsBackgroundService">If true, the migrator will be started as a background service</param>
+        public static ISiloBuilder AddDataMigrator(this ISiloBuilder builder, string oldStorage, string newStorage, string name = "default", Action<OptionsBuilder<DataMigratorOptions>> configureOptions = null, bool runAsBackgroundService = false)
             => builder.ConfigureServices(services => services.AddDataMigrator(oldStorage, newStorage, name, configureOptions, runAsBackgroundService));
 
-        public static IServiceCollection AddDataMigrator(this IServiceCollection services, string oldStorageName, string newStorageName, string name = "dataMigrator", Action<DataMigratorOptions> configureOptions = null, bool runAsBackgroundService = false)
+        public static IServiceCollection AddDataMigrator(this IServiceCollection services, string oldStorageName, string newStorageName, string name = "default", Action<DataMigratorOptions> configureOptions = null, bool runAsBackgroundService = false)
             => services.AddDataMigrator(oldStorageName, newStorageName, name, ob => ob.Configure(configureOptions), runAsBackgroundService);
 
         /// <summary>
         /// Configure a component to migrate inner data in storages.
         /// Should be registered once per each source-destination migration storage pair.
         /// </summary>
-        /// <param name="services">DI of the app</param>
-        /// <param name="oldStorageName">source storage (one you were already using)</param>
-        /// <param name="newStorageName">(one you would like to migrate to)</param>
-        /// <param name="name">this data migrator registration name</param>
-        /// <param name="configureOptions">options of data migrator configuration</param>
-        /// <param name="runAsBackgroundService">if true, the migrator will be started as a background service</param>
+        /// <param name="services">The service collection to add the data migrator to</param>
+        /// <param name="oldStorageName">Source storage (one you were already using)</param>
+        /// <param name="newStorageName">Destination storage (one you would like to migrate to)</param>
+        /// <param name="name">This data migrator registration name. Should be unique for each pair of source/destination storages</param>
+        /// <param name="configureOptions">Options of data migrator configuration</param>
+        /// <param name="runAsBackgroundService">If true, the migrator will be started as a background service</param>
         public static IServiceCollection AddDataMigrator(
             this IServiceCollection services,
             string oldStorageName,
             string newStorageName,
-            string name = "dataMigrator",
+            string name = "default",
             Action<OptionsBuilder<DataMigratorOptions>> configureOptions = null,
             bool runAsBackgroundService = false)
         {
