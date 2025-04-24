@@ -171,12 +171,13 @@ namespace Orleans.Persistence.Migration
             await foreach (var storageEntry in _sourceStorage.GetAll(_lastProcessedGrainCursor, cancellationToken))
             {
                 await _sourceStorageOpsRateLimiter.WaitIfNeededAsync(increment: 1, cancellationToken);
-                await _destinationStorageOpsRateLimiter.WaitIfNeededAsync(increment: 2, cancellationToken);
 
                 migrationStats.EntriesProcessed++;
                 if (!_options.ProcessMigratedEntries)
                 {
                     IGrainState tmpState = new GrainState<object>();
+
+                    await _destinationStorageOpsRateLimiter.WaitIfNeededAsync(increment: 1, cancellationToken);
                     await _destinationStorage.ReadStateAsync(storageEntry.GrainType, storageEntry.GrainReference, tmpState);
 
                     if (tmpState is not null && tmpState.RecordExists)
@@ -194,6 +195,7 @@ namespace Orleans.Persistence.Migration
 
                     try
                     {
+                        await _destinationStorageOpsRateLimiter.WaitIfNeededAsync(increment: 1, cancellationToken);
                         if (_destinationStorage is IMigrationGrainStorage migrationGrainStorage)
                         {
                             // sometimes the storage does not allow direct writing (i.e. CosmosDB with it's GrainActivationContext dependency)
