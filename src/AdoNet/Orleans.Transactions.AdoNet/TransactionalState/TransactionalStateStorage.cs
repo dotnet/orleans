@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
 using System.Globalization;
 using System.Linq;
 using System.Net;
@@ -136,7 +137,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");
             }
 
-            var batchOperation = new DbBatchOperation(stateId,this.options, this.storage, logger);
+            var batchOperation = new DbBatchOperation(stateId, this.options, this.storage, logger);
 
             // first, clean up aborted records
             if (abortAfter.HasValue && stateEntityList.Count != 0)
@@ -358,12 +359,16 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
 
         public async ValueTask Add(TableTransactionAction operation)
         {
-            if (operation.TableEntity != null && operation.TableEntity.StateId != stateId)
+            if (operation.TableEntity == null)
+            {
+                return;
+            }
+            if (operation.TableEntity.StateId != stateId)
             {
                 throw new ArgumentException($"StateId not match.");
             }
 
-            if (operation.TableEntity != null && string.IsNullOrEmpty(operation.TableEntity.ETag))
+            if (string.IsNullOrEmpty(operation.TableEntity.ETag))
             {
                 throw new ArgumentException($"{operation.TableEntity.StateId} ETag can not be null or empty");
             }
@@ -436,114 +441,100 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
 
             string delStateSql = this.options.ExecuteSqlDcitionary[Constants.DelStateSql];
 
-            //  this.storage.wx
-            try
+            List<Tuple<string, Action<DbCommand>>> multipleQuery = new List<Tuple<string, Action<DbCommand>>>();
+
+            //add,update,delete
+            foreach (var transaction in list)
             {
-                using (TransactionScope scope = new TransactionScope(TransactionScopeOption.Required,
-                    new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
-                    TransactionScopeAsyncFlowOption.Enabled))
+                if (transaction.TableEntity is KeyEntity)
                 {
-                    //add,update,delete
-                    foreach (var transaction in list)
+                    var keyData = transaction.TableEntity as KeyEntity;
+                    keyData.Timestamp = new DateTimeOffset(DateTime.Now).ToUniversalTime();
+                    switch (transaction.ActionType)
                     {
-                        if (transaction.TableEntity != null && transaction.TableEntity is KeyEntity)
-                        {
-                            var keyData = transaction.TableEntity as KeyEntity;
-                            keyData.Timestamp = new DateTimeOffset(DateTime.Now).ToUniversalTime();
-                            switch (transaction.ActionType)
+                        case TableTransactionActionType.Add:
+                            multipleQuery.Add(new Tuple<string, Action<DbCommand>>(addKeySql, command =>
                             {
-                                case TableTransactionActionType.Add:
-                                    int affectedRowsCount = await storage.ExecuteAsync(addKeySql, command =>
-                                    {
-                                        command.AddParameter(nameof(KeyEntity.StateId), keyData.StateId);
-                                        command.AddParameter(nameof(KeyEntity.CommittedSequenceId), keyData.CommittedSequenceId);
-                                        command.AddParameter(nameof(KeyEntity.Metadata), keyData.Metadata);
-                                        command.AddParameter(nameof(KeyEntity.Timestamp), keyData.Timestamp);
-                                        command.AddParameter(nameof(KeyEntity.ETag), keyData.ETag);
-                                    }).ConfigureAwait(continueOnCapturedContext: false);
-                                    break;
+                                command.AddParameter(nameof(KeyEntity.StateId), keyData.StateId);
+                                command.AddParameter(nameof(KeyEntity.CommittedSequenceId), keyData.CommittedSequenceId);
+                                command.AddParameter(nameof(KeyEntity.Metadata), keyData.Metadata);
+                                command.AddParameter(nameof(KeyEntity.Timestamp), keyData.Timestamp);
+                                command.AddParameter(nameof(KeyEntity.ETag), keyData.ETag);
+                            }));
+                            break;
 
-                                case TableTransactionActionType.UpdateReplace:
-                                    int affectedRowsCount2 = await storage.ExecuteAsync(updateKeySql, command =>
-                                    {
-                                        command.AddParameter(nameof(KeyEntity.CommittedSequenceId), keyData.CommittedSequenceId);
-                                        command.AddParameter(nameof(KeyEntity.Metadata), keyData.Metadata);
-                                        command.AddParameter(nameof(KeyEntity.Timestamp), keyData.Timestamp);
-                                        command.AddParameter(nameof(KeyEntity.StateId), keyData.StateId);
-                                        command.AddParameter(nameof(KeyEntity.ETag), keyData.ETag);
-                                    }).ConfigureAwait(continueOnCapturedContext: false);
-                                    break;
-
-                                case TableTransactionActionType.Delete:
-                                    int affectedRowsCount3 = await storage.ExecuteAsync(delKeySql, command =>
-                                    {
-                                        command.AddParameter(nameof(KeyEntity.StateId), keyData.StateId);
-                                        command.AddParameter(nameof(KeyEntity.ETag), keyData.ETag);
-                                    }).ConfigureAwait(continueOnCapturedContext: false);
-                                    break;
-
-                                default:
-                                    break;
-                            }
-                        }
-                        if (transaction.TableEntity != null && transaction.TableEntity is StateEntity)
-                        {
-                            var stateData = transaction.TableEntity as StateEntity;
-                            stateData.Timestamp = new DateTimeOffset(DateTime.Now).ToUniversalTime();
-                            switch (transaction.ActionType)
+                        case TableTransactionActionType.UpdateReplace:
+                            multipleQuery.Add(new Tuple<string, Action<DbCommand>>(updateKeySql, command =>
                             {
-                                case TableTransactionActionType.Add:
-                                    int affectedRowsCount = await storage.ExecuteAsync(addStateSql, command =>
-                                    {
-                                        command.AddParameter(nameof(StateEntity.StateId), stateData.StateId);
-                                        command.AddParameter(nameof(StateEntity.SequenceId), stateData.SequenceId);
-                                        command.AddParameter(nameof(StateEntity.TransactionId), stateData.TransactionId);
-                                        command.AddParameter(nameof(StateEntity.TransactionTimestamp), stateData.TransactionTimestamp);
-                                        command.AddParameter(nameof(StateEntity.TransactionManager), stateData.TransactionManager);
-                                        command.AddParameter(nameof(StateEntity.StateJson), stateData.StateJson);
-                                        command.AddParameter(nameof(StateEntity.Timestamp), stateData.Timestamp);
-                                        command.AddParameter(nameof(StateEntity.ETag), stateData.ETag);
-                                    }).ConfigureAwait(continueOnCapturedContext: false);
-                                    break;
+                                command.AddParameter(nameof(KeyEntity.CommittedSequenceId), keyData.CommittedSequenceId);
+                                command.AddParameter(nameof(KeyEntity.Metadata), keyData.Metadata);
+                                command.AddParameter(nameof(KeyEntity.Timestamp), keyData.Timestamp);
+                                command.AddParameter(nameof(KeyEntity.StateId), keyData.StateId);
+                                command.AddParameter(nameof(KeyEntity.ETag), keyData.ETag);
+                            }));
+                            break;
 
-                                case TableTransactionActionType.UpdateReplace:
-                                    int affectedRowsCount2 = await storage.ExecuteAsync(updateStateSql, command =>
-                                    {
-                                        command.AddParameter(nameof(StateEntity.StateId), stateData.StateId);
-                                        command.AddParameter(nameof(StateEntity.SequenceId), stateData.SequenceId);
-                                        command.AddParameter(nameof(StateEntity.TransactionId), stateData.TransactionId);
-                                        command.AddParameter(nameof(StateEntity.TransactionTimestamp), stateData.TransactionTimestamp);
-                                        command.AddParameter(nameof(StateEntity.TransactionManager), stateData.TransactionManager);
-                                        command.AddParameter(nameof(StateEntity.StateJson), stateData.StateJson);
-                                        command.AddParameter(nameof(StateEntity.Timestamp), stateData.Timestamp);
-                                    }).ConfigureAwait(continueOnCapturedContext: false);
-                                    break;
+                        case TableTransactionActionType.Delete:
+                            multipleQuery.Add(new Tuple<string, Action<DbCommand>>(delKeySql, command =>
+                            {
+                                command.AddParameter(nameof(KeyEntity.StateId), keyData.StateId);
+                                command.AddParameter(nameof(KeyEntity.ETag), keyData.ETag);
+                            }));
+                            break;
 
-                                case TableTransactionActionType.Delete:
-                                    int affectedRowsCount3 = await storage.ExecuteAsync(delStateSql, command =>
-                                    {
-                                        command.AddParameter(nameof(StateEntity.StateId), stateData.StateId);
-                                        command.AddParameter(nameof(StateEntity.SequenceId), stateData.SequenceId);
-                                        command.AddParameter(nameof(StateEntity.ETag), stateData.ETag);
-                                    }).ConfigureAwait(continueOnCapturedContext: false);
-                                    break;
-
-                                default:
-                                    break;
-                            }
-                        }
+                        default:
+                            break;
                     }
+                }
+                if (transaction.TableEntity is StateEntity)
+                {
+                    var stateData = transaction.TableEntity as StateEntity;
+                    stateData.Timestamp = new DateTimeOffset(DateTime.Now).ToUniversalTime();
+                    switch (transaction.ActionType)
+                    {
+                        case TableTransactionActionType.Add:
+                            multipleQuery.Add(new Tuple<string, Action<DbCommand>>(addStateSql, command =>
+                            {
+                                command.AddParameter(nameof(StateEntity.StateId), stateData.StateId);
+                                command.AddParameter(nameof(StateEntity.SequenceId), stateData.SequenceId);
+                                command.AddParameter(nameof(StateEntity.TransactionId), stateData.TransactionId);
+                                command.AddParameter(nameof(StateEntity.TransactionTimestamp), stateData.TransactionTimestamp);
+                                command.AddParameter(nameof(StateEntity.TransactionManager), stateData.TransactionManager);
+                                command.AddParameter(nameof(StateEntity.StateJson), stateData.StateJson);
+                                command.AddParameter(nameof(StateEntity.Timestamp), stateData.Timestamp);
+                                command.AddParameter(nameof(StateEntity.ETag), stateData.ETag);
+                            }));
+                            break;
 
-                    // commit
-                    scope.Complete();
+                        case TableTransactionActionType.UpdateReplace:
+                            multipleQuery.Add(new Tuple<string, Action<DbCommand>>(updateStateSql, command =>
+                            {
+                                command.AddParameter(nameof(StateEntity.StateId), stateData.StateId);
+                                command.AddParameter(nameof(StateEntity.SequenceId), stateData.SequenceId);
+                                command.AddParameter(nameof(StateEntity.TransactionId), stateData.TransactionId);
+                                command.AddParameter(nameof(StateEntity.TransactionTimestamp), stateData.TransactionTimestamp);
+                                command.AddParameter(nameof(StateEntity.TransactionManager), stateData.TransactionManager);
+                                command.AddParameter(nameof(StateEntity.StateJson), stateData.StateJson);
+                                command.AddParameter(nameof(StateEntity.Timestamp), stateData.Timestamp);
+                            }));
+                            break;
+
+                        case TableTransactionActionType.Delete:
+                            multipleQuery.Add(new Tuple<string, Action<DbCommand>>(delStateSql, command =>
+                            {
+                                command.AddParameter(nameof(StateEntity.StateId), stateData.StateId);
+                                command.AddParameter(nameof(StateEntity.SequenceId), stateData.SequenceId);
+                                command.AddParameter(nameof(StateEntity.ETag), stateData.ETag);
+                            }));
+                            break;
+
+                        default:
+                            break;
+                    }
                 }
             }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
 
-            await Task.CompletedTask;
+          await storage.ExecuteTransactionAsync(multipleQuery).ConfigureAwait(continueOnCapturedContext: false);
         }
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -102,6 +103,8 @@ namespace Orleans.Tests.SqlUtils
         /// </code>
         /// </example>
         Task<int> ExecuteAsync(string query, Action<IDbCommand> parameterProvider, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default);
+
+        Task<int> ExecuteTransactionAsync(List<Tuple<string, Action<DbCommand>>> multipleQuery, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// The well known invariant name of the underlying database.

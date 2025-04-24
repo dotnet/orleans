@@ -201,6 +201,25 @@ namespace Orleans.Tests.SqlUtils
         }
 
         /// <summary>
+        /// Executes a given statement. Especially intended to use with <em>INSERT</em>, <em>UPDATE</em>, <em>DELETE</em> or <em>DDL</em> queries with transaction
+        /// </summary>
+        /// <param name="multipleQuery"></param>
+        /// <param name="commandBehavior"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        public async Task<int> ExecuteTransactionAsync(List<Tuple<string, Action<DbCommand>>> multipleQuery, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default)
+        {
+            //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
+            if (multipleQuery == null)
+            {
+                throw new ArgumentNullException(nameof(multipleQuery));
+            }
+
+            return (await ExecuteTransactionAsync(multipleQuery, ExecuteReaderAsync, (unit, id, c) => Task.FromResult(unit), commandBehavior, cancellationToken).ConfigureAwait(false));
+        }
+
+        /// <summary>
         /// Creates an instance of a database of type <see cref="RelationalStorage"/>.
         /// </summary>
         /// <param name="invariantName">The invariant name of the connector for this database.</param>
@@ -292,48 +311,65 @@ namespace Orleans.Tests.SqlUtils
         /// execute with transaction
         /// </summary>
         /// <typeparam name="TResult"></typeparam>
-        /// <param name="query"></param>
-        /// <param name="parameterProvider"></param>
+        /// <param name="multipleQuery"></param>
         /// <param name="executor"></param>
         /// <param name="selector"></param>
         /// <param name="commandBehavior"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        private async Task<Tuple<IEnumerable<TResult>, int>> ExecuteTransactionAsync<TResult>(
-          string query,
-          Action<DbCommand> parameterProvider,
+        private async Task<int> ExecuteTransactionAsync<TResult>(
+          List<Tuple<string, Action<DbCommand>>> multipleQuery,
           Func<DbCommand, Func<IDataRecord, int, CancellationToken, Task<TResult>>, CommandBehavior, CancellationToken, Task<Tuple<IEnumerable<TResult>, int>>> executor,
           Func<IDataRecord, int, CancellationToken, Task<TResult>> selector,
           CommandBehavior commandBehavior,
           CancellationToken cancellationToken)
         {
+            int result = 0;
             using (var connection = DbConnectionFactory.CreateConnection(_invariantName, _connectionString))
             {
                 await connection.OpenAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
-                using (var transaction = connection.BeginTransaction())
+                using (var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted))
                 {
-                    using (var command = connection.CreateCommand())
+                    try
                     {
-                        parameterProvider?.Invoke(command);
-                        command.CommandText = query;
-                        command.Transaction = transaction;
-
-                        _databaseCommandInterceptor.Intercept(command);
-
-                        Task<Tuple<IEnumerable<TResult>, int>> ret;
-                        if (_isSynchronousAdoNetImplementation)
+                        foreach (var itemQuery in multipleQuery)
                         {
-                            ret = Task.Run(() => executor(command, selector, commandBehavior, cancellationToken), cancellationToken);
-                        }
-                        else
-                        {
-                            ret = executor(command, selector, commandBehavior, cancellationToken);
-                        }
+                            string query = itemQuery.Item1;
+                            Action<DbCommand> parameterProvider = itemQuery.Item2;
+                            using (var command = connection.CreateCommand())
+                            {
+                                parameterProvider?.Invoke(command);
+                                command.CommandText = query;
+                                command.Transaction = transaction;
 
-                        return await ret.ConfigureAwait(continueOnCapturedContext: false);
+                                _databaseCommandInterceptor.Intercept(command);
+
+                                Task<Tuple<IEnumerable<TResult>, int>> ret;
+                                if (_isSynchronousAdoNetImplementation)
+                                {
+                                    ret = Task.Run(() => executor(command, selector, commandBehavior, cancellationToken), cancellationToken);
+                                }
+                                else
+                                {
+                                    ret = executor(command, selector, commandBehavior, cancellationToken);
+                                }
+
+                                var res = await ret.ConfigureAwait(continueOnCapturedContext: false);
+                            }
+                        }
+                        // commit
+                        await transaction.CommitAsync().ConfigureAwait(continueOnCapturedContext: false);
+                        result = 1;
+                    }
+                    catch
+                    {
+                        // rollback
+                        await transaction.RollbackAsync().ConfigureAwait(continueOnCapturedContext: false); ;
+                        throw;
                     }
                 }
             }
+            return result;
         }
 
 
