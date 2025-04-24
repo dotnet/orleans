@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -7,9 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Core.Internal;
 using Orleans.Runtime;
-using Orleans.Runtime.Placement;
 using Orleans.TestingHost.Utils;
 using Microsoft.Extensions.Configuration;
 using Orleans.Configuration;
@@ -26,11 +25,12 @@ using Orleans.Hosting;
 using Orleans.Runtime.TestHooks;
 using Orleans.Configuration.Internal;
 using Orleans.TestingHost.Logging;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.TestingHost;
 
 /// <summary>
-/// A host class for local testing with Orleans using in-process silos. 
+/// A host class for local testing with Orleans using in-process silos.
 /// </summary>
 public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
 {
@@ -39,11 +39,13 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     private readonly StringBuilder _log = new();
     private readonly object _logLock = new();
     private readonly InMemoryTransportConnectionHub _transportHub = new();
-    private readonly GrainDirectoryObserver _grainDirectoryObserver = new();
     private readonly InProcessGrainDirectory _grainDirectory;
     private readonly InProcessMembershipTable _membershipTable;
     private bool _disposed;
     private int _startedInstances;
+
+    // Multi-client support
+    private readonly Dictionary<string, IHost> _clientHosts = new();
 
     /// <summary>
     /// Collection of all known silos.
@@ -62,7 +64,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <summary>
     /// Options used to configure the test cluster.
     /// </summary>
-    /// <remarks>This is the options you configured your test cluster with, or the default one. 
+    /// <remarks>This is the options you configured your test cluster with, or the default one.
     /// If the cluster is being configured via ClusterConfiguration, then this object may not reflect the true settings.
     /// </remarks>
     public InProcessTestClusterOptions Options { get; }
@@ -70,24 +72,40 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <summary>
     /// The internal client interface.
     /// </summary>
-    internal IHost? ClientHost { get; private set; }
+    internal IHost? ClientHost
+    {
+        get
+        {
+            _clientHosts.TryGetValue("default", out var clientHost);
+            return clientHost;
+        }
+        set
+        {
+            if (value is null)
+            {
+                _clientHosts.Remove("default");
+            }
+            else
+            {
+                _clientHosts["default"] = value;
+            }
+        }
+    }
 
     /// <summary>
     /// The internal client interface.
     /// </summary>
-    internal IInternalClusterClient? InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>();
+    internal IInternalClusterClient InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>() ?? throw new InvalidOperationException("Client not initialized");
 
     /// <summary>
     /// The client.
     /// </summary>
-    /// <exception cref="InvalidOperationException">The cluster has not been deployed or the client has been stopped.</exception>
-    public IClusterClient Client => InternalClient ?? throw new InvalidOperationException(
-        "The test cluster client is unavailable because the cluster has not been deployed or has been stopped.");
+    public IClusterClient Client => ClientHost?.Services.GetRequiredService<IInternalClusterClient>() ?? throw new InvalidOperationException("Client not initialized");
 
     /// <summary>
     /// The port allocator.
     /// </summary>
-    public ITestClusterPortAllocator PortAllocator { get; }
+    public ITestClusterPortAllocator? PortAllocator { get; }
 
     /// <summary>
     /// Returns whether the address belongs to this cluster.
@@ -379,51 +397,11 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <param name="didKill">Whether recent membership changes we done by graceful Stop.</param>
     public async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
     {
-        var clusterMembershipOptions = Client!.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value; // Stabilization requires a deployed client.
+        var clusterMembershipOptions = Client.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
         TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
-        var activeSilos = GetActiveSilos().ToArray();
-        var testHooks = activeSilos.Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>()).ToArray();
-        var gatewayManager = Client.ServiceProvider.GetRequiredService<GatewayManager>();
-        Func<TimeSpan, Task<bool>>? waitForGrainDirectoryConvergence =
-            GrainDirectoryObserver.CanObserve(activeSilos)
-                ? timeout => _grainDirectoryObserver.WaitForConvergenceAsync(activeSilos, timeout)
-                : null;
-        WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is waiting up to {0} for {1} active silo(s)", stabilizationTime, activeSilos.Length);
-        if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAndGatewaysAsync(
-            activeSilos,
-            testHooks,
-            gatewayManager,
-            stabilizationTime,
-            waitForGrainDirectoryConvergence))
-        {
-            WriteLog("WaitForLivenessToStabilize observed stable active silo and gateway views");
-        }
-        else
-        {
-            WriteLog("WaitForLivenessToStabilize reached the fallback wait of {0}", stabilizationTime);
-        }
-    }
-
-    /// <summary>
-    /// Wait for active silos to observe cluster manifest updates for all active silos.
-    /// </summary>
-    /// <param name="didKill">Whether recent membership changes were done by graceful Stop.</param>
-    public async Task WaitForClusterManifestToStabilizeAsync(bool didKill = false)
-    {
-        var clusterMembershipOptions = Client!.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value; // Stabilization requires a deployed client.
-        var stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
-        var activeSilos = GetActiveSilos().ToArray();
-        var testHooks = activeSilos.Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>()).ToArray();
-
-        WriteLog(Environment.NewLine + Environment.NewLine + "WaitForClusterManifestToStabilize is waiting up to {0} for {1} active silo manifest(s)", stabilizationTime, activeSilos.Length);
-        if (await ClusterManifestStabilizationHelper.WaitForExpectedClusterManifestAsync(activeSilos, testHooks, stabilizationTime))
-        {
-            WriteLog("WaitForClusterManifestToStabilize observed stable cluster manifests");
-        }
-        else
-        {
-            WriteLog("WaitForClusterManifestToStabilize reached the fallback wait of {0}", stabilizationTime);
-        }
+        WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
+        await Task.Delay(stabilizationTime);
+        WriteLog("WaitForLivenessToStabilize is done sleeping");
     }
 
     internal async Task WaitForTopologyToConvergeAsync(
@@ -479,7 +457,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         if (didKill)
         {
             // in case of hard kill (kill and not Stop), we should give silos time to detect failures first.
-            stabilizationTime = TestingUtils.Multiply(clusterMembershipOptions.MaxProbeTimeout, clusterMembershipOptions.NumMissedProbesLimit);
+            stabilizationTime = TestingUtils.Multiply(clusterMembershipOptions.ProbeTimeout, clusterMembershipOptions.NumMissedProbesLimit);
         }
         if (clusterMembershipOptions.UseLivenessGossip)
         {
@@ -769,9 +747,9 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// Do a Stop or Kill of the specified silo, followed by a restart.
     /// </summary>
     /// <param name="instance">Silo to be restarted.</param>
-    public async Task<InProcessSiloHandle?> RestartSiloAsync(InProcessSiloHandle instance)
+    public async Task<InProcessSiloHandle?> RestartSiloAsync(InProcessSiloHandle? instance)
     {
-        if (instance is not null)
+        if (instance != null)
         {
             var instanceNumber = instance.InstanceNumber;
             await StopSiloAsync(instance);
@@ -821,10 +799,17 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             await StopClusterClientAsync(cancellationToken);
         }
 
+        var clientHost = CreateClientHost("default");
+        ClientHost = clientHost;
+        await ClientHost.StartAsync();
+    }
+
+    private IHost CreateClientHost(string name)
+    {
         var hostBuilder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
         {
             EnvironmentName = Environments.Development,
-            ApplicationName = "TestClusterClient",
+            ApplicationName = $"Client_{name}",
             DisableDefaults = true,
         });
 
@@ -849,18 +834,49 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             clientBuilder.UseInMemoryConnectionTransport(_transportHub);
         });
 
-        TryConfigureFileLogging(Options, hostBuilder.Services, "TestClusterClient");
+        TryConfigureFileLogging(Options, hostBuilder.Services, $"Client_{name}");
 
         var clientHost = hostBuilder.Build();
-        try
+        return clientHost;
+    }
+
+    /// <summary>
+    /// Gets a client by name, or null if not found.
+    /// </summary>
+    public IClusterClient? GetClient(string name)
+    {
+        if (_clientHosts.TryGetValue(name, out var host))
         {
-            await clientHost.StartAsync(cancellationToken);
-            ClientHost = clientHost;
+            return host.Services.GetRequiredService<IInternalClusterClient>();
         }
-        catch
+
+        return null;
+    }
+
+    /// <summary>
+    /// Gets the client with the given name, creating a new client if none exists with that name.
+    /// </summary>
+    public async Task<IClusterClient> GetClientAsync(string name, Action<IHostApplicationBuilder>? configure = null)
+    {
+        if (!_clientHosts.TryGetValue(name, out var host))
         {
-            await DisposeAsync(clientHost);
-            throw;
+            host = CreateClientHost(name);
+            _clientHosts[name] = host;
+            await host.StartAsync();
+        }
+
+        return host.Services.GetRequiredService<IInternalClusterClient>();
+    }
+
+    /// <summary>
+    /// Removes and disposes a client by name.
+    /// </summary>
+    public async Task RemoveClientAsync(string name)
+    {
+        if (_clientHosts.Remove(name, out var host))
+        {
+            await host.StopAsync();
+            await DisposeAsync(host);
         }
     }
 
@@ -1122,13 +1138,13 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         }
     }
 
-    private void ReportUnobservedException(object? sender, UnhandledExceptionEventArgs eventArgs)
+    private void ReportUnobservedException(object sender, UnhandledExceptionEventArgs eventArgs)
     {
         Exception exception = (Exception)eventArgs.ExceptionObject;
         WriteLog("Unobserved exception: {0}", exception);
     }
 
-    private void WriteLog(string format, params object?[] args)
+    private void WriteLog(string format, params object[] args)
     {
         lock (_logLock)
         {
@@ -1160,8 +1176,13 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             await DisposeAsync(ClientHost).ConfigureAwait(false);
             ClientHost = null;
 
+            foreach (var clientHost in _clientHosts.Values)
+            {
+                await DisposeAsync(clientHost).ConfigureAwait(false);
+            }
+            _clientHosts.Clear();
+
             PortAllocator?.Dispose();
-            _grainDirectoryObserver.Dispose();
         });
 
         _disposed = true;
@@ -1181,9 +1202,14 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         }
 
         ClientHost?.Dispose();
-        ClientHost = null;
+
+        foreach (var clientHost in _clientHosts.Values)
+        {
+            clientHost.Dispose();
+        }
+        _clientHosts.Clear();
+
         PortAllocator?.Dispose();
-        _grainDirectoryObserver.Dispose();
 
         _disposed = true;
     }

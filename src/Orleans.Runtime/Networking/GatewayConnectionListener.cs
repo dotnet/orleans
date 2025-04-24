@@ -17,7 +17,6 @@ namespace Orleans.Runtime.Messaging
         private readonly MessageCenter messageCenter;
         private readonly ConnectionCommon connectionShared;
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
-        private readonly ILogger<GatewayConnectionListener> logger;
         private readonly EndpointOptions endpointOptions;
         private readonly SiloConnectionOptions siloConnectionOptions;
         private readonly OverloadDetector overloadDetector;
@@ -44,7 +43,6 @@ namespace Orleans.Runtime.Messaging
             this.messageCenter = messageCenter;
             this.connectionShared = connectionShared;
             this.connectionPreambleHelper = connectionPreambleHelper;
-            this.logger = logger;
             this.endpointOptions = endpointOptions.Value;
         }
 

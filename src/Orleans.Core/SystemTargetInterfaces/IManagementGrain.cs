@@ -236,6 +236,18 @@ namespace Orleans.Runtime
         [Alias("54FE0FEC")]
         ValueTask ResetGrainCallFrequencies(SiloAddress[]? hostsIds, CancellationToken cancellationToken)
             => ResetGrainCallFrequencies(hostsIds);
+
+        /// <summary>
+        /// Instructs all gateways to drop defunct (disconnected and expired) clients.
+        /// </summary>
+        /// <param name="excludeRecent">If true, only clients that have been disconnected for longer than the configured client expiration time will be dropped.</param>
+        /// <returns>A task representing the work performed.</returns>
+        [Alias("DropDisconnectedClients")]
+        Task DropDisconnectedClients(bool excludeRecent);
+
+        [Alias("101564A8")]
+        Task DropDisconnectedClients(bool excludeRecent, CancellationToken cancellationToken)
+            => DropDisconnectedClients(excludeRecent);
     }
 
     /// <summary>
@@ -262,13 +274,13 @@ namespace Orleans.Runtime
         /// The source host.
         /// </summary>
         [Id(2)]
-        public SiloAddress? SourceHost { get; set; }
+        public SiloAddress SourceHost { get; set; }
 
         /// <summary>
         /// The target host.
         /// </summary>
         [Id(3)]
-        public SiloAddress? TargetHost { get; set; }
+        public SiloAddress TargetHost { get; set; }
 
         /// <summary>
         /// The estimated number of calls made.
