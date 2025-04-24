@@ -11,22 +11,14 @@ namespace Orleans.Transactions.AdoNet.Entity
     /// </summary>
     internal class KeyEntity : IEntity
     {
-        public const string RK = "k";
 
-        public KeyEntity()
-        {
-            RowKey = RK;
-        }
-
-        public string ETag { get; set; }
         public string StateId { get; set; }
-
-        public string RowKey { get; set; }
 
         public DateTimeOffset? Timestamp { get; set; }
 
         public long CommittedSequenceId { get; set; }
         public string Metadata { get; set; }
+        public string ETag { get; set; }
     }
 
 }
