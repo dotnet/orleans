@@ -241,6 +241,25 @@ namespace Orleans.Tests.SqlUtils
         }
 
         /// <summary>
+        /// Executes a given statement. Especially intended to use with <em>INSERT</em>, <em>UPDATE</em>, <em>DELETE</em> or <em>DDL</em> queries with transaction
+        /// </summary>
+        /// <param name="multipleQuery"></param>
+        /// <param name="commandBehavior"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        public async Task<int> ExecuteTransactionAsync(List<Tuple<string, Action<DbCommand>>> multipleQuery, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default)
+        {
+            //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
+            if (multipleQuery == null)
+            {
+                throw new ArgumentNullException(nameof(multipleQuery));
+            }
+
+            return (await ExecuteTransactionAsync(multipleQuery, ExecuteReaderAsync, (unit, id, c) => Task.FromResult(unit), commandBehavior, cancellationToken).ConfigureAwait(false));
+        }
+
+        /// <summary>
         /// Creates an instance of a database of type <see cref="RelationalStorage"/>.
         /// </summary>
         /// <param name="invariantName">The invariant name of the connector for this database.</param>
@@ -357,28 +376,41 @@ namespace Orleans.Tests.SqlUtils
             }
         }
 
-        private async Task<Tuple<IEnumerable<TResult>, int>> ExecuteTransactionAsync<TResult>(
-            string query,
-            Action<DbCommand>? parameterProvider,
+        private async Task<int> ExecuteTransactionAsync<TResult>(
+            List<Tuple<string, Action<DbCommand>>> multipleQuery,
             Func<DbCommand, Func<IDataRecord, int, CancellationToken, Task<TResult>>, CommandBehavior, CancellationToken, Task<Tuple<IEnumerable<TResult>, int>>> executor,
             Func<IDataRecord, int, CancellationToken, Task<TResult>> selector,
             CommandBehavior commandBehavior,
             CancellationToken cancellationToken)
         {
             using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
-            using var transaction = connection.BeginTransaction();
-            using var command = connection.CreateCommand();
-            parameterProvider?.Invoke(command);
-            command.CommandText = query;
-            command.Transaction = transaction;
+            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
+            try
+            {
+                foreach (var (query, parameterProvider) in multipleQuery)
+                {
+                    using var command = connection.CreateCommand();
+                    parameterProvider?.Invoke(command);
+                    command.CommandText = query;
+                    command.Transaction = transaction;
 
-            _databaseCommandInterceptor.Intercept(command);
+                    _databaseCommandInterceptor.Intercept(command);
 
-            var result = _isSynchronousAdoNetImplementation
-                ? Task.Run(() => executor(command, selector, commandBehavior, cancellationToken), cancellationToken)
-                : executor(command, selector, commandBehavior, cancellationToken);
+                    var operation = _isSynchronousAdoNetImplementation
+                        ? Task.Run(() => executor(command, selector, commandBehavior, cancellationToken), cancellationToken)
+                        : executor(command, selector, commandBehavior, cancellationToken);
 
-            return await result.ConfigureAwait(continueOnCapturedContext: false);
+                    await operation.ConfigureAwait(continueOnCapturedContext: false);
+                }
+
+                await transaction.CommitAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+                return 1;
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+                throw;
+            }
         }
 
 
