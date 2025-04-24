@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,7 +11,9 @@ using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.AdoNet.Entity;
 using Orleans.Transactions.AdoNet.Storage;
+using Orleans.Transactions.AdoNet.Utils;
 
 namespace Orleans.Transactions.AdoNet.TransactionalState
 {
@@ -35,10 +38,12 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             this.jsonSettings = TransactionalStateFactory.GetJsonSerializerSettings(services);
             this.loggerFactory = loggerFactory;
             //now just oracle sqlparameter dot is different
-            if (this.options.Invariant == AdoNetInvariants.InvariantNameOracleDatabase)
+            if (this.options.Invariant == AdoNetInvariants.InvariantNameOracleDatabase
+                && string.IsNullOrWhiteSpace(this.options.SqlParameterDot))
             {
                 this.options.SqlParameterDot = ":";
             }
+            InitExecuteSqlDic();
         }
 
         public static ITransactionalStateStorageFactory Create(IServiceProvider services, string name)
@@ -86,6 +91,55 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
         private  Task Init(CancellationToken cancellationToken)
         {
            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// init execute sql
+        /// </summary>
+        private void InitExecuteSqlDic()
+        {
+            var addKeySql = ActionToSql.InsertSql(this.options.KeyEntityTableName, new List<string>() {
+                nameof(KeyEntity.StateId),nameof(KeyEntity.CommittedSequenceId),
+                nameof(KeyEntity.Metadata),nameof(KeyEntity.Timestamp),nameof(KeyEntity.ETag) }, this.options.SqlParameterDot);
+            this.options.ExecuteSqlDcitionary.Add(Constants.AddKeySql, addKeySql);
+
+            string updateKeySql = ActionToSql.UpdateSql(this.options.KeyEntityTableName, new List<string>()
+            {
+                 nameof(KeyEntity.CommittedSequenceId),nameof(KeyEntity.Metadata),nameof(KeyEntity.Timestamp)
+            }, new List<string>() {
+                nameof(KeyEntity.StateId),nameof(KeyEntity.ETag)
+            }, this.options.SqlParameterDot);
+            this.options.ExecuteSqlDcitionary.Add(Constants.UpdateKeySql, updateKeySql);
+
+            string delKeySql = ActionToSql.DeleteSql(this.options.KeyEntityTableName, new List<string>()
+            {
+                nameof(KeyEntity.StateId),nameof(KeyEntity.ETag)
+            }, this.options.SqlParameterDot);
+            this.options.ExecuteSqlDcitionary.Add(Constants.DelKeySql, delKeySql);
+
+            string addStateSql = ActionToSql.InsertSql(this.options.StateEntityTableName, new List<string>() {
+                nameof(StateEntity.StateId), nameof(StateEntity.SequenceId),
+                nameof(StateEntity.TransactionId),nameof(StateEntity.TransactionTimestamp),
+                nameof(StateEntity.TransactionManager),nameof(StateEntity.StateJson),
+                nameof(StateEntity.ETag), nameof(StateEntity.Timestamp)
+            }, this.options.SqlParameterDot);
+            this.options.ExecuteSqlDcitionary.Add(Constants.AddStateSql, addStateSql);
+
+            string updateStateSql = ActionToSql.UpdateSql(this.options.StateEntityTableName, new List<string>()
+            {
+                nameof(StateEntity.TransactionId),nameof(StateEntity.TransactionTimestamp),
+                nameof(StateEntity.TransactionManager), nameof(StateEntity.StateJson),
+                 nameof(StateEntity.Timestamp) },
+             new List<string>() {
+                nameof(StateEntity.StateId),nameof(StateEntity.SequenceId) }
+             , this.options.SqlParameterDot);
+            this.options.ExecuteSqlDcitionary.Add(Constants.UpdateStateSql, updateStateSql);
+
+            string delStateSql = ActionToSql.DeleteSql(this.options.StateEntityTableName, new List<string>()
+            {
+                nameof(StateEntity.StateId),nameof(StateEntity.SequenceId),nameof(StateEntity.ETag)
+            }, this.options.SqlParameterDot);
+            this.options.ExecuteSqlDcitionary.Add(Constants.DelStateSql, delStateSql);
         }
     }
 }
