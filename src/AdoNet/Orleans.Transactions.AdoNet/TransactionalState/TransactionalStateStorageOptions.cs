@@ -23,12 +23,12 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
         /// <summary>
         /// the table name of StateEntity in database
         /// </summary>
-        public string StateEntityTableName { get; set; } = "orleanstransactionstatetable";
+        public string StateEntityTableName { get; set; } = "OrleansTransactionStateTable";
 
         /// <summary>
         /// the table name of KeyEntity in database
         /// </summary>
-        public string KeyEntityTableName { get; set; } = "orleanstransactionkeytable";
+        public string KeyEntityTableName { get; set; } = "OrleansTransactionKeyTable";
 
         /// <summary>
         ///  the database parameter dot
