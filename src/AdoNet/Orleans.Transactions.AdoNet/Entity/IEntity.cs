@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Orleans.Transactions.AdoNet.Entity;
+
 internal interface IEntity
 {
     public string ETag { get; set; }

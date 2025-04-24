@@ -61,13 +61,16 @@ internal static class ActionToSql
     {
         StringBuilder sb = new StringBuilder();
         sb.Append($"DELETE FROM {tableName}");
-        sb.Append(" WHERE ");
-        for (int i = 0; i < whereList.Count; i++)
+        if (whereList != null)
         {
-            sb.Append($"{whereList[i]}={sqlDot}{whereList[i]}");
-            if (i != whereList.Count - 1)
+            sb.Append(" WHERE ");
+            for (int i = 0; i < whereList.Count; i++)
             {
-                sb.Append(" AND ");
+                sb.Append($"{whereList[i]}={sqlDot}{whereList[i]}");
+                if (i != whereList.Count - 1)
+                {
+                    sb.Append(" AND ");
+                }
             }
         }
         sb.Append(";");
@@ -87,12 +90,15 @@ internal static class ActionToSql
             }
         }
         sb.Append($" FROM {tableName} WHERE ");
-        for (int i = 0; i < whereList.Count; i++)
+        if (whereList != null)
         {
-            sb.Append($"{whereList[i]}={sqlDot}{whereList[i]}");
-            if (i != whereList.Count - 1)
+            for (int i = 0; i < whereList.Count; i++)
             {
-                sb.Append(" AND ");
+                sb.Append($"{whereList[i]}={sqlDot}{whereList[i]}");
+                if (i != whereList.Count - 1)
+                {
+                    sb.Append(" AND ");
+                }
             }
         }
         if (orderList != null)
