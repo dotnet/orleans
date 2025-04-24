@@ -31,14 +31,13 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
         private readonly JsonSerializerSettings jsonSettings;
         private readonly IRelationalStorage storage;
 
-
         public TransactionalStateStorage(
             string stateId,
              JsonSerializerSettings jsonSettings,
             TransactionalStateStorageOptions options,
             ILogger<TransactionalStateStorage<TState>> logger)
         {
-            this.stateId = stateId;//state position
+            this.stateId = stateId;
             this.options = options;
             this.logger = logger;
             this.jsonSettings = jsonSettings;
@@ -84,7 +83,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             var prepareRecordsToRecover = new List<PendingTransactionState<TState>>();
             for (var i = 0; i < stateEntityList.Count; i++)
             {
-                var kvp  = stateEntityList[i];
+                var kvp = stateEntityList[i];
 
                 // pending states for already committed transactions can be ignored
                 if (kvp.Key <= keyEntity.CommittedSequenceId)
@@ -100,7 +99,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                 {
                     State = JsonConvert.DeserializeObject<TState>(kvp.Value.StateJson),
                     SequenceId = kvp.Key,
-                    TimeStamp = kvp.Value.TransactionTimestamp,
+                    TimeStamp = kvp.Value.TransactionTimestamp.Value.UtcDateTime,
                     TransactionId = kvp.Value.TransactionId,
                     TransactionManager = tm
                 });
@@ -122,7 +121,6 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                 keyEntity.CommittedSequenceId,
                 meta,
                 prepareRecordsToRecover);
-
         }
 
         public async Task<string> Store(
@@ -138,7 +136,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");
             }
 
-            var batchOperation = new DbBatchOperation(stateId,this.options,logger);
+            var batchOperation = new DbBatchOperation(stateId,this.options, this.storage, logger);
 
             // first, clean up aborted records
             if (abortAfter.HasValue && stateEntityList.Count != 0)
@@ -169,10 +167,9 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                             // overwrite with new pending state
                             StateEntity existing = stateEntityList[pos].Value;
                             existing.TransactionId = s.TransactionId;
-                            existing.TransactionTimestamp = s.TimeStamp;
+                            existing.TransactionTimestamp = new DateTimeOffset(s.TimeStamp).ToUniversalTime();
                             existing.TransactionManager = JsonConvert.SerializeObject(s.TransactionManager, jsonSettings);
                             existing.StateJson = JsonConvert.SerializeObject(s.State, jsonSettings);
-                            existing.Timestamp = DateTime.Now;
                             await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.UpdateReplace, existing)).ConfigureAwait(false);
                             keyETag = existing.ETag;
                             if (logger.IsEnabled(LogLevel.Trace))
@@ -181,7 +178,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                         else
                         {
                             var entity = StateEntity.Create(this.jsonSettings, this.stateId, s);
-                            entity.ETag = string.IsNullOrWhiteSpace(keyETag) ? Guid.NewGuid().ToString():keyETag;
+                            entity.ETag = string.IsNullOrWhiteSpace(keyETag) ? Guid.NewGuid().ToString() : keyETag;
                             await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.Add, entity)).ConfigureAwait(false);
                             keyETag = entity.ETag;
                             stateEntityList.Insert(pos, new KeyValuePair<long, StateEntity>(s.SequenceId, entity));
@@ -189,7 +186,6 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                             if (logger.IsEnabled(LogLevel.Trace))
                                 logger.LogTrace($"{stateId} Insert {entity.TransactionId}");
                         }
-
                     }
                 }
             }
@@ -246,6 +242,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                 {
                     case 0:
                         return true;
+
                     case -1:
                         pos++;
                         continue;
@@ -258,10 +255,10 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
 
         private async Task<KeyEntity> ReadKey()
         {
-            string querySql = ActionToSql.QuerySimpleSql(this.options.KeyEntityTableName,new List<string>() { "*"},new List<string>()
+            string querySql = ActionToSql.QuerySimpleSql(this.options.KeyEntityTableName, new List<string>() { "*" }, new List<string>()
             {
                 nameof(keyEntity.StateId)
-            },null,this.options.SqlParameterDot);
+            }, null, this.options.SqlParameterDot);
 
             var queryResult = await this.storage.ReadAsync<KeyEntity>(querySql, command =>
               {
@@ -269,7 +266,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
               }, (selector, resultSetCount, token) => Task.FromResult(GetConvertKeyRecord(selector)),
               cancellationToken: CancellationToken.None).ConfigureAwait(false);
 
-           foreach (var result in queryResult)
+            foreach (var result in queryResult)
             {
                 return result;
             }
@@ -293,7 +290,6 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             return keyEntity;
         }
 
-
         private async Task<List<KeyValuePair<long, StateEntity>>> ReadStates()
         {
             string querySql = ActionToSql.QuerySimpleSql(this.options.StateEntityTableName, new List<string>() { "*" }, new List<string>()
@@ -302,8 +298,8 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             }, new List<string>()
             {
                 nameof(StateEntity.SequenceId)
-            },this.options.SqlParameterDot);
-         
+            }, this.options.SqlParameterDot);
+
             var queryResult = await this.storage.ReadAsync<StateEntity>(querySql, command =>
             {
                 command.AddParameter(nameof(StateEntity.StateId), stateId);
@@ -313,7 +309,6 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             var results = new List<KeyValuePair<long, StateEntity>>();
             foreach (var entity in queryResult)
             {
-                //entity.SequenceId = StateEntity.GetSequenceId(entity.RowKey);
                 results.Add(new KeyValuePair<long, StateEntity>(entity.SequenceId, entity));
             };
             return results;
@@ -334,39 +329,36 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             };
             return stateEntity;
         }
-
-
-
     }
 
     internal class DbBatchOperation
     {
         private readonly IRelationalStorage storage;
-        readonly TransactionalStateStorageOptions options;
-        readonly ILogger logger;
-        readonly string stateId;
-        readonly int MaxBatchSize = 128;
+        private readonly TransactionalStateStorageOptions options;
+        private readonly ILogger logger;
+        private readonly string stateId;
+        private readonly int MaxBatchSize = 128;
 
-        bool flushing = false;
+        private bool flushing = false;
 
-
-        List<TableTransactionAction> batchOperation = new List<TableTransactionAction>();
+        private List<TableTransactionAction> batchOperation = new List<TableTransactionAction>();
 
         public DbBatchOperation(
             string stateId,
             TransactionalStateStorageOptions options,
+            IRelationalStorage storage,
             ILogger logger
             )
         {
             this.options = options;
             this.logger = logger;
             this.stateId = stateId;
-            this.storage = RelationalStorage.CreateInstance(this.options.Invariant, this.options.ConnectionString);
+            this.storage = storage;//RelationalStorage.CreateInstance(this.options.Invariant, this.options.ConnectionString);
         }
 
         public async ValueTask Add(TableTransactionAction operation)
         {
-            if (operation.TableEntity != null && operation.TableEntity.StateId  != stateId)
+            if (operation.TableEntity != null && operation.TableEntity.StateId != stateId)
             {
                 throw new ArgumentException($"StateId not match.");
             }
@@ -375,7 +367,6 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             {
                 throw new ArgumentException($"{operation.TableEntity.StateId} ETag can not be null or empty");
             }
-
 
             batchOperation.Add(operation);
 
@@ -396,7 +387,6 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             {
                 try
                 {
-
                     await SubmitTransactionAsync(batchOperation).ConfigureAwait(false);
 
                     if (logger.IsEnabled(LogLevel.Trace))
@@ -426,7 +416,6 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                     flushing = false;
                 }
             }
-
         }
 
         public async Task SubmitTransactionAsync(List<TableTransactionAction> list)
@@ -436,7 +425,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                 return;
             }
             var addKeySql = this.options.ExecuteSqlDcitionary[Constants.AddKeySql];
-         
+
             string updateKeySql = this.options.ExecuteSqlDcitionary[Constants.UpdateKeySql];
 
             string delKeySql = this.options.ExecuteSqlDcitionary[Constants.DelKeySql];
@@ -448,8 +437,8 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             string delStateSql = this.options.ExecuteSqlDcitionary[Constants.DelStateSql];
 
             //  this.storage.wx
-                try
-                {
+            try
+            {
                 using (TransactionScope scope = new TransactionScope(TransactionScopeOption.Required,
                     new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
                     TransactionScopeAsyncFlowOption.Enabled))
@@ -460,7 +449,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                         if (transaction.TableEntity != null && transaction.TableEntity is KeyEntity)
                         {
                             var keyData = transaction.TableEntity as KeyEntity;
-                            keyData.Timestamp = keyData.Timestamp ?? DateTime.Now;
+                            keyData.Timestamp = new DateTimeOffset(DateTime.Now).ToUniversalTime();
                             switch (transaction.ActionType)
                             {
                                 case TableTransactionActionType.Add:
@@ -473,6 +462,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                                         command.AddParameter(nameof(KeyEntity.ETag), keyData.ETag);
                                     }).ConfigureAwait(continueOnCapturedContext: false);
                                     break;
+
                                 case TableTransactionActionType.UpdateReplace:
                                     int affectedRowsCount2 = await storage.ExecuteAsync(updateKeySql, command =>
                                     {
@@ -483,6 +473,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                                         command.AddParameter(nameof(KeyEntity.ETag), keyData.ETag);
                                     }).ConfigureAwait(continueOnCapturedContext: false);
                                     break;
+
                                 case TableTransactionActionType.Delete:
                                     int affectedRowsCount3 = await storage.ExecuteAsync(delKeySql, command =>
                                     {
@@ -490,6 +481,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                                         command.AddParameter(nameof(KeyEntity.ETag), keyData.ETag);
                                     }).ConfigureAwait(continueOnCapturedContext: false);
                                     break;
+
                                 default:
                                     break;
                             }
@@ -497,7 +489,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                         if (transaction.TableEntity != null && transaction.TableEntity is StateEntity)
                         {
                             var stateData = transaction.TableEntity as StateEntity;
-                            stateData.Timestamp = stateData.Timestamp ?? DateTime.Now;
+                            stateData.Timestamp = new DateTimeOffset(DateTime.Now).ToUniversalTime();
                             switch (transaction.ActionType)
                             {
                                 case TableTransactionActionType.Add:
@@ -513,6 +505,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                                         command.AddParameter(nameof(StateEntity.ETag), stateData.ETag);
                                     }).ConfigureAwait(continueOnCapturedContext: false);
                                     break;
+
                                 case TableTransactionActionType.UpdateReplace:
                                     int affectedRowsCount2 = await storage.ExecuteAsync(updateStateSql, command =>
                                     {
@@ -525,6 +518,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                                         command.AddParameter(nameof(StateEntity.Timestamp), stateData.Timestamp);
                                     }).ConfigureAwait(continueOnCapturedContext: false);
                                     break;
+
                                 case TableTransactionActionType.Delete:
                                     int affectedRowsCount3 = await storage.ExecuteAsync(delStateSql, command =>
                                     {
@@ -533,6 +527,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                                         command.AddParameter(nameof(StateEntity.ETag), stateData.ETag);
                                     }).ConfigureAwait(continueOnCapturedContext: false);
                                     break;
+
                                 default:
                                     break;
                             }
@@ -542,14 +537,13 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                     // commit
                     scope.Complete();
                 }
-                }
-                catch (Exception ex)
-                {
-                    throw ex;
-                }
-            
-           await Task.CompletedTask;
-        }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
 
+            await Task.CompletedTask;
+        }
     }
 }
