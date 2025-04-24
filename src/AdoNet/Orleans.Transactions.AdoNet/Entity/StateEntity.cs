@@ -9,7 +9,7 @@ using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.AdoNet.Entity
 {
-    internal class StateEntity: IEntity
+    internal class StateEntity : IEntity
     {
         public string StateId { get; set; }
         public long SequenceId { get; set; }
@@ -18,9 +18,9 @@ namespace Orleans.Transactions.AdoNet.Entity
 
         public string TransactionId { get; set; }
 
-        public DateTime TransactionTimestamp { get; set; }
+        public DateTimeOffset? TransactionTimestamp { get; set; }
 
-        public string TransactionManager{ get; set; }
+        public string TransactionManager { get; set; }
 
         public string StateJson { get; set; }
 
@@ -35,14 +35,13 @@ namespace Orleans.Transactions.AdoNet.Entity
                 StateId = partitionKey,
                 SequenceId = pendingState.SequenceId,
                 TransactionId = pendingState.TransactionId,
-                TransactionTimestamp = pendingState.TimeStamp,
+                TransactionTimestamp = new DateTimeOffset(pendingState.TimeStamp).ToUniversalTime(),
                 TransactionManager = JsonConvert.SerializeObject(pendingState.TransactionManager, JsonSettings),
                 StateJson = JsonConvert.SerializeObject(pendingState.State, JsonSettings),
-                Timestamp = DateTime.Now,
+                //Timestamp = new DateTimeOffset(DateTime.Now).ToUniversalTime(),
             };
 
             return result;
         }
-
     }
 }
