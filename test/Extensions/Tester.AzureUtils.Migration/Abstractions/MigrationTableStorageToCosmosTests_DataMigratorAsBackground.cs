@@ -33,7 +33,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [SkippableFact]
         public async Task DataMigrator_MovesDataToDestinationStorage()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(baseId + 1);
+            var grain = GetMigrationGrain(baseId + 1);
             var oldGrainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
             var stateName = typeof(MigrationTestGrain).FullName;
 

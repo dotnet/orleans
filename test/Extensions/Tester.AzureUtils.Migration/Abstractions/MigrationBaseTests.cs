@@ -33,7 +33,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
                 return this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(id, grainClassNamePrefix: customType.FullName);
             }
 
-            return this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(id);
+            return this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(id, grainClassNamePrefix: typeof(MigrationTestGrain).FullName);
         }
 
         private IServiceProvider? serviceProvider;
@@ -130,7 +130,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             {
                 if (this.dataMigrator == null)
                 {
-                    this.dataMigrator = ServiceProvider.GetRequiredService<DataMigrator>();
+                    this.dataMigrator = ServiceProvider.GetRequiredServiceByName<DataMigrator>("default");
                 }
                 return this.dataMigrator;
             }

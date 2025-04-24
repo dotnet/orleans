@@ -28,7 +28,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [SkippableFact]
         public async Task ReadFromSourceTest()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(baseId + 1);
+            var grain = GetMigrationGrain(baseId + 1);
             var grainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
             var stateName = typeof(MigrationTestGrain).FullName;
 
@@ -44,7 +44,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [SkippableFact]
         public async Task UpdatesOnlyDestinationStorage()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(baseId + 2);
+            var grain = GetMigrationGrain(baseId + 2);
             var oldGrainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
             var newState = new MigrationTestGrain_State { A = 20, B = 30 };
             var stateName = typeof(MigrationTestGrain).FullName;
@@ -99,7 +99,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         [SkippableFact]
         public async Task DataMigrator_MovesDataToDestinationStorage()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationGrain>(baseId + 3);
+            var grain = GetMigrationGrain(baseId + 3);
             var oldGrainState = new GrainState<MigrationTestGrain_State>(new() { A = 33, B = 806 });
             var stateName = typeof(MigrationTestGrain).FullName;
 
