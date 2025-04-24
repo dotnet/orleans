@@ -16,5 +16,9 @@
     <PackageReference Include="System.Memory" Version="$(SystemMemoryVersion)" />
     <PackageReference Include="System.Threading.Tasks.Extensions" Version="$(SystemThreadingTasksExtensionsVersion)" />
   </ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Orleans.Reminders.Cosmos"/>
+	</ItemGroup>
   
 </Project>
