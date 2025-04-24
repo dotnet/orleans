@@ -70,7 +70,7 @@ namespace UnitTests
 
             Assert.Equal(expected: 0, actual: this.runtimeClient.GetRunningRequestsCount(errorGrainType));
 
-            // try to re-use the promise and should fail immideately.
+            // try to re-use the promise and should fail immediately.
             try
             {
                 stopwatch = new Stopwatch();

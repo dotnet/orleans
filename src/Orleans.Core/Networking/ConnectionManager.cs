@@ -78,7 +78,7 @@ namespace Orleans.Runtime.Messaging
             {
                 if (this.shutdownCancellation.IsCancellationRequested)
                 {
-                    throw new OperationCanceledException("Shutting down");
+                    throw new OperationCanceledException("The host is shutting down.");
                 }
 
                 Task pendingAttempt;

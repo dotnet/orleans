@@ -60,6 +60,29 @@ namespace Orleans.Runtime
             return true;
         }
 
+        /// <summary>
+        /// Checks if the provided <see cref="GrainId"/> points to the same client as this <see cref="ClientGrainId"/>.
+        /// </summary>
+        /// <param name="other">The <see cref="GrainId"/> to compare.</param>
+        /// <returns><see langword="true"/> if the provided <see cref="GrainId"/> corresponds to the same client, otherwise <see langword="false"/>.</returns>
+        public bool IsClientEqual(GrainId other)
+        {
+            if (!GrainId.Type.Equals(other.Type))
+            {
+                return false;
+            }
+
+            // Strip the observer id, if present, using span-based operations to avoid allocations.
+            var key = other.Key.AsSpan();
+            if (key.IndexOf((byte)ObserverGrainId.SegmentSeparator) is int index && index >= 0)
+            {
+                key = key[..index];
+            }
+
+            // Compare the stripped key with the current GrainId's key.
+            return GrainId.Key.AsSpan().SequenceEqual(key);
+        }
+
         /// <inheritdoc/>
         public override bool Equals(object? obj) => obj is ClientGrainId clientId && GrainId.Equals(clientId.GrainId);
 
