@@ -12,6 +12,8 @@ namespace Orleans.Persistence.Migration
     {
         private readonly ILogger<DataMigrator> _logger;
         private readonly DataMigratorOptions _options;
+        private readonly OperationsRateLimiter _sourceStorageOpsRateLimiter;
+        private readonly OperationsRateLimiter _destinationStorageOpsRateLimiter;
 
         private readonly IClusterMembershipService _clusterMembershipService;
         private readonly ILocalSiloDetails _localSiloDetails;
@@ -43,6 +45,9 @@ namespace Orleans.Persistence.Migration
             _options = options ?? new();
             Name = name;
 
+            _sourceStorageOpsRateLimiter = new OperationsRateLimiter(options.SourceStorageMaxOperationsPerMinute);
+            _destinationStorageOpsRateLimiter = new OperationsRateLimiter(options.SourceStorageMaxOperationsPerMinute);
+
             _clusterMembershipService = clusterMembershipService;
             _localSiloDetails = localSiloDetails;
 
@@ -56,6 +61,22 @@ namespace Orleans.Persistence.Migration
             _reminderMigrationStorage = (reminderTable is IReminderMigrationTable reminderMigrationTable)
                 ? reminderMigrationTable
                 : null!;
+        }
+
+        /// <summary>
+        /// Updates the upper limit on the number of operations per minute to be performed by the migrator against source storage.
+        /// </summary>
+        public void UpdateSourceStorageOperationsRateLimit(int limit)
+        {
+            _sourceStorageOpsRateLimiter.UpdateLimit(limit);
+        }
+
+        /// <summary>
+        /// Updates the upper limit on the number of operations per minute to be performed by the migrator against destination storage.
+        /// </summary>
+        public void UpdateDestinationStorageOperationsRateLimit(int limit)
+        {
+            _destinationStorageOpsRateLimiter.UpdateLimit(limit);
         }
 
         public Task StartAsync(CancellationToken cancellationToken) => _executeBackgroundMigrationTask = ExecuteBackgroundMigrationAsync(_backgroundWorkCts.Token);
@@ -149,10 +170,14 @@ namespace Orleans.Persistence.Migration
             var migrationStats = new MigrationStats();
             await foreach (var storageEntry in _sourceStorage.GetAll(_lastProcessedGrainCursor, cancellationToken))
             {
+                await _sourceStorageOpsRateLimiter.WaitIfNeededAsync(increment: 1, cancellationToken);
+
                 migrationStats.EntriesProcessed++;
                 if (!_options.ProcessMigratedEntries)
                 {
                     IGrainState tmpState = new GrainState<object>();
+
+                    await _destinationStorageOpsRateLimiter.WaitIfNeededAsync(increment: 1, cancellationToken);
                     await _destinationStorage.ReadStateAsync(storageEntry.GrainType, storageEntry.GrainReference, tmpState);
 
                     if (tmpState is not null && tmpState.RecordExists)
@@ -170,6 +195,7 @@ namespace Orleans.Persistence.Migration
 
                     try
                     {
+                        await _destinationStorageOpsRateLimiter.WaitIfNeededAsync(increment: 1, cancellationToken);
                         if (_destinationStorage is IMigrationGrainStorage migrationGrainStorage)
                         {
                             // sometimes the storage does not allow direct writing (i.e. CosmosDB with it's GrainActivationContext dependency)
@@ -318,5 +344,17 @@ namespace Orleans.Persistence.Migration
         /// If you want to skip awaiting, set it to null.
         /// </summary>
         public TimeSpan? BackgroundTaskInitialDelay { get; set; } = TimeSpan.FromMinutes(2);
+
+        /// <summary>
+        /// Maximum operations per minute to be performed by the migrator against source storage.
+        /// Defaults to 1000000 (basically no limit)
+        /// </summary>
+        public int SourceStorageMaxOperationsPerMinute { get; set; } = 1000000;
+
+        /// <summary>
+        /// Maximum operations per minute to be performed by the migrator against destination storage.
+        /// Defaults to 1000000 (basically no limit)
+        /// </summary>
+        public int DestinationStorageMaxOperationsPerMinute { get; set; } = 1000000;
     }
 }
