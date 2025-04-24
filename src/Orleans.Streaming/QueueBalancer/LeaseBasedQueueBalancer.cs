@@ -14,7 +14,7 @@ namespace Orleans.Streams;
 
 /// <summary>
 /// LeaseBasedQueueBalancer. This balancer supports queue balancing in cluster auto-scale scenarios,
-/// unexpected server failure scenarios, and tries to support ideal distribution as much as possible. 
+/// unexpected server failure scenarios, and tries to support ideal distribution as much as possible.
 /// </summary>
 /// <remarks>
 /// Initializes a new instance of the <see cref="LeaseBasedQueueBalancer"/> class.
@@ -24,7 +24,7 @@ namespace Orleans.Streams;
 /// <param name="leaseProvider">The lease provider.</param>
 /// <param name="services">The services.</param>
 /// <param name="loggerFactory">The logger factory.</param>
-public class LeaseBasedQueueBalancer(
+public partial class LeaseBasedQueueBalancer(
     string name,
     LeaseBasedQueueBalancerOptions options,
     ILeaseProvider leaseProvider,
@@ -79,7 +79,7 @@ public class LeaseBasedQueueBalancer(
         var allQueues = queueMapper.GetAllQueues().ToList();
         _allQueuesCount = allQueues.Count;
 
-        // Selector default to round robin selector now, but we can make a further change to make selector configurable if needed. Selector algorithm could 
+        // Selector default to round robin selector now, but we can make a further change to make selector configurable if needed. Selector algorithm could
         // be affecting queue balancing stabilization time in cluster initializing and auto-scaling
         _queueSelector = new RoundRobinSelector<QueueId>(allQueues);
         await base.Initialize(queueMapper);
@@ -211,10 +211,7 @@ public class LeaseBasedQueueBalancer(
     private async Task ReleaseLeasesToMeetResponsibility()
     {
         if (Cancellation.IsCancellationRequested) return;
-        if (Logger.IsEnabled(LogLevel.Trace))
-        {
-            Logger.LogTrace("ReleaseLeasesToMeetResponsibility. QueueCount: {QueueCount}, Responsibility: {Responsibility}", _myQueues.Count, _responsibility);
-        }
+        LogTraceReleaseLeasesToMeetResponsibility(Logger, _myQueues.Count, _responsibility);
 
         var queueCountToRelease = _myQueues.Count - _responsibility;
         if (queueCountToRelease <= 0)
@@ -242,19 +239,13 @@ public class LeaseBasedQueueBalancer(
         await _leaseProvider.Release(_options.LeaseCategory, queuesToGiveUp);
 
         // Remove queuesToGiveUp from myQueue list after the balancer released the leases on them.
-        if (Logger.IsEnabled(LogLevel.Debug))
-        {
-            Logger.LogDebug("Released leases for {QueueCount} queues. Holding leases for {QueueCount} of an expected {MinQueueCount} queues.", queueCountToRelease, _myQueues.Count, _responsibility);
-        }
+        LogDebugReleasedLeases(Logger, queueCountToRelease, _myQueues.Count, _responsibility);
     }
 
     private async Task AcquireLeasesToMeetExpectation(int expectedTotalLeaseCount, TimeSpan timeout)
     {
         if (Cancellation.IsCancellationRequested) return;
-        if (Logger.IsEnabled(LogLevel.Trace))
-        {
-            Logger.LogTrace("AcquireLeasesToMeetExpectation. QueueCount: {QueueCount}, ExpectedTotalLeaseCount: {ExpectedTotalLeaseCount}", _myQueues.Count, expectedTotalLeaseCount);
-        }
+        LogTraceAcquireLeasesToMeetExpectation(Logger, _myQueues.Count, expectedTotalLeaseCount);
 
         var leasesToAcquire = expectedTotalLeaseCount - _myQueues.Count;
         if (leasesToAcquire <= 0)
@@ -264,15 +255,7 @@ public class LeaseBasedQueueBalancer(
 
         // tracks how many remaining possible leases there are.
         var possibleLeaseCount = _queueSelector.Count - _myQueues.Count;
-        if (Logger.IsEnabled(LogLevel.Debug))
-        {
-            Logger.LogDebug(
-                "Holding leased for {QueueCount} queues. Trying to acquire {acquireQueueCount} queues to reach {TargetQueueCount} of a possible {PossibleLeaseCount}",
-                _myQueues.Count,
-                leasesToAcquire,
-                expectedTotalLeaseCount,
-                possibleLeaseCount);
-        }
+        LogDebugHoldingLeased(Logger, _myQueues.Count, leasesToAcquire, expectedTotalLeaseCount, possibleLeaseCount);
 
         // Try to acquire leases until we have no more to acquire or no more possible
         var sw = ValueStopwatch.StartNew();
@@ -300,27 +283,24 @@ public class LeaseBasedQueueBalancer(
                         }
                     case ResponseCode.TransientFailure:
                         {
-                            Logger.LogWarning(result.FailureException, "Failed to acquire lease {LeaseKey} due to transient error.", result.AcquiredLease.ResourceKey);
+                            LogWarningFailedToAcquireLeaseTransient(Logger, result.FailureException, result.AcquiredLease.ResourceKey);
                             break;
                         }
                     // This is expected much of the time.
                     case ResponseCode.LeaseNotAvailable:
                         {
-                            if (Logger.IsEnabled(LogLevel.Debug))
-                            {
-                                Logger.LogDebug(result.FailureException, "Failed to acquire lease {LeaseKey} due to {Reason}.", result.AcquiredLease.ResourceKey, result.StatusCode);
-                            }
+                            LogDebugFailedToAcquireLeaseNotAvailable(Logger, result.FailureException, result.AcquiredLease.ResourceKey, result.StatusCode);
                             break;
                         }
                     // An acquire call should not return this code, so log as error
                     case ResponseCode.InvalidToken:
                         {
-                            Logger.LogError(result.FailureException, "Failed to acquire acquire {LeaseKey} unexpected invalid token.", result.AcquiredLease.ResourceKey);
+                            LogErrorFailedToAcquireLeaseInvalidToken(Logger, result.FailureException, result.AcquiredLease.ResourceKey);
                             break;
                         }
                     default:
                         {
-                            Logger.LogError(result.FailureException, "Unexpected response to acquire request of lease {LeaseKey}. StatusCode {StatusCode}.", result.AcquiredLease.ResourceKey, result.StatusCode);
+                            LogErrorUnexpectedAcquireLease(Logger, result.FailureException, result.AcquiredLease.ResourceKey, result.StatusCode);
                             break;
                         }
                 }
@@ -328,15 +308,7 @@ public class LeaseBasedQueueBalancer(
 
             possibleLeaseCount -= expectedQueues.Count;
             leasesToAcquire = expectedTotalLeaseCount - _myQueues.Count;
-            if (Logger.IsEnabled(LogLevel.Debug))
-            {
-                Logger.LogDebug(
-                    "Holding leased for {QueueCount} queues. Trying to acquire {acquireQueueCount} queues to reach {TargetQueueCount} of a possible {PossibleLeaseCount} lease",
-                    _myQueues.Count,
-                    leasesToAcquire,
-                    expectedTotalLeaseCount,
-                    possibleLeaseCount);
-            }
+            LogDebugHoldingLeased(Logger, _myQueues.Count, leasesToAcquire, expectedTotalLeaseCount, possibleLeaseCount);
 
             if (sw.Elapsed > timeout)
             {
@@ -345,10 +317,7 @@ public class LeaseBasedQueueBalancer(
             }
         }
 
-        if (Logger.IsEnabled(LogLevel.Debug))
-        {
-            Logger.LogDebug("Holding leases for {QueueCount} of an expected {MinQueueCount} queues.", _myQueues.Count, _responsibility);
-        }
+        LogDebugHoldingLeases(Logger, _myQueues.Count, _responsibility);
     }
 
     /// <summary>
@@ -359,10 +328,7 @@ public class LeaseBasedQueueBalancer(
     {
         bool allRenewed = true;
         if (Cancellation.IsCancellationRequested) return false;
-        if (Logger.IsEnabled(LogLevel.Trace))
-        {
-            Logger.LogTrace("RenewLeases. QueueCount: {QueueCount}", _myQueues.Count);
-        }
+        LogTraceRenewLeases(Logger, _myQueues.Count);
 
         if (_myQueues.Count <= 0)
         {
@@ -386,7 +352,7 @@ public class LeaseBasedQueueBalancer(
                     {
                         _myQueues.RemoveAt(i);
                         allRenewed = false;
-                        Logger.LogWarning(result.FailureException, "Failed to renew lease {LeaseKey} due to transient error.", result.AcquiredLease.ResourceKey);
+                        LogWarningFailedToRenewLeaseTransient(Logger, result.FailureException, result.AcquiredLease.ResourceKey);
                         break;
                     }
                 // These can occur if lease has expired and/or someone else has taken it.
@@ -395,23 +361,20 @@ public class LeaseBasedQueueBalancer(
                     {
                         _myQueues.RemoveAt(i);
                         allRenewed = false;
-                        Logger.LogWarning(result.FailureException, "Failed to renew lease {LeaseKey} due to {Reason}.", result.AcquiredLease.ResourceKey, result.StatusCode);
+                        LogWarningFailedToRenewLeaseReason(Logger, result.FailureException, result.AcquiredLease.ResourceKey, result.StatusCode);
                         break;
                     }
                 default:
                     {
                         _myQueues.RemoveAt(i);
                         allRenewed = false;
-                        Logger.LogError(result.FailureException, "Unexpected response to renew of lease {LeaseKey}. StatusCode {StatusCode}.", result.AcquiredLease.ResourceKey, result.StatusCode);
+                        LogErrorUnexpectedRenewLease(Logger, result.FailureException, result.AcquiredLease.ResourceKey, result.StatusCode);
                         break;
                     }
             }
         }
 
-        if (Logger.IsEnabled(LogLevel.Debug))
-        {
-            Logger.LogDebug("Renewed leases for {QueueCount} queues.", _myQueues.Count);
-        }
+        LogDebugRenewedLeases(Logger, _myQueues.Count);
 
         return allRenewed;
     }
@@ -476,15 +439,7 @@ public class LeaseBasedQueueBalancer(
             _responsibility++;
         }
 
-        if (Logger.IsEnabled(LogLevel.Debug))
-        {
-            Logger.LogDebug(
-                "Updating Responsibilities for {QueueCount} queue over {SiloCount} silos. Need {MinQueueCount} queues, have {MyQueueCount}",
-                _allQueuesCount,
-                activeSiloCount,
-                _responsibility,
-                _myQueues.Count);
-        }
+        LogDebugUpdatingResponsibilities(Logger, _allQueuesCount, activeSiloCount, _responsibility, _myQueues.Count);
 
         if (_myQueues.Count < _responsibility && _leaseAcquisitionTimer.Period == Timeout.InfiniteTimeSpan)
         {
@@ -495,4 +450,100 @@ public class LeaseBasedQueueBalancer(
         _leaseMaintenanceTimer.Period = _options.LeaseRenewPeriod;
         await AcquireLeasesToMeetResponsibility();
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "ReleaseLeasesToMeetResponsibility. QueueCount: {QueueCount}, Responsibility: {Responsibility}"
+    )]
+    private static partial void LogTraceReleaseLeasesToMeetResponsibility(ILogger logger, int queueCount, int responsibility);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Released leases for {QueueCount} queues. Holding leases for {HoldingQueueCount} of an expected {MinQueueCount} queues."
+    )]
+    private static partial void LogDebugReleasedLeases(ILogger logger, int queueCount, int holdingQueueCount, int minQueueCount);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "AcquireLeasesToMeetExpectation. QueueCount: {QueueCount}, ExpectedTotalLeaseCount: {ExpectedTotalLeaseCount}"
+    )]
+    private static partial void LogTraceAcquireLeasesToMeetExpectation(ILogger logger, int queueCount, int expectedTotalLeaseCount);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Holding leased for {QueueCount} queues. Trying to acquire {acquireQueueCount} queues to reach {TargetQueueCount} of a possible {PossibleLeaseCount}"
+    )]
+    private static partial void LogDebugHoldingLeased(ILogger logger, int queueCount, int acquireQueueCount, int targetQueueCount, int possibleLeaseCount);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Failed to acquire lease {LeaseKey} due to transient error."
+    )]
+    private static partial void LogWarningFailedToAcquireLeaseTransient(ILogger logger, Exception exception, string leaseKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Failed to acquire lease {LeaseKey} due to {Reason}."
+    )]
+    private static partial void LogDebugFailedToAcquireLeaseNotAvailable(ILogger logger, Exception exception, string leaseKey, ResponseCode reason);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Failed to acquire acquire {LeaseKey} unexpected invalid token."
+    )]
+    private static partial void LogErrorFailedToAcquireLeaseInvalidToken(ILogger logger, Exception exception, string leaseKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Unexpected response to acquire request of lease {LeaseKey}. StatusCode {StatusCode}."
+    )]
+    private static partial void LogErrorUnexpectedAcquireLease(ILogger logger, Exception exception, string leaseKey, ResponseCode statusCode);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Holding leased for {QueueCount} queues. Trying to acquire {acquireQueueCount} queues to reach {TargetQueueCount} of a possible {PossibleLeaseCount} lease"
+    )]
+    private static partial void LogDebugHoldingLeasedAgain(ILogger logger, int queueCount, int acquireQueueCount, int targetQueueCount, int possibleLeaseCount);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Holding leases for {QueueCount} of an expected {MinQueueCount} queues."
+    )]
+    private static partial void LogDebugHoldingLeases(ILogger logger, int queueCount, int minQueueCount);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "RenewLeases. QueueCount: {QueueCount}"
+    )]
+    private static partial void LogTraceRenewLeases(ILogger logger, int queueCount);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Failed to renew lease {LeaseKey} due to transient error."
+    )]
+    private static partial void LogWarningFailedToRenewLeaseTransient(ILogger logger, Exception exception, string leaseKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Failed to renew lease {LeaseKey} due to {Reason}."
+    )]
+    private static partial void LogWarningFailedToRenewLeaseReason(ILogger logger, Exception exception, string leaseKey, ResponseCode reason);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Unexpected response to renew of lease {LeaseKey}. StatusCode {StatusCode}."
+    )]
+    private static partial void LogErrorUnexpectedRenewLease(ILogger logger, Exception exception, string leaseKey, ResponseCode statusCode);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Renewed leases for {QueueCount} queues."
+    )]
+    private static partial void LogDebugRenewedLeases(ILogger logger, int queueCount);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Updating Responsibilities for {QueueCount} queue over {SiloCount} silos. Need {MinQueueCount} queues, have {MyQueueCount}"
+    )]
+    private static partial void LogDebugUpdatingResponsibilities(ILogger logger, int queueCount, int siloCount, int minQueueCount, int myQueueCount);
 }
