@@ -35,7 +35,7 @@ namespace Orleans.Transactions.AdoNet.Hosting
     /// <summary>
     /// <see cref="IServiceCollection"/> extensions.
     /// </summary>
-    public static class AdoNetTransactionServicecollectionExtensions
+    internal static class AdoNetTransactionServicecollectionExtensions
     {
         internal static IServiceCollection AddAdoNetTransactionalStateStorage(this IServiceCollection services, string name,
             Action<OptionsBuilder<TransactionalStateStorageOptions>> configureOptions = null)

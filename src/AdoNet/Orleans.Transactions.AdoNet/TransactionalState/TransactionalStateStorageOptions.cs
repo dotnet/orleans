@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Orleans.Transactions.AdoNet.Storage;
 
 namespace Orleans.Transactions.AdoNet.TransactionalState
@@ -22,12 +23,12 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
         /// <summary>
         /// the table name of StateEntity in database
         /// </summary>
-        public string StateEntityTableName { get; set; } = "orleanstransactionstateentity";
+        public string StateEntityTableName { get; set; } = "orleanstransactionstatetable";
 
         /// <summary>
         /// the table name of KeyEntity in database
         /// </summary>
-        public string KeyEntityTableName { get; set; } = "orleanstransactionkeyentity";
+        public string KeyEntityTableName { get; set; } = "orleanstransactionkeytable";
 
         /// <summary>
         ///  the database parameter dot
@@ -40,5 +41,6 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
+        internal Dictionary<string, string> ExecuteSqlDcitionary { get; set; } = new Dictionary<string, string>();
     }
 }

@@ -11,7 +11,5 @@ internal interface IEntity
 
     public string StateId { get; set; }
 
-    public string RowKey { get; set; }
-
     public DateTimeOffset? Timestamp { get; set; }
 }
