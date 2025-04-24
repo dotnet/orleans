@@ -29,7 +29,6 @@ namespace Orleans.Transactions.AdoNet.Hosting
                 services.AddAdoNetTransactionalStateStorage(name, ob => ob.Configure(configureOptions));
             });
         }
-
     }
 
     /// <summary>
