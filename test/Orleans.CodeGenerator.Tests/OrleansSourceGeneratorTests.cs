@@ -37,6 +37,7 @@ public class DemoData
         driver = driver.RunGenerators(compilation);
 
         var result = driver.GetRunResult().Results.Single();
+        Assert.Empty(result.Diagnostics);
 
         Assert.Single(result.GeneratedSources);
         Assert.Equal($"{projectName}.orleans.g.cs", result.GeneratedSources[0].HintName);
