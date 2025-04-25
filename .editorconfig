@@ -20,6 +20,16 @@ trim_trailing_whitespace = true
 insert_final_newline = true
 spelling_exclusion_path = spelling.dic
 
+# Verify settings
+[*.{received,verified}.{cs}]
+charset = "utf-8-bom"
+end_of_line = lf
+indent_size = unset
+indent_style = unset
+insert_final_newline = false
+tab_width = unset
+trim_trailing_whitespace = false
+
 [*.{cs,csx,cake}]
 indent_size = 4
 dotnet_sort_system_directives_first = true

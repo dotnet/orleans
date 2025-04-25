@@ -90,6 +90,7 @@
     <PackageVersion Include="xunit.extensibility.core" Version="$(xUnitVersion)" />
     <PackageVersion Include="xunit.extensibility.execution" Version="$(xUnitVersion)" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="$(xUnitRunnerVersion)" />
+    <PackageVersion Include="Verify.Xunit" Version="28.15.0" />
     <PackageVersion Include="NodaTime" Version="3.1.10" />
     <PackageVersion Include="Autofac.Extensions.DependencyInjection" Version="8.0.0" />
     <PackageVersion Include="StructureMap.Microsoft.DependencyInjection" Version="2.0.0" />

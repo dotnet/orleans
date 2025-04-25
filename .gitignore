@@ -214,3 +214,6 @@ src/SetupTestScriptOutput.txt
 
 # VS Code
 .ionide/
+
+# Verify.Xunit
+*.received.*

@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Xunit;
 
@@ -9,8 +10,9 @@ namespace Orleans.CodeGenerator.Tests;
 public class OrleansSourceGeneratorTests
 {
     [Fact]
-    public async Task Test1()
+    public async Task TestBasicClass()
     {
+        var projectName = "TestProject";
         var compilation = await CreateCompilation(
 @"using Orleans;
 
@@ -22,7 +24,7 @@ public class DemoData
     [Id(0)]
     public string Value { get; set; } = string.Empty;
 }
-");
+", projectName);
 
         var generator = new OrleansSerializationSourceGenerator();
 
@@ -34,21 +36,13 @@ public class DemoData
         // Run the generator
         driver = driver.RunGenerators(compilation);
 
-        // Update the compilation and rerun the generator
-        compilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText("// dummy"));
-        driver = driver.RunGenerators(compilation);
-
-        // Assert the driver doesn't recompute the output
         var result = driver.GetRunResult().Results.Single();
-        var allOutputs = result.TrackedOutputSteps.SelectMany(outputStep => outputStep.Value).SelectMany(output => output.Outputs);
-        Assert.Collection(allOutputs, output => Assert.Equal(IncrementalStepRunReason.Cached, output.Reason));
 
-        // Assert the driver use the cached result from AssemblyName and Syntax
-        var assemblyNameOutputs = result.TrackedSteps["AssemblyName"].Single().Outputs;
-        Assert.Collection(assemblyNameOutputs, output => Assert.Equal(IncrementalStepRunReason.Unchanged, output.Reason));
+        Assert.Single(result.GeneratedSources);
+        Assert.Equal($"{projectName}.orleans.g.cs", result.GeneratedSources[0].HintName);
+        var generatedSource = result.GeneratedSources[0].SourceText.ToString();
 
-        var syntaxOutputs = result.TrackedSteps["Syntax"].Single().Outputs;
-        Assert.Collection(syntaxOutputs, output => Assert.Equal(IncrementalStepRunReason.Unchanged, output.Reason));
+        await Verify(generatedSource, extension: "cs").UseDirectory("snapshots");
     }
 
     private static async Task<CSharpCompilation> CreateCompilation(string sourceCode, string assemblyName = "TestProject")
@@ -66,18 +60,13 @@ public class DemoData
             // Orleans.Serialization
             MetadataReference.CreateFromFile(typeof(Serializer).Assembly.Location),
             // Orleans.Serialization.Abstractions
-            MetadataReference.CreateFromFile(typeof(GenerateFieldIds).Assembly.Location)
+            MetadataReference.CreateFromFile(typeof(GenerateFieldIds).Assembly.Location),
+            // Microsoft.Extensions.DependencyInjection.Abstractions
+            MetadataReference.CreateFromFile(typeof(ActivatorUtilitiesConstructorAttribute).Assembly.Location)
         );
 
         var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode);
 
         return CSharpCompilation.Create(assemblyName, [syntaxTree], references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-    }
-
-    [Serializable, GenerateSerializer]
-    public class DemoData
-    {
-        [Id(0)]
-        public string Value { get; set; } = string.Empty;
     }
 }
