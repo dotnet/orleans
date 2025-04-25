@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Orleans.Transactions.AdoNet.Storage;
+using Orleans.Transactions.AdoNet.Utils;
 
 namespace Orleans.Transactions.AdoNet.TransactionalState
 {
@@ -33,7 +34,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
         /// <summary>
         ///  the database parameter dot
         /// </summary>
-        public string SqlParameterDot { get; set; } = "@";
+        public string SqlParameterDot { get; set; } = Constants.SqlParameterDot;
 
         /// <summary>
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
