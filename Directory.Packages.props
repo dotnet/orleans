@@ -79,6 +79,7 @@
     <PackageVersion Include="CassandraCSharpDriver" Version="3.20.1" />
     <!-- Test related packages -->
     <PackageVersion Include="coverlet.collector" Version="6.0.2" />
+    <PackageVersion Include="coverlet.msbuild" Version="6.0.0" />
     <PackageVersion Include="AwesomeAssertions" Version="8.0.2" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.SourceGenerators.Testing" Version="1.1.2" />
