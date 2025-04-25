@@ -364,11 +364,11 @@ namespace Orleans.Messaging
 
             if (msg.Direction != Message.Directions.Request)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) LogDroppingMessage(msg, reason);
+                LogDroppingMessage(msg, reason);
             }
             else
             {
-                if (logger.IsEnabled(LogLevel.Debug)) LogRejectingMessage(msg, reason);
+                LogRejectingMessage(msg, reason);
                 MessagingInstruments.OnRejectedMessage(msg);
                 var error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
                 DispatchLocalMessage(error);

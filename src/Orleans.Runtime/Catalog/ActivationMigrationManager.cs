@@ -281,10 +281,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     {
         if (_workers.TryRemove(targetSilo, out var entry))
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                LogDebugTargetSilo(targetSilo);
-            }
+            LogDebugTargetSilo(targetSilo);
 
             entry.WorkItemChannel.Writer.TryComplete();
 
