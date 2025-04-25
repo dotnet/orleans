@@ -1,12 +1,9 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Runtime;
 using TestExtensions;
 using Xunit.Abstractions;
-using Orleans.Internal;
 using Orleans.Configuration;
 using Orleans.TestingHost.Utils;
-using Orleans.Reminders.Cosmos;
 using Xunit;
 using Orleans.Reminders.Cosmos.Migration;
 using Tester.Reminders.Cosmos.Migration.Helpers;
@@ -16,8 +13,10 @@ namespace Tester.Reminders.Cosmos.Migration;
 
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 [TestCategory("Cosmos")]
-public class ReminderTests_Cosmos_Standalone
+public class ReminderTests_Cosmos_Standalone : IClassFixture<TestEnvironmentFixture>
 {
+    private const string OrleansRemindersMigrationContainer = "OrleansRemindersMigration";
+
     private readonly ITestOutputHelper _output;
     private readonly ILogger _log;
     private readonly ILoggerFactory _loggerFactory;
@@ -25,7 +24,9 @@ public class ReminderTests_Cosmos_Standalone
     private readonly TestEnvironmentFixture _fixture;
     private readonly string _serviceId;
 
-    private readonly CosmosReminderTableOptions _options;
+    private readonly CosmosReminderTableOptions _reminderTableOptions;
+
+    private IOptions<CosmosReminderTableOptions> ReminderTableOptions => Options.Create(_reminderTableOptions);
 
     public ReminderTests_Cosmos_Standalone(ITestOutputHelper output, TestEnvironmentFixture fixture)
     {
@@ -36,10 +37,8 @@ public class ReminderTests_Cosmos_Standalone
         _loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{GetType().Name}.log");
         _log = _loggerFactory.CreateLogger<ReminderTests_Cosmos_Standalone>();
 
-        _options = new CosmosReminderTableOptions();
-        _options.ConfigureCosmosStorageOptions();
-
-        TestUtils.ConfigureClientThreadPoolSettingsForStorageTests(1000);
+        _reminderTableOptions = new CosmosReminderTableOptions { ContainerName = OrleansRemindersMigrationContainer };
+        _reminderTableOptions.ConfigureCosmosStorageOptions();
     }
 
     [SkippableFact, TestCategory("Reminders")]
@@ -47,9 +46,7 @@ public class ReminderTests_Cosmos_Standalone
     {
         string clusterId = NewClusterId();
         var clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = _serviceId });
-        var storageOptions = Options.Create(new CosmosReminderTableOptions());
-
-        IReminderTable table = new CosmosReminderTable(_loggerFactory, _fixture.Services, storageOptions, clusterOptions, null, null);
+        IReminderTable table = new CosmosReminderTable(_loggerFactory, _fixture.Services, ReminderTableOptions, clusterOptions, null, null);
         await table.Init();
 
         //ReminderEntry[] rows = (await GetAllRows(table)).ToArray();
