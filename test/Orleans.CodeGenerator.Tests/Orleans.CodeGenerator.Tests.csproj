@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- due to Verify.Xunit requiring newer versions of these libraries -->
     <PackageReference Include="System.IO.Hashing" VersionOverride="9.0.3" />
     <PackageReference Include="System.CodeDom" VersionOverride="9.0.2" />
     <PackageReference Include="Verify.Xunit" />
