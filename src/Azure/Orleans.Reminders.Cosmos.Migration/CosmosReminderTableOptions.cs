@@ -1,6 +1,6 @@
 using Orleans.Persistence.Cosmos;
 
-namespace Orleans.Reminders.Cosmos;
+namespace Orleans.Reminders.Cosmos.Migration;
 
 /// <summary>
 /// Options for Azure Cosmos DB Reminder Storage.

@@ -9,11 +9,10 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Persistence.Migration;
-using Orleans.Reminders.Cosmos.Models;
 using Orleans.Runtime;
-using CosmosReminderEntry = Orleans.Reminders.Cosmos.Models.ReminderEntity;
+using CosmosReminderEntry = Orleans.Reminders.Cosmos.Migration.Models.ReminderEntity;
 
-namespace Orleans.Reminders.Cosmos
+namespace Orleans.Reminders.Cosmos.Migration
 {
     internal class CosmosReminderTable : IReminderTable
     {
@@ -31,7 +30,6 @@ namespace Orleans.Reminders.Cosmos
         public CosmosReminderTable(
             ILoggerFactory loggerFactory,
             IServiceProvider serviceProvider,
-
             IOptions<CosmosReminderTableOptions> options,
             IOptions<ClusterOptions> clusterOptions,
             IGrainReferenceConverter grainReferenceConverter,

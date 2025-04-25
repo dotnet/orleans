@@ -25,4 +25,9 @@
     <PackageReference Include="Azure.Core" Version="$(AzureCoreVersion)" />
     <PackageReference Include="Microsoft.Azure.Cosmos" Version="$(AzureCosmosDbVersion)" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tester.Reminders.Cosmos.Migration"/>
+  </ItemGroup>
+
 </Project>

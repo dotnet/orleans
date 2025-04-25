@@ -1,6 +1,6 @@
-﻿using System;
+using System;
 
-namespace Orleans.Reminders.Cosmos.Shared;
+namespace Orleans.Reminders.Cosmos.Migration.Shared;
 
 internal static class CosmosIdSanitizer
 {
