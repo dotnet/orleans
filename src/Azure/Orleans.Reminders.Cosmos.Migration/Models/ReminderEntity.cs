@@ -50,18 +50,8 @@ internal class ReminderEntity : BaseEntity
     [JsonPropertyName(nameof(GrainHash))]
     public uint GrainHash { get; set; }
 
-    public static string ConstructId(GrainReference grainId, string reminderName)
-    {
-        var grainType = grainId.Type.ToString();
-        var grainKey = grainId.Key.ToString();
-
-        if (grainType is null || grainKey is null)
-        {
-            throw new ArgumentNullException(nameof(grainId));
-        }
-
-        return $"{CosmosIdSanitizer.Sanitize(grainType)}{CosmosIdSanitizer.SeparatorChar}{CosmosIdSanitizer.Sanitize(grainKey)}{CosmosIdSanitizer.SeparatorChar}{CosmosIdSanitizer.Sanitize(reminderName)}";
-    }
+    public static string ConstructId(GrainType grainType, IdSpan key, string reminderName)
+        => $"{CosmosIdSanitizer.Sanitize(grainType.ToString())}{CosmosIdSanitizer.SeparatorChar}{CosmosIdSanitizer.Sanitize(key.ToString())}{CosmosIdSanitizer.SeparatorChar}{CosmosIdSanitizer.Sanitize(reminderName)}";
 
     public static string ConstructPartitionKey(string serviceId, GrainReference grainId) => $"{serviceId}_{grainId.GetUniformHashCode():X}";
 }

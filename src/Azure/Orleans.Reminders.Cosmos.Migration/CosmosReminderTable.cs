@@ -8,6 +8,7 @@ using Microsoft.Azure.Cosmos.Linq;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Persistence.Migration;
 using Orleans.Reminders.Cosmos.Models;
 using Orleans.Runtime;
 using CosmosReminderEntry = Orleans.Reminders.Cosmos.Models.ReminderEntity;
@@ -22,18 +23,27 @@ namespace Orleans.Reminders.Cosmos
         private readonly ILogger _logger;
         private readonly IServiceProvider _serviceProvider;
         private readonly ClusterOptions _clusterOptions;
+
+        private readonly IGrainReferenceConverter _grainReferenceConverter;
+        private readonly IGrainReferenceExtractor _grainReferenceExtractor;
         private readonly CosmosReminderTableOptions _options;
 
         public CosmosReminderTable(
             ILoggerFactory loggerFactory,
             IServiceProvider serviceProvider,
+
             IOptions<CosmosReminderTableOptions> options,
-            IOptions<ClusterOptions> clusterOptions)
+            IOptions<ClusterOptions> clusterOptions,
+            IGrainReferenceConverter grainReferenceConverter,
+            IGrainReferenceExtractor grainReferenceExtractor)
         {
             _logger = loggerFactory.CreateLogger<CosmosReminderTable>();
             _serviceProvider = serviceProvider;
-            _options = options.Value;
             _clusterOptions = clusterOptions.Value;
+
+            _options = options.Value;
+            _grainReferenceConverter = grainReferenceConverter;
+            _grainReferenceExtractor = grainReferenceExtractor;
         }
 
 
@@ -63,7 +73,8 @@ namespace Orleans.Reminders.Cosmos
             try
             {
                 var pk = new PartitionKey(CosmosReminderEntry.ConstructPartitionKey(_clusterOptions.ServiceId, grainRef));
-                var id = CosmosReminderEntry.ConstructId(grainRef, reminderName);
+                var (grainType, grainInterfaceType, key) = _grainReferenceExtractor.Extract(grainRef);
+                var id = CosmosReminderEntry.ConstructId(grainType, key, reminderName);
 
                 var response = await _container.ReadItemAsync<CosmosReminderEntry>(id, pk).ConfigureAwait(false);
                 return response != null ? FromEntity(response)! : default!;
@@ -178,7 +189,8 @@ namespace Orleans.Reminders.Cosmos
         {
             try
             {
-                var id = CosmosReminderEntry.ConstructId(grainRef, reminderName);
+                var (grainType, grainInterfaceType, key) = _grainReferenceExtractor.Extract(grainRef);
+                var id = CosmosReminderEntry.ConstructId(grainType, key, reminderName);
                 var options = new ItemRequestOptions { IfMatchEtag = eTag, };
                 var pk = new PartitionKey(CosmosReminderEntry.ConstructPartitionKey(_clusterOptions.ServiceId, grainRef));
 
@@ -210,7 +222,7 @@ namespace Orleans.Reminders.Cosmos
         {
             return new ReminderEntry
             {
-                GrainRef = GrainReference.FromGrainId(entity.GrainId, ),
+                GrainRef = _grainReferenceConverter.GetGrainFromKeyString(entity.GrainId),
                 ReminderName = entity.Name,
                 Period = entity.Period,
                 StartAt = entity.StartAt.UtcDateTime,
@@ -220,9 +232,11 @@ namespace Orleans.Reminders.Cosmos
 
         private CosmosReminderEntry ToEntity(ReminderEntry entry)
         {
+            var (grainType, grainInterfaceType, key) = _grainReferenceExtractor.Extract(entry.GrainRef);
+
             return new CosmosReminderEntry
             {
-                Id = CosmosReminderEntry.ConstructId(entry.GrainRef, entry.ReminderName),
+                Id = CosmosReminderEntry.ConstructId(grainType, key, entry.ReminderName),
                 PartitionKey = CosmosReminderEntry.ConstructPartitionKey(_clusterOptions.ServiceId, entry.GrainRef),
                 ServiceId = _clusterOptions.ServiceId,
                 GrainHash = entry.GrainRef.GetUniformHashCode(),

@@ -16,8 +16,9 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
-    <ProjectReference Include="..\..\Orleans.Runtime\Orleans.Runtime.csproj" />
-    <ProjectReference Include="..\Orleans.Persistence.Cosmos\Orleans.Persistence.Cosmos.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Persistence.Migration\Orleans.Persistence.Migration.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Persistence.Cosmos\Orleans.Persistence.Cosmos.csproj" />
   </ItemGroup>
 
   <ItemGroup>
