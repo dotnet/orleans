@@ -17,7 +17,6 @@ using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.AdoNet.Entity;
 using Orleans.Transactions.AdoNet.Storage;
 using Orleans.Transactions.AdoNet.Utils;
-using IsolationLevel = System.Transactions.IsolationLevel;
 
 namespace Orleans.Transactions.AdoNet.TransactionalState
 {
@@ -354,7 +353,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
             this.options = options;
             this.logger = logger;
             this.stateId = stateId;
-            this.storage = storage;//RelationalStorage.CreateInstance(this.options.Invariant, this.options.ConnectionString);
+            this.storage = storage;
         }
 
         public async ValueTask Add(TableTransactionAction operation)
@@ -534,7 +533,7 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                 }
             }
 
-          await storage.ExecuteTransactionAsync(multipleQuery).ConfigureAwait(continueOnCapturedContext: false);
+            await storage.ExecuteTransactionAsync(multipleQuery).ConfigureAwait(continueOnCapturedContext: false);
         }
     }
 }
