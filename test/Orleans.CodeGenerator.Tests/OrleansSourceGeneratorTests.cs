@@ -28,10 +28,9 @@ public class DemoData
 
         var generator = new OrleansSerializationSourceGenerator();
 
-        // trackIncrementalGeneratorSteps allows to report info about each step of the generator
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators: [generator],
-            driverOptions: new GeneratorDriverOptions(default, trackIncrementalGeneratorSteps: true));
+            driverOptions: new GeneratorDriverOptions(default));
 
         // Run the generator
         driver = driver.RunGenerators(compilation);
