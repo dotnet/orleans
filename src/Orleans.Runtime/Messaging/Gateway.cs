@@ -372,7 +372,6 @@ namespace Orleans.Runtime.Messaging
             public void Drop()
             {
                 Interlocked.Exchange(ref _dropped, 1);
-                RejectDroppedClientMessages();
                 _signal.Signal();
             }
 
