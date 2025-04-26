@@ -1,53 +1,54 @@
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using TestExtensions;
-using Xunit.Abstractions;
-using Orleans.Configuration;
-using Orleans.TestingHost.Utils;
-using Xunit;
-using Orleans.Reminders.Cosmos.Migration;
-using Tester.Reminders.Cosmos.Migration.Helpers;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Runtime;
+using Tester.AzureUtils.Migration.Abstractions;
+using UnitTests.GrainInterfaces;
+using Xunit;
 
-namespace Tester.Reminders.Cosmos.Migration;
+namespace Tester.Reminders.Cosmos.Migration.Tests;
 
-[Collection(TestEnvironmentFixture.DefaultCollection)]
-[TestCategory("Cosmos")]
-public class ReminderTests_Cosmos_Standalone : IClassFixture<TestEnvironmentFixture>
+public abstract class RemindersCosmosTests : MigrationBaseTests
 {
+    const int baseId = 1000;
+
     private const string OrleansRemindersMigrationContainer = "OrleansRemindersMigration";
 
-    private readonly ITestOutputHelper _output;
-    private readonly ILogger _log;
-    private readonly ILoggerFactory _loggerFactory;
-
-    private readonly TestEnvironmentFixture _fixture;
-    private readonly string _serviceId;
-
-    private readonly CosmosReminderTableOptions _reminderTableOptions;
-
-    private IOptions<CosmosReminderTableOptions> ReminderTableOptions => Options.Create(_reminderTableOptions);
-
-    public ReminderTests_Cosmos_Standalone(ITestOutputHelper output, TestEnvironmentFixture fixture)
+    public RemindersCosmosTests(BaseAzureTestClusterFixture fixture)
+        : base(fixture)
     {
-        _output = output;
-        _fixture = fixture;
-        _serviceId = Guid.NewGuid().ToString();
-
-        _loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{GetType().Name}.log");
-        _log = _loggerFactory.CreateLogger<ReminderTests_Cosmos_Standalone>();
-
-        _reminderTableOptions = new CosmosReminderTableOptions { ContainerName = OrleansRemindersMigrationContainer };
-        _reminderTableOptions.ConfigureCosmosStorageOptions();
     }
+
+    //public RemindersCosmosTests(ITestOutputHelper output, MigrationEnvironmentFixture fixture)
+    //{
+    //    _output = output;
+    //    _fixture = fixture;
+    //    _serviceId = Guid.NewGuid().ToString();
+
+    //    _loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{GetType().Name}.log");
+    //    _log = _loggerFactory.CreateLogger<RemindersCosmosTests>();
+
+    //    _grainReferenceExtractor = _fixture.Services.GetRequiredService<IGrainReferenceExtractor>();
+
+    //    _reminderTableOptions = new CosmosReminderTableOptions { ContainerName = OrleansRemindersMigrationContainer };
+    //    _reminderTableOptions.ConfigureCosmosStorageOptions();
+    //}
 
     [SkippableFact, TestCategory("Reminders")]
     public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
     {
-        string clusterId = NewClusterId();
-        var clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = _serviceId });
-        IReminderTable table = new CosmosReminderTable(_loggerFactory, _fixture.Services, ReminderTableOptions, clusterOptions, null, null);
-        await table.Init();
+        await ReminderTable.Init();
+
+        var grainRef = PrepareGrainReference();
+        var reminderEntry = NewReminderEntry(grainRef);
+        var eTag = await ReminderTable.UpsertRow(reminderEntry);
+        Assert.NotNull(eTag);
+
+        //var clusterId = NewClusterId();
+        //var clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = _serviceId });
+        //IReminderTable table = new CosmosReminderTable(_loggerFactory, _fixture.Services, ReminderTableOptions, clusterOptions, null, null);
+        //await table.Init();
+
+
 
         //ReminderEntry[] rows = (await GetAllRows(table)).ToArray();
         //Assert.Empty(rows); // "The reminder table (sid={0}, did={1}) was not empty.", ServiceId, clusterId);
@@ -112,17 +113,13 @@ public class ReminderTests_Cosmos_Standalone : IClassFixture<TestEnvironmentFixt
     //        (numOfInserts / dur.TotalSeconds).ToString("f2"));
     //}
 
-    private ReminderEntry NewReminderEntry()
+    private ReminderEntry NewReminderEntry(GrainReference grainReference) => new ReminderEntry
     {
-        Guid guid = Guid.NewGuid();
-        return new ReminderEntry
-        {
-            // GrainRef = _fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId()).GetGrainId(),
-            ReminderName = string.Format("TestReminder.{0}", guid),
-            Period = TimeSpan.FromSeconds(5),
-            StartAt = DateTime.UtcNow
-        };
-    }
+        GrainRef = grainReference ?? PrepareGrainReference(),
+        ReminderName = string.Format("TestReminder.{0}", Guid.NewGuid()),
+        Period = TimeSpan.FromSeconds(5),
+        StartAt = DateTime.UtcNow
+    };
 
     private static string NewClusterId()
     {
@@ -131,7 +128,13 @@ public class ReminderTests_Cosmos_Standalone : IClassFixture<TestEnvironmentFixt
 
     private static async Task<IEnumerable<ReminderEntry>> GetAllRows(IReminderTable table)
     {
-        ReminderTableData data = await table.ReadRows(0, 0xffffffff);
+        var data = await table.ReadRows(0, 0xffffffff);
         return data.Reminders;
+    }
+
+    private GrainReference PrepareGrainReference()
+    {
+        var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 1);
+        return (GrainReference)grain;
     }
 }

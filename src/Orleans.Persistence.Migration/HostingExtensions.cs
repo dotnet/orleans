@@ -20,22 +20,19 @@ namespace Orleans.Persistence.Migration
         /// Adds components required for migration tooling to function correctly
         /// </summary>
         public static ISiloBuilder AddMigrationTools(this ISiloBuilder builder)
-        {
-            builder.ConfigureServices(services =>
-            {
-                services
-                    .AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, ConfigureOrleansJsonSerializerOptions>()
-                    .AddSingleton<OrleansMigrationJsonSerializer>()
-                    .AddSingleton<IGrainStorageSerializer, JsonGrainStorageSerializer>()
-                    .AddSingleton<IGrainTypeProvider, AttributeGrainTypeProvider>()
-                    .AddSingleton<TypeResolver, CachedTypeResolver>()
-                    .AddSingleton<TypeConverter>()
-                    .AddSingleton<Metadata.GrainTypeResolver>()
-                    .AddSingleton<GrainInterfaceTypeResolver>()
-                    .AddSingleton<IGrainReferenceExtractor, GrainReferenceExtractor>();
-            });
-            return builder;
-        }
+            => builder.ConfigureServices(services => services.AddMigrationTools());
+
+        internal static void AddMigrationTools(this IServiceCollection services)
+            => services
+                .AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, ConfigureOrleansJsonSerializerOptions>()
+                .AddSingleton<OrleansMigrationJsonSerializer>()
+                .AddSingleton<IGrainStorageSerializer, JsonGrainStorageSerializer>()
+                .AddSingleton<IGrainTypeProvider, AttributeGrainTypeProvider>()
+                .AddSingleton<TypeResolver, CachedTypeResolver>()
+                .AddSingleton<TypeConverter>()
+                .AddSingleton<Metadata.GrainTypeResolver>()
+                .AddSingleton<GrainInterfaceTypeResolver>()
+                .AddSingleton<IGrainReferenceExtractor, GrainReferenceExtractor>();
 
         /// <summary>
         /// Configure silo to use migration storage as the default grain storage.

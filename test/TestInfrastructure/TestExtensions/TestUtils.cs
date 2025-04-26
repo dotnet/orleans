@@ -22,28 +22,40 @@ namespace Tester
 
         public static void CheckForAzureStorage()
         {
-            if ((UseAadAuthentication && (TableEndpoint == null)) ||
-                (!UseAadAuthentication && string.IsNullOrWhiteSpace(DataConnectionString)))
+#if DEBUG
+            try
             {
-                throw new SkipException("No connection string found. Skipping");
+#endif
+                if ((UseAadAuthentication && (TableEndpoint == null)) ||
+                    (!UseAadAuthentication && string.IsNullOrWhiteSpace(DataConnectionString)))
+                {
+                    throw new SkipException("No connection string found. Skipping");
+                }
+
+                bool usingLocalWAS = string.Equals(DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
+
+                if (!usingLocalWAS)
+                {
+                    // Tests are using Azure Cloud Storage, not local WAS emulator.
+                    ForceTlsVersion();
+                    return;
+                }
+
+                //Starts the storage emulator if not started already and it exists (i.e. is installed).
+                if (!StorageEmulator.TryStart())
+                {
+                    string errorMsg = "Azure Storage Emulator could not be started.";
+                    Console.WriteLine(errorMsg);
+                    throw new SkipException(errorMsg);
+                }
+#if DEBUG
             }
-
-            bool usingLocalWAS = string.Equals(DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
-
-            if (!usingLocalWAS)
+            catch(Exception ex)
             {
-                // Tests are using Azure Cloud Storage, not local WAS emulator.
-                ForceTlsVersion();
-                return;
+                Console.WriteLine($"AzureStorage might not be ready for tests: {ex.Message}");
+                // ignore
             }
-
-            //Starts the storage emulator if not started already and it exists (i.e. is installed).
-            if (!StorageEmulator.TryStart())
-            {
-                string errorMsg = "Azure Storage Emulator could not be started.";
-                Console.WriteLine(errorMsg);
-                throw new SkipException(errorMsg);
-            }
+#endif
         }
 
         public static void CheckForEventHub()

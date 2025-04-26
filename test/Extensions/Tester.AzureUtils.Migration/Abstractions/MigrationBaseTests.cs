@@ -105,22 +105,35 @@ namespace Tester.AzureUtils.Migration.Abstractions
             }
         }
 
-        private IReminderMigrationTable? reminderTable;
+        private IReminderTable? reminderTable;
+        protected IReminderTable ReminderTable
+        {
+            get
+            {
+                if (this.reminderTable == null)
+                {
+                    this.reminderTable = ServiceProvider.GetRequiredService<IReminderTable>();
+                }
+                return this.reminderTable;
+            }
+        }
+
+        private IReminderMigrationTable? reminderMigrationTable;
         protected async Task<IReminderMigrationTable> GetAndInitReminderTableAsync()
         {
-            if (reminderTable == null)
+            if (reminderMigrationTable == null)
             {
                 var tmp = ServiceProvider.GetRequiredService<IReminderTable>();
-                if (tmp is not IReminderMigrationTable reminderMigrationTable)
+                if (tmp is not IReminderMigrationTable table)
                 {
                     throw new ArgumentException("Not a reminder migration table");
                 }
 
-                reminderTable = reminderMigrationTable;
-                await reminderTable.Init();
+                reminderMigrationTable = table;
+                await reminderMigrationTable.Init();
             }
 
-            return reminderTable;
+            return reminderMigrationTable;
         }
 
         private DataMigrator? dataMigrator;

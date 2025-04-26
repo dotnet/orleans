@@ -10,6 +10,9 @@ namespace Tester.AzureUtils.Migration.Helpers
     {
         public static void ConfigureCosmosStorageOptions(this CosmosGrainStorageOptions options)
         {
+#if DEBUG
+            options.ConfigureCosmosClient(accountEndpoint: TestDefaultConfiguration.CosmosDbEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential);
+#else
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
                 options.ConfigureCosmosClient(accountEndpoint: TestDefaultConfiguration.CosmosDbEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential);
@@ -22,10 +25,14 @@ namespace Tester.AzureUtils.Migration.Helpers
             {
                 throw new ArgumentException($"CosmosDb connection is incorrectly configured. See {nameof(TestDefaultConfiguration.CosmosDbEndpoint)}", nameof(options));
             }
+#endif
         }
 
         public static CosmosClient BuildClient()
         {
+#if DEBUG
+            return new CosmosClient(accountEndpoint: TestDefaultConfiguration.CosmosDbEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential);
+#else
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
                 return new CosmosClient(accountEndpoint: TestDefaultConfiguration.CosmosDbEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential);
@@ -36,6 +43,7 @@ namespace Tester.AzureUtils.Migration.Helpers
             }
 
             throw new ArgumentException($"CosmosDb connection is incorrectly configured. See {nameof(TestDefaultConfiguration.CosmosDbEndpoint)}");
+#endif
         }
     }
 }
