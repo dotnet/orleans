@@ -62,21 +62,12 @@ internal class RebalancerCompatibleRule(IServiceProvider provider) :
         }
     }
 
-    public async Task OnStart(CancellationToken cancellationToken)
+    public Task OnStart(CancellationToken cancellationToken)
     {
         _oracle.SubscribeToSiloStatusEvents(this);
+        _rebalancer?.SubscribeToReports(this);
 
-        if (_rebalancer is not null)
-        {
-            _rebalancer.SubscribeToReports(this);
-
-            var report = await _rebalancer.GetRebalancingReport(true).ConfigureAwait(false);
-
-            lock (_lock)
-            {
-                _clusterImbalance = report.ClusterImbalance;
-            }
-        }
+        return Task.CompletedTask;
     }
 
     public Task OnStop(CancellationToken cancellationToken)
