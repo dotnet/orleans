@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
 using Tester.AzureUtils.Migration.Abstractions;
@@ -11,27 +10,10 @@ public abstract class RemindersCosmosTests : MigrationBaseTests
 {
     const int baseId = 1000;
 
-    private const string OrleansRemindersMigrationContainer = "OrleansRemindersMigration";
-
     public RemindersCosmosTests(BaseAzureTestClusterFixture fixture)
         : base(fixture)
     {
     }
-
-    //public RemindersCosmosTests(ITestOutputHelper output, MigrationEnvironmentFixture fixture)
-    //{
-    //    _output = output;
-    //    _fixture = fixture;
-    //    _serviceId = Guid.NewGuid().ToString();
-
-    //    _loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{GetType().Name}.log");
-    //    _log = _loggerFactory.CreateLogger<RemindersCosmosTests>();
-
-    //    _grainReferenceExtractor = _fixture.Services.GetRequiredService<IGrainReferenceExtractor>();
-
-    //    _reminderTableOptions = new CosmosReminderTableOptions { ContainerName = OrleansRemindersMigrationContainer };
-    //    _reminderTableOptions.ConfigureCosmosStorageOptions();
-    //}
 
     [SkippableFact, TestCategory("Reminders")]
     public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
@@ -40,78 +22,17 @@ public abstract class RemindersCosmosTests : MigrationBaseTests
 
         var grainRef = PrepareGrainReference();
         var reminderEntry = NewReminderEntry(grainRef);
+
+        var keyInfo = grainRef.GrainId.ToKeyInfo();
+        Console.WriteLine($"GrainRef: {keyInfo}");
+
         var eTag = await ReminderTable.UpsertRow(reminderEntry);
         Assert.NotNull(eTag);
 
-        //var clusterId = NewClusterId();
-        //var clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = _serviceId });
-        //IReminderTable table = new CosmosReminderTable(_loggerFactory, _fixture.Services, ReminderTableOptions, clusterOptions, null, null);
-        //await table.Init();
-
-
-
-        //ReminderEntry[] rows = (await GetAllRows(table)).ToArray();
-        //Assert.Empty(rows); // "The reminder table (sid={0}, did={1}) was not empty.", ServiceId, clusterId);
-
-        //ReminderEntry expected = NewReminderEntry();
-        //await table.UpsertRow(expected);
-        //rows = (await GetAllRows(table)).ToArray();
-
-        //Assert.Single(rows); // "The reminder table (sid={0}, did={1}) did not contain the correct number of rows (1).", ServiceId, clusterId);
-        //ReminderEntry actual = rows[0];
-        //Assert.Equal(expected.GrainId, actual.GrainId); // "The newly inserted reminder table (sid={0}, did={1}) row did not contain the expected grain reference.", ServiceId, clusterId);
-        //Assert.Equal(expected.ReminderName, actual.ReminderName); // "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected reminder name.", ServiceId, clusterId);
-        //Assert.Equal(expected.Period, actual.Period); // "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected period.", ServiceId, clusterId);
-        //                                              // the following assertion fails but i don't know why yet-- the timestamps appear identical in the error message. it's not really a priority to hunt down the reason, however, because i have high confidence it is working well enough for the moment.
-        ///*Assert.Equal(expected.StartAt,  actual.StartAt); // "The newly inserted reminder table (sid={0}, did={1}) row did not contain the correct start time.", ServiceId, clusterId);*/
-        //Assert.False(string.IsNullOrWhiteSpace(actual.ETag), $"The newly inserted reminder table (sid={_serviceId}, did={clusterId}) row contains an invalid etag.");
+        var reminderDb = await ReminderTable.ReadRow(grainRef, reminderEntry.ReminderName);
+        Assert.NotNull(reminderDb);
+        CompareReminders(grainRef, reminderEntry, reminderDb);
     }
-
-    //private async Task TestTableInsertRate(IReminderTable reminderTable, double numOfInserts)
-    //{
-    //    DateTime startedAt = DateTime.UtcNow;
-
-    //    try
-    //    {
-    //        List<Task<bool>> promises = new List<Task<bool>>();
-    //        for (int i = 0; i < numOfInserts; i++)
-    //        {
-    //            //"177BF46E-D06D-44C0-943B-C12F26DF5373"
-    //            string s = string.Format("177BF46E-D06D-44C0-943B-C12F26D{0:d5}", i);
-
-    //            var e = new ReminderEntry
-    //            {
-    //                //GrainId = LegacyGrainId.GetGrainId(new Guid(s)),
-    //                GrainId = _fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId()).GetGrainId(),
-    //                ReminderName = "MY_REMINDER_" + i,
-    //                Period = TimeSpan.FromSeconds(5),
-    //                StartAt = DateTime.UtcNow
-    //            };
-
-    //            int capture = i;
-    //            Task<bool> promise = Task.Run(async () =>
-    //            {
-    //                await reminderTable.UpsertRow(e);
-    //                _output.WriteLine("Done " + capture);
-    //                return true;
-    //            });
-    //            promises.Add(promise);
-    //            _log.LogInformation("Started {Capture}", capture);
-    //        }
-    //        _log.LogInformation("Started all, now waiting...");
-    //        await Task.WhenAll(promises).WaitAsync(TimeSpan.FromSeconds(500));
-    //    }
-    //    catch (Exception exc)
-    //    {
-    //        _log.LogInformation(exc, "Exception caught");
-    //    }
-    //    TimeSpan dur = DateTime.UtcNow - startedAt;
-    //    _log.LogInformation(
-    //        "Inserted {InsertCount} rows in {Duration}, i.e., {Rate} upserts/sec",
-    //        numOfInserts,
-    //        dur,
-    //        (numOfInserts / dur.TotalSeconds).ToString("f2"));
-    //}
 
     private ReminderEntry NewReminderEntry(GrainReference grainReference) => new ReminderEntry
     {
@@ -136,5 +57,24 @@ public abstract class RemindersCosmosTests : MigrationBaseTests
     {
         var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 1);
         return (GrainReference)grain;
+    }
+
+    /// <summary>
+    /// Compares grain reference + reminder (built manually) with the reminder taken from the CosmosDb
+    /// </summary>
+    private static void CompareReminders(
+        GrainReference grainReference,
+        ReminderEntry reminderActual,
+        ReminderEntry reminderDb)
+    {
+        Assert.NotNull(reminderActual);
+        Assert.NotNull(reminderDb);
+
+        Assert.Equal(grainReference.ToKeyString(), reminderDb.GrainRef.ToKeyString());
+        Assert.Equal(grainReference.GetUniformHashCode(), reminderDb.GrainRef.GetUniformHashCode());
+
+        Assert.Equal(reminderActual.ReminderName, reminderDb.ReminderName);
+        Assert.Equal(reminderActual.Period, reminderDb.Period);
+        Assert.Equal(reminderActual.StartAt, reminderDb.StartAt);
     }
 }

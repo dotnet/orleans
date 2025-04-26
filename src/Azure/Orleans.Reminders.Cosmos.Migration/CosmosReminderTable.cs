@@ -169,7 +169,7 @@ namespace Orleans.Reminders.Cosmos.Migration
             try
             {
                 var entity = ToEntity(entry);
-                var pk = new PartitionKey(CosmosReminderEntry.ConstructPartitionKey(_clusterOptions.ServiceId, entry.GrainRef));
+                var pk = new PartitionKey(entity.PartitionKey);
                 var options = new ItemRequestOptions { IfMatchEtag = entity.ETag };
 
                 var response = await _container.UpsertItemAsync<CosmosReminderEntry>(entity, pk, options).ConfigureAwait(false);
@@ -189,8 +189,8 @@ namespace Orleans.Reminders.Cosmos.Migration
             {
                 var (grainType, grainInterfaceType, key) = _grainReferenceExtractor.Extract(grainRef);
                 var id = CosmosReminderEntry.ConstructId(grainType, key, reminderName);
-                var options = new ItemRequestOptions { IfMatchEtag = eTag, };
                 var pk = new PartitionKey(CosmosReminderEntry.ConstructPartitionKey(_clusterOptions.ServiceId, grainRef));
+                var options = new ItemRequestOptions { IfMatchEtag = eTag };
 
                 await _container.DeleteItemAsync<CosmosReminderEntry>(id, pk, options).ConfigureAwait(false);
 
@@ -215,12 +215,13 @@ namespace Orleans.Reminders.Cosmos.Migration
 
         public Task TestOnlyClearTable() => throw new System.NotImplementedException();
 
-
         private ReminderEntry FromEntity(CosmosReminderEntry entity)
         {
+            var grainRef = _grainReferenceConverter.GetGrainFromKeyString(entity.GrainReference);
+
             return new ReminderEntry
             {
-                GrainRef = _grainReferenceConverter.GetGrainFromKeyString(entity.GrainId),
+                GrainRef = grainRef,
                 ReminderName = entity.Name,
                 Period = entity.Period,
                 StartAt = entity.StartAt.UtcDateTime,
@@ -238,7 +239,8 @@ namespace Orleans.Reminders.Cosmos.Migration
                 PartitionKey = CosmosReminderEntry.ConstructPartitionKey(_clusterOptions.ServiceId, entry.GrainRef),
                 ServiceId = _clusterOptions.ServiceId,
                 GrainHash = entry.GrainRef.GetUniformHashCode(),
-                GrainId = entry.GrainRef.ToString(),
+                GrainId = $"{grainType}/{key}",
+                GrainReference = entry.GrainRef.ToKeyString(), // needed for resolving in a current runtime; not required for migrated data
                 Name = entry.ReminderName,
                 StartAt = entry.StartAt,
                 Period = entry.Period

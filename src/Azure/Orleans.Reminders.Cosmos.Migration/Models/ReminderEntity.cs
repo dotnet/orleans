@@ -34,6 +34,10 @@ internal class ReminderEntity : BaseEntity
     [JsonPropertyName(nameof(GrainId))]
     public string GrainId { get; set; } = default!;
 
+    [JsonProperty(nameof(GrainReference))]
+    [JsonPropertyName(nameof(GrainReference))]
+    public string GrainReference { get; set; } = default!;
+
     [JsonProperty(nameof(Name))]
     [JsonPropertyName(nameof(Name))]
     public string Name { get; set; } = default!;
