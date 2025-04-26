@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Placement.Repartitioning;
 #nullable enable
 
 /// <summary>
-/// Tolerance rule which is aware of the cluster size, and if rebalancer is enabled, its scales with the clusters imbalance.
+/// Tolerance rule which is aware of the cluster size, and if rebalancer is enabled, it scales with the clusters imbalance.
 /// </summary>
 /// <remarks>https://www.ledjonbehluli.com/posts/orleans_repartioner_rebalancer_coexistence/</remarks>
 internal class RebalancerCompatibleRule(IServiceProvider provider) :
