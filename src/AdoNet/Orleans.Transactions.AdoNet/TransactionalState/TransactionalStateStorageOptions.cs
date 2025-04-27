@@ -37,6 +37,11 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
         public string SqlParameterDot { get; set; } = Constants.SqlParameterDot;
 
         /// <summary>
+        /// the statId maxlenth
+        /// </summary>
+        public int StateIdKeyMaxLenth { get; set; } = 255;
+
+        /// <summary>
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
         /// </summary>
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
