@@ -98,9 +98,7 @@ namespace Orleans.Runtime.Placement
         private void SetMessageTargetPlacement(Message message, SiloAddress targetSilo)
         {
             message.TargetSilo = targetSilo;
-#if DEBUG
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace((int)ErrorCode.Dispatcher_AddressMsg_SelectTarget, "AddressMessage Placement SelectTarget {Message}", message);
-#endif
+            LogTraceAddressMessageSelectTarget(message);
         }
 
         public SiloAddress[] GetCompatibleSilos(PlacementTarget target)
@@ -318,7 +316,7 @@ namespace Orleans.Runtime.Placement
                     }
                     catch (Exception exception)
                     {
-                        _logger.LogWarning(exception, "Error in placement worker.");
+                        LogWarnInPlacementWorker(_logger, exception);
                     }
 
                     await _workSignal.WaitAsync();
@@ -415,6 +413,12 @@ namespace Orleans.Runtime.Placement
         private partial void LogDebugLookingUpAddress(GrainId grainId, Message message);
 
         [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "AddressMessage Placement SelectTarget {Message}"
+        )]
+        private partial void LogTraceAddressMessageSelectTarget(Message message);
+
+        [LoggerMessage(
             EventId = (int)ErrorCode.Catalog_GetApproximateSiloStatuses,
             Level = LogLevel.Warning,
             Message = "AllActiveSilos SiloStatusOracle.GetApproximateSiloStatuses empty"
@@ -426,5 +430,11 @@ namespace Orleans.Runtime.Placement
             Message = "Invalidating {Count} cached entries for message {Message}"
         )]
         private partial void LogDebugInvalidatingCachedEntries(int count, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Error in placement worker."
+        )]
+        private static partial void LogWarnInPlacementWorker(ILogger logger, Exception exception);
     }
 }

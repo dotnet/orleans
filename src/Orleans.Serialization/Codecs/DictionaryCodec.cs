@@ -1,8 +1,7 @@
-#nullable enable
+﻿#nullable enable
 using System;
 using System.Buffers;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
@@ -180,12 +179,12 @@ namespace Orleans.Serialization.Codecs
         {
             if (context.TryGetCopy<Dictionary<TKey, TValue>>(input, out var result))
             {
-                return result;
+                return result!;
             }
 
             if (input.GetType() != typeof(Dictionary<TKey, TValue>))
             {
-                return context.DeepCopy(input);
+                return context.DeepCopy(input)!;
             }
 
             result = new Dictionary<TKey, TValue>(input.Count, input.Comparer);

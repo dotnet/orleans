@@ -79,7 +79,11 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
 
     public IEnumerable<string> Keys => this;
 
-    public void Dispose() => _buffer.Reset();
+    public void Dispose()
+    {
+        _buffer.Reset();
+        _buffer = default;
+    }
 
     public bool TryGetBytes(string key, out ReadOnlySequence<byte> value)
     {

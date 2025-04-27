@@ -321,61 +321,61 @@ namespace Orleans.AzureUtils
         [LoggerMessage(
             EventId = (int)TableStorageErrorCode.AzureTable_33,
             Level = LogLevel.Error,
-            Message = "Exception trying to create or connect to the Azure table {tableName}"
+            Message = "Exception trying to create or connect to the Azure table {TableName}"
         )]
         private partial void LogErrorConnectingToAzureTable(Exception exception, string tableName);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.Runtime_Error_100270,
             Level = LogLevel.Information,
-            Message = "Registering silo instance: {data}"
+            Message = "Registering silo instance: {Data}"
         )]
         private partial void LogRegisterSiloInstance(SiloInstanceTableEntry data);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.Runtime_Error_100271,
             Level = LogLevel.Information,
-            Message = "Unregistering silo instance: {data}"
+            Message = "Unregistering silo instance: {Data}"
         )]
         private partial void LogUnregisterSiloInstance(SiloInstanceTableEntry data);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.Runtime_Error_100272,
             Level = LogLevel.Information,
-            Message = "Activating silo instance: {data}"
+            Message = "Activating silo instance: {Data}"
         )]
         private partial void LogActivateSiloInstance(SiloInstanceTableEntry data);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.Runtime_Error_100277,
             Level = LogLevel.Debug,
-            Message = "Searching for active gateway silos for deployment {deploymentId}."
+            Message = "Searching for active gateway silos for deployment {DeploymentId}."
         )]
         private partial void LogDebugSearchingGateway(string deploymentId);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.Runtime_Error_100278,
             Level = LogLevel.Information,
-            Message = "Found {gatewaySiloCount} active Gateway Silos for deployment {deploymentId}."
+            Message = "Found {GatewaySiloCount} active Gateway Silos for deployment {DeploymentId}."
         )]
         private partial void LogFoundGateway(int gatewaySiloCount, string deploymentId);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.Runtime_Error_100331,
             Level = LogLevel.Error,
-            Message = "Error searching for active gateway silos for deployment {deploymentId} "
+            Message = "Error searching for active gateway silos for deployment {DeploymentId} "
         )]
         private partial void LogErrorSearchingGateway(Exception exception, string deploymentId);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = "InsertSiloEntryConditionally failed with httpStatusCode={httpStatusCode}, restStatus={restStatus}"
+            Message = "InsertSiloEntryConditionally failed with httpStatusCode={HttpStatusCode}, restStatus={RestStatus}"
         )]
         private partial void LogTraceInsertSiloEntryConditionallyFailed(HttpStatusCode httpStatusCode, string restStatus);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = "UpdateSiloEntryConditionally failed with httpStatusCode={httpStatusCode}, restStatus={restStatus}"
+            Message = "UpdateSiloEntryConditionally failed with httpStatusCode={HttpStatusCode}, restStatus={RestStatus}"
         )]
         private partial void LogTraceUpdateSiloEntryConditionallyFailed(HttpStatusCode httpStatusCode, string restStatus);
     }

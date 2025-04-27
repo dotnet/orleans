@@ -275,7 +275,7 @@ namespace Orleans.Transactions
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = "{TotalMilliseconds} fail {TransactionId} prepare response status={status}"
+            Message = "{TotalMilliseconds} fail {TransactionId} prepare response status={Status}"
         )]
         private partial void LogDebugPrepareTransactionFailure(StopwatchLogRecord totalMilliseconds, Guid transactionId, TransactionalStatus status);
 
