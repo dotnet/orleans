@@ -41,7 +41,6 @@ namespace Orleans.Transactions.AdoNet.Hosting
                 options.InitExecuteSqlDic();
             }));
         }
-
     }
 
     /// <summary>
@@ -68,7 +67,7 @@ namespace Orleans.Transactions.AdoNet.Hosting
     }
 
     /// <summary>
-    /// 
+    ///
     /// </summary>
     internal static class ExecuteSqlExtensions
     {
@@ -78,6 +77,17 @@ namespace Orleans.Transactions.AdoNet.Hosting
         /// <param name="options"></param>
         internal static void InitExecuteSqlDic(this TransactionalStateStorageOptions options)
         {
+            var queryKeySql = ActionToSql.QuerySimpleSql(options.KeyEntityTableName, new List<string>()
+            {
+                nameof(KeyEntity.StateId),nameof(KeyEntity.CommittedSequenceId),
+                nameof(KeyEntity.Metadata),nameof(KeyEntity.ETag)
+            },
+                new List<string>()
+            {
+                nameof(KeyEntity.StateId)
+            }, null, options.SqlParameterDot);
+            options.ExecuteSqlDcitionary.Add(Constants.QueryKeySql,queryKeySql);
+
             var addKeySql = ActionToSql.InsertSql(options.KeyEntityTableName, new List<string>() {
                 nameof(KeyEntity.StateId),nameof(KeyEntity.CommittedSequenceId),
                 nameof(KeyEntity.Metadata),nameof(KeyEntity.Timestamp),nameof(KeyEntity.ETag) }, options.SqlParameterDot);
@@ -97,10 +107,23 @@ namespace Orleans.Transactions.AdoNet.Hosting
             }, options.SqlParameterDot);
             options.ExecuteSqlDcitionary.Add(Constants.DelKeySql, delKeySql);
 
+            string queryStateSql = ActionToSql.QuerySimpleSql(options.StateEntityTableName, new List<string>() {
+                nameof(StateEntity.StateId), nameof(StateEntity.SequenceId),
+                nameof(StateEntity.TransactionId),nameof(StateEntity.TransactionTimestamp),
+                nameof(StateEntity.TransactionManager),nameof(StateEntity.SateData),
+                nameof(StateEntity.ETag) }, new List<string>()
+            {
+                nameof(StateEntity.StateId)
+            }, new List<string>()
+            {
+                nameof(StateEntity.SequenceId)
+            }, options.SqlParameterDot);
+            options.ExecuteSqlDcitionary.Add(Constants.QueryStateSql, queryStateSql);
+
             string addStateSql = ActionToSql.InsertSql(options.StateEntityTableName, new List<string>() {
                 nameof(StateEntity.StateId), nameof(StateEntity.SequenceId),
                 nameof(StateEntity.TransactionId),nameof(StateEntity.TransactionTimestamp),
-                nameof(StateEntity.TransactionManager),nameof(StateEntity.StateJson),
+                nameof(StateEntity.TransactionManager),nameof(StateEntity.SateData),
                 nameof(StateEntity.ETag), nameof(StateEntity.Timestamp)
             }, options.SqlParameterDot);
             options.ExecuteSqlDcitionary.Add(Constants.AddStateSql, addStateSql);
@@ -108,7 +131,7 @@ namespace Orleans.Transactions.AdoNet.Hosting
             string updateStateSql = ActionToSql.UpdateSql(options.StateEntityTableName, new List<string>()
             {
                 nameof(StateEntity.TransactionId),nameof(StateEntity.TransactionTimestamp),
-                nameof(StateEntity.TransactionManager), nameof(StateEntity.StateJson),
+                nameof(StateEntity.TransactionManager), nameof(StateEntity.SateData),
                  nameof(StateEntity.Timestamp) },
              new List<string>() {
                 nameof(StateEntity.StateId),nameof(StateEntity.SequenceId) }

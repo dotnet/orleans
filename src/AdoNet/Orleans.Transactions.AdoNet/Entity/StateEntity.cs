@@ -6,6 +6,7 @@ using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.AdoNet.Utils;
 
 namespace Orleans.Transactions.AdoNet.Entity
 {
@@ -20,13 +21,13 @@ namespace Orleans.Transactions.AdoNet.Entity
 
         public DateTimeOffset? TransactionTimestamp { get; set; }
 
-        public string TransactionManager { get; set; }
+        public byte[] TransactionManager { get; set; }
 
-        public string StateJson { get; set; }
+        public byte[] SateData { get; set; }
 
         public string ETag { get; set; }
 
-        public static StateEntity Create<T>(JsonSerializerSettings JsonSettings,
+        public static StateEntity Create<T>(JsonSerializerSettings jsonSettings,
            string partitionKey, PendingTransactionState<T> pendingState)
            where T : class, new()
         {
@@ -36,9 +37,8 @@ namespace Orleans.Transactions.AdoNet.Entity
                 SequenceId = pendingState.SequenceId,
                 TransactionId = pendingState.TransactionId,
                 TransactionTimestamp = new DateTimeOffset(pendingState.TimeStamp).ToUniversalTime(),
-                TransactionManager = JsonConvert.SerializeObject(pendingState.TransactionManager, JsonSettings),
-                StateJson = JsonConvert.SerializeObject(pendingState.State, JsonSettings),
-                //Timestamp = new DateTimeOffset(DateTime.Now).ToUniversalTime(),
+                TransactionManager = JsonUtils.SerializeWithNewtonsoftJson(pendingState.TransactionManager,jsonSettings),
+                SateData = JsonUtils.SerializeWithNewtonsoftJson(pendingState.State, jsonSettings),
             };
 
             return result;
