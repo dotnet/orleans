@@ -64,8 +64,8 @@ namespace Orleans.Transactions.AdoNet.TransactionalState
                .Replace('\\', '_')       // Backslash
                .Replace('#', '_')        // Pound sign
                .Replace('?', '_');       // Question mark
-
-            if (key.Length >= 255)      // the max length of stateId in database
+            // recommand - mysql  255，sqlserver  500 ，pg 1000，oracle 100
+            if (key.Length >= this.options.StateIdKeyMaxLenth)      // the max length of stateId in database
             {
                 throw new ArgumentException(string.Format("Key length {0} is too long. Key={1}", key.Length, key));
             }

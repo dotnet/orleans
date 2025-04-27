@@ -16,7 +16,7 @@ namespace Orleans.Transactions.AdoNet.Entity
         public DateTimeOffset? Timestamp { get; set; }
 
         public long CommittedSequenceId { get; set; }
-        public string Metadata { get; set; }
+        public byte[] Metadata { get; set; }
         public string ETag { get; set; }
     }
 }
