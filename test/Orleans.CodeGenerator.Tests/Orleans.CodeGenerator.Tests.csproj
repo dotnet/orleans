@@ -29,7 +29,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="System.IO.Hashing" VersionOverride="9.0.3" />
+    <PackageReference Include="System.IO.Hashing" VersionOverride="9.0.4" />
     <PackageReference Include="System.CodeDom" VersionOverride="9.0.2" />
     <PackageReference Include="Verify.Xunit" />
     <Compile Remove="snapshots\**\*" />
