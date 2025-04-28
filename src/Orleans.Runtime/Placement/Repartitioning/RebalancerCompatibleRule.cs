@@ -29,8 +29,7 @@ internal class RebalancerCompatibleRule(IServiceProvider provider) :
     private readonly ISiloStatusOracle _oracle = provider.GetRequiredService<ISiloStatusOracle>();
     private readonly IActivationRebalancer? _rebalancer = provider.GetService<IActivationRebalancer>();
 
-    public bool IsSatisfiedBy(uint imbalance) =>
-        imbalance <= Volatile.Read(ref _pairwiseImbalance); // uint reads are atomic on all dotnet platforms.
+    public bool IsSatisfiedBy(uint imbalance) => imbalance <= Volatile.Read(ref _pairwiseImbalance);
 
     public void SiloStatusChangeNotification(SiloAddress silo, SiloStatus status)
     {
