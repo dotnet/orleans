@@ -3,29 +3,304 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
-using Xunit;
 
 namespace Orleans.CodeGenerator.Tests;
 
 public class OrleansSourceGeneratorTests
 {
     [Fact]
-    public async Task TestBasicClass()
-    {
-        var projectName = "TestProject";
-        var compilation = await CreateCompilation(
+    public Task TestBasicClass() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
 
 namespace TestProject;
 
-[Serializable, GenerateSerializer]
+[GenerateSerializer]
 public class DemoData
 {
     [Id(0)]
     public string Value { get; set; } = string.Empty;
-}
-", projectName);
+}");
 
+    [Fact]
+    public Task TestBasicStruct() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public struct DemoData
+{
+    [Id(0)]
+    public string Value { get; set; } = string.Empty;
+}");
+
+    [Fact]
+    public Task TestRecords() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public record struct DemoDataRecordStruct([property: Id(0)] string Value);
+
+[GenerateSerializer]
+public record class DemoDataRecordClass([property: Id(0)] string Value);
+
+[GenerateSerializer]
+public record DemoDataRecord([property: Id(0)] string Value);");
+
+    [Fact]
+    public Task TestClassReferenceProperties() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public class DemoData
+{
+    [Id(0)]
+    public string? NullableStringProp { get; set; }
+    
+    [Id(1)]
+    public string StringProp { get; set; } = string.Empty;
+
+    [Id(2)]
+    public required string RequiredStringProp { get; set; };
+
+    [Id(3)]
+    public required string RequiredStringPropInitOnly { get; init; }
+}");
+
+    [Fact]
+    public Task TestClassPrimitiveTypes() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public class DemoData
+{
+    [Id(0)]
+    public int IntProp { get; set; }
+
+    [Id(1)]
+    public double DoubleProp { get; set; }
+
+    [Id(2)]
+    public float FloatProp { get; set; }
+
+    [Id(3)]
+    public long LongProp { get; set; }
+
+    [Id(4)]
+    public bool BoolProp { get; set; }
+
+    [Id(5)]
+    public byte ByteProp { get; set; }
+
+    [Id(6)]
+    public short ShortProp { get; set; }
+
+    [Id(7)]
+    public char CharProp { get; set; }
+
+    [Id(8)]
+    public uint UIntProp { get; set; }
+
+    [Id(9)]
+    public ulong ULongProp { get; set; }
+
+    [Id(10)]
+    public ushort UShortProp { get; set; }
+
+    [Id(11)]
+    public sbyte SByteProp { get; set; }
+
+    [Id(12)]
+    public decimal DecimalProp { get; set; }
+
+    [Id(13)]
+    public DateTime DateTimeProp { get; set; }
+
+    [Id(14)]
+    public DateTimeOffset DateTimeOffsetProp { get; set; }
+
+    [Id(15)]
+    public TimeSpan TimeSpanProp { get; set; }
+
+    [Id(16)]
+    public Guid GuidProp { get; set; }
+
+    [Id(17)]
+    puint int[] public IntArrayProp { get; set; }
+}");
+
+    [Fact]
+    public Task TestClassPrimitiveTypesUsingFullName() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public class DemoData
+{
+    [Id(0)]
+    public System.Int32 IntProp { get; set; }
+
+    [Id(1)]
+    public System.Double DoubleProp { get; set; }
+
+    [Id(2)]
+    public System.Single FloatProp { get; set; }
+
+    [Id(3)]
+    public System.Int64 LongProp { get; set; }
+
+    [Id(4)]
+    public System.Boolean BoolProp { get; set; }
+
+    [Id(5)]
+    public System.Byte ByteProp { get; set; }
+
+    [Id(6)]
+    public System.Int16 ShortProp { get; set; }
+
+    [Id(7)]
+    public System.Char CharProp { get; set; }
+
+    [Id(8)]
+    public System.UInt32 UIntProp { get; set; }
+
+    [Id(9)]
+    public System.UInt64 ULongProp { get; set; }
+
+    [Id(10)]
+    public System.UInt16 UShortProp { get; set; }
+
+    [Id(11)]
+    public System.SByte SByteProp { get; set; }
+
+    [Id(12)]
+    public System.Decimal DecimalProp { get; set; }
+
+    [Id(13)]
+    public System.DateTime DateTimeProp { get; set; }
+
+    [Id(14)]
+    public System.DateTimeOffset DateTimeOffsetProp { get; set; }
+
+    [Id(15)]
+    public System.TimeSpan TimeSpanProp { get; set; }
+
+    [Id(16)]
+    public System.Guid GuidProp { get; set; }
+
+    [Id(17)]
+    puint System.Int32[] public IntArrayProp { get; set; }
+}");
+
+    [Fact]
+    public Task TestClassNestedTypes() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+using System.Collections.Generic;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public class DemoData
+{
+    [Id(0)]
+    public NestedClass Nested1 { get; set; }
+
+    [Id(1)]
+    public List<NestedClass> NestedList { get; set; }
+
+    [Id(2)]
+    public CyclicClass Cyclic { get; set; }
+}
+
+public class NestedClass1
+{
+    [Id(0)]
+    public string Value { get; set; }
+
+    [Id(1)]
+    public NestedClass2 Nested2 { get; set; }
+}
+
+public class NestedClass2
+{
+    [Id(0)]
+    public string Value { get; set; }
+    
+    [Id(1)]
+    public int IntProp { get; set; }
+}
+
+public class CyclicClass
+{
+    [Id(0)]
+    public CyclicClass Nested { get; set; }
+
+    [Id(1)]
+    public string Value { get; set; }
+}");
+
+
+    [Fact]
+    public Task TestAlias() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[Alias(""_custom_type_alias_"")]
+public class MyTypeAliasClass
+{
+    [Id(0)]
+    public string? Name { get; set; }
+}
+
+[GenerateSerializer]
+public struct MyTypeAliasStruct
+{
+    [Id(0)]
+    public string? Name { get; set; }
+}
+");
+
+    [Fact]
+    public Task TestCompoundTypeAlias() => AssertSuccessfulSourceGeneration(
+@"""using Orleans;
+
+namespace TestProject;
+
+[Alias(""_custom_type_alias_"")]
+public class MyTypeAliasClass
+{
+}
+
+[GenerateSerializer]
+public class MyCompoundTypeAliasBaseClass
+{
+    [Id(0)]
+    public int BaseValue { get; set; }
+}
+
+[GenerateSerializer]
+[CompoundTypeAlias(""xx_test_xx"", typeof(MyTypeAliasClass), typeof(int), ""1"")]
+public class MyCompoundTypeAliasClass : MyCompoundTypeAliasBaseClass
+{
+    [Id(0)]
+    public string? Name { get; set; }
+
+    [Id(1)]
+    public int Value { get; set; }
+}");
+
+    private static async Task AssertSuccessfulSourceGeneration(string code)
+    {
+        var projectName = "TestProject";
+        var compilation = await CreateCompilation(code, projectName);
         var generator = new OrleansSerializationSourceGenerator();
 
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
