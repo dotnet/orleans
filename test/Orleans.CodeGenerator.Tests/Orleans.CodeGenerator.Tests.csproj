@@ -9,7 +9,6 @@
 
   <PropertyGroup>
     <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
-    <xUnitVersion>2.9.3</xUnitVersion>
     <CollectCoverage>true</CollectCoverage>
     <CoverletOutputFormat>cobertura</CoverletOutputFormat>
     <Include>[Orleans.CodeGenerator]*</Include>
