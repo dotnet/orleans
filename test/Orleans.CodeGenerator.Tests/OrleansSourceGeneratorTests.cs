@@ -21,6 +21,32 @@ public class DemoData
     public string Value { get; set; } = string.Empty;
 }");
 
+[Fact]
+    public Task TestBasicClassWithFields() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public class DemoDataWithFields
+{
+    [Id(0)]
+    private readonly int _intValue;
+
+    [Id(1)]
+    private readonly string _stringValue;
+
+    public DemoDataWithFields(int intValue, string stringValue)
+    {
+        _intValue = intValue;
+        _stringValue = stringValue;
+    }
+
+    public int IntValue => _intValue;
+
+    public string StringValue => _stringValue;
+}");
+
     [Fact]
     public Task TestBasicStruct() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
