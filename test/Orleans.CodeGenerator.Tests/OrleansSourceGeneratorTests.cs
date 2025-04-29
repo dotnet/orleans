@@ -441,6 +441,41 @@ public class GrainWithIntegerCompoundKey : Grain, IMyGrainWithIntegerCompoundKey
     }
 }");
 
+    [Fact]
+    public Task TestGrainComplexGrain() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+using System.Threading.Tasks;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public class ComplexData
+{
+    [Id(0)]
+    public int IntValue { get; set; }
+
+    [Id(1)]
+    public string StringValue { get; set; }
+}
+
+public interface IComplexGrain : IGrainWithIntegerKey
+{
+    Task<ComplexData> ProcessData(int inputInt, string inputString, ComplexData data);
+}
+
+[GenerateSerializer]
+public class ComplexGrain : Grain, IComplexGrain
+{
+    public Task<ComplexData> ProcessData(int inputInt, string inputString, ComplexData data)
+    {
+        var result = new ComplexData
+        {
+            IntValue = inputInt * 2 + data.IntValue,
+            StringValue = $""Processed: {inputString}"" + data.StringValue
+        };
+        return Task.FromResult(result);
+    }
+}");
 
     private static async Task AssertSuccessfulSourceGeneration(string code)
     {
