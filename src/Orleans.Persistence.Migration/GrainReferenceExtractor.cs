@@ -97,9 +97,22 @@ namespace Orleans.Persistence.Migration
             {
                 throw new ArgumentException($"Grain type '{grainType}' not found.");
             }
-            var (key, keyExt) = GrainIdKeyExtensions.ParseIntegerKey(keyStr);
 
-            var grainId = GrainId.GetGrainId(typeCode: typeCode, primaryKey: key, keyExt);
+            GrainId grainId;
+            if (GrainIdKeyExtensions.TryParseGuidKey(keyStr, out var guidKey, out var ext))
+            {
+                grainId = GrainId.GetGrainId(typeCode: typeCode, primaryKey: guidKey, ext);
+            }
+            else if (GrainIdKeyExtensions.TryParseLongKey(keyStr, out var longKey, out ext))
+            {
+                grainId = GrainId.GetGrainId(typeCode: typeCode, primaryKey: longKey, ext);
+            }
+            else
+            {
+                var key = GrainIdKeyExtensions.ParseStringKey(keyStr);
+                grainId = GrainId.GetGrainId(typeCode: typeCode, primaryKey: key);
+            }
+
             return GrainReference.FromGrainId(grainId, _grainReferenceRuntime);
         }
 
