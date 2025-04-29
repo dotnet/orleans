@@ -360,6 +360,88 @@ public class RootType
     public MyServiceConsumer Consumer { get; set; }
 }");
 
+    [Fact]
+    public Task TestBasicGrain() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+using System.Threading.Tasks;
+
+namespace TestProject;
+
+public interface IBasicGrain : IGrainWithIntegerKey
+{
+    Task<string> SayHello(string name);
+}
+
+[GenerateSerializer]
+public class BasicGrain : Grain, IBasicGrain
+{
+    public Task<string> SayHello(string name)
+    {
+        return Task.FromResult($""Hello, {name}!"");
+    }
+}");
+
+    [Fact]
+    public Task TestGrainWithDifferentKeyTypes() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+using System;
+using System.Threading.Tasks;
+
+namespace TestProject;
+
+public interface IMyGrainWithGuidKey : IGrainWithGuidKey
+{
+    Task<Guid> GetGuidValue();
+}
+
+[GenerateSerializer]
+public class GrainWithGuidKey : Grain, IMyGrainWithGuidKey
+{
+    public Task<Guid> GetGuidValue() => Task.FromResult(this.GetPrimaryKey());
+}
+
+public interface IMyGrainWithStringKey : IGrainWithStringKey
+{
+    Task<string> GetStringKey();
+}
+
+[GenerateSerializer]
+public class GrainWithStringKey : Grain, IMyGrainWithStringKey
+{
+    public Task<string> GetStringKey() => Task.FromResult(this.GetPrimaryKeyString());
+}
+
+public interface IMyGrainWithGuidCompoundKey : IGrainWithGuidCompoundKey
+{
+    Task<Tuple<Guid, string>> GetGuidAndStringKey();
+}
+
+[GenerateSerializer]
+public class GrainWithGuidCompoundKey : Grain, IMyGrainWithGuidCompoundKey
+{
+    public Task<Tuple<Guid, string>> GetGuidAndStringKey()
+    {
+        Guid primaryKey = this.GetPrimaryKey(out var keyExtension);
+        return Task.FromResult(Tuple.Create(primaryKey, keyExtension));
+    }
+}
+
+public interface IMyGrainWithIntegerCompoundKey : IGrainWithIntegerCompoundKey
+{
+    Task<Tuple<long, string>> GetIntegerAndStringKey();
+}
+
+[GenerateSerializer]
+public class GrainWithIntegerCompoundKey : Grain, IMyGrainWithIntegerCompoundKey
+{
+    public Task<Tuple<long, string>> GetIntegerAndStringKey()
+    {
+        long primaryKey = this.GetPrimaryKeyLong(out var keyExtension);
+        return Task.FromResult(Tuple.Create(primaryKey, keyExtension));
+    }
+}");
+
+
     private static async Task AssertSuccessfulSourceGeneration(string code)
     {
         var projectName = "TestProject";
