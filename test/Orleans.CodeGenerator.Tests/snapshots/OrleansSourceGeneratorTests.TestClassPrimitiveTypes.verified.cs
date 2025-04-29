@@ -14,20 +14,11 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_DemoData : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.DemoData>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.DemoData>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.DemoData);
-        private readonly global::System.Type _type0 = typeof(DateTimeOffset);
-        private readonly global::Orleans.Serialization.Codecs.IFieldCodec<DateTimeOffset> _codec0;
-        private readonly global::System.Type _type1 = typeof(DateTime);
-        private readonly global::Orleans.Serialization.Codecs.IFieldCodec<DateTime> _codec1;
-        private readonly global::System.Type _type2 = typeof(Guid);
-        private readonly global::Orleans.Serialization.Codecs.IFieldCodec<Guid> _codec2;
-        private readonly global::System.Type _type3 = typeof(TimeSpan);
-        private readonly global::Orleans.Serialization.Codecs.IFieldCodec<TimeSpan> _codec3;
+        private readonly global::System.Type _type0 = typeof(int[]);
+        private readonly global::Orleans.Serialization.Codecs.ArrayCodec<int> _codec0;
         public Codec_DemoData(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
-            _codec0 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.IFieldCodec<DateTimeOffset>>(this, codecProvider);
-            _codec1 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.IFieldCodec<DateTime>>(this, codecProvider);
-            _codec2 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.IFieldCodec<Guid>>(this, codecProvider);
-            _codec3 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.IFieldCodec<TimeSpan>>(this, codecProvider);
+            _codec0 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ArrayCodec<int>>(this, codecProvider);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -47,10 +38,11 @@ namespace OrleansCodeGen.TestProject
             global::Orleans.Serialization.Codecs.UInt16Codec.WriteField(ref writer, 1U, instance.UShortProp);
             global::Orleans.Serialization.Codecs.SByteCodec.WriteField(ref writer, 1U, instance.SByteProp);
             global::Orleans.Serialization.Codecs.DecimalCodec.WriteField(ref writer, 1U, instance.DecimalProp);
-            _codec1.WriteField(ref writer, 1U, _type1, instance.DateTimeProp);
-            _codec0.WriteField(ref writer, 1U, _type0, instance.DateTimeOffsetProp);
-            _codec3.WriteField(ref writer, 1U, _type3, instance.TimeSpanProp);
-            _codec2.WriteField(ref writer, 1U, _type2, instance.GuidProp);
+            global::Orleans.Serialization.Codecs.DateTimeCodec.WriteField(ref writer, 1U, instance.DateTimeProp);
+            global::Orleans.Serialization.Codecs.DateTimeOffsetCodec.WriteField(ref writer, 1U, instance.DateTimeOffsetProp);
+            global::Orleans.Serialization.Codecs.TimeSpanCodec.WriteField(ref writer, 1U, instance.TimeSpanProp);
+            global::Orleans.Serialization.Codecs.GuidCodec.WriteField(ref writer, 1U, instance.GuidProp);
+            _codec0.WriteField(ref writer, 1U, _type0, instance.IntArrayProp);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -183,7 +175,7 @@ namespace OrleansCodeGen.TestProject
 
                 if (id == 13U)
                 {
-                    instance.DateTimeProp = _codec1.ReadValue(ref reader, header);
+                    instance.DateTimeProp = global::Orleans.Serialization.Codecs.DateTimeCodec.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                     if (header.IsEndBaseOrEndObject)
                         break;
@@ -192,7 +184,7 @@ namespace OrleansCodeGen.TestProject
 
                 if (id == 14U)
                 {
-                    instance.DateTimeOffsetProp = _codec0.ReadValue(ref reader, header);
+                    instance.DateTimeOffsetProp = global::Orleans.Serialization.Codecs.DateTimeOffsetCodec.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                     if (header.IsEndBaseOrEndObject)
                         break;
@@ -201,7 +193,7 @@ namespace OrleansCodeGen.TestProject
 
                 if (id == 15U)
                 {
-                    instance.TimeSpanProp = _codec3.ReadValue(ref reader, header);
+                    instance.TimeSpanProp = global::Orleans.Serialization.Codecs.TimeSpanCodec.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                     if (header.IsEndBaseOrEndObject)
                         break;
@@ -210,7 +202,16 @@ namespace OrleansCodeGen.TestProject
 
                 if (id == 16U)
                 {
-                    instance.GuidProp = _codec2.ReadValue(ref reader, header);
+                    instance.GuidProp = global::Orleans.Serialization.Codecs.GuidCodec.ReadValue(ref reader, header);
+                    reader.ReadFieldHeader(ref header);
+                    if (header.IsEndBaseOrEndObject)
+                        break;
+                    id += header.FieldIdDelta;
+                }
+
+                if (id == 17U)
+                {
+                    instance.IntArrayProp = _codec0.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                 }
 
@@ -257,10 +258,7 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "9.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_DemoData : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.DemoData>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.DemoData>
     {
-        private readonly global::Orleans.Serialization.Cloning.IDeepCopier<DateTimeOffset> _copier0;
-        private readonly global::Orleans.Serialization.Cloning.IDeepCopier<DateTime> _copier1;
-        private readonly global::Orleans.Serialization.Cloning.IDeepCopier<Guid> _copier2;
-        private readonly global::Orleans.Serialization.Cloning.IDeepCopier<TimeSpan> _copier3;
+        private readonly global::Orleans.Serialization.Codecs.ArrayCopier<int> _copier0;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.DemoData DeepCopy(global::TestProject.DemoData original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -276,10 +274,7 @@ namespace OrleansCodeGen.TestProject
 
         public Copier_DemoData(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
-            _copier0 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.IDeepCopier<DateTimeOffset>>(this, codecProvider);
-            _copier1 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.IDeepCopier<DateTime>>(this, codecProvider);
-            _copier2 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.IDeepCopier<Guid>>(this, codecProvider);
-            _copier3 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.IDeepCopier<TimeSpan>>(this, codecProvider);
+            _copier0 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ArrayCopier<int>>(this, codecProvider);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -298,10 +293,11 @@ namespace OrleansCodeGen.TestProject
             output.UShortProp = input.UShortProp;
             output.SByteProp = input.SByteProp;
             output.DecimalProp = input.DecimalProp;
-            output.DateTimeProp = _copier1.DeepCopy(input.DateTimeProp, context);
-            output.DateTimeOffsetProp = _copier0.DeepCopy(input.DateTimeOffsetProp, context);
-            output.TimeSpanProp = _copier3.DeepCopy(input.TimeSpanProp, context);
-            output.GuidProp = _copier2.DeepCopy(input.GuidProp, context);
+            output.DateTimeProp = input.DateTimeProp;
+            output.DateTimeOffsetProp = input.DateTimeOffsetProp;
+            output.TimeSpanProp = input.TimeSpanProp;
+            output.GuidProp = input.GuidProp;
+            output.IntArrayProp = _copier0.DeepCopy(input.IntArrayProp, context);
         }
     }
 

@@ -31,7 +31,7 @@ namespace TestProject;
 public struct DemoData
 {
     [Id(0)]
-    public string Value { get; set; } = string.Empty;
+    public string Value { get; set; }
 }");
 
     [Fact]
@@ -50,8 +50,36 @@ public record class DemoDataRecordClass([property: Id(0)] string Value);
 public record DemoDataRecord([property: Id(0)] string Value);");
 
     [Fact]
-    public Task TestClassReferenceProperties() => AssertSuccessfulSourceGeneration(
+    public Task TestGenericClass() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public class GenericData<T>
+{
+    [Id(0)]
+    public T Value { get; set; }
+
+    [Id(1)]
+    public string Description { get; set; } = string.Empty;
+}
+
+// Also need a concrete usage to trigger generation for a specific type
+[GenerateSerializer]
+public class ConcreteUsage
+{
+    [Id(0)]
+    public GenericData<int> IntData { get; set; }
+
+    [Id(1)]
+    public GenericData<string> StringData { get; set; }
+}");
+
+    [Fact]
+    public Task TestClassReferenceProperties() => AssertSuccessfulSourceGeneration(
+@"#nullable enable
+using Orleans;
 
 namespace TestProject;
 
@@ -60,12 +88,12 @@ public class DemoData
 {
     [Id(0)]
     public string? NullableStringProp { get; set; }
-    
+
     [Id(1)]
     public string StringProp { get; set; } = string.Empty;
 
     [Id(2)]
-    public required string RequiredStringProp { get; set; };
+    public required string RequiredStringProp { get; set; }
 
     [Id(3)]
     public required string RequiredStringPropInitOnly { get; init; }
@@ -74,6 +102,7 @@ public class DemoData
     [Fact]
     public Task TestClassPrimitiveTypes() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
+using System;
 
 namespace TestProject;
 
@@ -132,7 +161,7 @@ public class DemoData
     public Guid GuidProp { get; set; }
 
     [Id(17)]
-    puint int[] public IntArrayProp { get; set; }
+    public int[] IntArrayProp { get; set; }
 }");
 
     [Fact]
@@ -196,7 +225,7 @@ public class DemoData
     public System.Guid GuidProp { get; set; }
 
     [Id(17)]
-    puint System.Int32[] public IntArrayProp { get; set; }
+    public System.Int32[] IntArrayProp { get; set; }
 }");
 
     [Fact]
@@ -210,10 +239,10 @@ namespace TestProject;
 public class DemoData
 {
     [Id(0)]
-    public NestedClass Nested1 { get; set; }
+    public NestedClass1 Nested1 { get; set; }
 
     [Id(1)]
-    public List<NestedClass> NestedList { get; set; }
+    public List<NestedClass1> NestedList { get; set; }
 
     [Id(2)]
     public CyclicClass Cyclic { get; set; }
@@ -232,7 +261,7 @@ public class NestedClass2
 {
     [Id(0)]
     public string Value { get; set; }
-    
+
     [Id(1)]
     public int IntProp { get; set; }
 }
@@ -257,20 +286,20 @@ namespace TestProject;
 public class MyTypeAliasClass
 {
     [Id(0)]
-    public string? Name { get; set; }
+    public string Name { get; set; }
 }
 
 [GenerateSerializer]
 public struct MyTypeAliasStruct
 {
     [Id(0)]
-    public string? Name { get; set; }
+    public string Name { get; set; }
 }
 ");
 
     [Fact]
     public Task TestCompoundTypeAlias() => AssertSuccessfulSourceGeneration(
-@"""using Orleans;
+@"using Orleans;
 
 namespace TestProject;
 
@@ -291,16 +320,51 @@ public class MyCompoundTypeAliasBaseClass
 public class MyCompoundTypeAliasClass : MyCompoundTypeAliasBaseClass
 {
     [Id(0)]
-    public string? Name { get; set; }
+    public string Name { get; set; }
 
     [Id(1)]
     public int Value { get; set; }
+}");
+
+    [Fact]
+    public Task TestClassWithParameterizedConstructor() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+public interface IMyService { }
+public class MyService : IMyService { }
+
+[GenerateSerializer]
+public class MyServiceConsumer
+{
+    private readonly IMyService _service;
+    private readonly int _value;
+
+    // Constructor requiring parameters, which the generator should use for activation
+    public MyServiceConsumer(IMyService service, int value)
+    {
+        _service = service;
+        _value = value;
+    }
+
+    [Id(0)]
+    public string Name { get; set; }
+}
+
+// Include a type that uses the above class to ensure it's processed
+[GenerateSerializer]
+public class RootType
+{
+    [Id(0)]
+    public MyServiceConsumer Consumer { get; set; }
 }");
 
     private static async Task AssertSuccessfulSourceGeneration(string code)
     {
         var projectName = "TestProject";
         var compilation = await CreateCompilation(code, projectName);
+        Assert.Empty(compilation.GetDiagnostics());
         var generator = new OrleansSerializationSourceGenerator();
 
         GeneratorDriver driver = CSharpGeneratorDriver.Create(

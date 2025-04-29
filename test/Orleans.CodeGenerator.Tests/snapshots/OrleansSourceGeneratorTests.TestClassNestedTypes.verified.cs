@@ -16,15 +16,15 @@ namespace OrleansCodeGen.TestProject
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.DemoData);
         private readonly global::System.Type _type0 = typeof(global::TestProject.CyclicClass);
         private readonly global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.CyclicClass> _codec0;
-        private readonly global::System.Type _type1 = typeof(NestedClass);
-        private readonly global::Orleans.Serialization.Codecs.IFieldCodec<NestedClass> _codec1;
-        private readonly global::System.Type _type2 = typeof(global::System.Collections.Generic.List<NestedClass>);
-        private readonly global::Orleans.Serialization.Codecs.ListCodec<NestedClass> _codec2;
+        private readonly global::System.Type _type1 = typeof(global::TestProject.NestedClass1);
+        private readonly global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.NestedClass1> _codec1;
+        private readonly global::System.Type _type2 = typeof(global::System.Collections.Generic.List<global::TestProject.NestedClass1>);
+        private readonly global::Orleans.Serialization.Codecs.ListCodec<global::TestProject.NestedClass1> _codec2;
         public Codec_DemoData(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
             _codec0 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.CyclicClass>>(this, codecProvider);
-            _codec1 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.IFieldCodec<NestedClass>>(this, codecProvider);
-            _codec2 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ListCodec<NestedClass>>(this, codecProvider);
+            _codec1 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.NestedClass1>>(this, codecProvider);
+            _codec2 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ListCodec<global::TestProject.NestedClass1>>(this, codecProvider);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -115,8 +115,8 @@ namespace OrleansCodeGen.TestProject
     public sealed class Copier_DemoData : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.DemoData>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.DemoData>
     {
         private readonly global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.CyclicClass> _copier0;
-        private readonly global::Orleans.Serialization.Cloning.IDeepCopier<NestedClass> _copier1;
-        private readonly global::Orleans.Serialization.Codecs.ListCopier<NestedClass> _copier2;
+        private readonly global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.NestedClass1> _copier1;
+        private readonly global::Orleans.Serialization.Codecs.ListCopier<global::TestProject.NestedClass1> _copier2;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.DemoData DeepCopy(global::TestProject.DemoData original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -133,8 +133,8 @@ namespace OrleansCodeGen.TestProject
         public Copier_DemoData(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
             _copier0 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.CyclicClass>>(this, codecProvider);
-            _copier1 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.IDeepCopier<NestedClass>>(this, codecProvider);
-            _copier2 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ListCopier<NestedClass>>(this, codecProvider);
+            _copier1 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.NestedClass1>>(this, codecProvider);
+            _copier2 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ListCopier<global::TestProject.NestedClass1>>(this, codecProvider);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
