@@ -16,7 +16,7 @@ public abstract class RemindersCosmosTests : MigrationBaseTests
     }
 
     [SkippableFact, TestCategory("Reminders")]
-    public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
+    public async Task Reminders_Cosmos_InsertNewRowAndReadBack()
     {
         await ReminderTable.Init();
 
@@ -41,17 +41,6 @@ public abstract class RemindersCosmosTests : MigrationBaseTests
         Period = TimeSpan.FromSeconds(5),
         StartAt = DateTime.UtcNow
     };
-
-    private static string NewClusterId()
-    {
-        return string.Format("ReminderTest.{0}", Guid.NewGuid());
-    }
-
-    private static async Task<IEnumerable<ReminderEntry>> GetAllRows(IReminderTable table)
-    {
-        var data = await table.ReadRows(0, 0xffffffff);
-        return data.Reminders;
-    }
 
     private GrainReference PrepareGrainReference()
     {

@@ -158,5 +158,25 @@ namespace Orleans.Runtime
 
             return new IdSpan(buf);
         }
+
+        public static (long key, string? keyExtension) ParseIntegerKey(IdSpan id)
+        {
+            var span = id.AsSpan();
+            int plusIndex = span.IndexOf((byte)'+');
+
+            ReadOnlySpan<byte> keySpan = plusIndex >= 0 ? span.Slice(0, plusIndex) : span;
+            if (!Utf8Parser.TryParse(keySpan, out long key, out int consumed, 'X') || consumed != keySpan.Length)
+            {
+                throw new FormatException("Invalid key format.");
+            }
+
+            string? keyExtension = null;
+            if (plusIndex >= 0)
+            {
+                keyExtension = Encoding.UTF8.GetString(span.Slice(plusIndex + 1));
+            }
+
+            return (key, keyExtension);
+        }
     }
 }

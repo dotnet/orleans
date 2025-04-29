@@ -1,6 +1,6 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 
@@ -20,6 +20,8 @@ namespace Orleans.Runtime
         private readonly Dictionary<int, PlacementStrategy> placementStrategiesIndex;
         private readonly Dictionary<int, string> directoriesIndex;
 
+        internal readonly ConcurrentDictionary<Type, int> GrainTypeTypeCodeMap = new();
+        internal event Action<Type, int> OnGrainTypeAdded;
 
         // Keep it for wire serialization compatibility
         private readonly Dictionary<int, MultiClusterRegistrationStrategy> registrationStrategiesIndex;
@@ -128,6 +130,11 @@ namespace Orleans.Runtime
                     directoriesIndex.Add(kvp.Key, kvp.Value);
                 }
             }
+
+            foreach (var kvp in map.GrainTypeTypeCodeMap)
+            {
+                TryAddGrainTypeTypeCode(kvp.Key, kvp.Value);
+            }
         }
 
         internal void AddEntry(Type iface, Type grain, PlacementStrategy placement, string directory, bool primaryImplementation)
@@ -147,6 +154,7 @@ namespace Orleans.Runtime
                     placementStrategiesIndex.Add(grainTypeCode, placement);
                 if (!directoriesIndex.ContainsKey(grainTypeCode))
                     directoriesIndex.Add(grainTypeCode, directory);
+                TryAddGrainTypeTypeCode(grain, grainTypeCode);
 
                 grainInterfaceData.AddImplementation(implementation, primaryImplementation);
                 if (primaryImplementation)
@@ -288,6 +296,12 @@ namespace Orleans.Runtime
                 this.loadedGrainAsemblies,
                 this.unordered
                 );
+        }
+
+        void TryAddGrainTypeTypeCode(Type grainType, int typeCode)
+        {
+            GrainTypeTypeCodeMap.TryAdd(grainType, typeCode);
+            OnGrainTypeAdded?.Invoke(grainType, typeCode);
         }
     }
 }

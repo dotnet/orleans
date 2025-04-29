@@ -213,11 +213,47 @@ namespace Orleans.Reminders.Cosmos.Migration
             }
         }
 
-        public Task TestOnlyClearTable() => throw new System.NotImplementedException();
+        public async Task TestOnlyClearTable()
+        {
+            try
+            {
+                var query = _container.GetItemLinqQueryable<CosmosReminderEntry>()
+                    .Where(entity => entity.ServiceId == _clusterOptions.ServiceId)
+                    .ToFeedIterator();
+
+                var reminders = new List<CosmosReminderEntry>();
+                do
+                {
+                    var queryResponse = await query.ReadNextAsync().ConfigureAwait(false);
+                    if (queryResponse != null && queryResponse.Count > 0)
+                    {
+                        reminders.AddRange(queryResponse);
+                    }
+                    else
+                    {
+                        break;
+                    }
+                } while (query.HasMoreResults);
+
+                var deleteTasks = new List<Task>();
+                foreach (var entity in reminders)
+                {
+                    deleteTasks.Add(_container.DeleteItemAsync<CosmosReminderEntry>(entity.Id, new PartitionKey(entity.PartitionKey)));
+                }
+                await Task.WhenAll(deleteTasks).ConfigureAwait(false);
+            }
+            catch (Exception exc)
+            {
+                _logger.LogError(exc, "Failure to clear reminders for service {ServiceId}", _clusterOptions.ServiceId);
+                WrappedException.CreateAndRethrow(exc);
+                throw;
+            }
+        }
 
         private ReminderEntry FromEntity(CosmosReminderEntry entity)
         {
-            var grainRef = _grainReferenceConverter.GetGrainFromKeyString(entity.GrainReference);
+            // a reverse operation - resolving grainReference from grainId in format 'grainType/key'
+            var grainRef = _grainReferenceExtractor.ResolveGrainReference(entity.GrainId);
 
             return new ReminderEntry
             {
@@ -240,7 +276,6 @@ namespace Orleans.Reminders.Cosmos.Migration
                 ServiceId = _clusterOptions.ServiceId,
                 GrainHash = entry.GrainRef.GetUniformHashCode(),
                 GrainId = $"{grainType}/{key}",
-                GrainReference = entry.GrainRef.ToKeyString(), // needed for resolving in a current runtime; not required for migrated data
                 Name = entry.ReminderName,
                 StartAt = entry.StartAt,
                 Period = entry.Period
