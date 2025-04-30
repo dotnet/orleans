@@ -21,8 +21,8 @@ public class DemoData
     public string Value { get; set; } = string.Empty;
 }");
 
-[Fact]
-    public Task TestBasicClassWithFields() => AssertSuccessfulSourceGeneration(
+    [Fact]
+    public Task TestBasicClassWithAnnotatedFields() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
 
 namespace TestProject;
@@ -36,6 +36,7 @@ public class DemoDataWithFields
     [Id(1)]
     private readonly string _stringValue;
 
+    [GeneratedActivatorConstructor]
     public DemoDataWithFields(int intValue, string stringValue)
     {
         _intValue = intValue;
@@ -301,7 +302,6 @@ public class CyclicClass
     public string Value { get; set; }
 }");
 
-
     [Fact]
     public Task TestAlias() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
@@ -384,6 +384,164 @@ public class RootType
 {
     [Id(0)]
     public MyServiceConsumer Consumer { get; set; }
+}");
+
+    [Fact]
+    public Task TestGenericClassWithConstructorParameters() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public class GenericWithCtor<T>
+{
+    [Id(0)]
+    private readonly T _value;
+    [Id(1)]
+    private readonly int _id;
+
+    public GenericWithCtor(T value, int id)
+    {
+        _value = value;
+        _id = id;
+    }
+
+    public T Value => _value;
+    public int Id => _id;
+}
+
+[GenerateSerializer]
+public class UsesGenericWithCtor
+{
+    [Id(0)]
+    public GenericWithCtor<string> StringGen { get; set; }
+}");
+
+    [Fact]
+    public Task TestClassWithNoPublicConstructors() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public class NoPublicCtor
+{
+    [OrleansConstructor]
+    private NoPublicCtor() { }
+
+    [Id(0)]
+    public int Value { get; set; }
+}");
+
+    [Fact]
+    public Task TestClassWithOptionalConstructorParameters() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public class OptionalCtorParams
+{
+    [Id(0)]
+    private readonly int _x;
+    [Id(1)]
+    private readonly string _y;
+
+    public OptionalCtorParams(int x = 42, string y = ""default"")
+    {
+        _x = x;
+        _y = y;
+    }
+
+    public int X => _x;
+    public string Y => _y;
+}");
+
+    [Fact]
+    public Task TestClassWithInterfaceConstructorParameter() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+public interface IMyInterface { }
+
+[GenerateSerializer]
+public class InterfaceCtorParam
+{
+    [Id(0)]
+    private readonly IMyInterface _iface;
+
+    public InterfaceCtorParam(IMyInterface iface)
+    {
+        _iface = iface;
+    }
+
+    public IMyInterface Iface => _iface;
+}");
+
+    [Fact]
+    public Task TestClassesWithOrleansConstructorAnnotation() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+public class ClassWithOrleansConstructor
+{
+    [Id(0)]
+    public int Value { get; set; }
+
+    [Id(1)]
+    public string Name { get; set; } = string.Empty;
+
+    [OrleansConstructor]
+    public ClassWithOrleansConstructor(int value, string name)
+    {
+        Value = value;
+        Name = name;
+    }
+
+    public ClassWithOrleansConstructor() { }
+}");
+
+    [Fact]
+    public Task TestClassWithGenerateMethodSerializersAnnotation() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+using Orleans.Runtime;
+using System.Threading.Tasks;
+
+[GenerateMethodSerializers(typeof(GrainReference))]
+public interface IMyGrain : IGrainWithIntegerKey
+{
+    Task<string> SayHello(string name);
+}");
+
+    [Fact]
+    public Task TestClassWithGenerateSerializerAnnotation() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public enum MyCustomEnum
+{
+    None,
+    One,
+    Two,
+    Three
+}
+
+[GenerateSerializer(GenerateFieldIds = GenerateFieldIds.PublicProperties), Immutable]
+public class ClassWithImplicitFieldIds
+{
+    public string StringValue { get; }
+    public MyCustomEnum EnumValue { get; }
+
+    [OrleansConstructor]
+    public ClassWithImplicitFieldIds(string stringValue, MyCustomEnum enumValue)
+    {
+        StringValue = stringValue;
+        EnumValue = enumValue;
+    }
 }");
 
     [Fact]
