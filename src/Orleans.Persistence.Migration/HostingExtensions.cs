@@ -1,10 +1,10 @@
-using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.Metadata;
+using Orleans.Persistence.AzureStorage.Migration.Reminders;
 using Orleans.Persistence.Migration.Serialization;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -101,6 +101,33 @@ namespace Orleans.Persistence.Migration
                 services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
             }
             services.AddSingletonNamedService<IGrainStorage>(name, MigrationGrainStorage.Create);
+            return services;
+        }
+
+        /// <summary>
+        /// Configure silo to use migration storage for grain storage.
+        /// </summary>
+        public static ISiloBuilder UseMigrationReminderTable(this ISiloBuilder builder, Action<MigrationReminderTableOptions> configureOptions)
+        {
+            return builder.ConfigureServices(services => services.UseMigrationReminderTable(configureOptions));
+        }
+
+        /// <summary>
+        /// Configure silo to use migration storage for grain storage.
+        /// </summary>
+        public static IServiceCollection UseMigrationReminderTable(this IServiceCollection services, Action<MigrationReminderTableOptions> configureOptions)
+        {
+            return services.UseMigrationReminderTable(ob => ob.Configure(configureOptions));
+        }
+
+        /// <summary>
+        /// Configure silo to use migration flow for reminder table.
+        /// By default runs in mode "disabled" - turn it on once you are ready to start migration of the reminders.
+        /// </summary>
+        public static IServiceCollection UseMigrationReminderTable(this IServiceCollection services, Action<OptionsBuilder<MigrationReminderTableOptions>> configureOptions)
+        {
+            configureOptions?.Invoke(services.AddOptions<MigrationReminderTableOptions>());
+            services.AddSingleton<IReminderTable>(sp => MigrationReminderTable.Create(sp));
             return services;
         }
 

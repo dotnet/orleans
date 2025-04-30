@@ -1,44 +1,36 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.Persistence.AzureStorage.Migration.Reminders.Storage;
 using Orleans.Persistence.Migration;
-using Orleans.Reminders.AzureStorage;
 using Orleans.Runtime;
-using Orleans.Runtime.ReminderService;
+using Orleans.Storage;
 
 namespace Orleans.Persistence.AzureStorage.Migration.Reminders
 {
     /// <summary>
-    /// Simple storage provider for writing grain state data to Azure blob storage in JSON format.
-    /// Implementation impacts management of migrated and current data.
+    /// Migration reminder table controlling the runtime behavior of the underlying reminder entities.
+    /// Will write and read from source and destination storages depending on the migration mode (see <see cref="ReminderMigrationMode"/>).
     /// </summary>
-    public class MigrationAzureTableReminderStorage : IReminderMigrationTable
+    public class MigrationReminderTable : IReminderMigrationTable
     {
-        private readonly ILogger<MigrationAzureTableReminderStorage> _logger;
+        private readonly ILogger<MigrationReminderTable> _logger;
 
         public IReminderTable SourceReminderTable { get; }
         public IReminderTable DestinationReminderTable { get; }
 
         private ReminderMigrationMode _reminderMigrationMode;
 
-        public MigrationAzureTableReminderStorage(
-            IGrainReferenceConverter grainReferenceConverter,
-            ILoggerFactory loggerFactory,
-            IGrainReferenceExtractor grainReferenceExtractor,
-            IOptions<ClusterOptions> clusterOptions,
-            IOptions<AzureTableReminderStorageOptions> oldStorageOptions,
-            IOptions<AzureTableMigrationReminderStorageOptions> migratedStorageOptions)
+        public MigrationReminderTable(
+            ILogger<MigrationReminderTable> logger,
+            IReminderTable sourceTable,
+            IReminderTable destinationTable,
+            MigrationReminderTableOptions options)
         {
-            _logger = loggerFactory.CreateLogger<MigrationAzureTableReminderStorage>();
+            _logger = logger;
+            SourceReminderTable = sourceTable;
+            DestinationReminderTable = destinationTable;
 
-            SourceReminderTable = new AzureBasedReminderTable(grainReferenceConverter, loggerFactory, clusterOptions, oldStorageOptions);
-            DestinationReminderTable = new MigrationAzureBasedReminderTable(grainReferenceConverter, grainReferenceExtractor, loggerFactory, clusterOptions, migratedStorageOptions);
-
-            if (migratedStorageOptions?.Value is not null)
-            {
-                _reminderMigrationMode = migratedStorageOptions.Value.ReminderMigrationMode;
-            }
+            _reminderMigrationMode = options.Mode;
         }
 
         /// <summary>
@@ -246,18 +238,36 @@ namespace Orleans.Persistence.AzureStorage.Migration.Reminders
             }
         }
 
-        private class MigrationAzureBasedReminderTable : AzureBasedReminderTable
+        internal static IReminderTable Create(IServiceProvider serviceProvider)
         {
-            public MigrationAzureBasedReminderTable(
-                IGrainReferenceConverter grainReferenceConverter,
-                IGrainReferenceExtractor grainReferenceExtractor,
-                ILoggerFactory loggerFactory,
-                IOptions<ClusterOptions> clusterOptions,
-                IOptions<AzureTableMigrationReminderStorageOptions> storageOptions)
-                : base(grainReferenceConverter, loggerFactory, clusterOptions, storageOptions, new MigratedReminderTableEntryBuilder(grainReferenceExtractor))
-            {
-            }
+            var logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<MigrationReminderTable>();
+            var options = serviceProvider.GetRequiredService<IOptions<MigrationReminderTableOptions>>().Value;
+
+            var source = serviceProvider.GetRequiredServiceByName<IReminderTable>(options.SourceReminderTable);
+            var destination = serviceProvider.GetRequiredServiceByName<IReminderTable>(options.DestinationReminderTable);
+
+            return new MigrationReminderTable(logger, source, destination, options);
         }
+    }
+
+    public class MigrationReminderTableOptions
+    {
+        /// <summary>
+        /// Registration name of the source reminder table (the existing reminder table).
+        /// </summary>
+        public string SourceReminderTable { get; set; }
+
+        /// <summary>
+        /// Registration name of the destination reminder table (the one to which data should migrate to).
+        /// </summary>
+        public string DestinationReminderTable { get; set; }
+
+        /// <summary>
+        /// Controls the way migration for grains is happening.
+        /// By default is set to <see cref="ReminderMigrationMode.Disabled"/>.
+        /// Turn it on explicitly to enable reminders migration flow.
+        /// </summary>
+        public ReminderMigrationMode Mode { get; set; } = ReminderMigrationMode.Disabled;
     }
 
     /// <summary>

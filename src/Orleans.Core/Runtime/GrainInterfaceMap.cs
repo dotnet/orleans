@@ -20,8 +20,10 @@ namespace Orleans.Runtime
         private readonly Dictionary<int, PlacementStrategy> placementStrategiesIndex;
         private readonly Dictionary<int, string> directoriesIndex;
 
-        internal readonly ConcurrentDictionary<Type, int> GrainTypeTypeCodeMap = new();
-        internal event Action<Type, int> OnGrainTypeAdded;
+        [NonSerialized]
+        internal Action<Type, int> onGrainTypeAdded;
+        [NonSerialized]
+        internal readonly ConcurrentDictionary<Type, int> grainTypeTypeCodeMap = new();
 
         // Keep it for wire serialization compatibility
         private readonly Dictionary<int, MultiClusterRegistrationStrategy> registrationStrategiesIndex;
@@ -131,9 +133,12 @@ namespace Orleans.Runtime
                 }
             }
 
-            foreach (var kvp in map.GrainTypeTypeCodeMap)
+            if (map.grainTypeTypeCodeMap is not null)
             {
-                TryAddGrainTypeTypeCode(kvp.Key, kvp.Value);
+                foreach (var kvp in map.grainTypeTypeCodeMap)
+                {
+                    TryAddGrainTypeTypeCode(kvp.Key, kvp.Value);
+                }
             }
         }
 
@@ -300,8 +305,10 @@ namespace Orleans.Runtime
 
         void TryAddGrainTypeTypeCode(Type grainType, int typeCode)
         {
-            GrainTypeTypeCodeMap.TryAdd(grainType, typeCode);
-            OnGrainTypeAdded?.Invoke(grainType, typeCode);
+            if (grainTypeTypeCodeMap.TryAdd(grainType, typeCode))
+            {
+                onGrainTypeAdded?.Invoke(grainType, typeCode);
+            }
         }
     }
 }

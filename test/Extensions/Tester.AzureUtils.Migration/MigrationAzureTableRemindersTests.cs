@@ -1,8 +1,10 @@
+using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.Persistence.AzureStorage.Migration.Reminders;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
 using Tester.AzureUtils.Migration.Abstractions;
+using Orleans.Persistence.AzureStorage.Migration;
 using TesterInternal.AzureInfra;
 using Xunit;
 
@@ -34,6 +36,7 @@ namespace Tester.AzureUtils.Migration
             public void Configure(ISiloBuilder siloBuilder)
             {
                 siloBuilder
+                    .AddMigrationTools()
                     // needed for the OfflineMigrator
                     .AddMigrationGrainStorageAsDefault(options =>
                     {
@@ -50,22 +53,23 @@ namespace Tester.AzureUtils.Migration
                         options.ConfigureTestDefaults();
                         options.ContainerName = $"destination{Guid}";
                     })
-                    // -------------------------------------
-                    .AddMigrationTools()
-                    .UseMigrationAzureTableReminderStorage(
-                        oldStorageOptions =>
-                        {
-                            oldStorageOptions.ConfigureTestDefaults();
-                            oldStorageOptions.TableName = OldTableName;
-                        },
-                        migrationOptions =>
-                        {
-                            migrationOptions.ConfigureTestDefaults();
-                            migrationOptions.TableName = DestinationTableName;
-
-                            migrationOptions.ReminderMigrationMode = ReminderMigrationMode.ReadDestinationWithFallback_WriteBoth;
-                        }
-                    )
+                    // reminders
+                    .UseAzureTableReminderService("source", options =>
+                    {
+                        options.ConfigureTestDefaults();
+                        options.TableName = OldTableName;
+                    })
+                    .UseMigrationAzureTableReminderStorage("destination", options =>
+                    {
+                        options.ConfigureTestDefaults();
+                        options.TableName = DestinationTableName;
+                    })
+                    .UseMigrationReminderTable(options =>
+                    {
+                        options.SourceReminderTable = "source";
+                        options.DestinationReminderTable = "destination";
+                        options.Mode = ReminderMigrationMode.ReadDestinationWithFallback_WriteBoth;
+                    })
                     .AddDataMigrator(SourceStorageName, DestinationStorageName);
             }
         }

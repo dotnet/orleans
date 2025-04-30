@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Azure;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.AzureUtils.Utilities;
@@ -26,20 +27,30 @@ namespace Orleans.Runtime.ReminderService
             ILoggerFactory loggerFactory,
             IOptions<ClusterOptions> clusterOptions,
             IOptions<AzureTableReminderStorageOptions> storageOptions,
-            IReminderTableEntryBuilder reminderTableEntryBuilder = null)
+            IReminderTableEntryBuilder reminderTableEntryBuilder)
+            : this(grainReferenceConverter, loggerFactory, clusterOptions.Value, storageOptions.Value, reminderTableEntryBuilder)
+        {
+        }
+
+        public AzureBasedReminderTable(
+            IGrainReferenceConverter grainReferenceConverter,
+            ILoggerFactory loggerFactory,
+            ClusterOptions clusterOptions,
+            AzureTableReminderStorageOptions storageOptions,
+            IReminderTableEntryBuilder reminderTableEntryBuilder)
         {
             this.grainReferenceConverter = grainReferenceConverter;
+            this.reminderTableEntryBuilder = reminderTableEntryBuilder;
+
             this.logger = loggerFactory.CreateLogger<AzureBasedReminderTable>();
             this.loggerFactory = loggerFactory;
-            this.clusterOptions = clusterOptions.Value;
-            this.storageOptions = storageOptions.Value;
+            this.clusterOptions = clusterOptions;
+            this.storageOptions = storageOptions;
             this.remTableManager = new RemindersTableManager(
                 this.clusterOptions.ServiceId,
                 this.clusterOptions.ClusterId,
                 this.storageOptions,
                 this.loggerFactory);
-
-            this.reminderTableEntryBuilder = reminderTableEntryBuilder ?? DefaultReminderTableEntryBuilder.Instance;
         }
 
         public async Task Init()
@@ -73,63 +84,6 @@ namespace Orleans.Runtime.ReminderService
                 }
             }
             return new ReminderTableData(remEntries);
-        }
-
-        private ReminderEntry ConvertFromTableEntry(ReminderTableEntry tableEntry, string eTag)
-        {
-            try
-            {
-                return new ReminderEntry
-                {
-                    GrainRef = this.grainReferenceConverter.GetGrainFromKeyString(tableEntry.GrainReference),
-                    ReminderName = tableEntry.ReminderName,
-                    StartAt = LogFormatter.ParseDate(tableEntry.StartAt),
-                    Period = TimeSpan.Parse(tableEntry.Period),
-                    ETag = eTag,
-                };
-            }
-            catch (Exception exc)
-            {
-                var error =
-                    $"Failed to parse ReminderTableEntry: {tableEntry}. This entry is corrupt, going to ignore it.";
-                this.logger.Error((int)AzureReminderErrorCode.AzureTable_49, error, exc);
-                throw;
-            }
-            finally
-            {
-                string serviceIdStr = this.remTableManager.ServiceId;
-                if (!tableEntry.ServiceId.Equals(serviceIdStr))
-                {
-                    var error =
-                        $"Read a reminder entry for wrong Service id. Read {tableEntry}, but my service id is {serviceIdStr}. Going to discard it.";
-                    this.logger.Warn((int)AzureReminderErrorCode.AzureTable_ReadWrongReminder, error);
-                    throw new OrleansException(error);
-                }
-            }
-        }        
-
-        private ReminderTableEntry ConvertToTableEntry(ReminderEntry remEntry, string serviceId, string deploymentId)
-        {
-            string partitionKey = reminderTableEntryBuilder.ConstructPartitionKey(serviceId, remEntry.GrainRef);
-            string rowKey = reminderTableEntryBuilder.ConstructRowKey(remEntry.GrainRef, remEntry.ReminderName);
-            var consistentHash = remEntry.GrainRef.GetUniformHashCode();
-
-            return new ReminderTableEntry
-            {
-                PartitionKey = partitionKey,
-                RowKey = rowKey,
-
-                ServiceId = serviceId,
-                DeploymentId = deploymentId,
-                GrainReference = reminderTableEntryBuilder.GetGrainReference(remEntry.GrainRef),
-                ReminderName = remEntry.ReminderName,
-
-                StartAt = LogFormatter.PrintDate(remEntry.StartAt),
-                Period = remEntry.Period.ToString(),
-
-                GrainRefConsistentHash = string.Format("{0:X8}", consistentHash),
-                ETag = new ETag(remEntry.ETag),
-            };
         }
 
         public Task TestOnlyClearTable()
@@ -176,7 +130,10 @@ namespace Orleans.Runtime.ReminderService
             try
             {
                 if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("ReadRow grainRef = {0} reminderName = {1}", grainRef, reminderName);
-                var result = await this.remTableManager.FindReminderEntry(grainRef, reminderName);
+                var partitionKey = reminderTableEntryBuilder.ConstructPartitionKey(this.remTableManager.ServiceId, grainRef);
+                var rowKey = reminderTableEntryBuilder.ConstructRowKey(grainRef, reminderName);
+
+                var result = await this.remTableManager.ReadSingleTableEntryAsync(partitionKey, rowKey);
                 return result.Entity is null ? null : ConvertFromTableEntry(result.Entity, result.ETag);
             }
             catch (Exception exc)
@@ -236,6 +193,78 @@ namespace Orleans.Runtime.ReminderService
                     $"Intermediate error when deleting reminder entry {entry} to the table {this.remTableManager.TableName}.", exc);
                 throw;
             }
+        }
+
+        private ReminderEntry ConvertFromTableEntry(ReminderTableEntry tableEntry, string eTag)
+        {
+            try
+            {
+                var grainRef = reminderTableEntryBuilder.GetGrainReference(tableEntry.GrainReference);
+
+                return new ReminderEntry
+                {
+                    GrainRef = grainRef,
+                    ReminderName = tableEntry.ReminderName,
+                    StartAt = LogFormatter.ParseDate(tableEntry.StartAt),
+                    Period = TimeSpan.Parse(tableEntry.Period),
+                    ETag = eTag,
+                };
+            }
+            catch (Exception exc)
+            {
+                var error =
+                    $"Failed to parse ReminderTableEntry: {tableEntry}. This entry is corrupt, going to ignore it.";
+                this.logger.Error((int)AzureReminderErrorCode.AzureTable_49, error, exc);
+                throw;
+            }
+            finally
+            {
+                string serviceIdStr = this.remTableManager.ServiceId;
+                if (!tableEntry.ServiceId.Equals(serviceIdStr))
+                {
+                    var error =
+                        $"Read a reminder entry for wrong Service id. Read {tableEntry}, but my service id is {serviceIdStr}. Going to discard it.";
+                    this.logger.Warn((int)AzureReminderErrorCode.AzureTable_ReadWrongReminder, error);
+                    throw new OrleansException(error);
+                }
+            }
+        }
+
+        private ReminderTableEntry ConvertToTableEntry(ReminderEntry remEntry, string serviceId, string deploymentId)
+        {
+            string partitionKey = reminderTableEntryBuilder.ConstructPartitionKey(serviceId, remEntry.GrainRef);
+            string rowKey = reminderTableEntryBuilder.ConstructRowKey(remEntry.GrainRef, remEntry.ReminderName);
+            var consistentHash = remEntry.GrainRef.GetUniformHashCode();
+
+            return new ReminderTableEntry
+            {
+                PartitionKey = partitionKey,
+                RowKey = rowKey,
+
+                ServiceId = serviceId,
+                DeploymentId = deploymentId,
+                GrainReference = reminderTableEntryBuilder.GetGrainReference(remEntry.GrainRef),
+                ReminderName = remEntry.ReminderName,
+
+                StartAt = LogFormatter.PrintDate(remEntry.StartAt),
+                Period = remEntry.Period.ToString(),
+
+                GrainRefConsistentHash = string.Format("{0:X8}", consistentHash),
+                ETag = new ETag(remEntry.ETag),
+            };
+        }
+
+        internal static IReminderTable Create(IServiceProvider serviceProvider, string name)
+        {
+            var grainRefConverter = serviceProvider.GetService<IGrainReferenceConverter>();
+            var grainRefRuntime = serviceProvider.GetService<IGrainReferenceRuntime>();
+
+            var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+            var clusterOptions = serviceProvider.GetRequiredService<IOptions<ClusterOptions>>();
+            var storageOptions = serviceProvider.GetRequiredService<IOptionsMonitor<AzureTableReminderStorageOptions>>().Get(name);
+            var reminderTableEntryBuilder = new DefaultReminderTableEntryBuilder(grainRefRuntime);
+
+            return new AzureBasedReminderTable(grainRefConverter, loggerFactory, clusterOptions.Value, storageOptions, reminderTableEntryBuilder);
         }
     }
 }

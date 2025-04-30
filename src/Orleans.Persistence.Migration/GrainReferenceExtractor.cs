@@ -56,9 +56,9 @@ namespace Orleans.Persistence.Migration
         void InitializeGrainTypeTypeCodeMap()
         {
             // any grain type change should be reflected in _grainTypeTypeCodeMap
-            _grainTypeManager.ClusterGrainInterfaceMap.OnGrainTypeAdded += (type, typeCode) => TryAddGrainTypeTypeCode(type, typeCode);
+            _grainTypeManager.ClusterGrainInterfaceMap.onGrainTypeAdded += (type, typeCode) => TryAddGrainTypeTypeCode(type, typeCode);
 
-            var snapshot = new Dictionary<Type, int>(_grainTypeManager.ClusterGrainInterfaceMap.GrainTypeTypeCodeMap);
+            var snapshot = new Dictionary<Type, int>(_grainTypeManager.ClusterGrainInterfaceMap.grainTypeTypeCodeMap);
             foreach (var (type, typeCode) in snapshot)
             {
                 TryAddGrainTypeTypeCode(type, typeCode);

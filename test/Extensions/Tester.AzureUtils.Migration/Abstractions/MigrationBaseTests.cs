@@ -12,6 +12,8 @@ using Newtonsoft.Json.Linq;
 using System.Globalization;
 using Tester.AzureUtils.Migration.Grains;
 using Orleans.Persistence.Migration;
+using Orleans.Reminders.AzureStorage.Storage.Reminders;
+using Orleans.Persistence.AzureStorage.Migration.Reminders.Storage;
 
 namespace Tester.AzureUtils.Migration.Abstractions
 {
@@ -160,6 +162,23 @@ namespace Tester.AzureUtils.Migration.Abstractions
                     this.cosmosDocumentIdProvider = ServiceProvider.GetServiceByName<IDocumentIdProvider>(DestinationStorageName) ?? ServiceProvider.GetRequiredService<IDocumentIdProvider>();
                 }
                 return this.cosmosDocumentIdProvider;
+            }
+        }
+
+        protected IReminderTableEntryBuilder SourceReminderTableEntryBuilder
+        {
+            get
+            {
+                var grainRefRuntime = ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
+                return new DefaultReminderTableEntryBuilder(grainRefRuntime);
+            }
+        }
+        protected IReminderTableEntryBuilder DestinationReminderTableEntryBuilder
+        {
+            get
+            {
+                var grainRefExtractor = ServiceProvider.GetRequiredService<IGrainReferenceExtractor>();
+                return new MigratedReminderTableEntryBuilder(grainRefExtractor);
             }
         }
 
