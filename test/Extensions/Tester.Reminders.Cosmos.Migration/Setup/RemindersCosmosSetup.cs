@@ -48,7 +48,7 @@ namespace Tester.Reminders.Cosmos.Migration.Setup
                     .UseAzureTableReminderService("source", options =>
                     {
                         options.ConfigureTestDefaults();
-                        options.TableName = $"source{Guid.NewGuid().ToString().Replace("-", "")}"; // we will not call it anyway in tests. Tests only check COSMOS reminder service functionality
+                        options.TableName = $"source{Guid.NewGuid().ToString("N")}"; // we will not call it anyway in tests. Tests only check COSMOS reminder service functionality
                     })
                     .UseCosmosReminderService("destination", options =>
                     {
@@ -56,9 +56,6 @@ namespace Tester.Reminders.Cosmos.Migration.Setup
 
                         options.ContainerName = Resources.MigrationLatestContainer;
                         options.DatabaseName = Resources.MigrationDatabase;
-
-                        options.DatabaseName = "Orleans";
-                        options.ContainerName = "OrleansRemindersMigration";
                     })
                     .UseMigrationReminderTable(options =>
                     {
