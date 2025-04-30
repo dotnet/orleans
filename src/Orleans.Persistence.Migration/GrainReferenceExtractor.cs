@@ -201,7 +201,7 @@ namespace Orleans.Persistence.Migration
             }
             catch (Exception ex)
             {
-                _logger.Error((int)MigrationErrorCode.GrainTypeResolveError, $"Failed to resolve grainType '{type}' ", ex);
+                _logger.LogWarning((int)MigrationErrorCode.GrainTypeResolveError, $"Failed to resolve grainType '{type}' ", ex);
                 if (throwOnError)
                 {
                     throw;
