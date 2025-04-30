@@ -24,6 +24,37 @@ public class DemoData
 }");
 
     [Fact]
+    public Task TestBasicClassWithoutNamespace() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+[GenerateSerializer]
+public class DemoData
+{
+    [Id(0)]
+    public string Value { get; set; } = string.Empty;
+}");
+
+    [Fact]
+    public Task TestBasicClassWithDifferentAccessModifiers() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public class PublicDemoData
+{
+    [Id(0)]
+    public string Value { get; set; } = string.Empty;
+}
+
+[GenerateSerializer]
+internal class InternalDemoData
+{
+    [Id(0)]
+    public string Value { get; set; } = string.Empty;
+}");
+
+    [Fact]
     public Task TestBasicClassWithAnnotatedFields() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
 
@@ -48,6 +79,37 @@ public class DemoDataWithFields
     public int IntValue => _intValue;
 
     public string StringValue => _stringValue;
+}");
+
+    [Fact]
+    public Task TestBasicClassWithInheritance() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public abstract class BaseData
+{
+    [Id(0)]
+    public string BaseValue { get; set; } = string.Empty;
+
+    protected BaseData(string value)
+    {
+        BaseValue = value;
+    }
+}
+
+[GenerateSerializer]
+public class DerivedData : BaseData
+{
+    [Id(1)]
+    public string DerivedValue { get; set; } = string.Empty;
+
+    [OrleansConstructor]
+    public DerivedData(string baseValue, string derivedValue) : base(baseValue)
+    {
+        DerivedValue = derivedValue;
+    }
 }");
 
     [Fact]
@@ -630,6 +692,7 @@ public class GrainWithIntegerCompoundKey : Grain, IMyGrainWithIntegerCompoundKey
     [Fact]
     public Task TestGrainComplexGrain() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace TestProject;
@@ -646,13 +709,13 @@ public class ComplexData
 
 public interface IComplexGrain : IGrainWithIntegerKey
 {
-    Task<ComplexData> ProcessData(int inputInt, string inputString, ComplexData data);
+    Task<ComplexData> ProcessData(int inputInt, string inputString, ComplexData data, CancellationToken ctx);
 }
 
 [GenerateSerializer]
 public class ComplexGrain : Grain, IComplexGrain
 {
-    public Task<ComplexData> ProcessData(int inputInt, string inputString, ComplexData data)
+    public Task<ComplexData> ProcessData(int inputInt, string inputString, ComplexData data, CancellationToken ctx)
     {
         var result = new ComplexData
         {
