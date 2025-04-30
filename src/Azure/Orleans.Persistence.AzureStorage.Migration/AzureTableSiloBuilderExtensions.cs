@@ -98,7 +98,6 @@ namespace Orleans.Persistence.AzureStorage.Migration
             Action<OptionsBuilder<AzureTableReminderStorageOptions>> configureOptions)
         {
             configureOptions?.Invoke(services.AddOptions<AzureTableReminderStorageOptions>(name));
-            services.AddSingletonNamedService<IReminderTableEntryBuilder, MigratedReminderTableEntryBuilder>(name);
             services.AddSingletonNamedService(name, MigrationAzureTableReminderTable.Create);
 
             return services;

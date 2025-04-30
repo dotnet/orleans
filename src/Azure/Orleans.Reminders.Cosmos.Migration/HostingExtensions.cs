@@ -5,6 +5,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Persistence.Cosmos;
 using Orleans.Reminders.Cosmos.Migration;
+using Orleans.Runtime;
 
 namespace Orleans.Hosting;
 
@@ -19,15 +20,16 @@ public static class HostingExtensions
     /// <param name="builder">
     /// The builder.
     /// </param>
+    /// <param name="name">registration name of this cosmos reminder service</param>
     /// <param name="configure">
     /// The delegate used to configure the reminder store.
     /// </param>
     /// <returns>
     /// The provided <see cref="ISiloBuilder"/>, for chaining.
     /// </returns>
-    public static ISiloBuilder UseCosmosReminderService(this ISiloBuilder builder, Action<CosmosReminderTableOptions> configure)
+    public static ISiloBuilder UseCosmosReminderService(this ISiloBuilder builder, string name, Action<CosmosReminderTableOptions> configure)
     {
-        builder.ConfigureServices(services => services.UseCosmosReminderService(configure));
+        builder.ConfigureServices(services => services.UseCosmosReminderService(name, configure));
         return builder;
     }
 
@@ -37,15 +39,16 @@ public static class HostingExtensions
     /// <param name="builder">
     /// The builder.
     /// </param>
+    /// <param name="name"></param>
     /// <param name="configure">
     /// The delegate used to configure the reminder store.
     /// </param>
     /// <returns>
     /// The provided <see cref="ISiloBuilder"/>, for chaining.
     /// </returns>
-    public static ISiloBuilder UseCosmosReminderService(this ISiloBuilder builder, Action<OptionsBuilder<CosmosReminderTableOptions>> configure)
+    public static ISiloBuilder UseCosmosReminderService(this ISiloBuilder builder, string name, Action<OptionsBuilder<CosmosReminderTableOptions>> configure)
     {
-        return builder.ConfigureServices(services => services.UseCosmosReminderService(configure));
+        return builder.ConfigureServices(services => services.UseCosmosReminderService(name, configure));
     }
 
     /// <summary>
@@ -54,14 +57,15 @@ public static class HostingExtensions
     /// <param name="services">
     /// The service collection.
     /// </param>
+    /// <param name="name">registration name of this cosmos reminder service</param>
     /// <param name="configure">
     /// The delegate used to configure the reminder store.
     /// </param>
     /// <returns>
     /// The provided <see cref="IServiceCollection"/>, for chaining.
     /// </returns>
-    public static IServiceCollection UseCosmosReminderService(this IServiceCollection services, Action<CosmosReminderTableOptions> configure)
-        => services.UseCosmosReminderService(optionsBuilder => optionsBuilder.Configure(configure));
+    public static IServiceCollection UseCosmosReminderService(this IServiceCollection services, string name, Action<CosmosReminderTableOptions> configure)
+        => services.UseCosmosReminderService(name, optionsBuilder => optionsBuilder.Configure(configure));
 
     /// <summary>
     /// Adds reminder storage backed by Azure Cosmos DB.
@@ -69,22 +73,23 @@ public static class HostingExtensions
     /// <param name="services">
     /// The service collection.
     /// </param>
-    /// <param name="configure">
+    /// <param name="name">registration name of this cosmos reminder service</param>
+    /// <param name="configureOptions">
     /// The delegate used to configure the reminder store.
     /// </param>
     /// <returns>
     /// The provided <see cref="IServiceCollection"/>, for chaining.
     /// </returns>
-    public static IServiceCollection UseCosmosReminderService(this IServiceCollection services, Action<OptionsBuilder<CosmosReminderTableOptions>> configure)
+    public static IServiceCollection UseCosmosReminderService(this IServiceCollection services, string name, Action<OptionsBuilder<CosmosReminderTableOptions>> configureOptions)
     {
-        services.AddReminders();
-        services.AddSingleton<IReminderTable, CosmosReminderTable>();
-        configure(services.AddOptions<CosmosReminderTableOptions>());
-        services.ConfigureFormatter<CosmosReminderTableOptions>();
+        configureOptions?.Invoke(services.AddOptions<CosmosReminderTableOptions>(name));
+        services.AddSingletonNamedService(name, CosmosReminderTable.Create);
+
         services.AddTransient<IConfigurationValidator>(sp =>
             new CosmosOptionsValidator<CosmosReminderTableOptions>(
                 sp.GetRequiredService<IOptionsMonitor<CosmosReminderTableOptions>>().CurrentValue,
                 nameof(CosmosReminderTableOptions)));
+
         return services;
     }
 }

@@ -5,6 +5,7 @@ using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Linq;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -30,7 +31,7 @@ namespace Orleans.Reminders.Cosmos.Migration
         public CosmosReminderTable(
             ILoggerFactory loggerFactory,
             IServiceProvider serviceProvider,
-            IOptions<CosmosReminderTableOptions> options,
+            CosmosReminderTableOptions options,
             IOptions<ClusterOptions> clusterOptions,
             IGrainReferenceConverter grainReferenceConverter,
             IGrainReferenceExtractor grainReferenceExtractor)
@@ -39,7 +40,7 @@ namespace Orleans.Reminders.Cosmos.Migration
             _serviceProvider = serviceProvider;
             _clusterOptions = clusterOptions.Value;
 
-            _options = options.Value;
+            _options = options;
             _grainReferenceConverter = grainReferenceConverter;
             _grainReferenceExtractor = grainReferenceExtractor;
         }
@@ -280,6 +281,18 @@ namespace Orleans.Reminders.Cosmos.Migration
                 StartAt = entry.StartAt,
                 Period = entry.Period
             };
+        }
+
+        internal static IReminderTable Create(IServiceProvider serviceProvider, string name)
+        {
+            var grainRefConverter = serviceProvider.GetService<IGrainReferenceConverter>();
+            var grainReferenceExtractor = serviceProvider.GetService<IGrainReferenceExtractor>();
+
+            var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+            var clusterOptions = serviceProvider.GetRequiredService<IOptions<ClusterOptions>>();
+            var cosmosOptions = serviceProvider.GetRequiredService<IOptionsMonitor<CosmosReminderTableOptions>>().Get(name);
+
+            return new CosmosReminderTable(loggerFactory, serviceProvider, cosmosOptions, clusterOptions, grainRefConverter, grainReferenceExtractor);
         }
     }
 }

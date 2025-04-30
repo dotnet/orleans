@@ -120,6 +120,15 @@ namespace Tester.AzureUtils.Migration.Abstractions
             }
         }
 
+        protected IReminderTable? DestinationReminderTable
+        {
+            get
+            {
+                var reminderTable = ReminderTable as IReminderMigrationTable;
+                return reminderTable!.DestinationReminderTable;
+            }
+        }
+
         private IReminderMigrationTable? reminderMigrationTable;
         protected async Task<IReminderMigrationTable> GetAndInitReminderTableAsync()
         {

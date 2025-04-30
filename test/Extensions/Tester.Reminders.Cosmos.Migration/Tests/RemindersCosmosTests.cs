@@ -1,4 +1,5 @@
 using Orleans;
+using Orleans.Persistence.Migration;
 using Orleans.Runtime;
 using Tester.AzureUtils.Migration.Abstractions;
 using UnitTests.GrainInterfaces;
@@ -18,7 +19,7 @@ public abstract class RemindersCosmosTests : MigrationBaseTests
     [SkippableFact, TestCategory("Reminders")]
     public async Task Reminders_Cosmos_InsertNewRowAndReadBack()
     {
-        await ReminderTable.Init();
+        await DestinationReminderTable!.Init();
 
         var grainRef = PrepareGrainReference();
         var reminderEntry = NewReminderEntry(grainRef);
@@ -26,10 +27,10 @@ public abstract class RemindersCosmosTests : MigrationBaseTests
         var keyInfo = grainRef.GrainId.ToKeyInfo();
         Console.WriteLine($"GrainRef: {keyInfo}");
 
-        var eTag = await ReminderTable.UpsertRow(reminderEntry);
+        var eTag = await DestinationReminderTable.UpsertRow(reminderEntry);
         Assert.NotNull(eTag);
 
-        var reminderDb = await ReminderTable.ReadRow(grainRef, reminderEntry.ReminderName);
+        var reminderDb = await DestinationReminderTable.ReadRow(grainRef, reminderEntry.ReminderName);
         Assert.NotNull(reminderDb);
         CompareReminders(grainRef, reminderEntry, reminderDb);
     }
