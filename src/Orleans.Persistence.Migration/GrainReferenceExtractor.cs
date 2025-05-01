@@ -10,6 +10,7 @@ namespace Orleans.Persistence.Migration
     {
         GrainReference ResolveGrainReference(string grainId);
         GrainReference ResolveGrainReference(string grainType, string keyStr);
+        Type ResolveInterfaceType(string grainType, string keyStr, string interfaceTypeName);
 
         (GrainType grainType, GrainInterfaceType grainInterfaceType, IdSpan key) Extract(GrainReference grainReference);
 
@@ -35,6 +36,7 @@ namespace Orleans.Persistence.Migration
         private readonly IGrainReferenceRuntime _grainReferenceRuntime;
 
         private readonly ConcurrentDictionary<string, int> _grainTypeTypeCodeMap;
+        private readonly ConcurrentDictionary<string, int> _interfaceTypeIdMap;
 
         public GrainReferenceExtractor(
             ILoggerFactory loggerFactory,
@@ -49,8 +51,11 @@ namespace Orleans.Persistence.Migration
             _grainInterfaceTypeResolver = grainInterfaceTypeResolver;
             _grainReferenceRuntime = grainReferenceRuntime;
 
-            _grainTypeTypeCodeMap = new ConcurrentDictionary<string, int>();
+            _grainTypeTypeCodeMap = new();
             InitializeGrainTypeTypeCodeMap();
+
+            _interfaceTypeIdMap = new();
+            InitializeInterfaceTypeIdMap();
         }
 
         void InitializeGrainTypeTypeCodeMap()
@@ -62,6 +67,18 @@ namespace Orleans.Persistence.Migration
             foreach (var (type, typeCode) in snapshot)
             {
                 TryAddGrainTypeTypeCode(type, typeCode);
+            }
+        }
+
+        void InitializeInterfaceTypeIdMap()
+        {
+            // any grain type change should be reflected in _grainTypeTypeCodeMap
+            _grainTypeManager.ClusterGrainInterfaceMap.onGrainInterfaceAdded += (data) => TryAddInterfaceTypeId(data);
+
+            var snapshot = new List<GrainInterfaceData>(_grainTypeManager.ClusterGrainInterfaceMap.GrainInterfaceDatas);
+            foreach (var data in snapshot)
+            {
+                TryAddInterfaceTypeId(data);
             }
         }
 
@@ -114,6 +131,25 @@ namespace Orleans.Persistence.Migration
             }
 
             return GrainReference.FromGrainId(grainId, _grainReferenceRuntime);
+        }
+
+        public Type ResolveInterfaceType(string grainType, string keyStr, string interfaceTypeName)
+        {
+            if (!_interfaceTypeIdMap.TryGetValue(interfaceTypeName, out var interfaceId))
+            {
+                throw new ArgumentException($"Interface type '{interfaceTypeName}' not found.");
+            }
+            if (!_grainTypeManager.ClusterGrainInterfaceMap.TryGetServiceInterface(interfaceId, out var iface))
+            {
+                throw new ArgumentException($"Interface type '{interfaceTypeName}' not found at {nameof(_grainTypeManager.ClusterGrainInterfaceMap)}.");
+            }
+
+            if (iface.IsGenericType)
+            {
+                throw new NotImplementedException();
+            }
+
+            return iface;
         }
 
         public (GrainType grainType, GrainInterfaceType grainInterfaceType, IdSpan key) Extract(GrainReference grainReference)
@@ -190,6 +226,19 @@ namespace Orleans.Persistence.Migration
                 }
             }
             return null;
+        }
+
+        void TryAddInterfaceTypeId(GrainInterfaceData data)
+        {
+            try
+            {
+                var interfaceType = _grainInterfaceTypeResolver.GetGrainInterfaceType(data.Interface);
+                _interfaceTypeIdMap.TryAdd(interfaceType, data.InterfaceId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning((int)MigrationErrorCode.InterfaceTypeResolveError, $"Failed to resolve interface type '{data.Interface?.ToString()}' ", ex);
+            }
         }
 
         void TryAddGrainTypeTypeCode(Type type, int typeCode, bool throwOnError = false)

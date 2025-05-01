@@ -21,9 +21,13 @@ namespace Orleans.Runtime
         private readonly Dictionary<int, string> directoriesIndex;
 
         [NonSerialized]
+        internal Action<GrainInterfaceData> onGrainInterfaceAdded;
+        [NonSerialized]
         internal Action<Type, int> onGrainTypeAdded;
         [NonSerialized]
         internal readonly ConcurrentDictionary<Type, int> grainTypeTypeCodeMap = new();
+        
+        internal Dictionary<string, GrainInterfaceData>.ValueCollection GrainInterfaceDatas => typeToInterfaceData?.Values;
 
         // Keep it for wire serialization compatibility
         private readonly Dictionary<int, MultiClusterRegistrationStrategy> registrationStrategiesIndex;
@@ -80,7 +84,9 @@ namespace Orleans.Runtime
                 else
                 {
                     // Interface unknown until now
-                    typeToInterfaceData.Add(kvp.Key, new GrainInterfaceData(kvp.Value));
+                    var grainInterfaceData = new GrainInterfaceData(kvp.Value);
+                    typeToInterfaceData.Add(kvp.Key, grainInterfaceData);
+                    onGrainInterfaceAdded?.Invoke(grainInterfaceData);
                 }
             }
 
@@ -198,6 +204,7 @@ namespace Orleans.Runtime
             // Add entry to mapping iface string -> data
             var interfaceTypeKey = GetTypeKey(iface, isGenericGrainClass);
             typeToInterfaceData[interfaceTypeKey] = grainInterfaceData;
+            onGrainInterfaceAdded?.Invoke(grainInterfaceData);
 
             // If we are adding a concrete implementation of a generic interface
             // add also the latter to the map: GrainReference and InvokeMethodRequest 

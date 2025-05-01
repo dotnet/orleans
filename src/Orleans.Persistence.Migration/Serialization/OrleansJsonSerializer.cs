@@ -246,11 +246,11 @@ namespace Orleans.Persistence.Migration.Serialization
     public class GrainReferenceJsonConverter : JsonConverter
     {
         private static readonly Type AddressableType = typeof(IAddressable);
-        private readonly IGrainReferenceExtractor _grainIdExtractor;
+        private readonly IGrainReferenceExtractor _grainReferenceExtractor;
 
         public GrainReferenceJsonConverter(IGrainReferenceExtractor grainIdExtractor)
         {
-            _grainIdExtractor = grainIdExtractor;
+            _grainReferenceExtractor = grainIdExtractor;
         }
 
         /// <inheritdoc/>
@@ -263,7 +263,7 @@ namespace Orleans.Persistence.Migration.Serialization
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
             var val = (GrainReference)value;
-            var (type, iface, key) = _grainIdExtractor.Extract(val);
+            var (type, iface, key) = _grainReferenceExtractor.Extract(val);
             writer.WriteStartObject();
             writer.WritePropertyName("Id");
             writer.WriteStartObject();
@@ -280,12 +280,16 @@ namespace Orleans.Persistence.Migration.Serialization
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            throw new NotImplementedException();
-            //JObject jo = JObject.Load(reader);
-            //var id = jo["Id"];
-            //GrainId grainId = GrainId.Create(id["Type"].ToObject<string>(), id["Key"].ToObject<string>());
-            //var iface = GrainInterfaceType.Create(jo["Interface"].ToString());
-            //return this.referenceActivator.CreateReference(grainId, iface);
+            JObject jo = JObject.Load(reader);
+            var id = jo["Id"];
+            var grainType = id["Type"].ToObject<string>();
+            var key = id["Key"].ToObject<string>();
+            var encodedInterface = jo["Interface"].ToString();
+
+            var grainRef = _grainReferenceExtractor.ResolveGrainReference(grainType, key);
+            var iface = _grainReferenceExtractor.ResolveInterfaceType(grainType, key, encodedInterface);
+
+            return GrainExtensions.Cast(grainRef, iface);
         }
     }
 }

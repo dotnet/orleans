@@ -8,5 +8,6 @@ namespace Orleans.Persistence.Migration
         Runtime = 400000,
 
         GrainTypeResolveError = Runtime + 1,
+        InterfaceTypeResolveError = Runtime + 2,
     }
 }
