@@ -3,6 +3,7 @@
 // </copyright>
 
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Persistence.Cosmos.Serialization;
 using Orleans.Persistence.Cosmos.TypeInfo;
 using Orleans.Storage;
 
@@ -39,10 +40,19 @@ public static class CosmosStorageFactory
     {
         var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>();
         var idProvider = services.GetServiceByName<IDocumentIdProvider>(name) ?? services.GetRequiredService<IDocumentIdProvider>();
+        var options = optionsMonitor.Get(name);
+
+        if (options.UseOrleansCustomSerialization)
+        {
+            options.ClientOptions ??= new();
+            var grainStorageSerializer = services.GetRequiredService<IGrainStorageSerializer>();
+            var customSerializer = new OrleansCosmosSerializer(grainStorageSerializer);
+            options.ClientOptions.Serializer = customSerializer;
+        }
 
         return new CosmosGrainStorage(
             name,
-            optionsMonitor.Get(name),
+            options,
             services,
             idProvider,
             grainStateTypeInfoProvider);

@@ -46,4 +46,10 @@ public class CosmosGrainStorageOptions : CosmosOptions
     /// Otherwise it will fallback to default grain type resolver algorithm (see <see cref="GrainTypeResolver"/>)
     /// </summary>
     public bool ForceGrainTypeAttribute { get; set; } = false;
+
+    /// <summary>
+    /// Will override the default cosmos serializer.
+    /// Contains special converters for GrainReferences and other Orleans entities.
+    /// </summary>
+    public bool UseOrleansCustomSerialization { get; set; } = false;
 }
