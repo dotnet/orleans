@@ -158,5 +158,48 @@ namespace Orleans.Runtime
 
             return new IdSpan(buf);
         }
+
+        public static bool TryParseGuidKey(IdSpan id, out Guid key, out string? extension)
+        {
+            var span = id.AsSpan();
+            int plusIndex = span.IndexOf((byte)'+');
+
+            ReadOnlySpan<byte> keySpan = plusIndex >= 0 ? span.Slice(0, plusIndex) : span;
+            ReadOnlySpan<byte> extSpan = plusIndex >= 0 ? span.Slice(plusIndex + 1) : default;
+
+            if (keySpan.Length == 32 &&
+                Utf8Parser.TryParse(keySpan, out key, out int len, 'N') &&
+                len == 32)
+            {
+                extension = extSpan.IsEmpty ? null : Encoding.UTF8.GetString(extSpan);
+                return true;
+            }
+
+            key = default;
+            extension = null;
+            return false;
+        }
+
+        public static bool TryParseLongKey(IdSpan id, out long key, out string? extension)
+        {
+            var span = id.AsSpan();
+            int plusIndex = span.IndexOf((byte)'+');
+
+            ReadOnlySpan<byte> keySpan = plusIndex >= 0 ? span.Slice(0, plusIndex) : span;
+            ReadOnlySpan<byte> extSpan = plusIndex >= 0 ? span.Slice(plusIndex + 1) : default;
+
+            if (Utf8Parser.TryParse(keySpan, out key, out int len, 'X') &&
+                len == keySpan.Length)
+            {
+                extension = extSpan.IsEmpty ? null : Encoding.UTF8.GetString(extSpan);
+                return true;
+            }
+
+            key = default;
+            extension = null;
+            return false;
+        }
+
+        public static string ParseStringKey(IdSpan id) => Encoding.UTF8.GetString(id.AsSpan());
     }
 }

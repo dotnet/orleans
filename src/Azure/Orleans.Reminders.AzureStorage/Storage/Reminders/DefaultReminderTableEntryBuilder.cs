@@ -5,7 +5,12 @@ namespace Orleans.Reminders.AzureStorage.Storage.Reminders
 {
     internal class DefaultReminderTableEntryBuilder : IReminderTableEntryBuilder
     {
-        public static IReminderTableEntryBuilder Instance = new DefaultReminderTableEntryBuilder();
+        private readonly IGrainReferenceRuntime _grainReferenceRuntime;
+
+        public DefaultReminderTableEntryBuilder(IGrainReferenceRuntime grainReferenceRuntime)
+        {
+            _grainReferenceRuntime = grainReferenceRuntime;
+        }
 
         public string ConstructPartitionKey(string serviceId, GrainReference grainReference)
             => ReminderTableEntry.ConstructPartitionKey(serviceId, grainReference);
@@ -15,5 +20,8 @@ namespace Orleans.Reminders.AzureStorage.Storage.Reminders
 
         public string GetGrainReference(GrainReference grainReference)
             => grainReference.ToKeyString();
+
+        public GrainReference GetGrainReference(string grainRef)
+            => GrainReference.FromKeyString(grainRef, _grainReferenceRuntime);
     }
 }

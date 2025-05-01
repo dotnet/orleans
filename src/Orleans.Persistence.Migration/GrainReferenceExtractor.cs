@@ -1,11 +1,16 @@
-using Orleans.Runtime;
+using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 using Orleans.Metadata;
+using Orleans.Runtime;
 using GrainTypeResolver = Orleans.Metadata.GrainTypeResolver;
 
 namespace Orleans.Persistence.Migration
 {
     public interface IGrainReferenceExtractor
     {
+        GrainReference ResolveGrainReference(string grainId);
+        GrainReference ResolveGrainReference(string grainType, string keyStr);
+
         (GrainType grainType, GrainInterfaceType grainInterfaceType, IdSpan key) Extract(GrainReference grainReference);
 
         Type ExtractType(GrainReference grainReference);
@@ -22,18 +27,42 @@ namespace Orleans.Persistence.Migration
 
     internal class GrainReferenceExtractor : IGrainReferenceExtractor
     {
+        private readonly ILogger _logger;
+
         private readonly GrainTypeManager _grainTypeManager;
         private readonly GrainTypeResolver _grainTypeResolver;
         private readonly GrainInterfaceTypeResolver _grainInterfaceTypeResolver;
+        private readonly IGrainReferenceRuntime _grainReferenceRuntime;
+
+        private readonly ConcurrentDictionary<string, int> _grainTypeTypeCodeMap;
 
         public GrainReferenceExtractor(
+            ILoggerFactory loggerFactory,
             GrainTypeManager grainTypeManager,
             GrainTypeResolver grainTypeResolver,
-            GrainInterfaceTypeResolver grainInterfaceTypeResolver)
+            GrainInterfaceTypeResolver grainInterfaceTypeResolver,
+            IGrainReferenceRuntime grainReferenceRuntime)
         {
+            _logger = loggerFactory.CreateLogger<GrainReferenceExtractor>();
             _grainTypeManager = grainTypeManager;
             _grainTypeResolver = grainTypeResolver;
             _grainInterfaceTypeResolver = grainInterfaceTypeResolver;
+            _grainReferenceRuntime = grainReferenceRuntime;
+
+            _grainTypeTypeCodeMap = new ConcurrentDictionary<string, int>();
+            InitializeGrainTypeTypeCodeMap();
+        }
+
+        void InitializeGrainTypeTypeCodeMap()
+        {
+            // any grain type change should be reflected in _grainTypeTypeCodeMap
+            _grainTypeManager.ClusterGrainInterfaceMap.onGrainTypeAdded += (type, typeCode) => TryAddGrainTypeTypeCode(type, typeCode);
+
+            var snapshot = new Dictionary<Type, int>(_grainTypeManager.ClusterGrainInterfaceMap.grainTypeTypeCodeMap);
+            foreach (var (type, typeCode) in snapshot)
+            {
+                TryAddGrainTypeTypeCode(type, typeCode);
+            }
         }
 
         public Type ExtractType(GrainReference grainReference)
@@ -42,6 +71,49 @@ namespace Orleans.Persistence.Migration
             _grainTypeManager.GetTypeInfo(typeCode, out var grainClass, out _, grainReference.GenericArguments);
             Type grainType = LookupType(grainClass) ?? throw new ArgumentException("Grain type not found");
             return grainType;
+        }
+
+        /// <summary>
+        /// Does a reverse lookup of the grain reference from the grain id.
+        /// grainId should be in format 'grainType/grainId'.
+        /// </summary>
+        public GrainReference ResolveGrainReference(string grainId)
+        {
+            var parts = grainId.Split('/', 2);
+            if (parts.Length != 2)
+            {
+                throw new ArgumentException("Invalid grainId format. Expected 'grainType/grainId'.");
+            }
+
+            return ResolveGrainReference(parts[0], parts[1]);
+        }
+
+        /// <summary>
+        /// Does a reverse lookup of the grain reference from the grain id (coded as grainType and key).
+        /// </summary>
+        public GrainReference ResolveGrainReference(string grainType, string keyStr)
+        {
+            if (!_grainTypeTypeCodeMap.TryGetValue(grainType, out var typeCode))
+            {
+                throw new ArgumentException($"Grain type '{grainType}' not found.");
+            }
+
+            GrainId grainId;
+            if (GrainIdKeyExtensions.TryParseGuidKey(keyStr, out var guidKey, out var ext))
+            {
+                grainId = GrainId.GetGrainId(typeCode: typeCode, primaryKey: guidKey, ext);
+            }
+            else if (GrainIdKeyExtensions.TryParseLongKey(keyStr, out var longKey, out ext))
+            {
+                grainId = GrainId.GetGrainId(typeCode: typeCode, primaryKey: longKey, ext);
+            }
+            else
+            {
+                var key = GrainIdKeyExtensions.ParseStringKey(keyStr);
+                grainId = GrainId.GetGrainId(typeCode: typeCode, primaryKey: key);
+            }
+
+            return GrainReference.FromGrainId(grainId, _grainReferenceRuntime);
         }
 
         public (GrainType grainType, GrainInterfaceType grainInterfaceType, IdSpan key) Extract(GrainReference grainReference)
@@ -118,6 +190,23 @@ namespace Orleans.Persistence.Migration
                 }
             }
             return null;
+        }
+
+        void TryAddGrainTypeTypeCode(Type type, int typeCode, bool throwOnError = false)
+        {
+            try
+            {
+                var grainType = _grainTypeResolver.GetGrainType(type);
+                _grainTypeTypeCodeMap.TryAdd(grainType.ToString(), typeCode);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning((int)MigrationErrorCode.GrainTypeResolveError, $"Failed to resolve grainType '{type}' ", ex);
+                if (throwOnError)
+                {
+                    throw;
+                }
+            }
         }
     }
 }

@@ -1,10 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
-
 namespace Tester.AzureUtils.Migration
 {
-    internal static class Resources
+    public static class Resources
     {
         public static string MigrationDatabase = "OrleansMigration";
 

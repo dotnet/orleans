@@ -30,7 +30,7 @@ public abstract class CosmosOptions
     /// <summary>
     /// Gets factory method for creating a <see cref="CosmosClient"/>.
     /// </summary>
-    internal Func<IServiceProvider, ValueTask<CosmosClient>> CreateClient { get; private set; } = null!;
+    public Func<IServiceProvider, ValueTask<CosmosClient>> CreateClient { get; private set; } = null!;
 
     /// <summary>
     /// Configures the Cosmos DB client.

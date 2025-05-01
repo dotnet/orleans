@@ -28,6 +28,14 @@ namespace Orleans.Runtime
             _value = value;
         }
 
+        public static implicit operator IdSpan(string value)
+        {
+            int byteCount = Encoding.UTF8.GetByteCount(value);
+            var bytes = new byte[byteCount];
+            Encoding.UTF8.GetBytes(value, 0, value.Length, bytes, 0);
+            return new IdSpan(bytes);
+        }
+
         /// <summary>
         /// Gets the underlying value.
         /// </summary>

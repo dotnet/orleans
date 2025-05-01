@@ -13,6 +13,7 @@ using Xunit;
 using Orleans.Reminders.AzureStorage;
 using Tester.AzureUtils;
 using TesterInternal.AzureInfra;
+using Orleans.Reminders.AzureStorage.Storage.Reminders;
 
 namespace UnitTests.RemindersTest
 {
@@ -46,7 +47,12 @@ namespace UnitTests.RemindersTest
             TestUtils.CheckForAzureStorage();
             var options = Options.Create(new AzureTableReminderStorageOptions());
             options.Value.ConfigureTestDefaults();
-            return new AzureBasedReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(), loggerFactory, this.clusterOptions, options);
+            return new AzureBasedReminderTable(
+                this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(),
+                loggerFactory,
+                this.clusterOptions,
+                options,
+                new DefaultReminderTableEntryBuilder(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceRuntime>()));
         }
 
         protected override Task<string> GetConnectionString()

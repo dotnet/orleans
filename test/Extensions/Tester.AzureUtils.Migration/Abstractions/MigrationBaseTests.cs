@@ -12,6 +12,8 @@ using Newtonsoft.Json.Linq;
 using System.Globalization;
 using Tester.AzureUtils.Migration.Grains;
 using Orleans.Persistence.Migration;
+using Orleans.Reminders.AzureStorage.Storage.Reminders;
+using Orleans.Persistence.AzureStorage.Migration.Reminders.Storage;
 
 namespace Tester.AzureUtils.Migration.Abstractions
 {
@@ -105,22 +107,44 @@ namespace Tester.AzureUtils.Migration.Abstractions
             }
         }
 
-        private IReminderMigrationTable? reminderTable;
+        private IReminderTable? reminderTable;
+        protected IReminderTable ReminderTable
+        {
+            get
+            {
+                if (this.reminderTable == null)
+                {
+                    this.reminderTable = ServiceProvider.GetRequiredService<IReminderTable>();
+                }
+                return this.reminderTable;
+            }
+        }
+
+        protected IReminderTable? DestinationReminderTable
+        {
+            get
+            {
+                var reminderTable = ReminderTable as IReminderMigrationTable;
+                return reminderTable!.DestinationReminderTable;
+            }
+        }
+
+        private IReminderMigrationTable? reminderMigrationTable;
         protected async Task<IReminderMigrationTable> GetAndInitReminderTableAsync()
         {
-            if (reminderTable == null)
+            if (reminderMigrationTable == null)
             {
                 var tmp = ServiceProvider.GetRequiredService<IReminderTable>();
-                if (tmp is not IReminderMigrationTable reminderMigrationTable)
+                if (tmp is not IReminderMigrationTable table)
                 {
                     throw new ArgumentException("Not a reminder migration table");
                 }
 
-                reminderTable = reminderMigrationTable;
-                await reminderTable.Init();
+                reminderMigrationTable = table;
+                await reminderMigrationTable.Init();
             }
 
-            return reminderTable;
+            return reminderMigrationTable;
         }
 
         private DataMigrator? dataMigrator;
@@ -147,6 +171,23 @@ namespace Tester.AzureUtils.Migration.Abstractions
                     this.cosmosDocumentIdProvider = ServiceProvider.GetServiceByName<IDocumentIdProvider>(DestinationStorageName) ?? ServiceProvider.GetRequiredService<IDocumentIdProvider>();
                 }
                 return this.cosmosDocumentIdProvider;
+            }
+        }
+
+        protected IReminderTableEntryBuilder SourceReminderTableEntryBuilder
+        {
+            get
+            {
+                var grainRefRuntime = ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
+                return new DefaultReminderTableEntryBuilder(grainRefRuntime);
+            }
+        }
+        protected IReminderTableEntryBuilder DestinationReminderTableEntryBuilder
+        {
+            get
+            {
+                var grainRefExtractor = ServiceProvider.GetRequiredService<IGrainReferenceExtractor>();
+                return new MigratedReminderTableEntryBuilder(grainRefExtractor);
             }
         }
 

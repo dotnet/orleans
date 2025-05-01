@@ -17,4 +17,8 @@
     <PackageReference Include="Azure.Identity" Version="$(AzureIdentityVersion)" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tester.Reminders.Cosmos.Migration"/>
+  </ItemGroup>
+  
 </Project>
