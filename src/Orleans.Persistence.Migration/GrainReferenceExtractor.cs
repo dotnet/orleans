@@ -146,7 +146,8 @@ namespace Orleans.Persistence.Migration
 
             if (iface.IsGenericType)
             {
-                throw new NotImplementedException();
+                // TODO double-check - how could we do it?
+                throw new NotSupportedException($"Resolving generic interface type '{interfaceTypeName}' is not supported.");
             }
 
             return iface;
