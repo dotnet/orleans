@@ -1,18 +1,19 @@
 using Orleans;
+using Orleans.Persistence.Migration;
 using Orleans.Runtime;
 using Orleans.Storage;
+using Tester.AzureUtils.Migration.Grains;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-using Orleans.Persistence.Migration;
 
 namespace Tester.AzureUtils.Migration.Abstractions
 {
-    public abstract class MigrationGrainsTests : MigrationBaseTests
+    public abstract class MigrationAzureBlobToBlobTests : MigrationBaseTests
     {
         const int baseId = 200;
 
-        protected MigrationGrainsTests(BaseAzureTestClusterFixture fixture)
+        protected MigrationAzureBlobToBlobTests(BaseAzureTestClusterFixture fixture)
             : base(fixture)
         {
         }
@@ -95,6 +96,19 @@ namespace Tester.AzureUtils.Migration.Abstractions
             await DestinationStorage.ReadStateAsync(stateName, (GrainReference)grain, newGrainState2);
             Assert.False(oldGrainState2.RecordExists);
             Assert.False(newGrainState2.RecordExists);
+        }
+
+        [SkippableFact]
+        public async Task UpdateWithRef()
+        {
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationWithRefGrain>(baseId + 5);
+            var oldGrainState = new GrainState<MigrationTestGrainWithRef_State>(new() { A = 33, B = 806 });
+            var stateName = typeof(MigrationTestGrain).FullName;
+
+            await grain.SetGrainRef();
+            var grainRef = await grain.GetGrainRef();
+
+            Assert.Equal(expected: nameof(ISimplePersistentMigrationWithRefGrain), ((GrainReference)grainRef).InterfaceName);
         }
 
         [SkippableFact]

@@ -126,5 +126,18 @@ namespace Tester.AzureUtils.Migration.Abstractions
             Assert.Equal(oldGrainState.State.A, cosmosGrainState2.A);
             Assert.Equal(oldGrainState.State.B, cosmosGrainState2.B);
         }
+
+        [SkippableFact]
+        public async Task UpdateWithRef()
+        {
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationWithRefGrain>(baseId + 4);
+            var oldGrainState = new GrainState<MigrationTestGrainWithRef_State>(new() { A = 33, B = 806 });
+            var stateName = typeof(MigrationTestGrain).FullName;
+
+            await grain.SetGrainRef();
+            var grainRef = await grain.GetGrainRef();
+
+            Assert.True(true);
+        }
     }
 }

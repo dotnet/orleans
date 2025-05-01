@@ -8,7 +8,7 @@ using Xunit;
 namespace Tester.AzureUtils.Migration
 {
     [TestCategory("Functional"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureBlobStorage")]
-    public class MigrationAzureBlobTests : MigrationGrainsTests, IClassFixture<MigrationAzureBlobTests.Fixture>
+    public class MigrationAzureBlobTests : MigrationAzureBlobToBlobTests, IClassFixture<MigrationAzureBlobTests.Fixture>
     {
         public static Guid Guid = Guid.NewGuid();
 
