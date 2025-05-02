@@ -782,11 +782,9 @@ public class ResponseTimeoutGrain : Grain, IResponseTimeoutGrain
     public Task TestGrainMethodAnnotatedWithInvokableBaseType() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
 using Orleans.Runtime;
-using Orleans.Serialization.Invocation;
 
 using System;
 using System.Threading.Tasks;
-using System.Reflection;
 
 namespace TestProject;
 
@@ -800,18 +798,8 @@ public sealed class LoggingRcpAttribute : Attribute
     }
 }
 
-public class LoggerRequest : RequestBase
+public abstract class LoggerRequest : RequestBase
 {
-    public override void Dispose() => throw new NotImplementedException();
-    public override string GetActivityName() => throw new NotImplementedException();
-    public override string GetInterfaceName() => throw new NotImplementedException();
-    public override Type GetInterfaceType() => throw new NotImplementedException();
-    public override MethodInfo GetMethod() => throw new NotImplementedException();
-    public override string GetMethodName() => throw new NotImplementedException();
-    public override void SetTarget(ITargetHolder holder) => throw new NotImplementedException();
-    public override object GetTarget() => throw new NotImplementedException();
-    public override ValueTask<Response> Invoke() => throw new NotImplementedException();
-
     public void SetLoggingOptions(string options)
     {
     }
@@ -830,6 +818,61 @@ public class HelloGrain : Grain, IHelloGrain
     {
         return Task.FromResult($""Hello, {greeting}!"");
     }
+}");
+
+    [Fact]
+    public Task TestWithUseActivatorAnnotation() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+using Orleans.Serialization.Activators;
+
+namespace TestProject;
+
+[UseActivator]
+public class DemoClass
+{
+}
+
+[RegisterActivator]
+internal sealed class DemoClassActivator : IActivator<DemoClass>
+{
+    public DemoClass Create() => new DemoClass();
+}");
+
+    [Fact]
+    public Task TestWithSerializerTransparentAnnotation() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[SerializerTransparent]
+public abstract class DemoTransparentClass
+{
+}");
+
+    [Fact]
+    public Task TestWithSuppressReferenceTrackingAttribute() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer, SuppressReferenceTracking]
+public class DemoClass
+{
+    [Id(0)]
+    public string Value { get; set; } = string.Empty;
+}");
+
+    [Fact]
+    public Task TestWithOmitDefaultMemberValuesAnnotation() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer, OmitDefaultMemberValues]
+public class DemoClass
+{
+    [Id(0)]
+    public string Value { get; set; }
 }");
 
     [Fact]
