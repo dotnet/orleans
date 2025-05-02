@@ -727,6 +727,112 @@ public class ComplexGrain : Grain, IComplexGrain
 }");
 
     [Fact]
+    public Task TestGrainWithMultipleInterfaces() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+using System.Threading.Tasks;
+
+namespace TestProject;
+
+public interface IGrainA : IGrainWithIntegerKey
+{
+    Task<string> MethodA(string input);
+}
+
+public interface IGrainB : IGrainWithIntegerKey
+{
+    Task<string> MethodB(string input);
+}
+
+public class RealGrain : Grain, IGrainA, IGrainB
+{
+    public Task<string> MethodA(string input)
+    {
+        return Task.FromResult($""GrainA: {input}!"");
+    }
+
+    public Task<string> MethodB(string input)
+    {
+        return Task.FromResult($""GrainB: {input}!"");
+    }
+}");
+
+    [Fact]
+    public Task TestGrainMethodAnnotatedWithResponseTimeout() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+using System.Threading.Tasks;
+
+namespace TestProject;
+
+public interface IResponseTimeoutGrain : IGrainWithIntegerKey
+{
+    [ResponseTimeout(""00:00:10"")]
+    Task<string> LongRunningMethod(string input);
+}
+
+public class ResponseTimeoutGrain : Grain, IResponseTimeoutGrain
+{
+    public Task<string> LongRunningMethod(string input)
+    {
+        // Simulate a long-running operation
+        return Task.FromResult($""ResponseTimeoutGrain: {input}!"");
+    }
+}");
+
+    [Fact]
+    public Task TestGrainMethodAnnotatedWithInvokableBaseType() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+using Orleans.Runtime;
+using Orleans.Serialization.Invocation;
+
+using System;
+using System.Threading.Tasks;
+using System.Reflection;
+
+namespace TestProject;
+
+[InvokableCustomInitializer(nameof(LoggerRequest.SetLoggingOptions))]
+[InvokableBaseType(typeof(GrainReference), typeof(Task), typeof(LoggerRequest))]
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class LoggingRcpAttribute : Attribute
+{
+    public LoggingRcpAttribute(string options)
+    {
+    }
+}
+
+public class LoggerRequest : RequestBase
+{
+    public override void Dispose() => throw new NotImplementedException();
+    public override string GetActivityName() => throw new NotImplementedException();
+    public override string GetInterfaceName() => throw new NotImplementedException();
+    public override Type GetInterfaceType() => throw new NotImplementedException();
+    public override MethodInfo GetMethod() => throw new NotImplementedException();
+    public override string GetMethodName() => throw new NotImplementedException();
+    public override void SetTarget(ITargetHolder holder) => throw new NotImplementedException();
+    public override object GetTarget() => throw new NotImplementedException();
+    public override ValueTask<Response> Invoke() => throw new NotImplementedException();
+
+    public void SetLoggingOptions(string options)
+    {
+    }
+}
+
+public interface IHelloGrain : IGrainWithIntegerKey
+{
+    [LoggingRcp(""Hello"")]
+    Task<string> SayHello(string greeting);
+}
+
+[GenerateSerializer]
+public class HelloGrain : Grain, IHelloGrain
+{
+    public Task<string> SayHello(string greeting)
+    {
+        return Task.FromResult($""Hello, {greeting}!"");
+    }
+}");
+
+    [Fact]
     public async Task EmitsWarningForGenerateSerializerInReferenceAssembly()
     {
         var code = """
