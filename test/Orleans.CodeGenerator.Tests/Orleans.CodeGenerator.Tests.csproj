@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
+    <xUnitVersion>2.9.3</xUnitVersion>
+    <CollectCoverage>true</CollectCoverage>
+    <CoverletOutputFormat>cobertura</CoverletOutputFormat>
+    <Include>[Orleans.CodeGenerator]*</Include>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.SourceGenerators.Testing" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- due to Verify.Xunit requiring newer versions of these libraries -->
+    <PackageReference Include="coverlet.msbuild">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="System.IO.Hashing" VersionOverride="9.0.4" />
+    <PackageReference Include="System.CodeDom" VersionOverride="9.0.2" />
+    <PackageReference Include="Verify.Xunit" />
+    <Compile Remove="snapshots\**\*" />
+    <None Include="snapshots\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.CodeGenerator\Orleans.CodeGenerator.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Sdk\Orleans.Sdk.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Runtime\Orleans.Runtime.csproj" />
+  </ItemGroup>
+
+
+
+</Project>
