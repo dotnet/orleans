@@ -40,9 +40,9 @@ namespace UnitTests.StorageTests
                 builder.AddMemoryGrainStorage("test");
                 builder.AddMemoryStreams("test");
 
-#pragma warning disable ORLEANSEXP004 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+#pragma warning disable ORLEANSEXP006 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
                 builder.UseSystemTextJsonGrainStorageSerializer();
-#pragma warning restore ORLEANSEXP004 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+#pragma warning restore ORLEANSEXP006 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             });
             _testCluster = builder.Build();
 
