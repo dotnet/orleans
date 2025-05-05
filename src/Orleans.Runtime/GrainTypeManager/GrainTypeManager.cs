@@ -45,9 +45,21 @@ namespace Orleans.Runtime
             SerializationManager serializationManager,
             ILogger<GrainInterfaceMap> loggerGrainInterfaceMap,
             ILogger<GrainTypeManager> logger,
+            IOptions<GrainClassOptions> grainClassOptions)
+            : this(siloDetails, applicationPartManager, defaultPlacementStrategy, serializationManager, loggerGrainInterfaceMap, logger, grainClassOptions, null, null)
+        {
+        }
+
+        public GrainTypeManager(
+            ILocalSiloDetails siloDetails,
+            IApplicationPartManager applicationPartManager,
+            PlacementStrategy defaultPlacementStrategy,
+            SerializationManager serializationManager,
+            ILogger<GrainInterfaceMap> loggerGrainInterfaceMap,
+            ILogger<GrainTypeManager> logger,
             IOptions<GrainClassOptions> grainClassOptions,
-            Advanced.IGrainTypeResolver grainTypeResolver = null,
-            Advanced.IInterfaceTypeResolver interfaceTypeResolver = null)
+            Advanced.IGrainTypeResolver grainTypeResolver,
+            Advanced.IInterfaceTypeResolver interfaceTypeResolver)
         {
             var localTestMode = siloDetails.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback);
             this.logger = logger;
