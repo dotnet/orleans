@@ -161,7 +161,7 @@
 
   <!-- Migration Tooling properties -->
   <PropertyGroup>
-    <MigrationVersionSuffix>-preview4</MigrateToVersion>
+    <MigrationVersionSuffix>-preview4</MigrationVersionSuffix>
   </PropertyGroup>
 
   <!-- For Debug builds generated a date/time dependent version suffix -->
