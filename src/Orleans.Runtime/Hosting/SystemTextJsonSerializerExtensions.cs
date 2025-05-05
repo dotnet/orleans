@@ -17,7 +17,7 @@ namespace Orleans.Runtime.Hosting
         /// </summary>
         /// <param name="siloBuilder">The siloBuilder to configure with System.Text.Json grain storage support</param>
         /// <returns></returns>
-        [Experimental("ORLEANSEXP004")]
+        [Experimental("ORLEANSEXP006")]
         public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder)
         {
             siloBuilder.Services.AddSingleton<IGrainStorageSerializer, SystemTextJsonGrainStorageSerializer>();

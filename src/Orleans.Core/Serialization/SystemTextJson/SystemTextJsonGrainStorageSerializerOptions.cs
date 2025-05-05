@@ -14,7 +14,11 @@ namespace Orleans.Serialization
     {
         public JsonSerializerOptions JsonSerializerOptions { get; } = new JsonSerializerOptions()
         {
-            //ReferenceHandler = ReferenceHandler.,
+            // System.Text.Json  => 9.0.0 adds AllowOutOfOrderMetadataProperties
+            // which allows ReferenceHandler.Preserve to work with GuidId from Newtonsoft
+
+            // ReferenceHandler = ReferenceHandler.Preserve,
+            //  AllowOutOfOrderMetadataProperties = true,
             WriteIndented = true,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault | JsonIgnoreCondition.WhenWritingNull,
         };
