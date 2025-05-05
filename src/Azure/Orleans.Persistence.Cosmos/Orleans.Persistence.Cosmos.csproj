@@ -6,6 +6,9 @@
     <Description>Microsoft Orleans persistence providers for Azure Cosmos DB</Description>
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
+
+    <!-- keep while migration tooling is not in stable state -->
+    <VersionSuffix Condition=" '$(MigrationVersionSuffix)'!='' ">$(MigrationVersionSuffix)</VersionSuffix>
   </PropertyGroup>
 
   <ItemGroup>

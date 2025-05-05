@@ -159,6 +159,11 @@
     <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">3.0.0</VersionPrefix>
   </PropertyGroup>
 
+  <!-- Migration Tooling properties -->
+  <PropertyGroup>
+    <MigrationVersionSuffix>-preview4</MigrateToVersion>
+  </PropertyGroup>
+
   <!-- For Debug builds generated a date/time dependent version suffix -->
   <PropertyGroup Condition=" '$(Configuration)'=='Debug' ">
     <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">dev</VersionSuffix>
