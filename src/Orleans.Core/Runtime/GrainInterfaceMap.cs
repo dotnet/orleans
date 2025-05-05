@@ -132,14 +132,6 @@ namespace Orleans.Runtime
                     directoriesIndex.Add(kvp.Key, kvp.Value);
                 }
             }
-
-            if (map.grainTypeTypeCodeMap is not null)
-            {
-                foreach (var kvp in map.grainTypeTypeCodeMap)
-                {
-                    TryAddGrainTypeTypeCode(kvp.Key, kvp.Value);
-                }
-            }
         }
 
         internal void AddEntry(Type iface, Type grain, PlacementStrategy placement, string directory, bool primaryImplementation)
@@ -159,7 +151,10 @@ namespace Orleans.Runtime
                     placementStrategiesIndex.Add(grainTypeCode, placement);
                 if (!directoriesIndex.ContainsKey(grainTypeCode))
                     directoriesIndex.Add(grainTypeCode, directory);
-                TryAddGrainTypeTypeCode(grain, grainTypeCode);
+                if (grainTypeTypeCodeMap.TryAdd(grain, grainTypeCode))
+                {
+                    onGrainTypeAdded?.Invoke(grain, grainTypeCode);
+                }
 
                 grainInterfaceData.AddImplementation(implementation, primaryImplementation);
                 if (primaryImplementation)
@@ -305,10 +300,7 @@ namespace Orleans.Runtime
 
         void TryAddGrainTypeTypeCode(Type grainType, int typeCode)
         {
-            if (grainTypeTypeCodeMap.TryAdd(grainType, typeCode))
-            {
-                onGrainTypeAdded?.Invoke(grainType, typeCode);
-            }
+
         }
     }
 }
