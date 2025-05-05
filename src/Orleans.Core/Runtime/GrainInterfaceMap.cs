@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 
@@ -20,10 +21,11 @@ namespace Orleans.Runtime
         private readonly Dictionary<int, PlacementStrategy> placementStrategiesIndex;
         private readonly Dictionary<int, string> directoriesIndex;
 
+        // for migration capabilities
         [NonSerialized]
-        internal Action<Type, int> onGrainTypeAdded;
+        internal readonly ConcurrentDictionary<string /*7.x grainInterfaceType*/, int /*interfaceId*/> interfaceTypeIdMap = new();
         [NonSerialized]
-        internal readonly ConcurrentDictionary<Type, int> grainTypeTypeCodeMap = new();
+        internal readonly ConcurrentDictionary<string /*7.x grainType*/, int /*typeCode*/> grainTypeTypeCodeMap = new();
 
         // Keep it for wire serialization compatibility
         private readonly Dictionary<int, MultiClusterRegistrationStrategy> registrationStrategiesIndex;
@@ -36,6 +38,13 @@ namespace Orleans.Runtime
 		
 		private readonly PlacementStrategy defaultPlacementStrategy;
 
+        [NonSerialized]
+        private readonly ILogger logger;
+        [NonSerialized]
+        private readonly Advanced.IGrainTypeResolver grainTypeResolver;
+        [NonSerialized]
+        private readonly Advanced.IInterfaceTypeResolver interfaceTypeResolver;
+
         internal IEnumerable<GrainClassData> SupportedGrainClassData
         {
             get { return implementationIndex.Values; }
@@ -46,8 +55,19 @@ namespace Orleans.Runtime
             get { return table.Values; }
         }
 
-        public GrainInterfaceMap(bool localTestMode, PlacementStrategy defaultPlacementStrategy)
+        public GrainInterfaceMap(
+            ILogger logger,
+            bool localTestMode,
+            PlacementStrategy defaultPlacementStrategy,
+            Advanced.IGrainTypeResolver grainTypeResolver,
+            Advanced.IInterfaceTypeResolver interfaceTypeResolver)
         {
+            this.logger = logger;
+            this.grainTypeResolver = grainTypeResolver;
+            this.interfaceTypeResolver = interfaceTypeResolver;
+            this.localTestMode = localTestMode;
+            this.defaultPlacementStrategy = defaultPlacementStrategy;
+
             table = new Dictionary<int, GrainInterfaceData>();
             typeToInterfaceData = new Dictionary<string, GrainInterfaceData>();
             primaryImplementations = new Dictionary<string, string>();
@@ -56,9 +76,8 @@ namespace Orleans.Runtime
             registrationStrategiesIndex = new Dictionary<int, MultiClusterRegistrationStrategy>(); // init to avoid nullref in previous versions
             directoriesIndex = new Dictionary<int, string>();
             unordered = new HashSet<int>();
-            this.localTestMode = localTestMode;
-            this.defaultPlacementStrategy = defaultPlacementStrategy;
-            if(localTestMode) // if we are running in test mode, we'll build a list of loaded grain assemblies to help with troubleshooting deployment issue
+
+            if (localTestMode) // if we are running in test mode, we'll build a list of loaded grain assemblies to help with troubleshooting deployment issue
                 loadedGrainAsemblies = new HashSet<string>();
         }
 
@@ -132,6 +151,21 @@ namespace Orleans.Runtime
                     directoriesIndex.Add(kvp.Key, kvp.Value);
                 }
             }
+
+            if (map.grainTypeTypeCodeMap is not null)
+            {
+                foreach (var kvp in map.grainTypeTypeCodeMap)
+                {
+                    this.grainTypeTypeCodeMap.TryAdd(kvp.Key, kvp.Value);
+                }
+            }
+            if (map.interfaceTypeIdMap is not null)
+            {
+                foreach (var kvp in map.interfaceTypeIdMap)
+                {
+                    this.interfaceTypeIdMap.TryAdd(kvp.Key, kvp.Value);
+                }
+            }
         }
 
         internal void AddEntry(Type iface, Type grain, PlacementStrategy placement, string directory, bool primaryImplementation)
@@ -151,10 +185,7 @@ namespace Orleans.Runtime
                     placementStrategiesIndex.Add(grainTypeCode, placement);
                 if (!directoriesIndex.ContainsKey(grainTypeCode))
                     directoriesIndex.Add(grainTypeCode, directory);
-                if (grainTypeTypeCodeMap.TryAdd(grain, grainTypeCode))
-                {
-                    onGrainTypeAdded?.Invoke(grain, grainTypeCode);
-                }
+                TryAddToGrainTypeTypeCode(grain, grainTypeCode);
 
                 grainInterfaceData.AddImplementation(implementation, primaryImplementation);
                 if (primaryImplementation)
@@ -193,6 +224,7 @@ namespace Orleans.Runtime
             // Add entry to mapping iface string -> data
             var interfaceTypeKey = GetTypeKey(iface, isGenericGrainClass);
             typeToInterfaceData[interfaceTypeKey] = grainInterfaceData;
+            TryAddToInterfaceTypeId(iface, interfaceId);
 
             // If we are adding a concrete implementation of a generic interface
             // add also the latter to the map: GrainReference and InvokeMethodRequest 
@@ -298,9 +330,42 @@ namespace Orleans.Runtime
                 );
         }
 
-        void TryAddGrainTypeTypeCode(Type grainType, int typeCode)
+        private void TryAddToInterfaceTypeId(Type iface, int interfaceId)
         {
+            if (this.interfaceTypeResolver is null)
+            {
+                return;
+            }
 
+            try
+            {
+                var interfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(iface);
+                _ = interfaceTypeIdMap.TryAdd(interfaceType, interfaceId);
+            }
+            catch (Exception ex)
+            {
+                this.logger.Warn(ErrorCode.Runtime_Error_100332, $"Failed to resolve interface type (id={interfaceId}) for type {iface}.", ex);
+                // ignore
+            }
+        }
+
+        private void TryAddToGrainTypeTypeCode(Type grain, int typeCode)
+        {
+            if (this.grainTypeResolver is null)
+            {
+                return;
+            }
+
+            try
+            {
+                var grainType = this.grainTypeResolver.GetGrainType(grain);
+                _ = grainTypeTypeCodeMap.TryAdd(grainType, typeCode);
+            }
+            catch (Exception ex)
+            {
+                this.logger.Warn(ErrorCode.Runtime_Error_100332, $"Failed to resolve grainType (code={typeCode}) for type {grain}.", ex);
+                // ignore
+            }
         }
     }
 }

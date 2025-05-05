@@ -9,7 +9,7 @@ namespace Orleans.Metadata
     /// <summary>
     /// Associates a <see cref="GrainType"/> with a grain class.
     /// </summary>
-    public class GrainTypeResolver
+    public class GrainTypeResolver : Orleans.Runtime.Advanced.IGrainTypeResolver
     {
         private const string GrainSuffix = "grain";
         private readonly IGrainTypeProvider[] _providers;
@@ -31,6 +31,9 @@ namespace Orleans.Metadata
             _providers = resolvers.ToArray();
             _typeConverter = argumentFormatter;
         }
+
+        string Runtime.Advanced.IGrainTypeResolver.GetGrainType(Type type)
+            => GetGrainType(type).ToString();
 
         /// <summary>
         /// Returns the grain type for the provided class.

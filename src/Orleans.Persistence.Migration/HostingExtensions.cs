@@ -30,8 +30,8 @@ namespace Orleans.Persistence.Migration
                 .AddSingleton<IGrainTypeProvider, AttributeGrainTypeProvider>()
                 .AddSingleton<TypeResolver, CachedTypeResolver>()
                 .AddSingleton<TypeConverter>()
-                .AddSingleton<Metadata.GrainTypeResolver>()
-                .AddSingleton<GrainInterfaceTypeResolver>()
+                .AddSingleton<Orleans.Runtime.Advanced.IGrainTypeResolver, Metadata.GrainTypeResolver>()
+                .AddSingleton<Orleans.Runtime.Advanced.IInterfaceTypeResolver, GrainInterfaceTypeResolver>()
                 .AddSingleton<IGrainReferenceExtractor, GrainReferenceExtractor>();
 
         /// <summary>
