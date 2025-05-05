@@ -161,7 +161,7 @@
 
   <!-- Migration Tooling properties -->
   <PropertyGroup>
-    <MigrationVersionSuffix></MigrationVersionSuffix>
+    <MigrationVersionSuffix Condition=" '$(MigrationVersionSuffix)'!='' ">$(MigrationVersionSuffix)</MigrationVersionSuffix>
   </PropertyGroup>
 
   <!-- For Debug builds generated a date/time dependent version suffix -->
