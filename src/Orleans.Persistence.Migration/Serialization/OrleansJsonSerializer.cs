@@ -97,12 +97,11 @@ namespace Orleans.Persistence.Migration.Serialization
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            throw new NotImplementedException();
-            //return reader.Value switch
-            //{
-            //    string { Length: > 0 } str => ActivationId.GetActivationId(str),
-            //    _ => default
-            //};
+            return reader.Value switch
+            {
+                string { Length: > 0 } str => ActivationId.GetActivationId(UniqueKey.Parse(str)),
+                _ => default
+            };
         }
     }
 
