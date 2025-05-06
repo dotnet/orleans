@@ -101,7 +101,6 @@ namespace Orleans.Runtime
                     // Interface unknown until now
                     var grainInterfaceData = new GrainInterfaceData(kvp.Value);
                     typeToInterfaceData.Add(kvp.Key, grainInterfaceData);
-                    onGrainInterfaceAdded?.Invoke(grainInterfaceData);
                 }
             }
 

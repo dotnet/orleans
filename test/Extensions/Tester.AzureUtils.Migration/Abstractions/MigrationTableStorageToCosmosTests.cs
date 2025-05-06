@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Azure.Cosmos;
 using Orleans;
 using Orleans.Runtime;
@@ -128,7 +129,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
         }
 
         [SkippableFact]
-        public async Task UpdateWithRef()
+        public async Task UpdateWithGrainRefInState()
         {
             var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationWithRefGrain>(baseId + 4);
             var oldGrainState = new GrainState<MigrationTestGrainWithRef_State>(new() { A = 33, B = 806 });
@@ -137,7 +138,20 @@ namespace Tester.AzureUtils.Migration.Abstractions
             await grain.SetGrainRef();
             var grainRef = await grain.GetGrainRef();
 
-            Assert.True(true);
+            Assert.Equal(grainRef.AsReference<ISimplePersistentMigrationWithRefGrain>(), grain);
+        }
+
+        [SkippableFact]
+        public async Task UpdateWithIpEndpointInState()
+        {
+            var grain = this.fixture.Client.GetGrain<ISimplePersistentMigrationWithIpEndpointGrain>(baseId + 5);
+            var oldGrainState = new GrainState<MigrationTestGrainWithIpEndpoint_State>(new() { A = 33, B = 806 });
+            var stateName = typeof(MigrationTestGrainStorageWithIpEndpoint).FullName;
+
+            await grain.SetIpEndpoint();
+            var endpoint = await grain.GetEndpoint();
+
+            Assert.Equal(IPAddress.Loopback, endpoint.Address);
         }
     }
 }

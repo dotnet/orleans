@@ -49,18 +49,6 @@ namespace Orleans.Persistence.Migration
             _grainReferenceRuntime = grainReferenceRuntime;
         }
 
-        void InitializeInterfaceTypeIdMap()
-        {
-            // any grain type change should be reflected in _grainTypeTypeCodeMap
-            _grainTypeManager.ClusterGrainInterfaceMap.onGrainInterfaceAdded += (data) => TryAddInterfaceTypeId(data);
-
-            var snapshot = new List<GrainInterfaceData>(_grainTypeManager.ClusterGrainInterfaceMap.GrainInterfaceDatas);
-            foreach (var data in snapshot)
-            {
-                TryAddInterfaceTypeId(data);
-            }
-        }
-
         public Type ExtractType(GrainReference grainReference)
         {
             var typeCode = grainReference.GrainIdentity.TypeCode;
@@ -114,19 +102,14 @@ namespace Orleans.Persistence.Migration
 
         public Type ResolveInterfaceType(string grainType, string keyStr, string interfaceTypeName)
         {
-            if (!_interfaceTypeIdMap.TryGetValue(interfaceTypeName, out var interfaceId))
-            {
-                throw new ArgumentException($"Interface type '{interfaceTypeName}' not found.");
-            }
-            if (!_grainTypeManager.ClusterGrainInterfaceMap.TryGetServiceInterface(interfaceId, out var iface))
+            if (!_grainTypeManager.ClusterGrainInterfaceMap.interfaceTypeIdMap.TryGetValue(interfaceTypeName, out var interfaceId))
             {
                 throw new ArgumentException($"Interface type '{interfaceTypeName}' not found at {nameof(_grainTypeManager.ClusterGrainInterfaceMap)}.");
             }
 
-            if (iface.IsGenericType)
+            if (!_grainTypeManager.ClusterGrainInterfaceMap.TryGetServiceInterface(interfaceId, out var iface))
             {
-                // TODO double-check - how could we do it?
-                throw new NotSupportedException($"Resolving generic interface type '{interfaceTypeName}' is not supported.");
+                throw new ArgumentException($"Interface type id '{interfaceId}'/typename '{interfaceTypeName}' not found at {nameof(_grainTypeManager.ClusterGrainInterfaceMap)}.");
             }
 
             return iface;

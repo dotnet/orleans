@@ -61,9 +61,7 @@ namespace Orleans.Persistence.Migration.Serialization
     {
         /// <inheritdoc/>
         public override bool CanConvert(Type objectType)
-        {
-            return (objectType == typeof(IPAddress));
-        }
+            => objectType.IsAssignableTo(typeof(IPAddress));
 
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
@@ -102,7 +100,7 @@ namespace Orleans.Persistence.Migration.Serialization
             throw new NotImplementedException();
             //return reader.Value switch
             //{
-            //    string { Length: > 0 } str => ActivationId.FromParsableString(str),
+            //    string { Length: > 0 } str => ActivationId.GetActivationId(str),
             //    _ => default
             //};
         }
@@ -130,17 +128,16 @@ namespace Orleans.Persistence.Migration.Serialization
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            throw new NotImplementedException();
-            //switch (reader.TokenType)
-            //{
-            //    case JsonToken.StartObject:
-            //        var jo = JObject.Load(reader);
-            //        return SiloAddress.FromParsableString(jo["SiloAddress"].ToObject<string>());
-            //    case JsonToken.String:
-            //        return SiloAddress.FromParsableString(reader.Value as string);
-            //}
+            switch (reader.TokenType)
+            {
+                case JsonToken.StartObject:
+                    var jo = JObject.Load(reader);
+                    return SiloAddress.FromParsableString(jo["SiloAddress"].ToObject<string>());
+                case JsonToken.String:
+                    return SiloAddress.FromParsableString(reader.Value as string);
+            }
 
-            //return null;
+            return null;
         }
     }
 
@@ -163,12 +160,11 @@ namespace Orleans.Persistence.Migration.Serialization
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            throw new NotImplementedException();
-            //return reader.Value switch
-            //{
-            //    long l => new MembershipVersion(l),
-            //    _ => default(MembershipVersion)
-            //};
+            return reader.Value switch
+            {
+                long l => new MembershipVersion(l),
+                _ => default
+            };
         }
     }
 
@@ -197,10 +193,9 @@ namespace Orleans.Persistence.Migration.Serialization
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            throw new NotImplementedException();
-            //JObject jo = JObject.Load(reader);
-            //UniqueKey addr = UniqueKey.Parse(jo["UniqueKey"].ToObject<string>().AsSpan());
-            //return addr;
+            JObject jo = JObject.Load(reader);
+            UniqueKey addr = UniqueKey.Parse(jo["UniqueKey"].ToObject<string>().AsSpan());
+            return addr;
         }
     }
 
@@ -212,9 +207,7 @@ namespace Orleans.Persistence.Migration.Serialization
     {
         /// <inheritdoc/>
         public override bool CanConvert(Type objectType)
-        {
-            return (objectType == typeof(IPEndPoint));
-        }
+            => objectType.IsAssignableTo(typeof(IPEndPoint));
 
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
@@ -231,11 +224,10 @@ namespace Orleans.Persistence.Migration.Serialization
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            throw new NotImplementedException();
-            //JObject jo = JObject.Load(reader);
-            //IPAddress address = jo["Address"].ToObject<IPAddress>(serializer);
-            //int port = jo["Port"].Value<int>();
-            //return new IPEndPoint(address, port);
+            JObject jo = JObject.Load(reader);
+            IPAddress address = jo["Address"].ToObject<IPAddress>(serializer);
+            int port = jo["Port"].Value<int>();
+            return new IPEndPoint(address, port);
         }
     }
 
