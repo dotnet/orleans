@@ -35,6 +35,8 @@ namespace Orleans.Persistence.Migration
         private readonly Runtime.Advanced.IInterfaceTypeResolver _grainInterfaceTypeResolver;
         private readonly IGrainReferenceRuntime _grainReferenceRuntime;
 
+        private GrainInterfaceMap CurrentGrainInterfaceMap => _grainTypeManager.ClusterGrainInterfaceMap;
+
         public GrainReferenceExtractor(
             ILoggerFactory loggerFactory,
             GrainTypeManager grainTypeManager,
@@ -77,7 +79,7 @@ namespace Orleans.Persistence.Migration
         /// </summary>
         public GrainReference ResolveGrainReference(string grainType, string keyStr)
         {
-            if (!_grainTypeManager.ClusterGrainInterfaceMap.grainTypeTypeCodeMap.TryGetValue(grainType, out var typeCode))
+            if (!CurrentGrainInterfaceMap.GrainTypeTypeCodeMap.TryGetValue(grainType, out var typeCode))
             {
                 throw new ArgumentException($"Grain type '{grainType}' not found.");
             }

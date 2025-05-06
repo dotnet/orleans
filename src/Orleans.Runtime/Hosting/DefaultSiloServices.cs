@@ -129,7 +129,25 @@ namespace Orleans.Hosting
                             ? sp.GetService<GrainLocatorSelector>()
                             : sp.GetService<DhtGrainLocator>();
             });
-            services.TryAddSingleton<GrainTypeManager>();
+            services.TryAddSingleton<GrainTypeManager>(sp =>
+            {
+                // not required
+                var grainTypeResolver = sp.GetService<Orleans.Runtime.Advanced.IGrainTypeResolver>();
+                var interfaceTypeResolver = sp.GetService<Orleans.Runtime.Advanced.IInterfaceTypeResolver>();
+                var loggerFactory = sp.GetService<ILoggerFactory>();
+
+                return new GrainTypeManager(
+                    sp.GetRequiredService<ILocalSiloDetails>(),
+                    sp.GetRequiredService<IApplicationPartManager>(),
+                    sp.GetRequiredService<PlacementStrategy>(),
+                    sp.GetRequiredService<SerializationManager>(),
+                    loggerFactory.CreateLogger<GrainInterfaceMap>(),
+                    loggerFactory.CreateLogger<GrainTypeManager>(),
+                    sp.GetRequiredService<IOptions<GrainClassOptions>>(),
+                    grainTypeResolver,
+                    interfaceTypeResolver
+                );
+            });
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
             services.TryAddSingleton(FactoryUtility.Create<MessageCenter, Gateway>);

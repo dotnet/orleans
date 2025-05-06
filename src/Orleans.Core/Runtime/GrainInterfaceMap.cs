@@ -23,9 +23,12 @@ namespace Orleans.Runtime
 
         // for migration capabilities
         [NonSerialized]
-        internal readonly ConcurrentDictionary<string /*7.x grainInterfaceType*/, int /*interfaceId*/> interfaceTypeIdMap = new();
+        private readonly ConcurrentDictionary<string /*7.x grainInterfaceType*/, int /*interfaceId*/> interfaceTypeIdMap = new();
         [NonSerialized]
-        internal readonly ConcurrentDictionary<string /*7.x grainType*/, int /*typeCode*/> grainTypeTypeCodeMap = new();
+        private readonly ConcurrentDictionary<string /*7.x grainType*/, int /*typeCode*/> grainTypeTypeCodeMap = new();
+
+        internal ConcurrentDictionary<string, int> InterfaceTypeIdMap => interfaceTypeIdMap;
+        internal ConcurrentDictionary<string, int> GrainTypeTypeCodeMap => grainTypeTypeCodeMap;
 
         // Keep it for wire serialization compatibility
         private readonly Dictionary<int, MultiClusterRegistrationStrategy> registrationStrategiesIndex;
