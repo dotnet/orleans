@@ -7,6 +7,9 @@
     <TargetFrameworks>net6.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
+
+    <!-- keep while migration tooling is not in stable state -->
+    <VersionSuffix Condition=" '$(MigrationVersionSuffix)'!='' ">$(MigrationVersionSuffix)</VersionSuffix>
   </PropertyGroup>
 
   <ItemGroup>
