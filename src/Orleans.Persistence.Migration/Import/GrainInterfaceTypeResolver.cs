@@ -1,7 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Orleans.Runtime;
+using Orleans.Runtime.Advanced;
 using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Metadata
@@ -9,7 +7,7 @@ namespace Orleans.Metadata
     /// <summary>
     /// Associates a <see cref="GrainInterfaceType"/> with a <see cref="Type" />.
     /// </summary>
-    public class GrainInterfaceTypeResolver
+    public class GrainInterfaceTypeResolver : Orleans.Runtime.Advanced.IInterfaceTypeResolver
     {
         private readonly IGrainInterfaceTypeProvider[] _providers;
         private readonly TypeConverter _typeConverter;
@@ -30,6 +28,9 @@ namespace Orleans.Metadata
             _providers = providers.ToArray();
             _typeConverter = typeConverter;
         }
+
+        string IInterfaceTypeResolver.GetGrainInterfaceType(Type type)
+            => GetGrainInterfaceType(type).ToString();
 
         /// <summary>
         /// Returns the <see cref="GrainInterfaceType"/> for the provided interface.

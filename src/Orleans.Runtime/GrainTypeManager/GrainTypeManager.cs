@@ -34,19 +34,42 @@ namespace Orleans.Runtime
 
         public IGrainTypeResolver GrainTypeResolver { get; private set; }
 
+        private readonly ILogger<GrainInterfaceMap> loggerGrainInterfaceMap;
+        private readonly Advanced.IGrainTypeResolver grainTypeResolver;
+        private readonly Advanced.IInterfaceTypeResolver interfaceTypeResolver;
+
         public GrainTypeManager(
             ILocalSiloDetails siloDetails,
             IApplicationPartManager applicationPartManager,
             PlacementStrategy defaultPlacementStrategy,
             SerializationManager serializationManager,
+            ILogger<GrainInterfaceMap> loggerGrainInterfaceMap,
             ILogger<GrainTypeManager> logger,
             IOptions<GrainClassOptions> grainClassOptions)
+            : this(siloDetails, applicationPartManager, defaultPlacementStrategy, serializationManager, loggerGrainInterfaceMap, logger, grainClassOptions, null, null)
+        {
+        }
+
+        public GrainTypeManager(
+            ILocalSiloDetails siloDetails,
+            IApplicationPartManager applicationPartManager,
+            PlacementStrategy defaultPlacementStrategy,
+            SerializationManager serializationManager,
+            ILogger<GrainInterfaceMap> loggerGrainInterfaceMap,
+            ILogger<GrainTypeManager> logger,
+            IOptions<GrainClassOptions> grainClassOptions,
+            Advanced.IGrainTypeResolver grainTypeResolver,
+            Advanced.IInterfaceTypeResolver interfaceTypeResolver)
         {
             var localTestMode = siloDetails.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback);
             this.logger = logger;
             this.defaultPlacementStrategy = defaultPlacementStrategy;
             this.serializationManager = serializationManager;
-            grainInterfaceMap = new GrainInterfaceMap(localTestMode, this.defaultPlacementStrategy);
+            this.grainTypeResolver = grainTypeResolver;
+            this.interfaceTypeResolver = interfaceTypeResolver;
+            this.loggerGrainInterfaceMap = loggerGrainInterfaceMap;
+
+            grainInterfaceMap = new GrainInterfaceMap(loggerGrainInterfaceMap, localTestMode, this.defaultPlacementStrategy, grainTypeResolver, interfaceTypeResolver);
             ClusterGrainInterfaceMap = grainInterfaceMap;
             GrainTypeResolver = grainInterfaceMap.GetGrainTypeResolver();
             grainInterfaceMapsBySilo = new Dictionary<SiloAddress, GrainInterfaceMap>();
@@ -267,7 +290,7 @@ namespace Orleans.Runtime
 
         private void RebuildFullGrainInterfaceMap()
         {
-            var newClusterGrainInterfaceMap = new GrainInterfaceMap(false, this.defaultPlacementStrategy);
+            var newClusterGrainInterfaceMap = new GrainInterfaceMap(this.loggerGrainInterfaceMap, false, this.defaultPlacementStrategy, this.grainTypeResolver, this.interfaceTypeResolver);
             var newSupportedSilosByTypeCode = new Dictionary<int, List<SiloAddress>>();
             var newSupportedSilosByInterface = new Dictionary<int, Dictionary<ushort, List<SiloAddress>>>();
             foreach (var kvp in grainInterfaceMapsBySilo)
