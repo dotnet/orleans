@@ -1,8 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Placement;
-using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
-using TestExtensions;
 using Xunit;
 
 namespace UnitTests.PlacementFilterTests;
@@ -119,7 +117,7 @@ public class GrainPlacementFilterTests(GrainPlacementFilterTests.Fixture fixture
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
             await testGrain.Ping();
-        }); 
+        });
     }
 }
 
@@ -143,7 +141,7 @@ public class TestPlacementFilterStrategy(int order) : PlacementFilterStrategy(or
     }
 }
 
-public class TestPlacementFilterDirector() : IPlacementFilterDirector
+public class TestPlacementFilterDirector() : IPlacementFilterDirectorWithoutRequestContext
 {
     public static SemaphoreSlim Triggered { get; } = new(0);
 
@@ -165,7 +163,7 @@ public class OrderAPlacementFilterStrategy(int order) : PlacementFilterStrategy(
     }
 }
 
-public class OrderAPlacementFilterDirector : IPlacementFilterDirector
+public class OrderAPlacementFilterDirector : IPlacementFilterDirectorWithoutRequestContext
 {
     public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementFilterContext context, IEnumerable<SiloAddress> silos)
     {
@@ -187,7 +185,7 @@ public class OrderBPlacementFilterStrategy(int order) : PlacementFilterStrategy(
     }
 }
 
-public class OrderBPlacementFilterDirector() : IPlacementFilterDirector
+public class OrderBPlacementFilterDirector() : IPlacementFilterDirectorWithoutRequestContext
 {
     public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementFilterContext context, IEnumerable<SiloAddress> silos)
     {

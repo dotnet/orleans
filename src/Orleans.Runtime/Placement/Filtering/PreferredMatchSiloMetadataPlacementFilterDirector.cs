@@ -10,7 +10,7 @@ namespace Orleans.Runtime.Placement.Filtering;
 internal class PreferredMatchSiloMetadataPlacementFilterDirector(
     ILocalSiloDetails localSiloDetails,
     ISiloMetadataCache siloMetadataCache)
-    : IPlacementFilterDirector
+    : IPlacementFilterDirectorWithoutRequestContext
 {
     public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementFilterContext context, IEnumerable<SiloAddress> silos)
     {

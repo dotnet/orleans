@@ -121,11 +121,27 @@ namespace Orleans.Runtime.Placement
             if (filters.Length > 0)
             {
                 IEnumerable<SiloAddress> filteredSilos = compatibleSilos;
-                var context = new PlacementFilterContext(target.GrainIdentity.Type, target.InterfaceType, target.InterfaceVersion);
+                
+                PlacementFilterContext? context = null;
                 foreach (var placementFilter in filters)
                 {
                     var director = _placementFilterDirectoryResolver.GetFilterDirector(placementFilter);
-                    filteredSilos = director.Filter(placementFilter, context, filteredSilos);
+                    switch (director)
+                    {
+                        case IPlacementFilterDirectorWithRequestContext filterWithRequestContext:
+                            filteredSilos = filterWithRequestContext.Filter(placementFilter, target, filteredSilos);
+                            break;
+                        case IPlacementFilterDirectorWithoutRequestContext filterWithoutRequestContext:
+                        {
+                            context ??= new PlacementFilterContext(target.GrainIdentity.Type, target.InterfaceType, target.InterfaceVersion);
+                            // TODO: look up in a cache to see if we have already filtered this context + set of filtered silos
+                            // cache would get cleared or rebuilt when the silo status changes similar to the GrainVersionManifest.Cache
+                            filteredSilos = filterWithoutRequestContext.Filter(placementFilter, context.Value, filteredSilos);
+                            break;
+                        }
+                        default:
+                            throw new InvalidOperationException($"Placement filter {placementFilter} does not implement {nameof(IPlacementFilterDirector)} or {nameof(IPlacementFilterDirectorWithRequestContext)}");
+                    }
                 }
 
                 compatibleSilos = filteredSilos.ToArray();

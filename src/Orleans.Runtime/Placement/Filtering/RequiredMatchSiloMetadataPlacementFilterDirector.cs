@@ -7,7 +7,7 @@ using Orleans.Runtime.MembershipService.SiloMetadata;
 namespace Orleans.Runtime.Placement.Filtering;
 
 internal class RequiredMatchSiloMetadataPlacementFilterDirector(ILocalSiloDetails localSiloDetails, ISiloMetadataCache siloMetadataCache)
-    : IPlacementFilterDirector
+    : IPlacementFilterDirectorWithoutRequestContext
 {
     public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementFilterContext context, IEnumerable<SiloAddress> silos)
     {

@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
 
 #nullable enable
@@ -17,10 +18,16 @@ public static class PlacementFilterExtensions
         where TFilter : PlacementFilterStrategy, new()
         where TDirector : class, IPlacementFilterDirector
     {
-        services.Add(ServiceDescriptor.DescribeKeyed(typeof(PlacementFilterStrategy), typeof(TFilter).Name, typeof(TFilter), strategyLifetime));
-        services.AddKeyedSingleton<IPlacementFilterDirector, TDirector>(typeof(TFilter));
+        if (typeof(TDirector).IsAssignableTo(typeof(IPlacementFilterDirectorWithRequestContext))
+            || typeof(TDirector).IsAssignableTo(typeof(IPlacementFilterDirectorWithoutRequestContext)))
+        {
+            services.Add(ServiceDescriptor.DescribeKeyed(typeof(PlacementFilterStrategy), typeof(TFilter).Name,
+                typeof(TFilter), strategyLifetime));
+            services.AddKeyedSingleton<IPlacementFilterDirector, TDirector>(typeof(TFilter));
 
-        return services;
+            return services;
+        }
+        throw new ArgumentException("TDirector must implement either IPlacementFilterDirectorWithRequestContext or IPlacementFilterDirectorWithoutRequestContext.");
     }
 
 }
