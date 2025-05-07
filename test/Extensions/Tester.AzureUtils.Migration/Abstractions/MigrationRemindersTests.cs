@@ -43,7 +43,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             var stateName = typeof(SimplePersistentGrain).FullName;
             var grainReference = (GrainReference)grain;
 
-            var defaultEntryBuilder = DefaultReminderTableEntryBuilder.Instance;
+            var defaultEntryBuilder = SourceReminderTableEntryBuilder;
             var reminderName = GenerateReminderName();
             var migrationEntryRowKey = MigrationEntryBuilder.ConstructRowKey(grainReference, reminderName);
             var oldEntryRowKey = defaultEntryBuilder.ConstructRowKey(grainReference, reminderName);
@@ -58,6 +58,11 @@ namespace Tester.AzureUtils.Migration.Abstractions
 
             var reminderTable = await GetAndInitReminderTableAsync();
             var res = await reminderTable.UpsertRow(reminderEntry);
+
+            var entryStorage = await reminderTable.ReadRow(grainReference, reminderName);
+            Assert.NotNull(entryStorage);
+            Assert.Equal(entryStorage.GrainRef.ToKeyString(), grainReference.ToKeyString());
+            Assert.Equal(entryStorage.GrainRef.GrainIdentity.ToString(), grainReference.GrainIdentity.ToString());
 
             var migratedTableClient = GetMigratedTableClient();
             var migratedFetchedEntry = migratedTableClient.Query<ReminderTableEntry>(x => x.RowKey == migrationEntryRowKey).FirstOrDefault();
@@ -80,7 +85,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             var stateName = typeof(SimplePersistentGrain).FullName;
             var grainReference = (GrainReference)grain;
 
-            var defaultEntryBuilder = DefaultReminderTableEntryBuilder.Instance;
+            var defaultEntryBuilder = SourceReminderTableEntryBuilder;
             var reminderName = GenerateReminderName();
             var migrationEntryRowKey = MigrationEntryBuilder.ConstructRowKey(grainReference, reminderName);
             var oldEntryRowKey = defaultEntryBuilder.ConstructRowKey(grainReference, reminderName);
@@ -109,7 +114,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
             var stateName = typeof(SimplePersistentGrain).FullName;
             var grainReference = (GrainReference)grain;
 
-            var defaultEntryBuilder = DefaultReminderTableEntryBuilder.Instance;
+            var defaultEntryBuilder = SourceReminderTableEntryBuilder;
             var reminderName = GenerateReminderName();
             var migrationEntryRowKey = MigrationEntryBuilder.ConstructRowKey(grainReference, reminderName);
             var oldEntryRowKey = defaultEntryBuilder.ConstructRowKey(grainReference, reminderName);

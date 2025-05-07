@@ -1,0 +1,236 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Threading.Tasks;
+using Microsoft.Azure.Cosmos;
+using Microsoft.Azure.Cosmos.Linq;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Reminders.Cosmos.Models;
+using Orleans.Runtime;
+using CosmosReminderEntry = Orleans.Reminders.Cosmos.Models.ReminderEntity;
+
+namespace Orleans.Reminders.Cosmos
+{
+    internal class CosmosReminderTable : IReminderTable
+    {
+        private CosmosClient _client = default!;
+        private Container _container = default!;
+
+        private readonly ILogger _logger;
+        private readonly IServiceProvider _serviceProvider;
+        private readonly ClusterOptions _clusterOptions;
+        private readonly CosmosReminderTableOptions _options;
+
+        public CosmosReminderTable(
+            ILoggerFactory loggerFactory,
+            IServiceProvider serviceProvider,
+            IOptions<CosmosReminderTableOptions> options,
+            IOptions<ClusterOptions> clusterOptions)
+        {
+            _logger = loggerFactory.CreateLogger<CosmosReminderTable>();
+            _serviceProvider = serviceProvider;
+            _options = options.Value;
+            _clusterOptions = clusterOptions.Value;
+        }
+
+
+        public async Task Init()
+        {
+            try
+            {
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug(
+                        "Azure Cosmos DB Reminder Storage CosmosReminderTable is initializing: Name=CosmosReminderTable ServiceId={ServiceId} Collection={Container}",
+                        _clusterOptions.ServiceId,
+                        _options.ContainerName);
+                }
+
+                _client = await _options.CreateClient(_serviceProvider).ConfigureAwait(false);
+                _container = _client.GetContainer(_options.DatabaseName, _options.ContainerName);
+            }
+            catch (Exception ex)
+            {
+                WrappedException.CreateAndRethrow(ex);
+            }
+        }
+
+        public async Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName)
+        {
+            try
+            {
+                var pk = new PartitionKey(CosmosReminderEntry.ConstructPartitionKey(_clusterOptions.ServiceId, grainRef));
+                var id = CosmosReminderEntry.ConstructId(grainRef, reminderName);
+
+                var response = await _container.ReadItemAsync<CosmosReminderEntry>(id, pk).ConfigureAwait(false);
+                return response != null ? FromEntity(response)! : default!;
+            }
+            catch (CosmosException cosmosEx) when (cosmosEx.StatusCode == HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+            catch (Exception exc)
+            {
+                _logger.LogError(exc, "Failure reading reminder {Name} for service {ServiceId} and grain {GrainId}", reminderName, _clusterOptions.ServiceId, grainRef);
+                WrappedException.CreateAndRethrow(exc);
+                throw;
+            }
+        }
+
+        public async Task<ReminderTableData> ReadRows(GrainReference key)
+        {
+            try
+            {
+                var pk = new PartitionKey(CosmosReminderEntry.ConstructPartitionKey(_clusterOptions.ServiceId, key));
+                var queryRequestOptions = new QueryRequestOptions { PartitionKey = pk };
+
+                var query = _container.GetItemLinqQueryable<CosmosReminderEntry>(requestOptions: queryRequestOptions).ToFeedIterator();
+                var reminders = new List<CosmosReminderEntry>();
+                
+                do
+                {
+                    
+                    var queryResponse = await query.ReadNextAsync().ConfigureAwait(false);
+                    if (queryResponse != null && queryResponse.Count > 0)
+                    {
+                        reminders.AddRange(queryResponse);
+                    }
+                    else
+                    {
+                        break;
+                    }
+                } while (query.HasMoreResults);
+
+                return new ReminderTableData(reminders.Select(FromEntity));
+            }
+            catch (Exception exc)
+            {
+                _logger.LogError(exc, "Failure reading reminders for grain {GrainId} in container {Container}", key, _container.Id);
+                WrappedException.CreateAndRethrow(exc);
+                throw;
+            }
+        }
+
+        public async Task<ReminderTableData> ReadRows(uint begin, uint end)
+        {
+            try
+            {
+                var query = _container.GetItemLinqQueryable<CosmosReminderEntry>()
+                    .Where(entity => entity.ServiceId == _clusterOptions.ServiceId);
+
+                query = begin < end
+                    ? query.Where(r => r.GrainHash > begin && r.GrainHash <= end)
+                    : query.Where(r => r.GrainHash > begin || r.GrainHash <= end);
+
+                var iterator = query.ToFeedIterator();
+                var reminders = new List<CosmosReminderEntry>();
+                do
+                {
+                    var queryResponse = await iterator.ReadNextAsync().ConfigureAwait(false);
+                    if (queryResponse != null && queryResponse.Count > 0)
+                    {
+                        reminders.AddRange(queryResponse);
+                    }
+                    else
+                    {
+                        break;
+                    }
+                } while (iterator.HasMoreResults);
+
+                return new ReminderTableData(reminders.Select(FromEntity));
+            }
+            catch (Exception exc)
+            {
+                _logger.LogError(
+                    exc,
+                    "Failure reading reminders for service {Service} for range {Begin} to {End}",
+                    _clusterOptions.ServiceId,
+                    begin.ToString("X"),
+                    end.ToString("X"));
+                WrappedException.CreateAndRethrow(exc);
+                throw;
+            }
+        }
+
+        public async Task<string> UpsertRow(ReminderEntry entry)
+        {
+            try
+            {
+                var entity = ToEntity(entry);
+                var pk = new PartitionKey(CosmosReminderEntry.ConstructPartitionKey(_clusterOptions.ServiceId, entry.GrainRef));
+                var options = new ItemRequestOptions { IfMatchEtag = entity.ETag };
+
+                var response = await _container.UpsertItemAsync<CosmosReminderEntry>(entity, pk, options).ConfigureAwait(false);
+                return response.ETag;
+            }
+            catch (Exception exc)
+            {
+                _logger.LogError(exc, "Failure to upsert reminder for service {ServiceId}", _clusterOptions.ServiceId);
+                WrappedException.CreateAndRethrow(exc);
+                throw;
+            }
+        }
+
+        public async Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag)
+        {
+            try
+            {
+                var id = CosmosReminderEntry.ConstructId(grainRef, reminderName);
+                var options = new ItemRequestOptions { IfMatchEtag = eTag, };
+                var pk = new PartitionKey(CosmosReminderEntry.ConstructPartitionKey(_clusterOptions.ServiceId, grainRef));
+
+                await _container.DeleteItemAsync<CosmosReminderEntry>(id, pk, options).ConfigureAwait(false);
+
+                return true;
+            }
+            catch (CosmosException dce) when (dce.StatusCode is HttpStatusCode.PreconditionFailed)
+            {
+                return false;
+            }
+            catch (Exception exc)
+            {
+                _logger.LogError(
+                    exc,
+                    "Failure removing reminders for service {ServiceId} with GrainId {GrainId} and name {ReminderName}",
+                    _clusterOptions.ServiceId,
+                    grainRef,
+                    reminderName);
+                WrappedException.CreateAndRethrow(exc);
+                throw;
+            }
+        }
+
+        public Task TestOnlyClearTable() => throw new System.NotImplementedException();
+
+
+        private ReminderEntry FromEntity(CosmosReminderEntry entity)
+        {
+            return new ReminderEntry
+            {
+                GrainRef = GrainReference.FromGrainId(entity.GrainId, ),
+                ReminderName = entity.Name,
+                Period = entity.Period,
+                StartAt = entity.StartAt.UtcDateTime,
+                ETag = entity.ETag
+            };
+        }
+
+        private CosmosReminderEntry ToEntity(ReminderEntry entry)
+        {
+            return new CosmosReminderEntry
+            {
+                Id = CosmosReminderEntry.ConstructId(entry.GrainRef, entry.ReminderName),
+                PartitionKey = CosmosReminderEntry.ConstructPartitionKey(_clusterOptions.ServiceId, entry.GrainRef),
+                ServiceId = _clusterOptions.ServiceId,
+                GrainHash = entry.GrainRef.GetUniformHashCode(),
+                GrainId = entry.GrainRef.ToString(),
+                Name = entry.ReminderName,
+                StartAt = entry.StartAt,
+                Period = entry.Period
+            };
+        }
+    }
+}

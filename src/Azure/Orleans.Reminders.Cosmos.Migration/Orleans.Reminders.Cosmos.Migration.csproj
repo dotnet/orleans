@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Reminders.Cosmos</PackageId>
+    <Title>Microsoft Orleans Reminders Azure Cosmos DB</Title>
+    <Description>Microsoft Orleans reminders provider for Azure Cosmos DB</Description>
+    <PackageTags>$(PackageTags) Azure Cosmos DB</PackageTags>
+    <TargetFrameworks>net6.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Reminders.Cosmos.Migration</AssemblyName>
+    <RootNamespace>Orleans.Reminders.Cosmos.Migration</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);ORLEANS_REMINDERS</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Persistence.Migration\Orleans.Persistence.Migration.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Persistence.Cosmos\Orleans.Persistence.Cosmos.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Core" Version="$(AzureCoreVersion)" />
+    <PackageReference Include="Microsoft.Azure.Cosmos" Version="$(AzureCosmosDbVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tester.Reminders.Cosmos.Migration"/>
+  </ItemGroup>
+
+</Project>

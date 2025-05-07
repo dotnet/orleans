@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net6.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Azure\Orleans.Reminders.Cosmos.Migration\Orleans.Reminders.Cosmos.Migration.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.Persistence.Migration\Orleans.Persistence.Migration.csproj" />
+    <ProjectReference Include="..\..\TesterInternal\TesterInternal.csproj" />
+    <ProjectReference Include="..\Tester.AzureUtils.Migration\Tester.AzureUtils.Migration.csproj" />
+    <ProjectReference Include="..\TesterAzureUtils\Tester.AzureUtils.csproj" />
+  </ItemGroup>
+
+</Project>

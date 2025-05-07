@@ -9,11 +9,11 @@ namespace Orleans.Persistence.AzureStorage.Migration.Reminders.Storage
     /// </summary>
     public class MigratedReminderTableEntryBuilder : IReminderTableEntryBuilder
     {
-        IGrainReferenceExtractor grainReferenceExtractor;
+        IGrainReferenceExtractor _grainReferenceExtractor;
 
         public MigratedReminderTableEntryBuilder(IGrainReferenceExtractor grainReferenceExtractor)
         {
-            this.grainReferenceExtractor = grainReferenceExtractor;
+            this._grainReferenceExtractor = grainReferenceExtractor;
         }
 
         public string ConstructPartitionKey(string serviceId, GrainReference grainReference)
@@ -21,11 +21,14 @@ namespace Orleans.Persistence.AzureStorage.Migration.Reminders.Storage
 
         public string ConstructRowKey(GrainReference grainReference, string reminderName)
         {
-            var grainId = grainReferenceExtractor.GetGrainId(grainReference);
+            var grainId = _grainReferenceExtractor.GetGrainId(grainReference);
             return AzureTableUtils.SanitizeTableProperty($"{grainId}-{reminderName}");
         }
 
         public string GetGrainReference(GrainReference grainReference)
-            => grainReferenceExtractor.GetGrainId(grainReference);
+            => _grainReferenceExtractor.GetGrainId(grainReference);
+
+        public GrainReference GetGrainReference(string grainId)
+            => _grainReferenceExtractor.ResolveGrainReference(grainId);
     }
 }

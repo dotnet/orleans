@@ -3,19 +3,20 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.Configuration;
+using Orleans.Internal;
+using Orleans.Reminders.AzureStorage;
+using Orleans.Reminders.AzureStorage.Storage.Reminders;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
+using Orleans.TestingHost.Utils;
+using TesterInternal.AzureInfra;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.TestingHost.Utils;
-using Orleans.Internal;
-using Orleans.Reminders.AzureStorage;
-using TesterInternal.AzureInfra;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -51,7 +52,12 @@ namespace Tester.AzureUtils.TimerTests
             var storageOptions = Options.Create(new AzureTableReminderStorageOptions());
             storageOptions.Value.ConfigureTestDefaults();
 
-            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, clusterOptions, storageOptions);
+            IReminderTable table = new AzureBasedReminderTable(
+                this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(),
+                this.loggerFactory,
+                clusterOptions,
+                storageOptions,
+                new DefaultReminderTableEntryBuilder(this.fixture.Services.GetRequiredService<IGrainReferenceRuntime>()));
             await table.Init();
 
             await TestTableInsertRate(table, 10);
@@ -65,7 +71,12 @@ namespace Tester.AzureUtils.TimerTests
             var clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = this.serviceId });
             var storageOptions = Options.Create(new AzureTableReminderStorageOptions());
             storageOptions.Value.ConfigureTestDefaults();
-            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, clusterOptions, storageOptions);
+            IReminderTable table = new AzureBasedReminderTable(
+                this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(),
+                this.loggerFactory,
+                clusterOptions,
+                storageOptions,
+                new DefaultReminderTableEntryBuilder(this.fixture.Services.GetRequiredService<IGrainReferenceRuntime>()));
             await table.Init();
 
             ReminderEntry[] rows = (await GetAllRows(table)).ToArray();

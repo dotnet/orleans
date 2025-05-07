@@ -338,7 +338,8 @@ namespace Orleans
         Runtime_Error_100329 = Runtime + 329,
         Runtime_Error_100330 = Runtime + 330,
         Runtime_Error_100331 = Runtime + 331,
-        
+        Runtime_Error_100332 = Runtime + 332,
+
         SiloBase                        = Runtime + 400,
         SiloStarting                    = SiloBase + 1,
         SiloStarted                     = SiloBase + 2,

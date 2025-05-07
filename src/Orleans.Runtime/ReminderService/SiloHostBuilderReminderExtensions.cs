@@ -1,8 +1,10 @@
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
+using Orleans.Timers;
 
 namespace Orleans.Hosting
 {
@@ -55,6 +57,31 @@ namespace Orleans.Hosting
             services.AddFromExisting<IReminderTable, InMemoryReminderTable>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InMemoryReminderTable>();
             return services;
+        }
+
+        /// <summary>
+        /// Adds support for reminders to this silo.
+        /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <returns>The silo builder.</returns>
+        public static ISiloBuilder AddReminders(this ISiloBuilder builder) => builder.ConfigureServices(AddReminders);
+
+        /// <summary>
+        /// Add support for reminders to this client.
+        /// </summary>
+        /// <param name="services">The services.</param>
+        public static void AddReminders(this IServiceCollection services)
+        {
+            if (services.Any(service => service.ServiceType.Equals(typeof(LocalReminderService))))
+            {
+                return;
+            }
+
+            services.AddSingleton<LocalReminderService>();
+            services.AddFromExisting<IReminderService, LocalReminderService>();
+            // TODO?
+            // services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalReminderService>();
+            services.AddSingleton<IReminderRegistry, ReminderRegistry>();
         }
     }
 }

@@ -4,11 +4,13 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Persistence.AzureStorage.Migration;
 using Orleans.Persistence.AzureStorage.Migration.Reminders;
 using Orleans.Persistence.AzureStorage.Migration.Reminders.Storage;
 using Orleans.Persistence.Migration;
 using Orleans.Providers;
 using Orleans.Reminders.AzureStorage;
+using Orleans.Reminders.AzureStorage.Storage.Reminders;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.Storage.Migration.AzureStorage;
@@ -120,33 +122,6 @@ namespace Orleans.Hosting
             }
             return services.AddSingletonNamedService<IGrainStorage>(name, MigrationAzureBlobGrainStorageFactory.Create)
                            .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
-        }
-
-        /// <summary>
-        /// Use Azure Table Storage for migrated Reminder's data and current data.
-        /// </summary>
-        public static ISiloBuilder UseMigrationAzureTableReminderStorage(
-            this ISiloBuilder builder,
-            Action<AzureTableReminderStorageOptions> configureStorageOptions,
-            Action<AzureTableMigrationReminderStorageOptions> configureMigratedStorageOptions)
-        {
-            return builder.ConfigureServices(services => services.UseMigrationAzureTableReminderStorage(configureStorageOptions, configureMigratedStorageOptions));
-        }
-
-        /// <summary>
-        /// Use Azure Table Storage for migrated Reminder's data and current data
-        /// </summary>
-        public static IServiceCollection UseMigrationAzureTableReminderStorage(
-            this IServiceCollection services,
-            Action<AzureTableReminderStorageOptions> configureStorageOptions,
-            Action<AzureTableMigrationReminderStorageOptions> configureMigratedStorageOptions)
-        {
-            services.AddSingleton<IReminderTable, MigrationAzureTableReminderStorage>();
-            services.Configure<AzureTableReminderStorageOptions>(configureStorageOptions);
-            services.Configure<AzureTableMigrationReminderStorageOptions>(configureMigratedStorageOptions);
-            services.ConfigureFormatter<AzureTableReminderStorageOptions>();
-
-            return services;
         }
     }
 }

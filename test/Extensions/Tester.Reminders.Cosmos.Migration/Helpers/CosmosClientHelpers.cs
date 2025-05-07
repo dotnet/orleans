@@ -1,14 +1,18 @@
-using Azure.Identity;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
-using Microsoft.Extensions.Options;
 using Orleans.Persistence.Cosmos;
+using Orleans.Reminders.Cosmos.Migration;
 using TestExtensions;
 
-namespace Tester.AzureUtils.Migration.Helpers
+namespace Tester.Reminders.Cosmos.Migration.Helpers
 {
     internal static class CosmosClientHelpers
     {
-        public static void ConfigureCosmosStorageOptions(this CosmosGrainStorageOptions options)
+        public static void ConfigureCosmosStorageOptions(this CosmosReminderTableOptions options)
         {
 #if DEBUG
             options.ConfigureCosmosClient(accountEndpoint: TestDefaultConfiguration.CosmosDbEndpoint, tokenCredential: TestDefaultConfiguration.TokenCredential);

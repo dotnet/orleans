@@ -28,4 +28,8 @@
     <PackageReference Include="Azure.Core" Version="$(AzureCoreVersion)" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tester.Reminders.Cosmos.Migration"/>
+  </ItemGroup>
+
 </Project>
