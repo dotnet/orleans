@@ -1,7 +1,8 @@
-using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Orleans.Metadata;
 using Orleans.Runtime;
+using System;
+using System.Collections.Concurrent;
 using GrainTypeResolver = Orleans.Metadata.GrainTypeResolver;
 
 namespace Orleans.Persistence.Migration
@@ -104,7 +105,7 @@ namespace Orleans.Persistence.Migration
 
         public Type ResolveInterfaceType(string grainType, string keyStr, string interfaceTypeName)
         {
-            if (!_grainTypeManager.ClusterGrainInterfaceMap.interfaceTypeIdMap.TryGetValue(interfaceTypeName, out var interfaceId))
+            if (!CurrentGrainInterfaceMap.InterfaceTypeIdMap.TryGetValue(interfaceTypeName, out var interfaceId))
             {
                 throw new ArgumentException($"Interface type '{interfaceTypeName}' not found at {nameof(_grainTypeManager.ClusterGrainInterfaceMap)}.");
             }
