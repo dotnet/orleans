@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -24,11 +25,12 @@ using Orleans.Hosting;
 using Orleans.Runtime.TestHooks;
 using Orleans.Configuration.Internal;
 using Orleans.TestingHost.Logging;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.TestingHost;
 
 /// <summary>
-/// A host class for local testing with Orleans using in-process silos. 
+/// A host class for local testing with Orleans using in-process silos.
 /// </summary>
 public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
 {
@@ -39,6 +41,9 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     private readonly InProcessMembershipTable _membershipTable;
     private bool _disposed;
     private int _startedInstances;
+
+    // Multi-client support
+    private readonly Dictionary<string, IHost> _clientHosts = new();
 
     /// <summary>
     /// Collection of all known silos.
@@ -57,7 +62,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <summary>
     /// Options used to configure the test cluster.
     /// </summary>
-    /// <remarks>This is the options you configured your test cluster with, or the default one. 
+    /// <remarks>This is the options you configured your test cluster with, or the default one.
     /// If the cluster is being configured via ClusterConfiguration, then this object may not reflect the true settings.
     /// </remarks>
     public InProcessTestClusterOptions Options { get; }
@@ -65,22 +70,40 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <summary>
     /// The internal client interface.
     /// </summary>
-    internal IHost ClientHost { get; private set; }
+    internal IHost? ClientHost
+    {
+        get
+        {
+            _clientHosts.TryGetValue("default", out var clientHost);
+            return clientHost;
+        }
+        set
+        {
+            if (value is null)
+            {
+                _clientHosts.Remove("default");
+            }
+            else
+            {
+                _clientHosts["default"] = value;
+            }
+        }
+    }
 
     /// <summary>
     /// The internal client interface.
     /// </summary>
-    internal IInternalClusterClient InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>();
+    internal IInternalClusterClient InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>() ?? throw new InvalidOperationException("Client not initialized");
 
     /// <summary>
     /// The client.
     /// </summary>
-    public IClusterClient Client => ClientHost?.Services.GetRequiredService<IInternalClusterClient>();
+    public IClusterClient Client => ClientHost?.Services.GetRequiredService<IInternalClusterClient>() ?? throw new InvalidOperationException("Client not initialized");
 
     /// <summary>
     /// The port allocator.
     /// </summary>
-    public ITestClusterPortAllocator PortAllocator { get; }
+    public ITestClusterPortAllocator? PortAllocator { get; }
 
     /// <summary>
     /// Configures the test cluster plus client in-process.
@@ -100,7 +123,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// </summary>
     /// <param name="silo">The silo process to the the service provider for.</param>
     /// <remarks>If <paramref name="silo"/> is <see langword="null"/> one of the existing silos will be picked randomly.</remarks>
-    public IServiceProvider GetSiloServiceProvider(SiloAddress silo = null)
+    public IServiceProvider GetSiloServiceProvider(SiloAddress? silo = null)
     {
         if (silo != null)
         {
@@ -231,7 +254,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// </summary>
     /// <param name="siloAddress">Silo address to be found.</param>
     /// <returns>SiloHandle of the appropriate silo, or <c>null</c> if not found.</returns>
-    public InProcessSiloHandle GetSiloForAddress(SiloAddress siloAddress)
+    public InProcessSiloHandle? GetSiloForAddress(SiloAddress siloAddress)
     {
         var activeSilos = GetActiveSilos().ToList();
         var ret = activeSilos.Find(s => s.SiloAddress.Equals(siloAddress));
@@ -474,7 +497,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// Do a Stop or Kill of the specified silo, followed by a restart.
     /// </summary>
     /// <param name="instance">Silo to be restarted.</param>
-    public async Task<InProcessSiloHandle> RestartSiloAsync(InProcessSiloHandle instance)
+    public async Task<InProcessSiloHandle?> RestartSiloAsync(InProcessSiloHandle? instance)
     {
         if (instance != null)
         {
@@ -520,10 +543,17 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             await StopClusterClientAsync();
         }
 
+        var clientHost = CreateClientHost("default");
+        ClientHost = clientHost;
+        await ClientHost.StartAsync();
+    }
+
+    private IHost CreateClientHost(string name)
+    {
         var hostBuilder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
         {
             EnvironmentName = Environments.Development,
-            ApplicationName = "TestClusterClient",
+            ApplicationName = $"Client_{name}",
             DisableDefaults = true,
         });
 
@@ -548,10 +578,50 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             clientBuilder.UseInMemoryConnectionTransport(_transportHub);
         });
 
-        TryConfigureFileLogging(Options, hostBuilder.Services, "TestClusterClient");
+        TryConfigureFileLogging(Options, hostBuilder.Services, $"Client_{name}");
 
-        ClientHost = hostBuilder.Build();
-        await ClientHost.StartAsync();
+        var clientHost = hostBuilder.Build();
+        return clientHost;
+    }
+
+    /// <summary>
+    /// Gets a client by name, or null if not found.
+    /// </summary>
+    public IClusterClient? GetClient(string name)
+    {
+        if (_clientHosts.TryGetValue(name, out var host))
+        {
+            return host.Services.GetRequiredService<IInternalClusterClient>();
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Gets the client with the given name, creating a new client if none exists with that name.
+    /// </summary>
+    public async Task<IClusterClient> GetClientAsync(string name, Action<IHostApplicationBuilder>? configure = null)
+    {
+        if (!_clientHosts.TryGetValue(name, out var host))
+        {
+            host = CreateClientHost(name);
+            _clientHosts[name] = host;
+            await host.StartAsync();
+        }
+
+        return host.Services.GetRequiredService<IInternalClusterClient>();
+    }
+
+    /// <summary>
+    /// Removes and disposes a client by name.
+    /// </summary>
+    public async Task RemoveClientAsync(string name)
+    {
+        if (_clientHosts.Remove(name, out var host))
+        {
+            await host.StopAsync();
+            await DisposeAsync(host);
+        }
     }
 
     private async Task InitializeAsync()
@@ -767,6 +837,12 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             await DisposeAsync(ClientHost).ConfigureAwait(false);
             ClientHost = null;
 
+            foreach (var clientHost in _clientHosts.Values)
+            {
+                await DisposeAsync(clientHost).ConfigureAwait(false);
+            }
+            _clientHosts.Clear();
+
             PortAllocator?.Dispose();
         });
 
@@ -787,12 +863,19 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         }
 
         ClientHost?.Dispose();
+
+        foreach (var clientHost in _clientHosts.Values)
+        {
+            clientHost.Dispose();
+        }
+        _clientHosts.Clear();
+
         PortAllocator?.Dispose();
 
         _disposed = true;
     }
 
-    private static async Task DisposeAsync(IDisposable value)
+    private static async Task DisposeAsync(IDisposable? value)
     {
         if (value is IAsyncDisposable asyncDisposable)
         {

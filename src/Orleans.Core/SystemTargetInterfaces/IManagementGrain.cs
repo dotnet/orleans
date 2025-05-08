@@ -141,6 +141,13 @@ namespace Orleans.Runtime
         /// <param name="hostsIds">The hosts to invoke the operation on.</param>
         /// <returns>A task representing the work performed.</returns>
         ValueTask ResetGrainCallFrequencies(SiloAddress[] hostsIds = null);
+
+        /// <summary>
+        /// Instructs all gateways to drop defunct (disconnected and expired) clients.
+        /// </summary>
+        /// <param name="excludeRecent">If true, only clients that have been disconnected for longer than the configured client expiration time will be dropped.</param>
+        /// <returns>A task representing the work performed.</returns>
+        Task DropDisconnectedClients(bool excludeRecent);
     }
 
     /// <summary>
