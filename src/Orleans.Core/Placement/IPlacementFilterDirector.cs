@@ -7,5 +7,5 @@ namespace Orleans.Placement;
 
 public interface IPlacementFilterDirector
 {
-    IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementFilterContext context, IEnumerable<SiloAddress> silos);
+    IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, IEnumerable<SiloAddress> silos);
 }
