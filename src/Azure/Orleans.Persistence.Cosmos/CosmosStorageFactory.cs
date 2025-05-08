@@ -45,9 +45,7 @@ public static class CosmosStorageFactory
 
         if (options.UseOrleansCustomSerialization)
         {
-            var migrationSerializerOptions =
-                services.GetServiceByName<IOptions<OrleansJsonSerializerOptions>>(name)?.Value
-                ?? services.GetRequiredService<IOptions<OrleansJsonSerializerOptions>>().Value;
+            var migrationSerializerOptions = new OrleansJsonSerializerOptions();
 
             // orleans 7.x+ does not use type handling by default
             migrationSerializerOptions.JsonSerializerSettings.TypeNameHandling = Newtonsoft.Json.TypeNameHandling.None;
