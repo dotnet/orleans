@@ -47,20 +47,6 @@ namespace Tester.AzureUtils.Migration.Units
         }
 
         [Theory]
-        [MemberData(nameof(TestUniqueKeys))]
-        internal void UniqueKey_RoundtripSerialization(UniqueKey uniqueKey)
-        {
-            var serialized = this.serializer.Serialize(uniqueKey, typeof(UniqueKey));
-            Assert.NotEmpty(serialized);
-
-            var deserialized = (UniqueKey)this.serializer.Deserialize(typeof(UniqueKey), serialized);
-            Assert.Equal(uniqueKey.N0, deserialized.N0);
-            Assert.Equal(uniqueKey.N1, deserialized.N1);
-            Assert.Equal(uniqueKey.TypeCodeData, deserialized.TypeCodeData);
-            Assert.Equal(uniqueKey.KeyExt, deserialized.KeyExt);
-        }
-
-        [Theory]
         [MemberData(nameof(TestMembershipVersions))]
         internal void MembershipVersion_RoundtripSerialization(MembershipVersion membershipVersion)
         {
@@ -82,26 +68,9 @@ namespace Tester.AzureUtils.Migration.Units
             Assert.Equal(siloAddress.ToLongString(), deserialized.ToLongString());
         }
 
-        [Theory]
-        [MemberData(nameof(TestActivationIds))]
-        internal void ActivationId_RoundtripSerialization(ActivationId activationId)
-        {
-            var serialized = this.serializer.Serialize(activationId, typeof(ActivationId));
-            Assert.NotEmpty(serialized);
-
-            var deserialized = (ActivationId)this.serializer.Deserialize(typeof(ActivationId), serialized);
-            Assert.Equal(activationId.Key, deserialized.Key);
-            Assert.Equal(activationId, deserialized);
-        }
-
         public static IEnumerable<object[]> TestIpEndpoints => new List<object[]>
         {
             new object[] { new IPEndPoint(IPAddress.Any, 12345) },
-        };
-
-        public static IEnumerable<object[]> TestUniqueKeys => new List<object[]>
-        {
-            new object[] { Orleans.Runtime.UniqueKey.NewKey() }
         };
 
         public static IEnumerable<object[]> TestMembershipVersions => new List<object[]>
@@ -114,15 +83,6 @@ namespace Tester.AzureUtils.Migration.Units
         {
             new object[] { SiloAddress.New(new IPEndPoint(IPAddress.Any, port: 5000), gen: 3) },
             new object[] { SiloAddress.Zero }
-        };
-
-        public static IEnumerable<object[]> TestActivationIds => new List<object[]>
-        {
-            new object[] { ActivationId.NewId() },
-            new object[] { ActivationId.GetActivationId(UniqueKey.NewKey()) },
-            new object[] { ActivationId.GetActivationId(UniqueKey.NewKey(123 /* long */)) },
-            new object[] { ActivationId.GetActivationId(UniqueKey.NewKey(Guid.NewGuid() /* guid */)) },
-            new object[] { ActivationId.GetActivationId(UniqueKey.NewKey(n0: 1, n1: 2, typeCodeData: 123, keyExt: "ext")) },
         };
     }
 }

@@ -5,6 +5,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Persistence.Cosmos.Serialization;
 using Orleans.Persistence.Cosmos.TypeInfo;
+using Orleans.Persistence.Migration.Serialization;
 using Orleans.Storage;
 
 namespace Orleans.Persistence.Cosmos;
@@ -44,9 +45,18 @@ public static class CosmosStorageFactory
 
         if (options.UseOrleansCustomSerialization)
         {
-            options.ClientOptions ??= new();
-            var grainStorageSerializer = services.GetRequiredService<IGrainStorageSerializer>();
+            var migrationSerializerOptions =
+                services.GetServiceByName<IOptions<OrleansJsonSerializerOptions>>(name)?.Value
+                ?? services.GetRequiredService<IOptions<OrleansJsonSerializerOptions>>().Value;
+
+            // orleans 7.x+ does not use type handling by default
+            migrationSerializerOptions.JsonSerializerSettings.TypeNameHandling = Newtonsoft.Json.TypeNameHandling.None;
+            migrationSerializerOptions.JsonSerializerSettings.PreserveReferencesHandling = Newtonsoft.Json.PreserveReferencesHandling.None;
+
+            var grainStorageSerializer = new JsonGrainStorageSerializer(new OrleansMigrationJsonSerializer(migrationSerializerOptions));
             var customSerializer = new OrleansCosmosSerializer(grainStorageSerializer);
+
+            options.ClientOptions ??= new();
             options.ClientOptions.Serializer = customSerializer;
         }
 

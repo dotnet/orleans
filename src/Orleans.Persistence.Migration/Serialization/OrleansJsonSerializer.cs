@@ -25,8 +25,16 @@ namespace Orleans.Persistence.Migration.Serialization
         /// Initializes a new instance of the <see cref="OrleansMigrationJsonSerializer"/> class.
         /// </summary>
         public OrleansMigrationJsonSerializer(IOptions<OrleansJsonSerializerOptions> options)
+            : this(options.Value)
         {
-            this.settings = options.Value.JsonSerializerSettings;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="OrleansMigrationJsonSerializer"/> class.
+        /// </summary>
+        public OrleansMigrationJsonSerializer(OrleansJsonSerializerOptions options)
+        {
+            this.settings = options.JsonSerializerSettings;
         }
 
         /// <summary>
@@ -75,33 +83,6 @@ namespace Orleans.Persistence.Migration.Serialization
         {
             JToken token = JToken.Load(reader);
             return IPAddress.Parse(token.Value<string>());
-        }
-    }
-
-    /// <summary>
-    /// <see cref="Newtonsoft.Json.JsonConverter" /> implementation for <see cref="ActivationId"/>.
-    /// </summary>
-    /// <seealso cref="Newtonsoft.Json.JsonConverter" />
-    public class ActivationIdConverter : JsonConverter
-    {
-        /// <inheritdoc/>
-        public override bool CanConvert(Type objectType) => objectType == typeof(ActivationId);
-
-        /// <inheritdoc/>
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-        {
-            ActivationId id = (ActivationId)value;
-            writer.WriteValue(id.Key.ToString());
-        }
-
-        /// <inheritdoc/>
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-        {
-            return reader.Value switch
-            {
-                string { Length: > 0 } str => ActivationId.GetActivationId(UniqueKey.Parse(str)),
-                _ => default
-            };
         }
     }
 
@@ -164,37 +145,6 @@ namespace Orleans.Persistence.Migration.Serialization
                 long l => new MembershipVersion(l),
                 _ => default
             };
-        }
-    }
-
-    /// <summary>
-    /// <see cref="Newtonsoft.Json.JsonConverter" /> implementation for <see cref="UniqueKey"/>.
-    /// </summary>
-    /// <seealso cref="Newtonsoft.Json.JsonConverter" />
-    public class UniqueKeyConverter : JsonConverter
-    {
-        /// <inheritdoc/>
-        public override bool CanConvert(Type objectType)
-        {
-            return (objectType == typeof(UniqueKey));
-        }
-
-        /// <inheritdoc/>
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-        {
-            UniqueKey key = (UniqueKey)value;
-            writer.WriteStartObject();
-            writer.WritePropertyName("UniqueKey");
-            writer.WriteValue(key.ToHexString());
-            writer.WriteEndObject();
-        }
-
-        /// <inheritdoc/>
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-        {
-            JObject jo = JObject.Load(reader);
-            UniqueKey addr = UniqueKey.Parse(jo["UniqueKey"].ToObject<string>().AsSpan());
-            return addr;
         }
     }
 

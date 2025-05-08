@@ -50,6 +50,7 @@ public class CosmosGrainStorageOptions : CosmosOptions
     /// <summary>
     /// Will override the default cosmos serializer.
     /// Contains special converters for GrainReferences and other Orleans entities.
+    /// Is turned on by default.
     /// </summary>
-    public bool UseOrleansCustomSerialization { get; set; } = false;
+    public bool UseOrleansCustomSerialization { get; set; } = true;
 }

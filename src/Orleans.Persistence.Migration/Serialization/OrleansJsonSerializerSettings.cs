@@ -18,7 +18,6 @@ namespace Orleans.Persistence.Migration.Serialization
                 MissingMemberHandling = MissingMemberHandling.Ignore,
                 NullValueHandling = NullValueHandling.Ignore,
                 ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
-                TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple,
                 Formatting = Formatting.None,
                 SerializationBinder = null,
             };
@@ -40,18 +39,13 @@ namespace Orleans.Persistence.Migration.Serialization
 
         internal static void Configure(IServiceProvider services, JsonSerializerSettings jsonSerializerSettings)
         {
-            //if (jsonSerializerSettings.SerializationBinder == null)
-            //{
-            //    var typeResolver = services.GetRequiredService<TypeResolver>();
-            //    jsonSerializerSettings.SerializationBinder = new OrleansJsonSerializationBinder(typeResolver);
-            //}
+            // ActivationId and UniqueKey are different from Orleans7.x format; and we dont expect them be written here
+            // because this serializer **only** represents migrated format.
 
             jsonSerializerSettings.Converters.Add(new IPAddressConverter());
             jsonSerializerSettings.Converters.Add(new IPEndPointConverter());
-            jsonSerializerSettings.Converters.Add(new ActivationIdConverter());
             jsonSerializerSettings.Converters.Add(new SiloAddressJsonConverter());
             jsonSerializerSettings.Converters.Add(new MembershipVersionJsonConverter());
-            jsonSerializerSettings.Converters.Add(new UniqueKeyConverter());
             jsonSerializerSettings.Converters.Add(ActivatorUtilities.CreateInstance<GrainReferenceJsonConverter>(services));
         }
 
