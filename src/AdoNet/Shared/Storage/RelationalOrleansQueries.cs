@@ -14,8 +14,9 @@ namespace Orleans.Persistence.AdoNet.Storage
 #elif REMINDERS_ADONET
 namespace Orleans.Reminders.AdoNet.Storage
 #elif STREAMING_ADONET
-
 namespace Orleans.Streaming.AdoNet.Storage
+#elif TRANSACTIONS_ADONET
+namespace Orleans.Transactions.AdoNet.Storage
 #elif TESTER_SQLUTILS
 using Orleans.Streaming.AdoNet;
 namespace Orleans.Tests.SqlUtils
