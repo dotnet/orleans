@@ -5,9 +5,6 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{4CD3AA9E-D937-48CA-BB6C-158E12257D23}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{A6573187-FD0D-4DF7-91D1-03E07E470C0A}"
-	ProjectSection(SolutionItems) = preProject
-		OrleansTestSecrets.json = OrleansTestSecrets.json
-	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Benchmarks", "Benchmarks", "{2CAB7894-777C-42B1-8B1E-322868CE92C7}"
 EndProject
