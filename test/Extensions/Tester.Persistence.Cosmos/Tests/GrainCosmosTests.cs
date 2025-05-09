@@ -1,17 +1,14 @@
 using Microsoft.Azure.Cosmos;
 using Orleans;
-using Orleans.Persistence.Migration;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Tester.AzureUtils.Migration;
 using Tester.AzureUtils.Migration.Abstractions;
 using Tester.AzureUtils.Migration.Grains;
 using Tester.AzureUtils.Migration.Helpers;
-using Tester.Reminders.Cosmos.Migration.Setup;
-using UnitTests.GrainInterfaces;
 using Xunit;
 
-namespace Tester.Reminders.Cosmos.Migration.Tests;
+namespace Tester.Persistence.Cosmos.Tests;
 
 public abstract class GrainCosmosTests : MigrationBaseTests
 {

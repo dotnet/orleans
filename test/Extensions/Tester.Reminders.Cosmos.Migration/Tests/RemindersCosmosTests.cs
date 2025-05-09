@@ -1,11 +1,10 @@
 using Orleans;
-using Orleans.Persistence.Migration;
 using Orleans.Runtime;
 using Tester.AzureUtils.Migration.Abstractions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
-namespace Tester.Reminders.Cosmos.Migration.Tests;
+namespace Tester.Reminders.Cosmos.Tests;
 
 public abstract class RemindersCosmosTests : MigrationBaseTests
 {

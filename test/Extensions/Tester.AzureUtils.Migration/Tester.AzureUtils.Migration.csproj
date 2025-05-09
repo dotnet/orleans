@@ -32,7 +32,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Tester.Persistence.Cosmos" />
-    <InternalsVisibleTo Include="Tester.Reminders.Cosmos.Migration" />
+    <InternalsVisibleTo Include="Tester.Reminders.Cosmos" />
   </ItemGroup>
 
 </Project>

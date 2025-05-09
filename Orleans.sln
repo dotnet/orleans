@@ -231,9 +231,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Persistence.Cosmos"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestGrainsNet8", "test\Grains\TestGrainsNet8\TestGrainsNet8.csproj", "{3E88D0C9-9AEB-41FD-BCF5-81FDB15A4C4C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Reminders.Cosmos.Migration", "src\Azure\Orleans.Reminders.Cosmos.Migration\Orleans.Reminders.Cosmos.Migration.csproj", "{2EF759C0-F515-AD42-12DE-6DB2CA58F494}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Reminders.Cosmos", "src\Azure\Orleans.Reminders.Cosmos\Orleans.Reminders.Cosmos.csproj", "{2EF759C0-F515-AD42-12DE-6DB2CA58F494}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tester.Reminders.Cosmos.Migration", "test\Extensions\Tester.Reminders.Cosmos.Migration\Tester.Reminders.Cosmos.Migration.csproj", "{D65B23B5-CA1D-4CF7-9A0E-20B02A771C53}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tester.Reminders.Cosmos", "test\Extensions\Tester.Reminders.Cosmos.Migration\Tester.Reminders.Cosmos.csproj", "{D65B23B5-CA1D-4CF7-9A0E-20B02A771C53}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tester.Persistence.Cosmos", "test\Extensions\Tester.Persistence.Cosmos\Tester.Persistence.Cosmos.csproj", "{97E90AB7-69B8-4347-9F84-DE3B30A62FCD}"
 EndProject

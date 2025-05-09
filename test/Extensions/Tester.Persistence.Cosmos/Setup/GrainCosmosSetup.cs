@@ -1,18 +1,15 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
-using Orleans.Persistence.AzureStorage.Migration;
-using Orleans.Persistence.AzureStorage.Migration.Reminders;
+using Tester.Persistence.Cosmos.Tests;
 using Orleans.Persistence.Cosmos;
 using Orleans.Persistence.Cosmos.DocumentIdProviders;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
-using Tester.Reminders.Cosmos.Migration.Tests;
 using Tester.AzureUtils.Migration.Helpers;
 using Xunit;
-using TesterInternal.AzureInfra;
 using Resources = Tester.AzureUtils.Migration.Resources;
 
-namespace Tester.Reminders.Cosmos.Migration.Setup
+namespace Tester.Persistence.Cosmos.Setup
 {
     [TestCategory("Functional"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("Reminders"), TestCategory("Cosmos")]
     public class GrainCosmosSetup : GrainCosmosTests, IClassFixture<GrainCosmosSetup.Fixture>

@@ -9,7 +9,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("NonSilo.Tests")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
 [assembly: InternalsVisibleTo("Tester.AdoNet")]
-[assembly: InternalsVisibleTo("Tester.Reminders.Cosmos.Migration")]
+[assembly: InternalsVisibleTo("Tester.Reminders.Cosmos")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
 
