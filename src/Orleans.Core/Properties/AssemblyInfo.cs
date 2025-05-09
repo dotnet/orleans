@@ -22,7 +22,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Tester.AzureUtils.Migration")]
 [assembly: InternalsVisibleTo("Tester.AdoNet")]
 [assembly: InternalsVisibleTo("Tester.ZooKeeperUtils")]
-[assembly: InternalsVisibleTo("Tester.Reminders.Cosmos.Migration")]
+[assembly: InternalsVisibleTo("Tester.Reminders.Cosmos")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("TestExtensions")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]

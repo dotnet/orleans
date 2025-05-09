@@ -1,5 +1,4 @@
 using Orleans.Hosting;
-using Orleans.Persistence.Cosmos.Migration;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
 using Tester.AzureUtils.Migration.Abstractions;
@@ -60,7 +59,7 @@ namespace Tester.AzureUtils.Migration
                         options.ConfigureTestDefaults();
                         options.TableName = $"source1{RandomIdentifier}";
                     })
-                    .AddMigrationAzureCosmosGrainStorage(Destination1, options =>
+                    .AddCosmosGrainStorage(Destination1, options =>
                     {
                         options.ConfigureCosmosStorageOptions();
 
@@ -82,7 +81,7 @@ namespace Tester.AzureUtils.Migration
                         options.ConfigureTestDefaults();
                         options.TableName = $"source2{RandomIdentifier}";
                     })
-                    .AddMigrationAzureCosmosGrainStorage(Destination2, options =>
+                    .AddCosmosGrainStorage(Destination2, options =>
                     {
                         options.ConfigureCosmosStorageOptions();
 

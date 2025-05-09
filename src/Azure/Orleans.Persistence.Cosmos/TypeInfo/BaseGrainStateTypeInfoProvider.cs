@@ -1,27 +1,19 @@
-using System;
 using System.Collections.Concurrent;
-using System.Reflection;
-using System.Threading.Tasks;
-using Orleans.Persistence.Cosmos.TypeInfo;
-using Orleans.Persistence.Migration;
 using Orleans.Runtime;
 
-namespace Orleans.Persistence.Cosmos.Migration
+namespace Orleans.Persistence.Cosmos.TypeInfo
 {
-    internal class ReferenceExtractorGrainStateTypeInfoProvider : IGrainStateTypeInfoProvider
+    internal abstract class BaseGrainStateTypeInfoProvider : IGrainStateTypeInfoProvider
     {
-        private readonly IGrainReferenceExtractor grainReferenceExtractor;
-        private readonly CosmosGrainStorageOptions options;
+        protected readonly CosmosGrainStorageOptions options;
+        private readonly ConcurrentDictionary<(ulong grainTypeCode, Type stateType), GrainStateTypeInfo> grainStateTypeInfo = new();
 
-        public ReferenceExtractorGrainStateTypeInfoProvider(
-            IGrainReferenceExtractor grainReferenceExtractor,
-            CosmosGrainStorageOptions options)
+        protected BaseGrainStateTypeInfoProvider(CosmosGrainStorageOptions options)
         {
-            this.grainReferenceExtractor = grainReferenceExtractor;
             this.options = options;
         }
 
-        private readonly ConcurrentDictionary<(ulong grainTypeCode, Type stateType), GrainStateTypeInfo> grainStateTypeInfo = new();
+        protected abstract (Type grainClass, string grainTypeName, Func<GrainReference, string> grainKeyFormatter) GetGrainTypeInfo(GrainReference grainReference);
 
         public GrainStateTypeInfo GetGrainStateTypeInfo(CosmosGrainStorage grainStorage, GrainReference grainReference, IGrainState grainState)
         {
@@ -35,18 +27,14 @@ namespace Orleans.Persistence.Cosmos.Migration
             var grainStateType = grainState.Type;
             if (!this.grainStateTypeInfo.TryGetValue((typeCode, grainStateType), out var grainStateTypeInfo))
             {
-                // grainState.Type does not have a proper type -> we need to separately call extractor to find out a proper type
-                var grainClass = grainReferenceExtractor.ExtractType(grainReference);
+                var (grainClass, grainTypeName, grainKeyFormatter) = GetGrainTypeInfo(grainReference);
 
-                var grainTypeName = GrainTypeResolver.GetGrainTypeByConvention(grainClass, forceGrainTypeAttribute: options?.ForceGrainTypeAttribute);
-                var grainKeyFormatter = GrainStateTypeInfo.GetGrainKeyFormatter(grainClass);
-
+                // Create methods for reading/writing/clearing the state based on the grain state type.
                 var readStateFunc = CosmosGrainStorage.ReadStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(grainStorage);
                 var writeStateFunc = CosmosGrainStorage.WriteStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(grainStorage);
                 var clearStateFunc = CosmosGrainStorage.ClearStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(grainStorage);
 
                 var overrideStateName = DetermineOverrideStateName(grainClass);
-
                 grainStateTypeInfo
                     = this.grainStateTypeInfo[(typeCode, grainStateType)]
                     = new GrainStateTypeInfo(overrideStateName, grainTypeName, grainKeyFormatter, readStateFunc, writeStateFunc, clearStateFunc);

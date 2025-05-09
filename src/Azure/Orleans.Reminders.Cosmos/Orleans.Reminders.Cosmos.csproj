@@ -8,8 +8,8 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <AssemblyName>Orleans.Reminders.Cosmos.Migration</AssemblyName>
-    <RootNamespace>Orleans.Reminders.Cosmos.Migration</RootNamespace>
+    <AssemblyName>Orleans.Reminders.Cosmos</AssemblyName>
+    <RootNamespace>Orleans.Reminders.Cosmos</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <DefineConstants>$(DefineConstants);ORLEANS_REMINDERS</DefineConstants>
   </PropertyGroup>
@@ -27,7 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Tester.Reminders.Cosmos.Migration"/>
+    <InternalsVisibleTo Include="Tester.Reminders.Cosmos"/>
   </ItemGroup>
 
 </Project>

@@ -1,10 +1,9 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Persistence.Cosmos;
-using Orleans.Reminders.Cosmos.Migration;
+using Orleans.Reminders.Cosmos;
 using Orleans.Runtime;
 
 namespace Orleans.Hosting;

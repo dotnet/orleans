@@ -1,10 +1,10 @@
 using System;
 using System.Text.Json.Serialization;
 using Newtonsoft.Json;
-using Orleans.Reminders.Cosmos.Migration.Shared;
+using Orleans.Reminders.Cosmos.Shared;
 using Orleans.Runtime;
 
-namespace Orleans.Reminders.Cosmos.Migration.Models;
+namespace Orleans.Reminders.Cosmos.Models;
 
 internal abstract class BaseEntity
 {

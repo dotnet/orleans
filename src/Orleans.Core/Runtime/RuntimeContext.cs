@@ -24,7 +24,10 @@ namespace Orleans.Runtime
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void ResetExecutionContext()
         {
-            context.GrainContext = null;
+            if (context is not null)
+            {
+                context.GrainContext = null;
+            }
         }
 
         public override string ToString() => $"RuntimeContext: GrainContext={GrainContext?.ToString() ?? "null"}";
