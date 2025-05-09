@@ -1,5 +1,4 @@
 using Orleans.Hosting;
-using Orleans.Persistence.Cosmos.Migration;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
 using Tester.AzureUtils.Migration.Abstractions;
@@ -58,9 +57,10 @@ namespace Tester.AzureUtils.Migration
                         options.ConfigureTestDefaults();
                         options.TableName = $"source{RandomIdentifier}";
                     })
-                    .AddMigrationAzureCosmosGrainStorage(DestinationStorageName, options =>
+                    .AddCosmosGrainStorage(DestinationStorageName, options =>
                     {
-                        // to make serialization of grainRef in grainState work
+                        // to make serialization of grainRef in grainState work.
+                        // it is enabled by default, but showing that this is a test dependency here
                         options.UseOrleansCustomSerialization = true;
 
                         options.ConfigureCosmosStorageOptions();

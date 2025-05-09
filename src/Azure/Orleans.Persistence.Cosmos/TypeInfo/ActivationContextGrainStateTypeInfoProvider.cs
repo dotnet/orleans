@@ -1,53 +1,33 @@
 using System.Collections.Concurrent;
-using System.Reflection;
 
 namespace Orleans.Persistence.Cosmos.TypeInfo
 {
-    internal class ActivationContextGrainStateTypeInfoProvider : IGrainStateTypeInfoProvider
+    internal class ActivationContextGrainStateTypeInfoProvider : BaseGrainStateTypeInfoProvider
     {
         private readonly ConcurrentDictionary<(ulong grainTypeCode, Type stateType), GrainStateTypeInfo> grainStateTypeInfo = new();
         private readonly IGrainActivationContextAccessor contextAccessor;
-        private readonly CosmosGrainStorageOptions options;
 
         public ActivationContextGrainStateTypeInfoProvider(
             IGrainActivationContextAccessor contextAccessor,
             CosmosGrainStorageOptions options)
+            : base(options)
         {
             this.contextAccessor = contextAccessor;
-            this.options = options;
         }
 
-        public GrainStateTypeInfo GetGrainStateTypeInfo(CosmosGrainStorage grainStorage, GrainReference grainReference, IGrainState grainState)
+        protected override (Type grainClass, string grainTypeName, Func<GrainReference, string> grainKeyFormatter) GetGrainTypeInfo(GrainReference grainReference)
         {
-            var keyInfo = grainReference.ToKeyInfo();
-            var (_, _, typeCode, _) = keyInfo.Key;
-            if (!string.IsNullOrEmpty((string?)keyInfo.GenericArgument))
+            var grainContext = this.contextAccessor.GrainActivationContext;
+            if (grainContext is null)
             {
-                throw new InvalidOperationException($"Generic grain types are not supported by this provider. Grain: '{grainReference}'.");
+                throw new InvalidOperationException($"'{nameof(IGrainActivationContextAccessor)}.{nameof(IGrainActivationContextAccessor.GrainActivationContext)}' is not initialized. This likely indicates a concurrency issue, such as attempting to access storage from a non-grain thread.");
             }
 
-            var grainStateType = grainState.Type;
-            if (!this.grainStateTypeInfo.TryGetValue((typeCode, grainStateType), out var grainStateTypeInfo))
-            {
-                var grainContext = this.contextAccessor.GrainActivationContext;
-                if (grainContext is null)
-                {
-                    throw new InvalidOperationException($"'{nameof(IGrainActivationContextAccessor)}.{nameof(IGrainActivationContextAccessor.GrainActivationContext)}' is not initialized. This likely indicates a concurrency issue, such as attempting to access storage from a non-grain thread.");
-                }
+            var grainClass = grainContext.GrainType;
+            var grainTypeName = GrainTypeResolver.GetGrainTypeByConvention(grainClass, forceGrainTypeAttribute: options?.ForceGrainTypeAttribute);
+            var grainKeyFormatter = GrainStateTypeInfo.GetGrainKeyFormatter(grainClass);
 
-                var grainClass = grainContext.GrainType;
-                var grainTypeName = GrainTypeResolver.GetGrainTypeByConvention(grainClass, forceGrainTypeAttribute: options?.ForceGrainTypeAttribute);
-                var grainKeyFormatter = GrainStateTypeInfo.GetGrainKeyFormatter(grainClass);
-
-                // Create methods for reading/writing/clearing the state based on the grain state type.
-                var readStateAsync = CosmosGrainStorage.ReadStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(grainStorage);
-                var writeStateAsync = CosmosGrainStorage.WriteStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(grainStorage);
-                var clearStateAsync = CosmosGrainStorage.ClearStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(grainStorage);
-
-                grainStateTypeInfo = this.grainStateTypeInfo[(typeCode, grainStateType)] = new(grainTypeName, grainKeyFormatter, readStateAsync, writeStateAsync, clearStateAsync);
-            }
-
-            return grainStateTypeInfo;
+            return (grainClass, grainTypeName, grainKeyFormatter);
         }
     }
 }
