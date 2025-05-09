@@ -63,7 +63,7 @@ namespace Orleans.Streaming.EventHubs
         {
             return new CachedMessage()
             {
-                StreamId = streamPosition.StreamId, 
+                StreamId = streamPosition.StreamId,
                 SequenceNumber = queueMessage.SequenceNumber,
                 EventIndex = streamPosition.SequenceToken.EventIndex,
                 EnqueueTimeUtc = queueMessage.EnqueuedTime.UtcDateTime,
@@ -76,7 +76,7 @@ namespace Orleans.Streaming.EventHubs
         {
             StreamId streamId = this.GetStreamIdentity(queueMessage);
             StreamSequenceToken token =
-                new EventHubSequenceTokenV2(queueMessage.Offset.ToString(), queueMessage.SequenceNumber, 0);
+                new EventHubSequenceTokenV2(queueMessage.OffsetString, queueMessage.SequenceNumber, 0);
             return new StreamPosition(streamId, token);
         }
 
@@ -114,7 +114,7 @@ namespace Orleans.Streaming.EventHubs
         {
             byte[] propertiesBytes = queueMessage.SerializeProperties(this.serializer);
             var payload = queueMessage.Body.Span;
-            var offset = queueMessage.Offset.ToString();
+            var offset = queueMessage.OffsetString;
             // get size of namespace, offset, partitionkey, properties, and payload
             int size = SegmentBuilder.CalculateAppendSize(offset) +
                 SegmentBuilder.CalculateAppendSize(queueMessage.PartitionKey) +

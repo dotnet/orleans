@@ -11,6 +11,7 @@ using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Orleans.Statistics;
+using System.Globalization;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {
@@ -55,7 +56,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         }
 
         [Fact, TestCategory("BVT")]
-        public async Task EventhubQueueCache_WontPurge_WhenUnderPressure()
+        public async Task EventHubQueueCache_WontPurge_WhenUnderPressure()
         {
             InitForTesting();
             var tasks = new List<Task>();
@@ -78,7 +79,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         }
 
         [Fact, TestCategory("BVT")]
-        public async Task EventhubQueueCache_WontPurge_WhenTimePurgePredicateSaysDontPurge()
+        public async Task EventHubQueueCache_WontPurge_WhenTimePurgePredicateSaysDontPurge()
         {
             InitForTesting();
             var tasks = new List<Task>();
@@ -103,7 +104,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         }
 
         [Fact, TestCategory("BVT")]
-        public async Task EventhubQueueCache_WillPurge_WhenTimePurgePredicateSaysPurge_And_NotUnderPressure()
+        public async Task EventHubQueueCache_WillPurge_WhenTimePurgePredicateSaysPurge_And_NotUnderPressure()
         {
             InitForTesting();
             var tasks = new List<Task>();
@@ -129,7 +130,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         }
 
         [Fact, TestCategory("BVT")]
-        public async Task EventhubQueueCache_EvictionStrategy_Behavior()
+        public async Task EventHubQueueCache_EvictionStrategy_Behavior()
         {
             InitForTesting();
             var tasks = new List<Task>();
@@ -197,7 +198,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
                 EventHubPath = this.ehSettings.Hub.EventHubName,
             };
 
-            this.receiver1 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance, 
+            this.receiver1 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
                 new DefaultEventHubReceiverMonitor(monitorDimensions), new LoadSheddingOptions(), _hostEnvironmentStatistics);
             this.receiver2 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
                 new DefaultEventHubReceiverMonitor(monitorDimensions), new LoadSheddingOptions(), _hostEnvironmentStatistics);
@@ -226,20 +227,13 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
         private static EventData MakeEventData(long sequenceNumber)
         {
-            byte[] ignore = { 12, 23 };
             var now = DateTime.UtcNow;
-            var eventData = new TestEventData(ignore,
-                offset: now.Ticks,
+            var eventData = EventHubsModelFactory.EventData(
+                eventBody: new BinaryData([12, 23]),
+                offsetString: now.Ticks.ToString(CultureInfo.InvariantCulture),
                 sequenceNumber: sequenceNumber,
                 enqueuedTime: now);
             return eventData;
-        }
-
-        private class TestEventData : EventData
-        {
-            public TestEventData(ReadOnlyMemory<byte> eventBody, IDictionary<string, object> properties = null, IReadOnlyDictionary<string, object> systemProperties = null, long sequenceNumber = long.MinValue, long offset = long.MinValue, DateTimeOffset enqueuedTime = default, string partitionKey = null) : base(eventBody, properties, systemProperties, sequenceNumber, offset, enqueuedTime, partitionKey)
-            {
-            }
         }
 
         private Task<IStreamQueueCheckpointer<string>> CheckPointerFactory(string partition)
