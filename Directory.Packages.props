@@ -3,9 +3,9 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
     <!-- Shared Package Versions -->
-    <xUnitVersion>2.5.3</xUnitVersion>
+    <xUnitVersion>2.9.3</xUnitVersion>
     <xUnitVersion Condition=" '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'netstandard2.1' ">2.4.2</xUnitVersion>
-    <xUnitRunnerVersion>2.5.3</xUnitRunnerVersion>
+    <xUnitRunnerVersion>2.8.2</xUnitRunnerVersion>
     <xUnitRunnerVersion Condition=" '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'netstandard2.1' ">2.4.5</xUnitRunnerVersion>
   </PropertyGroup>
   <ItemGroup>
