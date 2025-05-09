@@ -49,6 +49,8 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override int GetHashCode() => _value.GetHashCode();
 
+        public static implicit operator string?(GrainInterfaceType type) => type.ToString();
+
         /// <summary>
         /// Returns a UTF8 interpretation of the current instance.
         /// </summary>

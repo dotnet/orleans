@@ -16,6 +16,7 @@ using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("Orleans.Persistence.Migration")]
 [assembly: InternalsVisibleTo("Orleans.Reminders.Cosmos.Migration")]
+[assembly: InternalsVisibleTo("Tester.AzureUtils.Migration")]
 
 // Mocking libraries
 [assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]

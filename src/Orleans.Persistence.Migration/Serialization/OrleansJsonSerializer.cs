@@ -25,8 +25,16 @@ namespace Orleans.Persistence.Migration.Serialization
         /// Initializes a new instance of the <see cref="OrleansMigrationJsonSerializer"/> class.
         /// </summary>
         public OrleansMigrationJsonSerializer(IOptions<OrleansJsonSerializerOptions> options)
+            : this(options.Value)
         {
-            this.settings = options.Value.JsonSerializerSettings;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="OrleansMigrationJsonSerializer"/> class.
+        /// </summary>
+        public OrleansMigrationJsonSerializer(OrleansJsonSerializerOptions options)
+        {
+            this.settings = options.JsonSerializerSettings;
         }
 
         /// <summary>
@@ -61,9 +69,7 @@ namespace Orleans.Persistence.Migration.Serialization
     {
         /// <inheritdoc/>
         public override bool CanConvert(Type objectType)
-        {
-            return (objectType == typeof(IPAddress));
-        }
+            => objectType.IsAssignableTo(typeof(IPAddress));
 
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
@@ -77,34 +83,6 @@ namespace Orleans.Persistence.Migration.Serialization
         {
             JToken token = JToken.Load(reader);
             return IPAddress.Parse(token.Value<string>());
-        }
-    }
-
-    /// <summary>
-    /// <see cref="Newtonsoft.Json.JsonConverter" /> implementation for <see cref="ActivationId"/>.
-    /// </summary>
-    /// <seealso cref="Newtonsoft.Json.JsonConverter" />
-    public class ActivationIdConverter : JsonConverter
-    {
-        /// <inheritdoc/>
-        public override bool CanConvert(Type objectType) => objectType == typeof(ActivationId);
-
-        /// <inheritdoc/>
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-        {
-            ActivationId id = (ActivationId)value;
-            writer.WriteValue(id.Key.ToString());
-        }
-
-        /// <inheritdoc/>
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-        {
-            throw new NotImplementedException();
-            //return reader.Value switch
-            //{
-            //    string { Length: > 0 } str => ActivationId.FromParsableString(str),
-            //    _ => default
-            //};
         }
     }
 
@@ -130,17 +108,16 @@ namespace Orleans.Persistence.Migration.Serialization
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            throw new NotImplementedException();
-            //switch (reader.TokenType)
-            //{
-            //    case JsonToken.StartObject:
-            //        var jo = JObject.Load(reader);
-            //        return SiloAddress.FromParsableString(jo["SiloAddress"].ToObject<string>());
-            //    case JsonToken.String:
-            //        return SiloAddress.FromParsableString(reader.Value as string);
-            //}
+            switch (reader.TokenType)
+            {
+                case JsonToken.StartObject:
+                    var jo = JObject.Load(reader);
+                    return SiloAddress.FromParsableString(jo["SiloAddress"].ToObject<string>());
+                case JsonToken.String:
+                    return SiloAddress.FromParsableString(reader.Value as string);
+            }
 
-            //return null;
+            return null;
         }
     }
 
@@ -163,44 +140,11 @@ namespace Orleans.Persistence.Migration.Serialization
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            throw new NotImplementedException();
-            //return reader.Value switch
-            //{
-            //    long l => new MembershipVersion(l),
-            //    _ => default(MembershipVersion)
-            //};
-        }
-    }
-
-    /// <summary>
-    /// <see cref="Newtonsoft.Json.JsonConverter" /> implementation for <see cref="UniqueKey"/>.
-    /// </summary>
-    /// <seealso cref="Newtonsoft.Json.JsonConverter" />
-    public class UniqueKeyConverter : JsonConverter
-    {
-        /// <inheritdoc/>
-        public override bool CanConvert(Type objectType)
-        {
-            return (objectType == typeof(UniqueKey));
-        }
-
-        /// <inheritdoc/>
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-        {
-            UniqueKey key = (UniqueKey)value;
-            writer.WriteStartObject();
-            writer.WritePropertyName("UniqueKey");
-            writer.WriteValue(key.ToHexString());
-            writer.WriteEndObject();
-        }
-
-        /// <inheritdoc/>
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-        {
-            throw new NotImplementedException();
-            //JObject jo = JObject.Load(reader);
-            //UniqueKey addr = UniqueKey.Parse(jo["UniqueKey"].ToObject<string>().AsSpan());
-            //return addr;
+            return reader.Value switch
+            {
+                long l => new MembershipVersion(l),
+                _ => default
+            };
         }
     }
 
@@ -212,9 +156,7 @@ namespace Orleans.Persistence.Migration.Serialization
     {
         /// <inheritdoc/>
         public override bool CanConvert(Type objectType)
-        {
-            return (objectType == typeof(IPEndPoint));
-        }
+            => objectType.IsAssignableTo(typeof(IPEndPoint));
 
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
@@ -231,11 +173,10 @@ namespace Orleans.Persistence.Migration.Serialization
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            throw new NotImplementedException();
-            //JObject jo = JObject.Load(reader);
-            //IPAddress address = jo["Address"].ToObject<IPAddress>(serializer);
-            //int port = jo["Port"].Value<int>();
-            //return new IPEndPoint(address, port);
+            JObject jo = JObject.Load(reader);
+            IPAddress address = jo["Address"].ToObject<IPAddress>(serializer);
+            int port = jo["Port"].Value<int>();
+            return new IPEndPoint(address, port);
         }
     }
 
@@ -246,11 +187,11 @@ namespace Orleans.Persistence.Migration.Serialization
     public class GrainReferenceJsonConverter : JsonConverter
     {
         private static readonly Type AddressableType = typeof(IAddressable);
-        private readonly IGrainReferenceExtractor _grainIdExtractor;
+        private readonly IGrainReferenceExtractor _grainReferenceExtractor;
 
         public GrainReferenceJsonConverter(IGrainReferenceExtractor grainIdExtractor)
         {
-            _grainIdExtractor = grainIdExtractor;
+            _grainReferenceExtractor = grainIdExtractor;
         }
 
         /// <inheritdoc/>
@@ -263,7 +204,7 @@ namespace Orleans.Persistence.Migration.Serialization
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
             var val = (GrainReference)value;
-            var (type, iface, key) = _grainIdExtractor.Extract(val);
+            var (type, iface, key) = _grainReferenceExtractor.Extract(val);
             writer.WriteStartObject();
             writer.WritePropertyName("Id");
             writer.WriteStartObject();
@@ -280,12 +221,16 @@ namespace Orleans.Persistence.Migration.Serialization
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            throw new NotImplementedException();
-            //JObject jo = JObject.Load(reader);
-            //var id = jo["Id"];
-            //GrainId grainId = GrainId.Create(id["Type"].ToObject<string>(), id["Key"].ToObject<string>());
-            //var iface = GrainInterfaceType.Create(jo["Interface"].ToString());
-            //return this.referenceActivator.CreateReference(grainId, iface);
+            JObject jo = JObject.Load(reader);
+            var id = jo["Id"];
+            var grainType = id["Type"].ToObject<string>();
+            var key = id["Key"].ToObject<string>();
+            var encodedInterface = jo["Interface"].ToString();
+
+            var grainRef = _grainReferenceExtractor.ResolveGrainReference(grainType, key);
+            var iface = _grainReferenceExtractor.ResolveInterfaceType(grainType, key, encodedInterface);
+
+            return GrainExtensions.Cast(grainRef, iface);
         }
     }
 }

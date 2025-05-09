@@ -1,6 +1,4 @@
-using Azure.Identity;
 using Microsoft.Azure.Cosmos;
-using Microsoft.Extensions.Options;
 using Orleans.Persistence.Cosmos;
 using TestExtensions;
 

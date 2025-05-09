@@ -60,6 +60,9 @@ namespace Tester.AzureUtils.Migration
                     })
                     .AddMigrationAzureCosmosGrainStorage(DestinationStorageName, options =>
                     {
+                        // to make serialization of grainRef in grainState work
+                        options.UseOrleansCustomSerialization = true;
+
                         options.ConfigureCosmosStorageOptions();
 
                         options.ContainerName = OrleansContainer;

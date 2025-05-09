@@ -1,7 +1,8 @@
-using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Orleans.Metadata;
 using Orleans.Runtime;
+using System;
+using System.Collections.Concurrent;
 using GrainTypeResolver = Orleans.Metadata.GrainTypeResolver;
 
 namespace Orleans.Persistence.Migration
@@ -10,6 +11,7 @@ namespace Orleans.Persistence.Migration
     {
         GrainReference ResolveGrainReference(string grainId);
         GrainReference ResolveGrainReference(string grainType, string keyStr);
+        Type ResolveInterfaceType(string grainType, string keyStr, string interfaceTypeName);
 
         (GrainType grainType, GrainInterfaceType grainInterfaceType, IdSpan key) Extract(GrainReference grainReference);
 
@@ -99,6 +101,21 @@ namespace Orleans.Persistence.Migration
             }
 
             return GrainReference.FromGrainId(grainId, _grainReferenceRuntime);
+        }
+
+        public Type ResolveInterfaceType(string grainType, string keyStr, string interfaceTypeName)
+        {
+            if (!CurrentGrainInterfaceMap.InterfaceTypeIdMap.TryGetValue(interfaceTypeName, out var interfaceId))
+            {
+                throw new ArgumentException($"Interface type '{interfaceTypeName}' not found at {nameof(_grainTypeManager.ClusterGrainInterfaceMap)}.");
+            }
+
+            if (!_grainTypeManager.ClusterGrainInterfaceMap.TryGetServiceInterface(interfaceId, out var iface))
+            {
+                throw new ArgumentException($"Interface type id '{interfaceId}'/typename '{interfaceTypeName}' not found at {nameof(_grainTypeManager.ClusterGrainInterfaceMap)}.");
+            }
+
+            return iface;
         }
 
         public (GrainType grainType, GrainInterfaceType grainInterfaceType, IdSpan key) Extract(GrainReference grainReference)
