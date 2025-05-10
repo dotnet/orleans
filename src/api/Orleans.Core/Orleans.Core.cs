@@ -947,40 +947,7 @@ namespace Orleans.Placement
 {
     public partial interface IPlacementFilterDirector
     {
-        System.Collections.Generic.IEnumerable<Runtime.SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementFilterContext context, System.Collections.Generic.IEnumerable<Runtime.SiloAddress> silos);
-    }
-
-    public readonly partial struct PlacementFilterContext : System.IEquatable<PlacementFilterContext>
-    {
-        private readonly int _dummyPrimitive;
-        public PlacementFilterContext(Runtime.GrainType GrainType, Runtime.GrainInterfaceType InterfaceType, ushort InterfaceVersion) { }
-
-        public Runtime.GrainType GrainType { get { throw null; } init { } }
-
-        public Runtime.GrainInterfaceType InterfaceType { get { throw null; } init { } }
-
-        public ushort InterfaceVersion { get { throw null; } init { } }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public readonly void Deconstruct(out Runtime.GrainType GrainType, out Runtime.GrainInterfaceType InterfaceType, out ushort InterfaceVersion) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public readonly bool Equals(PlacementFilterContext other) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public override readonly bool Equals(object obj) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public override readonly int GetHashCode() { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public static bool operator ==(PlacementFilterContext left, PlacementFilterContext right) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public static bool operator !=(PlacementFilterContext left, PlacementFilterContext right) { throw null; }
-
-        [System.Runtime.CompilerServices.CompilerGenerated]
-        public override readonly string ToString() { throw null; }
+        System.Collections.Generic.IEnumerable<Runtime.SiloAddress> Filter(PlacementFilterStrategy filterStrategy, Runtime.Placement.PlacementTarget target, System.Collections.Generic.IEnumerable<Runtime.SiloAddress> silos);
     }
 
     public static partial class PlacementFilterExtensions
