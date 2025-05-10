@@ -118,10 +118,10 @@ namespace Tester.AzureUtils.Streaming
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task AQTwoIntermitentStreamTest()
+        public async Task AQTwoIntermittentStreamTest()
         {
-            logger.LogInformation("************************ AQTwoIntermitentStreamTest *********************************");
-            await runner.TwoIntermitentStreamTest(Guid.NewGuid());
+            logger.LogInformation("************************ AQTwoIntermittentStreamTest *********************************");
+            await runner.TwoIntermittentStreamTest(Guid.NewGuid());
         }
 
         [SkippableFact, TestCategory("Functional")]
