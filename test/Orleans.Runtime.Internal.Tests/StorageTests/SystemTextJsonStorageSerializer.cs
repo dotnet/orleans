@@ -60,9 +60,19 @@ namespace UnitTests.StorageTests
             _systemTextJson.Deserialize<T>(_newtonSoft.Serialize(instance)).Should().BeEquivalentTo(instance);
             _newtonSoft.Deserialize<T>(_systemTextJson.Serialize(instance)).Should().BeEquivalentTo(instance);
 
+          
+            // Dictionary Key support is seperately implemented in the SystemTextJson JsonConverters so requires its own testing
+
+            var dict = new Dictionary<T, T>() { { instance, instance } };
+            _systemTextJson.Deserialize<Dictionary<T, T>>(_systemTextJson.Serialize(dict)).Should().BeEquivalentTo(dict);
+            _newtonSoft.Deserialize<Dictionary<T, T>>(_newtonSoft.Serialize(dict)).Should().BeEquivalentTo(dict);
+            _systemTextJson.Deserialize<Dictionary<T, T>>(_newtonSoft.Serialize(dict)).Should().BeEquivalentTo(dict);
+            _newtonSoft.Deserialize<Dictionary<T, T>>(_systemTextJson.Serialize(dict)).Should().BeEquivalentTo(dict);
+
+            // Test for default value support
             _systemTextJson.Deserialize<T>(_systemTextJson.Serialize(default(T))).Should().BeEquivalentTo(default(T));
 
-            // Looks like the Newtonsoft converts do not handle default or null values, so the below will often fail
+            // Looks like the Newtonsoft converts do not handle default or null values consistently, so the below will often fail
 
             // newtonSoft.Deserialize<X>(newtonSoft.Serialize(default(X))).Should().BeEquivalentTo(default(X));
             // systemTextJson.Deserialize<X>(newtonSoft.Serialize(default(X))).Should().BeEquivalentTo(default(X));
