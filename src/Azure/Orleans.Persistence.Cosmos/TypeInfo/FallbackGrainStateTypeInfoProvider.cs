@@ -2,8 +2,8 @@ namespace Orleans.Persistence.Cosmos.TypeInfo
 {
     internal class FallbackGrainStateTypeInfoProvider : IGrainStateTypeInfoProvider
     {
-        ILogger _logger;
-        IList<IGrainStateTypeInfoProvider> _providers;
+        private readonly ILogger _logger;
+        private readonly IList<IGrainStateTypeInfoProvider> _providers;
 
         public FallbackGrainStateTypeInfoProvider(
             ILogger logger,
