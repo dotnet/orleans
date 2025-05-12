@@ -3,6 +3,7 @@
 // </copyright>
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Persistence.Cosmos.Serialization;
 using Orleans.Persistence.Cosmos.TypeInfo;
 using Orleans.Persistence.Migration.Serialization;
@@ -23,8 +24,16 @@ public static class CosmosStorageFactory
     /// <returns>A new <see cref="CosmosGrainStorage"/> instance.</returns>
     public static IGrainStorage Create(IServiceProvider services, string name)
     {
-        var grainStateTypeInfoProvider = services.GetRequiredService<IGrainStateTypeInfoProvider>();
-        return Create(services, name, grainStateTypeInfoProvider);
+        var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>();
+        var options = optionsMonitor.Get(name);
+
+        var grainStateTypeInfoProvider = services.GetServiceByName<IGrainStateTypeInfoProvider>(name) ?? services.GetService<IGrainStateTypeInfoProvider>();
+        if (grainStateTypeInfoProvider is null)
+        {
+            grainStateTypeInfoProvider = GrainStateTypeInfoBuilder.BuildFallbackGrainStateTypeInfoProvider(services, name);
+        }
+
+        return Create(services, name, grainStateTypeInfoProvider, options);
     }
 
     /// <summary>
@@ -33,19 +42,20 @@ public static class CosmosStorageFactory
     /// <param name="services">The service provider.</param>
     /// <param name="name">The name.</param>
     /// <param name="grainStateTypeInfoProvider">provider for grainStateTypeInfo (probably based on activation context)</param>
+    /// <param name="options">options to configure cosmos grain storage</param>
     /// <returns>A new <see cref="CosmosGrainStorage"/> instance.</returns>
     internal static IGrainStorage Create(
         IServiceProvider services,
         string name,
-        IGrainStateTypeInfoProvider grainStateTypeInfoProvider)
+        IGrainStateTypeInfoProvider grainStateTypeInfoProvider,
+        CosmosGrainStorageOptions options)
     {
-        var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>();
         var idProvider = services.GetServiceByName<IDocumentIdProvider>(name) ?? services.GetRequiredService<IDocumentIdProvider>();
-        var options = optionsMonitor.Get(name);
-
         if (options.UseOrleansCustomSerialization)
         {
             var migrationSerializerOptions = new OrleansJsonSerializerOptions();
+            var postConfigurator = services.GetService<IPostConfigureOptions<OrleansJsonSerializerOptions>>() ?? new ConfigureOrleansJsonSerializerOptions(services);
+            postConfigurator.PostConfigure(name, migrationSerializerOptions);
 
             // orleans 7.x+ does not use type handling by default
             migrationSerializerOptions.JsonSerializerSettings.TypeNameHandling = Newtonsoft.Json.TypeNameHandling.None;

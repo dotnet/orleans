@@ -1,14 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
-using Orleans.Persistence.Cosmos;
-using Orleans.Reminders.Cosmos.Migration;
+using Orleans.Reminders.Cosmos;
 using TestExtensions;
 
-namespace Tester.Reminders.Cosmos.Migration.Helpers
+namespace Tester.Reminders.Cosmos.Helpers
 {
     internal static class CosmosClientHelpers
     {
