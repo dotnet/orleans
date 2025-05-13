@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Serialization;
@@ -28,6 +29,12 @@ namespace TestExtensions
 
     public static class TestClusterExtensions
     {
+        public static T RoundTripSystemTextJsonSerialization<T>(this TestCluster cluster, T value)
+        {
+            var serialized = JsonSerializer.Serialize<T>(value);
+            return JsonSerializer.Deserialize<T>(serialized);
+        }
+
         public static T RoundTripSerializationForTesting<T>(this TestCluster cluster, T value)
         {
             var serializer = cluster.ServiceProvider.GetRequiredService<Serializer>();
