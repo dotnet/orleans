@@ -96,8 +96,8 @@ namespace Orleans.Utilities
         /// </summary>
         public void Clear()
         {
-            CreateCopyForWriteIfNecessary();
-            _observers.Clear();
+            var observers = GetWritableObservers();
+            observers.Clear();
         }
 
         /// <summary>
@@ -112,25 +112,25 @@ namespace Orleans.Utilities
         /// <exception cref="Exception">A delegate callback throws an exception.</exception>
         public void Subscribe(TIdentity id, TObserver observer)
         {
-            CreateCopyForWriteIfNecessary();
+            var observers = GetWritableObservers();
 
             // Add or update the subscription.
             var now = GetDateTime();
-            if (_observers.TryGetValue(id, out var entry))
+            if (observers.TryGetValue(id, out var entry))
             {
                 entry.LastSeen = now;
                 entry.Observer = observer;
                 if (_log.IsEnabled(LogLevel.Debug))
                 {
-                    _log.LogDebug("Updating entry for {Id}/{Observer}. {Count} total observers.", id, observer, _observers.Count);
+                    _log.LogDebug("Updating entry for {Id}/{Observer}. {Count} total observers.", id, observer, observers.Count);
                 }
             }
             else
             {
-                _observers[id] = new ObserverEntry { LastSeen = now, Observer = observer };
+                observers[id] = new ObserverEntry { LastSeen = now, Observer = observer };
                 if (_log.IsEnabled(LogLevel.Debug))
                 {
-                    _log.LogDebug("Adding entry for {Id}/{Observer}. {Count} total observers after add.", id, observer, _observers.Count);
+                    _log.LogDebug("Adding entry for {Id}/{Observer}. {Count} total observers after add.", id, observer, observers.Count);
                 }
             }
         }
@@ -143,12 +143,12 @@ namespace Orleans.Utilities
         /// </param>
         public void Unsubscribe(TIdentity id)
         {
-            CreateCopyForWriteIfNecessary();
+            var observers = GetWritableObservers();
 
-            _observers.Remove(id, out _);
+            observers.Remove(id, out _);
             if (_log.IsEnabled(LogLevel.Debug))
             {
-                _log.LogDebug("Removed entry for {Id}. {Count} total observers after remove.", id, _observers.Count);
+                _log.LogDebug("Removed entry for {Id}. {Count} total observers after remove.", id, observers.Count);
             }
         }
 
@@ -166,15 +166,12 @@ namespace Orleans.Utilities
         /// </returns>
         public async Task Notify(Func<TObserver, Task> notification, Func<TObserver, bool> predicate = null)
         {
-            var observers = _readSnapshot = _observers;
-            ++_numReaders;
-
             var now = GetDateTime();
             var defunct = default(List<TIdentity>);
 
-            try
+            using (var snapshot = CreateReadSnapshot())
             {
-                foreach (var observerEntryPair in observers)
+                foreach (var observerEntryPair in snapshot.Observers)
                 {
                     if (observerEntryPair.Value.LastSeen + ExpirationDuration < now)
                     {
@@ -202,13 +199,6 @@ namespace Orleans.Utilities
                     }
                 }
             }
-            finally
-            {
-                if (--_numReaders == 0)
-                {
-                    _readSnapshot = null;
-                }
-            }
 
             RemoveDefunct(defunct);
         }
@@ -224,15 +214,12 @@ namespace Orleans.Utilities
         /// </param>
         public void Notify(Action<TObserver> notification, Func<TObserver, bool> predicate = null)
         {
-            var observers = _readSnapshot = _observers;
-            ++_numReaders;
-
             var now = GetDateTime();
             var defunct = default(List<TIdentity>);
 
-            try
+            using (var snapshot = CreateReadSnapshot())
             {
-                foreach (var observerEntryPair in observers)
+                foreach (var observerEntryPair in snapshot.Observers)
                 {
                     if (observerEntryPair.Value.LastSeen + ExpirationDuration < now)
                     {
@@ -260,13 +247,6 @@ namespace Orleans.Utilities
                     }
                 }
             }
-            finally
-            {
-                if (--_numReaders == 0)
-                {
-                    _readSnapshot = null;
-                }
-            }
 
             RemoveDefunct(defunct);
         }
@@ -276,15 +256,12 @@ namespace Orleans.Utilities
         /// </summary>
         public void ClearExpired()
         {
-            var observers = _readSnapshot = _observers;
-            ++_numReaders;
-
-            var now = GetDateTime();
             var defunct = default(List<TIdentity>);
-
-            try
+            using (var snapshot = CreateReadSnapshot())
             {
-                foreach (var observerEntryPair in observers)
+                var now = GetDateTime();
+
+                foreach (var observerEntryPair in snapshot.Observers)
                 {
                     if (observerEntryPair.Value.LastSeen + ExpirationDuration < now)
                     {
@@ -292,13 +269,6 @@ namespace Orleans.Utilities
                         defunct ??= [];
                         defunct.Add(observerEntryPair.Key);
                     }
-                }
-            }
-            finally
-            {
-                if (--_numReaders == 0)
-                {
-                    _readSnapshot = null;
                 }
             }
 
@@ -310,21 +280,13 @@ namespace Orleans.Utilities
             // Remove defunct observers.
             if (defunct != default(List<TIdentity>) && defunct.Count > 0)
             {
-                CreateCopyForWriteIfNecessary();
+                var observers = GetWritableObservers();
 
                 _log.LogInformation("Removing {Count} defunct observers entries.", defunct.Count);
                 foreach (var observerIdToRemove in defunct)
                 {
-                    _observers.Remove(observerIdToRemove, out _);
+                    observers.Remove(observerIdToRemove, out _);
                 }
-            }
-        }
-
-        private void CreateCopyForWriteIfNecessary()
-        {
-            if (_numReaders > 0 && ReferenceEquals(_observers, _readSnapshot))
-            {
-                _observers = new Dictionary<TIdentity, ObserverEntry>(_observers);
             }
         }
 
@@ -344,10 +306,27 @@ namespace Orleans.Utilities
         /// </returns>
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
+        private ReadSnapshot CreateReadSnapshot()
+        {
+            ++_numReaders;
+            var observers = _readSnapshot = _observers;
+            return new(this, observers);
+        }
+
+        private Dictionary<TIdentity, ObserverEntry> GetWritableObservers()
+        {
+            if (_numReaders > 0 && ReferenceEquals(_observers, _readSnapshot))
+            {
+                _observers = new Dictionary<TIdentity, ObserverEntry>(_observers);
+            }
+
+            return _observers;
+        }
+
         /// <summary>
         /// An observer entry.
         /// </summary>
-        private class ObserverEntry
+        private sealed class ObserverEntry
         {
             /// <summary>
             /// Gets or sets the observer.
@@ -358,6 +337,21 @@ namespace Orleans.Utilities
             /// Gets or sets the UTC last seen time.
             /// </summary>
             public DateTime LastSeen { get; set; }
+        }
+
+        private readonly struct ReadSnapshot(
+            ObserverManager<TIdentity, TObserver> manager,
+            IReadOnlyDictionary<TIdentity, ObserverEntry> snapshot) : IDisposable
+        {
+            public IReadOnlyDictionary<TIdentity, ObserverEntry> Observers { get; } = snapshot;
+
+            public void Dispose()
+            {
+                if (--manager._numReaders == 0)
+                {
+                    manager._readSnapshot = null;
+                }
+            }
         }
     }
 
