@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.Concurrency;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.TestKit.Correctnesss;
 
@@ -36,5 +37,9 @@ namespace Orleans.Transactions.TestKit
 
         [Transaction(TransactionOption.Create)]
         Task MultiGrainAdd(ITransactionCommitterTestGrain committer, ITransactionCommitOperation<IRemoteCommitService> operation, List<ITransactionTestGrain> grains, int numberToAdd);
+
+        [Transaction(TransactionOption.Create)]
+        [ReadOnly]
+        Task UpdateViolated(ITransactionTestGrain grains, int numberToAdd);
     }
 }
