@@ -52,7 +52,7 @@ namespace Orleans.Runtime
         /// Indicates that a request completed.
         /// </summary>
         [NonEvent]
-        public void DoCallback(Message message)
+        public void OnResponse(Message message)
         {
             if (this.IsEnabled())
             {
