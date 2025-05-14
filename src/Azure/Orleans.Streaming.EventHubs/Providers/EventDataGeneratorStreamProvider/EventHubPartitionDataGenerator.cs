@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.DependencyInjection;
@@ -45,26 +46,30 @@ namespace Orleans.Streaming.EventHubs.Testing
                 return false;
             }
             int count = maxCount;
-            List<EventData> eventDataList = new List<EventData>();
+            List<EventData> eventDataList = new List<EventData>(maxCount);
             while (count-- > 0)
             {
                 this.SequenceNumberCounter.Increment();
 
-                var eventData = EventHubBatchContainer.ToEventData(
+                // Create an EventData instance with an empty body. The body will be set later
+                // from the batch container's context. Because there is a need to explicitly set
+                // broker-owned properties such as the offset, sequence number, and partition key,
+                // an instance is created using the model factory, which avoids the need to set
+                // directly via the underlying AMQP message.
+                var eventData = EventHubsModelFactory.EventData(
+                        eventBody: BinaryData.Empty,
+                        partitionKey: StreamId.GetKeyAsString(),
+                        offsetString: DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture),
+                        sequenceNumber: this.SequenceNumberCounter.Value);
+
+                EventHubBatchContainer.UpdateEventData(
+                    eventData,
                     this.serializer,
                     this.StreamId,
                     GenerateEvent(this.SequenceNumberCounter.Value),
                     RequestContextExtensions.Export(this.deepCopier));
 
-               var wrapper = new WrappedEventData(
-                    eventData.Body,
-                    eventData.Properties,
-                    eventData.SystemProperties,
-                    partitionKey: StreamId.GetKeyAsString(),
-                    offset: DateTime.UtcNow.Ticks,
-                    sequenceNumber: this.SequenceNumberCounter.Value);
-
-                eventDataList.Add(wrapper);
+                eventDataList.Add(eventData);
                 LogInfoGenerateData(this.SequenceNumberCounter.Value, this.StreamId);
             }
 
@@ -74,22 +79,12 @@ namespace Orleans.Streaming.EventHubs.Testing
 
         private static IEnumerable<int> GenerateEvent(int sequenceNumber)
         {
-            var events = new List<int>();
-            events.Add(sequenceNumber);
-            return events;
+            return [sequenceNumber];
         }
 
         public static Func<StreamId, IStreamDataGenerator<EventData>> CreateFactory(IServiceProvider services)
         {
             return (streamId) => ActivatorUtilities.CreateInstance<SimpleStreamEventDataGenerator>(services, streamId);
-        }
-
-
-        private class WrappedEventData : EventData
-        {
-            public WrappedEventData(ReadOnlyMemory<byte> eventBody, IDictionary<string, object> properties = null, IReadOnlyDictionary<string, object> systemProperties = null, long sequenceNumber = long.MinValue, long offset = long.MinValue, DateTimeOffset enqueuedTime = default, string partitionKey = null) : base(eventBody, properties, systemProperties, sequenceNumber, offset, enqueuedTime, partitionKey)
-            {
-            }
         }
 
         [LoggerMessage(
