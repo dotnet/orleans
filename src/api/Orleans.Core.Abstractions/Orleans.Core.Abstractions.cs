@@ -2087,7 +2087,11 @@ namespace Orleans.Runtime
     {
         public override GrainId Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
 
+        public override GrainId ReadAsPropertyName(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
         public override void Write(System.Text.Json.Utf8JsonWriter writer, GrainId value, System.Text.Json.JsonSerializerOptions options) { }
+
+        public override void WriteAsPropertyName(System.Text.Json.Utf8JsonWriter writer, GrainId value, System.Text.Json.JsonSerializerOptions options) { }
     }
 
     public static partial class GrainIdKeyExtensions

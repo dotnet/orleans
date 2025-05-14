@@ -576,6 +576,224 @@ namespace Orleans.Serialization.Activators
 
 namespace Orleans.Serialization.Buffers
 {
+    public partial struct ArcBuffer : System.IDisposable
+    {
+        private int _dummyPrimitive;
+        public readonly ArcBufferPage First;
+        public readonly int Length;
+        public readonly int Offset;
+        public ArcBuffer(ArcBufferPage first, int token, int offset, int length) { }
+
+        public ArraySegmentEnumerator ArraySegments { get { throw null; } }
+
+        public MemoryEnumerator MemorySegments { get { throw null; } }
+
+        public SpanEnumerator SpanSegments { get { throw null; } }
+
+        public readonly System.Buffers.ReadOnlySequence<byte> AsReadOnlySequence() { throw null; }
+
+        public readonly void CopyTo(ArcBufferWriter output) { }
+
+        public readonly int CopyTo(System.Span<byte> output) { throw null; }
+
+        public readonly void CopyTo<TBufferWriter>(ref TBufferWriter output)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void Dispose() { }
+
+        public readonly SpanEnumerator GetEnumerator() { throw null; }
+
+        public readonly void Pin() { }
+
+        public readonly ArcBuffer Slice(int offset, int length) { throw null; }
+
+        public readonly ArcBuffer Slice(int offset) { throw null; }
+
+        public readonly byte[] ToArray() { throw null; }
+
+        public void Unpin() { }
+
+        public readonly ArcBuffer UnsafeSlice(int offset, int length) { throw null; }
+
+        public partial struct ArraySegmentEnumerator : System.Collections.Generic.IEnumerable<System.ArraySegment<byte>>, System.Collections.IEnumerable, System.Collections.Generic.IEnumerator<System.ArraySegment<byte>>, System.Collections.IEnumerator, System.IDisposable
+        {
+            public ArraySegmentEnumerator(ArcBuffer slice) { }
+
+            public System.ArraySegment<byte> Current { get { throw null; } }
+
+            public bool IsCompleted { get { throw null; } }
+
+            object? System.Collections.IEnumerator.Current { get { throw null; } }
+
+            public readonly ArraySegmentEnumerator GetEnumerator() { throw null; }
+
+            public bool MoveNext() { throw null; }
+
+            readonly System.Collections.Generic.IEnumerator<System.ArraySegment<byte>> System.Collections.Generic.IEnumerable<System.ArraySegment<byte>>.GetEnumerator() { throw null; }
+
+            readonly System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() { throw null; }
+
+            void System.Collections.IEnumerator.Reset() { }
+
+            readonly void System.IDisposable.Dispose() { }
+        }
+
+        public partial struct MemoryEnumerator : System.Collections.Generic.IEnumerable<System.ReadOnlyMemory<byte>>, System.Collections.IEnumerable, System.Collections.Generic.IEnumerator<System.ReadOnlyMemory<byte>>, System.Collections.IEnumerator, System.IDisposable
+        {
+            public MemoryEnumerator(ArcBuffer slice) { }
+
+            public System.ReadOnlyMemory<byte> Current { get { throw null; } }
+
+            object? System.Collections.IEnumerator.Current { get { throw null; } }
+
+            public readonly MemoryEnumerator GetEnumerator() { throw null; }
+
+            public bool MoveNext() { throw null; }
+
+            readonly System.Collections.Generic.IEnumerator<System.ReadOnlyMemory<byte>> System.Collections.Generic.IEnumerable<System.ReadOnlyMemory<byte>>.GetEnumerator() { throw null; }
+
+            readonly System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() { throw null; }
+
+            void System.Collections.IEnumerator.Reset() { }
+
+            readonly void System.IDisposable.Dispose() { }
+        }
+
+        public readonly partial struct PageSegment
+        {
+            public readonly int Length;
+            public readonly int Offset;
+            public readonly ArcBufferPage Page;
+            public PageSegment(ArcBufferPage page, int offset, int length) { }
+
+            public System.ArraySegment<byte> ArraySegment { get { throw null; } }
+
+            public System.ReadOnlyMemory<byte> Memory { get { throw null; } }
+
+            public System.ReadOnlySpan<byte> Span { get { throw null; } }
+        }
+
+        public ref partial struct SpanEnumerator
+        {
+            private object _dummy;
+            private int _dummyPrimitive;
+            public SpanEnumerator(ArcBuffer slice) { }
+
+            public System.ReadOnlySpan<byte> Current { get { throw null; } }
+
+            public readonly SpanEnumerator GetEnumerator() { throw null; }
+
+            public bool MoveNext() { throw null; }
+        }
+    }
+
+    public sealed partial class ArcBufferPage
+    {
+        internal ArcBufferPage() { }
+
+        public byte[] Array { get { throw null; } }
+
+        public bool IsMinimumSize { get { throw null; } }
+
+        public bool IsValid { get { throw null; } }
+
+        public int Length { get { throw null; } }
+
+        public ArcBufferPage? Next { get { throw null; } protected set { } }
+
+        public System.ArraySegment<byte> ReadableArraySegment { get { throw null; } }
+
+        public System.ReadOnlyMemory<byte> ReadableMemory { get { throw null; } }
+
+        public System.ReadOnlySpan<byte> ReadableSpan { get { throw null; } }
+
+        public int Version { get { throw null; } }
+
+        public System.ArraySegment<byte> WritableArraySegment { get { throw null; } }
+
+        public System.Memory<byte> WritableMemory { get { throw null; } }
+
+        public System.Span<byte> WritableSpan { get { throw null; } }
+
+        public int WriteCapacity { get { throw null; } }
+
+        public void Advance(int bytes) { }
+
+        public System.ArraySegment<byte> AsArraySegment(int offset, int length) { throw null; }
+
+        public System.Memory<byte> AsMemory(int offset, int length) { throw null; }
+
+        public System.Memory<byte> AsMemory(int offset) { throw null; }
+
+        public System.Span<byte> AsSpan(int offset, int length) { throw null; }
+
+        public System.Span<byte> AsSpan(int offset) { throw null; }
+
+        public void CheckValidity(int token) { }
+
+        public void Pin(int token) { }
+
+        public void ResizeLargeSegment(int length) { }
+
+        public void SetNext(ArcBufferPage next, int token) { }
+
+        public void Unpin(int token) { }
+    }
+
+    public readonly partial struct ArcBufferReader
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public ArcBufferReader(ArcBufferWriter writer) { }
+
+        public int Length { get { throw null; } }
+
+        public readonly void Consume(System.Span<byte> output) { }
+
+        public readonly ArcBuffer ConsumeSlice(int count) { throw null; }
+
+        public readonly System.ReadOnlySpan<byte> Peek(scoped in System.Span<byte> destination) { throw null; }
+
+        public readonly ArcBuffer PeekSlice(int count) { throw null; }
+
+        public readonly void Skip(int count) { }
+    }
+
+    [Immutable]
+    public sealed partial class ArcBufferWriter : System.Buffers.IBufferWriter<byte>, System.IDisposable
+    {
+        public const int MinimumPageSize = 16384;
+        public int Length { get { throw null; } }
+
+        public void AdvanceReader(int count) { }
+
+        public void AdvanceWriter(int count) { }
+
+        public ArcBuffer ConsumeSlice(int count) { throw null; }
+
+        public void Dispose() { }
+
+        public System.Memory<byte> GetMemory(int sizeHint = 0) { throw null; }
+
+        public System.Span<byte> GetSpan(int sizeHint = 0) { throw null; }
+
+        public int Peek(System.Span<byte> output) { throw null; }
+
+        public System.ReadOnlySpan<byte> Peek(scoped in System.Span<byte> destination) { throw null; }
+
+        public ArcBuffer PeekSlice(int count) { throw null; }
+
+        public void ReplenishBuffers(System.Collections.Generic.List<System.ArraySegment<byte>> buffers) { }
+
+        public void Reset() { }
+
+        void System.Buffers.IBufferWriter<byte>.Advance(int count) { }
+
+        public void Write(System.Buffers.ReadOnlySequence<byte> input) { }
+
+        public void Write(System.ReadOnlySpan<byte> value) { }
+    }
+
     public static partial class BufferWriterExtensions
     {
         public static Writer<TBufferWriter> CreateWriter<TBufferWriter>(this TBufferWriter buffer, Session.SerializerSession session)
@@ -588,6 +806,8 @@ namespace Orleans.Serialization.Buffers
         private object _dummy;
         private int _dummyPrimitive;
         public int Length { get { throw null; } }
+
+        public MemoryEnumerator MemorySegments { get { throw null; } }
 
         public void Advance(int bytes) { }
 
@@ -602,8 +822,6 @@ namespace Orleans.Serialization.Buffers
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public void Dispose() { }
-
-        public readonly BufferSlice.SpanEnumerator GetEnumerator() { throw null; }
 
         public System.Memory<byte> GetMemory(int sizeHint = 0) { throw null; }
 
@@ -633,6 +851,8 @@ namespace Orleans.Serialization.Buffers
 
             public int Length { get { throw null; } }
 
+            public MemoryEnumerator MemorySegments { get { throw null; } }
+
             public int Offset { get { throw null; } }
 
             public readonly void CopyTo(ref PooledBuffer output) { }
@@ -650,6 +870,19 @@ namespace Orleans.Serialization.Buffers
 
             public readonly byte[] ToArray() { throw null; }
 
+            public partial struct MemoryEnumerator
+            {
+                private object _dummy;
+                private int _dummyPrimitive;
+                public MemoryEnumerator(BufferSlice slice) { }
+
+                public System.ReadOnlyMemory<byte> Current { get { throw null; } }
+
+                public readonly MemoryEnumerator GetEnumerator() { throw null; }
+
+                public bool MoveNext() { throw null; }
+            }
+
             public ref partial struct SpanEnumerator
             {
                 private object _dummy;
@@ -658,9 +891,43 @@ namespace Orleans.Serialization.Buffers
 
                 public System.ReadOnlySpan<byte> Current { get { throw null; } }
 
+                public readonly SpanEnumerator GetEnumerator() { throw null; }
+
                 public bool MoveNext() { throw null; }
             }
         }
+
+        public partial struct MemoryEnumerator
+        {
+            private object _dummy;
+            private int _dummyPrimitive;
+            public System.ReadOnlyMemory<byte> CurrentMemory;
+            public MemoryEnumerator(PooledBuffer buffer) { }
+
+            public System.ReadOnlyMemory<byte> Current { get { throw null; } }
+
+            public readonly MemoryEnumerator GetEnumerator() { throw null; }
+
+            public bool MoveNext() { throw null; }
+        }
+
+        public ref partial struct SpanEnumerator
+        {
+            private object _dummy;
+            private int _dummyPrimitive;
+            public SpanEnumerator(ref PooledBuffer buffer) { }
+
+            public System.ReadOnlySpan<byte> Current { get { throw null; } }
+
+            public readonly SpanEnumerator GetEnumerator() { throw null; }
+
+            public bool MoveNext() { throw null; }
+        }
+    }
+
+    public static partial class PooledBufferExtensions
+    {
+        public static PooledBuffer.SpanEnumerator GetEnumerator(this ref PooledBuffer buffer) { throw null; }
     }
 
     public static partial class Reader
@@ -993,7 +1260,7 @@ namespace Orleans.Serialization.Cloning
     {
         public CopyContext(Serializers.CodecProvider codecProvider, System.Action<CopyContext> onDisposed) { }
 
-        public T DeepCopy<T>(T value) { throw null; }
+        public T? DeepCopy<T>(T? value) { throw null; }
 
         public void Dispose() { }
 
@@ -1001,7 +1268,7 @@ namespace Orleans.Serialization.Cloning
 
         public void Reset() { }
 
-        public bool TryGetCopy<T>(object original, out T result)
+        public bool TryGetCopy<T>(object? original, out T? result)
             where T : class { throw null; }
     }
 
@@ -1023,7 +1290,7 @@ namespace Orleans.Serialization.Cloning
 
     public partial interface IDeepCopier
     {
-        object DeepCopy(object input, CopyContext context);
+        object? DeepCopy(object? input, CopyContext context);
     }
 
     public partial interface IDeepCopierProvider
@@ -1032,14 +1299,14 @@ namespace Orleans.Serialization.Cloning
             where T : class;
         IDeepCopier GetDeepCopier(System.Type type);
         IDeepCopier<T> GetDeepCopier<T>();
-        IDeepCopier TryGetDeepCopier(System.Type type);
-        IDeepCopier<T> TryGetDeepCopier<T>();
+        IDeepCopier? TryGetDeepCopier(System.Type type);
+        IDeepCopier<T>? TryGetDeepCopier<T>();
     }
 
     public partial interface IDeepCopier<T> : IDeepCopier
     {
         T DeepCopy(T input, CopyContext context);
-        object IDeepCopier.DeepCopy(object input, CopyContext context);
+        object? IDeepCopier.DeepCopy(object? input, CopyContext context);
     }
 
     public partial interface IDerivedTypeCopier : IDeepCopier
@@ -1066,7 +1333,7 @@ namespace Orleans.Serialization.Cloning
     {
         public T DeepCopy(T input, CopyContext _) { throw null; }
 
-        public object DeepCopy(object input, CopyContext _) { throw null; }
+        public object? DeepCopy(object? input, CopyContext _) { throw null; }
 
         public bool IsShallowCopyable() { throw null; }
     }
