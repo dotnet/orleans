@@ -3,6 +3,7 @@ using System;
 using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
@@ -97,7 +98,7 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
         return false;
     }
 
-    public bool TryGetValue<T>(string key, out T? value)
+    public bool TryGetValue<T>(string key, [NotNullWhen(true)] out T? value)
     {
         if (_indices.TryGetValue(key, out var record) && _sessionPool.CodecProvider.TryGetCodec<T>() is { } codec)
         {
@@ -106,7 +107,7 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
             var reader = Reader.Create(source, session);
             var field = reader.ReadFieldHeader();
             value = codec.ReadValue(ref reader, field);
-            return true;
+            return value is not null;
         }
 
         value = default;
