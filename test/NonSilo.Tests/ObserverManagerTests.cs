@@ -556,7 +556,6 @@ public sealed class ObserverManagerTests
     [Fact]
     public async Task ClearDuringNotification_WorksCorrectly()
     {
-        // Arrange.
         var observerManager = new ObserverManager<int, int>(TimeSpan.FromHours(1), NullLogger.Instance);
         var notifiedObservers = new ConcurrentBag<int>();
 
