@@ -5,6 +5,8 @@ using System.Collections;
 using System.Collections.Generic;
 using Orleans.Runtime;
 using System.Linq;
+using Microsoft.CodeAnalysis.Classification;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Utilities
 {
@@ -89,7 +91,7 @@ namespace Orleans.Utilities
         /// <summary>
         /// Gets a copy of the observers.
         /// </summary>
-        public IDictionary<TIdentity, TObserver> Observers => _observers.ToDictionary(_ => _.Key, _ => _.Value.Observer);
+        public IReadOnlyDictionary<TIdentity, TObserver> Observers => _observers.ToDictionary(_ => _.Key, _ => _.Value.Observer);
 
         /// <summary>
         /// Removes all observers.
@@ -296,7 +298,7 @@ namespace Orleans.Utilities
         /// <returns>
         /// A <see cref="T:System.Collections.Generic.IEnumerator`1"/> that can be used to iterate through the collection.
         /// </returns>
-        public IEnumerator<TObserver> GetEnumerator() => _observers.Select(observer => observer.Value.Observer).GetEnumerator();
+        public IEnumerator<TObserver> GetEnumerator() => new ObserverEnumerator(CreateReadSnapshot());
 
         /// <summary>
         /// Returns an enumerator that iterates through a collection.
@@ -353,6 +355,25 @@ namespace Orleans.Utilities
                 }
             }
         }
-    }
 
+        private sealed class ObserverEnumerator(ReadSnapshot snapshot) : IEnumerator<TObserver>
+        {
+            private bool _isDisposed;
+            private readonly IEnumerator<KeyValuePair<TIdentity, ObserverEntry>> _enumerator = snapshot.Observers.GetEnumerator();
+            public TObserver Current => _enumerator.Current.Value.Observer;
+            object IEnumerator.Current => Current;
+            public void Dispose()
+            {
+                if (!_isDisposed)
+                {
+                    _isDisposed = true;
+                    _enumerator.Dispose();
+                    snapshot.Dispose();
+                }
+            }
+
+            public bool MoveNext() => _enumerator.MoveNext();
+            public void Reset() => _enumerator.Reset();
+        }
+    }
 }

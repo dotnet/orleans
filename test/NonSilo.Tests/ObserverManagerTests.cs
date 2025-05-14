@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -22,9 +23,9 @@ public sealed class ObserverManagerTests
             observerManager.Subscribe(i, i);
         }
 
+        // Using predicate for an easier simulation of inserting item while enumerating
         bool Predicate(int observer)
         {
-            // Using predicate for an easier simulation of inserting item while enumerating
             if (observer == 5)
             {
                 observerManager.Subscribe(11, 1);
@@ -377,5 +378,248 @@ public sealed class ObserverManagerTests
         // (those that were present when the snapshot was created)
         Assert.Equal(observerCount, notifiedCount);
         Assert.Equal(observerCount + 50, observerManager.Count);
+    }
+
+    [Fact]
+    public void PredicateFiltersObserversToNotify()
+    {
+        var observerManager = new ObserverManager<int, int>(TimeSpan.FromHours(1), NullLogger.Instance);
+        var notifiedObservers = new List<int>();
+
+        // Subscribe some observers
+        for (var i = 0; i < 10; i++)
+        {
+            observerManager.Subscribe(i, i);
+        }
+
+        bool EvenNumberPredicate(int observer) => observer % 2 == 0;
+
+        void Notification(int observer)
+        {
+            notifiedObservers.Add(observer);
+        }
+
+        observerManager.Notify(Notification, EvenNumberPredicate);
+
+        Assert.Equal(5, notifiedObservers.Count); // Only even observers should be notified
+        Assert.All(notifiedObservers, observer => Assert.True(observer % 2 == 0)); // All notified observers should be even
+    }
+
+    [Fact]
+    public async Task AsyncPredicateFiltersObserversToNotify()
+    {
+        var observerManager = new ObserverManager<int, int>(TimeSpan.FromHours(1), NullLogger.Instance);
+        var notifiedObservers = new List<int>();
+
+        // Subscribe some observers
+        for (var i = 0; i < 10; i++)
+        {
+            observerManager.Subscribe(i, i);
+        }
+
+        bool OddNumberPredicate(int observer) => observer % 2 == 1;
+
+        async Task NotificationAsync(int observer)
+        {
+            notifiedObservers.Add(observer);
+            await Task.CompletedTask;
+        }
+
+        await observerManager.Notify(NotificationAsync, OddNumberPredicate);
+
+        Assert.Equal(5, notifiedObservers.Count); // Only odd observers should be notified
+        Assert.All(notifiedObservers, observer => Assert.True(observer % 2 == 1)); // All notified observers should be odd
+    }
+
+    [Fact]
+    public void EnumeratorWorksCorrectly()
+    {
+        var observerManager = new ObserverManager<int, int>(TimeSpan.FromHours(1), NullLogger.Instance);
+
+        // Subscribe some observers
+        for (var i = 0; i < 5; i++)
+        {
+            observerManager.Subscribe(i, i);
+        }
+
+        var enumeratedObservers = new List<int>();
+        foreach (var observer in observerManager)
+        {
+            enumeratedObservers.Add(observer);
+        }
+
+        Assert.Equal(5, enumeratedObservers.Count);
+        Assert.Equal(Enumerable.Range(0, 5), enumeratedObservers.OrderBy(x => x));
+    }
+
+    [Fact]
+    public void SubscribingExistingObserver_UpdatesLastSeenTime()
+    {
+        var observerManager = new ObserverManager<int, int>(TimeSpan.FromMinutes(30), NullLogger.Instance);
+        var startTime = DateTime.UtcNow;
+        
+        // Mock GetDateTime to control time
+        observerManager.GetDateTime = () => startTime;
+        
+        // Subscribe initial observer
+        observerManager.Subscribe(1, 42);
+        
+        // Advance time to near expiration but not quite
+        var laterTime = startTime.AddMinutes(25);
+        observerManager.GetDateTime = () => laterTime;
+        
+        // Update the subscription (same ID, same observer value)
+        observerManager.Subscribe(1, 42);
+        
+        // Advance time to past the original subscription time + expiration
+        var expirationCheckTime = startTime.AddMinutes(35);
+        observerManager.GetDateTime = () => expirationCheckTime;
+        
+        var notified = false;
+        observerManager.Notify(observer => notified = true);
+        
+        Assert.True(notified); // Observer should still be active due to the refresh
+        Assert.Equal(1, observerManager.Count);
+    }
+
+    [Fact]
+    public void SubscribingExistingObserver_UpdatesObserverValue()
+    {
+        var observerManager = new ObserverManager<int, int>(TimeSpan.FromHours(1), NullLogger.Instance);
+        
+        // Subscribe initial observer
+        observerManager.Subscribe(1, 100);
+        
+        // Update the subscription (same ID, different observer value)
+        observerManager.Subscribe(1, 200);
+        
+        var observedValue = 0;
+        observerManager.Notify(observer => observedValue = observer);
+        
+        Assert.Equal(200, observedValue); // Should get the updated value
+    }
+
+    [Fact]
+    public void SetExpirationDuration_AffectsExpiration()
+    {
+        var observerManager = new ObserverManager<int, int>(TimeSpan.FromHours(1), NullLogger.Instance);
+        var startTime = DateTime.UtcNow;
+        
+        // Mock GetDateTime to control time
+        observerManager.GetDateTime = () => startTime;
+        
+        // Subscribe some observers
+        for (var i = 0; i < 5; i++)
+        {
+            observerManager.Subscribe(i, i);
+        }
+        
+        // Change expiration to a shorter duration after subscribing
+        observerManager.ExpirationDuration = TimeSpan.FromMinutes(30);
+        
+        // Advance time to between the old and new expiration durations
+        var laterTime = startTime.AddMinutes(45); // Past 30min, but before 1hr
+        observerManager.GetDateTime = () => laterTime;
+        
+        var notifiedObservers = new List<int>();
+        observerManager.Notify(observer => notifiedObservers.Add(observer));
+        
+        Assert.Empty(notifiedObservers); // No observers should be notified due to expiration
+        Assert.Equal(0, observerManager.Count); // All observers should be removed
+    }
+
+    [Fact]
+    public async Task ClearDuringNotification_WorksCorrectly()
+    {
+        // Arrange
+        var observerManager = new ObserverManager<int, int>(TimeSpan.FromHours(1), NullLogger.Instance);
+        var notifiedObservers = new ConcurrentBag<int>();
+        
+        // Subscribe some observers
+        for (var i = 0; i < 10; i++)
+        {
+            observerManager.Subscribe(i, i);
+        }
+        
+        // Start notification
+        var notifyStartedTcs = new TaskCompletionSource();
+        var notifyTask = Task.Run(() => 
+        {
+            observerManager.Notify(observer => 
+            {
+                notifyStartedTcs.TrySetResult();
+                notifiedObservers.Add(observer);
+            });
+        });
+
+        // Clear while notification is happening
+        await notifyStartedTcs.Task;
+        observerManager.Clear();
+        
+        // Wait for notification to complete
+        await notifyTask;
+        
+        // Assert - We should still have notified all the original observers in the snapshot
+        Assert.Equal(10, notifiedObservers.Count);
+        
+        // But the collection should now be empty
+        Assert.Equal(0, observerManager.Count);
+        Assert.Empty(observerManager.Observers);
+    }
+
+    [Fact]
+    public void ModifyDuringEnumeration_WorksWithoutExceptions()
+    {
+        var observerManager = new ObserverManager<int, int>(TimeSpan.FromHours(1), NullLogger.Instance);
+        
+        // Subscribe some initial observers
+        for (var i = 0; i < 5; i++)
+        {
+            observerManager.Subscribe(i, i);
+        }
+        
+        var enumeratedObservers = new List<int>();
+        var newObserversAdded = new List<int>();
+        var removedObserver = -1;
+        
+        // Enumerate using foreach which uses GetEnumerator under the hood
+        foreach (var observer in observerManager)
+        {
+            enumeratedObservers.Add(observer);
+            
+            // Add and remove observers during enumeration
+            if (observer == 2)
+            {
+                // Add new observers
+                for (var i = 10; i < 15; i++)
+                {
+                    observerManager.Subscribe(i, i);
+                    newObserversAdded.Add(i);
+                }
+                
+                // Remove an observer
+                observerManager.Unsubscribe(4);
+                removedObserver = 4;
+                
+                // Verify immediate visibility in the collection (but not in the enumeration)
+                Assert.DoesNotContain(4, observerManager.Observers.Values);
+                foreach (var newObserver in newObserversAdded)
+                {
+                    Assert.Contains(newObserver, observerManager.Observers.Values);
+                }
+            }
+        }
+        
+        // Original enumeration should complete with all original observers
+        Assert.Equal(5, enumeratedObservers.Count);
+        Assert.Contains(removedObserver, enumeratedObservers); // Even though we removed it during enumeration
+        
+        // Verify final collection state
+        Assert.Equal(9, observerManager.Count); // 5 original - 1 removed + 5 added = 9 total
+        Assert.DoesNotContain(removedObserver, observerManager);
+        foreach (var newObserver in newObserversAdded)
+        {
+            Assert.Contains(newObserver, observerManager);
+        }
     }
 }
