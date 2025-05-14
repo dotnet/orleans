@@ -106,6 +106,6 @@ namespace Orleans.Runtime
         /// <param name="key">The key.</param>
         /// <param name="value">The value, if present.</param>
         /// <returns><see langword="true"/> if the key exists in the context, otherwise <see langword="false"/>.</returns>
-        bool TryGetValue<T>(string key, out T? value);
+        bool TryGetValue<T>(string key, [NotNullWhen(true)] out T? value);
     }
 }
