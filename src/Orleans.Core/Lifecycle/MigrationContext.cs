@@ -107,7 +107,7 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
             var reader = Reader.Create(source, session);
             var field = reader.ReadFieldHeader();
             value = codec.ReadValue(ref reader, field);
-            return true;
+            return value is not null;
         }
 
         value = default;
