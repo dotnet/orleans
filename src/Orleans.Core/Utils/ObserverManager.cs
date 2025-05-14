@@ -5,6 +5,8 @@ using System.Collections;
 using System.Collections.Generic;
 using Orleans.Runtime;
 using System.Linq;
+using Microsoft.CodeAnalysis.Classification;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Utilities
 {
@@ -17,7 +19,7 @@ namespace Orleans.Utilities
     public class ObserverManager<TObserver> : ObserverManager<IAddressable, TObserver>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="ObserverManager{TObserver}"/> class. 
+        /// Initializes a new instance of the <see cref="ObserverManager{TObserver}"/> class.
         /// </summary>
         /// <param name="expiration">
         /// The expiration.
@@ -42,15 +44,23 @@ namespace Orleans.Utilities
         /// <summary>
         /// The observers.
         /// </summary>
-        private readonly Dictionary<TIdentity, ObserverEntry> _observers = new();
+        private Dictionary<TIdentity, ObserverEntry> _observers = [];
 
         /// <summary>
         /// The log.
         /// </summary>
         private readonly ILogger _log;
 
+        // The number of concurrent readers.
+        private int _numReaders;
+
+        // The most recently captured read snapshot.
+        // Each time a reader is added, we capture the current _observers reference here, signaling to writers
+        // that _observers must be set to a copy before modifying.
+        private Dictionary<TIdentity, ObserverEntry> _readSnapshot;
+
         /// <summary>
-        /// Initializes a new instance of the <see cref="ObserverManager{TIdentity,TObserver}"/> class. 
+        /// Initializes a new instance of the <see cref="ObserverManager{TIdentity,TObserver}"/> class.
         /// </summary>
         /// <param name="expiration">
         /// The expiration.
@@ -81,12 +91,16 @@ namespace Orleans.Utilities
         /// <summary>
         /// Gets a copy of the observers.
         /// </summary>
-        public IDictionary<TIdentity, TObserver> Observers => _observers.ToDictionary(_ => _.Key, _ => _.Value.Observer);
+        public IReadOnlyDictionary<TIdentity, TObserver> Observers => _observers.ToDictionary(_ => _.Key, _ => _.Value.Observer);
 
         /// <summary>
         /// Removes all observers.
         /// </summary>
-        public void Clear() => _observers.Clear();
+        public void Clear()
+        {
+            var observers = GetWritableObservers();
+            observers.Clear();
+        }
 
         /// <summary>
         /// Ensures that the provided <paramref name="observer"/> is subscribed, renewing its subscription.
@@ -100,24 +114,25 @@ namespace Orleans.Utilities
         /// <exception cref="Exception">A delegate callback throws an exception.</exception>
         public void Subscribe(TIdentity id, TObserver observer)
         {
+            var observers = GetWritableObservers();
+
             // Add or update the subscription.
             var now = GetDateTime();
-            ObserverEntry entry;
-            if (_observers.TryGetValue(id, out entry))
+            if (observers.TryGetValue(id, out var entry))
             {
                 entry.LastSeen = now;
                 entry.Observer = observer;
                 if (_log.IsEnabled(LogLevel.Debug))
                 {
-                    _log.LogDebug("Updating entry for {Id}/{Observer}. {Count} total observers.", id, observer, _observers.Count);
+                    _log.LogDebug("Updating entry for {Id}/{Observer}. {Count} total observers.", id, observer, observers.Count);
                 }
             }
             else
             {
-                _observers[id] = new ObserverEntry { LastSeen = now, Observer = observer };
+                observers[id] = new ObserverEntry { LastSeen = now, Observer = observer };
                 if (_log.IsEnabled(LogLevel.Debug))
                 {
-                    _log.LogDebug("Adding entry for {Id}/{Observer}. {Count} total observers after add.", id, observer, _observers.Count);
+                    _log.LogDebug("Adding entry for {Id}/{Observer}. {Count} total observers after add.", id, observer, observers.Count);
                 }
             }
         }
@@ -130,10 +145,12 @@ namespace Orleans.Utilities
         /// </param>
         public void Unsubscribe(TIdentity id)
         {
-            _observers.Remove(id, out _);
+            var observers = GetWritableObservers();
+
+            observers.Remove(id, out _);
             if (_log.IsEnabled(LogLevel.Debug))
             {
-                _log.LogDebug("Removed entry for {Id}. {Count} total observers after remove.", id, _observers.Count);
+                _log.LogDebug("Removed entry for {Id}. {Count} total observers after remove.", id, observers.Count);
             }
         }
 
@@ -153,46 +170,39 @@ namespace Orleans.Utilities
         {
             var now = GetDateTime();
             var defunct = default(List<TIdentity>);
-            foreach (var observer in _observers)
+
+            using (var snapshot = CreateReadSnapshot())
             {
-                if (observer.Value.LastSeen + ExpirationDuration < now)
+                foreach (var observerEntryPair in snapshot.Observers)
                 {
-                    // Expired observers will be removed.
-                    defunct ??= new List<TIdentity>();
-                    defunct.Add(observer.Key);
-                    continue;
-                }
-
-                // Skip observers which don't match the provided predicate.
-                if (predicate != null && !predicate(observer.Value.Observer))
-                {
-                    continue;
-                }
-
-                try
-                {
-                    await notification(observer.Value.Observer);
-                }
-                catch (Exception)
-                {
-                    // Failing observers are considered defunct and will be removed..
-                    defunct ??= new List<TIdentity>();
-                    defunct.Add(observer.Key);
-                }
-            }
-
-            // Remove defunct observers.
-            if (defunct != default(List<TIdentity>))
-            {
-                foreach (var observer in defunct)
-                {
-                    _observers.Remove(observer, out _);
-                    if (_log.IsEnabled(LogLevel.Debug))
+                    if (observerEntryPair.Value.LastSeen + ExpirationDuration < now)
                     {
-                        _log.LogDebug("Removing defunct entry for {Id}. {Count} total observers after remove.", observer, _observers.Count);
+                        // Expired observers will be removed.
+                        defunct ??= [];
+                        defunct.Add(observerEntryPair.Key);
+                        continue;
+                    }
+
+                    // Skip observers which don't match the provided predicate.
+                    if (predicate != null && !predicate(observerEntryPair.Value.Observer))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        await notification(observerEntryPair.Value.Observer);
+                    }
+                    catch (Exception)
+                    {
+                        // Failing observers are considered defunct and will be removed.
+                        defunct ??= [];
+                        defunct.Add(observerEntryPair.Key);
                     }
                 }
             }
+
+            RemoveDefunct(defunct);
         }
 
         /// <summary>
@@ -208,46 +218,39 @@ namespace Orleans.Utilities
         {
             var now = GetDateTime();
             var defunct = default(List<TIdentity>);
-            foreach (var observer in _observers)
+
+            using (var snapshot = CreateReadSnapshot())
             {
-                if (observer.Value.LastSeen + ExpirationDuration < now)
+                foreach (var observerEntryPair in snapshot.Observers)
                 {
-                    // Expired observers will be removed.
-                    defunct ??= new List<TIdentity>();
-                    defunct.Add(observer.Key);
-                    continue;
-                }
-
-                // Skip observers which don't match the provided predicate.
-                if (predicate != null && !predicate(observer.Value.Observer))
-                {
-                    continue;
-                }
-
-                try
-                {
-                    notification(observer.Value.Observer);
-                }
-                catch (Exception)
-                {
-                    // Failing observers are considered defunct and will be removed..
-                    defunct ??= new List<TIdentity>();
-                    defunct.Add(observer.Key);
-                }
-            }
-
-            // Remove defunct observers.
-            if (defunct != default(List<TIdentity>))
-            {
-                foreach (var observer in defunct)
-                {
-                    _observers.Remove(observer, out _);
-                    if (_log.IsEnabled(LogLevel.Debug))
+                    if (observerEntryPair.Value.LastSeen + ExpirationDuration < now)
                     {
-                        _log.LogDebug("Removing defunct entry for {Id}. {Count} total observers after remove.", observer, _observers.Count);
+                        // Expired observers will be removed.
+                        defunct ??= [];
+                        defunct.Add(observerEntryPair.Key);
+                        continue;
+                    }
+
+                    // Skip observers which don't match the provided predicate.
+                    if (predicate != null && !predicate(observerEntryPair.Value.Observer))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        notification(observerEntryPair.Value.Observer);
+                    }
+                    catch (Exception)
+                    {
+                        // Failing observers are considered defunct and will be removed.
+                        defunct ??= [];
+                        defunct.Add(observerEntryPair.Key);
                     }
                 }
             }
+
+            RemoveDefunct(defunct);
         }
 
         /// <summary>
@@ -255,25 +258,36 @@ namespace Orleans.Utilities
         /// </summary>
         public void ClearExpired()
         {
-            var now = GetDateTime();
             var defunct = default(List<TIdentity>);
-            foreach (var observer in _observers)
+            using (var snapshot = CreateReadSnapshot())
             {
-                if (observer.Value.LastSeen + ExpirationDuration < now)
+                var now = GetDateTime();
+
+                foreach (var observerEntryPair in snapshot.Observers)
                 {
-                    // Expired observers will be removed.
-                    defunct ??= new List<TIdentity>();
-                    defunct.Add(observer.Key);
+                    if (observerEntryPair.Value.LastSeen + ExpirationDuration < now)
+                    {
+                        // Expired observers will be removed.
+                        defunct ??= [];
+                        defunct.Add(observerEntryPair.Key);
+                    }
                 }
             }
 
+            RemoveDefunct(defunct);
+        }
+
+        private void RemoveDefunct(List<TIdentity> defunct)
+        {
             // Remove defunct observers.
-            if (defunct is { Count: > 0 })
+            if (defunct != default(List<TIdentity>) && defunct.Count > 0)
             {
+                var observers = GetWritableObservers();
+
                 _log.LogInformation("Removing {Count} defunct observers entries.", defunct.Count);
-                foreach (var observer in defunct)
+                foreach (var observerIdToRemove in defunct)
                 {
-                    _observers.Remove(observer, out _);
+                    observers.Remove(observerIdToRemove, out _);
                 }
             }
         }
@@ -284,7 +298,7 @@ namespace Orleans.Utilities
         /// <returns>
         /// A <see cref="T:System.Collections.Generic.IEnumerator`1"/> that can be used to iterate through the collection.
         /// </returns>
-        public IEnumerator<TObserver> GetEnumerator() => _observers.Select(observer => observer.Value.Observer).GetEnumerator();
+        public IEnumerator<TObserver> GetEnumerator() => new ObserverEnumerator(CreateReadSnapshot());
 
         /// <summary>
         /// Returns an enumerator that iterates through a collection.
@@ -294,10 +308,27 @@ namespace Orleans.Utilities
         /// </returns>
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
+        private ReadSnapshot CreateReadSnapshot()
+        {
+            ++_numReaders;
+            var observers = _readSnapshot = _observers;
+            return new(this, observers);
+        }
+
+        private Dictionary<TIdentity, ObserverEntry> GetWritableObservers()
+        {
+            if (_numReaders > 0 && ReferenceEquals(_observers, _readSnapshot))
+            {
+                _observers = new Dictionary<TIdentity, ObserverEntry>(_observers);
+            }
+
+            return _observers;
+        }
+
         /// <summary>
         /// An observer entry.
         /// </summary>
-        private class ObserverEntry
+        private sealed class ObserverEntry
         {
             /// <summary>
             /// Gets or sets the observer.
@@ -309,6 +340,40 @@ namespace Orleans.Utilities
             /// </summary>
             public DateTime LastSeen { get; set; }
         }
-    }
 
+        private readonly struct ReadSnapshot(
+            ObserverManager<TIdentity, TObserver> manager,
+            IReadOnlyDictionary<TIdentity, ObserverEntry> snapshot) : IDisposable
+        {
+            public IReadOnlyDictionary<TIdentity, ObserverEntry> Observers { get; } = snapshot;
+
+            public void Dispose()
+            {
+                if (--manager._numReaders == 0)
+                {
+                    manager._readSnapshot = null;
+                }
+            }
+        }
+
+        private sealed class ObserverEnumerator(ReadSnapshot snapshot) : IEnumerator<TObserver>
+        {
+            private bool _isDisposed;
+            private readonly IEnumerator<KeyValuePair<TIdentity, ObserverEntry>> _enumerator = snapshot.Observers.GetEnumerator();
+            public TObserver Current => _enumerator.Current.Value.Observer;
+            object IEnumerator.Current => Current;
+            public void Dispose()
+            {
+                if (!_isDisposed)
+                {
+                    _isDisposed = true;
+                    _enumerator.Dispose();
+                    snapshot.Dispose();
+                }
+            }
+
+            public bool MoveNext() => _enumerator.MoveNext();
+            public void Reset() => _enumerator.Reset();
+        }
+    }
 }
