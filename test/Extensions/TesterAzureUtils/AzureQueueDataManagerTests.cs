@@ -9,7 +9,7 @@ using Xunit;
 namespace Tester.AzureUtils
 {
     [TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("AzureQueue")]
-    public class AzureQueueDataManagerTests : IClassFixture<AzureStorageBasicTests>, IAsyncLifetime
+    public class AzureQueueDataManagerTests : IAsyncLifetime
     {
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
@@ -18,6 +18,8 @@ namespace Tester.AzureUtils
 
         public AzureQueueDataManagerTests()
         {
+            TestUtils.CheckForAzureStorage();
+
             var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName("Client", DateTime.Now.ToString("yyyyMMdd_hhmmss")));
             logger = loggerFactory.CreateLogger<AzureQueueDataManagerTests>();
             this.loggerFactory = loggerFactory;
