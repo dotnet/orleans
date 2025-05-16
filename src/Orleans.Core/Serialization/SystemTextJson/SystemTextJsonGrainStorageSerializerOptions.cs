@@ -28,13 +28,10 @@ namespace Orleans.Serialization
     {
         public void PostConfigure(string? name, SystemTextJsonGrainStorageSerializerOptions options)
         {
+            var ipAddressConverter = new IpAddressConverter();
             options.JsonSerializerOptions.Converters.Add(new GrainIdJsonConverter());
-            options.JsonSerializerOptions.Converters.Add(new IpAddressConverter());
-     
-            options.JsonSerializerOptions.Converters.Add(new SiloAddressConverter());
-            options.JsonSerializerOptions.Converters.Add(new MembershipVersionConverter());
-            options.JsonSerializerOptions.Converters.Add(new UniqueKeyJsonConverter());
-            options.JsonSerializerOptions.Converters.Add(new IpEndPointConverter());
+            options.JsonSerializerOptions.Converters.Add(ipAddressConverter);
+            options.JsonSerializerOptions.Converters.Add(new IpEndPointConverter(ipAddressConverter));
             options.JsonSerializerOptions.Converters.Add(new GrainReferenceConverter(grainReferenceActivator));
         }
     }

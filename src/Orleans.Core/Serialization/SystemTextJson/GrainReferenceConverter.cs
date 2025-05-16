@@ -12,8 +12,10 @@ namespace Orleans.Serialization
     {
         private readonly Type _addressableType = typeof(IAddressable);
 
+        /// <inheritdoc />
         public override bool CanConvert(Type typeToConvert) => _addressableType.IsAssignableFrom(typeToConvert);
 
+        /// <inheritdoc />
         public override IAddressable? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             string? type = null, key = null, iface = null;
@@ -62,6 +64,7 @@ namespace Orleans.Serialization
             return referenceActivator.CreateReference(grainId, grainInterface);
         }
 
+        /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, IAddressable value, JsonSerializerOptions options)
         {
             var val = value.AsReference();

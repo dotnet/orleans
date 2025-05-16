@@ -470,5 +470,11 @@ namespace Orleans.Runtime
 
         /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, SiloAddress value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToUtf8String());
+
+        /// <inheritdoc />
+        public override SiloAddress ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => SiloAddress.FromParsableString(reader.GetString()!);
+
+        /// <inheritdoc />
+        public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] SiloAddress value, JsonSerializerOptions options) => writer.WritePropertyName(value.ToUtf8String());
     }
 }

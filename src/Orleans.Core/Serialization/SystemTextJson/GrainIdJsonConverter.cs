@@ -10,6 +10,7 @@ namespace Orleans.Serialization
 {
     internal sealed class GrainIdJsonConverter : JsonConverter<GrainId>
     {
+        /// <inheritdoc />
         public override GrainId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType != JsonTokenType.StartObject)
@@ -51,6 +52,7 @@ namespace Orleans.Serialization
             }
         }
 
+        /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, GrainId value, JsonSerializerOptions options)
         {
             writer.WriteStartObject();
@@ -59,6 +61,7 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc />
         public override GrainId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var valueLength = reader.HasValueSequence
@@ -75,6 +78,7 @@ namespace Orleans.Serialization
             return GrainId.Parse(buf);
         }
 
+        /// <inheritdoc />
         public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] GrainId value, JsonSerializerOptions options)
         {
             var type = value.Type.AsSpan();
