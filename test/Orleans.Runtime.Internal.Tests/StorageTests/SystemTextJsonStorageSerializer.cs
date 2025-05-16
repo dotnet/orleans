@@ -104,7 +104,13 @@ namespace UnitTests.StorageTests
         public void UniqueKeyConverter() => Roundtrip(UniqueKey.NewKey());
 
         [Fact]
-        public void IpEndPointConverter() => Roundtrip(IPEndPoint.Parse("127.0.0.1:499"));
+        public void IpEndPointConverter()
+        { 
+            Roundtrip(IPEndPoint.Parse("[1234:1224:1223:1234:1234:ffff:192.168.100.228]:443"));
+            Roundtrip(IPEndPoint.Parse("[1234:1224:1223:1234:1234:ffff:192.168.100.228]"));
+            Roundtrip(IPEndPoint.Parse("192.168.100.228"));
+            Roundtrip(IPEndPoint.Parse("192.168.100.228:443"));
+        }
 
         [Fact]
         public void EventSequenceTokenV2Converter() => Roundtrip(new EventSequenceTokenV2(35242,24298));
