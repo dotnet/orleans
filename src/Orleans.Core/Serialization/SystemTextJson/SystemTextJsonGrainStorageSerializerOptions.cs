@@ -30,7 +30,7 @@ namespace Orleans.Serialization
         {
             options.JsonSerializerOptions.Converters.Add(new GrainIdJsonConverter());
             options.JsonSerializerOptions.Converters.Add(new IpAddressConverter());
-            options.JsonSerializerOptions.Converters.Add(new ActivationIdJsonConverter());
+     
             options.JsonSerializerOptions.Converters.Add(new SiloAddressConverter());
             options.JsonSerializerOptions.Converters.Add(new MembershipVersionConverter());
             options.JsonSerializerOptions.Converters.Add(new UniqueKeyJsonConverter());

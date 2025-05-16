@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Orleans.Runtime;
@@ -53,9 +54,38 @@ namespace Orleans.Serialization
         public override void Write(Utf8JsonWriter writer, GrainId value, JsonSerializerOptions options)
         {
             writer.WriteStartObject();
-            writer.WriteString("Type", value.Type.ToString());
-            writer.WriteString("Key", value.Key.ToString());
+            writer.WriteString("Type", value.Type.AsSpan());
+            writer.WriteString("Key", value.Key.AsSpan());
             writer.WriteEndObject();
+        }
+
+        public override GrainId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var valueLength = reader.HasValueSequence
+                ? checked((int)reader.ValueSequence.Length)
+                : reader.ValueSpan.Length;
+
+            Span<char> buf = valueLength <= 128
+                ? (stackalloc char[128])[..valueLength]
+                : new char[valueLength];
+
+            var written = reader.CopyString(buf);
+            buf = buf[..written];
+
+            return GrainId.Parse(buf);
+        }
+
+        public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] GrainId value, JsonSerializerOptions options)
+        {
+            var type = value.Type.AsSpan();
+            var key = value.Key.AsSpan();
+            Span<byte> buf = stackalloc byte[type.Length + key.Length + 1];
+
+            type.CopyTo(buf);
+            buf[type.Length] = (byte)'/';
+            key.CopyTo(buf[(type.Length + 1)..]);
+
+            writer.WritePropertyName(buf);
         }
     }
 }

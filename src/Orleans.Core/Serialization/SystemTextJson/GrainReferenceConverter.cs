@@ -67,8 +67,8 @@ namespace Orleans.Serialization
             var val = value.AsReference();
             writer.WriteStartObject();
             writer.WriteStartObject("Id");
-            writer.WriteString("Type", val.GrainId.Type.ToString());
-            writer.WriteString("Key", val.GrainId.Key.ToString());
+            writer.WriteString("Type", val.GrainId.Type.AsSpan());
+            writer.WriteString("Key", val.GrainId.Key.AsSpan());
             writer.WriteEndObject();
             writer.WriteString("Interface", val.InterfaceType.ToString());
             writer.WriteEndObject();
