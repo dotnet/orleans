@@ -18,7 +18,7 @@ namespace Orleans.Runtime.MembershipService
     /// <summary>
     /// Responsible for ensuring that this silo monitors other silos in the cluster.
     /// </summary>
-    internal class ClusterHealthMonitor : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor.ITestAccessor, IDisposable, IAsyncDisposable
+    internal partial class ClusterHealthMonitor : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor.ITestAccessor, IDisposable, IAsyncDisposable
     {
         private readonly CancellationTokenSource shutdownCancellation = new CancellationTokenSource();
         private readonly ILocalSiloDetails localSiloDetails;
@@ -76,7 +76,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting to process membership updates");
+                LogDebugStartingToProcessMembershipUpdates(log);
                 await foreach (var tableSnapshot in this.membershipService.MembershipTableUpdates.WithCancellation(this.shutdownCancellation.Token))
                 {
                     var utcNow = DateTime.UtcNow;
@@ -111,7 +111,7 @@ namespace Orleans.Runtime.MembershipService
             }
             finally
             {
-                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopped processing membership updates");
+                LogDebugStoppedProcessingMembershipUpdates(log);
             }
         }
 
@@ -129,16 +129,12 @@ namespace Orleans.Runtime.MembershipService
                 {
                     try
                     {
-                        if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stale silo with a joining or created state found, calling 'TryToSuspectOrKill'");
+                        LogDebugStaleSiloFound(log);
                         await this.membershipService.TryToSuspectOrKill(member.Key);
                     }
                     catch(Exception exception)
                     {
-                        log.LogError(
-                            exception,
-                            "Silo {SuspectAddress} has had the status '{SiloStatus}' for longer than 'MaxJoinAttemptTime' but a call to 'TryToSuspectOrKill' has failed",
-                            member.Value.SiloAddress,
-                            member.Value.Status.ToString());
+                        LogErrorTryToSuspectOrKillFailed(log, exception, member.Value.SiloAddress, member.Value.Status);
                     }
                 }
             }
@@ -228,11 +224,7 @@ namespace Orleans.Runtime.MembershipService
                 var myIndex = tmpList.FindIndex(el => el.SiloAddress.Equals(self.SiloAddress));
                 if (myIndex < 0)
                 {
-                    log.LogError(
-                        (int)ErrorCode.Runtime_Error_100305,
-                        "This silo {SiloAddress} status {Status} is not in its own local silo list! This is a bug!",
-                        self.SiloAddress.ToString(),
-                        self.Status);
+                    LogErrorSiloNotInLocalList(log, self.SiloAddress, self.Status);
                     throw new OrleansMissingMembershipEntryException(
                         $"This silo {self.SiloAddress} status {self.Status} is not in its own local silo list! This is a bug!");
                 }
@@ -267,11 +259,7 @@ namespace Orleans.Runtime.MembershipService
             var result = newProbedSilos.ToImmutable();
             if (!AreTheSame(monitoredSilos, result))
             {
-                log.LogInformation(
-                    (int)ErrorCode.MembershipWatchList,
-                    "Will watch (actively ping) {ProbedSiloCount} silos: {ProbedSilos}",
-                    newProbedSilos.Count,
-                    Utils.EnumerableToString(newProbedSilos.Keys));
+                LogInformationWillWatchActivelyPing(log, newProbedSilos.Count, new(newProbedSilos.Keys));
             }
 
             return result;
@@ -368,7 +356,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exception)
             {
-                log.LogError(exception, "Error cancelling shutdown token.");
+                LogErrorCancellingShutdownToken(log, exception);
             }
 
             foreach (var monitor in monitoredSilos.Values)
@@ -379,7 +367,7 @@ namespace Orleans.Runtime.MembershipService
                 }
                 catch (Exception exception)
                 {
-                    log.LogError(exception, "Error disposing monitor for {SiloAddress}.", monitor.TargetSiloAddress);
+                    LogErrorDisposingMonitorForSilo(log, exception, monitor.TargetSiloAddress);
                 }
             }
         }
@@ -392,7 +380,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exception)
             {
-                log.LogError(exception, "Error cancelling shutdown token.");
+                LogErrorCancellingShutdownToken(log, exception);
             }
 
             var tasks = new List<Task>();
@@ -404,11 +392,68 @@ namespace Orleans.Runtime.MembershipService
                 }
                 catch (Exception exception)
                 {
-                    log.LogError(exception, "Error disposing monitor for {SiloAddress}.", monitor.TargetSiloAddress);
+                    LogErrorDisposingMonitorForSilo(log, exception, monitor.TargetSiloAddress);
                 }
             }
 
             await Task.WhenAll(tasks).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         }
+
+        // --- Logging methods ---
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Starting to process membership updates"
+        )]
+        private static partial void LogDebugStartingToProcessMembershipUpdates(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Stopped processing membership updates"
+        )]
+        private static partial void LogDebugStoppedProcessingMembershipUpdates(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Stale silo with a joining or created state found, calling 'TryToSuspectOrKill'"
+        )]
+        private static partial void LogDebugStaleSiloFound(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Silo {SuspectAddress} has had the status '{SiloStatus}' for longer than 'MaxJoinAttemptTime' but a call to 'TryToSuspectOrKill' has failed"
+        )]
+        private static partial void LogErrorTryToSuspectOrKillFailed(ILogger logger, Exception exception, SiloAddress suspectAddress, SiloStatus siloStatus);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100305,
+            Level = LogLevel.Error,
+            Message = "This silo {SiloAddress} status {Status} is not in its own local silo list! This is a bug!"
+        )]
+        private static partial void LogErrorSiloNotInLocalList(ILogger logger, SiloAddress siloAddress, SiloStatus status);
+
+        private readonly struct ProbedSilosLogRecord(IEnumerable<SiloAddress> probedSilos)
+        {
+            public override string ToString() => Utils.EnumerableToString(probedSilos);
+        }
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.MembershipWatchList,
+            Level = LogLevel.Information,
+            Message = "Will watch (actively ping) {ProbedSiloCount} silos: {ProbedSilos}"
+        )]
+        private static partial void LogInformationWillWatchActivelyPing(ILogger logger, int probedSiloCount, ProbedSilosLogRecord probedSilos);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error cancelling shutdown token."
+        )]
+        private static partial void LogErrorCancellingShutdownToken(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error disposing monitor for {SiloAddress}."
+        )]
+        private static partial void LogErrorDisposingMonitorForSilo(ILogger logger, Exception exception, SiloAddress siloAddress);
     }
 }

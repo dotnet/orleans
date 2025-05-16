@@ -7,7 +7,7 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.MembershipService
 {
-    internal sealed class MembershipSystemTarget : SystemTarget, IMembershipService, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed partial class MembershipSystemTarget : SystemTarget, IMembershipService, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly MembershipTableManager membershipTableManager;
         private readonly ILogger<MembershipSystemTarget> log;
@@ -36,9 +36,7 @@ namespace Orleans.Runtime.MembershipService
             }
             else
             {
-                if (this.log.IsEnabled(LogLevel.Trace))
-                    this.log.LogTrace("-Received GOSSIP MembershipChangeNotification with MembershipVersion.MinValue. Going to read the table");
-
+                LogTraceReceivedGossipMembershipChangeNotificationWithMinValue(this.log);
                 await ReadTable();
             }
         }
@@ -88,7 +86,7 @@ namespace Orleans.Runtime.MembershipService
                 }
                 catch (TimeoutException exception)
                 {
-                    log.LogWarning(exception, "Requested probe timeout {ProbeTimeout} exceeded", probeTimeout);
+                    LogWarningRequestedProbeTimeoutExceeded(this.log, exception, probeTimeout);
                     throw;
                 }
 
@@ -139,14 +137,7 @@ namespace Orleans.Runtime.MembershipService
             SiloAddress updatedSilo,
             SiloStatus updatedStatus)
         {
-            if (this.log.IsEnabled(LogLevel.Trace))
-            {
-                this.log.LogTrace(
-                    "-Sending status update GOSSIP notification about silo {UpdatedSilo}, status {UpdatedStatus}, to silo {RemoteSilo}",
-                    updatedSilo,
-                    updatedStatus,
-                    silo);
-            }
+            LogTraceSendingStatusUpdateGossipNotification(this.log, updatedSilo, updatedStatus, silo);
 
             try
             {
@@ -155,11 +146,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exception)
             {
-                this.log.LogWarning(
-                    (int)ErrorCode.MembershipGossipSendFailure,
-                    exception,
-                    "Error sending gossip notification to remote silo '{Silo}'.",
-                    silo);
+                LogWarningErrorSendingGossipNotificationToRemoteSilo(this.log, exception, silo);
             }
         }
 
@@ -171,10 +158,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exception)
             {
-                this.log.LogError(
-                    (int)ErrorCode.MembershipGossipProcessingFailure,
-                    exception,
-                    "Error refreshing membership table.");
+                LogErrorErrorRefreshingMembershipTable(this.log, exception);
             }
         }
 
@@ -202,5 +186,37 @@ namespace Orleans.Runtime.MembershipService
         {
             // No-op, just ensure this instance is created at start-up.
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "-Received GOSSIP MembershipChangeNotification with MembershipVersion.MinValue. Going to read the table"
+        )]
+        private static partial void LogTraceReceivedGossipMembershipChangeNotificationWithMinValue(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Requested probe timeout {ProbeTimeout} exceeded"
+        )]
+        private static partial void LogWarningRequestedProbeTimeoutExceeded(ILogger logger, Exception exception, TimeSpan probeTimeout);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "-Sending status update GOSSIP notification about silo {UpdatedSilo}, status {UpdatedStatus}, to silo {RemoteSilo}"
+        )]
+        private static partial void LogTraceSendingStatusUpdateGossipNotification(ILogger logger, SiloAddress updatedSilo, SiloStatus updatedStatus, SiloAddress remoteSilo);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.MembershipGossipSendFailure,
+            Level = LogLevel.Warning,
+            Message = "Error sending gossip notification to remote silo '{Silo}'."
+        )]
+        private static partial void LogWarningErrorSendingGossipNotificationToRemoteSilo(ILogger logger, Exception exception, SiloAddress silo);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.MembershipGossipProcessingFailure,
+            Level = LogLevel.Error,
+            Message = "Error refreshing membership table."
+        )]
+        private static partial void LogErrorErrorRefreshingMembershipTable(ILogger logger, Exception exception);
     }
 }

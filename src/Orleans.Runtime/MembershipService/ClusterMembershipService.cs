@@ -10,7 +10,7 @@ using Orleans.Runtime.Utilities;
 
 namespace Orleans.Runtime
 {
-    internal class ClusterMembershipService : IClusterMembershipService, ILifecycleParticipant<ISiloLifecycle>, IDisposable
+    internal partial class ClusterMembershipService : IClusterMembershipService, ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
         private readonly AsyncEnumerable<ClusterMembershipSnapshot> updates;
         private readonly MembershipTableManager membershipTableManager;
@@ -81,7 +81,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting to process membership updates");
+                LogDebugStartingToProcessMembershipUpdates(log);
                 await foreach (var tableSnapshot in this.membershipTableManager.MembershipTableUpdates.WithCancellation(ct))
                 {
                     this.updates.TryPublish(tableSnapshot.CreateClusterMembershipSnapshot());
@@ -93,12 +93,12 @@ namespace Orleans.Runtime
             }
             catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
             {
-                this.log.LogError(exception, "Error processing membership updates");
+                LogErrorProcessingMembershipUpdates(log, exception);
                 this.fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
             }
             finally
             {
-                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopping membership update processor");
+                LogDebugStoppingMembershipUpdateProcessor(log);
             }
         }
 
@@ -130,5 +130,23 @@ namespace Orleans.Runtime
         {
             this.updates.Dispose();
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Starting to process membership updates"
+        )]
+        private static partial void LogDebugStartingToProcessMembershipUpdates(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error processing membership updates"
+        )]
+        private static partial void LogErrorProcessingMembershipUpdates(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Stopping membership update processor"
+        )]
+        private static partial void LogDebugStoppingMembershipUpdateProcessor(ILogger logger);
     }
 }

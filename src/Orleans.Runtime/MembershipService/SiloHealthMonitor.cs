@@ -17,7 +17,7 @@ namespace Orleans.Runtime.MembershipService
     /// <summary>
     /// Responsible for monitoring an individual remote silo.
     /// </summary>
-    internal class SiloHealthMonitor : ITestAccessor, IHealthCheckable, IDisposable, IAsyncDisposable
+    internal partial class SiloHealthMonitor : ITestAccessor, IHealthCheckable, IDisposable, IAsyncDisposable
     {
         private readonly ILogger _log;
         private readonly IOptionsMonitor<ClusterMembershipOptions> _clusterMembershipOptions;
@@ -203,7 +203,7 @@ namespace Orleans.Runtime.MembershipService
                         // Note that all recused silos will be included in the consideration set the next time cluster membership changes.
                         if (probeResult.Status != ProbeResultStatus.Succeeded && probeResult.IntermediaryHealthDegradationScore > 0)
                         {
-                            _log.LogInformation("Recusing unhealthy intermediary '{Intermediary}' and trying again with remaining nodes", intermediary);
+                            LogInformationRecusingUnhealthyIntermediary(_log, intermediary);
                             otherNodes = [.. otherNodes.Where(node => !node.Equals(intermediary))];
                             overrideDelay = TimeSpan.FromMilliseconds(250);
                         }
@@ -216,7 +216,7 @@ namespace Orleans.Runtime.MembershipService
                 }
                 catch (Exception exception)
                 {
-                    _log.LogError(exception, "Exception monitoring silo {SiloAddress}", TargetSiloAddress);
+                    LogErrorExceptionMonitoringSilo(_log, exception, TargetSiloAddress);
                 }
             }
 
@@ -256,10 +256,7 @@ namespace Orleans.Runtime.MembershipService
         private async Task<ProbeResult> ProbeDirectly(CancellationToken cancellation)
         {
             var id = ++_nextProbeId;
-            if (_log.IsEnabled(LogLevel.Trace))
-            {
-                _log.LogTrace("Going to send Ping #{Id} to probe silo {Silo}", id, TargetSiloAddress);
-            }
+            LogTraceGoingToSendPing(_log, id, TargetSiloAddress);
 
             var roundTripTimer = ValueStopwatch.StartNew();
             ProbeResult probeResult;
@@ -286,14 +283,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 MessagingInstruments.OnPingReplyReceived(TargetSiloAddress);
 
-                if (_log.IsEnabled(LogLevel.Trace))
-                {
-                    _log.LogTrace(
-                        "Got successful ping response for ping #{Id} from {Silo} with round trip time of {RoundTripTime}",
-                        id,
-                        TargetSiloAddress,
-                        roundTripTimer.Elapsed);
-                }
+                LogTraceGotSuccessfulPingResponse(_log, id, TargetSiloAddress, roundTripTimer.Elapsed);
 
                 _failedProbes = 0;
                 _elapsedSinceLastSuccessfulResponse.Restart();
@@ -305,14 +295,7 @@ namespace Orleans.Runtime.MembershipService
                 MessagingInstruments.OnPingReplyMissed(TargetSiloAddress);
 
                 var failedProbes = ++_failedProbes;
-                _log.LogWarning(
-                    (int)ErrorCode.MembershipMissedPing,
-                    failureException,
-                    "Did not get response for probe #{Id} to silo {Silo} after {Elapsed}. Current number of consecutive failed probes is {FailedProbeCount}",
-                    id,
-                    TargetSiloAddress,
-                    roundTripTimer.Elapsed,
-                    failedProbes);
+                LogWarningDidNotGetResponseForProbe(_log, failureException, id, TargetSiloAddress, roundTripTimer.Elapsed, failedProbes);
 
                 probeResult = ProbeResult.CreateDirect(failedProbes, ProbeResultStatus.Failed);
             }
@@ -330,10 +313,7 @@ namespace Orleans.Runtime.MembershipService
         private async Task<ProbeResult> ProbeIndirectly(SiloAddress intermediary, TimeSpan directProbeTimeout, CancellationToken cancellation)
         {
             var id = ++_nextProbeId;
-            if (_log.IsEnabled(LogLevel.Trace))
-            {
-                _log.LogTrace("Going to send indirect ping #{Id} to probe silo {Silo} via {Intermediary}", id, TargetSiloAddress, intermediary);
-            }
+            LogTraceGoingToSendIndirectPing(_log, id, TargetSiloAddress, intermediary);
 
             var roundTripTimer = ValueStopwatch.StartNew();
             ProbeResult probeResult;
@@ -350,13 +330,7 @@ namespace Orleans.Runtime.MembershipService
 
                 if (indirectResult.Succeeded)
                 {
-                    _log.LogInformation(
-                        "Indirect probe request #{Id} to silo {SiloAddress} via silo {IntermediarySiloAddress} succeeded after {RoundTripTime} with a direct probe response time of {ProbeResponseTime}.",
-                        id,
-                        TargetSiloAddress,
-                        intermediary,
-                        roundTripTimer.Elapsed,
-                        indirectResult.ProbeResponseTime);
+                    LogInformationIndirectProbeSucceeded(_log, id, TargetSiloAddress, intermediary, roundTripTimer.Elapsed, indirectResult.ProbeResponseTime);
 
                     MessagingInstruments.OnPingReplyReceived(TargetSiloAddress);
 
@@ -369,24 +343,12 @@ namespace Orleans.Runtime.MembershipService
 
                     if (indirectResult.IntermediaryHealthScore > 0)
                     {
-                        _log.LogInformation(
-                            "Ignoring failure result for ping #{Id} from {Silo} since the intermediary used to probe the silo is not healthy. Intermediary health degradation score: {IntermediaryHealthScore}.",
-                            id,
-                            TargetSiloAddress,
-                            indirectResult.IntermediaryHealthScore);
+                        LogInformationIgnoringFailureResultForPing(_log, id, TargetSiloAddress, indirectResult.IntermediaryHealthScore);
                         probeResult = ProbeResult.CreateIndirect(_failedProbes, ProbeResultStatus.Unknown, indirectResult, intermediary);
                     }
                     else
                     {
-                        _log.LogWarning(
-                            "Indirect probe request #{Id} to silo {SiloAddress} via silo {IntermediarySiloAddress} failed after {RoundTripTime} with a direct probe response time of {ProbeResponseTime}. Failure message: {FailureMessage}. Intermediary health score: {IntermediaryHealthScore}.",
-                            id,
-                            TargetSiloAddress,
-                            intermediary,
-                            roundTripTimer.Elapsed,
-                            indirectResult.ProbeResponseTime,
-                            indirectResult.FailureMessage,
-                            indirectResult.IntermediaryHealthScore);
+                        LogWarningIndirectProbeFailed(_log, id, TargetSiloAddress, intermediary, roundTripTimer.Elapsed, indirectResult.ProbeResponseTime, indirectResult.FailureMessage, indirectResult.IntermediaryHealthScore);
 
                         var missed = ++_failedProbes;
                         probeResult = ProbeResult.CreateIndirect(missed, ProbeResultStatus.Failed, indirectResult, intermediary);
@@ -396,7 +358,7 @@ namespace Orleans.Runtime.MembershipService
             catch (Exception exception)
             {
                 MessagingInstruments.OnPingReplyMissed(TargetSiloAddress);
-                _log.LogWarning(exception, "Indirect probe request failed.");
+                LogWarningIndirectProbeRequestFailed(_log, exception);
                 probeResult = ProbeResult.CreateIndirect(_failedProbes, ProbeResultStatus.Unknown, default, intermediary);
             }
 
@@ -444,5 +406,66 @@ namespace Orleans.Runtime.MembershipService
             Failed,
             Succeeded
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Going to send Ping #{Id} to probe silo {Silo}"
+        )]
+        private static partial void LogTraceGoingToSendPing(ILogger logger, int id, SiloAddress silo);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Got successful ping response for ping #{Id} from {Silo} with round trip time of {RoundTripTime}"
+        )]
+        private static partial void LogTraceGotSuccessfulPingResponse(ILogger logger, int id, SiloAddress silo, TimeSpan roundTripTime);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.MembershipMissedPing,
+            Message = "Did not get response for probe #{Id} to silo {Silo} after {Elapsed}. Current number of consecutive failed probes is {FailedProbeCount}"
+        )]
+        private static partial void LogWarningDidNotGetResponseForProbe(ILogger logger, Exception exception, int id, SiloAddress silo, TimeSpan elapsed, int failedProbeCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Going to send indirect ping #{Id} to probe silo {Silo} via {Intermediary}"
+        )]
+        private static partial void LogTraceGoingToSendIndirectPing(ILogger logger, int id, SiloAddress silo, SiloAddress intermediary);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Indirect probe request #{Id} to silo {SiloAddress} via silo {IntermediarySiloAddress} succeeded after {RoundTripTime} with a direct probe response time of {ProbeResponseTime}."
+        )]
+        private static partial void LogInformationIndirectProbeSucceeded(ILogger logger, int id, SiloAddress siloAddress, SiloAddress intermediarySiloAddress, TimeSpan roundTripTime, TimeSpan probeResponseTime);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Ignoring failure result for ping #{Id} from {Silo} since the intermediary used to probe the silo is not healthy. Intermediary health degradation score: {IntermediaryHealthScore}."
+        )]
+        private static partial void LogInformationIgnoringFailureResultForPing(ILogger logger, int id, SiloAddress silo, int intermediaryHealthScore);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Indirect probe request #{Id} to silo {SiloAddress} via silo {IntermediarySiloAddress} failed after {RoundTripTime} with a direct probe response time of {ProbeResponseTime}. Failure message: {FailureMessage}. Intermediary health score: {IntermediaryHealthScore}."
+        )]
+        private static partial void LogWarningIndirectProbeFailed(ILogger logger, int id, SiloAddress siloAddress, SiloAddress intermediarySiloAddress, TimeSpan roundTripTime, TimeSpan probeResponseTime, string failureMessage, int intermediaryHealthScore);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Indirect probe request failed."
+        )]
+        private static partial void LogWarningIndirectProbeRequestFailed(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Recusing unhealthy intermediary '{Intermediary}' and trying again with remaining nodes"
+        )]
+        private static partial void LogInformationRecusingUnhealthyIntermediary(ILogger logger, SiloAddress intermediary);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Exception monitoring silo {SiloAddress}"
+        )]
+        private static partial void LogErrorExceptionMonitoringSilo(ILogger logger, Exception exception, SiloAddress siloAddress);
     }
 }

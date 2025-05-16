@@ -10,7 +10,7 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal sealed class AdaptiveDirectoryCacheMaintainer
+    internal sealed partial class AdaptiveDirectoryCacheMaintainer
     {
         private static readonly TimeSpan SLEEP_TIME_BETWEEN_REFRESHES = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromMinutes(1); // this should be something like minTTL/4
 
@@ -135,14 +135,7 @@ namespace Orleans.Runtime.GrainDirectory
                         }
                     }
 
-                    if (Log.IsEnabled(LogLevel.Trace))
-                        Log.LogTrace(
-                            "Silo {SiloAddress} self-owned (and removed) {OwnedAndRemovedCount}, kept {KeptCount}, removed {RemovedCount} and tried to refresh {RefreshedCount} grains",
-                            router.MyAddress,
-                            ownedAndRemovedCount,
-                            keptCount,
-                            removedCount,
-                            refreshedCount);
+                    LogTraceSelfOwnedAndRemoved(Log, router.MyAddress, ownedAndRemovedCount, keptCount, removedCount, refreshedCount);
 
                     // Send batch requests
                     SendBatchCacheRefreshRequests(fetchInBatchList);
@@ -174,7 +167,7 @@ namespace Orleans.Runtime.GrainDirectory
                     ProcessCacheRefreshResponse(silo, response);
                 }).Ignore();
 
-                if (Log.IsEnabled(LogLevel.Trace)) Log.LogTrace("Silo {SiloAddress} is sending request to silo {OwnerSilo} with {Count} entries", router.MyAddress, silo, cachedGrainAndETagList.Count);
+                LogTraceSendingRequest(Log, router.MyAddress, silo, cachedGrainAndETagList.Count);
             }
         }
 
@@ -182,7 +175,7 @@ namespace Orleans.Runtime.GrainDirectory
             SiloAddress silo,
             List<AddressAndTag> refreshResponse)
         {
-            if (Log.IsEnabled(LogLevel.Trace)) Log.LogTrace("Silo {SiloAddress} received ProcessCacheRefreshResponse. #Response entries {Count}.", router.MyAddress, refreshResponse.Count);
+            LogTraceReceivedProcessCacheRefreshResponse(Log, router.MyAddress, refreshResponse.Count);
 
             int otherSiloCount = 0, updatedCount = 0, unchangedCount = 0;
 
@@ -218,14 +211,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
             }
 
-            if (Log.IsEnabled(LogLevel.Trace))
-                Log.LogTrace(
-                    "Silo {SiloAddress} processed refresh response from {OtherSilo} with {UpdatedCount} updated, {RemovedCount} removed, {UnchangedCount} unchanged grains",
-                    router.MyAddress,
-                    silo,
-                    otherSiloCount,
-                    updatedCount,
-                    unchangedCount);
+            LogTraceProcessedRefreshResponse(Log, router.MyAddress, silo, otherSiloCount, updatedCount, unchangedCount);
         }
 
         /// <summary>
@@ -277,5 +263,29 @@ namespace Orleans.Runtime.GrainDirectory
             lastNumAccesses = curNumAccesses;
             lastNumHits = curNumHits;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Silo {SiloAddress} self-owned (and removed) {OwnedAndRemovedCount}, kept {KeptCount}, removed {RemovedCount} and tried to refresh {RefreshedCount} grains"
+        )]
+        private static partial void LogTraceSelfOwnedAndRemoved(ILogger logger, SiloAddress siloAddress, int ownedAndRemovedCount, int keptCount, int removedCount, int refreshedCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Silo {SiloAddress} is sending request to silo {OwnerSilo} with {Count} entries"
+        )]
+        private static partial void LogTraceSendingRequest(ILogger logger, SiloAddress siloAddress, SiloAddress ownerSilo, int count);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Silo {SiloAddress} received ProcessCacheRefreshResponse. #Response entries {Count}."
+        )]
+        private static partial void LogTraceReceivedProcessCacheRefreshResponse(ILogger logger, SiloAddress siloAddress, int count);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Silo {SiloAddress} processed refresh response from {OtherSilo} with {UpdatedCount} updated, {RemovedCount} removed, {UnchangedCount} unchanged grains"
+        )]
+        private static partial void LogTraceProcessedRefreshResponse(ILogger logger, SiloAddress siloAddress, SiloAddress otherSilo, int updatedCount, int removedCount, int unchangedCount);
     }
 }
