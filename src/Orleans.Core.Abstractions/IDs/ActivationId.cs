@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Buffers.Text;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -109,14 +110,29 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override ActivationId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => reader.GetString() is { } str ? ActivationId.FromParsableString(str) : default;
 
-        /// <inheritdoc />
-        public override void Write(Utf8JsonWriter writer, ActivationId value, JsonSerializerOptions options)
+        private void WriteCore(Utf8JsonWriter writer, ActivationId value, JsonSerializerOptions options, bool writeAsPropertyName)
         {
             Span<byte> buf = stackalloc byte[33];
             buf[0] = (byte)'@';
             Utf8Formatter.TryFormat(value.Key, buf[1..], out var len, 'N');
             Debug.Assert(len == 32);
-            writer.WriteStringValue(buf);
+
+            if (writeAsPropertyName)
+            {
+                writer.WritePropertyName(buf);
+            }
+            else
+            {
+                writer.WriteStringValue(buf);
+            }
         }
+        /// <inheritdoc />
+        public override void Write(Utf8JsonWriter writer, ActivationId value, JsonSerializerOptions options)
+            => WriteCore(writer, value, options, false);
+
+        public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] ActivationId value, JsonSerializerOptions options)
+            => WriteCore(writer, value, options, true);
+
+        public override ActivationId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => Read(ref reader, typeToConvert, options);
     }
 }
