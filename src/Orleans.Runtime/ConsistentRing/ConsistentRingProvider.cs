@@ -159,7 +159,7 @@ namespace Orleans.Runtime.ConsistentRing
                     }
                 }
 
-                LogDebugRemovedServer(log, silo, silo.GetConsistentHashCode(), this);
+                LogDebugRemovedServer(log, silo, new(silo), this);
             }
         }
 
