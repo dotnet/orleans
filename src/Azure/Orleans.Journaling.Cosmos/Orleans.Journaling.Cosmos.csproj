@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Cosmos\CosmosOptions.cs" Link="Storage\CosmosOptions.cs" />
+    <Compile Include="..\Shared\Cosmos\CosmosOptionsValidator.cs" Link="Storage\CosmosOptionsValidator.cs" />
+    <Compile Include="..\Shared\Cosmos\BaseEntity.cs" Link="Storage\BaseEntity.cs" />
+    <Compile Include="..\Shared\Cosmos\Usings.cs" Link="Storage\Usings.cs" />
+    <Compile Include="..\Shared\Cosmos\CosmosIdSanitizer.cs" Link="Storage\CosmosIdSanitizer.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" />
+    <PackageReference Include="Azure.Core" />
+    <PackageReference Include="Microsoft.Azure.Cosmos" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Journaling.Tests" />
+  </ItemGroup>
+
+</Project>
