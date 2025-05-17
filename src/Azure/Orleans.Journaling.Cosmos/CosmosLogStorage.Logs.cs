@@ -1,6 +1,6 @@
 namespace Orleans.Journaling;
 
-internal partial class StateMachineStorage
+internal partial class CosmosLogStorage
 {
     [LoggerMessage(Level = LogLevel.Error, Message = "Error initializing Azure Cosmos DB Client for membership table provider.")]
     private partial void LogErrorInitializingClient(Exception exception);
@@ -28,9 +28,6 @@ internal partial class StateMachineStorage
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Entry {EntryId} for log {LogId} not found during read, though expected.")]
     private static partial void LogWarnNotFoundOnRead(ILogger logger, string logId, string entryId);
-
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Reading {EntryCount} log entries for log {LogId}")]
-    private static partial void LogReadingEntries(ILogger logger, string logId, int entryCount);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "De-compacting log {LogId} to append new entry.")]
     private static partial void LogDecompacting(ILogger logger, string logId);

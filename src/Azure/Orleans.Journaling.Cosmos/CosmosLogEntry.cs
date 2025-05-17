@@ -2,7 +2,7 @@ using Newtonsoft.Json;
 
 namespace Orleans.Journaling;
 
-internal class LogEntry : BaseEntity
+internal sealed class CosmosLogEntry : BaseEntity
 {
     [JsonProperty(nameof(LogId))]
     [JsonPropertyName(nameof(LogId))]
@@ -14,7 +14,7 @@ internal class LogEntry : BaseEntity
 
     [JsonProperty(nameof(EntryType))]
     [JsonPropertyName(nameof(EntryType))]
-    public LogEntryType EntryType { get; set; }
+    public CosmosLogEntryType EntryType { get; set; }
 
     [JsonProperty(nameof(Data))]
     [JsonPropertyName(nameof(Data))]

@@ -1,11 +1,8 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using System.Net;
 
 namespace Orleans.Journaling;
 
-internal partial class StateMachineStorage
+internal partial class CosmosLogStorage
 {
     private async ValueTask EnsureInitializedAsync(CancellationToken cancellationToken)
     {
@@ -31,7 +28,7 @@ internal partial class StateMachineStorage
         // Check for a pending compaction first.
         try
         {
-            var pendingResponse = await _container.ReadItemAsync<LogEntry>(
+            var pendingResponse = await _container.ReadItemAsync<CosmosLogEntry>(
                     PendingCompactionEntryId, _partitionKey, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
@@ -50,7 +47,7 @@ internal partial class StateMachineStorage
                 _logEntriesCount = 1;
                 _nextSequenceNumber = 0;
 
-                _compactedEntryETag = (await _container.ReadItemAsync<LogEntry>(
+                _compactedEntryETag = (await _container.ReadItemAsync<CosmosLogEntry>(
                         CompactedEntryId, _partitionKey, cancellationToken: cancellationToken)
                     .ConfigureAwait(false)).ETag;
 
@@ -67,7 +64,7 @@ internal partial class StateMachineStorage
         // Check for an existing compacted log.
         try
         {
-            var compactedResponse = await _container.ReadItemAsync<LogEntry>(
+            var compactedResponse = await _container.ReadItemAsync<CosmosLogEntry>(
                     CompactedEntryId, _partitionKey, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
@@ -90,16 +87,16 @@ internal partial class StateMachineStorage
         }
 
         // Read existing log entries to determine current state
-        List<LogEntry> entries = [];
+        List<CosmosLogEntry> entries = [];
 
         var query = new QueryDefinition(@"
                 SELECT * FROM c
                 WHERE c.LogId = @logId AND c.EntryType = @entryType
                 ORDER BY c.SequenceNumber ASC")
             .WithParameter("@logId", logId)
-            .WithParameter("@entryType", LogEntryType.Default);
+            .WithParameter("@entryType", CosmosLogEntryType.Default);
 
-        using var feed = _container.GetItemQueryIterator<LogEntry>(query, requestOptions: _requestOptions);
+        using var feed = _container.GetItemQueryIterator<CosmosLogEntry>(query, requestOptions: _requestOptions);
         long maxSequence = -1;
 
         while (feed.HasMoreResults)
@@ -134,6 +131,7 @@ internal partial class StateMachineStorage
         {
             LogErrorInitializingClient(ex);
             WrappedException.CreateAndRethrow(ex);
+
             throw;
         }
     }
