@@ -8,8 +8,10 @@ using System.Text.Json.Serialization;
 
 namespace Orleans.Serialization
 {
-    internal sealed class IpEndPointConverter(JsonConverter<IPAddress> addressConverter) : JsonConverter<IPEndPoint>
+    public sealed class IpEndPointConverter(JsonConverter<IPAddress> addressConverter) : JsonConverter<IPEndPoint>
     {
+        private const int MaxAddressSize = 71;
+
         /// <inheritdoc />
         public override IPEndPoint? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
@@ -56,9 +58,9 @@ namespace Orleans.Serialization
             ? checked((int)reader.ValueSequence.Length)
             : reader.ValueSpan.Length;
 
-            if (valueLength <= 65)
+            if (valueLength <= MaxAddressSize)
             {
-                Span<char> buffer = stackalloc char[65];
+                Span<char> buffer = stackalloc char[MaxAddressSize];
                 var written = reader.CopyString(buffer);
                 return IPEndPoint.Parse(buffer[..written]);
             }
