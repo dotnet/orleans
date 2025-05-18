@@ -2,12 +2,6 @@ namespace Orleans.Journaling;
 
 internal partial class CosmosLogStorage
 {
-    [LoggerMessage(Level = LogLevel.Error, Message = "Error initializing Azure Cosmos DB Client for membership table provider.")]
-    private partial void LogErrorInitializingClient(Exception exception);
-
-    [LoggerMessage(Level = LogLevel.Error, Message = "Error deleting Azure Cosmos DB database.")]
-    private partial void LogErrorDeletingDatabase(Exception exception);
-
     [LoggerMessage(Level = LogLevel.Debug, Message = "Appending {Length} bytes to log {LogId}")]
     private static partial void LogAppend(ILogger logger, long length, string logId);
 

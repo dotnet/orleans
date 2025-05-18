@@ -1,8 +1,4 @@
-using Microsoft.Azure.Cosmos;
-using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Buffers;
-using System.Buffers;
-using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Runtime.CompilerServices;
 
@@ -11,19 +7,16 @@ namespace Orleans.Journaling;
 #pragma warning disable ORLEANSEXP005
 
 internal sealed partial class CosmosLogStorage(
-    string logId,
+    string documentId,
+    PartitionKey partitionKey,
+    Container container,
     CosmosLogStorageOptions options,
-    IServiceProvider serviceProvider,
     ILogger<CosmosLogStorage> logger) : IStateMachineStorage
 {
-    [AllowNull] private CosmosClient _client;
-    [AllowNull] private Container _container;
-
-    private readonly PartitionKey _partitionKey = new(logId);
     private readonly int _compactionThreshold = options.CompactionThreshold;
-    private readonly QueryRequestOptions _requestOptions = new() { PartitionKey = new PartitionKey(logId) };
+    private readonly QueryRequestOptions _requestOptions = new() { PartitionKey = new PartitionKey(documentId) };
 
-    private bool _initialized;
+    private bool _isInitialized;
     private bool _isCompacted;
     private int _logEntriesCount;
     private long _nextSequenceNumber;
@@ -31,9 +24,9 @@ internal sealed partial class CosmosLogStorage(
 
     public bool IsCompactionRequested => !_isCompacted && _logEntriesCount > _compactionThreshold;
 
-    private string CompactedEntryId => $"{logId}-compacted";
-    private string PendingCompactionEntryId => $"{logId}-pending-compaction";
-    private string FormatEntryId(long sequenceNumber) => $"{logId}-{sequenceNumber}";
+    private string CompactedEntryId => $"{documentId}-compacted";
+    private string PendingCompactionEntryId => $"{documentId}-pending-compaction";
+    private string FormatEntryId(long sequenceNumber) => $"{documentId}-{sequenceNumber}";
 
     private static LogExtent ToLogExtent(byte[] data)
     {
@@ -45,10 +38,111 @@ internal sealed partial class CosmosLogStorage(
         return new(buffer);
     }
 
+    public async ValueTask EnsureInitializedAsync(CancellationToken cancellationToken)
+    {
+        if (_isInitialized)
+        {
+            return;
+        }
+
+        // Check for a pending compaction first.
+        try
+        {
+            var pendingResponse = await container.ReadItemAsync<CosmosLogEntry>(
+                    PendingCompactionEntryId, partitionKey, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+
+            if (pendingResponse.StatusCode == HttpStatusCode.OK && pendingResponse.Resource is { } pendingResource)
+            {
+                LogPendingCompactionFound(logger, documentId);
+
+                // A pending compaction exists. Attempt to complete it.
+                await FinalizeCompactionAsync(pendingResource.Data, pendingResponse.ETag,
+                    cancellationToken).ConfigureAwait(false);
+
+                // State is now compacted!
+
+                _isInitialized = true;
+                _isCompacted = true;
+                _logEntriesCount = 1;
+                _nextSequenceNumber = 0;
+
+                _compactedEntryETag = (await container.ReadItemAsync<CosmosLogEntry>(
+                        CompactedEntryId, partitionKey, cancellationToken: cancellationToken)
+                    .ConfigureAwait(false)).ETag;
+
+                LogInitialized(logger, documentId, _isCompacted, _logEntriesCount);
+
+                return;
+            }
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            // No pending compaction, proceed.
+        }
+
+        // Check for an existing compacted log.
+        try
+        {
+            var compactedResponse = await container.ReadItemAsync<CosmosLogEntry>(
+                    CompactedEntryId, partitionKey, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+
+            if (compactedResponse.StatusCode == HttpStatusCode.OK)
+            {
+                _isInitialized = true;
+                _isCompacted = true;
+                _logEntriesCount = 1;
+                _nextSequenceNumber = 0;
+                _compactedEntryETag = compactedResponse.ETag;
+
+                LogInitialized(logger, documentId, _isCompacted, _logEntriesCount);
+
+                return;
+            }
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            // No compacted log, proceed to check for entries.
+        }
+
+        // Read existing log entries to determine current state
+        List<CosmosLogEntry> entries = [];
+
+        var query = new QueryDefinition(@"
+                SELECT * FROM c
+                WHERE c.LogId = @logId AND c.EntryType = @entryType
+                ORDER BY c.SequenceNumber ASC")
+            .WithParameter("@logId", documentId)
+            .WithParameter("@entryType", CosmosLogEntryType.Default);
+
+        using var feed = container.GetItemQueryIterator<CosmosLogEntry>(query, requestOptions: _requestOptions);
+        long maxSequence = -1;
+
+        while (feed.HasMoreResults)
+        {
+            foreach (var item in await feed.ReadNextAsync(cancellationToken).ConfigureAwait(false))
+            {
+                entries.Add(item);
+
+                if (item.SequenceNumber > maxSequence)
+                {
+                    maxSequence = item.SequenceNumber;
+                }
+            }
+        }
+
+        _isInitialized = true;
+        _isCompacted = false;
+        _logEntriesCount = entries.Count;
+        _nextSequenceNumber = entries.Count > 0 ? maxSequence + 1 : 0;
+        _compactedEntryETag = null;
+
+        LogInitialized(logger, documentId, _isCompacted, _logEntriesCount);
+    }
+
     public async ValueTask AppendAsync(LogExtentBuilder builder, CancellationToken cancellationToken)
     {
-        await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
-
         var data = builder.ToArray();
         CosmosLogEntry newEntry;
 
@@ -62,18 +156,18 @@ internal sealed partial class CosmosLogStorage(
 
             // All this should be done in a transactional batch to ensure atomicity.
 
-            LogDecompacting(logger, logId);
+            LogDecompacting(logger, documentId);
 
-            var compactedResponse = await _container.ReadItemAsync<CosmosLogEntry>(
-                    CompactedEntryId, _partitionKey, cancellationToken: cancellationToken)
+            var compactedResponse = await container.ReadItemAsync<CosmosLogEntry>(
+                    CompactedEntryId, partitionKey, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
             if (compactedResponse.Resource is not { } compactedResource)
             {
-                throw new InvalidOperationException($"Compacted item {logId}-compacted not found during de-compaction.");
+                throw new InvalidOperationException($"Compacted item {documentId}-compacted not found during de-compaction.");
             }
                 
-            var batch = _container.CreateTransactionalBatch(_partitionKey);
+            var batch = container.CreateTransactionalBatch(partitionKey);
 
             // We delete the old compacted entry
             batch.DeleteItem(CompactedEntryId, new TransactionalBatchItemRequestOptions { IfMatchEtag = _compactedEntryETag });
@@ -81,7 +175,7 @@ internal sealed partial class CosmosLogStorage(
             var newCompactedEntry = new CosmosLogEntry
             {
                 Id = FormatEntryId(0),
-                LogId = logId,
+                LogId = documentId,
                 SequenceNumber = 0,
                 EntryType = CosmosLogEntryType.Default,
                 Data = compactedResource.Data
@@ -92,7 +186,7 @@ internal sealed partial class CosmosLogStorage(
             newEntry = new CosmosLogEntry
             {
                 Id = FormatEntryId(1),
-                LogId = logId,
+                LogId = documentId,
                 SequenceNumber = 1,
                 EntryType = CosmosLogEntryType.Default,
                 Data = data
@@ -118,38 +212,36 @@ internal sealed partial class CosmosLogStorage(
             newEntry = new CosmosLogEntry
             {
                 Id = FormatEntryId(_nextSequenceNumber),
-                LogId = logId,
+                LogId = documentId,
                 SequenceNumber = _nextSequenceNumber,
                 EntryType = CosmosLogEntryType.Default,
                 Data = data
             };
 
-            await _container
-                .CreateItemAsync(newEntry, _partitionKey, cancellationToken: cancellationToken)
+            await container
+                .CreateItemAsync(newEntry, partitionKey, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
             _logEntriesCount++;
             _nextSequenceNumber++;
         }
 
-        LogAppend(logger, builder.Length, logId);
+        LogAppend(logger, builder.Length, documentId);
     }
 
     public async IAsyncEnumerable<LogExtent> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
-
         if (_isCompacted)
         {
-            var compactedResponse = await _container.ReadItemAsync<CosmosLogEntry>(
-                    CompactedEntryId, _partitionKey, cancellationToken: cancellationToken)
+            var compactedResponse = await container.ReadItemAsync<CosmosLogEntry>(
+                    CompactedEntryId, partitionKey, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
             if (compactedResponse.StatusCode == HttpStatusCode.NotFound)
             {
                 // This might happen if DeleteAsync was called and _initialized wasn't reset.
                 // Or if initialization logic had a race. For safety, we yield break.
-                LogWarnNotFoundOnRead(logger, logId, CompactedEntryId);
+                LogWarnNotFoundOnRead(logger, documentId, CompactedEntryId);
 
                 yield break;
             }
@@ -161,7 +253,7 @@ internal sealed partial class CosmosLogStorage(
 
             _compactedEntryETag = compactedResponse.ETag;
 
-            LogRead(logger, compactedResource.Data.Length, logId);
+            LogRead(logger, compactedResource.Data.Length, documentId);
 
             yield return ToLogExtent(compactedResource.Data);
         }
@@ -170,12 +262,12 @@ internal sealed partial class CosmosLogStorage(
             int itemsRead = 0;
             long totalBytesRead = 0;
 
-            using var feed = _container.GetItemQueryIterator<CosmosLogEntry>(
+            using var feed = container.GetItemQueryIterator<CosmosLogEntry>(
                 new QueryDefinition(@"
                     SELECT * FROM c
                     WHERE c.LogId = @logId AND c.EntryType = @entryType
                     ORDER BY c.SequenceNumber ASC")
-                .WithParameter("@logId", logId)
+                .WithParameter("@logId", documentId)
                 .WithParameter("@entryType", CosmosLogEntryType.Default),
                     requestOptions: _requestOptions);
 
@@ -192,21 +284,19 @@ internal sealed partial class CosmosLogStorage(
 
             if (itemsRead > 0)
             {
-                LogRead(logger, totalBytesRead, logId);
+                LogRead(logger, totalBytesRead, documentId);
             }
         }
     }
 
     public async ValueTask ReplaceAsync(LogExtentBuilder builder, CancellationToken cancellationToken)
     {
-        await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
-
         var data = builder.ToArray();
 
         var pendingEntry = new CosmosLogEntry // This is our "snapshot" marker.
         {
             Id = PendingCompactionEntryId,
-            LogId = logId,
+            LogId = documentId,
             EntryType = CosmosLogEntryType.PendingCompaction,
             Data = data,
             SequenceNumber = 0
@@ -216,13 +306,13 @@ internal sealed partial class CosmosLogStorage(
         try
         {
             // Create if not exists, or replace if it exists (say from a failed previous attempt)
-            pendingResponse = await _container.UpsertItemAsync(pendingEntry,
-                    _partitionKey, cancellationToken: cancellationToken)
+            pendingResponse = await container.UpsertItemAsync(pendingEntry,
+                    partitionKey, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (CosmosException ex)
         {
-            LogErrorCreatingPending(logger, logId, ex.Message, ex);
+            LogErrorCreatingPending(logger, documentId, ex.Message, ex);
             WrappedException.CreateAndRethrow(ex);
 
             throw;
@@ -234,11 +324,11 @@ internal sealed partial class CosmosLogStorage(
         _logEntriesCount = 1;
         _nextSequenceNumber = 0;
 
-        _compactedEntryETag = (await _container.ReadItemAsync<CosmosLogEntry>(
-                CompactedEntryId, _partitionKey, cancellationToken: cancellationToken)
+        _compactedEntryETag = (await container.ReadItemAsync<CosmosLogEntry>(
+                CompactedEntryId, partitionKey, cancellationToken: cancellationToken)
             .ConfigureAwait(false)).ETag;
 
-        LogReplaced(logger, logId, data.Length);
+        LogReplaced(logger, documentId, data.Length);
     }
 
     public async ValueTask DeleteAsync(CancellationToken cancellationToken)
@@ -252,8 +342,8 @@ internal sealed partial class CosmosLogStorage(
         // We use 'dynamic' for the query results because we are only interested in the document 'id',
         // making it a lightweight way to handle the minimal data returned.
 
-        using var feed = _container.GetItemQueryIterator<dynamic>(
-            new QueryDefinition("SELECT c.id FROM c WHERE c.LogId = @logId").WithParameter("@logId", logId),
+        using var feed = container.GetItemQueryIterator<dynamic>(
+            new QueryDefinition("SELECT c.id FROM c WHERE c.LogId = @logId").WithParameter("@logId", documentId),
             requestOptions: _requestOptions);
 
         while (feed.HasMoreResults)
@@ -266,7 +356,7 @@ internal sealed partial class CosmosLogStorage(
 
         if (documentIds.Count > 0)
         {
-            var batch = _container.CreateTransactionalBatch(_partitionKey);
+            var batch = container.CreateTransactionalBatch(partitionKey);
 
             foreach (var itemId in documentIds)
             {
@@ -276,13 +366,13 @@ internal sealed partial class CosmosLogStorage(
             await batch.ExecuteAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        _initialized = false; // To force re-initialize on next the operation.
         _logEntriesCount = 0;
         _nextSequenceNumber = 0;
         _isCompacted = false;
         _compactedEntryETag = null;
+        _isInitialized = false; // To force re-initialize on next the operation.
 
-        LogDeleted(logger, logId, documentIds.Count);
+        LogDeleted(logger, documentId, documentIds.Count);
     }
 
     /// <summary>
@@ -291,13 +381,13 @@ internal sealed partial class CosmosLogStorage(
     /// </summary>
     private async Task FinalizeCompactionAsync(byte[] compactedData, string pendingEntryETag, CancellationToken cancellationToken)
     {
-        var batch = _container.CreateTransactionalBatch(_partitionKey);
+        var batch = container.CreateTransactionalBatch(partitionKey);
 
-        using var feed = _container.GetItemQueryIterator<dynamic>(
+        using var feed = container.GetItemQueryIterator<dynamic>(
             new QueryDefinition(@"
                 SELECT c.id FROM c
                 WHERE c.LogId = @logId AND (c.EntryType = @entry1 OR c.EntryType = @entry2)")
-            .WithParameter("@logId", logId)
+            .WithParameter("@logId", documentId)
             .WithParameter("@entry1", CosmosLogEntryType.Default)
             .WithParameter("@entry2", CosmosLogEntryType.Compacted),
                 requestOptions: _requestOptions);
@@ -315,7 +405,7 @@ internal sealed partial class CosmosLogStorage(
         var newCompacted = new CosmosLogEntry
         {
             Id = CompactedEntryId,
-            LogId = logId,
+            LogId = documentId,
             EntryType = CosmosLogEntryType.Compacted,
             Data = compactedData,
             SequenceNumber = 0
@@ -326,10 +416,10 @@ internal sealed partial class CosmosLogStorage(
         var batchResponse = await batch.ExecuteAsync(cancellationToken).ConfigureAwait(false);
         if (!batchResponse.IsSuccessStatusCode)
         {
-            LogErrorFinalizingCompaction(logger, logId, batchResponse.StatusCode.ToString(), batchResponse.ErrorMessage);
-            throw new InvalidOperationException($"Failed to finalize compaction for log {logId}. Status: {batchResponse.StatusCode}. Error: {batchResponse.ErrorMessage}");
+            LogErrorFinalizingCompaction(logger, documentId, batchResponse.StatusCode.ToString(), batchResponse.ErrorMessage);
+            throw new InvalidOperationException($"Failed to finalize compaction for log {documentId}. Status: {batchResponse.StatusCode}. Error: {batchResponse.ErrorMessage}");
         }
 
-        LogFinalizedCompaction(logger, logId);
+        LogFinalizedCompaction(logger, documentId);
     }
 }
