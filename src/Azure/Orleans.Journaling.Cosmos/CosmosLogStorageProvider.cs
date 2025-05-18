@@ -3,8 +3,6 @@ using System.Net;
 
 namespace Orleans.Journaling;
 
-#pragma warning disable ORLEANSEXP005
-
 internal sealed class CosmosLogStorageProvider(
     ILoggerFactory loggerFactory,
     IServiceProvider serviceProvider,
