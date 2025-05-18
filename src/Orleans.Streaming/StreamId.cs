@@ -7,6 +7,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Unicode;
 using Orleans.Streams;
 
 #nullable enable
@@ -19,7 +20,7 @@ namespace Orleans.Runtime
     [Serializable]
     [GenerateSerializer]
     [JsonConverter(typeof(StreamIdJsonConverter))]
-    public readonly struct StreamId : IEquatable<StreamId>, IComparable<StreamId>, ISerializable, ISpanFormattable
+    public readonly struct StreamId : IEquatable<StreamId>, IComparable<StreamId>, ISerializable, ISpanFormattable, IUtf8SpanFormattable
     {
         [Id(0)]
         private readonly byte[] fullKey;
@@ -207,6 +208,31 @@ namespace Orleans.Runtime
             return false;
         }
 
+        bool IUtf8SpanFormattable.TryFormat(Span<byte> utf8Destination, out int bytesWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
+        {
+            if (keyIndex == 0)
+            {
+                if (utf8Destination.Length >= fullKey.Length + 5)
+                {
+                    ("null/"u8).CopyTo(utf8Destination);
+                    fullKey.CopyTo(utf8Destination[5..]);
+                    bytesWritten = fullKey.Length + 5;
+                    return true;
+                }
+            }
+            else if (utf8Destination.Length > fullKey.Length)
+            {
+                fullKey[..keyIndex].CopyTo(utf8Destination);
+                utf8Destination[keyIndex] = (byte)'/';
+                fullKey[keyIndex..].CopyTo(utf8Destination[(keyIndex + 1)..]);
+                bytesWritten = fullKey.Length + 1;
+                return true;
+            }
+
+            bytesWritten = 0;
+            return false;
+        }
+
         /// <summary>
         /// Parses a <see cref="StreamId"/> instance from a <see cref="string"/>.
         /// </summary>
@@ -243,6 +269,7 @@ namespace Orleans.Runtime
         public string? GetNamespace() => keyIndex == 0 ? null : Encoding.UTF8.GetString(fullKey, 0, keyIndex);
 
         internal IdSpan GetKeyIdSpan() => keyIndex == 0 ? IdSpan.UnsafeCreate(fullKey, hash) : new(fullKey.AsSpan(keyIndex).ToArray());
+       
     }
 
     public sealed class StreamIdJsonConverter : JsonConverter<StreamId>
@@ -351,15 +378,16 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] StreamId value, JsonSerializerOptions options)
         {
-            var @namespace = value.Namespace.Span;
-            var key = value.Key.Span;
-            Span<byte> buf = stackalloc byte[@namespace.Length + key.Length + 1];
+            Span<byte> buf = stackalloc byte[128];
 
-            @namespace.CopyTo(buf);
-            buf[@namespace.Length] = (byte)'/';
-            key.CopyTo(buf[(@namespace.Length + 1)..]);
-
-            writer.WritePropertyName(buf);
+            if (((IUtf8SpanFormattable)value).TryFormat(buf, out var written, [], null))
+            {
+                writer.WritePropertyName(buf[..written]);
+            }
+            else
+            {
+                writer.WritePropertyName(value.ToString());
+            }
         }
     }
 }

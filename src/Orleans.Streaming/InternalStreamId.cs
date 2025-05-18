@@ -1,6 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Unicode;
+using Orleans.Providers.Streams.Generator;
 
 #nullable enable
 namespace Orleans.Runtime
@@ -8,6 +13,7 @@ namespace Orleans.Runtime
     [Immutable]
     [Serializable]
     [GenerateSerializer]
+    [JsonConverter(typeof(QualifiedStreamIdJsonConverter))]
     public readonly struct QualifiedStreamId : IEquatable<QualifiedStreamId>, IComparable<QualifiedStreamId>, ISerializable, ISpanFormattable
     {
         [Id(0)]
@@ -55,5 +61,81 @@ namespace Orleans.Runtime
             => destination.TryWrite($"{ProviderName}/{StreamId}", out charsWritten);
 
         internal string? GetNamespace() => StreamId.GetNamespace();
+    }
+
+    public sealed class QualifiedStreamIdJsonConverter : JsonConverter<QualifiedStreamId>
+    {
+        private readonly string? _qualifiedStreamIdType = typeof(QualifiedStreamId).AssemblyQualifiedName;
+
+        public override QualifiedStreamId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                return default;
+            }
+
+            string? providerName = null;
+            StreamId streamId = default;
+
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndObject)
+                {
+                    break;
+                }
+
+                if (reader.TokenType == JsonTokenType.PropertyName)
+                {
+                    var propertyName = reader.GetString();
+
+                    reader.Read();
+
+                    switch (propertyName)
+                    {
+                        case "pvn":
+                            providerName = reader.GetString();
+                            break;
+                        case "sid":
+                            streamId = JsonSerializer.Deserialize<StreamId>(ref reader, options);
+                            break;
+                    }
+                }
+            }
+
+            if (providerName is null || streamId == default)
+            {
+                return default;
+            }
+
+            return new QualifiedStreamId(providerName, streamId);
+        }
+
+        public override void Write(Utf8JsonWriter writer, QualifiedStreamId value, JsonSerializerOptions options)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("$type", _qualifiedStreamIdType);
+            writer.WriteString("pvn", value.ProviderName);
+            writer.WritePropertyName("sid");
+            JsonSerializer.Serialize(writer, value.StreamId, options);
+            writer.WriteEndObject();
+        }
+
+        public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] QualifiedStreamId value, JsonSerializerOptions options)
+        {
+            Span<char> buffer = stackalloc char[128];
+
+            if (value.ProviderName.TryCopyTo(buffer)
+                && ((ISpanFormattable)value.StreamId).TryFormat(buffer, out var written, [], null))
+            {
+                buffer[value.ProviderName.Length] = ':';
+                Span<byte> buffer2 = stackalloc byte[128];
+                Utf8.FromUtf16(buffer[0..(value.ProviderName.Length + written)], buffer2, out _, out written);
+                writer.WritePropertyName(buffer2[..written]);
+            }
+            else
+            {
+               writer.WritePropertyName($"{value.ProviderName}:{value.StreamId}");
+            }
+        }
     }
 }
