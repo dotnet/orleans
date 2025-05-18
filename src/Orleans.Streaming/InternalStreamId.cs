@@ -1,10 +1,13 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Unicode;
+using Newtonsoft.Json.Linq;
 using Orleans.Providers.Streams.Generator;
 
 #nullable enable
@@ -66,6 +69,7 @@ namespace Orleans.Runtime
     public sealed class QualifiedStreamIdJsonConverter : JsonConverter<QualifiedStreamId>
     {
         private readonly string? _qualifiedStreamIdType = typeof(QualifiedStreamId).AssemblyQualifiedName;
+        private const int MaxBufferSize = 128;
 
         public override QualifiedStreamId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
@@ -120,21 +124,46 @@ namespace Orleans.Runtime
             writer.WriteEndObject();
         }
 
-        public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] QualifiedStreamId value, JsonSerializerOptions options)
+        public override QualifiedStreamId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            Span<char> buffer = stackalloc char[128];
+            scoped ReadOnlySpan<byte> value;
 
-            if (value.ProviderName.TryCopyTo(buffer)
-                && ((ISpanFormattable)value.StreamId).TryFormat(buffer, out var written, [], null))
+            if (reader.HasValueSequence)
             {
-                buffer[value.ProviderName.Length] = ':';
-                Span<byte> buffer2 = stackalloc byte[128];
-                Utf8.FromUtf16(buffer[0..(value.ProviderName.Length + written)], buffer2, out _, out written);
-                writer.WritePropertyName(buffer2[..written]);
+                var buffer = reader.ValueSequence.Length <= MaxBufferSize ?
+                             stackalloc byte[(int)reader.ValueSequence.Length] :
+                             new byte[reader.ValueSequence.Length];
+
+                reader.ValueSequence.CopyTo(buffer);
+                value = buffer;
             }
             else
             {
-               writer.WritePropertyName($"{value.ProviderName}:{value.StreamId}");
+                value = reader.ValueSpan;
+            }
+
+            var i = value.IndexOf((byte)':');
+
+            ArgumentOutOfRangeException.ThrowIfLessThan(i, 0);
+
+            var providerName = Encoding.UTF8.GetString(value[0..i]);
+            var streamId = StreamId.Parse(value[(i + 1)..]);
+            return new QualifiedStreamId(providerName, streamId);
+        }
+
+        public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] QualifiedStreamId value, JsonSerializerOptions options)
+        {
+            Span<byte> buffer = stackalloc byte[MaxBufferSize];
+
+            if (Encoding.UTF8.TryGetBytes(value.ProviderName, buffer, out var bytesWritten)
+                && ((IUtf8SpanFormattable)value.StreamId).TryFormat(buffer[(bytesWritten + 1)..], out var moreBytesWritten, [], null))
+            {
+                buffer[bytesWritten] = (byte)':';
+                writer.WritePropertyName(buffer[..(bytesWritten + 1 + moreBytesWritten)]);
+            }
+            else
+            {
+                writer.WritePropertyName($"{value.ProviderName}:{value.StreamId}");
             }
         }
     }
