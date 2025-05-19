@@ -3,6 +3,7 @@ using Orleans.Serialization.Buffers;
 using System.Diagnostics;
 using System.Net;
 using System.Runtime.CompilerServices;
+using static CosmosIdSanitizer;
 
 namespace Orleans.Journaling.Cosmos;
 
@@ -11,8 +12,8 @@ internal sealed partial class CosmosLogStorage(
     Container container, CosmosLogStorageOptions options,
     ILogger<CosmosLogStorage> logger) : IStateMachineStorage
 {
-    private readonly string _compactedEntryId = $"{logId}-compacted";
-    private readonly string _compactionPendingEntryId = $"{logId}-compaction-pending";
+    private readonly string _compactedEntryId = Sanitize($"{logId}{SeparatorChar}compacted");
+    private readonly string _compactionPendingEntryId = Sanitize($"{logId}{SeparatorChar}compaction{SeparatorChar}pending");
     private readonly int _compactionThreshold = options.CompactionThreshold;
     private readonly QueryRequestOptions _requestOptions = new() { PartitionKey = partitionKey };
 
@@ -25,11 +26,20 @@ internal sealed partial class CosmosLogStorage(
     public bool IsCompactionRequested
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => !_isCompacted && _logEntriesCount > _compactionThreshold;
+        get
+        {
+            if (_logEntriesCount > _compactionThreshold)
+            {
+                Debug.Assert(!_isCompacted);
+                return true;
+            }
+
+            return false;
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private string CreateEntryId(long sequenceNumber) => $"{logId}-{sequenceNumber}";
+    private string CreateEntryId(long sequenceNumber) => Sanitize($"{logId}{SeparatorChar}{sequenceNumber}");
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static LogExtent ToLogExtent(byte[] data)
