@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using Orleans.Serialization.Buffers;
 using System.Diagnostics;
 using System.Net;
@@ -312,21 +313,10 @@ internal sealed partial class CosmosLogStorage(
             SequenceNumber = 0
         };
 
-        ItemResponse<CosmosLogEntry> pendingResponse;
-        try
-        {
-            // Create if not exists, or replace if it exists (say from a previous failed attempt)
-            pendingResponse = await container.UpsertItemAsync(
+        // Create if not exists, or replace if it exists (say from a previous failed attempt)
+       var pendingResponse = await container.UpsertItemAsync(
                 pendingEntry, partitionKey, cancellationToken: cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (CosmosException ex)
-        {
-            LogErrorCreatingPending(logger, logId, ex.Message, ex);
-            WrappedException.CreateAndRethrow(ex);
-
-            throw;
-        }
+            .ConfigureAwait(false);
 
         await FinalizeCompactionAsync(data, pendingResponse.ETag, cancellationToken).ConfigureAwait(false);
 
@@ -369,14 +359,20 @@ internal sealed partial class CosmosLogStorage(
 
         if (documentIds.Count > 0)
         {
-            var batch = container.CreateTransactionalBatch(partitionKey);
+            const int BatchSize = 100; // Transactional batch has a limit of 100 operations
 
-            foreach (var itemId in documentIds)
+            for (var i = 0; i < documentIds.Count; i += BatchSize)
             {
-                batch.DeleteItem(itemId);
-            }
+                var batch = container.CreateTransactionalBatch(partitionKey);
+                var batchIds = documentIds.Skip(i).Take(BatchSize);
 
-            await batch.ExecuteAsync(cancellationToken).ConfigureAwait(false);
+                foreach (var itemId in batchIds)
+                {
+                    batch.DeleteItem(itemId);
+                }
+
+                await batch.ExecuteAsync(cancellationToken).ConfigureAwait(false);
+            }
         }
 
         _logEntriesCount = 0;
