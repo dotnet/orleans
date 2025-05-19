@@ -1,7 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration.Internal;
-using Orleans.Journaling;
 using Orleans.Runtime;
+using Orleans.Journaling;
+using Orleans.Journaling.Cosmos;
 
 namespace Orleans.Hosting;
 

@@ -1,6 +1,6 @@
 using static CosmosIdSanitizer;
 
-namespace Orleans.Journaling;
+namespace Orleans.Journaling.Cosmos;
 
 /// <summary>
 /// The default implementation of <see cref="IDocumentIdProvider"/>.

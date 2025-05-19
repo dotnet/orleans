@@ -1,4 +1,4 @@
-﻿namespace Orleans.Journaling;
+namespace Orleans.Journaling.Cosmos;
 
 internal enum CosmosLogEntryType
 {
@@ -13,5 +13,5 @@ internal enum CosmosLogEntryType
     /// <summary>
     /// This represents an entry that compaction is pending.
     /// </summary>
-    PendingCompaction = 3
+    CompactionPending = 3
 }

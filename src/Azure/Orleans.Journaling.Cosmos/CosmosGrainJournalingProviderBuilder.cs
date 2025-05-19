@@ -2,6 +2,7 @@ using Azure.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
+using Orleans.Journaling.Cosmos;
 using Orleans.Providers;
 
 namespace Orleans.Hosting;

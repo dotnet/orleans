@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 
-namespace Orleans.Journaling;
+namespace Orleans.Journaling.Cosmos;
 
 internal sealed class CosmosLogStorageProvider(
     ILoggerFactory loggerFactory,

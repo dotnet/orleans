@@ -1,4 +1,4 @@
-namespace Orleans.Journaling;
+namespace Orleans.Journaling.Cosmos;
 
 internal partial class CosmosLogStorage
 {

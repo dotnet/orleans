@@ -1,4 +1,4 @@
-namespace Orleans.Journaling;
+namespace Orleans.Journaling.Cosmos;
 
 /// <summary>
 /// Gets document and partition identifiers for grain state documents.
