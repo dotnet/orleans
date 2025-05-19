@@ -4,7 +4,7 @@ using Microsoft.Extensions.Time.Testing;
 using Orleans.Configuration;
 using Xunit;
 
-namespace UnitTests.Serialization
+namespace UnitTests.Runtime
 {
     [TestCategory("BVT"), TestCategory("Runtime")]
     public class ActivationCollectorTests
