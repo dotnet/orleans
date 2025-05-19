@@ -189,10 +189,10 @@ namespace Orleans.Runtime
             var len = Encoding.UTF8.GetCharCount(fullKey);
             if (keyIndex == 0)
             {
-                if (destination.Length >= len + 5)
+                if (destination.Length >= len + 1)
                 {
-                    "null/".CopyTo(destination);
-                    charsWritten = Encoding.UTF8.GetChars(fullKey, destination[5..]) + 5;
+                    destination[0] = '/';
+                    charsWritten = Encoding.UTF8.GetChars(fullKey, destination[1..]) + 1;
                     return true;
                 }
             }
@@ -212,11 +212,11 @@ namespace Orleans.Runtime
         {
             if (keyIndex == 0)
             {
-                if (utf8Destination.Length >= fullKey.Length + 5)
+                if (utf8Destination.Length >= fullKey.Length + 1)
                 {
-                    ("null/"u8).CopyTo(utf8Destination);
-                    fullKey.CopyTo(utf8Destination[5..]);
-                    bytesWritten = fullKey.Length + 5;
+                    utf8Destination[0] = (byte)'/';
+                    fullKey.CopyTo(utf8Destination[1..]);
+                    bytesWritten = fullKey.Length + 1;
                     return true;
                 }
             }
@@ -380,7 +380,8 @@ namespace Orleans.Runtime
         {
             Span<byte> buf = stackalloc byte[128];
 
-            if (((IUtf8SpanFormattable)value).TryFormat(buf, out var written, [], null))
+            if (value is IUtf8SpanFormattable formattable
+                && formattable.TryFormat(buf, out var written, [], null))
             {
                 writer.WritePropertyName(buf[..written]);
             }
