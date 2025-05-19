@@ -37,7 +37,7 @@ namespace Orleans.Transactions
 
             LogTraceStartTransaction(new(stopwatch), guid, new(ts));
             this.statistics.TrackTransactionStarted();
-            return Task.FromResult<TransactionInfo>(new TransactionInfo(guid, ts, ts));
+            return Task.FromResult<TransactionInfo>(new TransactionInfo(guid, ts, ts, readOnly));
         }
 
         public async Task<(TransactionalStatus, Exception)> Resolve(TransactionInfo transactionInfo)
