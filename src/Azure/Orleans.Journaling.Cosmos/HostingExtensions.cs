@@ -6,11 +6,13 @@ using Orleans.Journaling.Cosmos;
 
 namespace Orleans.Hosting;
 
-public static class CosmosLogStorageHostingExtensions
+public static class HostingExtensions
 {
-    public static ISiloBuilder AddCosmosLogStorage(this ISiloBuilder builder) => builder.AddCosmosLogStorage(null);
+    public static ISiloBuilder AddCosmosLogStorage(this ISiloBuilder builder, Action<CosmosLogStorageOptions>? configure = null)
+        => builder.AddCosmosLogStorage<DefaultDocumentIdProvider>(configure);
 
-    public static ISiloBuilder AddCosmosLogStorage(this ISiloBuilder builder, Action<CosmosLogStorageOptions>? configure)
+    public static ISiloBuilder AddCosmosLogStorage<T>(this ISiloBuilder builder, Action<CosmosLogStorageOptions>? configure = null)
+        where T : class, IDocumentIdProvider
     {
         builder.AddStateMachineStorage();
 
@@ -25,6 +27,8 @@ public static class CosmosLogStorageHostingExtensions
             return builder;
         }
 
+        builder.Services.AddSingleton<T>();
+        builder.Services.AddFromExisting<IDocumentIdProvider, T>();
         builder.Services.AddSingleton<CosmosLogStorageProvider>();
         builder.Services.AddFromExisting<IStateMachineStorageProvider, CosmosLogStorageProvider>();
         builder.Services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, CosmosLogStorageProvider>();

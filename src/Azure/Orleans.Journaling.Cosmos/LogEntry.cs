@@ -2,7 +2,7 @@ using Newtonsoft.Json;
 
 namespace Orleans.Journaling.Cosmos;
 
-internal sealed class CosmosLogEntry : BaseEntity
+internal sealed class LogEntry : BaseEntity
 {
     /// <summary>
     /// Used for partitioning.
@@ -23,7 +23,7 @@ internal sealed class CosmosLogEntry : BaseEntity
     /// </summary>
     [JsonProperty(nameof(EntryType))]
     [JsonPropertyName(nameof(EntryType))]
-    public CosmosLogEntryType EntryType { get; set; }
+    public LogEntryType EntryType { get; set; }
 
     /// <summary>
     /// The actual log data.

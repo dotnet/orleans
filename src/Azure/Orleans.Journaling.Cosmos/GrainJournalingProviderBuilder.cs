@@ -7,7 +7,7 @@ using Orleans.Providers;
 
 namespace Orleans.Hosting;
 
-internal sealed class CosmosGrainJournalingProviderBuilder : IProviderBuilder<ISiloBuilder>
+internal sealed class GrainJournalingProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
     public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
     {

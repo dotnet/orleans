@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
+using Orleans.Journaling.Cosmos;
 using Orleans.Serialization;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
@@ -11,6 +12,24 @@ using TestExtensions;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
+
+[TestCategory("Cosmos"), TestCategory("Functional")]
+public sealed class CosmosStorageLogSegmentTests : LogSegmentTests
+{
+    public CosmosStorageLogSegmentTests()
+    {
+        JournalingCosmosTestConfiguration.CheckPreconditionsOrThrow();
+    }
+
+    protected override void ConfigureServices(IServiceCollection services)
+    {
+        services.Configure<CosmosLogStorageOptions>(options => options.ConfigureTestDefaults());
+        services.AddSingleton<IDocumentIdProvider, DefaultDocumentIdProvider>();
+        services.AddSingleton<CosmosLogStorageProvider>();
+        services.AddFromExisting<IStateMachineStorageProvider, CosmosLogStorageProvider>();
+        services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, CosmosLogStorageProvider>();
+    }
+}
 
 [TestCategory("AzureStorage"), TestCategory("Functional")]
 public sealed class AzureStorageLogSegmentTests : LogSegmentTests

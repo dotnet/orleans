@@ -2,16 +2,16 @@ namespace Orleans.Journaling.Cosmos;
 
 internal partial class CosmosLogStorage
 {
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Appending {Length} bytes to log {LogId}")]
-    private static partial void LogAppend(ILogger logger, long length, string logId);
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Appended {Length} bytes to log {LogId}")]
+    private static partial void LogAppended(ILogger logger, long length, string logId);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Reading {Length} bytes from log {LogId}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Read {Length} bytes from log {LogId}")]
     private static partial void LogRead(ILogger logger, long length, string logId);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Log {LogId} replaced, written {Length} bytes.")]
     private static partial void LogReplaced(ILogger logger, string logId, long length);
 
-    [LoggerMessage(Level = LogLevel.Trace, Message = "Initialized CosmosLogStorage for log {LogId}. IsCompacted: {IsCompacted}, EntryCount: {EntryCount}")]
+    [LoggerMessage(Level = LogLevel.Trace, Message = "Initialized log storage for log {LogId}. IsCompacted: {IsCompacted}, EntryCount: {EntryCount}")]
     private static partial void LogInitialized(ILogger logger, string logId, bool isCompacted, int entryCount);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Pending compaction found for log {LogId} during initialization. Attempting recovery.")]

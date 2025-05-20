@@ -1,6 +1,6 @@
 namespace Orleans.Journaling.Cosmos;
 
-internal enum CosmosLogEntryType
+internal enum LogEntryType
 {
     /// <summary>
     /// This <strong>is</strong> a log entry.
