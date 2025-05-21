@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.Reminders.AdoNet</PackageId>
     <Title>Microsoft Orleans ADO.NET Reminders Provider</Title>
     <Description>Microsoft Orleans reminders provider backed by ADO.NET</Description>
@@ -8,6 +9,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <AssemblyName>Orleans.Reminders.AdoNet</AssemblyName>
     <RootNamespace>Orleans.Reminders.AdoNet</RootNamespace>
     <DefineConstants>$(DefineConstants);REMINDERS_ADONET</DefineConstants>
@@ -22,3 +24,7 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders\Orleans.Reminders.csproj" />
   </ItemGroup>
 </Project>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
