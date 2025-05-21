@@ -12,6 +12,13 @@ dotnet add package Microsoft.Orleans.Persistence.AzureStorage
 
 ## Example - Configuring Azure Storage Persistence
 ```csharp
+// Define grain interface
+public interface IMyGrain : IGrainWithStringKey
+{
+    Task SetData(string data);
+    Task<string> GetData();
+}
+
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Hosting;

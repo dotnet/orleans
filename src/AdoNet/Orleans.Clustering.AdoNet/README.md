@@ -21,6 +21,21 @@ You will also need to install the appropriate database driver package for your d
 ## Example - Configuring ADO.NET Clustering
 
 ```csharp
+// Define a grain interface
+public interface IHelloGrain : IGrainWithStringKey
+{
+    Task<string> SayHello(string greeting);
+}
+
+// Implement the grain interface
+public class HelloGrain : Grain, IHelloGrain
+{
+    public Task<string> SayHello(string greeting)
+    {
+        return Task.FromResult($"Hello, {greeting}!");
+    }
+}
+
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -58,6 +73,21 @@ await host.WaitForShutdownAsync();
 ## Example - Configuring Client to Connect to Cluster
 
 ```csharp
+// Define a grain interface
+public interface IHelloGrain : IGrainWithStringKey
+{
+    Task<string> SayHello(string greeting);
+}
+
+// The grain implementation would be in the silo project
+// public class HelloGrain : Grain, IHelloGrain
+// {
+//     public Task<string> SayHello(string greeting)
+//     {
+//         return Task.FromResult($"Hello, {greeting}!");
+//     }
+// }
+
 using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;

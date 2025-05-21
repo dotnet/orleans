@@ -12,6 +12,21 @@ dotnet add package Microsoft.Orleans.Clustering.DynamoDB
 
 ## Example - Configuring DynamoDB Membership
 ```csharp
+// Define a grain interface
+public interface IHelloGrain : IGrainWithStringKey
+{
+    Task<string> SayHello(string greeting);
+}
+
+// Implement the grain interface
+public class HelloGrain : Grain, IHelloGrain
+{
+    public Task<string> SayHello(string greeting)
+    {
+        return Task.FromResult($"Hello, {greeting}!");
+    }
+}
+
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Microsoft.Extensions.DependencyInjection;
