@@ -9,7 +9,6 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
     <AssemblyName>Orleans.Persistence.DynamoDB</AssemblyName>
     <RootNamespace>Orleans.Persistence.DynamoDB</RootNamespace>
     <DefineConstants>$(DefineConstants);PERSISTENCE_DYNAMODB</DefineConstants>

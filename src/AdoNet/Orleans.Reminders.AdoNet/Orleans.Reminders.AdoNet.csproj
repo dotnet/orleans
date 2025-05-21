@@ -9,7 +9,6 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
     <AssemblyName>Orleans.Reminders.AdoNet</AssemblyName>
     <RootNamespace>Orleans.Reminders.AdoNet</RootNamespace>
     <DefineConstants>$(DefineConstants);REMINDERS_ADONET</DefineConstants>

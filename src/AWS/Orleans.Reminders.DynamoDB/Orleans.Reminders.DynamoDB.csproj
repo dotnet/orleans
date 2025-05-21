@@ -9,7 +9,6 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
     <AssemblyName>Orleans.Reminders.DynamoDB</AssemblyName>
     <RootNamespace>Orleans.Reminders.DynamoDB</RootNamespace>
     <DefineConstants>$(DefineConstants);REMINDERS_DYNAMODB</DefineConstants>

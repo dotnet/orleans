@@ -9,7 +9,6 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
     <AssemblyName>Orleans.Clustering.DynamoDB</AssemblyName>
     <RootNamespace>Orleans.Clustering.DynamoDB</RootNamespace>
     <DefineConstants>$(DefineConstants);CLUSTERING_DYNAMODB</DefineConstants>

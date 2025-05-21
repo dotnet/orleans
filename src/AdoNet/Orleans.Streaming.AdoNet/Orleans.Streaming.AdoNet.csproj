@@ -12,7 +12,6 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
     <AssemblyName>Orleans.Streaming.AdoNet</AssemblyName>
     <RootNamespace>Orleans.Streaming.AdoNet</RootNamespace>
     <DefineConstants>$(DefineConstants);STREAMING_ADONET</DefineConstants>
