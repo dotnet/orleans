@@ -27,23 +27,21 @@ namespace Orleans.Runtime
         private Task _collectionLoopTask;
         private int collectionNumber;
         private int _activationCount;
-        private readonly IOptions<GrainCollectionOptions> _options;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ActivationCollector"/> class.
         /// </summary>
-        /// <param name="timerFactory">The timer factory.</param>
+        /// <param name="timeProvider">The time provider.</param>
         /// <param name="options">The options.</param>
         /// <param name="logger">The logger.</param>
         public ActivationCollector(
-            IAsyncTimerFactory timerFactory,
+            TimeProvider timeProvider,
             IOptions<GrainCollectionOptions> options,
             ILogger<ActivationCollector> logger)
         {
-            _options = options;
             quantum = options.Value.CollectionQuantum;
             shortestAgeLimit = new(options.Value.ClassSpecificCollectionAge.Values.Aggregate(options.Value.CollectionAge.Ticks, (a, v) => Math.Min(a, v.Ticks)));
-            nextTicket = MakeTicketFromDateTime(DateTime.UtcNow);
+            nextTicket = MakeTicketFromDateTime(timeProvider.GetUtcNow().UtcDateTime);
             this.logger = logger;
             _collectionTimer = new PeriodicTimer(quantum);
         }
@@ -325,11 +323,17 @@ namespace Orleans.Runtime
             return ticket < nextTicket;
         }
 
-        private DateTime MakeTicketFromDateTime(DateTime timestamp)
+        public DateTime MakeTicketFromDateTime(DateTime timestamp)
         {
             // Round the timestamp to the next quantum. e.g. if the quantum is 1 minute and the timestamp is 3:45:22, then the ticket will be 3:46.
             // Note that TimeStamp.Ticks and DateTime.Ticks both return a long.
-            var ticket = new DateTime(((timestamp.Ticks - 1) / quantum.Ticks + 1) * quantum.Ticks, DateTimeKind.Utc);
+            var ticketTicks = ((timestamp.Ticks - 1) / quantum.Ticks + 1) * quantum.Ticks;
+            if (ticketTicks > DateTime.MaxValue.Ticks)
+            {
+                return DateTime.MaxValue;
+            }
+
+            var ticket = new DateTime(ticketTicks, DateTimeKind.Utc);
             if (ticket < nextTicket)
             {
                 throw new ArgumentException(string.Format("The earliest collection that can be scheduled from now is for {0}", new DateTime(nextTicket.Ticks - quantum.Ticks + 1, DateTimeKind.Utc)));
