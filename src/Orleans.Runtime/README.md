@@ -23,13 +23,7 @@ var builder = new HostBuilder()
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
-            .UseLocalhostClustering()
-            .Configure<ClusterOptions>(options =>
-            {
-                options.ClusterId = "my-cluster";
-                options.ServiceId = "MyOrleansService";
-            })
-            .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(MyGrain).Assembly).WithCodeGeneration());
+            .UseLocalhostClustering();
     });
 
 var host = builder.Build();

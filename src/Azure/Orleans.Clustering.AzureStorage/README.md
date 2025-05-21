@@ -29,11 +29,6 @@ var builder = new HostBuilder()
             {
                 options.ConnectionString = "YOUR_AZURE_STORAGE_CONNECTION_STRING";
                 options.TableName = "OrleansClustering"; // Optional: defaults to "OrleansClustering"
-            })
-            .Configure<ClusterOptions>(options =>
-            {
-                options.ClusterId = "my-cluster";
-                options.ServiceId = "MyOrleansService";
             });
     });
 
@@ -71,11 +66,6 @@ var clientBuilder = new HostBuilder()
             {
                 options.ConnectionString = "YOUR_AZURE_STORAGE_CONNECTION_STRING";
                 options.TableName = "OrleansClustering"; // Optional: defaults to "OrleansClustering"
-            })
-            .Configure<ClusterOptions>(options =>
-            {
-                options.ClusterId = "my-cluster";
-                options.ServiceId = "MyOrleansService";
             });
     });
 

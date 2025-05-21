@@ -25,8 +25,7 @@ var builder = new HostBuilder()
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
-            .UseLocalhostClustering()
-            .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(MyGrain).Assembly).WithCodeGeneration());
+            .UseLocalhostClustering();
     });
 
 // Start the host
