@@ -1,0 +1,89 @@
+# Microsoft Orleans Persistence for Azure Storage
+
+## Introduction
+Microsoft Orleans Persistence for Azure Storage provides grain persistence for Microsoft Orleans using Azure Storage (Blob and Table). This allows your grains to persist their state in Azure Storage and reload it when they are reactivated.
+
+## Getting Started
+To use this package, install it via NuGet:
+
+```shell
+dotnet add package Microsoft.Orleans.Persistence.AzureStorage
+```
+
+## Example - Configuring Azure Storage Persistence
+```csharp
+using Microsoft.Extensions.Hosting;
+using Orleans.Configuration;
+using Orleans.Hosting;
+
+var builder = new HostBuilder()
+    .UseOrleans(siloBuilder =>
+    {
+        siloBuilder
+            .UseLocalhostClustering()
+            // Configure Azure Table Storage as grain storage
+            .AddAzureTableGrainStorage(
+                name: "tableStore",
+                configureOptions: options =>
+                {
+                    options.ConnectionString = "YOUR_AZURE_STORAGE_CONNECTION_STRING";
+                })
+            // Configure Azure Blob Storage as grain storage
+            .AddAzureBlobGrainStorage(
+                name: "blobStore",
+                configureOptions: options =>
+                {
+                    options.ConnectionString = "YOUR_AZURE_STORAGE_CONNECTION_STRING";
+                });
+    });
+
+// Run the host
+await builder.RunConsoleAsync();
+```
+
+## Example - Using Grain Storage in a Grain
+```csharp
+// Define grain state class
+[Serializable]
+public class MyGrainState
+{
+    public string Data { get; set; }
+    public int Version { get; set; }
+}
+
+// Grain implementation that uses the Azure storage
+public class MyGrain : Grain, IMyGrain, IGrainWithStringKey
+{
+    private readonly IPersistentState<MyGrainState> _state;
+
+    public MyGrain([PersistentState("state", "tableStore")] IPersistentState<MyGrainState> state)
+    {
+        _state = state;
+    }
+
+    public async Task SetData(string data)
+    {
+        _state.State.Data = data;
+        _state.State.Version++;
+        await _state.WriteStateAsync();
+    }
+
+    public Task<string> GetData()
+    {
+        return Task.FromResult(_state.State.Data);
+    }
+}
+```
+
+## Documentation
+For more comprehensive documentation, please refer to:
+- [Microsoft Orleans Documentation](https://docs.microsoft.com/dotnet/orleans/)
+- [Grain Persistence](https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-persistence)
+- [Azure Storage Persistence](https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-persistence/azure-storage)
+
+## Feedback & Contributing
+- If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)
+- Join our community on [Discord](https://aka.ms/orleans-discord)
+- Follow the [@msftorleans](https://twitter.com/msftorleans) Twitter account for Orleans announcements
+- Contributions are welcome! Please review our [contribution guidelines](https://github.com/dotnet/orleans/blob/main/CONTRIBUTING.md)
+- This project is licensed under the [MIT license](https://github.com/dotnet/orleans/blob/main/LICENSE)
