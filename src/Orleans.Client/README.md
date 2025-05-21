@@ -26,15 +26,6 @@ public interface IMyGrain : IGrainWithStringKey
     Task<string> DoSomething();
 }
 
-// The grain implementation would be in the silo project
-// public class MyGrain : Grain, IMyGrain
-// {
-//     public Task<string> DoSomething()
-//     {
-//         return Task.FromResult("Done something!");
-//     }
-// }
-
 
 // Create a client
 var builder = new HostBuilder()
