@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
 using System.Diagnostics.Tracing;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Runtime;
 
 namespace Orleans.Statistics;
@@ -15,7 +17,7 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
     private long _availableMemoryBytes;
     private long _maximumAvailableMemoryBytes;
 
-    private readonly EventCounterListener _eventCounterListener = new();
+    private readonly EventCounterListener _eventCounterListener;
 
     [SuppressMessage("CodeQuality", "IDE0052:Remove unread private members", Justification = "Used for memory-dump debugging.")]
     private readonly ObservableCounter<long> _availableMemoryCounter;
@@ -27,9 +29,11 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
     private readonly DualModeKalmanFilter _memoryUsageFilter = new();
     private readonly DualModeKalmanFilter _availableMemoryFilter = new();
 
-    public EnvironmentStatisticsProvider()
+    public EnvironmentStatisticsProvider(IOptions<EnvironmentStatisticsOptions> options)
     {
         GC.Collect(0, GCCollectionMode.Forced, true); // we make sure the GC structure wont be empty, also performing a blocking GC guarantees immediate collection.
+
+        _eventCounterListener = new EventCounterListener(options.Value);
 
         _availableMemoryCounter = Instruments.Meter.CreateObservableCounter(InstrumentNames.RUNTIME_MEMORY_AVAILABLE_MEMORY_MB, () => (long)(_availableMemoryBytes / OneKiloByte / OneKiloByte), unit: "MB");
         _maximumAvailableMemoryCounter = Instruments.Meter.CreateObservableCounter(InstrumentNames.RUNTIME_MEMORY_TOTAL_PHYSICAL_MEMORY_MB, () => (long)(_maximumAvailableMemoryBytes / OneKiloByte / OneKiloByte), unit: "MB");
@@ -65,13 +69,20 @@ public EnvironmentStatistics GetEnvironmentStatistics()
 
     private sealed class EventCounterListener : EventListener
     {
+        private readonly EnvironmentStatisticsOptions _options;
+
         public float CpuUsage { get; private set; } = 0f;
+
+        public EventCounterListener(EnvironmentStatisticsOptions options)
+        {
+            _options = options;
+        }
 
         protected override void OnEventSourceCreated(EventSource source)
         {
             if (source.Name.Equals("System.Runtime"))
             {
-                Dictionary<string, string?>? refreshInterval = new() { ["EventCounterIntervalSec"] = "1" };
+                Dictionary<string, string?>? refreshInterval = new() { ["EventCounterIntervalSec"] = _options.CPUUsageCollectionInterval.TotalSeconds.ToString() };
                 EnableEvents(source, EventLevel.Informational, (EventKeywords)(-1), refreshInterval);
             }
         }

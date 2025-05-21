@@ -83,6 +83,7 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloControl>();
 
             // Statistics
+            services.AddOptions<EnvironmentStatisticsOptions>();
             services.AddSingleton<IEnvironmentStatisticsProvider, EnvironmentStatisticsProvider>();
 #pragma warning disable 618
             services.AddSingleton<OldEnvironmentStatistics>();
