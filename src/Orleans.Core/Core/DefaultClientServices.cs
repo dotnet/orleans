@@ -63,7 +63,6 @@ namespace Orleans
             services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientOptionsLogger>();
 
             // Statistics
-            services.AddOptions<EnvironmentStatisticsOptions>();
             services.AddSingleton<IEnvironmentStatisticsProvider, EnvironmentStatisticsProvider>();
 #pragma warning disable 618
             services.AddSingleton<OldEnvironmentStatistics>();
