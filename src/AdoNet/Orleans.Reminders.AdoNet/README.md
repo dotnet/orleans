@@ -26,24 +26,36 @@ dotnet add package Npgsql
 ## Example - Configuring ADO.NET Reminders
 ```csharp
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Example;
 
-var builder = Host.CreateApplicationBuilder(args)
-    .UseOrleans(siloBuilder =>
-    {
-        siloBuilder
-            .UseLocalhostClustering()
-            // Configure ADO.NET as reminder storage
-            .UseAdoNetReminderService(options =>
-            {
-                options.Invariant = "System.Data.SqlClient";  // For SQL Server
-                options.ConnectionString = "Server=localhost;Database=OrleansReminders;User ID=orleans;******;";
-            });
-    });
+// Create a host builder
+var builder = Host.CreateApplicationBuilder(args);
+builder.UseOrleans(siloBuilder =>
+{
+    siloBuilder
+        .UseLocalhostClustering()
+        // Configure ADO.NET as reminder storage
+        .UseAdoNetReminderService(options =>
+        {
+            options.Invariant = "System.Data.SqlClient";  // For SQL Server
+            options.ConnectionString = "Server=localhost;Database=OrleansReminders;User ID=orleans;******;";
+        });
+});
 
-// Run the host
-await builder.RunConsoleAsync();
+// Build and start the host
+var host = builder.Build();
+await host.StartAsync();
+
+// Get a grain reference and use it
+var grain = host.Services.GetRequiredService<IGrainFactory>().GetGrain<IReminderGrain>("my-reminder-grain");
+await grain.StartReminder("DailyReport");
+Console.WriteLine("Reminder started successfully!");
+
+// Keep the host running until the application is shut down
+await host.WaitForShutdownAsync();
 ```
 
 ## Example - Using Reminders in a Grain
@@ -53,9 +65,16 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 
+namespace Example;
+
+public interface IReminderGrain : IGrainWithStringKey
+{
+    Task StartReminder(string reminderName);
+    Task StopReminder();
+}
+
 public class ReminderGrain : Grain, IReminderGrain, IRemindable
 {
-    private IDisposable _timer;
     private string _reminderName = "MyReminder";
 
     public async Task StartReminder(string reminderName)
