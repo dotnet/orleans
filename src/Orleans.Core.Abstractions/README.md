@@ -16,12 +16,11 @@ This package is a dependency of both client and silo (server) applications and i
 ```csharp
 using Orleans;
 
-namespace MyGrainInterfaces
+namespace MyGrainInterfaces;
+
+public interface IHelloGrain : IGrainWithStringKey
 {
-    public interface IHelloGrain : IGrainWithStringKey
-    {
-        Task<string> SayHello(string greeting);
-    }
+    Task<string> SayHello(string greeting);
 }
 ```
 

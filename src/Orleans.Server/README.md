@@ -21,6 +21,8 @@ using System;
 using System.Threading.Tasks;
 
 // Define a grain interface
+namespace MyGrainNamespace;
+
 public interface IMyGrain : IGrainWithStringKey
 {
     Task<string> DoSomething();
@@ -37,7 +39,7 @@ public class MyGrain : Grain, IMyGrain
 
 
 // Create the host
-var builder = new HostBuilder()
+var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder

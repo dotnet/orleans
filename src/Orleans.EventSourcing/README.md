@@ -17,9 +17,12 @@ using Orleans;
 using Orleans.EventSourcing;
 using System;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Linq;
 
 // Define grain state and events
-[Serializable]
+namespace BankAccount;
+
 public class BankAccountState
 {
     public decimal Balance { get; set; }
@@ -27,13 +30,11 @@ public class BankAccountState
     public int Version { get; set; }
 }
 
-[Serializable]
 public class DepositEvent
 {
     public decimal Amount { get; set; }
 }
 
-[Serializable]
 public class WithdrawalEvent
 {
     public decimal Amount { get; set; }
@@ -118,7 +119,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading.Tasks;
 
-var builder = new HostBuilder()
+var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder

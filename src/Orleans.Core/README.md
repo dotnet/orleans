@@ -19,9 +19,28 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Configuration;
+using System;
+using System.Threading.Tasks;
+
+// Define a grain interface
+namespace MyGrainNamespace;
+
+public interface IHelloGrain : IGrainWithStringKey
+{
+    Task<string> SayHello(string greeting);
+}
+
+// Implement the grain interface
+public class HelloGrain : Grain, IHelloGrain
+{
+    public Task<string> SayHello(string greeting)
+    {
+        return Task.FromResult($"Hello! I got: {greeting}");
+    }
+}
 
 // Create a client
-var builder = new HostBuilder()
+var builder = Host.CreateApplicationBuilder(args)
     .UseOrleansClient(client =>
     {
         client.UseLocalhostClustering();
@@ -33,6 +52,12 @@ await host.StartAsync();
 // Get a reference to a grain and call it
 var grain = host.Services.GetRequiredService<IClusterClient>().GetGrain<IHelloGrain>("grain-id");
 var response = await grain.SayHello("Hello from client!");
+
+// Print the result
+Console.WriteLine($"Response: {response}");
+
+// Keep the host running until the application is shut down
+await host.WaitForShutdownAsync();
 ```
 
 ## Documentation
