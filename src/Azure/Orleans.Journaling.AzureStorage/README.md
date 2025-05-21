@@ -26,13 +26,10 @@ var builder = Host.CreateApplicationBuilder(args)
         siloBuilder
             .UseLocalhostClustering()
             // Configure Azure Storage as a journaling provider
-            .AddAzureTableJournal(
-                name: "AzureJournal",
-                configureOptions: options =>
-                {
-                    options.ConnectionString = "YOUR_AZURE_STORAGE_CONNECTION_STRING";
-                    options.TableName = "GrainJournal";
-                });
+            .AddAzureAppendBlobStateMachineStorage(optionsBuilder =>
+            {
+                optionsBuilder.Configure((options, serviceProvider) => options.BlobServiceClient = serviceProvider.GetRequiredService<BlobServiceClient>());
+            });
     });
 
 var host = await builder.StartAsync();

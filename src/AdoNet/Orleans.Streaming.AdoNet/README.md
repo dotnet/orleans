@@ -45,7 +45,7 @@ var builder = Host.CreateApplicationBuilder(args)
     });
 
 // Run the host
-await builder.RunConsoleAsync();
+await builder.RunAsync();
 ```
 
 ## Example - Using ADO.NET Streams in a Grain

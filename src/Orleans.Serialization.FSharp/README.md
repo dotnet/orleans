@@ -24,7 +24,7 @@ let builder =
                 |> ignore)
 
 // Run the host
-await builder.Build().RunAsync()
+await builder.RunAsync()
 ```
 
 ## Example - Using F# Types with Orleans

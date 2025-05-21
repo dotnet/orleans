@@ -27,7 +27,7 @@ var builder = Host.CreateApplicationBuilder(args)
     });
 
 // Run the host
-await builder.Build().RunAsync();
+await builder.RunAsync();
 ```
 
 ## Example - Using Newtonsoft.Json with a Custom Type

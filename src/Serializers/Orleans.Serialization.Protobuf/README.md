@@ -27,7 +27,7 @@ var builder = Host.CreateApplicationBuilder(args)
     });
 
 // Run the host
-await builder.RunConsoleAsync();
+await builder.RunAsync();
 ```
 
 ## Example - Using Protobuf with a Custom Type

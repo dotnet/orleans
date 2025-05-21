@@ -33,7 +33,7 @@ var builder = Host.CreateApplicationBuilder(args)
     });
 
 // Run the host
-await builder.RunConsoleAsync();
+await builder.RunAsync();
 ```
 
 ## Example - Using SQS Streams in a Grain
