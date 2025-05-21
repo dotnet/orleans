@@ -25,7 +25,7 @@ using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Hosting;
 
-var builder = new HostBuilder()
+var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
@@ -34,11 +34,6 @@ var builder = new HostBuilder()
             {
                 options.Invariant = "System.Data.SqlClient";  // Or other providers like "MySql.Data.MySqlClient", "Npgsql", etc.
                 options.ConnectionString = "Server=localhost;Database=OrleansCluster;User Id=myUsername;******;";
-            })
-            .Configure<ClusterOptions>(options =>
-            {
-                options.ClusterId = "my-cluster";
-                options.ServiceId = "MyOrleansService";
             });
     });
 
@@ -53,7 +48,7 @@ using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 
-var clientBuilder = new HostBuilder()
+var clientBuilder = Host.CreateApplicationBuilder(args)
     .UseOrleansClient(clientBuilder =>
     {
         clientBuilder
@@ -62,16 +57,18 @@ var clientBuilder = new HostBuilder()
             {
                 options.Invariant = "System.Data.SqlClient";  // Or other providers like "MySql.Data.MySqlClient", "Npgsql", etc.
                 options.ConnectionString = "Server=localhost;Database=OrleansCluster;User Id=myUsername;******;";
-            })
-            .Configure<ClusterOptions>(options =>
-            {
-                options.ClusterId = "my-cluster";
-                options.ServiceId = "MyOrleansService";
             });
     });
 
 var host = await clientBuilder.StartAsync();
 var client = host.Services.GetRequiredService<IClusterClient>();
+
+// Get a reference to a grain and call it
+var grain = client.GetGrain<IHelloGrain>("user123");
+var response = await grain.SayHello("World");
+
+// Keep the host running until the application is shut down
+await host.WaitForShutdownAsync();
 ```
 
 ## Database Setup
@@ -85,7 +82,7 @@ Before using the ADO.NET clustering provider, you need to set up the necessary d
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://docs.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Clustering providers](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/cluster-management)
 - [Relational Database Provider](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/relational-storage-providers)
 

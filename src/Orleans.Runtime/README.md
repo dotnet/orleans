@@ -38,7 +38,7 @@ await host.StartAsync();
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://docs.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Server configuration](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/server-configuration)
 - [Silo lifecycle](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/silo-lifecycle)
 - [Clustering](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/cluster-management)

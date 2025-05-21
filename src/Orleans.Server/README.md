@@ -23,11 +23,6 @@ var builder = new HostBuilder()
     {
         siloBuilder
             .UseLocalhostClustering()
-            .Configure<ClusterOptions>(options =>
-            {
-                options.ClusterId = "dev-cluster";
-                options.ServiceId = "MyOrleansApp";
-            })
             .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(MyGrain).Assembly).WithCodeGeneration());
     });
 
@@ -41,7 +36,7 @@ await host.WaitForShutdownAsync();
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://docs.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Orleans server (silo) configuration](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/server-configuration)
 - [Hosting Orleans](https://learn.microsoft.com/en-us/dotnet/orleans/host/generic-host)
 - [Grain persistence](https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-persistence)

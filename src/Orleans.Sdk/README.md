@@ -37,27 +37,29 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 
 // Create the host
-var builder = new HostBuilder()
+var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
             .UseLocalhostClustering()
-            .Configure<ClusterOptions>(options =>
-            {
-                options.ClusterId = "dev-cluster";
-                options.ServiceId = "MyOrleansApp";
-            })
             .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(HelloGrain).Assembly).WithCodeGeneration());
     });
 
 // Start the host
 var host = builder.Build();
 await host.StartAsync();
+// Keep the host running until the application is shut down
+await host.WaitForShutdownAsync();
+
+// Get a reference to a grain and call it
+var client = host.Services.GetRequiredService<IClusterClient>();
+var grain = client.GetGrain<IHelloGrain>("user123");
+var response = await grain.SayHello("World");
 ```
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://docs.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Getting started with Orleans](https://learn.microsoft.com/en-us/dotnet/orleans/tutorials-and-samples/tutorial-1)
 - [Grains](https://learn.microsoft.com/en-us/dotnet/orleans/grains/)
 - [Hosting Orleans](https://learn.microsoft.com/en-us/dotnet/orleans/host/)
