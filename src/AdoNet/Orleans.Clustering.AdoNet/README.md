@@ -86,15 +86,6 @@ public interface IHelloGrain : IGrainWithStringKey
     Task<string> SayHello(string greeting);
 }
 
-// The grain implementation would be in the silo project
-// public class HelloGrain : Grain, IHelloGrain
-// {
-//     public Task<string> SayHello(string greeting)
-//     {
-//         return Task.FromResult($"Hello, {greeting}!");
-//     }
-// }
-
 var clientBuilder = Host.CreateApplicationBuilder(args)
     .UseOrleansClient(clientBuilder =>
     {

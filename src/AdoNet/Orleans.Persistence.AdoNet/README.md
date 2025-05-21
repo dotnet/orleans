@@ -55,7 +55,6 @@ using Orleans;
 using Orleans.Runtime;
 
 // Define grain state class
-[Serializable]
 public class MyGrainState
 {
     public string Data { get; set; }
