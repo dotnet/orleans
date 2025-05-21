@@ -65,8 +65,8 @@ public class ReminderGrain : Grain, IReminderGrain, IRemindable
         // Register a persistent reminder
         await RegisterOrUpdateReminder(
             reminderName,
-            TimeSpan.FromSeconds(5),  // Time to delay before the first tick
-            TimeSpan.FromSeconds(30)); // Period of the reminder
+            TimeSpan.FromMinutes(2),  // Time to delay before the first tick (must be > 1 minute)
+            TimeSpan.FromMinutes(5)); // Period of the reminder (must be > 1 minute)
     }
 
     public async Task StopReminder()
