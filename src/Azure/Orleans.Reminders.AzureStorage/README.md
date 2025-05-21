@@ -35,9 +35,14 @@ await builder.RunConsoleAsync();
 
 ## Example - Using Reminders in a Grain
 ```csharp
+public interface IReminderGrain
+{
+    Task StartReminder(string reminderName);
+    Task StopReminder();
+}
+
 public class ReminderGrain : Grain, IReminderGrain, IRemindable
 {
-    private IDisposable _timer;
     private string _reminderName = "MyReminder";
 
     public async Task StartReminder(string reminderName)
