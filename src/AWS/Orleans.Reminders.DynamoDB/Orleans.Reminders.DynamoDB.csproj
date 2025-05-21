@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.Reminders.DynamoDB</PackageId>
     <Title>Microsoft Orleans AWS DynamoDB Reminders Provider</Title>
     <Description>Microsoft Orleans reminders provider backed by AWS DynamoDB</Description>
@@ -8,6 +9,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <AssemblyName>Orleans.Reminders.DynamoDB</AssemblyName>
     <RootNamespace>Orleans.Reminders.DynamoDB</RootNamespace>
     <DefineConstants>$(DefineConstants);REMINDERS_DYNAMODB</DefineConstants>
@@ -27,3 +29,7 @@
   </ItemGroup>
 
 </Project>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>

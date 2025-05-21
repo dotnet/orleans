@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.Persistence.DynamoDB</PackageId>
     <Title>Microsoft Orleans AWS DynamoDB Persistence Provider</Title>
     <Description>Microsoft Orleans persistence providers backed by AWS DynamoDB</Description>
@@ -8,6 +9,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <AssemblyName>Orleans.Persistence.DynamoDB</AssemblyName>
     <RootNamespace>Orleans.Persistence.DynamoDB</RootNamespace>
     <DefineConstants>$(DefineConstants);PERSISTENCE_DYNAMODB</DefineConstants>
@@ -24,3 +26,7 @@
     <PackageReference Include="AWSSDK.DynamoDBv2" />
   </ItemGroup>
 </Project>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
