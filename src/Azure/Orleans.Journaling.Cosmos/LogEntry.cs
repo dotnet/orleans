@@ -2,6 +2,36 @@ using Newtonsoft.Json;
 
 namespace Orleans.Journaling.Cosmos;
 
+internal enum LogEntryType
+{
+    /// <summary>
+    /// This <strong>is</strong> a log entry.
+    /// </summary>
+    Log = 1,
+    /// <summary>
+    /// This represents a compacted entry.
+    /// </summary>
+    Compacted = 2,
+    /// <summary>
+    /// This represents an entry that compaction is pending.
+    /// </summary>
+    CompactionPending = 3
+}
+
+
+/// <summary>
+/// Used for reading just the 'id' field of any given log entry document.
+/// </summary>
+/// <param name="value">The value of <see cref="BaseEntity.Id"/></param>
+[method: Newtonsoft.Json.JsonConstructor]
+[method: System.Text.Json.Serialization.JsonConstructor]
+internal readonly struct LogEntryId(string value)
+{
+    [JsonProperty("id")]
+    [JsonPropertyName("id")]
+    public string Value { get; } = value;
+}
+
 internal sealed class LogEntry : BaseEntity
 {
     /// <summary>

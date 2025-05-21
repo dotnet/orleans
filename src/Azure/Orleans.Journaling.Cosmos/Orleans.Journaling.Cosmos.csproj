@@ -9,6 +9,10 @@
     <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+
   <ItemGroup>
     <Compile Include="..\Shared\Cosmos\CosmosOptions.cs" Link="Storage\CosmosOptions.cs" />
     <Compile Include="..\Shared\Cosmos\CosmosOptionsValidator.cs" Link="Storage\CosmosOptionsValidator.cs" />

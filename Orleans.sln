@@ -266,6 +266,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Journaling.AzureSto
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Journaling.Cosmos", "src\Azure\Orleans.Journaling.Cosmos\Orleans.Journaling.Cosmos.csproj", "{514FB669-D664-4AB0-862F-D1A2A83D8DA8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CosmosLogStorageTestApp", "test\CosmosLogStorageTestApp\CosmosLogStorageTestApp.csproj", "{D06D4EC3-41B7-45F4-A062-82F72F986B41}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -696,6 +698,10 @@ Global
 		{514FB669-D664-4AB0-862F-D1A2A83D8DA8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{514FB669-D664-4AB0-862F-D1A2A83D8DA8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{514FB669-D664-4AB0-862F-D1A2A83D8DA8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D06D4EC3-41B7-45F4-A062-82F72F986B41}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D06D4EC3-41B7-45F4-A062-82F72F986B41}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D06D4EC3-41B7-45F4-A062-82F72F986B41}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D06D4EC3-41B7-45F4-A062-82F72F986B41}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -824,6 +830,7 @@ Global
 		{4A4D30F4-6D61-7A80-8352-D76BD29582E0} = {A6573187-FD0D-4DF7-91D1-03E07E470C0A}
 		{E613A10D-757D-44BA-97C1-3D06C22BDB2E} = {4C5D66BF-EE1C-4DD8-8551-D1B7F3768A34}
 		{514FB669-D664-4AB0-862F-D1A2A83D8DA8} = {4C5D66BF-EE1C-4DD8-8551-D1B7F3768A34}
+		{D06D4EC3-41B7-45F4-A062-82F72F986B41} = {A6573187-FD0D-4DF7-91D1-03E07E470C0A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}
