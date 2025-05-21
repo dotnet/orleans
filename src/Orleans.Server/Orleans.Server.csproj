@@ -8,11 +8,16 @@
     <IncludeSymbols>false</IncludeSymbols>
     <IncludeSource>false</IncludeSource>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Persistence.Memory\Orleans.Persistence.Memory.csproj" />
     <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
     <ProjectReference Include="..\Orleans.Sdk\Orleans.Sdk.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>
