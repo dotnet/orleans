@@ -16,7 +16,7 @@ open Microsoft.Extensions.Hosting
 open Orleans.Hosting
 
 let builder = 
-    HostBuilder()
+    Host.CreateApplicationBuilder(args)
         .UseOrleans(fun siloBuilder ->
             siloBuilder
                 .UseLocalhostClustering()
@@ -24,17 +24,19 @@ let builder =
                 |> ignore)
 
 // Run the host
-builder.RunConsoleAsync() |> Async.AwaitTask |> ignore
+await builder.Build().RunAsync()
 ```
 
 ## Example - Using F# Types with Orleans
 ```fsharp
 // Define F# discriminated union and record types
+[<Orleans.GenerateSerializer>]
 type UserRole =
     | Admin
     | Moderator
     | User of level:int
 
+[<Orleans.GenerateSerializer>]
 type UserRecord = {
     Id: string
     Name: string

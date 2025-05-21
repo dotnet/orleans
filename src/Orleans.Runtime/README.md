@@ -26,8 +26,7 @@ var builder = Host.CreateApplicationBuilder(args)
             .UseLocalhostClustering();
     });
 
-var host = builder.Build();
-await host.StartAsync();
+await builder.Build().RunAsync();
 ```
 
 ## Documentation

@@ -56,7 +56,7 @@ public class MyTransactionalGrain : Grain, IMyTransactionalGrain
     public async Task Transfer(string otherGrainKey, int amount)
     {
         // Read our state within the transaction
-        var myState = await _state.PerformRead();
+        var myState = await _state.PerformRead(state => state);
         
         // Ensure we have enough balance
         if (myState.Balance < amount)

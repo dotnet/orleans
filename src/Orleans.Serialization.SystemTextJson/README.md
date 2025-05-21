@@ -27,7 +27,7 @@ var builder = Host.CreateApplicationBuilder(args)
     });
 
 // Run the host
-await builder.RunConsoleAsync();
+await builder.Build().RunAsync();
 ```
 
 ## Example - Using System.Text.Json with a Custom Type
