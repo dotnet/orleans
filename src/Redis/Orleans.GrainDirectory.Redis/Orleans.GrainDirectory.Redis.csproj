@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.GrainDirectory.Redis</PackageId>
     <Title>Microsoft Orleans Grain Directory Redis Provider</Title>
     <Description>Microsoft Orleans Grain Directory implementation that uses Redis</Description>
@@ -19,3 +20,7 @@
   </ItemGroup>
 
 </Project>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
