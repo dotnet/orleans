@@ -15,6 +15,10 @@ dotnet add package Microsoft.Orleans.Journaling.AzureStorage
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Configuration;
+using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using MyGrainNamespace;
 
 var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
@@ -31,67 +35,86 @@ var builder = Host.CreateApplicationBuilder(args)
                 });
     });
 
-// Run the host
-await builder.RunConsoleAsync();
+var host = await builder.StartAsync();
+
+// Get a reference to the grain
+var shoppingCart = host.Services.GetRequiredService<IGrainFactory>()
+    .GetGrain<IShoppingCartGrain>("user1-cart");
+
+// Use the grain
+await shoppingCart.UpdateItem("apple", 5, 0);
+await shoppingCart.UpdateItem("banana", 3, 1);
+
+// Get and print the cart contents
+var (contents, version) = await shoppingCart.GetCart();
+Console.WriteLine($"Shopping cart (version {version}):");
+foreach (var item in contents)
+{
+    Console.WriteLine($"- {item.Key}: {item.Value}");
+}
+
+// Wait for the application to terminate
+await host.WaitForShutdownAsync();
 ```
 
 ## Example - Using Journaling in a Grain
 ```csharp
-public class JournaledGrain : JournaledGrain<MyState, MyEvent>, IJournaledGrain
+using Orleans.Runtime;
+
+namespace MyGrainNamespace;
+
+public interface IShoppingCartGrain : IGrain
 {
-    public Task<int> GetValue()
-    {
-        return Task.FromResult(State.Value);
-    }
+    ValueTask<(bool success, long version)> UpdateItem(string itemId, int quantity, long version);
+    ValueTask<(Dictionary<string, int> Contents, long Version)> GetCart();
+    ValueTask<long> GetVersion();
+    ValueTask<(bool success, long version)> Clear(long version);
+}
 
-    public Task Increment()
-    {
-        // Record an event in the journal
-        return RaiseEvent(new IncrementEvent());
-    }
+public class ShoppingCartGrain(
+    [FromKeyedServices("shopping-cart")] IDurableDictionary cart,
+    [FromKeyedServices("version")] IDurableValue<long> version) : DurableGrain, IShoppingCartGrain
+{
+    private readonly IDurableValue<long> _version = version;
 
-    public Task Add(int value)
+    public async ValueTask<(bool success, long version)> UpdateItem(string itemId, int quantity, long version)
     {
-        // Record an event with a parameter
-        return RaiseEvent(new AddEvent { AmountToAdd = value });
-    }
-
-    // Apply events to the state
-    protected override void ApplyEvent(MyEvent @event)
-    {
-        switch (@event)
+        if (_version.Value != version)
         {
-            case IncrementEvent _:
-                State.Value++;
-                break;
-            case AddEvent addEvent:
-                State.Value += addEvent.AmountToAdd;
-                break;
+            // Conflict
+            return (false, _version.Value);
         }
+
+        if (quantity == 0)
+        {
+            cart.Remove(itemId);
+        }
+        else
+        {
+            cart[itemId] = quantity;
+        }
+
+        _version.Value++;
+        await WriteStateAsync();
+        return (true, _version.Value);
     }
-}
 
-// State and event classes
+    public ValueTask<(Dictionary<string, int> Contents, long Version)> GetCart() => new((cart.ToDictionary(), _version.Value));
+    public ValueTask<long> GetVersion() => new(_version.Value);
 
-public class MyState
-{
-    public int Value { get; set; }
-}
+    public async ValueTask<(bool success, long version)> Clear(long version)
+    {
+        if (_version.Value != version)
+        {
+            // Conflict
+            return (false, _version.Value);
+        }
 
-
-public abstract class MyEvent
-{
-}
-
-
-public class IncrementEvent : MyEvent
-{
-}
-
-
-public class AddEvent : MyEvent
-{
-    public int AmountToAdd { get; set; }
+        cart.Clear();
+        _version.Value++;
+        await WriteStateAsync();
+        return (true, _version.Value);
+    }
 }
 ```
 
