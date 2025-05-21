@@ -35,7 +35,7 @@ public class HelloGrain : Grain, IHelloGrain
     }
 }
 
-var builder = new HostBuilder()
+var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
@@ -71,6 +71,7 @@ using Orleans.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading.Tasks;
+namespace ExampleGrains;
 
 // Define a grain interface
 public interface IHelloGrain : IGrainWithStringKey
@@ -78,7 +79,7 @@ public interface IHelloGrain : IGrainWithStringKey
     Task<string> SayHello(string greeting);
 }
 
-var clientBuilder = new HostBuilder()
+var clientBuilder = Host.CreateApplicationBuilder(args)
     .UseOrleansClient(clientBuilder =>
     {
         clientBuilder

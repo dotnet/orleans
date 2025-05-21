@@ -15,7 +15,7 @@ dotnet add package Microsoft.Orleans.GrainDirectory.AzureStorage
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 
-var builder = new HostBuilder()
+var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder

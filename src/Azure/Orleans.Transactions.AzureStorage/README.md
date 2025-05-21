@@ -17,7 +17,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Transactions;
 
-var builder = new HostBuilder()
+var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
@@ -87,7 +87,7 @@ public class MyTransactionalGrain : Grain, IMyTransactionalGrain
 }
 
 // State class
-[Serializable]
+
 public class MyState
 {
     public int Balance { get; set; }

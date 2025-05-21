@@ -18,6 +18,8 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading.Tasks;
 
+namespace ExampleGrains;
+
 // Define a grain interface
 public interface IHelloGrain : IGrainWithStringKey
 {
@@ -33,7 +35,7 @@ public class HelloGrain : Grain, IHelloGrain
     }
 }
 
-var builder = new HostBuilder()
+var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder

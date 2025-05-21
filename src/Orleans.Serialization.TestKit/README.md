@@ -58,7 +58,7 @@ public class SerializationTests
 }
 
 // The custom class being tested
-[Serializable]
+
 public class MyCustomClass
 {
     public int Id { get; set; }

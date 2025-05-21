@@ -19,6 +19,7 @@ using Orleans.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading.Tasks;
+namespace ExampleGrains;
 
 // Define a grain interface
 public interface IMyGrain : IGrainWithStringKey
@@ -28,7 +29,7 @@ public interface IMyGrain : IGrainWithStringKey
 
 
 // Create a client
-var builder = new HostBuilder()
+var builder = Host.CreateApplicationBuilder(args)
     .UseOrleansClient(client =>
     {
         client.UseLocalhostClustering();

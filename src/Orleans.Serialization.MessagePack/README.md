@@ -17,7 +17,7 @@ using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Serialization;
 
-var builder = new HostBuilder()
+var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
@@ -38,6 +38,7 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
 using MessagePack;
+namespace ExampleGrains;
 
 // Define a class with MessagePack attributes
 [MessagePackObject]

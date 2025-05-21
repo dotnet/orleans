@@ -23,7 +23,7 @@ public class WorkerRole : RoleEntryPoint
     public override bool OnStart()
     {
         // Create the silo host
-        _silo = new HostBuilder()
+        _silo = Host.CreateApplicationBuilder(args)
             .UseOrleans(builder =>
             {
                 // Configure Orleans for Azure Cloud Services

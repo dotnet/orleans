@@ -16,8 +16,9 @@ dotnet add package Microsoft.Orleans.Streaming.EventHubs
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Hosting;
+namespace ExampleGrains;
 
-var builder = new HostBuilder()
+var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
@@ -93,7 +94,7 @@ public class StreamProcessingGrain : Grain, IStreamProcessingGrain
 }
 
 // Event class
-[Serializable]
+
 public class MyEvent
 {
     public string Data { get; set; }

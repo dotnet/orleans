@@ -27,7 +27,7 @@ public interface IMyGrain : IGrainWithStringKey
 }
 
 
-var builder = new HostBuilder()
+var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
@@ -70,9 +70,10 @@ using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
+namespace ExampleGrains;
 
 // Define grain state class
-[Serializable]
+
 public class MyGrainState
 {
     public string Data { get; set; }

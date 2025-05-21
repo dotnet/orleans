@@ -16,7 +16,7 @@ using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Hosting;
 
-var builder = new HostBuilder()
+var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
@@ -40,7 +40,7 @@ await builder.RunConsoleAsync();
 ## Example - Using Grain Storage in a Grain
 ```csharp
 // Define grain state class
-[Serializable]
+
 public class MyGrainState
 {
     public string Data { get; set; }

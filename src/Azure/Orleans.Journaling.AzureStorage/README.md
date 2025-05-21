@@ -16,7 +16,7 @@ using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Configuration;
 
-var builder = new HostBuilder()
+var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
@@ -72,23 +72,23 @@ public class JournaledGrain : JournaledGrain<MyState, MyEvent>, IJournaledGrain
 }
 
 // State and event classes
-[Serializable]
+
 public class MyState
 {
     public int Value { get; set; }
 }
 
-[Serializable]
+
 public abstract class MyEvent
 {
 }
 
-[Serializable]
+
 public class IncrementEvent : MyEvent
 {
 }
 
-[Serializable]
+
 public class AddEvent : MyEvent
 {
     public int AmountToAdd { get; set; }

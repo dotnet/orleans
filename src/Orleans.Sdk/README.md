@@ -38,6 +38,7 @@ using Orleans.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading.Tasks;
+namespace ExampleGrains;
 
 // Create the host
 var builder = Host.CreateApplicationBuilder(args)

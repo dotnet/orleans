@@ -17,7 +17,7 @@ using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Serialization;
 
-var builder = new HostBuilder()
+var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
@@ -34,6 +34,7 @@ await builder.RunConsoleAsync();
 ```csharp
 using Orleans;
 using System.Text.Json.Serialization;
+namespace ExampleGrains;
 
 // Define a class with System.Text.Json attributes
 public class MyJsonClass
