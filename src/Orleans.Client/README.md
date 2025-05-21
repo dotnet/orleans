@@ -16,6 +16,9 @@ dotnet add package Microsoft.Orleans.Client
 using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Threading.Tasks;
 
 // Create a client
 var builder = new HostBuilder()
@@ -28,15 +31,20 @@ var host = builder.Build();
 await host.StartAsync();
 
 // Get a reference to a grain and call it
-var grain = host.Services.GetRequiredService<IClusterClient>().GetGrain<IMyGrain>("my-grain-id");
+var client = host.Services.GetRequiredService<IClusterClient>();
+var grain = client.GetGrain<IMyGrain>("my-grain-id");
 var result = await grain.DoSomething();
 
-Console.WriteLine(result);
+// Print the result
+Console.WriteLine($"Result: {result}");
+
+// Keep the host running until the application is shut down
+await host.WaitForShutdownAsync();
 ```
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://docs.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Orleans client configuration](https://learn.microsoft.com/en-us/dotnet/orleans/host/client)
 - [Grain references](https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-references)
 - [Orleans request context](https://learn.microsoft.com/en-us/dotnet/orleans/grains/request-context)

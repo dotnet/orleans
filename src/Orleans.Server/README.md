@@ -16,6 +16,9 @@ dotnet add package Microsoft.Orleans.Server
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Threading.Tasks;
 
 // Create the host
 var builder = new HostBuilder()
@@ -29,6 +32,14 @@ var builder = new HostBuilder()
 // Start the host
 var host = builder.Build();
 await host.StartAsync();
+
+// Get a reference to a grain and call it
+var client = host.Services.GetRequiredService<IClusterClient>();
+var grain = client.GetGrain<IMyGrain>("my-grain-id");
+var result = await grain.DoSomething();
+
+// Print the result
+Console.WriteLine($"Result: {result}");
 
 // Keep the host running until the application is shut down
 await host.WaitForShutdownAsync();

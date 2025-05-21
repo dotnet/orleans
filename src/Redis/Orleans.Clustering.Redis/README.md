@@ -14,6 +14,9 @@ dotnet add package Microsoft.Orleans.Clustering.Redis
 ```csharp
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Threading.Tasks;
 
 var builder = new HostBuilder()
     .UseOrleans(siloBuilder =>
@@ -27,30 +30,60 @@ var builder = new HostBuilder()
             });
     });
 
-// Run the host
-await builder.RunConsoleAsync();
+var host = builder.Build();
+await host.StartAsync();
+
+// Get a reference to a grain and call it
+var client = host.Services.GetRequiredService<IClusterClient>();
+var grain = client.GetGrain<IHelloGrain>("user123");
+var response = await grain.SayHello("Redis");
+
+// Print the result
+Console.WriteLine($"Grain response: {response}");
+
+// Keep the host running until the application is shut down
+await host.WaitForShutdownAsync();
 ```
 
 ## Example - Client Configuration
 ```csharp
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
+using Orleans;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Threading.Tasks;
 
-var clientBuilder = new ClientBuilder()
-    // Configure Redis as the gateway provider
-    .UseRedisGatewayListProvider(options =>
+var clientBuilder = new HostBuilder()
+    .UseOrleansClient(builder =>
     {
-        options.ConnectionString = "localhost:6379";
-        options.Database = 0;
+        builder
+            // Configure Redis as the gateway provider
+            .UseRedisGatewayListProvider(options =>
+            {
+                options.ConnectionString = "localhost:6379";
+                options.Database = 0;
+            });
     });
 
-var client = clientBuilder.Build();
-await client.Connect();
+var host = clientBuilder.Build();
+await host.StartAsync();
+var client = host.Services.GetRequiredService<IClusterClient>();
+
+// Get a reference to a grain and call it
+var grain = client.GetGrain<IHelloGrain>("user123");
+var response = await grain.SayHello("Redis Client");
+
+// Print the result
+Console.WriteLine($"Grain response: {response}");
+
+// Keep the host running until the application is shut down
+await host.WaitForShutdownAsync();
 ```
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://docs.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Configuration Guide](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/)
 - [Orleans Clustering](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/cluster-management)
 - [Redis Documentation](https://redis.io/documentation)

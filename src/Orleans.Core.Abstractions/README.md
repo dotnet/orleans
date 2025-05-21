@@ -27,7 +27,7 @@ namespace MyGrainInterfaces
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://docs.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Grain interfaces](https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-interfaces)
 - [Grain references](https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-references)
 

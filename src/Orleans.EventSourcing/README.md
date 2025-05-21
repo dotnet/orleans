@@ -114,6 +114,9 @@ using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.EventSourcing;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Threading.Tasks;
 
 var builder = new HostBuilder()
     .UseOrleans(siloBuilder =>
@@ -134,13 +137,31 @@ var builder = new HostBuilder()
             });
     });
 
-// Run the host
-await builder.RunConsoleAsync();
+var host = builder.Build();
+await host.StartAsync();
+
+// Get a reference to a grain and call it
+var client = host.Services.GetRequiredService<IClusterClient>();
+var bankAccount = client.GetGrain<IBankAccountGrain>("account-123");
+
+// Call grain methods
+await bankAccount.Deposit(100);
+await bankAccount.Withdraw(25);
+var balance = await bankAccount.GetBalance();
+
+// Print the result
+Console.WriteLine($"Account balance: ${balance}");
+
+var history = await bankAccount.GetHistory();
+Console.WriteLine($"Transaction history: {history.Count} events");
+
+// Keep the host running until the application is shut down
+await host.WaitForShutdownAsync();
 ```
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://docs.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Event Sourcing Overview](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/event-sourcing/overview)
 - [Journaled Grains](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/event-sourcing/journaled-grains)
 - [Replicated Grains](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/event-sourcing/replicated-grains)

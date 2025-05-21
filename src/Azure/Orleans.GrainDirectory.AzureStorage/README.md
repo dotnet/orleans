@@ -34,7 +34,7 @@ await builder.RunConsoleAsync();
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://docs.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Configuration Guide](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/)
 - [Implementation Details](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/index)
 

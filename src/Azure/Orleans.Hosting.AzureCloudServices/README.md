@@ -54,7 +54,7 @@ public class WorkerRole : RoleEntryPoint
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://docs.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Hosting in Azure](https://learn.microsoft.com/en-us/dotnet/orleans/host/azure-cloud-services)
 - [Silo Configuration](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/typical-configurations)
 

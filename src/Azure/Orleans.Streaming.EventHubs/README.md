@@ -102,7 +102,7 @@ public class MyEvent
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://docs.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Orleans Streams](https://learn.microsoft.com/en-us/dotnet/orleans/streaming/)
 - [Event Hubs integration](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/streams-implementation)
 

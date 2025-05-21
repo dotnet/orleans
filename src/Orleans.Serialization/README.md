@@ -46,7 +46,7 @@ public class MyClass
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://docs.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Serialization in Orleans](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/serialization)
 - [Orleans type serialization](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/serialization-attributes)
 

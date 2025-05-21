@@ -24,6 +24,9 @@ You will also need to install the appropriate database driver package for your d
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Threading.Tasks;
 
 var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
@@ -37,8 +40,19 @@ var builder = Host.CreateApplicationBuilder(args)
             });
     });
 
-// Run the host
-await builder.RunConsoleAsync();
+var host = builder.Build();
+await host.StartAsync();
+
+// Get a reference to a grain and call it
+var client = host.Services.GetRequiredService<IClusterClient>();
+var grain = client.GetGrain<IHelloGrain>("user123");
+var response = await grain.SayHello("World");
+
+// Print the result
+Console.WriteLine($"Grain response: {response}");
+
+// Keep the host running until the application is shut down
+await host.WaitForShutdownAsync();
 ```
 
 ## Example - Configuring Client to Connect to Cluster
@@ -47,6 +61,9 @@ await builder.RunConsoleAsync();
 using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Threading.Tasks;
 
 var clientBuilder = Host.CreateApplicationBuilder(args)
     .UseOrleansClient(clientBuilder =>
@@ -60,12 +77,16 @@ var clientBuilder = Host.CreateApplicationBuilder(args)
             });
     });
 
-var host = await clientBuilder.StartAsync();
+var host = clientBuilder.Build();
+await host.StartAsync();
 var client = host.Services.GetRequiredService<IClusterClient>();
 
 // Get a reference to a grain and call it
 var grain = client.GetGrain<IHelloGrain>("user123");
 var response = await grain.SayHello("World");
+
+// Print the result
+Console.WriteLine($"Grain response: {response}");
 
 // Keep the host running until the application is shut down
 await host.WaitForShutdownAsync();

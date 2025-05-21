@@ -37,7 +37,7 @@ var response = await grain.SayHello("Hello from client!");
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://docs.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Client Configuration](https://learn.microsoft.com/en-us/dotnet/orleans/host/client)
 - [Dependency Injection](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/dependency-injection)
 

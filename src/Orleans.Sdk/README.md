@@ -35,6 +35,9 @@ public class HelloGrain : Grain, IHelloGrain
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Threading.Tasks;
 
 // Create the host
 var builder = Host.CreateApplicationBuilder(args)
@@ -48,13 +51,17 @@ var builder = Host.CreateApplicationBuilder(args)
 // Start the host
 var host = builder.Build();
 await host.StartAsync();
-// Keep the host running until the application is shut down
-await host.WaitForShutdownAsync();
 
 // Get a reference to a grain and call it
 var client = host.Services.GetRequiredService<IClusterClient>();
 var grain = client.GetGrain<IHelloGrain>("user123");
 var response = await grain.SayHello("World");
+
+// Print the result
+Console.WriteLine($"Grain response: {response}");
+
+// Keep the host running until the application is shut down
+await host.WaitForShutdownAsync();
 ```
 
 ## Documentation

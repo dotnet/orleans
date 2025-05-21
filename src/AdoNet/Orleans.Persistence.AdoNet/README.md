@@ -92,7 +92,7 @@ Before using the ADO.NET provider, you need to set up the necessary database tab
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://docs.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Grain Persistence](https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-persistence)
 - [Relational Database Persistence](https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-persistence/relational-storage)
 

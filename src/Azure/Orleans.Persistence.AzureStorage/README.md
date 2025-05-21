@@ -15,6 +15,9 @@ dotnet add package Microsoft.Orleans.Persistence.AzureStorage
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Threading.Tasks;
 
 var builder = new HostBuilder()
     .UseOrleans(siloBuilder =>
@@ -37,8 +40,20 @@ var builder = new HostBuilder()
                 });
     });
 
-// Run the host
-await builder.RunConsoleAsync();
+var host = builder.Build();
+await host.StartAsync();
+
+// Get a reference to a grain and call it
+var client = host.Services.GetRequiredService<IClusterClient>();
+var grain = client.GetGrain<IMyGrain>("user123");
+await grain.SetData("Hello from Azure Storage!");
+var response = await grain.GetData();
+
+// Print the result
+Console.WriteLine($"Grain data: {response}");
+
+// Keep the host running until the application is shut down
+await host.WaitForShutdownAsync();
 ```
 
 ## Example - Using Grain Storage in a Grain
@@ -77,7 +92,7 @@ public class MyGrain : Grain, IMyGrain, IGrainWithStringKey
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://docs.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Grain Persistence](https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-persistence)
 - [Azure Storage Persistence](https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-persistence/azure-storage)
 

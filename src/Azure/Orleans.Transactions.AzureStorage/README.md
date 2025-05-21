@@ -96,7 +96,7 @@ public class MyState
 
 ## Documentation
 For more comprehensive documentation, please refer to:
-- [Microsoft Orleans Documentation](https://docs.microsoft.com/dotnet/orleans/)
+- [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Transactions](https://learn.microsoft.com/en-us/dotnet/orleans/grains/transactions)
 - [Distributed ACID Transactions](https://learn.microsoft.com/en-us/dotnet/orleans/grains/transactions/acid-transactions)
 
