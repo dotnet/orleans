@@ -13,6 +13,7 @@ dotnet add package Microsoft.Orleans.Reminders.DynamoDB
 ## Example - Configuring DynamoDB Reminders
 ```csharp
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Hosting;
 
@@ -33,7 +34,19 @@ var builder = Host.CreateApplicationBuilder(args)
     });
 
 // Run the host
-await builder.RunConsoleAsync();
+var host = builder.Build();
+await host.StartAsync();
+
+// Get a reference to the grain
+var reminderGrain = host.Services.GetRequiredService<IGrainFactory>()
+    .GetGrain<IReminderGrain>("my-reminder-grain");
+
+// Start the reminder
+await reminderGrain.StartReminder("ExampleReminder");
+Console.WriteLine("Reminder started!");
+
+// Keep the host running until the application is shut down
+await host.WaitForShutdownAsync();
 ```
 
 ## Example - Using Reminders in a Grain
@@ -43,9 +56,16 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 
+namespace ReminderExample;
+
+public interface IReminderGrain : IGrainWithStringKey
+{
+    Task StartReminder(string reminderName);
+    Task StopReminder();
+}
+
 public class ReminderGrain : Grain, IReminderGrain, IRemindable
 {
-    private IDisposable _timer;
     private string _reminderName = "MyReminder";
 
     public async Task StartReminder(string reminderName)
