@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.Streaming.AzureStorage</PackageId>
     <Title>Microsoft Orleans Azure Queue Storage Streaming Provider</Title>
     <Description>Microsoft Orleans streaming provider backed by Azure Queue Storage</Description>
@@ -30,3 +31,7 @@
     <PackageReference Include="System.Net.NameResolution" />
   </ItemGroup>
 </Project>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>

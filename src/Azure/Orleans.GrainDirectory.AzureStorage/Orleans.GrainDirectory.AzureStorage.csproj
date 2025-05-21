@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.GrainDirectory.AzureStorage</PackageId>
     <Title>Microsoft Orleans Azure Storage Grain Directory Provider</Title>
     <Description>Microsoft Orleans Grain Directory provider backed by Azure Storage</Description>
@@ -27,3 +28,7 @@
   </ItemGroup>
 
 </Project>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
