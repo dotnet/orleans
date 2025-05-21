@@ -12,6 +12,12 @@ dotnet add package Microsoft.Orleans.Clustering.DynamoDB
 
 ## Example - Configuring DynamoDB Membership
 ```csharp
+using Microsoft.Extensions.Hosting;
+using Orleans.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Threading.Tasks;
+
 // Define a grain interface
 public interface IHelloGrain : IGrainWithStringKey
 {
@@ -26,12 +32,6 @@ public class HelloGrain : Grain, IHelloGrain
         return Task.FromResult($"Hello, {greeting}!");
     }
 }
-
-using Microsoft.Extensions.Hosting;
-using Orleans.Hosting;
-using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Threading.Tasks;
 
 var builder = new HostBuilder()
     .UseOrleans(siloBuilder =>

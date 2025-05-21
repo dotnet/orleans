@@ -49,6 +49,11 @@ await builder.RunConsoleAsync();
 ## Example - Using Grain Storage in a Grain
 
 ```csharp
+using System;
+using System.Threading.Tasks;
+using Orleans;
+using Orleans.Runtime;
+
 // Define grain state class
 [Serializable]
 public class MyGrainState

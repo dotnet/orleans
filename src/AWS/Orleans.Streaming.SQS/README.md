@@ -38,6 +38,12 @@ await builder.RunConsoleAsync();
 
 ## Example - Using SQS Streams in a Grain
 ```csharp
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Orleans;
+using Orleans.Streams;
+
 // Producer grain
 public class ProducerGrain : Grain, IProducerGrain
 {

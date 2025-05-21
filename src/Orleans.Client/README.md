@@ -13,6 +13,13 @@ dotnet add package Microsoft.Orleans.Client
 ## Example - Creating an Orleans Client
 
 ```csharp
+using Microsoft.Extensions.Hosting;
+using Orleans;
+using Orleans.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Threading.Tasks;
+
 // Define a grain interface
 public interface IMyGrain : IGrainWithStringKey
 {
@@ -28,12 +35,6 @@ public interface IMyGrain : IGrainWithStringKey
 //     }
 // }
 
-using Microsoft.Extensions.Hosting;
-using Orleans;
-using Orleans.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Threading.Tasks;
 
 // Create a client
 var builder = new HostBuilder()

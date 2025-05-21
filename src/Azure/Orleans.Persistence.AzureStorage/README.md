@@ -12,6 +12,13 @@ dotnet add package Microsoft.Orleans.Persistence.AzureStorage
 
 ## Example - Configuring Azure Storage Persistence
 ```csharp
+using Microsoft.Extensions.Hosting;
+using Orleans.Configuration;
+using Orleans.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Threading.Tasks;
+
 // Define grain interface
 public interface IMyGrain : IGrainWithStringKey
 {
@@ -19,12 +26,6 @@ public interface IMyGrain : IGrainWithStringKey
     Task<string> GetData();
 }
 
-using Microsoft.Extensions.Hosting;
-using Orleans.Configuration;
-using Orleans.Hosting;
-using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Threading.Tasks;
 
 var builder = new HostBuilder()
     .UseOrleans(siloBuilder =>
@@ -65,6 +66,11 @@ await host.WaitForShutdownAsync();
 
 ## Example - Using Grain Storage in a Grain
 ```csharp
+using System;
+using System.Threading.Tasks;
+using Orleans;
+using Orleans.Runtime;
+
 // Define grain state class
 [Serializable]
 public class MyGrainState

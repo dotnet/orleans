@@ -21,6 +21,13 @@ You will also need to install the appropriate database driver package for your d
 ## Example - Configuring ADO.NET Clustering
 
 ```csharp
+using Microsoft.Extensions.Hosting;
+using Orleans.Configuration;
+using Orleans.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Threading.Tasks;
+
 // Define a grain interface
 public interface IHelloGrain : IGrainWithStringKey
 {
@@ -35,13 +42,6 @@ public class HelloGrain : Grain, IHelloGrain
         return Task.FromResult($"Hello, {greeting}!");
     }
 }
-
-using Microsoft.Extensions.Hosting;
-using Orleans.Configuration;
-using Orleans.Hosting;
-using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Threading.Tasks;
 
 var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
@@ -73,6 +73,13 @@ await host.WaitForShutdownAsync();
 ## Example - Configuring Client to Connect to Cluster
 
 ```csharp
+using Microsoft.Extensions.Hosting;
+using Orleans;
+using Orleans.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Threading.Tasks;
+
 // Define a grain interface
 public interface IHelloGrain : IGrainWithStringKey
 {
@@ -87,13 +94,6 @@ public interface IHelloGrain : IGrainWithStringKey
 //         return Task.FromResult($"Hello, {greeting}!");
 //     }
 // }
-
-using Microsoft.Extensions.Hosting;
-using Orleans;
-using Orleans.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Threading.Tasks;
 
 var clientBuilder = Host.CreateApplicationBuilder(args)
     .UseOrleansClient(clientBuilder =>

@@ -13,6 +13,13 @@ dotnet add package Microsoft.Orleans.Server
 ## Example - Creating an Orleans Silo Host
 
 ```csharp
+using Microsoft.Extensions.Hosting;
+using Orleans.Configuration;
+using Orleans.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Threading.Tasks;
+
 // Define a grain interface
 public interface IMyGrain : IGrainWithStringKey
 {
@@ -28,12 +35,6 @@ public class MyGrain : Grain, IMyGrain
     }
 }
 
-using Microsoft.Extensions.Hosting;
-using Orleans.Configuration;
-using Orleans.Hosting;
-using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Threading.Tasks;
 
 // Create the host
 var builder = new HostBuilder()
