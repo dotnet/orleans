@@ -1,9 +1,11 @@
+using Microsoft.Azure.Cosmos.Serialization.HybridRow.RecordIO;
 using Microsoft.CodeAnalysis;
 using Orleans.Serialization.Buffers;
 using System.Diagnostics;
 using System.Net;
 using System.Runtime.CompilerServices;
 using static CosmosIdSanitizer;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Orleans.Journaling.Cosmos;
 
@@ -40,17 +42,6 @@ internal sealed partial class CosmosLogStorage(
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private string CreateEntryId(long sequenceNumber) => Sanitize($"{logId}{SeparatorChar}{sequenceNumber}");
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static LogExtent ToLogExtent(byte[] data)
-    {
-        using var writer = new ArcBufferWriter();
-
-        writer.Write(data);
-        var buffer = writer.ConsumeSlice(writer.Length);
-
-        return new(buffer);
-    }
 
     public async ValueTask EnsureInitializedAsync(CancellationToken cancellationToken)
     {
@@ -127,7 +118,7 @@ internal sealed partial class CosmosLogStorage(
                 WHERE c.LogId = @logId AND c.EntryType = @entryType
                 ORDER BY c.SequenceNumber ASC")
             .WithParameter("@logId", logId)
-            .WithParameter("@entryType", LogEntryType.Default);
+            .WithParameter("@entryType", LogEntryType.Log);
 
         long maxSequence = -1;
         using var feed = container.GetItemQueryIterator<LogEntry>(query, requestOptions: _requestOptions);
@@ -195,7 +186,7 @@ internal sealed partial class CosmosLogStorage(
                 Id = CreateEntryId(0),
                 LogId = logId,
                 SequenceNumber = 0,
-                EntryType = LogEntryType.Default,
+                EntryType = LogEntryType.Log,
                 Data = compactedResource.Data
             };
 
@@ -206,7 +197,7 @@ internal sealed partial class CosmosLogStorage(
                 Id = CreateEntryId(1),
                 LogId = logId,
                 SequenceNumber = 1,
-                EntryType = LogEntryType.Default,
+                EntryType = LogEntryType.Log,
                 Data = data
             };
 
@@ -232,7 +223,7 @@ internal sealed partial class CosmosLogStorage(
                 Id = CreateEntryId(_nextSequenceNumber),
                 LogId = logId,
                 SequenceNumber = _nextSequenceNumber,
-                EntryType = LogEntryType.Default,
+                EntryType = LogEntryType.Log,
                 Data = data
             };
 
@@ -273,38 +264,53 @@ internal sealed partial class CosmosLogStorage(
 
             _compactedEntryETag = compactedResponse.ETag;
 
+            using var writer = new ArcBufferWriter();
+            writer.Write(compactedResource.Data);
+
             LogRead(logger, compactedResource.Data.Length, logId);
 
-            yield return ToLogExtent(compactedResource.Data);
+            yield return new LogExtent(writer.ConsumeSlice(writer.Length));
         }
         else
         {
-            int itemsRead = 0;
-            long totalBytesRead = 0;
-
             using var feed = container.GetItemQueryIterator<LogEntry>(
                 new QueryDefinition(@"
                     SELECT * FROM c
                     WHERE c.LogId = @logId AND c.EntryType = @entryType
                     ORDER BY c.SequenceNumber ASC")
                         .WithParameter("@logId", logId)
-                        .WithParameter("@entryType", LogEntryType.Default),
+                        .WithParameter("@entryType", LogEntryType.Log),
                     requestOptions: _requestOptions);
+
+            long bytesRead = 0;
+            using var writer = new ArcBufferWriter();
 
             while (feed.HasMoreResults)
             {
-                foreach (var item in await feed.ReadNextAsync(cancellationToken).ConfigureAwait(false))
-                {
-                    itemsRead++;
-                    totalBytesRead += item.Data.Length;
+                cancellationToken.ThrowIfCancellationRequested();
 
-                    yield return ToLogExtent(item.Data);
+                foreach (var entry in await feed.ReadNextAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    var data = entry.Data;
+
+                    writer.Write(data); // No need to advance on the writer, as writing does so internally.
+                    bytesRead += data.Length;
                 }
             }
 
-            if (itemsRead > 0)
+            // After reading all entries and accumulating them in buffer, we yield one single LogExtent
+            // for the entire accumulated content. This is purely done so to be in accordance with
+            // the AzureAppendBlob implemation.
+
+            if (writer.Length > 0)
             {
-                LogRead(logger, totalBytesRead, logId);
+                LogRead(logger, bytesRead, logId);
+                yield return new LogExtent(writer.ConsumeSlice(writer.Length));
+            }
+            else
+            {
+                LogRead(logger, 0, logId);
+                yield break;
             }
         }
     }
@@ -408,7 +414,7 @@ internal sealed partial class CosmosLogStorage(
                 SELECT c.id FROM c
                 WHERE c.LogId = @logId AND (c.EntryType = @entry1 OR c.EntryType = @entry2)")
             .WithParameter("@logId", logId)
-            .WithParameter("@entry1", LogEntryType.Default)
+            .WithParameter("@entry1", LogEntryType.Log)
             .WithParameter("@entry2", LogEntryType.Compacted),
                 requestOptions: _requestOptions);
 

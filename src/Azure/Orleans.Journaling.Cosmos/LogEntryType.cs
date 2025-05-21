@@ -5,7 +5,7 @@ internal enum LogEntryType
     /// <summary>
     /// This <strong>is</strong> a log entry.
     /// </summary>
-    Default = 1,
+    Log = 1,
     /// <summary>
     /// This represents a compacted entry.
     /// </summary>
