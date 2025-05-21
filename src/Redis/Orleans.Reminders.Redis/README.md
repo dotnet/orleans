@@ -38,7 +38,6 @@ await builder.RunConsoleAsync();
 ```csharp
 public class ReminderGrain : Grain, IReminderGrain, IRemindable
 {
-    private IDisposable _timer;
     private string _reminderName = "MyReminder";
 
     public async Task StartReminder(string reminderName)

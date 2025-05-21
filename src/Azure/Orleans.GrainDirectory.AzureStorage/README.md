@@ -21,7 +21,7 @@ var builder = Host.CreateApplicationBuilder(args)
         siloBuilder
             .UseLocalhostClustering()
             // Configure Azure Storage as grain directory
-            .UseAzureStorageGrainDirectory(options =>
+            .UseAzureStorageGrainDirectoryAsDefault(options =>
             {
                 options.ConnectionString = "YOUR_AZURE_STORAGE_CONNECTION_STRING";
                 options.TableName = "GrainDirectory";

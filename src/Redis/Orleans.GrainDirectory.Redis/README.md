@@ -21,7 +21,7 @@ var builder = Host.CreateApplicationBuilder(args)
         siloBuilder
             .UseLocalhostClustering()
             // Configure Redis as the grain directory
-            .UseRedisGrainDirectory(options =>
+            .UseRedisGrainDirectoryAsDefault(options =>
             {
                 options.ConnectionString = "localhost:6379";
                 options.Database = 0;
