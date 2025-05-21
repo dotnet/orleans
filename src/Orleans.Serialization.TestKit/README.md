@@ -12,77 +12,78 @@ dotnet add package Microsoft.Orleans.Serialization.TestKit
 
 You'll typically add this package to a test project.
 
-## Example - Testing Serialization of a Custom Type
+## Example - Testing Serialization 
 ```csharp
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Serialization;
 using Orleans.Serialization.TestKit;
-using Xunit;
+using Xunit.Abstractions;
 
-// Define a test class for serialization
-public class SerializationTests
+public class TimeSpanTests(ITestOutputHelper output) : FieldCodecTester<TimeSpan>(output)
 {
-    // Create a test for a custom class
-    [Fact]
-    public void MyClass_Should_Serialize_And_Deserialize()
-    {
-        // Set up the serialization context
-        var services = new ServiceCollection()
-            .AddSerializer()
-            .BuildServiceProvider();
-
-        // Get a serializer tester
-        var serializerTester = services.GetRequiredService<SerializerTester>();
-
-        // Create an instance of your class to test
-        var original = new MyCustomClass
-        {
-            Id = 123,
-            Name = "Test Object",
-            Data = new List<string> { "item1", "item2", "item3" }
-        };
-
-        // Test that serialization and deserialization work correctly
-        var roundTripped = serializerTester.RoundTrip(original);
-
-        // Verify properties are correct after round-trip
-        Assert.Equal(original.Id, roundTripped.Id);
-        Assert.Equal(original.Name, roundTripped.Name);
-        Assert.Equal(original.Data.Count, roundTripped.Data.Count);
-
-        for (int i = 0; i < original.Data.Count; i++)
-        {
-            Assert.Equal(original.Data[i], roundTripped.Data[i]);
-        }
-    }
+    protected override TimeSpan CreateValue() => TimeSpan.FromMilliseconds(Guid.NewGuid().GetHashCode());
+    protected override TimeSpan[] TestValues => [TimeSpan.MinValue, TimeSpan.MaxValue, TimeSpan.Zero, TimeSpan.FromSeconds(12345)];
+    protected override Action<Action<TimeSpan>> ValueProvider => Gen.TimeSpan.ToValueProvider();
 }
 
-// The custom class being tested
-
-public class MyCustomClass
+public class TimeSpanCopierTests(ITestOutputHelper output) : CopierTester<TimeSpan, IDeepCopier<TimeSpan>>(output)
 {
-    public int Id { get; set; }
-    public string Name { get; set; }
-    public List<string> Data { get; set; }
+    protected override TimeSpan CreateValue() => TimeSpan.FromMilliseconds(Guid.NewGuid().GetHashCode());
+    protected override TimeSpan[] TestValues => [TimeSpan.MinValue, TimeSpan.MaxValue, TimeSpan.Zero, TimeSpan.FromSeconds(12345)];
+    protected override Action<Action<TimeSpan>> ValueProvider => Gen.TimeSpan.ToValueProvider();
+}
+
+public class DateTimeOffsetTests(ITestOutputHelper output) : FieldCodecTester<DateTimeOffset, DateTimeOffsetCodec>(output)
+{
+    protected override DateTimeOffset CreateValue() => DateTime.UtcNow;
+    protected override DateTimeOffset[] TestValues =>
+    [
+        DateTimeOffset.MinValue,
+        DateTimeOffset.MaxValue,
+        new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0), TimeSpan.FromHours(11.5)),
+        new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0), TimeSpan.FromHours(-11.5)),
+    ];
+
+    protected override Action<Action<DateTimeOffset>> ValueProvider => Gen.DateTimeOffset.ToValueProvider();
+}
+
+public class DateTimeOffsetCopierTests(ITestOutputHelper output) : CopierTester<DateTimeOffset, IDeepCopier<DateTimeOffset>>(output)
+{
+    protected override DateTimeOffset CreateValue() => DateTime.UtcNow;
+    protected override DateTimeOffset[] TestValues =>
+    [
+        DateTimeOffset.MinValue,
+        DateTimeOffset.MaxValue,
+        new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0), TimeSpan.FromHours(11.5)),
+        new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0), TimeSpan.FromHours(-11.5)),
+    ];
+
+    protected override Action<Action<DateTimeOffset>> ValueProvider => Gen.DateTimeOffset.ToValueProvider();
 }
 ```
 
 ## Additional Testing Features
-The TestKit provides several utilities for testing serialization:
+The TestKit provides several utilities for testing serialization and allows you to focus on testing specific serialization components:
 
 ```csharp
-// Testing with serialization contexts
-var context1 = services.GetRequiredService<SerializerSessionPool>().GetSession();
-var context2 = services.GetRequiredService<SerializerSessionPool>().GetSession();
+// Using SerializerTester for round-trip testing
+public class MyCustomClassTests
+{
+    [Fact]
+    public void MyCustomClass_RoundTrip()
+    {
+        var services = new ServiceCollection()
+            .AddSerializer()
+            .BuildServiceProvider();
+            
+        var serializerTester = services.GetRequiredService<SerializerTester>();
+        
+        var original = new MyCustomClass { /* initialize properties */ };
+        var roundTripped = serializerTester.RoundTrip(original);
+        
+        // Assert properties are equal
+    }
+}
 
-// Deep copying objects
-var originalObject = new MyObject();
-var copiedObject = serializerTester.DeepCopy(originalObject);
-// Verify copied object is equivalent but not the same instance
-Assert.Equal(originalObject.Value, copiedObject.Value);
-Assert.NotSame(originalObject, copiedObject);
-
-// Testing specific serializers
+// Using a specific serializer
 var specificSerializer = services.GetRequiredService<Serializer<MyCustomType>>();
 byte[] bytes = specificSerializer.SerializeToArray(original);
 var deserialized = specificSerializer.Deserialize(bytes);
