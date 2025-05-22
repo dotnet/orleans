@@ -32,16 +32,16 @@ await builder.RunAsync()
 // Define F# discriminated union and record types
 [<Orleans.GenerateSerializer>]
 type UserRole =
-    | Admin
-    | Moderator
-    | User of level:int
+    | [<Id(0u)>] Admin
+    | [<Id(1u)>] Moderator
+    | [<Id(2u)>] User of level:int
 
 [<Orleans.GenerateSerializer>]
 type UserRecord = {
-    Id: string
-    Name: string
-    Role: UserRole
-    Tags: string list
+    [<Id(0u)>] Id: string
+    [<Id(1u)>] Name: string
+    [<Id(2u)>] Role: UserRole
+    [<Id(3u)>] Tags: string list
 }
 
 // Define a grain interface
