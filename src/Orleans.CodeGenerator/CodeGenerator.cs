@@ -128,7 +128,23 @@ namespace Orleans.CodeGenerator
                     }
                     else if (ShouldGenerateSerializer(symbol))
                     {
-                        if (containingAssemblyAttributes.Any(attr => attr.AttributeClass?.Name == "ReferenceAssemblyAttribute"))
+                        if (containingAssemblyAttributes.Any(attributeData => attributeData.AttributeClass is
+                            {
+                                Name: "ReferenceAssemblyAttribute",
+                                ContainingNamespace:
+                                {
+                                    Name: "CompilerServices",
+                                    ContainingNamespace:
+                                    {
+                                        Name: "Runtime",
+                                        ContainingNamespace:
+                                        {
+                                            Name: "System",
+                                            ContainingNamespace.IsGlobalNamespace: true
+                                        }
+                                    }
+                                }
+                            }))
                         {
                             // not ALWAYS will be properly processed, therefore emit a warning
                             throw new OrleansGeneratorDiagnosticAnalysisException(ReferenceAssemblyWithGenerateSerializerDiagnostic.CreateDiagnostic(symbol));
