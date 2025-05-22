@@ -126,6 +126,11 @@ namespace Orleans.CodeGenerator
                     }
                     else if (ShouldGenerateSerializer(symbol))
                     {
+                        // Emit a warning if the type is from a reference assembly
+                        if (symbol.ContainingAssembly.IsReferenceAssembly)
+                        {
+                            throw new OrleansGeneratorDiagnosticAnalysisException(ReferenceAssemblyWithGenerateSerializerDiagnostic.CreateDiagnostic(symbol));
+                        }
                         if (!Compilation.IsSymbolAccessibleWithin(symbol, Compilation.Assembly))
                         {
                             throw new OrleansGeneratorDiagnosticAnalysisException(InaccessibleSerializableTypeDiagnostic.CreateDiagnostic(symbol));
