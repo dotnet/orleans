@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Runtime.Serialization;
 using Azure;
 using Microsoft.Extensions.Logging;
@@ -65,6 +66,8 @@ namespace Orleans.Transactions.TestKit
         {
         }
 
+        [Obsolete("TThe serialization constructor pattern was made obsolete in modern versions of .NET. Use the other constructors instead.")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         protected SimpleAzureStorageException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
         }
