@@ -6,12 +6,13 @@ namespace Orleans.Journaling.Cosmos;
 internal sealed class CosmosLogStorageProvider(
     ILoggerFactory loggerFactory,
     IServiceProvider serviceProvider,
-    IDocumentIdProvider docIdProvider,
+    IOptions<ClusterOptions> clusterOptions,
     IOptions<CosmosLogStorageOptions> options)
         : IStateMachineStorageProvider, ILifecycleParticipant<ISiloLifecycle>
 {
     [AllowNull] private CosmosClient _client;
 
+    private readonly string _serviceId = clusterOptions.Value.ServiceId;
     private readonly CosmosLogStorageOptions _options = options.Value;
     private readonly ILogger<CosmosLogStorageProvider> _logger = loggerFactory.CreateLogger<CosmosLogStorageProvider>();
 
@@ -24,9 +25,9 @@ internal sealed class CosmosLogStorageProvider(
     public IStateMachineStorage Create(IGrainContext grainContext)
     {
         var container = _client.GetContainer(_options.DatabaseName, _options.ContainerName);
-        (var id, var pk) = docIdProvider.GetIdentifiers(grainContext.GrainId);
 
-        return new CosmosLogStorage(id, pk, container, _options, loggerFactory.CreateLogger<CosmosLogStorage>());
+        return new CosmosLogStorage(grainContext.GrainId, _serviceId, container,
+            _options, loggerFactory.CreateLogger<CosmosLogStorage>());
     }
 
     private async Task Initialize(CancellationToken cancellationToken)
@@ -88,11 +89,11 @@ internal sealed class CosmosLogStorageProvider(
 
         var db = dbResponse.Database;
 
-        var logEntryProps = new ContainerProperties(_options.ContainerName, _options.PartitionKeyPath);
+        var logEntryProps = new ContainerProperties(_options.ContainerName, $"/{nameof(LogEntry.LogId)}");
 
         logEntryProps.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
         logEntryProps.IndexingPolicy.IncludedPaths.Add(new IncludedPath { Path = "/*" });
-        logEntryProps.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/Data/?" });
+        logEntryProps.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = $"/{nameof(LogEntry.Data)}/?" });
 
         const int maxRetries = 3;
 

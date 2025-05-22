@@ -1,14 +1,10 @@
-using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Specialized;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.Journaling.Cosmos;
 using Orleans.Serialization;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
-using TestExtensions;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -18,13 +14,21 @@ public sealed class CosmosStorageLogSegmentTests : LogSegmentTests
 {
     public CosmosStorageLogSegmentTests()
     {
-        JournalingCosmosTestConfiguration.CheckPreconditionsOrThrow();
+        //TODO: Uncoment 
+        //JournalingCosmosTestConfiguration.CheckPreconditionsOrThrow();
     }
 
     protected override void ConfigureServices(IServiceCollection services)
     {
-        services.Configure<CosmosLogStorageOptions>(options => options.ConfigureTestDefaults());
-        services.AddSingleton<IDocumentIdProvider, DefaultDocumentIdProvider>();
+        //TODO: Remove 
+        services.Configure<CosmosLogStorageOptions>(c =>
+        {
+            c.IsResourceCreationEnabled = true;
+            c.ConfigureCosmosClient("AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==;DisableServerCertificateValidation=True");
+        });
+
+        //TODO: Uncoment 
+        //services.Configure<CosmosLogStorageOptions>(options => options.ConfigureTestDefaults());
         services.AddSingleton<CosmosLogStorageProvider>();
         services.AddFromExisting<IStateMachineStorageProvider, CosmosLogStorageProvider>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, CosmosLogStorageProvider>();

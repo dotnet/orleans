@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -22,10 +22,10 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Journaling.AzureStorage\Orleans.Journaling.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Journaling.Cosmos\Orleans.Journaling.Cosmos.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Extensions\TesterAzureUtils\Tester.AzureUtils.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
-    <ProjectReference Include="..\..\src\Azure\Orleans.Journaling.Cosmos\Orleans.Journaling.Cosmos.csproj" />
   </ItemGroup>
 
 </Project>

@@ -2,18 +2,6 @@ namespace Orleans.Journaling.Cosmos;
 
 public class CosmosLogStorageOptions : CosmosOptions
 {
-    private const string CONTAINER_NAME = "OrleansJournaling";
-
-    /// <summary>
-    /// The partition key path for the logs.
-    /// </summary>
-    public string PartitionKeyPath { get; set; } = DEFAULT_PARTITION_KEY_PATH;
-
-    /// <summary>
-    /// The default value of <see cref="PartitionKeyPath"/>.
-    /// </summary>
-    public const string DEFAULT_PARTITION_KEY_PATH = "/LogId";
-
     /// <summary>
     /// The number of log entries after which compaction is requested.
     /// </summary>
@@ -26,6 +14,6 @@ public class CosmosLogStorageOptions : CosmosOptions
 
     public CosmosLogStorageOptions()
     {
-        ContainerName = CONTAINER_NAME;
+        ContainerName = "OrleansJournaling";
     }
 }

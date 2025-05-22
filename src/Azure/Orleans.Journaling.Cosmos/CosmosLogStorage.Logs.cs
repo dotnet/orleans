@@ -3,7 +3,7 @@ namespace Orleans.Journaling.Cosmos;
 internal partial class CosmosLogStorage
 {
     [LoggerMessage(Level = LogLevel.Debug, Message = "Appended {Length} bytes to log {LogId}")]
-    private static partial void LogAppended(ILogger logger, long length, string logId);
+    private static partial void LogAppend(ILogger logger, long length, string logId);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Read {Length} bytes from log {LogId}")]
     private static partial void LogRead(ILogger logger, long length, string logId);
@@ -26,7 +26,7 @@ internal partial class CosmosLogStorage
     [LoggerMessage(Level = LogLevel.Debug, Message = "De-compacting log {LogId} to append new entry.")]
     private static partial void LogDecompacting(ILogger logger, string logId);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Deleted {EntryCount} Entrys for log {LogId}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Deleted {EntryCount} entries for log {LogId}")]
     private static partial void LogDeleted(ILogger logger, string logId, int entryCount);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Error finalizing compaction for log {LogId}. Status: {StatusCode}, Message: {ErrorMessage}")]
