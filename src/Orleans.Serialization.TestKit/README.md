@@ -64,25 +64,6 @@ public class DateTimeOffsetCopierTests(ITestOutputHelper output) : CopierTester<
 The TestKit provides several utilities for testing serialization and allows you to focus on testing specific serialization components:
 
 ```csharp
-// Using SerializerTester for round-trip testing
-public class MyCustomClassTests
-{
-    [Fact]
-    public void MyCustomClass_RoundTrip()
-    {
-        var services = new ServiceCollection()
-            .AddSerializer()
-            .BuildServiceProvider();
-            
-        var serializerTester = services.GetRequiredService<SerializerTester>();
-        
-        var original = new MyCustomClass { /* initialize properties */ };
-        var roundTripped = serializerTester.RoundTrip(original);
-        
-        // Assert properties are equal
-    }
-}
-
 // Using a specific serializer
 var specificSerializer = services.GetRequiredService<Serializer<MyCustomType>>();
 byte[] bytes = specificSerializer.SerializeToArray(original);
