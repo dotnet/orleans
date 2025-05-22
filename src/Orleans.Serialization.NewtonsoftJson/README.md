@@ -23,7 +23,7 @@ var builder = Host.CreateApplicationBuilder(args)
         siloBuilder
             .UseLocalhostClustering()
             // Configure Newtonsoft.Json as a serializer
-            .AddNewtonsoftJsonSerializer(type => type.Namespace.StartsWith("ExampleGrains"));
+            .AddSerializer(serializerBuilder => serializerBuilder.AddNewtonsoftJsonSerializer(type => type.Namespace.StartsWith("ExampleGrains")));
     });
 
 // Run the host
