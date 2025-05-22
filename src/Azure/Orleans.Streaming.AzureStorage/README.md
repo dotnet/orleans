@@ -1,7 +1,7 @@
-# Microsoft Orleans Azure Blob Streaming
+# Microsoft Orleans Streaming for Azure Storage Queues
 
 ## Introduction
-Microsoft Orleans Streaming for Azure Storage provides a stream provider implementation for Orleans using Azure Blob Storage. This allows for publishing and subscribing to streams of events with Azure Blob as the underlying storage mechanism.
+Microsoft Orleans Streaming for Azure Storage provides a stream provider implementation for Orleans using Azure Storage Queues. This allows for publishing and subscribing to streams of events with Azure Storage Queues as the underlying messaging infrastructure.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -10,7 +10,7 @@ To use this package, install it via NuGet:
 dotnet add package Microsoft.Orleans.Streaming.AzureStorage
 ```
 
-## Example - Configuring Azure Blob Streaming
+## Example - Configuring Azure Storage Queues Streaming
 ```csharp
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
@@ -21,20 +21,21 @@ var builder = Host.CreateApplicationBuilder(args)
     {
         siloBuilder
             .UseLocalhostClustering()
-            // Configure Azure Blob Storage as a stream provider
-            .AddAzureBlobStreaming(
-                name: "AzureBlobStreamProvider",
-                configureOptions: options =>
+            // Configure Azure Storage Queues as a stream provider
+            .AddAzureQueueStreams(
+                name: "AzureQueueStreamProvider", 
+                b => b.ConfigureAzureQueue(ob => ob.Configure((options, dep) =>
                 {
-                    options.ConnectionString = "YOUR_AZURE_STORAGE_CONNECTION_STRING";
-                });
+                    options.ConfigureTestDefaults();
+                    options.QueueNames = Enumerable.Range(0, 8).Select(num => $"{dep.Value.ClusterId}-{num}").ToList();
+                })));
     });
 
 // Run the host
 await builder.RunAsync();
 ```
 
-## Example - Using Azure Blob Streams in a Grain
+## Example - Using Azure Storage Queue Streams in a Grain
 ```csharp
 // Producer grain
 public class ProducerGrain : Grain, IProducerGrain
@@ -44,7 +45,7 @@ public class ProducerGrain : Grain, IProducerGrain
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
         // Get a reference to a stream
-        var streamProvider = GetStreamProvider("AzureBlobStreamProvider");
+        var streamProvider = GetStreamProvider("AzureQueueStreamProvider");
         _stream = streamProvider.GetStream<string>(Guid.NewGuid(), "MyStreamNamespace");
         
         return base.OnActivateAsync(cancellationToken);
@@ -65,7 +66,7 @@ public class ConsumerGrain : Grain, IConsumerGrain, IAsyncObserver<string>
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         // Get a reference to a stream
-        var streamProvider = GetStreamProvider("AzureBlobStreamProvider");
+        var streamProvider = GetStreamProvider("AzureQueueStreamProvider");
         var stream = streamProvider.GetStream<string>(this.GetPrimaryKey(), "MyStreamNamespace");
         
         // Subscribe to the stream

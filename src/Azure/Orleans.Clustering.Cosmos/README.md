@@ -19,7 +19,7 @@ var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
-            .UseCosmosDBMembership(options =>
+            .UseCosmosClustering(options =>
             {
                 options.AccountEndpoint = "https://YOUR_COSMOS_ENDPOINT";
                 options.AccountKey = "YOUR_COSMOS_KEY";
