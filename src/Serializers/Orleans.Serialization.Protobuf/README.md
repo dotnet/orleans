@@ -23,7 +23,7 @@ var builder = Host.CreateApplicationBuilder(args)
         siloBuilder
             .UseLocalhostClustering()
             // Configure Protobuf as a serializer
-            .AddProtobufSerializer();
+            .AddSerializer(serializerBuilder => serializerBuilder.AddProtobufSerializer());
     });
 
 // Run the host
