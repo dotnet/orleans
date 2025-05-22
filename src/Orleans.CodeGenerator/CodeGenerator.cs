@@ -128,6 +128,7 @@ namespace Orleans.CodeGenerator
                     }
                     else if (ShouldGenerateSerializer(symbol))
                     {
+                        // https://learn.microsoft.com/dotnet/api/system.runtime.compilerservices.referenceassemblyattribute
                         if (containingAssemblyAttributes.Any(attributeData => attributeData.AttributeClass is
                             {
                                 Name: "ReferenceAssemblyAttribute",
