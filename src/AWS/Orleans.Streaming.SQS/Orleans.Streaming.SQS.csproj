@@ -19,8 +19,8 @@
     <PackageReference Include="AWSSDK.SQS" />
   </ItemGroup>
 
-</Project>
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+</Project>

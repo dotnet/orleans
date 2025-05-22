@@ -27,8 +27,8 @@
     <PackageReference Include="AWSSDK.DynamoDBv2" />
   </ItemGroup>
 
-</Project>
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+</Project>

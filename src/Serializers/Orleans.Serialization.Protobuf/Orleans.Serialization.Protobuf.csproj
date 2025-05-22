@@ -17,8 +17,8 @@
     <ProjectReference Include="..\..\Orleans.Serialization\Orleans.Serialization.csproj" />
   </ItemGroup>
 
-</Project>
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+</Project>

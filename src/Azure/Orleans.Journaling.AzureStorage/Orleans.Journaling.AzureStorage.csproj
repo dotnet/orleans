@@ -21,8 +21,8 @@
     <InternalsVisibleTo Include="Orleans.Journaling.Tests" />
   </ItemGroup>
 
-</Project>
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+</Project>
