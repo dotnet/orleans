@@ -23,7 +23,7 @@ var builder = Host.CreateApplicationBuilder(args)
         siloBuilder
             .UseLocalhostClustering()
             // Configure MessagePack as a serializer
-            .AddMessagePackSerializer();
+            .AddSerializer(serializerBuilder => serializerBuilder.AddMessagePackSerializer());
     });
 
 // Run the host
