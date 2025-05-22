@@ -99,6 +99,8 @@ namespace Orleans.CodeGenerator
             {
                 foreach (var symbol in asm.GetDeclaredTypes())
                 {
+                    var containingAssemblyAttributes = symbol.ContainingAssembly.GetAttributes();
+
                     if (GetWellKnownTypeId(symbol) is uint wellKnownTypeId)
                     {
                         MetadataModel.WellKnownTypeIds.Add((symbol.ToOpenTypeSyntax(), wellKnownTypeId));
@@ -126,11 +128,12 @@ namespace Orleans.CodeGenerator
                     }
                     else if (ShouldGenerateSerializer(symbol))
                     {
-                        // Emit a warning if the type is from a reference assembly
-                        if (symbol.ContainingAssembly.IsReferenceAssembly)
+                        if (containingAssemblyAttributes.Any(attr => attr.AttributeClass?.Name == "ReferenceAssemblyAttribute"))
                         {
+                            // not ALWAYS will be properly processed, therefore emit a warning
                             throw new OrleansGeneratorDiagnosticAnalysisException(ReferenceAssemblyWithGenerateSerializerDiagnostic.CreateDiagnostic(symbol));
                         }
+
                         if (!Compilation.IsSymbolAccessibleWithin(symbol, Compilation.Assembly))
                         {
                             throw new OrleansGeneratorDiagnosticAnalysisException(InaccessibleSerializableTypeDiagnostic.CreateDiagnostic(symbol));

@@ -1,7 +1,9 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.CodeGenerator.Diagnostics;
 using Orleans.Serialization;
 
 namespace Orleans.CodeGenerator.Tests;
@@ -523,12 +525,12 @@ public class ComplexGrain : Grain, IComplexGrain
         // This triggers the Orleans code generator's logic to emit a diagnostic if [GenerateSerializer] is used in such an assembly.
         var compilation = await CreateCompilation(code, "TestProject");
         var referenceAssemblyAttribute = SyntaxFactory.Attribute(SyntaxFactory.ParseName("System.Runtime.CompilerServices.ReferenceAssemblyAttribute"));
-        var attrList = SyntaxFactory.AttributeList(SyntaxFactory.SingletonSeparatedList(referenceAssemblyAttribute));        
+        var attrList = SyntaxFactory.AttributeList(SyntaxFactory.SingletonSeparatedList(referenceAssemblyAttribute));
         var assemblyAttr = SyntaxFactory.AttributeList(
             SyntaxFactory.SingletonSeparatedList(referenceAssemblyAttribute))
             .WithTarget(SyntaxFactory.AttributeTargetSpecifier(SyntaxFactory.Token(SyntaxKind.AssemblyKeyword)));
         var root = (CSharpSyntaxNode)compilation.SyntaxTrees[0].GetRoot();
-        var newRoot = root.AddAttributeLists(assemblyAttr);
+        var newRoot = ((CompilationUnitSyntax)root).AddAttributeLists(assemblyAttr);
         var newTree = compilation.SyntaxTrees[0].WithRootAndOptions(newRoot, compilation.SyntaxTrees[0].Options);
         
         // leave only syntaxTree with the ReferenceAssemblyAttribute
@@ -541,7 +543,7 @@ public class ComplexGrain : Grain, IComplexGrain
         driver = driver.RunGenerators(compilation);
 
         var result = driver.GetRunResult().Results.Single();
-        Assert.Contains(result.Diagnostics, d => d.Id == "ORLEANS0110");
+        Assert.Contains(result.Diagnostics, d => d.Id == DiagnosticRuleId.ReferenceAssemblyWithGenerateSerializer);
     }
 
     private static async Task AssertSuccessfulSourceGeneration(string code)

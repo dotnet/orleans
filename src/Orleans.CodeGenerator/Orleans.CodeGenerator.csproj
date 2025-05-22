@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.CodeGenerator</PackageId>
@@ -65,4 +65,7 @@
     <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute"/>
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.CodeGenerator.Tests"/>
+  </ItemGroup>
 </Project>
