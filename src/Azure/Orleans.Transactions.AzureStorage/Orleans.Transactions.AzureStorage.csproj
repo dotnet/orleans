@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.Transactions.AzureStorage</PackageId>
     <Title>Microsoft Orleans Azure Storage Transactions Provider</Title>
     <Description>Microsoft Orleans transactions storage provider backed by Azure Storage</Description>
@@ -23,5 +24,9 @@
     <PackageReference Include="Azure.Data.Tables" />
     <PackageReference Include="System.Net.NameResolution" />
     <ProjectReference Include="..\..\Orleans.Transactions\Orleans.Transactions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>
