@@ -23,7 +23,7 @@ var builder = Host.CreateApplicationBuilder(args)
         siloBuilder
             .UseLocalhostClustering()
             // Configure System.Text.Json as a serializer
-            .AddSystemTextJsonSerializer();
+            .AddSerializer(serializerBuilder => serializerBuilder.AddSystemTextJsonSerializer(type => type.Namespace.StartsWith("ExampleGrains")));
     });
 
 // Run the host
