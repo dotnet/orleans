@@ -57,6 +57,11 @@ namespace Orleans.Transactions.TestKit
             return Task.WhenAll(tasks);
         }
 
+        public Task UpdateViolated(ITransactionTestGrain grain, int numberToAdd)
+        {
+            return grain.Add(numberToAdd);
+        }
+
         private async Task Double(ITransactionTestGrain grain)
         {
             int[] values = await grain.Get();

@@ -13,7 +13,7 @@ namespace Orleans.Reminders.DynamoDB
     /// <summary>
     /// Implementation for IReminderTable using DynamoDB as underlying storage.
     /// </summary>
-    internal sealed class DynamoDBReminderTable : IReminderTable
+    internal sealed partial class DynamoDBReminderTable : IReminderTable
     {
         private const string GRAIN_REFERENCE_PROPERTY_NAME = "GrainReference";
         private const string REMINDER_NAME_PROPERTY_NAME = "ReminderName";
@@ -63,7 +63,7 @@ namespace Orleans.Reminders.DynamoDB
                 this.options.CreateIfNotExists,
                 this.options.UpdateIfExists);
 
-            this.logger.LogInformation((int)ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
+            LogInformationInitializingDynamoDBRemindersTable(logger);
 
             var serviceIdGrainHashGlobalSecondaryIndex = new GlobalSecondaryIndex
             {
@@ -126,12 +126,7 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.LogWarning(
-                    (int)ErrorCode.ReminderServiceBase,
-                    exc,
-                    "Intermediate error reading reminder entry {Utils.DictionaryToString(keys)} from table {this.options.TableName}.",
-                    Utils.DictionaryToString(keys),
-                    this.options.TableName);
+                LogWarningReadReminderEntry(logger, exc, new(keys), this.options.TableName);
                 throw;
             }
         }
@@ -158,12 +153,7 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.LogWarning(
-                    (int)ErrorCode.ReminderServiceBase,
-                    exc,
-                    "Intermediate error reading reminder entry {Entries} from table {TableName}.",
-                    Utils.DictionaryToString(expressionValues),
-                    this.options.TableName);
+                LogWarningReadReminderEntries(logger, exc, new(expressionValues), this.options.TableName);
                 throw;
             }
         }
@@ -218,12 +208,7 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.LogWarning(
-                    (int)ErrorCode.ReminderServiceBase,
-                    exc,
-                    "Intermediate error reading reminder entry {Utils.DictionaryToString(expressionValues)} from table {this.options.TableName}.",
-                    Utils.DictionaryToString(expressionValues),
-                    this.options.TableName);
+                LogWarningReadReminderEntryRange(logger, exc, new(expressionValues), this.options.TableName);
                 throw;
             }
         }
@@ -308,12 +293,7 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.LogWarning(
-                    (int)ErrorCode.ReminderServiceBase,
-                    exc,
-                    "Intermediate error removing reminder entries {Entries} from table {TableName}.",
-                    Utils.DictionaryToString(expressionValues),
-                    this.options.TableName);
+                LogWarningRemoveReminderEntries(logger, exc, new(expressionValues), this.options.TableName);
                 throw;
             }
         }
@@ -341,7 +321,7 @@ namespace Orleans.Reminders.DynamoDB
 
             try
             {
-                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("UpsertRow entry = {Entry}, etag = {ETag}", entry.ToString(), entry.ETag);
+                LogDebugUpsertRow(logger, entry, entry.ETag);
 
                 await this.storage.PutEntryAsync(this.options.TableName, fields);
 
@@ -350,16 +330,64 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.LogWarning(
-                    (int)ErrorCode.ReminderServiceBase,
-                    exc,
-                    "Intermediate error updating entry {Entry} to the table {TableName}.",
-                    entry.ToString(),
-                    options.TableName);
+                LogWarningUpdateReminderEntry(logger, exc, entry, options.TableName);
                 throw;
             }
         }
 
         private static string ConstructReminderId(string serviceId, GrainId grainId, string reminderName) => $"{serviceId}_{grainId}_{reminderName}";
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.ReminderServiceBase,
+            Level = LogLevel.Information,
+            Message = "Initializing AWS DynamoDB Reminders Table"
+        )]
+        private static partial void LogInformationInitializingDynamoDBRemindersTable(ILogger logger);
+
+        private readonly struct DictionaryLogRecord(Dictionary<string, AttributeValue> keys)
+        {
+            public override string ToString() => Utils.DictionaryToString(keys);
+        }
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.ReminderServiceBase,
+            Level = LogLevel.Warning,
+            Message = "Intermediate error reading reminder entry {Keys} from table {TableName}."
+        )]
+        private static partial void LogWarningReadReminderEntry(ILogger logger, Exception exception, DictionaryLogRecord keys, string tableName);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.ReminderServiceBase,
+            Level = LogLevel.Warning,
+            Message = "Intermediate error reading reminder entry {Entries} from table {TableName}."
+        )]
+        private static partial void LogWarningReadReminderEntries(ILogger logger, Exception exception, DictionaryLogRecord entries, string tableName);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.ReminderServiceBase,
+            Level = LogLevel.Warning,
+            Message = "Intermediate error reading reminder entry {ExpressionValues} from table {TableName}."
+        )]
+        private static partial void LogWarningReadReminderEntryRange(ILogger logger, Exception exception, DictionaryLogRecord expressionValues, string tableName);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.ReminderServiceBase,
+            Level = LogLevel.Warning,
+            Message = "Intermediate error removing reminder entries {Entries} from table {TableName}."
+        )]
+        private static partial void LogWarningRemoveReminderEntries(ILogger logger, Exception exception, DictionaryLogRecord entries, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "UpsertRow entry = {Entry}, etag = {ETag}"
+        )]
+        private static partial void LogDebugUpsertRow(ILogger logger, ReminderEntry entry, string eTag);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.ReminderServiceBase,
+            Level = LogLevel.Warning,
+            Message = "Intermediate error updating entry {Entry} to the table {TableName}."
+        )]
+        private static partial void LogWarningUpdateReminderEntry(ILogger logger, Exception exception, ReminderEntry entry, string tableName);
     }
 }

@@ -8,7 +8,7 @@ using Orleans.Serialization.Serializers;
 
 namespace Orleans.Persistence.Cosmos;
 
-public sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
+public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
 {
     private const string ANY_ETAG = "*";
     private const string KEY_STRING_SEPARATOR = "__";
@@ -50,16 +50,7 @@ public sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<IS
         var id = GetKeyString(grainId);
         var partitionKey = await BuildPartitionKey(grainType, grainId);
 
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace(
-                "Reading: GrainType={GrainType} Key={Id} GrainId={GrainId} from Container={Container} with PartitionKey={PartitionKey}",
-                grainType,
-                id,
-                grainId,
-                _options.ContainerName,
-                partitionKey);
-        }
+        LogTraceReadingState(grainType, id, grainId, _options.ContainerName, partitionKey);
 
         try
         {
@@ -93,13 +84,13 @@ public sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<IS
                 return;
             }
 
-            _logger.LogError(dce, "Failure reading state for Grain Type {GrainType} with Id {Id}", grainType, id);
+            LogErrorReadingState(dce, grainType, id);
             WrappedException.CreateAndRethrow(dce);
             throw;
         }
         catch (Exception exc)
         {
-            _logger.LogError(exc, "Failure reading state for Grain Type {GrainType} with Id {id}", grainType, id);
+            LogErrorReadingState(exc, grainType, id);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
@@ -111,17 +102,7 @@ public sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<IS
 
         var partitionKey = await BuildPartitionKey(grainType, grainId);
 
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace(
-                "Writing: GrainType={GrainType} Key={id} GrainId={GrainId} ETag={ETag} from Container={Container} with PartitionKey={PartitionKey}",
-                grainType,
-                id,
-                grainId,
-                grainState.ETag,
-                _options.ContainerName,
-                partitionKey);
-        }
+        LogTraceWritingState(grainType, id, grainId, grainState.ETag, _options.ContainerName, partitionKey);
 
         ItemResponse<GrainStateEntity<T>>? response = null;
 
@@ -179,7 +160,7 @@ public sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<IS
         }
         catch (Exception exc)
         {
-            _logger.LogError(exc, "Failure writing state for Grain Type {GrainType} with Id {Id}", grainType, id);
+            LogErrorWritingState(exc, grainType, id);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
@@ -189,18 +170,8 @@ public sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<IS
     {
         var id = GetKeyString(grainId);
         var partitionKey = await BuildPartitionKey(grainType, grainId);
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace(
-                "Clearing: GrainType={GrainType} Key={Id} GrainId={GrainId} ETag={ETag} DeleteStateOnClear={DeleteOnClear} from Container={Container} with PartitionKey {PartitionKey}",
-                 grainType,
-                 id,
-                 grainId,
-                 grainState.ETag,
-                 _options.DeleteStateOnClear,
-                 _options.ContainerName,
-                 partitionKey);
-        }
+
+        LogTraceClearingState(grainType, id, grainId, grainState.ETag, _options.DeleteStateOnClear, _options.ContainerName, partitionKey);
 
         var pk = new PartitionKey(partitionKey);
         var requestOptions = new ItemRequestOptions { IfMatchEtag = grainState.ETag };
@@ -210,11 +181,23 @@ public sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<IS
             {
                 if (string.IsNullOrWhiteSpace(grainState.ETag))
                 {
-                    await ReadStateAsync<T>(grainType, grainId, grainState);
-                    if (grainState.RecordExists)
+                    try
                     {
-                        // State exists but the current activation has not observed state creation. Therefore, we have inconsistent state and should throw to give the grain a chance to deactivate and recover.
-                        throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, grainState.ETag, "None");
+                        var entity = await _executor.ExecuteOperation(static args =>
+                        {
+                            var (self, id, pk) = args;
+                            return self._container.ReadItemAsync<GrainStateEntity<T>>(id, pk);
+                        },
+                        (this, id, pk)).ConfigureAwait(false);
+
+                        // State exists but the current activation has not observed state creation. Therefore, we have inconsistent
+                        // state and should throw to give the grain a chance to deactivate and recover.
+                        throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, "None", entity.ETag);
+                    }
+                    catch (CosmosException dce) when (dce.StatusCode == HttpStatusCode.NotFound)
+                    {
+                        // Ignore, since this is the expected outcome.
+                        // All other exceptions will be handled by the outer catch blocks.
                     }
                 }
                 else
@@ -263,7 +246,7 @@ public sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<IS
         }
         catch (Exception exc)
         {
-            _logger.LogError(exc, "Failure clearing state for Grain Type {GrainType} with Id {Id}", grainType, id);
+            LogErrorClearingState(exc, grainType, id);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
@@ -285,16 +268,7 @@ public sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<IS
 
         try
         {
-
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug(
-                    "Initializing: Name={Name} ServiceId={ServiceId} Collection={Collection} DeleteStateOnClear={DeleteStateOnClear}",
-                    _name,
-                    _serviceId,
-                    _options.ContainerName,
-                    _options.DeleteStateOnClear);
-            }
+            LogDebugInit(_name, _serviceId, _options.ContainerName, _options.DeleteStateOnClear);
 
             await InitializeCosmosClient().ConfigureAwait(false);
 
@@ -311,27 +285,12 @@ public sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<IS
             _container = _client.GetContainer(_options.DatabaseName, _options.ContainerName);
 
             stopWatch.Stop();
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug(
-                    "Initializing provider {ProviderName} of type {ProviderType} in stage {Stage} took {ElapsedMilliseconds} milliseconds",
-                    _name,
-                    GetType().Name,
-                    _options.InitStage,
-                    stopWatch.ElapsedMilliseconds);
-            }
+            LogDebugInitializingProvider(_name, GetType().Name, _options.InitStage, stopWatch.ElapsedMilliseconds);
         }
         catch (Exception ex)
         {
             stopWatch.Stop();
-            _logger.LogError(
-                (int)ErrorCode.Provider_ErrorFromInit,
-                ex,
-                "Initialization failed for provider {ProviderName} of type {ProviderType} in stage {Stage} in {ElapsedMilliseconds} milliseconds",
-                _name,
-                GetType().Name,
-                _options.InitStage,
-                stopWatch.ElapsedMilliseconds);
+            LogErrorInitializationFailed(ex, _name, GetType().Name, _options.InitStage, stopWatch.ElapsedMilliseconds);
             WrappedException.CreateAndRethrow(ex);
             throw;
         }
@@ -345,7 +304,7 @@ public sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<IS
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error initializing Azure Cosmos DB client for grain storage provider");
+            LogErrorInitializingClient(ex);
             WrappedException.CreateAndRethrow(ex);
             throw;
         }
@@ -404,7 +363,7 @@ public sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<IS
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting Azure Cosmos DB database");
+            LogErrorDeletingDatabase(ex);
             WrappedException.CreateAndRethrow(ex);
             throw;
         }
@@ -418,6 +377,73 @@ public sealed class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<IS
     }
 
     private T CreateInstance<T>() => _activatorProvider.GetActivator<T>().Create();
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Reading: GrainType={GrainType} Key={Id} GrainId={GrainId} from Container={Container} with PartitionKey={PartitionKey}"
+    )]
+    private partial void LogTraceReadingState(string grainType, string id, GrainId grainId, string container, string partitionKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Failure reading state for Grain Type {GrainType} with Id {Id}"
+    )]
+    private partial void LogErrorReadingState(Exception exception, string grainType, string id);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Writing: GrainType={GrainType} Key={Id} GrainId={GrainId} ETag={ETag} from Container={Container} with PartitionKey={PartitionKey}"
+    )]
+    private partial void LogTraceWritingState(string grainType, string id, GrainId grainId, string eTag, string container, string partitionKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Failure writing state for Grain Type {GrainType} with Id {Id}"
+    )]
+    private partial void LogErrorWritingState(Exception exception, string grainType, string id);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Clearing: GrainType={GrainType} Key={Id} GrainId={GrainId} ETag={ETag} DeleteStateOnClear={DeleteStateOnClear} from Container={Container} with PartitionKey {PartitionKey}"
+    )]
+    private partial void LogTraceClearingState(string grainType, string id, GrainId grainId, string eTag, bool deleteStateOnClear, string container, string partitionKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Failure clearing state for Grain Type {GrainType} with Id {Id}"
+    )]
+    private partial void LogErrorClearingState(Exception exception, string grainType, string id);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Initializing: Name={Name} ServiceId={ServiceId} Collection={Collection} DeleteStateOnClear={DeleteStateOnClear}"
+    )]
+    private partial void LogDebugInit(string name, string serviceId, string collection, bool deleteStateOnClear);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Initializing provider {ProviderName} of type {ProviderType} in stage {Stage} took {ElapsedMilliseconds} milliseconds"
+    )]
+    private partial void LogDebugInitializingProvider(string providerName, string providerType, int stage, long elapsedMilliseconds);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Provider_ErrorFromInit,
+        Level = LogLevel.Error,
+        Message = "Initialization failed for provider {ProviderName} of type {ProviderType} in stage {Stage} in {ElapsedMilliseconds} milliseconds"
+    )]
+    private partial void LogErrorInitializationFailed(Exception exception, string providerName, string providerType, int stage, long elapsedMilliseconds);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error initializing Azure Cosmos DB client for grain storage provider"
+    )]
+    private partial void LogErrorInitializingClient(Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error deleting Azure Cosmos DB database"
+    )]
+    private partial void LogErrorDeletingDatabase(Exception exception);
 }
 
 public static class CosmosStorageFactory

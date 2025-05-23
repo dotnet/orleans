@@ -4,7 +4,7 @@ using Orleans.Clustering.Cosmos.Models;
 
 namespace Orleans.Clustering.Cosmos;
 
-internal class CosmosGatewayListProvider : IGatewayListProvider
+internal partial class CosmosGatewayListProvider : IGatewayListProvider
 {
     private readonly ILogger _logger;
     private readonly string _clusterId;
@@ -42,7 +42,7 @@ internal class CosmosGatewayListProvider : IGatewayListProvider
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error initializing Azure Cosmos DB gateway list provider");
+            LogErrorInitializingGatewayListProvider(ex);
             throw;
         }
     }
@@ -70,11 +70,23 @@ internal class CosmosGatewayListProvider : IGatewayListProvider
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error reading gateway list from Azure Cosmos DB");
+            LogErrorReadingGatewayListFromCosmosDb(ex);
             throw;
         }
     }
 
     private static Uri ConvertToGatewayUri(SiloEntity gateway) =>
         SiloAddress.New(new IPEndPoint(IPAddress.Parse(gateway.Address), gateway.ProxyPort!.Value), gateway.Generation).ToGatewayUri();
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error initializing Azure Cosmos DB gateway list provider"
+    )]
+    private partial void LogErrorInitializingGatewayListProvider(Exception ex);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error reading gateway list from Azure Cosmos DB"
+    )]
+    private partial void LogErrorReadingGatewayListFromCosmosDb(Exception ex);
 }

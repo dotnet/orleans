@@ -8,18 +8,19 @@ using Orleans.GrainDirectory;
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal sealed class RemoteGrainDirectory : SystemTarget, IRemoteGrainDirectory
+    internal sealed partial class RemoteGrainDirectory : SystemTarget, IRemoteGrainDirectory
     {
         private readonly LocalGrainDirectory router;
         private readonly LocalGrainDirectoryPartition partition;
         private readonly ILogger logger;
 
-        internal RemoteGrainDirectory(LocalGrainDirectory r, GrainType grainType, ILoggerFactory loggerFactory)
-            : base(grainType, r.MyAddress, loggerFactory)
+        internal RemoteGrainDirectory(LocalGrainDirectory localGrainDirectory, GrainType grainType, SystemTargetShared shared)
+            : base(grainType, shared)
         {
-            router = r;
-            partition = r.DirectoryPartition;
-            logger = loggerFactory.CreateLogger($"{typeof(RemoteGrainDirectory).FullName}.CacheValidator");
+            router = localGrainDirectory;
+            partition = localGrainDirectory.DirectoryPartition;
+            logger = shared.LoggerFactory.CreateLogger($"{typeof(RemoteGrainDirectory).FullName}.CacheValidator");
+            shared.ActivationDirectory.RecordNewTarget(this);
         }
 
         public Task<AddressAndTag> RegisterAsync(GrainAddress address, GrainAddress? previousAddress, int hopCount)
@@ -39,8 +40,7 @@ namespace Orleans.Runtime.GrainDirectory
             // validate that this request arrived correctly
             //logger.Assert(ErrorCode.Runtime_Error_100140, silo.Matches(router.MyAddress), "destination address != my address");
 
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("RegisterMany Count={Count}", addresses.Count);
-
+            LogRegisterMany(addresses.Count);
 
             return Task.WhenAll(addresses.Select(addr => router.RegisterAsync(addr, previousAddress: null, 1)));
         }
@@ -68,7 +68,7 @@ namespace Orleans.Runtime.GrainDirectory
         public Task<List<AddressAndTag>> LookUpMany(List<(GrainId GrainId, int Version)> grainAndETagList)
         {
             DirectoryInstruments.ValidationsCacheReceived.Add(1);
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("LookUpMany for {Count} entries", grainAndETagList.Count);
+            LogLookUpMany(grainAndETagList.Count);
 
             var result = new List<AddressAndTag>();
 
@@ -107,5 +107,17 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         public Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount = 0) => router.RegisterAsync(address, hopCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "RegisterMany Count={Count}"
+        )]
+        private partial void LogRegisterMany(int count);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "LookUpMany for {Count} entries"
+        )]
+        private partial void LogLookUpMany(int count);
     }
 }

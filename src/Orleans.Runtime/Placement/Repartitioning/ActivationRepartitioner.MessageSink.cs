@@ -1,7 +1,5 @@
 #nullable enable
 using System;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -10,7 +8,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime.Placement.Repartitioning;
 
-internal partial class ActivationRepartitioner : IMessageStatisticsSink
+internal sealed partial class ActivationRepartitioner : IMessageStatisticsSink
 {
     private readonly CancellationTokenSource _shutdownCts = new();
 
@@ -24,10 +22,7 @@ internal partial class ActivationRepartitioner : IMessageStatisticsSink
         using var _ = new ExecutionContextSuppressor();
         _processPendingEdgesTask = ProcessPendingEdges(_shutdownCts.Token);
 
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace("{Service} has started.", nameof(ActivationRepartitioner));
-        }
+        LogTraceServiceStarted(_logger, nameof(ActivationRepartitioner));
     }
 
     public async Task StopProcessingEdgesAsync(CancellationToken cancellationToken)
@@ -41,10 +36,7 @@ internal partial class ActivationRepartitioner : IMessageStatisticsSink
         _pendingMessageEvent.Signal();
         await _processPendingEdgesTask.WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
 
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace("{Service} has stopped.", nameof(ActivationRepartitioner));
-        }
+        LogTraceServiceStopped(_logger, nameof(ActivationRepartitioner));
     }
 
     private async Task ProcessPendingEdges(CancellationToken cancellationToken)
@@ -144,4 +136,16 @@ internal partial class ActivationRepartitioner : IMessageStatisticsSink
             await Task.Delay(TimeSpan.FromMilliseconds(30));
         }
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "{Service} has started."
+    )]
+    private static partial void LogTraceServiceStarted(ILogger logger, string service);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "{Service} has stopped."
+    )]
+    private static partial void LogTraceServiceStopped(ILogger logger, string service);
 }

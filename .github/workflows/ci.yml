@@ -515,3 +515,24 @@ jobs:
         path: |
           **/TestResults/*
           **/logs/*
+  test-codegenerator:
+    name: Test Code Generator
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        framework: [net8.0]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: |
+          8.0.x
+    - name: Test Code Generator
+      run: dotnet test
+        test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj
+        --framework ${{ matrix.framework }}
+        --logger "trx;LogFileName=test_results_${{ matrix.framework }}.trx"
+        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"

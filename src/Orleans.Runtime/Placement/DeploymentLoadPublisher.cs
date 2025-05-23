@@ -15,7 +15,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// This class collects runtime statistics for all silos in the current deployment for use by placement.
     /// </summary>
-    internal class DeploymentLoadPublisher : SystemTarget, IDeploymentLoadPublisher, ISiloStatusListener, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed partial class DeploymentLoadPublisher : SystemTarget, IDeploymentLoadPublisher, ISiloStatusListener, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly ILocalSiloDetails _siloDetails;
         private readonly ISiloStatusOracle _siloStatusOracle;
@@ -46,8 +46,8 @@ namespace Orleans.Runtime
             IActivationWorkingSet activationWorkingSet,
             IEnvironmentStatisticsProvider environmentStatisticsProvider,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
-            Catalog catalog)
-            : base(Constants.DeploymentLoadPublisherSystemTargetType, siloDetails.SiloAddress, loggerFactory)
+            SystemTargetShared shared)
+            : base(Constants.DeploymentLoadPublisherSystemTargetType, shared)
         {
             _logger = loggerFactory.CreateLogger<DeploymentLoadPublisher>();
             _siloDetails = siloDetails;
@@ -60,16 +60,13 @@ namespace Orleans.Runtime
             _statisticsRefreshTime = options.Value.DeploymentLoadPublisherRefreshTime;
             _periodicStats = new ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>();
             _siloStatisticsChangeListeners = new List<ISiloStatisticsChangeListener>();
-            catalog.RegisterSystemTarget(this);
             siloStatusOracle.SubscribeToSiloStatusEvents(this);
+            shared.ActivationDirectory.RecordNewTarget(this);
         }
 
         private async Task StartAsync(CancellationToken cancellationToken)
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Starting DeploymentLoadPublisher");
-            }
+            LogDebugStartingDeploymentLoadPublisher(_logger);
 
             if (_statisticsRefreshTime > TimeSpan.Zero)
             {
@@ -85,20 +82,14 @@ namespace Orleans.Runtime
 
             await RefreshClusterStatistics();
             await PublishStatistics();
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Started DeploymentLoadPublisher");
-            }
+            LogDebugStartedDeploymentLoadPublisher(_logger);
         }
 
         private async Task PublishStatistics()
         {
             try
             {
-                if (_logger.IsEnabled(LogLevel.Trace))
-                {
-                    _logger.LogTrace("PublishStatistics");
-                }
+                LogTracePublishStatistics(_logger);
 
                 // Ensure that our timestamp is monotonically increasing.
                 var ticks = _lastUpdateDateTimeTicks = Math.Max(_lastUpdateDateTimeTicks + 1, DateTime.UtcNow.Ticks);
@@ -132,10 +123,7 @@ namespace Orleans.Runtime
                     }
                     catch (Exception exception)
                     {
-                        _logger.LogWarning(
-                            (int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_1,
-                            exception,
-                            "An unexpected exception was thrown by PublishStatistics.UpdateRuntimeStatistics(). Ignored");
+                        LogWarningRuntimeStatisticsUpdateFailure1(_logger, exception);
                     }
                 }
 
@@ -143,10 +131,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                _logger.LogWarning(
-                    (int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_2,
-                    exc,
-                    "An exception was thrown by PublishStatistics.UpdateRuntimeStatistics(). Ignoring");
+                LogWarningRuntimeStatisticsUpdateFailure2(_logger, exc);
             }
         }
 
@@ -158,7 +143,7 @@ namespace Orleans.Runtime
 
         private void UpdateRuntimeStatisticsInternal(SiloAddress siloAddress, SiloRuntimeStatistics siloStats)
         {
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("UpdateRuntimeStatistics from {Server}", siloAddress);
+            LogTraceUpdateRuntimeStatistics(_logger, siloAddress);
             if (_siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
             {
                 return;
@@ -176,7 +161,7 @@ namespace Orleans.Runtime
 
         internal async Task RefreshClusterStatistics()
         {
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("RefreshStatistics");
+            LogTraceRefreshStatistics(_logger);
             await this.RunOrQueueTask(() =>
                 {
                     var members = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
@@ -199,11 +184,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exception)
             {
-                _logger.LogWarning(
-                    (int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_3,
-                    exception,
-                    "An unexpected exception was thrown from RefreshStatistics by ISiloControl.GetRuntimeStatistics({SiloAddress}). Will keep using stale statistics.",
-                    silo);
+                LogWarningRuntimeStatisticsUpdateFailure3(_logger, exception, silo);
             }
         }
 
@@ -272,5 +253,56 @@ namespace Orleans.Runtime
                 return Task.CompletedTask;
             });
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Starting DeploymentLoadPublisher"
+        )]
+        private static partial void LogDebugStartingDeploymentLoadPublisher(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Started DeploymentLoadPublisher"
+        )]
+        private static partial void LogDebugStartedDeploymentLoadPublisher(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "PublishStatistics"
+        )]
+        private static partial void LogTracePublishStatistics(ILogger logger);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_1,
+            Level = LogLevel.Warning,
+            Message = "An unexpected exception was thrown by PublishStatistics.UpdateRuntimeStatistics(). Ignored"
+        )]
+        private static partial void LogWarningRuntimeStatisticsUpdateFailure1(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_2,
+            Level = LogLevel.Warning,
+            Message = "An exception was thrown by PublishStatistics.UpdateRuntimeStatistics(). Ignoring"
+        )]
+        private static partial void LogWarningRuntimeStatisticsUpdateFailure2(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "UpdateRuntimeStatistics from {Server}"
+        )]
+        private static partial void LogTraceUpdateRuntimeStatistics(ILogger logger, SiloAddress server);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "RefreshStatistics"
+        )]
+        private static partial void LogTraceRefreshStatistics(ILogger logger);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_3,
+            Level = LogLevel.Warning,
+            Message = "An unexpected exception was thrown from RefreshStatistics by ISiloControl.GetRuntimeStatistics({SiloAddress}). Will keep using stale statistics."
+        )]
+        private static partial void LogWarningRuntimeStatisticsUpdateFailure3(ILogger logger, Exception exception, SiloAddress siloAddress);
     }
 }

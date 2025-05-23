@@ -274,7 +274,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     /// Returns an enumerator which can be used to enumerate the data referenced by this instance.
     /// </summary>
     /// <returns>An enumerator for the data contained in this instance.</returns>
-    public readonly BufferSlice.SpanEnumerator GetEnumerator() => new(Slice());
+    public readonly MemoryEnumerator MemorySegments => new(this);
 
     /// <summary>
     /// Writes the provided sequence to this buffer.
@@ -365,6 +365,191 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         Last = WriteHead;
         WriteHead = null;
         CurrentPosition = 0;
+    }
+
+    /// <summary>
+    /// Enumerates over sequences of bytes in a <see cref="PooledBuffer"/>.
+    /// </summary>
+    public struct MemoryEnumerator
+    {
+        private static readonly SequenceSegment InitialSegmentSentinel = new();
+        private static readonly SequenceSegment FinalSegmentSentinel = new();
+        private readonly PooledBuffer _buffer;
+        private int _position;
+        private SequenceSegment _segment;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MemoryEnumerator"/> type.
+        /// </summary>
+        /// <param name="buffer">The buffer to enumerate.</param>
+        public MemoryEnumerator(PooledBuffer buffer)
+        {
+            _buffer = buffer;
+            _segment = InitialSegmentSentinel;
+            CurrentMemory = ReadOnlyMemory<byte>.Empty;
+        }
+
+        /// <summary>
+        /// Returns an enumerator which can be used to enumerate the data referenced by this instance.
+        /// </summary>
+        /// <returns>An enumerator for the data contained in this instance.</returns>
+        public readonly MemoryEnumerator GetEnumerator() => this;
+
+        /// <summary>
+        /// Gets the element in the collection at the current position of the enumerator.
+        /// </summary>
+        public readonly ReadOnlyMemory<byte> Current => CurrentMemory;
+        public ReadOnlyMemory<byte> CurrentMemory;
+
+        /// <summary>
+        /// Advances the enumerator to the next element of the collection.
+        /// </summary>
+        /// <returns><see langword="true"/> if the enumerator was successfully advanced to the next element; <see langword="false"/> if the enumerator has passed the end of the collection.</returns>
+        public bool MoveNext()
+        {
+            if (ReferenceEquals(_segment, InitialSegmentSentinel))
+            {
+                _segment = _buffer.First;
+            }
+
+            var endPosition = _buffer.Length;
+            while (_segment != null && _segment != FinalSegmentSentinel)
+            {
+                var segment = _segment.CommittedMemory;
+
+                // Find the starting segment and the offset to copy from.
+                var segmentLength = segment.Length;
+                if (segmentLength == 0)
+                {
+                    CurrentMemory = ReadOnlyMemory<byte>.Empty;
+                    _segment = FinalSegmentSentinel;
+                    return false;
+                }
+
+                CurrentMemory = segment[..segmentLength];
+                _position += segmentLength;
+                _segment = _segment.Next as SequenceSegment;
+                return true;
+            }
+
+            // Account for the uncommitted data at the end of the buffer.
+            // The write head is only linked to the previous buffers when Commit() is called and it is set to null afterwards,
+            // meaning that if the write head is not null, the other buffers are not linked to it and it therefore has not been enumerated.
+            if (_segment != FinalSegmentSentinel && _buffer.CurrentPosition > 0 && _buffer.WriteHead is { } head)
+            {
+                var finalLength = _buffer.CurrentPosition;
+                if (finalLength == 0)
+                {
+                    CurrentMemory = ReadOnlyMemory<byte>.Empty;
+                    _segment = FinalSegmentSentinel;
+                    return false;
+                }
+
+                CurrentMemory = head.Array.AsMemory(0, finalLength);
+                _position += finalLength;
+                Debug.Assert(_position == _buffer.Length);
+                _segment = FinalSegmentSentinel;
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Enumerates over sequences of bytes in a <see cref="PooledBuffer"/>.
+    /// </summary>
+    public ref struct SpanEnumerator
+    {
+        private static readonly SequenceSegment InitialSegmentSentinel = new();
+        private static readonly SequenceSegment FinalSegmentSentinel = new();
+        private readonly
+#if NET8_0_OR_GREATER
+            ref readonly 
+#endif
+            PooledBuffer _buffer;
+        private int _position;
+        private SequenceSegment _segment;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SpanEnumerator"/> type.
+        /// </summary>
+        /// <param name="buffer">The buffer to enumerate.</param>
+        public SpanEnumerator(ref PooledBuffer buffer)
+        {
+            _buffer =
+#if NET8_0_OR_GREATER
+                ref
+#endif
+                buffer;
+            _segment = InitialSegmentSentinel;
+            Current = ReadOnlySpan<byte>.Empty;
+        }
+
+        /// <summary>
+        /// Returns an enumerator which can be used to enumerate the data referenced by this instance.
+        /// </summary>
+        /// <returns>An enumerator for the data contained in this instance.</returns>
+        public readonly SpanEnumerator GetEnumerator() => this;
+
+        /// <summary>
+        /// Gets the element in the collection at the current position of the enumerator.
+        /// </summary>
+        public ReadOnlySpan<byte> Current { get; private set; }
+
+        /// <summary>
+        /// Advances the enumerator to the next element of the collection.
+        /// </summary>
+        /// <returns><see langword="true"/> if the enumerator was successfully advanced to the next element; <see langword="false"/> if the enumerator has passed the end of the collection.</returns>
+        public bool MoveNext()
+        {
+            if (ReferenceEquals(_segment, InitialSegmentSentinel))
+            {
+                _segment = _buffer.First;
+            }
+
+            var endPosition = _buffer.Length;
+            while (_segment != null && _segment != FinalSegmentSentinel)
+            {
+                var segment = _segment.CommittedMemory;
+
+                // Find the starting segment and the offset to copy from.
+                var segmentLength = Math.Min(segment.Length, endPosition - _position);
+                if (segmentLength == 0)
+                {
+                    Current = ReadOnlySpan<byte>.Empty;
+                    _segment = FinalSegmentSentinel;
+                    return false;
+                }
+
+                Current = segment.Span[..segmentLength];
+                _position += segmentLength;
+                _segment = _segment.Next as SequenceSegment;
+                return true;
+            }
+
+            // Account for the uncommitted data at the end of the buffer.
+            // The write head is only linked to the previous buffers when Commit() is called and it is set to null afterwards,
+            // meaning that if the write head is not null, the other buffers are not linked to it and it therefore has not been enumerated.
+            if (_segment != FinalSegmentSentinel && _buffer.CurrentPosition > 0 && _buffer.WriteHead is { } head && _position < endPosition)
+            {
+                var finalLength = Math.Min(_buffer.CurrentPosition, endPosition - _position);
+                if (finalLength == 0)
+                {
+                    Current = ReadOnlySpan<byte>.Empty;
+                    _segment = FinalSegmentSentinel;
+                    return false;
+                }
+
+                Current = head.Array.AsSpan(0, finalLength);
+                _position += finalLength;
+                Debug.Assert(_position == endPosition);
+                _segment = FinalSegmentSentinel;
+                return true;
+            }
+
+            return false;
+        }
     }
 
     /// <summary>
@@ -472,6 +657,12 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         public readonly SpanEnumerator GetEnumerator() => new(this);
 
         /// <summary>
+        /// Returns an enumerator which can be used to enumerate the data referenced by this instance.
+        /// </summary>
+        /// <returns>An enumerator for the data contained in this instance.</returns>
+        public readonly MemoryEnumerator MemorySegments => new(this);
+
+        /// <summary>
         /// Enumerates over spans of bytes in a <see cref="BufferSlice"/>.
         /// </summary>
         public ref struct SpanEnumerator
@@ -496,6 +687,12 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             internal readonly PooledBuffer Buffer => _slice._buffer;
             internal readonly int Offset => _slice._offset;
             internal readonly int Length => _slice._length;
+
+            /// <summary>
+            /// Returns an enumerator which can be used to enumerate the data referenced by this instance.
+            /// </summary>
+            /// <returns>An enumerator for the data contained in this instance.</returns>
+            public readonly SpanEnumerator GetEnumerator() => this;
 
             /// <summary>
             /// Gets the element in the collection at the current position of the enumerator.
@@ -569,6 +766,120 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                     }
 
                     Current = head.Array.AsSpan(finalOffset, finalLength);
+                    _position += finalOffset + finalLength;
+                    Debug.Assert(_position == endPosition);
+                    _segment = FinalSegmentSentinel;
+                    return true;
+                }
+
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Enumerates over sequences of bytes in a <see cref="BufferSlice"/>.
+        /// </summary>
+        public struct MemoryEnumerator
+        {
+            private static readonly SequenceSegment InitialSegmentSentinel = new();
+            private static readonly SequenceSegment FinalSegmentSentinel = new();
+            private readonly BufferSlice _slice;
+            private int _position;
+            private SequenceSegment _segment;
+
+            /// <summary>
+            /// Initializes a new instance of the <see cref="MemoryEnumerator"/> type.
+            /// </summary>
+            /// <param name="slice">The slice to enumerate.</param>
+            public MemoryEnumerator(BufferSlice slice)
+            {
+                _slice = slice;
+                _segment = InitialSegmentSentinel;
+                Current = ReadOnlyMemory<byte>.Empty;
+            }
+
+            internal readonly PooledBuffer Buffer => _slice._buffer;
+            internal readonly int Offset => _slice._offset;
+            internal readonly int Length => _slice._length;
+
+            /// <summary>
+            /// Returns an enumerator which can be used to enumerate the data referenced by this instance.
+            /// </summary>
+            /// <returns>An enumerator for the data contained in this instance.</returns>
+            public readonly MemoryEnumerator GetEnumerator() => this;
+
+            /// <summary>
+            /// Gets the element in the collection at the current position of the enumerator.
+            /// </summary>
+            public ReadOnlyMemory<byte> Current { get; private set; }
+
+            /// <summary>
+            /// Advances the enumerator to the next element of the collection.
+            /// </summary>
+            /// <returns><see langword="true"/> if the enumerator was successfully advanced to the next element; <see langword="false"/> if the enumerator has passed the end of the collection.</returns>
+            public bool MoveNext()
+            {
+                if (ReferenceEquals(_segment, InitialSegmentSentinel))
+                {
+                    _segment = Buffer.First;
+                }
+
+                var endPosition = Offset + Length;
+                while (_segment != null && _segment != FinalSegmentSentinel)
+                {
+                    var segment = _segment.CommittedMemory;
+
+                    // Find the starting segment and the offset to copy from.
+                    int segmentOffset;
+                    if (_position < Offset)
+                    {
+                        if (_position + segment.Length <= Offset)
+                        {
+                            // Start is in a subsequent segment
+                            _position += segment.Length;
+                            _segment = _segment.Next as SequenceSegment;
+                            continue;
+                        }
+                        else
+                        {
+                            // Start is in this segment
+                            segmentOffset = Offset;
+                        }
+                    }
+                    else
+                    {
+                        segmentOffset = 0;
+                    }
+
+                    var segmentLength = Math.Min(segment.Length - segmentOffset, endPosition - (_position + segmentOffset));
+                    if (segmentLength == 0)
+                    {
+                        Current = ReadOnlyMemory<byte>.Empty;
+                        _segment = FinalSegmentSentinel;
+                        return false;
+                    }
+
+                    Current = segment.Slice(segmentOffset, segmentLength);
+                    _position += segmentOffset + segmentLength;
+                    _segment = _segment.Next as SequenceSegment;
+                    return true;
+                }
+
+                // Account for the uncommitted data at the end of the buffer.
+                // The write head is only linked to the previous buffers when Commit() is called and it is set to null afterwards,
+                // meaning that if the write head is not null, the other buffers are not linked to it and it therefore has not been enumerated.
+                if (_segment != FinalSegmentSentinel && Buffer.CurrentPosition > 0 && Buffer.WriteHead is { } head && _position < endPosition)
+                {
+                    var finalOffset = Math.Max(Offset - _position, 0);
+                    var finalLength = Math.Min(Buffer.CurrentPosition, endPosition - (_position + finalOffset));
+                    if (finalLength == 0)
+                    {
+                        Current = ReadOnlyMemory<byte>.Empty;
+                        _segment = FinalSegmentSentinel;
+                        return false;
+                    }
+
+                    Current = head.Array.AsMemory(finalOffset, finalLength);
                     _position += finalOffset + finalLength;
                     Debug.Assert(_position == endPosition);
                     _segment = FinalSegmentSentinel;
@@ -725,4 +1036,16 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             SequenceSegmentPool.Shared.Return(this);
         }
     }
+}
+
+/// <summary>
+/// Extensions for <see cref="PooledBuffer"/>.
+/// </summary>
+public static class PooledBufferExtensions
+{
+    /// <summary>
+    /// Returns an enumerator which can be used to enumerate the data referenced by this instance.
+    /// </summary>
+    /// <returns>An enumerator for the data contained in this instance.</returns>
+    public static PooledBuffer.SpanEnumerator GetEnumerator(this ref PooledBuffer buffer) => new(ref buffer);
 }

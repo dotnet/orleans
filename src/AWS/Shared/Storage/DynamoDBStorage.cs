@@ -28,7 +28,7 @@ namespace Orleans.Transactions.DynamoDB
     /// <summary>
     /// Wrapper around AWS DynamoDB SDK.
     /// </summary>
-    internal class DynamoDBStorage
+    internal partial class DynamoDBStorage
     {
         private readonly string _accessKey;
         private readonly string _token;
@@ -105,10 +105,7 @@ namespace Orleans.Transactions.DynamoDB
         {
             if (!this._createIfNotExists && !this._updateIfExists)
             {
-                _logger.LogInformation(
-                    (int)ErrorCode.StorageProviderBase,
-                    "The config values for 'createIfNotExists' and 'updateIfExists' are false. The table '{TableName}' will not be created or updated.",
-                    tableName);
+                LogInformationTableNotCreatedOrUpdated(_logger, tableName);
                 return;
             }
 
@@ -121,7 +118,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                _logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Could not initialize connection to storage table {TableName}", tableName);
+                LogErrorCouldNotInitializeTable(_logger, exc, tableName);
                 throw;
             }
         }
@@ -192,10 +189,7 @@ namespace Orleans.Transactions.DynamoDB
         {
             if (!_createIfNotExists)
             {
-                _logger.LogWarning(
-                    (int)ErrorCode.StorageProviderBase,
-                    "The config value 'createIfNotExists' is false. The table '{TableName}' does not exist and it will not get created.",
-                    tableName);
+                LogWarningTableNotCreated(_logger, tableName);
                 return;
             }
 
@@ -237,7 +231,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                _logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Could not create table {TableName}", tableName);
+                LogErrorCouldNotCreateTable(_logger, exc, tableName);
                 throw;
             }
         }
@@ -246,7 +240,7 @@ namespace Orleans.Transactions.DynamoDB
         {
             if (!this._updateIfExists)
             {
-                _logger.LogWarning((int)ErrorCode.StorageProviderBase, "The config value 'updateIfExists' is false. The table structure for table '{TableName}' will not be updated.", tableDescription.TableName);
+                LogWarningTableNotUpdated(_logger, tableDescription.TableName);
                 return;
             }
 
@@ -314,7 +308,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                _logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Could not update table {TableName}", tableDescription.TableName);
+                LogErrorCouldNotUpdateTable(_logger, exc, tableDescription.TableName);
                 throw;
             }
         }
@@ -358,9 +352,10 @@ namespace Orleans.Transactions.DynamoDB
             // This is because updating the TTL attribute requires (1) disabling the table TTL and (2) re-enabling it with the new TTL attribute.
             // As per the below details page for this API: "It can take up to one hour for the change to fully process. Any additional UpdateTimeToLive calls for the same table during this one hour duration result in a ValidationException."
             // https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_UpdateTimeToLive.html
-            if (describeTimeToLive.TimeToLiveStatus != TimeToLiveStatus.DISABLED)
+            // However if the TTL is already set on the correct attribute, the attribute value is updated every time a record is written, thus the configuration is already correct and warning doesn't need to be logged.
+            if (describeTimeToLive.TimeToLiveStatus != TimeToLiveStatus.DISABLED && describeTimeToLive.AttributeName != ttlAttributeName)
             {
-                _logger.LogError((int)ErrorCode.StorageProviderBase, "TTL is not DISABLED. Cannot update table TTL for table {TableName}. Please update manually.", tableDescription.TableName);
+                LogWarningTtlNotDisabled(_logger, tableDescription.TableName);
                 return tableDescription;
             }
 
@@ -384,12 +379,7 @@ namespace Orleans.Transactions.DynamoDB
                 // We need to swallow this exception as there is no API exposed to determine if the below issue will occur before calling UpdateTimeToLive(Async)
                 // "Time to live has been modified multiple times within a fixed interval".
                 // We can arrive at this situation if the TTL feature was recently disabled on the target table.
-                _logger.LogError(
-                    (int)ErrorCode.StorageProviderBase,
-                    ddbEx,
-                    "Exception occured while updating table {TableName} TTL attribute to {TtlAttributeName}. Please update manually.",
-                    tableDescription.TableName,
-                    ttlAttributeName);
+                LogErrorUpdateTtlException(_logger, ddbEx, tableDescription.TableName, ttlAttributeName);
                 return tableDescription;
             }
         }
@@ -453,7 +443,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                _logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Could not delete table {TableName}", tableName);
+                LogErrorCouldNotDeleteTable(_logger, exc, tableName);
                 throw;
             }
         }
@@ -468,7 +458,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task PutEntryAsync(string tableName, Dictionary<string, AttributeValue> fields, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null)
         {
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Creating {TableName} table entry: {TableEntry}", tableName, Utils.DictionaryToString(fields));
+            LogTraceCreatingTableEntry(_logger, tableName, new(fields));
 
             try
             {
@@ -483,7 +473,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                _logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Unable to create item to table {TableName}", tableName);
+                LogErrorUnableToCreateItem(_logger, exc, tableName);
                 throw;
             }
         }
@@ -504,12 +494,7 @@ namespace Orleans.Transactions.DynamoDB
             string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null, string extraExpression = "",
             Dictionary<string, AttributeValue> extraExpressionValues = null)
         {
-            if (_logger.IsEnabled(LogLevel.Trace))
-                _logger.LogTrace(
-                    "Upserting entry {Entry} with key(s) {Keys} into table {TableName}",
-                    Utils.DictionaryToString(fields),
-                    Utils.DictionaryToString(keys),
-                    tableName);
+            LogTraceUpsertingEntry(_logger, new(fields), new(keys), tableName);
 
             try
             {
@@ -542,11 +527,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                _logger.LogWarning(
-                    (int)ErrorCode.StorageProviderBase,
-                    exc,
-                    "Intermediate error upserting to the table {TableName}",
-                    tableName);
+                LogWarningIntermediateUpsert(_logger, exc, tableName);
                 throw;
             }
         }
@@ -604,7 +585,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task DeleteEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null)
         {
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Deleting table {TableName} entry with key(s) {Keys}", tableName, Utils.DictionaryToString(keys));
+            LogTraceDeletingTableEntry(_logger, tableName, new(keys));
 
             try
             {
@@ -624,11 +605,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                _logger.LogWarning(
-                    (int)ErrorCode.StorageProviderBase,
-                    exc,
-                    "Intermediate error deleting entry from the table {TableName}.",
-                    tableName);
+                LogWarningIntermediateDelete(_logger, exc, tableName);
                 throw;
             }
         }
@@ -641,7 +618,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task DeleteEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toDelete)
         {
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Deleting {TableName} table entries", tableName);
+            LogTraceDeletingTableEntries(_logger, tableName);
 
             if (toDelete == null) throw new ArgumentNullException(nameof(toDelete));
 
@@ -666,11 +643,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                _logger.LogWarning(
-                    (int)ErrorCode.StorageProviderBase,
-                    exc,
-                    "Intermediate error deleting entries from the table {TableName}.",
-                    tableName);
+                LogWarningIntermediateDeleteEntries(_logger, exc, tableName);
                 throw;
             }
         }
@@ -707,7 +680,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception)
             {
-                if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Unable to find table entry for Keys = {Keys}", Utils.DictionaryToString(keys));
+                LogDebugUnableToFindTableEntry(_logger, new(keys));
                 throw;
             }
         }
@@ -756,7 +729,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception)
             {
-                if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Unable to find table entry for Keys = {Keys}", Utils.DictionaryToString(keys));
+                LogDebugUnableToFindTableEntry(_logger, new(keys));
                 throw;
             }
         }
@@ -853,7 +826,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                _logger.LogWarning((int)ErrorCode.StorageProviderBase, exc, "Failed to read table {TableName}", tableName);
+                LogWarningFailedToReadTable(_logger, exc, tableName);
                 throw new OrleansException($"Failed to read table {tableName}: {exc.Message}", exc);
             }
         }
@@ -866,7 +839,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task PutEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toCreate)
         {
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Put entries {TableName} table", tableName);
+            LogTracePutEntries(_logger, tableName);
 
             if (toCreate == null) throw new ArgumentNullException(nameof(toCreate));
 
@@ -891,11 +864,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                _logger.LogWarning(
-                    (int)ErrorCode.StorageProviderBase,
-                    exc,
-                    "Intermediate error bulk inserting entries to table {TableName}.",
-                    tableName);
+                LogWarningIntermediateBulkInsert(_logger, exc, tableName);
                 throw;
             }
         }
@@ -930,10 +899,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception)
             {
-                if (_logger.IsEnabled(LogLevel.Debug))
-                    _logger.LogDebug(
-                        "Unable to find table entry for Keys = {Keys}",
-                        Utils.EnumerableToString(keys, d => Utils.DictionaryToString(d)));
+                LogDebugUnableToFindTableEntries(_logger, new(keys));
                 throw;
             }
         }
@@ -977,10 +943,157 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug(exc, "Unable to write");
+                LogDebugUnableToWrite(_logger, exc);
                 throw;
             }
         }
-    }
 
+        private readonly struct DictionaryLogRecord(Dictionary<string, AttributeValue> dictionary)
+        {
+            public override string ToString() => Utils.DictionaryToString(dictionary);
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "The config values for 'createIfNotExists' and 'updateIfExists' are false. The table '{TableName}' will not be created or updated."
+        )]
+        private static partial void LogInformationTableNotCreatedOrUpdated(ILogger logger, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Could not initialize connection to storage table {TableName}"
+        )]
+        private static partial void LogErrorCouldNotInitializeTable(ILogger logger, Exception exception, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "The config value 'createIfNotExists' is false. The table '{TableName}' does not exist and it will not get created."
+        )]
+        private static partial void LogWarningTableNotCreated(ILogger logger, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Could not create table {TableName}"
+        )]
+        private static partial void LogErrorCouldNotCreateTable(ILogger logger, Exception exception, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "The config value 'updateIfExists' is false. The table structure for table '{TableName}' will not be updated."
+        )]
+        private static partial void LogWarningTableNotUpdated(ILogger logger, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Could not update table {TableName}"
+        )]
+        private static partial void LogErrorCouldNotUpdateTable(ILogger logger, Exception exception, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "TTL is not DISABLED. Cannot update table TTL for table {TableName}. Please update manually."
+        )]
+        private static partial void LogWarningTtlNotDisabled(ILogger logger, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Exception occured while updating table {TableName} TTL attribute to {TtlAttributeName}. Please update manually."
+        )]
+        private static partial void LogErrorUpdateTtlException(ILogger logger, Exception exception, string tableName, string ttlAttributeName);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Could not delete table {TableName}"
+        )]
+        private static partial void LogErrorCouldNotDeleteTable(ILogger logger, Exception exception, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Creating {TableName} table entry: {TableEntry}"
+        )]
+        private static partial void LogTraceCreatingTableEntry(ILogger logger, string tableName, DictionaryLogRecord tableEntry);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Unable to create item to table {TableName}"
+        )]
+        private static partial void LogErrorUnableToCreateItem(ILogger logger, Exception exception, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Upserting entry {Entry} with key(s) {Keys} into table {TableName}"
+        )]
+        private static partial void LogTraceUpsertingEntry(ILogger logger, DictionaryLogRecord entry, DictionaryLogRecord keys, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Intermediate error upserting to the table {TableName}"
+        )]
+        private static partial void LogWarningIntermediateUpsert(ILogger logger, Exception exception, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Deleting table {TableName} entry with key(s) {Keys}"
+        )]
+        private static partial void LogTraceDeletingTableEntry(ILogger logger, string tableName, DictionaryLogRecord keys);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Intermediate error deleting entry from the table {TableName}."
+        )]
+        private static partial void LogWarningIntermediateDelete(ILogger logger, Exception exception, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Deleting {TableName} table entries"
+        )]
+        private static partial void LogTraceDeletingTableEntries(ILogger logger, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Intermediate error deleting entries from the table {TableName}."
+        )]
+        private static partial void LogWarningIntermediateDeleteEntries(ILogger logger, Exception exception, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Put entries {TableName} table"
+        )]
+        private static partial void LogTracePutEntries(ILogger logger, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Intermediate error bulk inserting entries to table {TableName}."
+        )]
+        private static partial void LogWarningIntermediateBulkInsert(ILogger logger, Exception exception, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Unable to find table entry for Keys = {Keys}"
+        )]
+        private static partial void LogDebugUnableToFindTableEntry(ILogger logger, DictionaryLogRecord keys);
+
+        private readonly struct DictionariesLogRecord(IEnumerable<Dictionary<string, AttributeValue>> keys)
+        {
+            public override string ToString() => Utils.EnumerableToString(keys, d => Utils.DictionaryToString(d));
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Unable to find table entry for Keys = {Keys}"
+        )]
+        private static partial void LogDebugUnableToFindTableEntries(ILogger logger, DictionariesLogRecord keys);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Failed to read table {TableName}"
+        )]
+        private static partial void LogWarningFailedToReadTable(ILogger logger, Exception exception, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Unable to write"
+        )]
+        private static partial void LogDebugUnableToWrite(ILogger logger, Exception exception);
+    }
 }

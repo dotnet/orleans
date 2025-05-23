@@ -20,7 +20,7 @@ public static class ActivationRepartitioningExtensions
     /// </remarks>
     [Experimental("ORLEANSEXP001")]
     public static ISiloBuilder AddActivationRepartitioner(this ISiloBuilder builder)
-        => builder.AddActivationRepartitioner<DefaultImbalanceRule>();
+        => builder.AddActivationRepartitioner<RebalancerCompatibleRule>();
 
     /// <summary>
     /// Enables activation repartitioning for this silo.

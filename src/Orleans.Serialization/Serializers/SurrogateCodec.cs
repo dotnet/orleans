@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using System;
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
@@ -50,7 +50,7 @@ public sealed class SurrogateCodec<TField, TSurrogate, TConverter>
     {
         if (context.TryGetCopy<TField>(input, out var result))
         {
-            return result;
+            return result!;
         }
 
         var surrogate = _converter.ConvertToSurrogate(in input);

@@ -5,10 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.GrainReferences;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
-using Orleans.Timers;
 
 namespace Orleans.Runtime
 {
@@ -17,80 +15,69 @@ namespace Orleans.Runtime
     /// Made public for GrainService to inherit from it.
     /// Can be turned to internal after a refactoring that would remove the inheritance relation.
     /// </summary>
-    public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IGrainContext, IGrainExtensionBinder, ISpanFormattable, IDisposable, IGrainTimerRegistry
+    public abstract partial class SystemTarget : ISystemTarget, ISystemTargetBase, IGrainContext, IGrainExtensionBinder, ISpanFormattable, IDisposable, IGrainTimerRegistry
     {
-        private readonly SystemTargetGrainId id;
+        private readonly SystemTargetGrainId _id;
+        private readonly SystemTargetShared _shared;
         private readonly HashSet<IGrainTimer> _timers = [];
-        private GrainReference selfReference;
-        private Message running;
+        private GrainReference _selfReference;
+        private Message _running;
         private Dictionary<Type, object> _components = new Dictionary<Type, object>();
 
         /// <summary>Silo address of the system target.</summary>
-        public SiloAddress Silo { get; }
+        public SiloAddress Silo => _shared.SiloAddress;
         internal GrainAddress ActivationAddress { get; }
 
         internal ActivationId ActivationId { get; set; }
-        private InsideRuntimeClient runtimeClient;
-        private RuntimeMessagingTrace messagingTrace;
-        private readonly ILogger logger;
+        private readonly ILogger _logger;
 
-        internal InsideRuntimeClient RuntimeClient
-        {
-            get
-            {
-                if (this.runtimeClient == null)
-                    throw new OrleansException(
-                        $"{nameof(this.RuntimeClient)} has not been set on {this.GetType()}. Most likely, this means that the system target was not registered.");
-                return this.runtimeClient;
-            }
-            set { this.runtimeClient = value; }
-        }
+        internal InsideRuntimeClient RuntimeClient => _shared.RuntimeClient;
 
         /// <inheritdoc/>
-        public GrainReference GrainReference => selfReference ??= this.RuntimeClient.ServiceProvider.GetRequiredService<GrainReferenceActivator>().CreateReference(this.id.GrainId, default);
+        public GrainReference GrainReference => _selfReference ??= _shared.GrainReferenceActivator.CreateReference(_id.GrainId, default);
 
         /// <inheritdoc/>
-        public GrainId GrainId => this.id.GrainId;
+        public GrainId GrainId => _id.GrainId;
 
         /// <inheritdoc/>
         object IGrainContext.GrainInstance => this;
 
         /// <inheritdoc/>
-        ActivationId IGrainContext.ActivationId => this.ActivationId;
+        ActivationId IGrainContext.ActivationId => ActivationId;
 
         /// <inheritdoc/>
-        GrainAddress IGrainContext.Address => this.ActivationAddress;
+        GrainAddress IGrainContext.Address => ActivationAddress;
 
-        private RuntimeMessagingTrace MessagingTrace => this.messagingTrace ??= this.RuntimeClient.ServiceProvider.GetRequiredService<RuntimeMessagingTrace>();
+        private RuntimeMessagingTrace MessagingTrace => _shared.MessagingTrace;
 
         /// <summary>Only needed to make Reflection happy.</summary>
         protected SystemTarget()
         {
         }
 
-        internal SystemTarget(GrainType grainType, SiloAddress siloAddress, ILoggerFactory loggerFactory)
-            : this(SystemTargetGrainId.Create(grainType, siloAddress), siloAddress, loggerFactory)
+        internal SystemTarget(GrainType grainType, SystemTargetShared shared)
+            : this(SystemTargetGrainId.Create(grainType, shared.SiloAddress), shared)
         {
         }
 
-        internal SystemTarget(SystemTargetGrainId grainId, SiloAddress silo, ILoggerFactory loggerFactory)
+        internal SystemTarget(SystemTargetGrainId grainId, SystemTargetShared shared)
         {
-            this.id = grainId;
-            this.Silo = silo;
-            this.ActivationId = ActivationId.GetDeterministic(grainId.GrainId);
-            this.ActivationAddress = GrainAddress.GetAddress(this.Silo, this.id.GrainId, this.ActivationId);
-            this.logger = loggerFactory.CreateLogger(this.GetType());
-
+            _id = grainId;
+            _shared = shared;
+            ActivationId = ActivationId.GetDeterministic(grainId.GrainId);
+            ActivationAddress = GrainAddress.GetAddress(Silo, _id.GrainId, ActivationId);
+            _logger = shared.LoggerFactory.CreateLogger(GetType());
+            WorkItemGroup = _shared.CreateWorkItemGroup(this);
             if (!Constants.IsSingletonSystemTarget(GrainId.Type))
             {
                 GrainInstruments.IncrementSystemTargetCounts(Constants.SystemTargetName(GrainId.Type));
             }
         }
 
-        internal WorkItemGroup WorkItemGroup { get; set; }
+        internal WorkItemGroup WorkItemGroup { get; }
 
         /// <inheritdoc />
-        public IServiceProvider ActivationServices => this.RuntimeClient.ServiceProvider;
+        public IServiceProvider ActivationServices => RuntimeClient.ServiceProvider;
 
         /// <inheritdoc />
         IGrainLifecycle IGrainContext.ObservableLifecycle => throw new NotImplementedException("IGrainContext.ObservableLifecycle is not implemented by SystemTarget");
@@ -146,14 +133,14 @@ namespace Orleans.Runtime
 
         internal void HandleNewRequest(Message request)
         {
-            running = request;
-            this.RuntimeClient.Invoke(this, request).Ignore();
+            _running = request;
+            RuntimeClient.Invoke(this, request).Ignore();
         }
 
         internal void HandleResponse(Message response)
         {
-            running = response;
-            this.RuntimeClient.ReceiveResponse(response);
+            _running = response;
+            RuntimeClient.ReceiveResponse(response);
         }
 
         /// <summary>
@@ -176,7 +163,7 @@ namespace Orleans.Runtime
         public IGrainTimer RegisterTimer(Func<object, Task> callback, object state, TimeSpan dueTime, TimeSpan period)
         {
             ArgumentNullException.ThrowIfNull(callback);
-            var timer = this.ActivationServices.GetRequiredService<ITimerRegistry>()
+            var timer = _shared.TimerRegistry
                 .RegisterGrainTimer(this, static (state, _) => state.Callback(state.State), (Callback: callback, State: state), new() { DueTime = dueTime, Period = period, Interleave = true });
             return timer;
         }
@@ -201,7 +188,7 @@ namespace Orleans.Runtime
         {
             CheckRuntimeContext();
             ArgumentNullException.ThrowIfNull(callback);
-            var timer = this.ActivationServices.GetRequiredService<ITimerRegistry>()
+            var timer = _shared.TimerRegistry
                 .RegisterGrainTimer(this, (state, ct) => state(ct), callback, new() { DueTime = dueTime, Period = period, Interleave = true });
             return timer;
         }
@@ -228,7 +215,7 @@ namespace Orleans.Runtime
         {
             CheckRuntimeContext();
             ArgumentNullException.ThrowIfNull(callback);
-            var timer = this.ActivationServices.GetRequiredService<ITimerRegistry>()
+            var timer = _shared.TimerRegistry
                 .RegisterGrainTimer(this, callback, state, new() { DueTime = dueTime, Period = period, Interleave = true });
             return timer;
         }
@@ -239,10 +226,10 @@ namespace Orleans.Runtime
         string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
-            => destination.TryWrite($"[SystemTarget: {Silo}/{id}{ActivationId}]", out charsWritten);
+            => destination.TryWrite($"[SystemTarget: {Silo}/{_id}{ActivationId}]", out charsWritten);
 
         /// <summary>Adds details about message currently being processed</summary>
-        internal string ToDetailedString() => $"{this} CurrentlyExecuting={running}{(running != null ? null : "null")}";
+        internal string ToDetailedString() => $"{this} CurrentlyExecuting={_running}{(_running != null ? null : "null")}";
 
         /// <inheritdoc/>
         bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
@@ -253,7 +240,7 @@ namespace Orleans.Runtime
             where TExtensionInterface : class, IGrainExtension
         {
             TExtension implementation;
-            if (this.GetComponent<TExtensionInterface>() is object existing)
+            if (GetComponent<TExtensionInterface>() is object existing)
             {
                 if (existing is TExtension typedResult)
                 {
@@ -267,26 +254,26 @@ namespace Orleans.Runtime
             else
             {
                 implementation = newExtensionFunc();
-                this.SetComponent<TExtensionInterface>(implementation);
+                SetComponent<TExtensionInterface>(implementation);
             }
 
-            var reference = this.GrainReference.Cast<TExtensionInterface>();
+            var reference = GrainReference.Cast<TExtensionInterface>();
             return (implementation, reference);
         }
 
         /// <inheritdoc/>
         TComponent ITargetHolder.GetComponent<TComponent>()
         {
-            var result = this.GetComponent<TComponent>();
+            var result = GetComponent<TComponent>();
             if (result is null && typeof(IGrainExtension).IsAssignableFrom(typeof(TComponent)))
             {
-                var implementation = this.ActivationServices.GetKeyedService<IGrainExtension>(typeof(TComponent));
+                var implementation = ActivationServices.GetKeyedService<IGrainExtension>(typeof(TComponent));
                 if (implementation is not TComponent typedResult)
                 {
                     throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TComponent)} is installed on this instance and no implementations are registered for automated install");
                 }
 
-                this.SetComponent<TComponent>(typedResult);
+                SetComponent<TComponent>(typedResult);
                 result = typedResult;
             }
 
@@ -297,18 +284,18 @@ namespace Orleans.Runtime
         public TExtensionInterface GetExtension<TExtensionInterface>()
             where TExtensionInterface : class, IGrainExtension
         {
-            if (this.GetComponent<TExtensionInterface>() is TExtensionInterface result)
+            if (GetComponent<TExtensionInterface>() is TExtensionInterface result)
             {
                 return result;
             }
 
-            var implementation = this.ActivationServices.GetKeyedService<IGrainExtension>(typeof(TExtensionInterface));
+            var implementation = ActivationServices.GetKeyedService<IGrainExtension>(typeof(TExtensionInterface));
             if (!(implementation is TExtensionInterface typedResult))
             {
                 throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TExtensionInterface)} is installed on this instance and no implementations are registered for automated install");
             }
 
-            this.SetComponent<TExtensionInterface>(typedResult);
+            SetComponent<TExtensionInterface>(typedResult);
             return typedResult;
         }
 
@@ -321,14 +308,14 @@ namespace Orleans.Runtime
                 case Message.Directions.Request:
                 case Message.Directions.OneWay:
                     {
-                        this.MessagingTrace.OnEnqueueMessageOnActivation(msg, this);
+                        MessagingTrace.OnEnqueueMessageOnActivation(msg, this);
                         var workItem = new RequestWorkItem(this, msg);
-                        this.WorkItemGroup.QueueWorkItem(workItem);
+                        WorkItemGroup.QueueWorkItem(workItem);
                         break;
                     }
 
                 default:
-                    this.logger.LogError((int)ErrorCode.Runtime_Error_100097, "Invalid message: {Message}", msg);
+                    LogInvalidMessage(_logger, msg);
                     break;
             }
         }
@@ -398,5 +385,12 @@ namespace Orleans.Runtime
                 void ThrowAccessViolation(IGrainContext currentContext) => throw new InvalidOperationException($"Access violation: attempt to access context '{this}' from different context, '{currentContext}'.");
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)ErrorCode.Runtime_Error_100097,
+            Message = "Invalid message: {Message}"
+        )]
+        private static partial void LogInvalidMessage(ILogger logger, Message Message);
     }
 }

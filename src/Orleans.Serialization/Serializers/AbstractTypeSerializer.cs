@@ -12,7 +12,7 @@ namespace Orleans.Serialization.Serializers
     /// </summary>
     public class AbstractTypeSerializer<TField> : AbstractTypeSerializer, IFieldCodec<TField>, IBaseCodec<TField> where TField : class
     {
-        public AbstractTypeSerializer() : base(typeof(TField)) { }
+        protected AbstractTypeSerializer() : base(typeof(TField)) { }
 
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value) where TBufferWriter : IBufferWriter<byte>
             => base.WriteField(ref writer, fieldIdDelta, expectedType, value);
@@ -39,7 +39,7 @@ namespace Orleans.Serialization.Serializers
     {
         private readonly Type _fieldType;
 
-        internal AbstractTypeSerializer(Type fieldType) => _fieldType = fieldType;
+        protected internal AbstractTypeSerializer(Type fieldType) => _fieldType = fieldType;
 
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
         {

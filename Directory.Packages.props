@@ -45,6 +45,7 @@
     <PackageVersion Include="Microsoft.Extensions.ObjectPool" Version="8.0.11" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="8.0.2" />
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.5.0" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="8.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
@@ -79,8 +80,10 @@
     <PackageVersion Include="CassandraCSharpDriver" Version="3.20.1" />
     <!-- Test related packages -->
     <PackageVersion Include="coverlet.collector" Version="6.0.2" />
+    <PackageVersion Include="coverlet.msbuild" Version="6.0.0" />
     <PackageVersion Include="AwesomeAssertions" Version="8.0.2" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.SourceGenerators.Testing" Version="1.1.2" />
     <PackageVersion Include="BenchmarkDotNet" Version="0.13.12" />
     <PackageVersion Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.13.12" />
     <PackageVersion Include="Xunit.SkippableFact" Version="1.4.13" />
@@ -89,6 +92,7 @@
     <PackageVersion Include="xunit.extensibility.core" Version="$(xUnitVersion)" />
     <PackageVersion Include="xunit.extensibility.execution" Version="$(xUnitVersion)" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="$(xUnitRunnerVersion)" />
+    <PackageVersion Include="Verify.Xunit" Version="29.3.1" />
     <PackageVersion Include="NodaTime" Version="3.1.10" />
     <PackageVersion Include="Autofac.Extensions.DependencyInjection" Version="8.0.0" />
     <PackageVersion Include="StructureMap.Microsoft.DependencyInjection" Version="2.0.0" />
@@ -118,5 +122,6 @@
     <!-- Tooling related packages -->
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="8.0.0" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.DotNet.GenAPI.Task" Version="9.0.103-servicing.25065.25" />
   </ItemGroup>
 </Project>

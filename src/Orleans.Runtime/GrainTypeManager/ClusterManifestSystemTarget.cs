@@ -1,14 +1,9 @@
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Orleans.Metadata;
 
 namespace Orleans.Runtime
 {
-    internal class ClusterManifestSystemTarget : SystemTarget, IClusterManifestSystemTarget, ISiloManifestSystemTarget
+    internal sealed class ClusterManifestSystemTarget : SystemTarget, IClusterManifestSystemTarget, ISiloManifestSystemTarget, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly GrainManifest _siloManifest;
         private readonly IClusterMembershipService _clusterMembershipService;
@@ -20,13 +15,13 @@ namespace Orleans.Runtime
         public ClusterManifestSystemTarget(
             IClusterMembershipService clusterMembershipService,
             IClusterManifestProvider clusterManifestProvider,
-            ILocalSiloDetails siloDetails,
-            ILoggerFactory loggerFactory)
-            : base(Constants.ManifestProviderType, siloDetails.SiloAddress, loggerFactory)
+            SystemTargetShared shared)
+            : base(Constants.ManifestProviderType, shared)
         {
             _siloManifest = clusterManifestProvider.LocalGrainManifest;
             _clusterMembershipService = clusterMembershipService;
             _clusterManifestProvider = clusterManifestProvider;
+            shared.ActivationDirectory.RecordNewTarget(this);
         }
 
         public ValueTask<ClusterManifest> GetClusterManifest() => new(_clusterManifestProvider.Current);
@@ -67,5 +62,9 @@ namespace Orleans.Runtime
         }
 
         public ValueTask<GrainManifest> GetSiloManifest() => new(_siloManifest);
+        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+        {
+            // We don't participate in any lifecycle stages: activating this instance is all that is necessary.
+        }
     }
 }

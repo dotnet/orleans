@@ -5,7 +5,7 @@ namespace Orleans.CodeGenerator.Diagnostics;
 
 public static class MultipleCancellationTokenParametersDiagnostic
 {
-    public const string DiagnosticId = "ORLEANS0109";
+    public const string DiagnosticId = DiagnosticRuleId.MultipleCancellationTokenParameters;
     public const string Title = "Grain method has multiple parameters of type CancellationToken";
     public const string MessageFormat = "The type {0} contains method {1} which has multiple CancellationToken parameters. Only a single CancellationToken parameter is supported.";
     public const string Category = "Usage";

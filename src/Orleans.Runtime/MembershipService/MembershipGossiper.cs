@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.MembershipService;
 
-internal class MembershipGossiper(IServiceProvider serviceProvider, ILogger<MembershipGossiper> logger) : IMembershipGossiper
+internal partial class MembershipGossiper(IServiceProvider serviceProvider, ILogger<MembershipGossiper> logger) : IMembershipGossiper
 {
     private MembershipSystemTarget? _membershipSystemTarget;
 
@@ -19,16 +19,15 @@ internal class MembershipGossiper(IServiceProvider serviceProvider, ILogger<Memb
     {
         if (gossipPartners.Count == 0) return Task.CompletedTask;
 
-        if (logger.IsEnabled(LogLevel.Debug))
-        {
-            logger.LogDebug(
-                "Gossiping {Silo} status {Status} to {NumPartners} partners",
-                updatedSilo,
-                updatedStatus,
-                gossipPartners.Count);
-        }
+        LogDebugGossipingStatusToPartners(logger, updatedSilo, updatedStatus, gossipPartners.Count);
 
         var systemTarget = _membershipSystemTarget ??= serviceProvider.GetRequiredService<MembershipSystemTarget>();
         return systemTarget.GossipToRemoteSilos(gossipPartners, snapshot, updatedSilo, updatedStatus);
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Gossiping {Silo} status {Status} to {NumPartners} partners"
+    )]
+    private static partial void LogDebugGossipingStatusToPartners(ILogger logger, SiloAddress silo, SiloStatus status, int numPartners);
 }

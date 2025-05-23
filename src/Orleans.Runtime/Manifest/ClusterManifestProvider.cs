@@ -14,7 +14,7 @@ using Orleans.Runtime.Utilities;
 
 namespace Orleans.Runtime.Metadata
 {
-    internal class ClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable, IDisposable, ILifecycleParticipant<ISiloLifecycle>
+    internal partial class ClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable, IDisposable, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly SiloAddress _localSiloAddress;
         private readonly ILogger<ClusterManifestProvider> _logger;
@@ -60,10 +60,7 @@ namespace Orleans.Runtime.Metadata
         {
             try
             {
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug("Starting to process membership updates");
-                }
+                LogDebugStartingToProcessMembershipUpdates();
 
                 var cancellation = _shutdownCts.Token;
                 await foreach (var _ in _clusterMembershipService.MembershipUpdates.WithCancellation(cancellation))
@@ -93,10 +90,7 @@ namespace Orleans.Runtime.Metadata
             }
             finally
             {
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug("Stopped processing membership updates");
-                }
+                LogDebugStoppedProcessingMembershipUpdates();
             }
         }
 
@@ -177,7 +171,7 @@ namespace Orleans.Runtime.Metadata
                     fetchSuccess = false;
                     if (exception is not OperationCanceledException)
                     {
-                        _logger.LogWarning(exception, "Error retrieving silo manifest for silo {SiloAddress}", result.Key);
+                        LogWarningErrorRetrievingSiloManifest(exception, result.Key);
                     }
                 }
                 else
@@ -209,8 +203,6 @@ namespace Orleans.Runtime.Metadata
         private Task Initialize(CancellationToken cancellationToken)
         {
             _grainFactory = _services.GetRequiredService<IInternalGrainFactory>();
-            var catalog = _services.GetRequiredService<Catalog>();
-            catalog.RegisterSystemTarget(ActivatorUtilities.CreateInstance<ClusterManifestSystemTarget>(_services));
             return Task.CompletedTask;
         }
 
@@ -252,5 +244,23 @@ namespace Orleans.Runtime.Metadata
         {
             DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Error retrieving silo manifest for silo {SiloAddress}"
+        )]
+        private partial void LogWarningErrorRetrievingSiloManifest(Exception exception, SiloAddress siloAddress);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Starting to process membership updates"
+        )]
+        private partial void LogDebugStartingToProcessMembershipUpdates();
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Stopped processing membership updates"
+        )]
+        private partial void LogDebugStoppedProcessingMembershipUpdates();
     }
 }

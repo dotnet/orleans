@@ -20,7 +20,6 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
 
     private readonly TimeProvider _timeProvider;
     private readonly ActivationDirectory _activationDirectory;
-    private readonly ISiloStatusOracle _siloStatusOracle;
     private readonly IActivationRebalancerWorker _rebalancerGrain;
     private readonly ILogger<ActivationRebalancerMonitor> _logger;
     private readonly List<IActivationRebalancerReportListener> _statusListeners = [];
@@ -29,23 +28,18 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     private readonly static TimeSpan TimerPeriod = 2 * IActivationRebalancerMonitor.WorkerReportPeriod;
 
     public ActivationRebalancerMonitor(
-        Catalog catalog,
         TimeProvider timeProvider,
         ActivationDirectory activationDirectory,
         ILoggerFactory loggerFactory,
         IGrainFactory grainFactory,
-        ILocalSiloDetails localSiloDetails,
-        ISiloStatusOracle siloStatusOracle)
-            : base(Constants.ActivationRebalancerMonitorType, localSiloDetails.SiloAddress, loggerFactory)
+        SystemTargetShared shared)
+        : base(Constants.ActivationRebalancerMonitorType, shared)
     {
         _timeProvider = timeProvider;
         _activationDirectory = activationDirectory;
-        _siloStatusOracle = siloStatusOracle;
         _logger = loggerFactory.CreateLogger<ActivationRebalancerMonitor>();
         _rebalancerGrain = grainFactory.GetGrain<IActivationRebalancerWorker>(0);
         _lastHeartbeatTimestamp = _timeProvider.GetTimestamp();
-
-        catalog.RegisterSystemTarget(this);
 
         _latestReport = new()
         {
@@ -55,6 +49,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
             SuspensionDuration = Timeout.InfiniteTimeSpan,
             Statistics = []
         };
+        shared.ActivationDirectory.RecordNewTarget(this);
     }
 
     public void Participate(ISiloLifecycle observer)
@@ -70,7 +65,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
            ServiceLifecycleStage.ApplicationServices,
            _ => Task.CompletedTask,
            OnStop);
-    }  
+    }
 
     private async Task OnStart(CancellationToken cancellationToken)
     {
@@ -135,7 +130,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An unexpected error occurred while notifying rebalancer listener.");
+                LogErrorWhileNotifyingListener(ex);
             }
         }
 
@@ -153,13 +148,23 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     public void UnsubscribeFromReports(IActivationRebalancerReportListener listener) =>
         _statusListeners.Remove(listener);
 
-    [LoggerMessage(Level = LogLevel.Trace, Message =
-        "I have not received a report from the activation rebalancer for the last {Duration} which is more than the " +
-        "allowed interval {Period}. I will now try to wake it up with the assumption that it has has been stopped ungracefully.")]
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "I have not received a report from the activation rebalancer for the last {Duration} which is more than the " +
+        "allowed interval {Period}. I will now try to wake it up with the assumption that it has has been stopped ungracefully."
+    )]
     private partial void LogStartingRebalancer(TimeSpan duration, TimeSpan period);
 
-    [LoggerMessage(Level = LogLevel.Trace, Message =
-        "My silo '{Silo}' is stopping now, and I am the host of the activation rebalancer. " +
-        "I will attempt to migrate the rebalancer to another silo.")]
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "My silo '{Silo}' is stopping now, and I am the host of the activation rebalancer. " +
+        "I will attempt to migrate the rebalancer to another silo."
+    )]
     private partial void LogMigratingRebalancer(SiloAddress silo);
-} 
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "An unexpected error occurred while notifying rebalancer listener."
+    )]
+    private partial void LogErrorWhileNotifyingListener(Exception exception);
+}

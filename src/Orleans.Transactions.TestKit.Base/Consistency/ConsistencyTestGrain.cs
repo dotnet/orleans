@@ -38,14 +38,14 @@ namespace Orleans.Transactions.TestKit.Consistency
 
         private int MyNumber => (int)(this.GetPrimaryKeyLong() % ConsistencyTestOptions.MaxGrains);
 
-        public const double recursionProbability = .1 - .9 * (1.0 / (10 * 40 - 1));
+        private const double RecursionProbability = .1 - .9 * (1.0 / (10 * 40 - 1));
 
         public async Task<Observation[]> Run(ConsistencyTestOptions options, int depth, string stack, int maxgrain, DateTime stopAfter)
         {
             if (random == null)
                 random = new Random(options.RandomSeed* options.NumGrains + MyNumber);
 
-            if (depth < options.MaxDepth && random.NextDouble() < recursionProbability)
+            if (depth < options.MaxDepth && random.NextDouble() < RecursionProbability)
             {
                 switch (random.Next(2))
                 {

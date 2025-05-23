@@ -10,7 +10,7 @@ using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.AzureStorage
 {
-    public class AzureTableTransactionalStateStorage<TState> : ITransactionalStateStorage<TState>
+    public partial class AzureTableTransactionalStateStorage<TState> : ITransactionalStateStorage<TState>
         where TState : class, new()
     {
         private readonly TableClient table;
@@ -45,8 +45,7 @@ namespace Orleans.Transactions.AzureStorage
 
                 if (string.IsNullOrEmpty(key.ETag.ToString()))
                 {
-                    if (logger.IsEnabled(LogLevel.Debug))
-                        logger.LogDebug("{Partition} Loaded v0, fresh", partition);
+                    LogDebugLoadedV0Fresh(partition);
 
                     // first time load
                     return new TransactionalStorageLoadResponse<TState>();
@@ -63,7 +62,7 @@ namespace Orleans.Transactions.AzureStorage
                         if (!FindState(this.key.CommittedSequenceId, out var pos))
                         {
                             var error = $"Storage state corrupted: no record for committed state v{this.key.CommittedSequenceId}";
-                            logger.LogCritical($"{partition} {error}");
+                            LogCriticalPartitionError(partition, error);
                             throw new InvalidOperationException(error);
                         }
                         committedState = states[pos].Value.GetState<TState>(this.jsonSettings);
@@ -101,8 +100,7 @@ namespace Orleans.Transactions.AzureStorage
                         entity.StateJson = null;
                     }
 
-                    if (logger.IsEnabled(LogLevel.Debug))
-                        logger.LogDebug("{PartitionKey} Loaded v{CommittedSequenceId} rows={Data}", partition, this.key.CommittedSequenceId, string.Join(",", states.Select(s => s.Key.ToString("x16"))));
+                    LogDebugLoadedPartitionKeyRows(partition, this.key.CommittedSequenceId, new(states));
 
                     TransactionalStateMetaData metadata = JsonConvert.DeserializeObject<TransactionalStateMetaData>(this.key.Metadata, this.jsonSettings);
                     return new TransactionalStorageLoadResponse<TState>(this.key.ETag.ToString(), committedState, this.key.CommittedSequenceId, metadata, PrepareRecordsToRecover);
@@ -110,11 +108,10 @@ namespace Orleans.Transactions.AzureStorage
             }
             catch (Exception ex)
             {
-                this.logger.LogError(ex, "Transactional state load failed");
+                LogErrorTransactionalStateLoadFailed(ex);
                 throw;
             }
         }
-
 
         public async Task<string> Store(string expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
         {
@@ -139,8 +136,7 @@ namespace Orleans.Transactions.AzureStorage
                     key.ETag = batchOperation.KeyETag;
                     states.RemoveAt(states.Count - 1);
 
-                    if (logger.IsEnabled(LogLevel.Trace))
-                        logger.LogTrace("{PartitionKey}.{RowKey} Delete {TransactionId}", partition, entity.RowKey, entity.TransactionId);
+                    LogTraceDeleteTransaction(partition, entity.RowKey, entity.TransactionId);
                 }
             }
 
@@ -161,8 +157,7 @@ namespace Orleans.Transactions.AzureStorage
                             await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.UpdateReplace, existing.Entity, existing.ETag)).ConfigureAwait(false);
                             key.ETag = batchOperation.KeyETag;
 
-                            if (logger.IsEnabled(LogLevel.Trace))
-                                logger.LogTrace("{PartitionKey}.{RowKey} Update {TransactionId}", partition, existing.RowKey, existing.TransactionId);
+                            LogTraceUpdateTransaction(partition, existing.RowKey, existing.TransactionId);
                         }
                         else
                         {
@@ -171,8 +166,7 @@ namespace Orleans.Transactions.AzureStorage
                             key.ETag = batchOperation.KeyETag;
                             states.Insert(pos, new KeyValuePair<long, StateEntity>(s.SequenceId, entity));
 
-                            if (logger.IsEnabled(LogLevel.Trace))
-                                logger.LogTrace("{PartitionKey}.{RowKey} Insert {TransactionId}", partition, entity.RowKey, entity.TransactionId);
+                            LogTraceInsertTransaction(partition, entity.RowKey, entity.TransactionId);
                         }
                     }
 
@@ -187,16 +181,14 @@ namespace Orleans.Transactions.AzureStorage
                 await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.Add, key)).ConfigureAwait(false);
                 key.ETag = batchOperation.KeyETag;
 
-                if (logger.IsEnabled(LogLevel.Trace))
-                    logger.LogTrace("{PartitionKey}.{RowKey} Insert. v{CommittedSequenceId}, {CommitRecordsCount}c", partition, KeyEntity.RK, this.key.CommittedSequenceId, metadata.CommitRecords.Count);
+                LogTraceInsertWithCount(partition, KeyEntity.RK, this.key.CommittedSequenceId, metadata.CommitRecords.Count);
             }
             else
             {
                 await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.UpdateReplace, key, key.ETag)).ConfigureAwait(false);
                 key.ETag = batchOperation.KeyETag;
 
-                if (logger.IsEnabled(LogLevel.Trace))
-                    logger.LogTrace("{PartitionKey}.{RowKey} Update. v{CommittedSequenceId}, {CommitRecordsCount}c", partition, KeyEntity.RK, this.key.CommittedSequenceId, metadata.CommitRecords.Count);
+                LogTraceUpdateWithCount(partition, KeyEntity.RK, this.key.CommittedSequenceId, metadata.CommitRecords.Count);
             }
 
             // fourth, remove obsolete records
@@ -208,16 +200,14 @@ namespace Orleans.Transactions.AzureStorage
                     await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.Delete, states[i].Value.Entity, states[i].Value.ETag)).ConfigureAwait(false);
                     key.ETag = batchOperation.KeyETag;
 
-                    if (logger.IsEnabled(LogLevel.Trace))
-                        logger.LogTrace("{PartitionKey}.{RowKey} Delete {TransactionId}", partition, states[i].Value.RowKey, states[i].Value.TransactionId);
+                    LogTraceDeleteTransaction(partition, states[i].Value.RowKey, states[i].Value.TransactionId);
                 }
                 states.RemoveRange(0, pos);
             }
 
             await batchOperation.Flush().ConfigureAwait(false);
 
-            if (logger.IsEnabled(LogLevel.Debug))
-                logger.LogDebug("{PartitionKey} Stored v{CommittedSequenceId} eTag={ETag}", partition, this.key.CommittedSequenceId, key.ETag);
+            LogDebugStoredETag(partition, this.key.CommittedSequenceId, key.ETag);
 
             return key.ETag.ToString();
         }
@@ -341,7 +331,7 @@ namespace Orleans.Transactions.AzureStorage
                         {
                             for (int i = 0; i < batchOperation.Count; i++)
                             {
-                                logger.LogTrace("{PartitionKey}.{RowKey} batch-op ok {BatchCount}", batchOperation[i].Entity.PartitionKey, batchOperation[i].Entity.RowKey, i);
+                                LogTraceBatchOpOk(logger, batchOperation[i].Entity.PartitionKey, batchOperation[i].Entity.RowKey, i);
                             }
                         }
 
@@ -354,16 +344,98 @@ namespace Orleans.Transactions.AzureStorage
                         {
                             for (int i = 0; i < batchOperation.Count; i++)
                             {
-                                logger.LogTrace("{PartitionKey}.{RowKey} batch-op failed {BatchCount}", batchOperation[i].Entity.PartitionKey, batchOperation[i].Entity.RowKey, i);
+                                LogTraceBatchOpFailed(logger, batchOperation[i].Entity.PartitionKey, batchOperation[i].Entity.RowKey, i);
                             }
                         }
 
-                        this.logger.LogError(ex, "Transactional state store failed.");
+                        LogErrorTransactionalStateStoreFailed(logger, ex);
                         throw;
                     }
                 }
             }
         }
 
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "{Partition} Loaded v0, fresh"
+        )]
+        private partial void LogDebugLoadedV0Fresh(string partition);
+
+        [LoggerMessage(
+            Level = LogLevel.Critical,
+            Message = "{Partition} {Error}"
+        )]
+        private partial void LogCriticalPartitionError(string partition, string error);
+
+        private readonly struct StatesLogRecord(List<KeyValuePair<long, StateEntity>> states)
+        {
+            public override string ToString() => string.Join(",", states.Select(s => s.Key.ToString("x16")));
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "{PartitionKey} Loaded v{CommittedSequenceId} rows={Data}"
+        )]
+        private partial void LogDebugLoadedPartitionKeyRows(string partitionKey, long committedSequenceId, StatesLogRecord data);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Transactional state load failed"
+        )]
+        private partial void LogErrorTransactionalStateLoadFailed(Exception ex);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{PartitionKey}.{RowKey} Delete {TransactionId}"
+        )]
+        private partial void LogTraceDeleteTransaction(string partitionKey, string rowKey, string transactionId);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{PartitionKey}.{RowKey} Update {TransactionId}"
+        )]
+        private partial void LogTraceUpdateTransaction(string partitionKey, string rowKey, string transactionId);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{PartitionKey}.{RowKey} Insert {TransactionId}"
+        )]
+        private partial void LogTraceInsertTransaction(string partitionKey, string rowKey, string transactionId);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{PartitionKey}.{RowKey} Insert. v{CommittedSequenceId}, {CommitRecordsCount}c"
+        )]
+        private partial void LogTraceInsertWithCount(string partitionKey, string rowKey, long committedSequenceId, int commitRecordsCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{PartitionKey}.{RowKey} Update. v{CommittedSequenceId}, {CommitRecordsCount}c"
+        )]
+        private partial void LogTraceUpdateWithCount(string partitionKey, string rowKey, long committedSequenceId, int commitRecordsCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "{PartitionKey} Stored v{CommittedSequenceId} eTag={ETag}"
+        )]
+        private partial void LogDebugStoredETag(string partitionKey, long committedSequenceId, ETag eTag);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{PartitionKey}.{RowKey} batch-op ok {BatchCount}"
+        )]
+        private static partial void LogTraceBatchOpOk(ILogger logger, string partitionKey, string rowKey, int batchCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{PartitionKey}.{RowKey} batch-op failed {BatchCount}"
+        )]
+        private static partial void LogTraceBatchOpFailed(ILogger logger, string partitionKey, string rowKey, int batchCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Transactional state store failed."
+        )]
+        private static partial void LogErrorTransactionalStateStoreFailed(ILogger logger, Exception ex);
     }
 }

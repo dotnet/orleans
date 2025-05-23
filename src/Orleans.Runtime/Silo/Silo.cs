@@ -9,19 +9,19 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.ConsistentRing;
-using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
 using Orleans.Services;
 using Orleans.Configuration;
 using Orleans.Internal;
+using System.Net;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Orleans silo.
     /// </summary>
-    public sealed class Silo : IAsyncDisposable, IDisposable
+    public sealed partial class Silo : IAsyncDisposable, IDisposable
     {
         /// <summary>Standard name for Primary silo. </summary>
         public const string PrimarySiloName = "Primary";
@@ -30,12 +30,9 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private readonly TaskCompletionSource<int> siloTerminatedTask = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly InsideRuntimeClient runtimeClient;
-        private readonly SystemTarget fallbackScheduler;
-        private readonly ISiloStatusOracle siloStatusOracle;
         private readonly Watchdog platformWatchdog;
         private readonly TimeSpan waitForMessageToBeQueuedForOutbound;
         private readonly TimeSpan initTimeout;
-        private readonly Catalog catalog;
         private readonly object lockable = new object();
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
@@ -72,7 +69,6 @@ namespace Orleans.Runtime
             Services = services;
             RingProvider = services.GetRequiredService<IConsistentRingProvider>();
             platformWatchdog = services.GetRequiredService<Watchdog>();
-            fallbackScheduler = services.GetRequiredService<FallbackSystemTarget>();
             this.siloDetails = siloDetails;
 
             IOptions<ClusterMembershipOptions> clusterMembershipOptions = services.GetRequiredService<IOptions<ClusterMembershipOptions>>();
@@ -91,37 +87,21 @@ namespace Orleans.Runtime
             this.loggerFactory = this.Services.GetRequiredService<ILoggerFactory>();
             logger = this.loggerFactory.CreateLogger<Silo>();
 
-            logger.LogInformation(
-                (int)ErrorCode.SiloGcSetting,
-                "Silo starting with GC settings: ServerGC={ServerGC} GCLatencyMode={GCLatencyMode}",
-                GCSettings.IsServerGC,
-                GCSettings.LatencyMode.ToString());
+            LogSiloStartingWithGC(logger, GCSettings.IsServerGC, GCSettings.LatencyMode);
             if (!GCSettings.IsServerGC)
             {
-                logger.LogWarning((int)ErrorCode.SiloGcWarning, "Note: Silo not running with ServerGC turned on - recommend checking app config : <configuration>-<runtime>-<gcServer enabled=\"true\">");
-                logger.LogWarning((int)ErrorCode.SiloGcWarning, "Note: ServerGC only kicks in on multi-core systems (settings enabling ServerGC have no effect on single-core machines).");
+                LogWarningSiloGcNotRunningWithServerGC(logger);
+                LogWarningSiloGcMultiCoreSystem(logger);
             }
 
             if (logger.IsEnabled(LogLevel.Debug))
             {
                 var highestLogLevel = logger.IsEnabled(LogLevel.Trace) ? nameof(LogLevel.Trace) : nameof(LogLevel.Debug);
-                logger.LogWarning(
-                    (int)ErrorCode.SiloGcWarning,
-                    $"A verbose logging level ({{highestLogLevel}}) is configured. This will impact performance. The recommended log level is {nameof(LogLevel.Information)}.",
-                    highestLogLevel);
+                LogWarningSiloGcVerboseLOggingConfigured(logger, highestLogLevel);
             }
 
-            logger.LogInformation(
-                (int)ErrorCode.SiloInitializing,
-                "-------------- Initializing silo on host {HostName} MachineName {MachineName} at {LocalEndpoint}, gen {Generation} --------------",
-                this.siloDetails.DnsHostName,
-                Environment.MachineName,
-                localEndpoint,
-                this.siloDetails.SiloAddress.Generation);
-            logger.LogInformation(
-                (int)ErrorCode.SiloInitConfig,
-                "Starting silo {SiloName}",
-                siloDetails.Name);
+            LogInfoSiloInitializing(logger, siloDetails.DnsHostName, Environment.MachineName, localEndpoint, siloDetails.SiloAddress.Generation);
+            LogInfoSiloInitConfig(logger, siloDetails.Name);
 
             try
             {
@@ -129,8 +109,7 @@ namespace Orleans.Runtime
             }
             catch (InvalidOperationException exc)
             {
-                logger.LogError(
-                    (int)ErrorCode.SiloStartError, exc, "Exception during Silo.Start, GrainFactory was not registered in Dependency Injection container");
+                LogErrorSiloStartGrainFactoryNotRegistered(logger, exc);
                 throw;
             }
 
@@ -139,10 +118,6 @@ namespace Orleans.Runtime
             // Initialize the message center
             messageCenter = Services.GetRequiredService<MessageCenter>();
             messageCenter.SniffIncomingMessage = runtimeClient.SniffIncomingMessage;
-
-            catalog = Services.GetRequiredService<Catalog>();
-
-            siloStatusOracle = Services.GetRequiredService<ISiloStatusOracle>();
 
             this.SystemStatus = SystemStatus.Created;
 
@@ -157,11 +132,7 @@ namespace Orleans.Runtime
             // add self to lifecycle
             this.Participate(this.siloLifecycle);
 
-            logger.LogInformation(
-                (int)ErrorCode.SiloInitializingFinished,
-                "-------------- Started silo {SiloAddress}, ConsistentHashCode {HashCode} --------------",
-                SiloAddress.ToString(),
-                SiloAddress.GetConsistentHashCode().ToString("X"));
+            LogInfoSiloInitializingFinished(logger, SiloAddress, new(SiloAddress));
         }
 
         /// <summary>
@@ -173,7 +144,6 @@ namespace Orleans.Runtime
         {
             // SystemTarget for provider init calls
             this.lifecycleSchedulingSystemTarget = Services.GetRequiredService<LifecycleSchedulingSystemTarget>();
-            catalog.RegisterSystemTarget(lifecycleSchedulingSystemTarget);
 
             try
             {
@@ -181,24 +151,9 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                logger.LogError((int)ErrorCode.SiloStartError, exc, "Exception during Silo.Start");
+                LogErrorSiloStart(logger, exc);
                 throw;
             }
-        }
-
-        private void CreateSystemTargets()
-        {
-            var siloControl = ActivatorUtilities.CreateInstance<SiloControl>(Services);
-            catalog.RegisterSystemTarget(siloControl);
-
-        }
-
-        private void InjectDependencies()
-        {
-            catalog.SiloStatusOracle = this.siloStatusOracle;
-
-            // SystemTarget for provider init calls
-            catalog.RegisterSystemTarget(fallbackScheduler);
         }
 
         private Task OnRuntimeInitializeStart(CancellationToken ct)
@@ -211,7 +166,7 @@ namespace Orleans.Runtime
                 this.SystemStatus = SystemStatus.Starting;
             }
 
-            logger.LogInformation((int)ErrorCode.SiloStarting, "Silo Start()");
+            LogInfoSiloStarting(logger);
             return Task.CompletedTask;
         }
 
@@ -220,11 +175,8 @@ namespace Orleans.Runtime
             stopWatch.Restart();
             task.Invoke();
             stopWatch.Stop();
-            this.logger.LogInformation(
-                (int)ErrorCode.SiloStartPerfMeasure,
-                "{TaskName} took {ElapsedMilliseconds} milliseconds to finish",
-                taskName,
-                stopWatch.ElapsedMilliseconds);
+
+            LogInfoSiloStartPerfMeasure(logger, taskName, stopWatch.ElapsedMilliseconds);
         }
 
         private async Task StartAsyncTaskWithPerfAnalysis(string taskName, Func<Task> task, Stopwatch stopWatch)
@@ -232,22 +184,12 @@ namespace Orleans.Runtime
             stopWatch.Restart();
             await task.Invoke();
             stopWatch.Stop();
-            this.logger.LogInformation(
-                (int)ErrorCode.SiloStartPerfMeasure,
-                "{TaskName} took {ElapsedMilliseconds} milliseconds to finish",
-                taskName,
-                stopWatch.ElapsedMilliseconds);
+
+            LogInfoSiloStartPerfMeasure(logger, taskName, stopWatch.ElapsedMilliseconds);
         }
 
         private Task OnRuntimeServicesStart(CancellationToken ct)
         {
-            //TODO: Setup all (or as many as possible) of the class started in this call to work directly with lifecycle
-            var stopWatch = Stopwatch.StartNew();
-
-            // This has to follow the above steps that start the runtime components
-            CreateSystemTargets();
-            InjectDependencies();
-
             return Task.CompletedTask;
         }
 
@@ -266,18 +208,11 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                this.logger.LogError(
-                    (int)ErrorCode.Runtime_Error_100330,
-                    exc,
-                    "Error starting silo {SiloAddress}. Going to FastKill().",
-                    this.SiloAddress);
+                LogErrorStartingSiloGoingToFastKill(logger, exc, SiloAddress);
                 throw;
             }
 
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                logger.LogDebug("Silo.Start complete: System status = {SystemStatus}", this.SystemStatus);
-            }
+            LogDebugSiloStartComplete(logger, this.SystemStatus);
         }
 
         private Task OnBecomeActiveStart(CancellationToken ct)
@@ -306,7 +241,8 @@ namespace Orleans.Runtime
         private async Task RegisterGrainService(IGrainService service)
         {
             var grainService = (GrainService)service;
-            catalog.RegisterSystemTarget(grainService);
+            var activationDirectory = this.Services.GetRequiredService<ActivationDirectory>();
+            activationDirectory.RecordNewTarget(grainService);
             grainServices.Add(grainService);
 
             try
@@ -315,13 +251,11 @@ namespace Orleans.Runtime
             }
             catch (TimeoutException exception)
             {
-                logger.LogError(exception, "GrainService initialization timed out after '{Timeout}'.", initTimeout);
+                LogErrorGrainInitializationTimeout(logger, exception, initTimeout);
                 throw;
             }
 
-            logger.LogInformation(
-                "Grain Service {GrainServiceType} registered successfully.",
-                service.GetType().FullName);
+            LogInfoGrainServiceRegistered(logger, service.GetType().FullName);
         }
 
         private async Task StartGrainService(IGrainService service)
@@ -334,11 +268,11 @@ namespace Orleans.Runtime
             }
             catch (TimeoutException exception)
             {
-                logger.LogError(exception, "GrainService startup timed out after '{Timeout}'.", initTimeout);
+                LogErrorGrainStartupTimeout(logger, exception, initTimeout);
                 throw;
             }
 
-            logger.LogInformation("Grain Service {GrainServiceType} started successfully.", service.GetType().FullName);
+            LogInfoGrainServiceStarted(logger, service.GetType().FullName);
         }
 
         /// <summary>
@@ -386,18 +320,12 @@ namespace Orleans.Runtime
 
             if (stopAlreadyInProgress)
             {
-                if (logger.IsEnabled(LogLevel.Debug))
-                {
-                    logger.LogDebug((int)ErrorCode.SiloStopInProgress, "Silo shutdown in progress. Waiting for shutdown to be completed.");
-                }
+                LogDebugSiloStopInProgress(logger);
                 var pause = TimeSpan.FromSeconds(1);
 
                 while (!this.SystemStatus.Equals(SystemStatus.Terminated))
                 {
-                    if (logger.IsEnabled(LogLevel.Debug))
-                    {
-                        logger.LogDebug((int)ErrorCode.WaitingForSiloStop, "Silo shutdown still in progress...");
-                    }
+                    LogDebugSiloStopStillInProgress(logger);
                     await Task.Delay(pause).ConfigureAwait(false);
                 }
 
@@ -407,17 +335,11 @@ namespace Orleans.Runtime
 
             if (gracefully)
             {
-                if (logger.IsEnabled(LogLevel.Debug))
-                {
-                    logger.LogDebug((int)ErrorCode.SiloShuttingDown, "Silo shutdown initiated (graceful)");
-                }
+                LogSiloShuttingDown(logger, LogLevel.Debug, "graceful");
             }
             else
             {
-                if (logger.IsEnabled(LogLevel.Warning))
-                {
-                    logger.LogWarning((int)ErrorCode.SiloShuttingDown, "Silo shutdown initiated (non-graceful)");
-                }
+                LogSiloShuttingDown(logger, LogLevel.Debug, "non-graceful");
             }
 
             try
@@ -429,17 +351,11 @@ namespace Orleans.Runtime
                 // log final status
                 if (gracefully)
                 {
-                    if (logger.IsEnabled(LogLevel.Debug))
-                    {
-                        logger.LogDebug((int)ErrorCode.SiloShutDown, "Silo shutdown completed (graceful)!");
-                    }
+                    LogSiloShutDown(logger, LogLevel.Debug, "graceful");
                 }
                 else
                 {
-                    if (logger.IsEnabled(LogLevel.Warning))
-                    {
-                        logger.LogWarning((int)ErrorCode.SiloShutDown, "Silo shutdown completed (non-graceful)!");
-                    }
+                    LogSiloShutDown(logger, LogLevel.Warning, "non-graceful");
                 }
 
                 // signal to all awaiters that the silo has terminated.
@@ -463,7 +379,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exception)
             {
-                this.logger.LogError(exception, "Error stopping message center");
+                LogErrorStoppingMessageCenter(logger, exception);
             }
 
             SystemStatus = SystemStatus.Terminated;
@@ -475,17 +391,18 @@ namespace Orleans.Runtime
             {
                 try
                 {
+                    var catalog = this.Services.GetRequiredService<Catalog>();
                     await catalog.DeactivateAllActivations(ct);
                 }
                 catch (Exception exception)
                 {
                     if (!ct.IsCancellationRequested)
                     {
-                        logger.LogError(exception, "Error deactivating activations.");
+                        LogErrorDeactivatingActivations(logger, exception);
                     }
                     else
                     {
-                        logger.LogWarning("Some grains failed to deactivate promptly.");
+                        LogWarningSomeGrainsFailedToDeactivate(logger);
                     }
                 }
 
@@ -494,10 +411,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                logger.LogError(
-                    (int)ErrorCode.SiloFailedToStopMembership,
-                    exc,
-                    "Failed to shutdown gracefully. About to terminate ungracefully");
+                LogErrorSiloFailedToStopMembership(logger, exc);
             }
 
             // Stop the gateway
@@ -518,7 +432,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exception)
                 {
-                    logger.LogError(exception, "Sending gateway disconnection requests to connected clients failed.");
+                    LogErrorSendingDisconnectRequests(logger, exception);
                     if (!ct.IsCancellationRequested)
                     {
                         throw;
@@ -536,20 +450,14 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exception)
                 {
-                    logger.LogError(exception, "Stopping GrainService '{GrainService}' failed.", grainService);
+                    LogErrorStoppingGrainService(logger, grainService, exception);
                     if (!ct.IsCancellationRequested)
                     {
                         throw;
                     }
                 }
 
-                if (this.logger.IsEnabled(LogLevel.Debug))
-                {
-                    logger.LogDebug(
-                        "{GrainServiceType} Grain Service with Id {GrainServiceId} stopped successfully.",
-                        grainService.GetType().FullName,
-                        grainService.GetGrainId().ToString());
-                }
+                LogDebugGrainServiceStopped(logger, grainService.GetType().FullName, grainService.GetGrainId());
             }
         }
 
@@ -584,23 +492,201 @@ namespace Orleans.Runtime
             {
             }
         }
-    }
 
-    // A dummy system target for fallback scheduler
-    internal class FallbackSystemTarget : SystemTarget
-    {
-        public FallbackSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
-            : base(Constants.FallbackSystemTargetType, localSiloDetails.SiloAddress, loggerFactory)
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Silo starting with GC settings: ServerGC={ServerGC} GCLatencyMode={GCLatencyMode}"
+        )]
+        private static partial void LogSiloStartingWithGC(ILogger logger, bool serverGC, GCLatencyMode gcLatencyMode);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.SiloGcWarning,
+            Message = "Note: Silo not running with ServerGC turned on - recommend checking app config : <configuration>-<runtime>-<gcServer enabled=\"true\">"
+        )]
+        private static partial void LogWarningSiloGcNotRunningWithServerGC(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.SiloGcWarning,
+            Message = "Note: ServerGC only kicks in on multi-core systems (settings enabling ServerGC have no effect on single-core machines)."
+        )]
+        private static partial void LogWarningSiloGcMultiCoreSystem(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.SiloGcWarning,
+            Message = $"A verbose logging level ({{HighestLogLevel}}) is configured. This will impact performance. The recommended log level is {nameof(LogLevel.Information)}."
+        )]
+        private static partial void LogWarningSiloGcVerboseLOggingConfigured(ILogger logger, string highestLogLevel);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.SiloInitializing,
+            Message = "-------------- Initializing silo on host {HostName} MachineName {MachineName} at {LocalEndpoint}, gen {Generation} --------------"
+        )]
+        private static partial void LogInfoSiloInitializing(ILogger logger, string hostName, string machineName, IPEndPoint localEndpoint, int generation);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.SiloInitConfig,
+            Message = "Starting silo {SiloName}"
+        )]
+        private static partial void LogInfoSiloInitConfig(ILogger logger, string siloName);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)ErrorCode.SiloStartError,
+            Message = "Exception during Silo.Start, GrainFactory was not registered in Dependency Injection container"
+        )]
+        private static partial void LogErrorSiloStartGrainFactoryNotRegistered(ILogger logger, Exception exc);
+
+        private readonly struct SiloAddressConsistentHashCodeLogValue(SiloAddress siloAddress)
         {
+            public override string ToString() => siloAddress.GetConsistentHashCode().ToString("X");
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.SiloInitializingFinished,
+            Message = "-------------- Started silo {SiloAddress}, ConsistentHashCode {HashCode} --------------"
+        )]
+        private static partial void LogInfoSiloInitializingFinished(ILogger logger, SiloAddress siloAddress, SiloAddressConsistentHashCodeLogValue hashCode);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)ErrorCode.SiloStartError,
+            Message = "Exception during Silo.Start"
+        )]
+        private static partial void LogErrorSiloStart(ILogger logger, Exception exc);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.SiloStarting,
+            Message = "Silo Start()"
+        )]
+        private static partial void LogInfoSiloStarting(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.SiloStartPerfMeasure,
+            Message = "{TaskName} took {ElapsedMilliseconds} milliseconds to finish"
+        )]
+        private static partial void LogInfoSiloStartPerfMeasure(ILogger logger, string taskName, long elapsedMilliseconds);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)ErrorCode.Runtime_Error_100330,
+            Message = "Error starting silo {SiloAddress}. Going to FastKill()."
+        )]
+        private static partial void LogErrorStartingSiloGoingToFastKill(ILogger logger, Exception exc, SiloAddress siloAddress);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Silo.Start complete: System status = {SystemStatus}"
+        )]
+        private static partial void LogDebugSiloStartComplete(ILogger logger, SystemStatus systemStatus);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "GrainService initialization timed out after '{Timeout}'."
+        )]
+        private static partial void LogErrorGrainInitializationTimeout(ILogger logger, Exception exception, TimeSpan timeout);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Grain Service {GrainServiceType} registered successfully."
+        )]
+        private static partial void LogInfoGrainServiceRegistered(ILogger logger, string grainServiceType);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "GrainService startup timed out after '{Timeout}'."
+        )]
+        private static partial void LogErrorGrainStartupTimeout(ILogger logger, Exception exception, TimeSpan timeout);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Grain Service {GrainServiceType} started successfully."
+        )]
+        private static partial void LogInfoGrainServiceStarted(ILogger logger, string grainServiceType);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            EventId = (int)ErrorCode.SiloStopInProgress,
+            Message = "Silo shutdown in progress. Waiting for shutdown to be completed."
+        )]
+        private static partial void LogDebugSiloStopInProgress(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            EventId = (int)ErrorCode.SiloStopInProgress,
+            Message = "Silo shutdown still in progress."
+        )]
+        private static partial void LogDebugSiloStopStillInProgress(ILogger logger);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.SiloShuttingDown,
+            Message = "Silo shutdown initiated ({Gracefully})."
+        )]
+        private static partial void LogSiloShuttingDown(ILogger logger, LogLevel logLevel, string gracefully);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.SiloShutDown,
+            Message = "Silo shutdown completed ({Gracefully})."
+        )]
+        private static partial void LogSiloShutDown(ILogger logger, LogLevel logLevel, string gracefully);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error stopping message center."
+        )]
+        private static partial void LogErrorStoppingMessageCenter(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error deactivating activations."
+        )]
+        private static partial void LogErrorDeactivatingActivations(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Some grains failed to deactivate promptly."
+        )]
+        private static partial void LogWarningSomeGrainsFailedToDeactivate(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Failed to stop gracefully. About to terminate ungracefully."
+        )]
+        private static partial void LogErrorSiloFailedToStopMembership(ILogger logger, Exception exc);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error sending disconnect requests to connected clients."
+        )]
+        private static partial void LogErrorSendingDisconnectRequests(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Stopping GrainService '{GrainService}' failed."
+        )]
+        private static partial void LogErrorStoppingGrainService(ILogger logger, GrainService grainService, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "{GrainServiceType} Grain Service with Id {GrainServiceId} stopped successfully."
+        )]
+        private static partial void LogDebugGrainServiceStopped(ILogger logger, string grainServiceType, GrainId grainServiceId);
     }
 
     // A dummy system target for fallback scheduler
-    internal class LifecycleSchedulingSystemTarget : SystemTarget
+    internal sealed class LifecycleSchedulingSystemTarget : SystemTarget
     {
-        public LifecycleSchedulingSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
-            : base(Constants.LifecycleSchedulingSystemTargetType, localSiloDetails.SiloAddress, loggerFactory)
+        public LifecycleSchedulingSystemTarget(SystemTargetShared shared)
+            : base(Constants.LifecycleSchedulingSystemTargetType, shared)
         {
+            shared.ActivationDirectory.RecordNewTarget(this);
         }
     }
 }

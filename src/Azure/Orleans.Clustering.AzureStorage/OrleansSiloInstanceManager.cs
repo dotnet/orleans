@@ -13,7 +13,7 @@ using Orleans.Runtime;
 
 namespace Orleans.AzureUtils
 {
-    internal class OrleansSiloInstanceManager
+    internal partial class OrleansSiloInstanceManager
     {
         public string TableName { get; }
 
@@ -53,8 +53,8 @@ namespace Orleans.AzureUtils
             }
             catch (Exception ex)
             {
-                instance.logger.LogError((int)TableStorageErrorCode.AzureTable_33, ex, "Exception trying to create or connect to the Azure table {TableName}", instance.storage.TableName);
-                throw new OrleansException($"Exception trying to create or connect to the Azure table {instance.storage.TableName}", ex);
+                instance.LogErrorConnectingToAzureTable(ex, instance.storage.TableName);
+                throw;
             }
             return instance;
         }
@@ -73,20 +73,20 @@ namespace Orleans.AzureUtils
         public void RegisterSiloInstance(SiloInstanceTableEntry entry)
         {
             entry.Status = INSTANCE_STATUS_CREATED;
-            logger.LogInformation((int)ErrorCode.Runtime_Error_100270, "Registering silo instance: {Data}", entry.ToString());
+            LogRegisterSiloInstance(entry);
             Task.WaitAll(new Task[] { storage.UpsertTableEntryAsync(entry) });
         }
 
         public Task<string> UnregisterSiloInstance(SiloInstanceTableEntry entry)
         {
             entry.Status = INSTANCE_STATUS_DEAD;
-            logger.LogInformation((int)ErrorCode.Runtime_Error_100271, "Unregistering silo instance: {Data}", entry.ToString());
+            LogUnregisterSiloInstance(entry);
             return storage.UpsertTableEntryAsync(entry);
         }
 
         public Task<string> ActivateSiloInstance(SiloInstanceTableEntry entry)
         {
-            logger.LogInformation((int)ErrorCode.Runtime_Error_100272, "Activating silo instance: {Data}", entry.ToString());
+            LogActivateSiloInstance(entry);
             entry.Status = INSTANCE_STATUS_ACTIVE;
             return storage.UpsertTableEntryAsync(entry);
         }
@@ -112,21 +112,20 @@ namespace Orleans.AzureUtils
 
         public async Task<IList<Uri>> FindAllGatewayProxyEndpoints()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.Runtime_Error_100277, "Searching for active gateway silos for deployment {DeploymentId}.", this.DeploymentId);
+            LogDebugSearchingGateway(this.DeploymentId);
 
             try
             {
-                const string Active = nameof(SiloStatus.Active);
                 const string Zero = "0";
-                var queryResults = await storage.ReadTableEntriesAndEtagsAsync(TableClient.CreateQueryFilter($"PartitionKey eq {DeploymentId} and Status eq {Active} and ProxyPort ne {Zero}"));
+                var queryResults = await storage.ReadTableEntriesAndEtagsAsync(TableClient.CreateQueryFilter($"PartitionKey eq {DeploymentId} and Status eq {INSTANCE_STATUS_ACTIVE} and ProxyPort ne {Zero}"));
 
                 var gatewaySiloInstances = queryResults.Select(entity => ConvertToGatewayUri(entity.Item1)).ToList();
 
-                logger.LogInformation((int)ErrorCode.Runtime_Error_100278, "Found {GatewaySiloCount} active Gateway Silos for deployment {DeploymentId}.", gatewaySiloInstances.Count, this.DeploymentId);
+                LogFoundGateway(gatewaySiloInstances.Count, this.DeploymentId);
                 return gatewaySiloInstances;
             }catch(Exception exc)
             {
-                logger.LogError((int)ErrorCode.Runtime_Error_100331, exc, "Error searching for active gateway silos for deployment {DeploymentId} ", this.DeploymentId);
+                LogErrorSearchingGateway(exc, this.DeploymentId);
                 throw;
             }
         }
@@ -213,36 +212,32 @@ namespace Orleans.AzureUtils
 
             var filter = TableClient.CreateQueryFilter($"(PartitionKey eq {DeploymentId}) and ((RowKey eq {rowKey}) or (RowKey eq {SiloInstanceTableEntry.TABLE_VERSION_ROW}))");
             var queryResults = await storage.ReadTableEntriesAndEtagsAsync(filter);
+            if (queryResults.Count < 1 || queryResults.Count > 2)
+                throw new KeyNotFoundException(string.Format("Could not find table version row or found too many entries. Was looking for key {0}, found = {1}", siloAddress, Utils.EnumerableToString(queryResults)));
 
-            var asList = queryResults.ToList();
-            if (asList.Count < 1 || asList.Count > 2)
-                throw new KeyNotFoundException(string.Format("Could not find table version row or found too many entries. Was looking for key {0}, found = {1}", siloAddress, Utils.EnumerableToString(asList)));
-
-            int numTableVersionRows = asList.Count(tuple => tuple.Item1.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW);
+            int numTableVersionRows = queryResults.Count(tuple => tuple.Item1.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW);
             if (numTableVersionRows < 1)
-                throw new KeyNotFoundException(string.Format("Did not read table version row. Read = {0}", Utils.EnumerableToString(asList)));
+                throw new KeyNotFoundException(string.Format("Did not read table version row. Read = {0}", Utils.EnumerableToString(queryResults)));
 
             if (numTableVersionRows > 1)
-                throw new KeyNotFoundException(string.Format("Read {0} table version rows, while was expecting only 1. Read = {1}", numTableVersionRows, Utils.EnumerableToString(asList)));
+                throw new KeyNotFoundException(string.Format("Read {0} table version rows, while was expecting only 1. Read = {1}", numTableVersionRows, Utils.EnumerableToString(queryResults)));
 
-            return asList;
+            return queryResults;
         }
 
         internal async Task<List<(SiloInstanceTableEntry, string)>> FindAllSiloEntries()
         {
             var queryResults = await storage.ReadAllTableEntriesForPartitionAsync(this.DeploymentId);
+            if (queryResults.Count < 1)
+                throw new KeyNotFoundException(string.Format("Could not find enough rows in the FindAllSiloEntries call. Found = {0}", Utils.EnumerableToString(queryResults)));
 
-            var asList = queryResults.ToList();
-            if (asList.Count < 1)
-                throw new KeyNotFoundException(string.Format("Could not find enough rows in the FindAllSiloEntries call. Found = {0}", Utils.EnumerableToString(asList)));
-
-            int numTableVersionRows = asList.Count(tuple => tuple.Item1.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW);
+            int numTableVersionRows = queryResults.Count(tuple => tuple.Item1.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW);
             if (numTableVersionRows < 1)
-                throw new KeyNotFoundException(string.Format("Did not find table version row. Read = {0}", Utils.EnumerableToString(asList)));
+                throw new KeyNotFoundException(string.Format("Did not find table version row. Read = {0}", Utils.EnumerableToString(queryResults)));
             if (numTableVersionRows > 1)
-                throw new KeyNotFoundException(string.Format("Read {0} table version rows, while was expecting only 1. Read = {1}", numTableVersionRows, Utils.EnumerableToString(asList)));
+                throw new KeyNotFoundException(string.Format("Read {0} table version rows, while was expecting only 1. Read = {1}", numTableVersionRows, Utils.EnumerableToString(queryResults)));
 
-            return asList;
+            return queryResults;
         }
 
         /// <summary>
@@ -264,11 +259,9 @@ namespace Orleans.AzureUtils
             }
             catch (Exception exc)
             {
-                HttpStatusCode httpStatusCode;
-                string restStatus;
-                if (!AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus)) throw;
+                if (!AzureTableUtils.EvaluateException(exc, out var httpStatusCode, out var restStatus)) throw;
 
-                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("InsertSiloEntryConditionally failed with httpStatusCode={StatusCode}, restStatus={RESTStatusCode}", httpStatusCode, restStatus);
+                LogTraceInsertSiloEntryConditionallyFailed(httpStatusCode, restStatus);
                 if (AzureTableUtils.IsContentionError(httpStatusCode)) return false;
 
                 throw;
@@ -290,11 +283,9 @@ namespace Orleans.AzureUtils
             }
             catch (Exception exc)
             {
-                HttpStatusCode httpStatusCode;
-                string restStatus;
-                if (!AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus)) throw;
+                if (!AzureTableUtils.EvaluateException(exc, out var httpStatusCode, out var restStatus)) throw;
 
-                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("InsertSiloEntryConditionally failed with httpStatusCode={StatusCode}, restStatus={RESTStatusCode}", httpStatusCode, restStatus);
+                LogTraceInsertSiloEntryConditionallyFailed(httpStatusCode, restStatus);
                 if (AzureTableUtils.IsContentionError(httpStatusCode)) return false;
 
                 throw;
@@ -318,15 +309,74 @@ namespace Orleans.AzureUtils
             }
             catch (Exception exc)
             {
-                HttpStatusCode httpStatusCode;
-                string restStatus;
-                if (!AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus)) throw;
+                if (!AzureTableUtils.EvaluateException(exc, out var httpStatusCode, out var restStatus)) throw;
 
-                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("UpdateSiloEntryConditionally failed with httpStatusCode={StatusCode}, restStatus={RESTStatusCode}", httpStatusCode, restStatus);
+                LogTraceUpdateSiloEntryConditionallyFailed(httpStatusCode, restStatus);
                 if (AzureTableUtils.IsContentionError(httpStatusCode)) return false;
 
                 throw;
             }
         }
+
+        [LoggerMessage(
+            EventId = (int)TableStorageErrorCode.AzureTable_33,
+            Level = LogLevel.Error,
+            Message = "Exception trying to create or connect to the Azure table {TableName}"
+        )]
+        private partial void LogErrorConnectingToAzureTable(Exception exception, string tableName);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100270,
+            Level = LogLevel.Information,
+            Message = "Registering silo instance: {Data}"
+        )]
+        private partial void LogRegisterSiloInstance(SiloInstanceTableEntry data);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100271,
+            Level = LogLevel.Information,
+            Message = "Unregistering silo instance: {Data}"
+        )]
+        private partial void LogUnregisterSiloInstance(SiloInstanceTableEntry data);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100272,
+            Level = LogLevel.Information,
+            Message = "Activating silo instance: {Data}"
+        )]
+        private partial void LogActivateSiloInstance(SiloInstanceTableEntry data);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100277,
+            Level = LogLevel.Debug,
+            Message = "Searching for active gateway silos for deployment {DeploymentId}."
+        )]
+        private partial void LogDebugSearchingGateway(string deploymentId);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100278,
+            Level = LogLevel.Information,
+            Message = "Found {GatewaySiloCount} active Gateway Silos for deployment {DeploymentId}."
+        )]
+        private partial void LogFoundGateway(int gatewaySiloCount, string deploymentId);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100331,
+            Level = LogLevel.Error,
+            Message = "Error searching for active gateway silos for deployment {DeploymentId} "
+        )]
+        private partial void LogErrorSearchingGateway(Exception exception, string deploymentId);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "InsertSiloEntryConditionally failed with httpStatusCode={HttpStatusCode}, restStatus={RestStatus}"
+        )]
+        private partial void LogTraceInsertSiloEntryConditionallyFailed(HttpStatusCode httpStatusCode, string restStatus);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "UpdateSiloEntryConditionally failed with httpStatusCode={HttpStatusCode}, restStatus={RestStatus}"
+        )]
+        private partial void LogTraceUpdateSiloEntryConditionallyFailed(HttpStatusCode httpStatusCode, string restStatus);
     }
 }

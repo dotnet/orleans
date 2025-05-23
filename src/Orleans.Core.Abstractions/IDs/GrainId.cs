@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Text.Json;
@@ -223,7 +224,18 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
+        public override GrainId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            => Read(ref reader, typeToConvert, options);
+
+        /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, GrainId value, JsonSerializerOptions options)
+            => WriteGrainId(writer, value, isPropertyName: false);
+
+        /// <inheritdoc />
+        public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] GrainId value, JsonSerializerOptions options)
+            => WriteGrainId(writer, value, isPropertyName: true);
+
+        private static void WriteGrainId(Utf8JsonWriter writer, GrainId value, bool isPropertyName)
         {
             var type = value.Type.AsSpan();
             var key = value.Key.AsSpan();
@@ -233,7 +245,14 @@ namespace Orleans.Runtime
             buf[type.Length] = (byte)'/';
             key.CopyTo(buf[(type.Length + 1)..]);
 
-            writer.WriteStringValue(buf);
+            if (isPropertyName)
+            {
+                writer.WritePropertyName(buf);
+            }
+            else
+            {
+                writer.WriteStringValue(buf);
+            }
         }
     }
 }

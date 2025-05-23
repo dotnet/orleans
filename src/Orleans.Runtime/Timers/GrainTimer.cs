@@ -12,7 +12,7 @@ using Orleans.Timers;
 
 namespace Orleans.Runtime;
 
-internal abstract class GrainTimer : IGrainTimer
+internal abstract partial class GrainTimer : IGrainTimer
 {
     protected static readonly GrainInterfaceType InvokableInterfaceType = GrainInterfaceType.Create("Orleans.Runtime.IGrainTimerInvoker");
     protected static readonly TimerCallback TimerCallback = (state) => ((GrainTimer)state!).ScheduleTickOnActivation();
@@ -92,7 +92,7 @@ internal abstract class GrainTimer : IGrainTimer
         {
             try
             {
-                Logger.LogError(exception, "Error invoking timer tick for timer '{Timer}'.", this);
+                LogErrorScheduleTickOnActivation(Logger, exception, this);
             }
             catch
             {
@@ -108,10 +108,7 @@ internal abstract class GrainTimer : IGrainTimer
     {
         try
         {
-            if (Logger.IsEnabled(LogLevel.Trace))
-            {
-                Logger.LogTrace((int)ErrorCode.TimerBeforeCallback, "About to invoke callback for timer {Timer}", this);
-            }
+            LogTraceBeforeCallback(Logger, this);
 
             _changed = false;
             var task = InvokeCallbackAsync(_cts.Token);
@@ -125,10 +122,7 @@ internal abstract class GrainTimer : IGrainTimer
             else
             {
                 // Complete synchronously.
-                if (Logger.IsEnabled(LogLevel.Trace))
-                {
-                    Logger.LogTrace((int)ErrorCode.TimerAfterCallback, "Completed timer callback for timer {Timer}", this);
-                }
+                LogTraceAfterCallback(Logger, this);
 
                 OnTickCompleted();
                 return new(Response.Completed);
@@ -174,11 +168,7 @@ internal abstract class GrainTimer : IGrainTimer
 
     private Response OnCallbackException(Exception exc)
     {
-        Logger.LogWarning(
-            (int)ErrorCode.Timer_GrainTimerCallbackError,
-            exc,
-            "Caught and ignored exception thrown from timer callback for timer '{Timer}'.",
-            this);
+        LogWarningCallbackException(Logger, exc, this);
         return Response.FromException(exc);
     }
 
@@ -188,10 +178,7 @@ internal abstract class GrainTimer : IGrainTimer
         {
             await task;
 
-            if (Logger.IsEnabled(LogLevel.Trace))
-            {
-                Logger.LogTrace((int)ErrorCode.TimerAfterCallback, "Completed timer callback for timer '{Timer}'.", this);
-            }
+            LogTraceAfterCallback(Logger, this);
 
             return Response.Completed;
         }
@@ -252,7 +239,7 @@ internal abstract class GrainTimer : IGrainTimer
         }
         catch (Exception exception)
         {
-            Logger.LogWarning(exception, "Error cancelling timer callback.");
+            LogErrorCancellingCallback(Logger, exception);
         }
 
         _timer.Dispose();
@@ -305,6 +292,39 @@ internal abstract class GrainTimer : IGrainTimer
 
         public override string ToString() => timer.ToString();
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error invoking timer tick for timer '{Timer}'."
+    )]
+    private static partial void LogErrorScheduleTickOnActivation(ILogger logger, Exception exception, GrainTimer timer);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.TimerBeforeCallback,
+        Level = LogLevel.Trace,
+        Message = "About to invoke callback for timer {Timer}"
+    )]
+    private static partial void LogTraceBeforeCallback(ILogger logger, GrainTimer timer);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.TimerAfterCallback,
+        Level = LogLevel.Trace,
+        Message = "Completed timer callback for timer '{Timer}'."
+    )]
+    private static partial void LogTraceAfterCallback(ILogger logger, GrainTimer timer);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Timer_GrainTimerCallbackError,
+        Level = LogLevel.Warning,
+        Message = "Caught and ignored exception thrown from timer callback for timer '{Timer}'."
+    )]
+    private static partial void LogWarningCallbackException(ILogger logger, Exception exception, GrainTimer timer);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error cancelling timer callback."
+    )]
+    private static partial void LogErrorCancellingCallback(ILogger logger, Exception exception);
 }
 
 internal sealed class GrainTimer<T> : GrainTimer

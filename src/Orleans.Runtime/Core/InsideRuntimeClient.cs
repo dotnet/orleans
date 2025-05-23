@@ -24,7 +24,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Internal class for system grains to get access to runtime object
     /// </summary>
-    internal sealed class InsideRuntimeClient : IRuntimeClient, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed partial class InsideRuntimeClient : IRuntimeClient, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly ILogger logger;
         private readonly ILogger invokeExceptionLogger;
@@ -243,7 +243,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                this.logger.LogWarning((int)ErrorCode.IGC_SniffIncomingMessage_Exc, exc, "SniffIncomingMessage has thrown exception. Ignoring.");
+                LogWarningSniffIncomingMessage(this.logger, exc);
             }
         }
 
@@ -299,16 +299,7 @@ namespace Orleans.Runtime
 
                 if (response.Exception is { } invocationException)
                 {
-                    if (message.Direction == Message.Directions.OneWay || invokeExceptionLogger.IsEnabled(LogLevel.Debug))
-                    {
-                        var logLevel = message.Direction != Message.Directions.OneWay ? LogLevel.Debug : LogLevel.Warning;
-                        this.invokeExceptionLogger.Log(
-                            logLevel,
-                            (int)ErrorCode.GrainInvokeException,
-                            invocationException,
-                            "Exception during Grain method call of message {Message}: ",
-                            message);
-                    }
+                    LogGrainInvokeException(this.invokeExceptionLogger, message.Direction != Message.Directions.OneWay ? LogLevel.Debug : LogLevel.Warning, invocationException, message);
 
                     // If a grain allowed an inconsistent state exception to escape and the exception originated from
                     // this activation, then deactivate it.
@@ -317,7 +308,7 @@ namespace Orleans.Runtime
                         // Mark the exception so that it doesn't deactivate any other activations.
                         ise.IsSourceActivation = false;
 
-                        this.invokeExceptionLogger.LogInformation("Deactivating {Target} due to inconsistent state.", target);
+                        LogDeactivatingInconsistentState(this.invokeExceptionLogger, target, invocationException);
                         target.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)));
                     }
                 }
@@ -331,7 +322,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc2)
             {
-                this.logger.LogWarning((int)ErrorCode.Runtime_Error_100329, exc2, "Exception during Invoke of message {Message}", message);
+                LogWarningInvokeException(this.logger, exc2, message);
 
                 if (message.Direction != Message.Directions.OneWay)
                 {
@@ -348,10 +339,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                this.logger.LogWarning(
-                    (int)ErrorCode.IGC_SendResponseFailed,
-                    exc,
-                    "Exception trying to send a response");
+                LogWarningResponseFailed(this.logger, exc);
                 SendResponse(message, Response.FromException(exc));
             }
         }
@@ -366,18 +354,12 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    this.logger.LogWarning(
-                        (int)ErrorCode.IGC_SendExceptionResponseFailed,
-                        exc1,
-                        "Exception trying to send an exception response");
+                    LogWarningSendExceptionResponseFailed(this.logger, exc1);
                     SendResponse(message, Response.FromException(exc1));
                 }
                 catch (Exception exc2)
                 {
-                    this.logger.LogWarning(
-                        (int)ErrorCode.IGC_UnhandledExceptionInInvoke,
-                        exc2,
-                        "Exception trying to send an exception. Ignoring and not trying to send again.");
+                    LogWarningUnhandledExceptionInInvoke(this.logger, exc2);
                 }
             }
         }
@@ -390,12 +372,12 @@ namespace Orleans.Runtime
                 if (!message.TargetSilo.Matches(this.MySilo))
                 {
                     // gatewayed message - gateway back to sender
-                    if (logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)ErrorCode.Dispatcher_NoCallbackForRejectionResp, "No callback for rejection response message: {Message}", message);
+                    LogTraceNoCallbackForRejection(this.logger, message);
                     this.MessageCenter.AddressAndSendMessage(message);
                     return;
                 }
 
-                if (logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug((int)ErrorCode.Dispatcher_HandleMsg, "HandleMessage {Message}", message);
+                LogHandleMessage(this.logger, message);
                 var rejection = (RejectionResponse)message.BodyObject;
                 switch (rejection.RejectionType)
                 {
@@ -416,10 +398,7 @@ namespace Orleans.Runtime
                         // The message targeted an invalid (eg, defunct) activation and this response serves only to invalidate this silo's activation cache.
                         return;
                     default:
-                        this.logger.LogError(
-                            (int)ErrorCode.Dispatcher_InvalidEnum_RejectionType,
-                            "Unsupported rejection type: {RejectionType}",
-                            rejection.RejectionType);
+                        LogErrorUnsupportedRejectionType(this.logger, rejection.RejectionType);
                         break;
                 }
             }
@@ -431,10 +410,9 @@ namespace Orleans.Runtime
                 if (request is not null)
                 {
                     callback.OnStatusUpdate(status);
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Information))
+                    if (status.Diagnostics != null && status.Diagnostics.Count > 0)
                     {
-                        var diagnosticsString = string.Join("\n", status.Diagnostics);
-                        this.logger.LogInformation("Received status update for pending request, Request: {RequestMessage}. Status: {Diagnostics}", request, diagnosticsString);
+                        LogInformationReceivedStatusUpdate(this.logger, request, status.Diagnostics);
                     }
                 }
                 else
@@ -470,10 +448,7 @@ namespace Orleans.Runtime
             }
             else
             {
-                if (logger.IsEnabled(LogLevel.Debug))
-                {
-                    this.logger.LogDebug((int)ErrorCode.Dispatcher_NoCallbackForResp, "No callback for response message {Message}", message);
-                }
+                LogDebugNoCallbackForResponse(this.logger, message);
             }
         }
 
@@ -519,16 +494,18 @@ namespace Orleans.Runtime
             var stopWatch = ValueStopwatch.StartNew();
             this.callbackTimerTask = Task.Run(MonitorCallbackExpiry);
 
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                stopWatch.Stop();
-                this.logger.LogInformation(
-                    (int)ErrorCode.SiloStartPerfMeasure,
-                    "Start InsideRuntimeClient took {ElapsedMs} milliseconds",
-                    stopWatch.Elapsed.TotalMilliseconds);
-            }
+            LogDebugSiloStartPerfMeasure(this.logger, new(stopWatch));
 
             return Task.CompletedTask;
+        }
+
+        private readonly struct ValueStopwatchLogValue(ValueStopwatch stopWatch)
+        {
+            override public string ToString()
+            {
+                stopWatch.Stop();
+                return stopWatch.Elapsed.ToString();
+            }
         }
 
         public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
@@ -575,9 +552,96 @@ namespace Orleans.Runtime
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Error while processing callback expiry.");
+                    LogWarningWhileProcessingCallbackExpiry(this.logger, ex);
                 }
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.IGC_SniffIncomingMessage_Exc,
+            Message = "SniffIncomingMessage has thrown exception. Ignoring.")]
+        private static partial void LogWarningSniffIncomingMessage(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.GrainInvokeException,
+            Message = "Exception during Grain method call of message {Message}: ")]
+        private static partial void LogGrainInvokeException(ILogger logger, LogLevel level, Exception exception, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.Runtime_Error_100329,
+            Message = "Exception during Invoke of message {Message}")]
+        private static partial void LogWarningInvokeException(ILogger logger, Exception exception, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.IGC_SendResponseFailed,
+            Message = "Exception trying to send a response")]
+        private static partial void LogWarningResponseFailed(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.IGC_SendExceptionResponseFailed,
+            Message = "Exception trying to send an exception response")]
+        private static partial void LogWarningSendExceptionResponseFailed(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.IGC_UnhandledExceptionInInvoke,
+            Message = "Exception trying to send an exception. Ignoring and not trying to send again.")]
+        private static partial void LogWarningUnhandledExceptionInInvoke(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            EventId = (int)ErrorCode.Dispatcher_NoCallbackForRejectionResp,
+            Message = "No callback for rejection response message: {Message}")]
+        private static partial void LogTraceNoCallbackForRejection(ILogger logger, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            EventId = (int)ErrorCode.Dispatcher_HandleMsg,
+            Message = "HandleMessage {Message}")]
+        private static partial void LogHandleMessage(ILogger logger, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Deactivating {Target} due to inconsistent state.")]
+        private static partial void LogDeactivatingInconsistentState(ILogger logger, IGrainContext target, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)ErrorCode.Dispatcher_InvalidEnum_RejectionType,
+            Message = "Unsupported rejection type: {RejectionType}")]
+        private static partial void LogErrorUnsupportedRejectionType(ILogger logger, Message.RejectionTypes rejectionType);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Received status update for pending request, Request: {RequestMessage}. Status: {Diagnostics}")]
+        private static partial void LogInformationReceivedStatusUpdate(ILogger logger, Message requestMessage, IEnumerable<string> diagnostics);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}")]
+        private static partial void LogInformationReceivedStatusUpdateUnknownRequest(ILogger logger, Message statusMessage, IEnumerable<string> diagnostics);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            EventId = (int)ErrorCode.Dispatcher_NoCallbackForResp,
+            Message = "No callback for response message {Message}")]
+        private static partial void LogDebugNoCallbackForResponse(ILogger logger, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            EventId = (int)ErrorCode.SiloStartPerfMeasure,
+            Message = "Start InsideRuntimeClient took {ElapsedMs} milliseconds"
+        )]
+        private static partial void LogDebugSiloStartPerfMeasure(ILogger logger, ValueStopwatchLogValue elapsedMs);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Error while processing callback expiry."
+        )]
+        private static partial void LogWarningWhileProcessingCallbackExpiry(ILogger logger, Exception exception);
     }
 }

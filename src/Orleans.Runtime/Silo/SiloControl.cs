@@ -24,13 +24,12 @@ using Orleans.Versions.Selector;
 
 namespace Orleans.Runtime
 {
-    internal class SiloControl : SystemTarget, ISiloControl
+    internal sealed partial class SiloControl : SystemTarget, ISiloControl, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly ILogger logger;
         private readonly ILocalSiloDetails localSiloDetails;
 
         private readonly DeploymentLoadPublisher deploymentLoadPublisher;
-        private readonly Catalog catalog;
         private readonly CachedVersionSelectorManager cachedVersionSelectorManager;
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
         private readonly VersionSelectorManager selectorManager;
@@ -50,7 +49,6 @@ namespace Orleans.Runtime
         public SiloControl(
             ILocalSiloDetails localSiloDetails,
             DeploymentLoadPublisher deploymentLoadPublisher,
-            Catalog catalog,
             CachedVersionSelectorManager cachedVersionSelectorManager,
             CompatibilityDirectorManager compatibilityDirectorManager,
             VersionSelectorManager selectorManager,
@@ -64,14 +62,14 @@ namespace Orleans.Runtime
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             GrainCountStatistics grainCountStatistics,
             GrainPropertiesResolver grainPropertiesResolver,
-            GrainMigratabilityChecker migratabilityChecker)
-            : base(Constants.SiloControlType, localSiloDetails.SiloAddress, loggerFactory)
+            GrainMigratabilityChecker migratabilityChecker,
+            SystemTargetShared shared)
+            : base(Constants.SiloControlType, shared)
         {
             this.localSiloDetails = localSiloDetails;
 
             this.logger = loggerFactory.CreateLogger<SiloControl>();
             this.deploymentLoadPublisher = deploymentLoadPublisher;
-            this.catalog = catalog;
             this.cachedVersionSelectorManager = cachedVersionSelectorManager;
             this.compatibilityDirectorManager = compatibilityDirectorManager;
             this.selectorManager = selectorManager;
@@ -84,37 +82,38 @@ namespace Orleans.Runtime
             _grainCountStatistics = grainCountStatistics;
             this.grainPropertiesResolver = grainPropertiesResolver;
             _migratabilityChecker = migratabilityChecker;
+            shared.ActivationDirectory.RecordNewTarget(this);
         }
 
         public Task Ping(string message)
         {
-            logger.LogInformation("Ping");
+            LogInformationPing();
             return Task.CompletedTask;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods", MessageId = "System.GC.Collect")]
         public Task ForceGarbageCollection()
         {
-            logger.LogInformation("ForceGarbageCollection");
+            LogInformationForceGarbageCollection();
             GC.Collect();
             return Task.CompletedTask;
         }
 
         public Task ForceActivationCollection(TimeSpan ageLimit)
         {
-            logger.LogInformation("ForceActivationCollection");
+            LogInformationForceActivationCollection();
             return _activationCollector.CollectActivations(ageLimit, CancellationToken.None);
         }
 
         public Task ForceRuntimeStatisticsCollection()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("ForceRuntimeStatisticsCollection");
+            LogDebugForceRuntimeStatisticsCollection();
             return this.deploymentLoadPublisher.RefreshClusterStatistics();
         }
 
         public Task<SiloRuntimeStatistics> GetRuntimeStatistics()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetRuntimeStatistics");
+            LogDebugGetRuntimeStatistics();
             var activationCount = this.activationDirectory.Count;
             var stats = new SiloRuntimeStatistics(
                 activationCount,
@@ -127,7 +126,7 @@ namespace Orleans.Runtime
 
         public Task<List<Tuple<GrainId, string, int>>> GetGrainStatistics()
         {
-            logger.LogInformation("GetGrainStatistics");
+            LogInformationGetGrainStatistics();
             var counts = new Dictionary<string, Dictionary<GrainId, int>>();
             lock (activationDirectory)
             {
@@ -225,7 +224,7 @@ namespace Orleans.Runtime
 
         public Task<int> GetActivationCount()
         {
-            return Task.FromResult(this.catalog.ActivationCount);
+            return Task.FromResult(this.activationDirectory.Count);
         }
 
         public Task<object> SendControlCommandToProvider<T>(string providerName, int command, object arg) where T : IControllable
@@ -238,11 +237,7 @@ namespace Orleans.Runtime
 
             if (controllable == null)
             {
-                logger.LogError(
-                    (int)ErrorCode.Provider_ProviderNotFound,
-                    "Could not find a controllable service for type {ProviderTypeFullName} and name {ProviderName}.",
-                    typeof(IControllable).FullName,
-                    providerName);
+                LogErrorProviderNotFound(typeof(IControllable).FullName!, providerName);
                 throw new ArgumentException($"Could not find a controllable service for type {typeof(IControllable).FullName} and name {providerName}.");
             }
 
@@ -345,5 +340,53 @@ namespace Orleans.Runtime
             }
             return stats;
         }
+
+        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+        {
+            // Do nothing, just ensure that this instance is created so that it can register itself in the activation directory.
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Ping"
+        )]
+        private partial void LogInformationPing();
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "ForceGarbageCollection"
+        )]
+        private partial void LogInformationForceGarbageCollection();
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "ForceActivationCollection"
+        )]
+        private partial void LogInformationForceActivationCollection();
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "ForceRuntimeStatisticsCollection"
+        )]
+        private partial void LogDebugForceRuntimeStatisticsCollection();
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "GetRuntimeStatistics"
+        )]
+        private partial void LogDebugGetRuntimeStatistics();
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "GetGrainStatistics"
+        )]
+        private partial void LogInformationGetGrainStatistics();
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Provider_ProviderNotFound,
+            Level = LogLevel.Error,
+            Message = "Could not find a controllable service for type {ProviderTypeFullName} and name {ProviderName}."
+        )]
+        private partial void LogErrorProviderNotFound(string providerTypeFullName, string providerName);
     }
 }

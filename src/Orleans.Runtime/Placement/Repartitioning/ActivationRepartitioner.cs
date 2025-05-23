@@ -43,17 +43,16 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
 
     public ActivationRepartitioner(
         ISiloStatusOracle siloStatusOracle,
-        ILocalSiloDetails localSiloDetails,
         ILoggerFactory loggerFactory,
         IInternalGrainFactory internalGrainFactory,
         IRepartitionerMessageFilter messageFilter,
         IImbalanceToleranceRule toleranceRule,
         IActivationMigrationManager migrationManager,
         ActivationDirectory activationDirectory,
-        Catalog catalog,
         IOptions<ActivationRepartitionerOptions> options,
-        TimeProvider timeProvider)
-        : base(Constants.ActivationRepartitionerType, localSiloDetails.SiloAddress, loggerFactory)
+        TimeProvider timeProvider,
+        SystemTargetShared shared)
+        : base(Constants.ActivationRepartitionerType, shared)
     {
         _logger = loggerFactory.CreateLogger<ActivationRepartitioner>();
         _options = options.Value;
@@ -71,7 +70,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
             null;
        
         _lastExchangedStopwatch = CoarseStopwatch.StartNew();
-        catalog.RegisterSystemTarget(this);
+        shared.ActivationDirectory.RecordNewTarget(this);
         _siloStatusOracle.SubscribeToSiloStatusEvents(this);
         _timer = RegisterTimer(_ => TriggerExchangeRequest().AsTask(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
     }
