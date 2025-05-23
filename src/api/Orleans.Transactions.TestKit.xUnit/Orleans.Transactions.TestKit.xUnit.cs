@@ -217,6 +217,12 @@ namespace Orleans.Transactions.TestKit.xUnit
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
+        public override System.Threading.Tasks.Task AbortTransactionOnReadOnlyViolatedException(string grainStates) { throw null; }
+
+        [SkippableTheory(new[] { })]
+        [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
+        [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
+        [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task MultiGrainAbortTransactionOnExceptions(string grainStates) { throw null; }
     }
 

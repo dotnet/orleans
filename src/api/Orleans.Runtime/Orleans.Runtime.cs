@@ -572,6 +572,7 @@ namespace Orleans.Runtime
     public abstract partial class GrainService : SystemTarget, Orleans.Services.IGrainService, ISystemTarget, IAddressable
     {
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        [System.Obsolete("Do not call the empty constructor.")]
         protected GrainService() { }
 
         protected GrainService(GrainId grainId, Silo silo, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
