@@ -9,6 +9,7 @@
     <WarningLevel>3</WarningLevel>
     <AnalysisLevel>preview</AnalysisLevel>
     <Features>strict</Features>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <PropertyGroup>
