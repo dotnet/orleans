@@ -5,7 +5,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Streaming.AdoNet;
 using Orleans.Streams;
 using Orleans.Tests.SqlUtils;
-using Tester.AdoNet.Streaming.Fakes;
+using Tester.AdoNet.Fakes;
 using TestExtensions;
 using UnitTests.General;
 using static System.String;
