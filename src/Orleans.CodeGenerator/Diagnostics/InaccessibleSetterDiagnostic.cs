@@ -4,7 +4,7 @@ namespace Orleans.CodeGenerator.Diagnostics;
 
 public static class InaccessibleSetterDiagnostic
 {
-    public const string RuleId = "ORLEANS0101"; 
+    public const string RuleId = DiagnosticRuleId.InaccessibleSetter; 
     private const string Category = "Usage";
     private static readonly LocalizableString Title = new LocalizableResourceString(nameof(Resources.InaccessibleSetterTitle), Resources.ResourceManager, typeof(Resources));
     private static readonly LocalizableString MessageFormat = new LocalizableResourceString(nameof(Resources.InaccessibleSetterMessageFormat), Resources.ResourceManager, typeof(Resources));

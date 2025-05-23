@@ -1,7 +1,9 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.CodeGenerator.Diagnostics;
 using Orleans.Serialization;
 
 namespace Orleans.CodeGenerator.Tests;
@@ -21,7 +23,7 @@ public class DemoData
     public string Value { get; set; } = string.Empty;
 }");
 
-[Fact]
+    [Fact]
     public Task TestBasicClassWithFields() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
 
@@ -502,6 +504,47 @@ public class ComplexGrain : Grain, IComplexGrain
         return Task.FromResult(result);
     }
 }");
+
+    [Fact]
+    public async Task EmitsWarningForGenerateSerializerInReferenceAssembly()
+    {
+        var code = """
+            using Orleans;
+
+            namespace TestProject;
+
+            [GenerateSerializer]
+            public class RefAsmType
+            {
+                [Id(0)]
+                public string Value { get; set; } = string.Empty;
+            }
+        """;
+
+        // The ReferenceAssemblyAttribute marks the assembly as a reference assembly.
+        // This triggers the Orleans code generator's logic to emit a diagnostic if [GenerateSerializer] is used in such an assembly.
+        var compilation = await CreateCompilation(code, "TestProject");
+        var referenceAssemblyAttribute = SyntaxFactory.Attribute(SyntaxFactory.ParseName("System.Runtime.CompilerServices.ReferenceAssemblyAttribute"));
+        var attrList = SyntaxFactory.AttributeList(SyntaxFactory.SingletonSeparatedList(referenceAssemblyAttribute));
+        var assemblyAttr = SyntaxFactory.AttributeList(
+            SyntaxFactory.SingletonSeparatedList(referenceAssemblyAttribute))
+            .WithTarget(SyntaxFactory.AttributeTargetSpecifier(SyntaxFactory.Token(SyntaxKind.AssemblyKeyword)));
+        var root = (CSharpSyntaxNode)compilation.SyntaxTrees[0].GetRoot();
+        var newRoot = ((CompilationUnitSyntax)root).AddAttributeLists(assemblyAttr);
+        var newTree = compilation.SyntaxTrees[0].WithRootAndOptions(newRoot, compilation.SyntaxTrees[0].Options);
+        
+        // leave only syntaxTree with the ReferenceAssemblyAttribute
+        compilation = compilation.RemoveSyntaxTrees(compilation.SyntaxTrees[0]).AddSyntaxTrees(newTree);
+
+        var generator = new OrleansSerializationSourceGenerator();
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators: [generator],
+            driverOptions: new GeneratorDriverOptions(default));
+        driver = driver.RunGenerators(compilation);
+
+        var result = driver.GetRunResult().Results.Single();
+        Assert.Contains(result.Diagnostics, d => d.Id == DiagnosticRuleId.ReferenceAssemblyWithGenerateSerializer);
+    }
 
     private static async Task AssertSuccessfulSourceGeneration(string code)
     {
