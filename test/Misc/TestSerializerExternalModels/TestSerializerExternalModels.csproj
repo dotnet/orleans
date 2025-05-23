@@ -3,6 +3,7 @@
     <RootNamespace>UnitTests.SerializerExternalModels</RootNamespace>
     <AssemblyName>SerializerExternalModels</AssemblyName>
     <TargetFrameworks>$(TestTargetFrameworks);netcoreapp3.1</TargetFrameworks>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     <SuppressTfmSupportBuildWarnings Condition="'$(TargetFramework)' == 'netcoreapp3.1'">true</SuppressTfmSupportBuildWarnings>
   </PropertyGroup>
   <ItemGroup>

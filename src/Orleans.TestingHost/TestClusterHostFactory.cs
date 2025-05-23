@@ -108,15 +108,7 @@ namespace Orleans.TestingHost
         /// <returns>The serialized configuration.</returns>
         public static string SerializeConfiguration(IConfiguration configuration)
         {
-            var settings = new JsonSerializerSettings
-            {
-#pragma warning disable CA2326
-                // Safe to use here since it's only used to serialize the test config
-                TypeNameHandling = TypeNameHandling.Auto,
-#pragma warning restore CA2326
-
-                Formatting = Formatting.None,
-            };
+            var settings = new JsonSerializerSettings();
 
             KeyValuePair<string, string>[] enumerated = configuration.AsEnumerable().ToArray();
             return JsonConvert.SerializeObject(enumerated, settings);
@@ -129,10 +121,7 @@ namespace Orleans.TestingHost
         /// <returns>The deserialized configuration.</returns>
         public static IConfiguration DeserializeConfiguration(string serializedSources)
         {
-            var settings = new JsonSerializerSettings
-            {
-                TypeNameHandling = TypeNameHandling.Auto,
-            };
+            var settings = new JsonSerializerSettings();
 
             var builder = new ConfigurationBuilder();
             var enumerated = JsonConvert.DeserializeObject<KeyValuePair<string, string>[]>(serializedSources, settings);
