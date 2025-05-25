@@ -12,7 +12,7 @@ public class CosmosLogStorageOptions : CosmosOptions
     /// <remarks>
     /// <para>Valid range is [1-97]</para>
     /// <para>Recomended value is 10</para>
-    /// <para>1 means compact after every state update.</para>
+    /// <para>1 means compact after every state update</para>
     /// </remarks>
     public int CompactionThreshold { get; set; } = DEFAULT_COMPACTION_THRESHOLD;
 
@@ -35,7 +35,7 @@ internal class CosmosLogStorageOptionsValidator(CosmosLogStorageOptions options)
     public override void ValidateConfiguration()
     {
         // Lower bound is 1 -> means compact after every entry.
-        // Upper bound is 97 -> max of 98 (entry deletes) + 1 (pending delete) + 1 (create compacted) = 100 (exactly the cosmos limit)
+        // Upper bound is 97 -> max of 98 (log deletes) + 1 (pending delete) + 1 (compacted creation) = 100 (exactly the cosmos TX batch limit)
 
         if (_options.CompactionThreshold < 1 || _options.CompactionThreshold > 97)
         {

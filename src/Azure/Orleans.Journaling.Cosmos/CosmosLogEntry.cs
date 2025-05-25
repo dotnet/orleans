@@ -32,7 +32,7 @@ internal readonly struct LogEntryId(string value)
     public string Value { get; } = value;
 }
 
-internal sealed class LogEntry : BaseEntity
+internal sealed class CosmosLogEntry : BaseEntity
 {
     /// <summary>
     /// Used for partitioning.

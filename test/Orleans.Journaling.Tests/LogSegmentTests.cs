@@ -14,21 +14,12 @@ public sealed class CosmosStorageLogSegmentTests : LogSegmentTests
 {
     public CosmosStorageLogSegmentTests()
     {
-        //TODO: Uncoment 
-        //JournalingCosmosTestConfiguration.CheckPreconditionsOrThrow();
+        JournalingCosmosTestConfiguration.CheckPreconditionsOrThrow();
     }
 
     protected override void ConfigureServices(IServiceCollection services)
     {
-        //TODO: Remove 
-        services.Configure<CosmosLogStorageOptions>(c =>
-        {
-            c.IsResourceCreationEnabled = true;
-            c.ConfigureCosmosClient("AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==;DisableServerCertificateValidation=True");
-        });
-
-        //TODO: Uncoment 
-        //services.Configure<CosmosLogStorageOptions>(options => options.ConfigureTestDefaults());
+        services.Configure<CosmosLogStorageOptions>(options => options.ConfigureTestDefaults());
         services.AddSingleton<CosmosLogStorageProvider>();
         services.AddFromExisting<IStateMachineStorageProvider, CosmosLogStorageProvider>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, CosmosLogStorageProvider>();

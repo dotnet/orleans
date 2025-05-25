@@ -89,11 +89,11 @@ internal sealed class CosmosLogStorageProvider(
 
         var db = dbResponse.Database;
 
-        var logEntryProps = new ContainerProperties(_options.ContainerName, $"/{nameof(LogEntry.LogId)}");
+        var logEntryProps = new ContainerProperties(_options.ContainerName, $"/{nameof(CosmosLogEntry.LogId)}");
 
         logEntryProps.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
         logEntryProps.IndexingPolicy.IncludedPaths.Add(new IncludedPath { Path = "/*" });
-        logEntryProps.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = $"/{nameof(LogEntry.Data)}/?" });
+        logEntryProps.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = $"/{nameof(CosmosLogEntry.Data)}/?" });
 
         const int maxRetries = 3;
 
