@@ -32,8 +32,11 @@ internal partial class CosmosLogStorage
     [LoggerMessage(Level = LogLevel.Error, Message = "Error finalizing compaction for log {LogId}. Status: {StatusCode}, Message: {ErrorMessage}")]
     private static partial void LogErrorFinalizingCompaction(ILogger logger, string logId, string statusCode, string errorMessage);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Finalized compaction for log {LogId}")]
-    private static partial void LogFinalizedCompaction(ILogger logger, string logId);
+    [LoggerMessage(Level = LogLevel.Error, Message = "Error deleting entries log {LogId}. Status: {StatusCode}, Message: {ErrorMessage}")]
+    private static partial void LogErrorDeleting(ILogger logger, string logId, string statusCode, string errorMessage);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Finalized compaction of {EntryCount} entries for log {LogId}")]
+    private static partial void LogFinalizedCompaction(ILogger logger, string logId, int entryCount);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Error creating pending compaction Entry for log {LogId}. Message: {ErrorMessage}")]
     private static partial void LogErrorCreatingPending(ILogger logger, string logId, string errorMessage, Exception ex);

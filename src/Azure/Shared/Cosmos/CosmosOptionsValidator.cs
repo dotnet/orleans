@@ -35,7 +35,7 @@ public class CosmosOptionsValidator<TOptions> : IConfigurationValidator where TO
     }
 
     /// <inheritdoc/>
-    public void ValidateConfiguration()
+    public virtual void ValidateConfiguration()
     {
         if (string.IsNullOrWhiteSpace(_options.DatabaseName))
             throw new OrleansConfigurationException(

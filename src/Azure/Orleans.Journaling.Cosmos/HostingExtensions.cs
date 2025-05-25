@@ -13,11 +13,14 @@ public static class HostingExtensions
     {
         builder.AddStateMachineStorage();
 
-        var options = builder.Services.AddOptions<CosmosLogStorageOptions>();
+        var optionsBuilder = builder.Services.AddOptions<CosmosLogStorageOptions>();
         if (configure != null)
         {
-            options.Configure(configure);
+            optionsBuilder.Configure(configure);
         }
+
+        builder.Services.AddTransient<IConfigurationValidator>(sp => new CosmosLogStorageOptionsValidator(
+            sp.GetRequiredService<IOptionsMonitor<CosmosLogStorageOptions>>().CurrentValue));
 
         if (builder.Services.Any(service => service.ServiceType.Equals(typeof(CosmosLogStorageProvider))))
         {
