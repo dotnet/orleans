@@ -600,8 +600,6 @@ namespace Orleans.Tests.SqlUtils
             ArgumentNullException.ThrowIfNull(siloAddress);
             ArgumentNullException.ThrowIfNull(activationId);
 
-            var grainIdHash = (int)StableHash.ComputeHash(grainId);
-
             return ReadAsync(
                 dbStoredQueries.RegisterGrainActivationKey,
                 record => new AdoNetGrainDirectoryEntry(
@@ -614,7 +612,6 @@ namespace Orleans.Tests.SqlUtils
                 {
                     ClusterId = clusterId,
                     ProviderId = providerId,
-                    GrainIdHash = grainIdHash,
                     GrainId = grainId,
                     SiloAddressAsString = siloAddress,
                     ActivationId = activationId
@@ -636,8 +633,6 @@ namespace Orleans.Tests.SqlUtils
             ArgumentNullException.ThrowIfNull(grainId);
             ArgumentNullException.ThrowIfNull(activationId);
 
-            var grainIdHash = (int)StableHash.ComputeHash(grainId);
-
             return ReadAsync(
                 dbStoredQueries.UnregisterGrainActivationKey,
                 record => record.GetInt32(0),
@@ -645,7 +640,6 @@ namespace Orleans.Tests.SqlUtils
                 {
                     ClusterId = clusterId,
                     ProviderId = providerId,
-                    GrainIdHash = grainIdHash,
                     GrainId = grainId,
                     ActivationId = activationId
                 },
@@ -664,8 +658,6 @@ namespace Orleans.Tests.SqlUtils
             ArgumentNullException.ThrowIfNull(providerId);
             ArgumentNullException.ThrowIfNull(grainId);
 
-            var grainIdHash = (int)StableHash.ComputeHash(grainId);
-
             return ReadAsync(
                 dbStoredQueries.LookupGrainActivationKey,
                 record => new AdoNetGrainDirectoryEntry(
@@ -678,7 +670,6 @@ namespace Orleans.Tests.SqlUtils
                 {
                     ClusterId = clusterId,
                     ProviderId = providerId,
-                    GrainIdHash = grainIdHash,
                     GrainId = grainId,
                 },
                 result => result.SingleOrDefault());

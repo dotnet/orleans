@@ -1,18 +1,8 @@
 /*
+
 Orleans Grain Directory.
 
 This table stores the location of all grains in the cluster.
-
-The demands for this table are as follows:
-
-1. The table will see rows inserted individually, as new grains are added.
-2. The table will see rows deleted at random as grains are deactivated, without regard for order.
-3. Insert/Delete churn is expected to be very high.
-4. The GrainId is too large to be indexed by SQL Server.
-
-To address these demands, this table is implemented as a non-unique clustered index.
-This index covers the hash of the grain id to allow for fast lookups.
-Uniqueness is then guaranteed by careful use of locks on the hash index.
 
 */
 CREATE TABLE OrleansGrainDirectory
@@ -23,11 +13,8 @@ CREATE TABLE OrleansGrainDirectory
     /* Identifies the grain directory provider */
     ProviderId NVARCHAR(150) NOT NULL,
 
-    /* Holds the hash of the grain id */
-    GrainIdHash INT NOT NULL,
-
     /* Holds the grain id in text form */
-    GrainId NVARCHAR(MAX) NOT NULL,
+    GrainId NVARCHAR(150) NOT NULL,
 
     /* Holds the silo address where the grain is located */
     SiloAddress NVARCHAR(100) NOT NULL,
@@ -37,29 +24,22 @@ CREATE TABLE OrleansGrainDirectory
 
     /* Holds the time at which the grain was added to the directory */
     CreatedOn DATETIMEOFFSET(3) NOT NULL,
-)
-GO
 
-/* This turns the table into a CLUSTERED INDEX that allows duplication on the hash. */
-CREATE CLUSTERED INDEX CI_OrleansGrainDirectory
-ON OrleansGrainDirectory
-(
-    ClusterId ASC,
-    ProviderId ASC,
-    GrainIdHash ASC
+    /* Identifies a unique grain activation */
+    CONSTRAINT PK_OrleansGrainDirectory PRIMARY KEY CLUSTERED
+    (
+        ClusterId ASC,
+        ProviderId ASC,
+        GrainId ASC
+    )
 )
-GO
-
-ALTER TABLE OrleansGrainDirectory
-SET (LOCK_ESCALATION = DISABLE)
 GO
 
 /* Registers a new grain activation */
 CREATE PROCEDURE RegisterGrainActivation
     @ClusterId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
-    @GrainIdHash INT,
-    @GrainId NVARCHAR(MAX),
+    @GrainId NVARCHAR(150),
     @SiloAddress NVARCHAR(100),
     @ActivationId NVARCHAR(100)
 AS
@@ -72,70 +52,66 @@ DECLARE @Now DATETIMEOFFSET(3) = CAST(SYSUTCDATETIME() AS DATETIMEOFFSET(3));
 BEGIN TRANSACTION;
 
 /* Get the existing entry if it exists. */
-/* This also places a lock on the hash index pages upfront in case we need to add a new entry. */
-/* This lock is required to prevent both deadlocks and duplicates. */
-SELECT
-    ClusterId,
-    ProviderId,
-    GrainId,
-    SiloAddress,
-    ActivationId
-FROM
-    OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(CI_OrleansGrainDirectory))
-WHERE
-    ClusterId = @ClusterId
-    AND ProviderId = @ProviderId
-    AND GrainIdHash = @GrainIdHash
-    AND GrainId = @GrainId;
+/* This also places a lock on the range upfront in case we need to add a new entry. */
+/* This lock is required to prevent deadlocks. */
+DECLARE @Exists INT =
+(
+    SELECT
+        1
+    FROM
+        OrleansGrainDirectory WITH (UPDLOCK, HOLDLOCK)
+    WHERE
+        ClusterId = @ClusterId
+        AND ProviderId = @ProviderId
+        AND GrainId = @GrainId
+);
 
-/* Otherwise add a new entry if one does exist yet. */
-IF @@ROWCOUNT = 0
+IF @Exists = 1
 BEGIN
 
-    MERGE INTO OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(CI_OrleansGrainDirectory)) AS Target
-    USING
+    /* If the entry already exists, we can return it. */
+    SELECT
+        ClusterId,
+        ProviderId,
+        GrainId,
+        SiloAddress,
+        ActivationId
+    FROM
+        OrleansGrainDirectory
+    WHERE
+        ClusterId = @ClusterId
+        AND ProviderId = @ProviderId
+        AND GrainId = @GrainId;
+
+END
+ELSE
+BEGIN
+
+    /* If the entry does not yet exist, we will add it now. */
+    INSERT INTO OrleansGrainDirectory
     (
-        SELECT
-            @ClusterId AS ClusterId,
-            @ProviderId AS ProviderId,
-            @GrainIdHash AS GrainIdHash,
-            @GrainId AS GrainId,
-            @SiloAddress AS SiloAddress,
-            @ActivationId AS ActivationId,
-            @Now AS CreatedOn
-    ) AS Source
-    ON
-        Target.ClusterId = Source.ClusterId
-        AND Target.ProviderId = Source.ProviderId
-        AND Target.GrainIdHash = Source.GrainIdHash
-        AND Target.GrainId = Source.GrainId
-    WHEN NOT MATCHED BY TARGET THEN
-        INSERT
-        (
-            ClusterId,
-            ProviderId,
-            GrainIdHash,
-            GrainId,
-            SiloAddress,
-            ActivationId,
-            CreatedOn
-        )
-        VALUES
-        (
-            Source.ClusterId,
-            Source.ProviderId,
-            Source.GrainIdHash,
-            Source.GrainId,
-            Source.SiloAddress,
-            Source.ActivationId,
-            Source.CreatedOn
-        )
+        ClusterId,
+        ProviderId,
+        GrainId,
+        SiloAddress,
+        ActivationId,
+        CreatedOn
+    )
     OUTPUT
         INSERTED.ClusterId,
         INSERTED.ProviderId,
         INSERTED.GrainId,
         INSERTED.SiloAddress,
-        INSERTED.ActivationId;
+        INSERTED.ActivationId
+    VALUES
+    (
+        @ClusterId,
+        @ProviderId,
+        @GrainId,
+        @SiloAddress,
+        @ActivationId,
+        @Now
+    );
 
 END
 
@@ -150,15 +126,14 @@ INSERT INTO OrleansQuery
 )
 SELECT
 	'RegisterGrainActivationKey',
-	'EXECUTE RegisterGrainActivation @ClusterId = @ClusterId, @ProviderId = @ProviderId, @GrainIdHash = @GrainIdHash, @GrainId = @GrainId, @SiloAddress = @SiloAddress, @ActivationId = @ActivationId'
+	'EXECUTE RegisterGrainActivation @ClusterId = @ClusterId, @ProviderId = @ProviderId, @GrainId = @GrainId, @SiloAddress = @SiloAddress, @ActivationId = @ActivationId'
 GO
 
 /* Unregisters an existing grain activation */
 CREATE PROCEDURE UnregisterGrainActivation
     @ClusterId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
-    @GrainIdHash INT,
-    @GrainId NVARCHAR(MAX),
+    @GrainId NVARCHAR(150),
     @ActivationId NVARCHAR(100)
 AS
 
@@ -168,11 +143,10 @@ SET XACT_ABORT ON;
 /* Delete the entry if it exists. */
 /* This places a lock on the hash index pages upfront to prevent deadlocks. */
 DELETE OrleansGrainDirectory
-FROM OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(CI_OrleansGrainDirectory))
+FROM OrleansGrainDirectory
 WHERE
     ClusterId = @ClusterId
     AND ProviderId = @ProviderId
-    AND GrainIdHash = @GrainIdHash
     AND GrainId = @GrainId
     AND ActivationId = @ActivationId;
 
@@ -187,7 +161,7 @@ INSERT INTO OrleansQuery
 )
 SELECT
 	'UnregisterGrainActivationKey',
-	'EXECUTE UnregisterGrainActivation @ClusterId = @ClusterId, @ProviderId = @ProviderId, @GrainIdHash = @GrainIdHash, @GrainId = @GrainId, @ActivationId = @ActivationId'
+	'EXECUTE UnregisterGrainActivation @ClusterId = @ClusterId, @ProviderId = @ProviderId, @GrainId = @GrainId, @ActivationId = @ActivationId'
 GO
 
 
@@ -195,8 +169,7 @@ GO
 CREATE PROCEDURE LookupGrainActivation
     @ClusterId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
-    @GrainIdHash INT,
-    @GrainId NVARCHAR(MAX)
+    @GrainId NVARCHAR(150)
 AS
 
 SET NOCOUNT ON;
@@ -211,11 +184,10 @@ SELECT
     SiloAddress,
     ActivationId
 FROM
-    OrleansGrainDirectory WITH (UPDLOCK, PAGLOCK, HOLDLOCK, INDEX(CI_OrleansGrainDirectory))
+    OrleansGrainDirectory
 WHERE
     ClusterId = @ClusterId
     AND ProviderId = @ProviderId
-    AND GrainIdHash = @GrainIdHash
     AND GrainId = @GrainId;
 
 GO
@@ -227,7 +199,7 @@ INSERT INTO OrleansQuery
 )
 SELECT
 	'LookupGrainActivationKey',
-	'EXECUTE LookupGrainActivation @ClusterId = @ClusterId, @ProviderId = @ProviderId, @GrainIdHash = @GrainIdHash, @GrainId = @GrainId'
+	'EXECUTE LookupGrainActivation @ClusterId = @ClusterId, @ProviderId = @ProviderId, @GrainId = @GrainId'
 GO
 
 
