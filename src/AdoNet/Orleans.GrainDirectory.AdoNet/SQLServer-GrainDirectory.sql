@@ -8,19 +8,19 @@ This table stores the location of all grains in the cluster.
 CREATE TABLE OrleansGrainDirectory
 (
     /* Identifies the cluster instance */
-    ClusterId NVARCHAR(150) NOT NULL,
+    ClusterId VARCHAR(150) NOT NULL,
 
     /* Identifies the grain directory provider */
-    ProviderId NVARCHAR(150) NOT NULL,
+    ProviderId VARCHAR(150) NOT NULL,
 
     /* Holds the grain id in text form */
-    GrainId NVARCHAR(150) NOT NULL,
+    GrainId VARCHAR(600) NOT NULL,
 
     /* Holds the silo address where the grain is located */
-    SiloAddress NVARCHAR(100) NOT NULL,
+    SiloAddress VARCHAR(100) NOT NULL,
 
     /* Holds the activation id in the silo where it is located */
-    ActivationId NVARCHAR(100) NOT NULL,
+    ActivationId VARCHAR(100) NOT NULL,
 
     /* Holds the time at which the grain was added to the directory */
     CreatedOn DATETIMEOFFSET(3) NOT NULL,
@@ -37,11 +37,11 @@ GO
 
 /* Registers a new grain activation */
 CREATE PROCEDURE RegisterGrainActivation
-    @ClusterId NVARCHAR(150),
-    @ProviderId NVARCHAR(150),
-    @GrainId NVARCHAR(150),
-    @SiloAddress NVARCHAR(100),
-    @ActivationId NVARCHAR(100)
+    @ClusterId VARCHAR(150),
+    @ProviderId VARCHAR(150),
+    @GrainId VARCHAR(600),
+    @SiloAddress VARCHAR(100),
+    @ActivationId VARCHAR(100)
 AS
 
 SET NOCOUNT ON;
@@ -131,10 +131,10 @@ GO
 
 /* Unregisters an existing grain activation */
 CREATE PROCEDURE UnregisterGrainActivation
-    @ClusterId NVARCHAR(150),
-    @ProviderId NVARCHAR(150),
-    @GrainId NVARCHAR(150),
-    @ActivationId NVARCHAR(100)
+    @ClusterId VARCHAR(150),
+    @ProviderId VARCHAR(150),
+    @GrainId VARCHAR(600),
+    @ActivationId VARCHAR(100)
 AS
 
 SET NOCOUNT ON;
@@ -167,9 +167,9 @@ GO
 
 /* Looks up an existing grain activation */
 CREATE PROCEDURE LookupGrainActivation
-    @ClusterId NVARCHAR(150),
-    @ProviderId NVARCHAR(150),
-    @GrainId NVARCHAR(150)
+    @ClusterId VARCHAR(150),
+    @ProviderId VARCHAR(150),
+    @GrainId VARCHAR(600)
 AS
 
 SET NOCOUNT ON;
@@ -205,9 +205,9 @@ GO
 
 /* Unregisters all grain activations in the specified silos */
 CREATE PROCEDURE UnregisterGrainActivations
-    @ClusterId NVARCHAR(150),
-    @ProviderId NVARCHAR(150),
-    @SiloAddresses NVARCHAR(MAX)
+    @ClusterId VARCHAR(150),
+    @ProviderId VARCHAR(150),
+    @SiloAddresses VARCHAR(MAX)
 AS
 
 SET NOCOUNT ON;

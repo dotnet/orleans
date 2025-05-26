@@ -1,18 +1,8 @@
 /*
+
 Orleans Grain Directory.
 
 This table stores the location of all grains in the cluster.
-
-The demands for this table are as follows:
-
-1. The table will see rows inserted individually, as new grains are added.
-2. The table will see rows deleted at random as grains are deactivated, without regard for order.
-3. Insert/Delete churn is expected to be very high.
-4. The GrainId is too large to be indexed by SQL Server.
-
-To address these demands, this table is implemented as a non-unique table with a hash index.
-This index covers the hash of the grain id to allow for fast lookups.
-Uniqueness is then guaranteed by careful use of locks on the hash index.
 
 */
 CREATE TABLE OrleansGrainDirectory
@@ -23,11 +13,8 @@ CREATE TABLE OrleansGrainDirectory
     /* Identifies the grain directory provider */
     ProviderId VARCHAR(150) NOT NULL,
 
-    /* Holds the hash of the grain id */
-    GrainIdHash INT NOT NULL,
-
     /* Holds the grain id in text form */
-    GrainId TEXT NOT NULL,
+    GrainId VARCHAR(600) NOT NULL,
 
     /* Holds the silo address where the grain is located */
     SiloAddress VARCHAR(100) NOT NULL,
@@ -36,24 +23,22 @@ CREATE TABLE OrleansGrainDirectory
     ActivationId VARCHAR(100) NOT NULL,
 
     /* Holds the time at which the grain was added to the directory */
-    CreatedOn TIMESTAMPTZ NOT NULL
-);
+    CreatedOn TIMESTAMPTZ NOT NULL,
 
-/* This index allows duplication on the hash. */
-CREATE INDEX IX_OrleansGrainDirectory
-ON OrleansGrainDirectory
-(
-    ClusterId,
-    ProviderId,
-    GrainIdHash
+    /* Identifies a unique grain activation */
+    CONSTRAINT PK_OrleansGrainDirectory PRIMARY KEY
+    (
+        ClusterId,
+        ProviderId,
+        GrainId
+    )
 );
 
 /* Registers a new grain activation */
 CREATE OR REPLACE FUNCTION RegisterGrainActivation(
     _ClusterId VARCHAR(150),
     _ProviderId VARCHAR(150),
-    _GrainIdHash INT,
-    _GrainId TEXT,
+    _GrainId VARCHAR(600),
     _SiloAddress VARCHAR(100),
     _ActivationId VARCHAR(100)
 )
@@ -61,7 +46,7 @@ RETURNS TABLE
 (
     ClusterId VARCHAR(150),
     ProviderId VARCHAR(150),
-    GrainId TEXT,
+    GrainId VARCHAR(600),
     SiloAddress VARCHAR(100),
     ActivationId VARCHAR(100)
 )
@@ -72,56 +57,34 @@ DECLARE
     _Now TIMESTAMPTZ := NOW();
 BEGIN
 
--- this is required to prevent both duplication and deadlocks
-LOCK TABLE OrleansGrainDirectory IN EXCLUSIVE MODE;
-
 RETURN QUERY
-SELECT
+INSERT INTO OrleansGrainDirectory
+(
     ClusterId,
     ProviderId,
     GrainId,
     SiloAddress,
-    ActivationId
-FROM
-    OrleansGrainDirectory
-WHERE
-    ClusterId = _ClusterId
-    AND ProviderId = _ProviderId
-    AND GrainIdHash = _GrainIdHash
-    AND GrainId = _GrainId
-FOR UPDATE;
-
-IF NOT FOUND THEN
-
-    RETURN QUERY
-    INSERT INTO OrleansGrainDirectory
-    (
-        ClusterId,
-        ProviderId,
-        GrainIdHash,
-        GrainId,
-        SiloAddress,
-        ActivationId,
-        CreatedOn
-    )
-    VALUES
-    (
-        _ClusterId,
-        _ProviderId,
-        _GrainIdHash,
-        _GrainId,
-        _SiloAddress,
-        _ActivationId,
-        _Now
-    )
-    RETURNING
-        ClusterId,
-        ProviderId,
-        GrainId,
-        SiloAddress,
-        ActivationId;
-
-END IF;
+    ActivationId,
+    CreatedOn
+)
+SELECT
+    _ClusterId,
+    _ProviderId,
+    _GrainId,
+    _SiloAddress,
+    _ActivationId,
+    _Now
+ON CONFLICT (ClusterId, ProviderId, GrainId)
+DO UPDATE SET
+    ClusterId = _ClusterId,
+    ProviderId = _ProviderId,
+    GrainId = _GrainId
+RETURNING
+    ClusterId,
+    ProviderId,
+    GrainId,
+    SiloAddress,
+    ActivationId;
 
 END;
 $$;
@@ -133,15 +96,14 @@ INSERT INTO OrleansQuery
 )
 SELECT
 	'RegisterGrainActivationKey',
-	'SELECT * FROM RegisterGrainActivation (@ClusterId, @ProviderId, @GrainIdHash, @GrainId, @SiloAddress, @ActivationId)'
+	'START TRANSACTION; SELECT * FROM RegisterGrainActivation (@ClusterId, @ProviderId, @GrainId, @SiloAddress, @ActivationId); COMMIT;'
 ;
 
 /* Unregisters an existing grain activation */
 CREATE OR REPLACE FUNCTION UnregisterGrainActivation(
     _ClusterId VARCHAR(150),
     _ProviderId VARCHAR(150),
-    _GrainIdHash INT,
-    _GrainId TEXT,
+    _GrainId VARCHAR(600),
     _ActivationId VARCHAR(100)
 )
 RETURNS INT
@@ -151,13 +113,9 @@ DECLARE
     _RowCount INT;
 BEGIN
 
--- this is required to prevent both duplication and deadlocks
-LOCK TABLE OrleansGrainDirectory IN EXCLUSIVE MODE;
-
 DELETE FROM OrleansGrainDirectory
 WHERE ClusterId = _ClusterId
     AND ProviderId = _ProviderId
-    AND GrainIdHash = _GrainIdHash
     AND GrainId = _GrainId
     AND ActivationId = _ActivationId;
 
@@ -175,21 +133,20 @@ INSERT INTO OrleansQuery
 )
 SELECT
 	'UnregisterGrainActivationKey',
-	'SELECT * FROM UnregisterGrainActivation (@ClusterId, @ProviderId, @GrainIdHash, @GrainId, @ActivationId)'
+	'SELECT * FROM UnregisterGrainActivation (@ClusterId, @ProviderId, @GrainId, @ActivationId)'
 ;
 
 /* Looks up an existing grain activation */
 CREATE OR REPLACE FUNCTION LookupGrainActivation(
     _ClusterId VARCHAR(150),
     _ProviderId VARCHAR(150),
-    _GrainIdHash INT,
-    _GrainId TEXT
+    _GrainId VARCHAR(600)
 )
 RETURNS TABLE
 (
     ClusterId VARCHAR(150),
     ProviderId VARCHAR(150),
-    GrainId TEXT,
+    GrainId VARCHAR(600),
     SiloAddress VARCHAR(100),
     ActivationId VARCHAR(100)
 )
@@ -210,7 +167,6 @@ FROM
 WHERE
     ClusterId = _ClusterId
     AND ProviderId = _ProviderId
-    AND GrainIdHash = _GrainIdHash
     AND GrainId = _GrainId;
 
 END;
@@ -223,7 +179,7 @@ INSERT INTO OrleansQuery
 )
 SELECT
     'LookupGrainActivationKey',
-    'SELECT * FROM LookupGrainActivation(@ClusterId, @ProviderId, @GrainIdHash, @GrainId)'
+    'SELECT * FROM LookupGrainActivation(@ClusterId, @ProviderId, @GrainId)'
 ;
 
 /* Unregisters all grain activations in the specified silos */
@@ -238,9 +194,6 @@ AS $$
 DECLARE
     _RowCount INT;
 BEGIN
-
--- this is required to prevent both duplication and deadlocks
-LOCK TABLE OrleansGrainDirectory IN EXCLUSIVE MODE;
 
 DELETE FROM OrleansGrainDirectory
 WHERE
