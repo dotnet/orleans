@@ -6,6 +6,8 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
+#nullable disable
+
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
 #elif PERSISTENCE_ADONET
@@ -702,3 +704,5 @@ namespace Orleans.Tests.SqlUtils
 #endif
     }
 }
+
+#nullable restore

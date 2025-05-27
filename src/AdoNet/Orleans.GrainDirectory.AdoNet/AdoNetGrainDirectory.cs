@@ -1,29 +1,17 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.GrainDirectory.AdoNet.Storage;
-using Orleans.Runtime;
-
 namespace Orleans.GrainDirectory.AdoNet;
 
 internal sealed partial class AdoNetGrainDirectory(string name, AdoNetGrainDirectoryOptions options, ILogger<AdoNetGrainDirectory> logger, IOptions<ClusterOptions> clusterOptions, IHostApplicationLifetime lifetime) : IGrainDirectory
 {
     private readonly ILogger _logger = logger;
     private readonly string _clusterId = clusterOptions.Value.ClusterId;
-    private RelationalOrleansQueries _queries;
+    private RelationalOrleansQueries? _queries;
 
     /// <summary>
     /// Looks up a grain activation.
     /// </summary>
     /// <param name="grainId">The grain identifier.</param>
     /// <returns>The grain address if found or null if not found.</returns>
-    public async Task<GrainAddress> Lookup(GrainId grainId)
+    public async Task<GrainAddress?> Lookup(GrainId grainId)
     {
         try
         {
@@ -47,9 +35,10 @@ internal sealed partial class AdoNetGrainDirectory(string name, AdoNetGrainDirec
     /// </summary>
     /// <param name="address">The grain address.</param>
     /// <returns>The new or current grain address.</returns>
-    public async Task<GrainAddress> Register(GrainAddress address)
+    public async Task<GrainAddress?> Register(GrainAddress address)
     {
         ArgumentNullException.ThrowIfNull(address);
+        ArgumentNullException.ThrowIfNull(address.SiloAddress);
 
         try
         {
@@ -78,6 +67,7 @@ internal sealed partial class AdoNetGrainDirectory(string name, AdoNetGrainDirec
     public async Task Unregister(GrainAddress address)
     {
         ArgumentNullException.ThrowIfNull(address);
+        ArgumentNullException.ThrowIfNull(address.SiloAddress);
 
         try
         {

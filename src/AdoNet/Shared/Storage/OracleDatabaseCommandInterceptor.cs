@@ -2,6 +2,8 @@ using System;
 using System.Data;
 using System.Linq.Expressions;
 
+#nullable disable
+
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
 #elif PERSISTENCE_ADONET
@@ -127,3 +129,5 @@ namespace Orleans.Tests.SqlUtils
         }
     }
 }
+
+#nullable restore

@@ -1,6 +1,3 @@
-using System;
-using Orleans.Runtime;
-
 namespace Orleans.GrainDirectory.AdoNet;
 
 /// <summary>
@@ -19,7 +16,7 @@ internal sealed record AdoNetGrainDirectoryEntry(
 
     public GrainAddress ToGrainAddress() => new()
     {
-        GrainId = Runtime.GrainId.Parse(GrainId),
+        GrainId = Runtime.GrainId.Parse(GrainId, CultureInfo.InvariantCulture),
         SiloAddress = Runtime.SiloAddress.FromParsableString(SiloAddress),
         ActivationId = Runtime.ActivationId.FromParsableString(ActivationId)
     };
@@ -28,6 +25,7 @@ internal sealed record AdoNetGrainDirectoryEntry(
     {
         ArgumentNullException.ThrowIfNull(clusterId);
         ArgumentNullException.ThrowIfNull(address);
+        ArgumentNullException.ThrowIfNull(address.SiloAddress);
 
         return new AdoNetGrainDirectoryEntry(
             clusterId,

@@ -8,11 +8,13 @@ public class AdoNetGrainDirectoryOptions
     /// <summary>
     /// Gets or sets the ADO.NET invariant.
     /// </summary>
-    public string Invariant { get; set; }
+    [Required]
+    public string Invariant { get; set; } = "";
 
     /// <summary>
     /// Gets or sets the connection string.
     /// </summary>
     [Redact]
-    public string ConnectionString { get; set; }
+    [Required]
+    public string ConnectionString { get; set; } = "";
 }

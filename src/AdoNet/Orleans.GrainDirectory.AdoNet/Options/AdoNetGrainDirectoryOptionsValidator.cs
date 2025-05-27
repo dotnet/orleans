@@ -1,5 +1,3 @@
-using Orleans.GrainDirectory.AdoNet;
-using Orleans.Runtime;
 using static System.String;
 
 namespace Orleans.Configuration;

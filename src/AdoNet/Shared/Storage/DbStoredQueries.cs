@@ -6,6 +6,8 @@ using System.Net;
 using System.Reflection;
 using Orleans.Runtime;
 
+#nullable disable
+
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
 #elif ORLEANS_REMINDERS_PROVIDER
@@ -565,3 +567,5 @@ namespace Orleans.Tests.SqlUtils
         }
     }
 }
+
+#nullable restore
