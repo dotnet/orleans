@@ -1,9 +1,6 @@
 /*
-
 Orleans Grain Directory.
-
 This table stores the location of all grains in the cluster.
-
 */
 CREATE TABLE OrleansGrainDirectory
 (

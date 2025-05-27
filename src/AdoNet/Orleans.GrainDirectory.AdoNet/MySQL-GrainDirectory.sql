@@ -1,31 +1,23 @@
 /*
 Orleans Grain Directory.
-
 This table stores the location of all grains in the cluster.
-
-The rationale for this table is as follows:
-
-1. The table will see rows inserted individually, as new grains are added.
-2. The table will see rows deleted at random as grains are deactivated, without regard for order.
-3. Insert/Delete churn is expected to be very high.
-4. The GrainId is VARCHAR(767) to support reasonable length grain identifiers.
 */
 CREATE TABLE OrleansGrainDirectory
 (
     /* Identifies the cluster instance */
-    ClusterId NVARCHAR(150) NOT NULL,
+    ClusterId VARCHAR(150) NOT NULL,
 
     /* Identifies the grain directory provider */
-    ProviderId NVARCHAR(150) NOT NULL,
+    ProviderId VARCHAR(150) NOT NULL,
 
     /* Holds the grain id in text form */
-    GrainId VARCHAR(767) NOT NULL,
+    GrainId VARCHAR(468) NOT NULL,
 
     /* Holds the silo address where the grain is located */
-    SiloAddress NVARCHAR(100) NOT NULL,
+    SiloAddress VARCHAR(100) NOT NULL,
 
     /* Holds the activation id in the silo where it is located */
-    ActivationId NVARCHAR(100) NOT NULL,
+    ActivationId VARCHAR(100) NOT NULL,
 
     /* Holds the time at which the grain was added to the directory */
     CreatedOn DATETIME(3) NOT NULL,
@@ -36,13 +28,24 @@ CREATE TABLE OrleansGrainDirectory
 
 DELIMITER $$
 
-INSERT INTO OrleansQuery
+CREATE PROCEDURE RegisterGrainActivation
 (
-	QueryKey,
-	QueryText
+    IN _ClusterId NVARCHAR(150),
+    IN _ProviderId NVARCHAR(150),
+    IN _GrainId NVARCHAR(468),
+    IN _SiloAddress NVARCHAR(100),
+    IN _ActivationId NVARCHAR(100)
 )
-SELECT 'RegisterGrainActivationKey',
-    '
+BEGIN
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
+
     INSERT INTO OrleansGrainDirectory
     (
         ClusterId,
@@ -52,12 +55,13 @@ SELECT 'RegisterGrainActivationKey',
         ActivationId,
         CreatedOn
     )
-    VALUES (
-        @ClusterId,
-        @ProviderId,
-        @GrainId,
-        @SiloAddress,
-        @ActivationId,
+    VALUES
+    (
+        _ClusterId,
+        _ProviderId,
+        _GrainId,
+        _SiloAddress,
+        _ActivationId,
         UTC_TIMESTAMP(3)
     )
     ON DUPLICATE KEY UPDATE
@@ -73,11 +77,14 @@ SELECT 'RegisterGrainActivationKey',
     FROM
         OrleansGrainDirectory
     WHERE
-        ClusterId = @ClusterId
-        AND ProviderId = @ProviderId
-        AND GrainId = @GrainId;
-    '
-;
+        ClusterId = _ClusterId
+        AND ProviderId = _ProviderId
+        AND GrainId = _GrainId;
+
+    COMMIT;
+
+END;
+
 
 DELIMITER $$
 
@@ -86,28 +93,60 @@ INSERT INTO OrleansQuery
 	QueryKey,
 	QueryText
 )
-SELECT 'UnregisterGrainActivationKey',
-	'
+SELECT
+    'RegisterGrainActivationKey',
+    'CALL RegisterGrainActivation(@ClusterId, @ProviderId, @GrainId, @SiloAddress, @ActivationId);';
+
+DELIMITER $$
+
+CREATE PROCEDURE UnregisterGrainActivation
+(
+    IN _ClusterId VARCHAR(150),
+    IN _ProviderId VARCHAR(150),
+    IN _GrainId VARCHAR(468),
+    IN _ActivationId VARCHAR(100)
+)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
+
     DELETE FROM OrleansGrainDirectory
     WHERE
-        ClusterId = @ClusterId
-        AND ProviderId = @ProviderId
-        AND GrainId = @GrainId
-        AND ActivationId = @ActivationId;
+        ClusterId = _ClusterId
+        AND ProviderId = _ProviderId
+        AND GrainId = _GrainId
+        AND ActivationId = _ActivationId;
 
     SELECT ROW_COUNT() AS DeletedRows;
-    '
-;
+
+    COMMIT;
+END;
 
 DELIMITER $$
 
 INSERT INTO OrleansQuery
 (
-    QueryKey,
-    QueryText
+	QueryKey,
+	QueryText
 )
-SELECT 'LookupGrainActivationKey',
-    '
+SELECT
+    'UnregisterGrainActivationKey',
+	'CALL UnregisterGrainActivation(@ClusterId, @ProviderId, @GrainId, @ActivationId);';
+
+DELIMITER $$
+
+CREATE PROCEDURE LookupGrainActivation
+(
+    IN _ClusterId VARCHAR(150),
+    IN _ProviderId VARCHAR(150),
+    IN _GrainId VARCHAR(468)
+)
+BEGIN
     SELECT
         ClusterId,
         ProviderId,
@@ -117,11 +156,75 @@ SELECT 'LookupGrainActivationKey',
     FROM
         OrleansGrainDirectory
     WHERE
-        ClusterId = @ClusterId
-        AND ProviderId = @ProviderId
-        AND GrainId = @GrainId;
-    '
-;
+        ClusterId = _ClusterId
+        AND ProviderId = _ProviderId
+        AND GrainId = _GrainId;
+END
+
+DELIMITER $$
+
+INSERT INTO OrleansQuery
+(
+    QueryKey,
+    QueryText
+)
+SELECT
+    'LookupGrainActivationKey',
+    'CALL LookupGrainActivation(@ClusterId, @ProviderId, @GrainId);';
+
+DELIMITER $$
+
+CREATE PROCEDURE UnregisterGrainActivations
+(
+    IN _ClusterId VARCHAR(150),
+    IN _ProviderId VARCHAR(150),
+    IN _SiloAddresses TEXT
+)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
+
+    -- Parse silo addresses into temporary table for batch operation
+    CREATE TEMPORARY TABLE TempSiloAddresses
+    (
+        SiloAddress VARCHAR(100) NOT NULL,
+        Level INT NOT NULL
+    );
+
+    INSERT INTO TempSiloAddresses (SiloAddress, Level)
+    WITH RECURSIVE SiloAddressesCTE AS
+    (
+        SELECT
+            SUBSTRING_INDEX(_SiloAddresses, '|', 1) AS Value,
+            SUBSTRING(_SiloAddresses, CHAR_LENGTH(SUBSTRING_INDEX(_SiloAddresses, '|', 1)) + 2, CHAR_LENGTH(_SiloAddresses)) AS Others,
+            1 AS Level
+        UNION ALL
+        SELECT
+            SUBSTRING_INDEX(Others, '|', 1) AS Value,
+            SUBSTRING(Others, CHAR_LENGTH(SUBSTRING_INDEX(Others, '|', 1)) + 2, CHAR_LENGTH(Others)) AS Others,
+            Level + 1
+        FROM SiloAddressesCTE
+        WHERE Others != ''
+    )
+    SELECT Value, Level FROM SiloAddressesCTE;
+
+    DELETE FROM OrleansGrainDirectory
+    WHERE
+        ClusterId = _ClusterId
+        AND ProviderId = _ProviderId
+        AND SiloAddress IN (SELECT SiloAddress FROM TempSiloAddresses);
+
+    SELECT ROW_COUNT() AS DeletedRows;
+
+    DROP TEMPORARY TABLE TempSiloAddresses;
+
+    COMMIT;
+END
 
 DELIMITER $$
 
@@ -130,44 +233,8 @@ INSERT INTO OrleansQuery
 	QueryKey,
 	QueryText
 )
-SELECT 'UnregisterGrainActivationsKey',
-	'
-    -- Parse silo addresses into temporary table for batch operation
-    CREATE TEMPORARY TABLE TempSiloAddresses
-    (
-        SiloAddress NVARCHAR(100) NOT NULL,
-        Level INT NOT NULL
-    );
+SELECT
+    'UnregisterGrainActivationsKey',
+    'CALL UnregisterGrainActivations(@ClusterId, @ProviderId, @SiloAddresses);';
 
-    INSERT INTO TempSiloAddresses
-    (
-        SiloAddress,
-        Level
-    )
-    WITH RECURSIVE SiloAddressesCTE AS
-    (
-        SELECT
-            SUBSTRING_INDEX(@SiloAddresses, ''|'', 1) AS Value,
-  		    SUBSTRING(@SiloAddresses, CHAR_LENGTH(SUBSTRING_INDEX(@SiloAddresses, ''|'', 1)) + 2, CHAR_LENGTH(@SiloAddresses)) AS Others,
-            1 AS Level
-        UNION ALL
-        SELECT
-            SUBSTRING_INDEX(Others, ''|'', 1) AS Value,
-            SUBSTRING(Others, CHAR_LENGTH(SUBSTRING_INDEX(Others, ''|'', 1)) + 2, CHAR_LENGTH(Others)) AS Others,
-            Level + 1
-        FROM SiloAddressesCTE
-        WHERE Others != ''''
-    )
-    SELECT Value, Level FROM SiloAddressesCTE;
-
-    DELETE FROM OrleansGrainDirectory
-    WHERE
-        ClusterId = @ClusterId
-        AND ProviderId = @ProviderId
-        AND SiloAddress IN (SELECT SiloAddress FROM TempSiloAddresses);
-
-    SELECT ROW_COUNT() AS DeletedRows;
-
-    DROP TEMPORARY TABLE TempSiloAddresses;
-    '
-;
+DELIMITER ;
