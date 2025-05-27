@@ -1,18 +1,16 @@
-using Microsoft.CodeAnalysis.CodeActions;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-using System.Collections.Generic;
-
 namespace Orleans.Journaling.Cosmos;
 
+/// <summary>
+/// Options for configuring the Azure Cosmos DB log-based storage provider.
+/// </summary>
 public class CosmosLogStorageOptions : CosmosOptions
 {
     /// <summary>
     /// The number of log entries after which compaction is requested.
+    /// Given a threshold value of 10, compaction will occur on the 11th append.
     /// </summary>
     /// <remarks>
     /// <para>Valid range is [1-97]</para>
-    /// <para>Recomended value is 10</para>
-    /// <para>1 means compact after every state update</para>
     /// </remarks>
     public int CompactionThreshold { get; set; } = DEFAULT_COMPACTION_THRESHOLD;
 
