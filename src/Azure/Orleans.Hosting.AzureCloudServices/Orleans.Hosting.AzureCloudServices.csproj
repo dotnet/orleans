@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.Hosting.AzureCloudServices</PackageId>
     <Title>Microsoft Orleans Hosting on Azure Cloud Services</Title>
     <Description>Hosting utilities for Azure Cloud Services of Microsoft Orleans.</Description>
@@ -15,4 +16,8 @@
     <PackageReference Include="Microsoft.CSharp" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>

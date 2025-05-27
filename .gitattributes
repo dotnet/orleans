@@ -15,3 +15,6 @@
 *.PDF	 diff=astextplain
 *.rtf	 diff=astextplain
 *.RTF	 diff=astextplain
+
+# Verify.Xunit
+*.verified.cs text eol=lf working-tree-encoding=UTF-8

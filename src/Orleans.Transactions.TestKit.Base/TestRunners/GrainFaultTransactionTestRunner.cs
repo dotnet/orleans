@@ -33,6 +33,27 @@ namespace Orleans.Transactions.TestKit
             });
         }
 
+        public virtual async Task AbortTransactionOnReadOnlyViolatedException(string grainStates)
+        {
+            const int expected = 5;
+
+            ITransactionTestGrain grain = RandomTestGrain(grainStates);
+            ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+
+            await coordinator.MultiGrainSet(new List<ITransactionTestGrain> { grain }, expected);
+            Func<Task> task = () => coordinator.UpdateViolated(grain, expected);
+            await task.Should().ThrowAsync<OrleansReadOnlyViolatedException>();
+
+            await TestAfterDustSettles(async () =>
+            {
+                int[] actualValues = await grain.Get();
+                foreach (var actual in actualValues)
+                {
+                    actual.Should().Be(expected);
+                }
+            });
+        }
+
         public virtual async Task MultiGrainAbortTransactionOnExceptions(string grainStates)
         {
             const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions - 1;

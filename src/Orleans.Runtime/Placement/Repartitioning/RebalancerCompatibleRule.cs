@@ -29,7 +29,7 @@ internal class RebalancerCompatibleRule(IServiceProvider provider) :
     private readonly ISiloStatusOracle _oracle = provider.GetRequiredService<ISiloStatusOracle>();
     private readonly IActivationRebalancer? _rebalancer = provider.GetService<IActivationRebalancer>();
 
-    public bool IsSatisfiedBy(uint imbalance) => imbalance <= _pairwiseImbalance;
+    public bool IsSatisfiedBy(uint imbalance) => imbalance <= Volatile.Read(ref _pairwiseImbalance);
 
     public void SiloStatusChangeNotification(SiloAddress silo, SiloStatus status)
     {
@@ -37,16 +37,7 @@ internal class RebalancerCompatibleRule(IServiceProvider provider) :
         {
             ref var statusRef = ref CollectionsMarshal.GetValueRefOrAddDefault(_silos, silo, out _);
             statusRef = status;
-
-            var activeSilos = _silos.Count(s => s.Value == SiloStatus.Active);
-            var percentageOfBaseline = 100d / (1 + Math.Exp(0.07d * activeSilos - 4.8d));
-
-            if (percentageOfBaseline < 10d) percentageOfBaseline = 10d;
-
-            var pairwiseImbalance = (uint)Math.Round(10.1d * percentageOfBaseline, 0);
-            var toleranceFactor = Math.Cos(Math.PI * _clusterImbalance / 2);  // This will always be 1 if rebalancer is not registered.
-
-            _pairwiseImbalance = (uint)Math.Max(pairwiseImbalance * toleranceFactor, 0);
+            UpdatePairwiseImbalance();
         }
     }
 
@@ -59,7 +50,21 @@ internal class RebalancerCompatibleRule(IServiceProvider provider) :
         lock (_lock)
         {
             _clusterImbalance = report.ClusterImbalance;
+            UpdatePairwiseImbalance();
         }
+    }
+
+    private void UpdatePairwiseImbalance()
+    {
+        var activeSilos = _silos.Count(s => s.Value == SiloStatus.Active);
+        var percentageOfBaseline = 100d / (1 + Math.Exp(0.07d * activeSilos - 4.8d));
+
+        if (percentageOfBaseline < 10d) percentageOfBaseline = 10d;
+
+        var pairwiseImbalance = (uint)Math.Round(10.1d * percentageOfBaseline, 0);
+        var toleranceFactor = Math.Cos(Math.PI * _clusterImbalance / 2);  // This will always be 1 if rebalancer is not registered.
+
+        _pairwiseImbalance = (uint)Math.Max(pairwiseImbalance * toleranceFactor, 0);
     }
 
     public Task OnStart(CancellationToken cancellationToken)

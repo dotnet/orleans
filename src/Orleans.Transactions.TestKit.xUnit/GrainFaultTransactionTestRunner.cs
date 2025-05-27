@@ -23,6 +23,15 @@ namespace Orleans.Transactions.TestKit.xUnit
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
+        public override Task AbortTransactionOnReadOnlyViolatedException(string grainStates)
+        {
+            return base.AbortTransactionOnReadOnlyViolatedException(grainStates);
+        }
+
+        [SkippableTheory]
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
         public override Task MultiGrainAbortTransactionOnExceptions(string grainStates)
         {
             return base.MultiGrainAbortTransactionOnExceptions(grainStates);

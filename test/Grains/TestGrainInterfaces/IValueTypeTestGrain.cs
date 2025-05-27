@@ -227,6 +227,36 @@ namespace UnitTests.GrainInterfaces
         }
     }
 
+    public struct WithGrainIdType
+    {
+        public GrainId GrainId { get; set; }
+
+        public WithGrainIdType(GrainId grainId)
+        {
+            GrainId = grainId;
+        }
+    }
+
+    public struct WithGrainIdMapType
+    {
+        public IDictionary<GrainId, int> Map { get; set; }
+
+        public WithGrainIdMapType(IDictionary<GrainId, int> map)
+        {
+            Map = map;
+        }
+    }
+
+    public struct WithGrainIdSetType
+    {
+        public ISet<GrainId> Set { get; set; }
+
+        public WithGrainIdSetType(ISet<GrainId> set)
+        {
+            Set = set;
+        }
+    }
+
     [UseActivator]
     [Serializable]
     [GenerateSerializer]
