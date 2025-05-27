@@ -11,7 +11,7 @@ CREATE TABLE OrleansGrainDirectory
     ProviderId VARCHAR(150) NOT NULL,
 
     /* Holds the grain id in text form */
-    GrainId VARCHAR(600) NOT NULL,
+    GrainId VARCHAR(2404) NOT NULL,
 
     /* Holds the silo address where the grain is located */
     SiloAddress VARCHAR(100) NOT NULL,
