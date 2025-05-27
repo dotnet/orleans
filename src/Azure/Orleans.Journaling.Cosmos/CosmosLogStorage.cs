@@ -291,7 +291,7 @@ internal sealed partial class CosmosLogStorage : IStateMachineStorage
         },
         (this, pendingEntry, _partitionKey, cancellationToken)).ConfigureAwait(false);
 
-        await FinalizeCompactionAsync(data, pendingResponse.ETag, cancellationToken).ConfigureAwait(false);
+        await CompactAsync(data, pendingResponse.ETag, cancellationToken).ConfigureAwait(false);
 
         _isCompacted = true;
         _logEntriesCount = 1;
@@ -401,7 +401,7 @@ internal sealed partial class CosmosLogStorage : IStateMachineStorage
                 LogPendingCompactionFound(_logger, _logId);
 
                 // A pending compaction exists, so we attempt to complete it.
-                await FinalizeCompactionAsync(pendingResource.Data, pendingResponse.ETag,
+                await CompactAsync(pendingResource.Data, pendingResponse.ETag,
                     cancellationToken).ConfigureAwait(false);
 
                 _isInitialized = true;
@@ -460,7 +460,7 @@ internal sealed partial class CosmosLogStorage : IStateMachineStorage
         using var feed = _container.GetItemQueryIterator<LogSummary>(
             new QueryDefinition(@"
                 SELECT
-                    COUNT(1) AS EntryCount,
+                    COUNT(1) AS EntriesCount,
                     MAX(c.SequenceNumber) AS MaxSequenceNumber
                 FROM c
                 WHERE c.LogId = @logId AND c.EntryType = @entryType")
@@ -474,12 +474,12 @@ internal sealed partial class CosmosLogStorage : IStateMachineStorage
         {
             var feedResponse = await _executor.ExecuteOperation(static args =>
             {
-                var (iterator, ct) = args;
-                return iterator.ReadNextAsync(ct);
+                var (feed, ct) = args;
+                return feed.ReadNextAsync(ct);
             },
             (feed, cancellationToken)).ConfigureAwait(false);
 
-            summary = feedResponse.SingleOrDefault(); // There should only be 0 or 1 document.
+            summary = feedResponse.SingleOrDefault(); // There should not be more than 1 document.
         }
 
         if (summary != null)
@@ -501,10 +501,10 @@ internal sealed partial class CosmosLogStorage : IStateMachineStorage
     }
 
     /// <summary>
-    /// This finalizes the compaction. It deletes old log entries, the pending compaction entry
-    /// and creates the new compacted entry. All of it within one transaction.
+    /// This does the compaction, which means it deletes old log entries, the pending compaction entry,
+    /// and creates the new entry of type 'compacted'.
     /// </summary>
-    private async Task FinalizeCompactionAsync(byte[] compactedData, string pendingEntryETag, CancellationToken cancellationToken)
+    private async Task CompactAsync(byte[] compactedData, string pendingEntryETag, CancellationToken cancellationToken)
     {
         // This is similar to DeleteAsync, but we exclude the pending compaction entry from the loop.
         // We delete the pending compaction afterwards (still within the same transactional batch) by using the ETag.

@@ -73,7 +73,7 @@ internal partial class CosmosLogStorage
         [JsonPropertyName(nameof(EntriesCount))]
         public int EntriesCount { get; set; }
 
-        /// <remarks>Nullable because MAX on an empty set is null.</remarks>
+        /// <remarks>Nullable because MAX(SequenceNumber) on an empty set is null.</remarks>
         [JsonProperty(nameof(MaxSequenceNumber))]
         [JsonPropertyName(nameof(MaxSequenceNumber))]
         public long? MaxSequenceNumber { get; set; }
