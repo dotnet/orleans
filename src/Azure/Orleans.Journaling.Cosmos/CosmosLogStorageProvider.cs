@@ -53,7 +53,7 @@ internal sealed class CosmosLogStorageProvider(
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error initializing Azure Cosmos DB Client for membership table provider.");
+            _logger.LogError(ex, "Error initializing Azure Cosmos DB client.");
             WrappedException.CreateAndRethrow(ex);
 
             throw;
