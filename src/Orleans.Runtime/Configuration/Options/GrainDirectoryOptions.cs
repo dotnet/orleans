@@ -26,14 +26,14 @@ namespace Orleans.Configuration
         /// The options are None, which means don't cache directory entries locally;
         /// LRU, which indicates that a standard fixed-size least recently used strategy should be used; and
         /// Adaptive, which indicates that an adaptive strategy with a fixed maximum size should be used.
-        /// The Adaptive strategy is used by default.
+        /// The LRU strategy is used by default.
         /// </summary>
         public CachingStrategyType CachingStrategy { get; set; } = DEFAULT_CACHING_STRATEGY;
 
         /// <summary>
         /// The default value for <see cref="CachingStrategy"/>.
         /// </summary>
-        public const CachingStrategyType DEFAULT_CACHING_STRATEGY = CachingStrategyType.Adaptive;
+        public const CachingStrategyType DEFAULT_CACHING_STRATEGY = CachingStrategyType.LRU;
 
         /// <summary>
         /// Gets or sets the maximum number of grains to cache directory information for.
@@ -43,7 +43,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// The default value for <see cref="CacheSize"/>.
         /// </summary>
-        public const int DEFAULT_CACHE_SIZE = 1000000;
+        public const int DEFAULT_CACHE_SIZE = 1_000_000;
 
         /// <summary>
         /// Gets or sets the initial (minimum) time, in seconds, to keep a cache entry before revalidating.

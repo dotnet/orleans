@@ -417,7 +417,7 @@ internal struct PaddedHeadAndTail
     [FieldOffset(2 * Padding.CACHE_LINE_SIZE)] public int Tail;
 }
 
-internal class Padding
+internal static class Padding
 {
 #if TARGET_ARM64 || TARGET_LOONGARCH64
         internal const int CACHE_LINE_SIZE = 128;

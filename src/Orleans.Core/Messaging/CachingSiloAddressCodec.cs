@@ -3,6 +3,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Orleans.Caching;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 
@@ -13,7 +14,7 @@ namespace Orleans.Runtime.Messaging
     /// </summary>
     internal sealed class CachingSiloAddressCodec
     {
-        internal static LRU<SiloAddress, (SiloAddress Value, byte[] Encoded)> SharedCache { get; } = new(maxSize: 128_000, maxAge: TimeSpan.FromHours(1));
+        internal static ConcurrentLruCache<SiloAddress, (SiloAddress Value, byte[] Encoded)> SharedCache { get; } = new(capacity: 1024);
 
         // Purge entries which have not been accessed in over 2 minutes.
         private const long PurgeAfterMilliseconds = 2 * 60 * 1000;
@@ -62,7 +63,7 @@ namespace Orleans.Runtime.Messaging
 
                 // Before adding this value to the private cache and returning it, intern it via the shared cache to hopefully reduce duplicates.
                 payloadArray ??= payloadSpan.ToArray();
-                (result, payloadArray) = SharedCache.GetOrAdd(result, static (encoded, key) => (key, encoded), payloadArray);
+                (result, payloadArray) = SharedCache.GetOrAdd(result, static (key, encoded) => (key, encoded), payloadArray);
 
                 // If there is a hash collision, then the last seen entry will always win.
                 cacheEntry.Encoded = payloadArray;
@@ -141,7 +142,7 @@ namespace Orleans.Runtime.Messaging
             innerWriter.Dispose();
 
             // Before adding this value to the private cache, intern it via the shared cache to hopefully reduce duplicates.
-            (_, payloadArray) = SharedCache.GetOrAdd(value, static (encoded, key) => (key, encoded), payloadArray);
+            (_, payloadArray) = SharedCache.GetOrAdd(value, static (key, encoded) => (key, encoded), payloadArray);
 
             // If there is a hash collision, then the last seen entry will always win.
             cacheEntry.Encoded = payloadArray;
