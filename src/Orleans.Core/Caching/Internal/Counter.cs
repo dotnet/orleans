@@ -13,7 +13,8 @@ namespace Orleans.Caching.Internal;
 /// A thread-safe counter suitable for high throughput counting across many concurrent threads.
 /// </summary>
 /// Based on the LongAdder class by Doug Lea.
-// Source: https://github.com/bitfaster/BitFaster.Caching/blob/5b2d64a1afcc251787fbe231c6967a62820fc93c/BitFaster.Caching/Counters/Counter.cs
+// Derived from BitFaster.Caching by Alex Peck
+// https://github.com/bitfaster/BitFaster.Caching/blob/5b2d64a1afcc251787fbe231c6967a62820fc93c/BitFaster.Caching/Counters/Counter.cs
 internal sealed class Counter : Striped64
 {
     /// <summary>

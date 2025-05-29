@@ -78,7 +78,8 @@ namespace Orleans.Caching.Internal;
 /// Maintains a lazily-initialized table of atomically updated variables, plus an extra 
 /// "base" field. The table size is a power of two. Indexing uses masked thread IDs.
 /// </summary>
-// Source: https://github.com/bitfaster/BitFaster.Caching/blob/5b2d64a1afcc251787fbe231c6967a62820fc93c/BitFaster.Caching/Counters/Striped64.cs
+// Derived from BitFaster.Caching by Alex Peck
+// https://github.com/bitfaster/BitFaster.Caching/blob/5b2d64a1afcc251787fbe231c6967a62820fc93c/BitFaster.Caching/Counters/Striped64.cs
 [ExcludeFromCodeCoverage]
 internal abstract class Striped64
 {

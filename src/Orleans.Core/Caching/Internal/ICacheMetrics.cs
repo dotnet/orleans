@@ -4,7 +4,8 @@ namespace Orleans.Caching.Internal;
 /// Represents cache metrics collected over the lifetime of the cache.
 /// If metrics are disabled.
 /// </summary>
-// Source: https://github.com/bitfaster/BitFaster.Caching/blob/5b2d64a1afcc251787fbe231c6967a62820fc93c/BitFaster.Caching/ICacheMetrics.cs?plain=1#L8C22-L8C35
+// Derived from BitFaster.Caching by Alex Peck
+// https://github.com/bitfaster/BitFaster.Caching/blob/5b2d64a1afcc251787fbe231c6967a62820fc93c/BitFaster.Caching/ICacheMetrics.cs?plain=1#L8C22-L8C35
 internal interface ICacheMetrics
 {
     /// <summary>

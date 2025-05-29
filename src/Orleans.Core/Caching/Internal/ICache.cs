@@ -9,7 +9,8 @@ namespace Orleans.Caching.Internal;
 /// </summary>
 /// <typeparam name="K">The type of keys in the cache.</typeparam>
 /// <typeparam name="V">The type of values in the cache.</typeparam>
-// Source: https://github.com/bitfaster/BitFaster.Caching/blob/5b2d64a1afcc251787fbe231c6967a62820fc93c/BitFaster.Caching/ICache.cs
+// Derived from BitFaster.Caching by Alex Peck
+// https://github.com/bitfaster/BitFaster.Caching/blob/5b2d64a1afcc251787fbe231c6967a62820fc93c/BitFaster.Caching/ICache.cs
 internal interface ICache<K, V> : IEnumerable<KeyValuePair<K, V>>
 {
     /// <summary>

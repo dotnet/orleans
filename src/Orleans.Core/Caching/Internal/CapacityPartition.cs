@@ -7,7 +7,8 @@ namespace Orleans.Caching.Internal;
 /// A capacity partitioning scheme that favors frequently accessed items by allocating 80%
 /// capacity to the warm queue.
 /// </summary>
-// Source: https://github.com/bitfaster/BitFaster.Caching/blob/5b2d64a1afcc251787fbe231c6967a62820fc93c/BitFaster.Caching/Lru/FavorWarmPartition.cs
+// Derived from BitFaster.Caching by Alex Peck
+// https://github.com/bitfaster/BitFaster.Caching/blob/5b2d64a1afcc251787fbe231c6967a62820fc93c/BitFaster.Caching/Lru/FavorWarmPartition.cs
 [DebuggerDisplay("{Hot}/{Warm}/{Cold}")]
 internal readonly struct CapacityPartition
 {

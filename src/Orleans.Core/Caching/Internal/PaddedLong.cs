@@ -6,7 +6,8 @@ namespace Orleans.Caching.Internal;
 /// <summary>
 /// A long value padded by the size of a CPU cache line to mitigate false sharing.
 /// </summary>
-// Source: https://github.com/bitfaster/BitFaster.Caching/blob/5b2d64a1afcc251787fbe231c6967a62820fc93c/BitFaster.Caching/Counters/PaddedLong.cs
+// Derived from BitFaster.Caching by Alex Peck
+// https://github.com/bitfaster/BitFaster.Caching/blob/5b2d64a1afcc251787fbe231c6967a62820fc93c/BitFaster.Caching/Counters/PaddedLong.cs
 [StructLayout(LayoutKind.Explicit, Size = 2 * Padding.CACHE_LINE_SIZE)] // padding before/between/after fields
 internal struct PaddedLong
 {
