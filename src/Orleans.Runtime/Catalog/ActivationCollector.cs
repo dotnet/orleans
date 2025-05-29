@@ -323,8 +323,8 @@ namespace Orleans.Runtime
         /// Checks if current memory usage is above the configured threshold for deactivation.
         /// Also calculates the target number of activations to deactivate if memory is overloaded to reach target memory usage.
         /// </summary>
+        /// <remarks>internal for testing</remarks>
         /// <param name="targetDeactivationNumber">number of deactivations to perform to bring back memory consumption to target value</param>
-        /// <returns></returns>
         internal bool IsMemoryOverloaded(out int targetDeactivationNumber)
         {
             targetDeactivationNumber = 0;
@@ -356,8 +356,9 @@ namespace Orleans.Runtime
 
         /// <summary>
         /// Deactivates <param name="deactivationsNumber" /> activations in due time order
+        /// <remarks>internal for testing</remarks>
         /// </summary>
-        private async Task DeactivateInDueTimeOrder(int deactivationsNumber, CancellationToken cancellationToken)
+        internal async Task DeactivateInDueTimeOrder(int deactivationsNumber, CancellationToken cancellationToken)
         {
             if (deactivationsNumber <= 0)
             {
@@ -380,10 +381,12 @@ namespace Orleans.Runtime
                     var activation = item.Value;
                     lock (activation)
                     {
-                        if (!activation.IsValid || activation.CollectionTicket == default || IsExpired(activation.CollectionTicket))
-                        {
-                            continue;
-                        }
+                        // TODO - do we need to check some properties of activation here?
+                        // IMO if memory is running very low, then we should forcefully deactivate all the activations regardless of their state.
+                        //if (!activation.IsValid || IsExpired(activation.CollectionTicket))
+                        //{
+                        //    continue;
+                        //}
                     }
 
                     candidates.Add(activation);
@@ -405,7 +408,7 @@ namespace Orleans.Runtime
             if (candidates is { Count: > 0 })
             {
                 LogCollectActivations(new(candidates));
-                await DeactivateActivationsFromCollector(candidates, cancellationToken);
+                await DeactivateActivationsFromCollector(candidates, cancellationToken, new DeactivationReason(DeactivationReasonCode.MemoryLow, "App is running on low memory"));
             }
 
             long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
@@ -614,12 +617,12 @@ namespace Orleans.Runtime
             LogAfterCollection(number, memAfter, _activationCount, list?.Count ?? 0, this, watch.Elapsed);
         }
 
-        private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list, CancellationToken cancellationToken)
+        private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list, CancellationToken cancellationToken, DeactivationReason? deactivationReason = null)
         {
             LogDeactivateActivationsFromCollector(list.Count);
             CatalogInstruments.ActivationShutdownViaCollection();
 
-            var reason = GetDeactivationReason();
+            deactivationReason ??= GetDeactivationReason();
 
             var options = new ParallelOptions
             {
@@ -631,7 +634,7 @@ namespace Orleans.Runtime
             await Parallel.ForEachAsync(list, options, async (activationData, token) =>
             {
                 // Continue deactivation when ready.
-                activationData.Deactivate(reason, cancellationToken);
+                activationData.Deactivate(deactivationReason.Value, cancellationToken);
                 await activationData.Deactivated.ConfigureAwait(false);
             }).WaitAsync(cancellationToken);
         }

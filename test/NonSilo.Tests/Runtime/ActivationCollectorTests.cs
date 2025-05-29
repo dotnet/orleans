@@ -1,9 +1,11 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Statistics;
+using TestGrains;
 using Xunit;
 
 namespace UnitTests.Runtime
@@ -62,9 +64,9 @@ namespace UnitTests.Runtime
         [Theory, TestCategory("MemoryBasedDeactivations")]
         [InlineData(80.0, 70.0, 1000, 150, 100, true, 18)] // Over threshold, need to deactivate
         [InlineData(80.0, 70.0, 1000, 250, 100, false, 0)] // Below threshold, no deactivation
-        [InlineData(80.0, 70.0, 1000, 100, 200, true, 45)]  // More activations, smaller per-activation size
+        [InlineData(80.0, 70.0, 1000, 100, 200, true, 45)] // More activations, smaller per-activation size
         [InlineData(80.0, 70.0, 1000, 800, 100, false, 0)] // Well below threshold
-        [InlineData(80.0, 70.0, 1000, 50, 10, true, 3)]    // Few activations, large per-activation size
+        [InlineData(80.0, 70.0, 1000, 50,  10,  true,  3)] // Few activations, large per-activation size
         public void IsMemoryOverloaded_WorksAsExpected(
             double memoryLoadThreshold,
             double targetMemoryLoad,
@@ -108,6 +110,61 @@ namespace UnitTests.Runtime
 
             Assert.Equal(expectedOverloaded, overloaded);
             Assert.Equal(expectedToDeactivate, toDeactivate);
+        }
+
+        [Fact]
+        public async Task DeactivateInDueTimeOrder_OnlyOldestAndEligibleAreDeactivated()
+        {
+            var options = Options.Create(new GrainCollectionOptions
+            {
+                MemoryBasedOptions = new MemoryBasedGrainCollectionOptions()
+            });
+            var logger = NullLogger<ActivationCollector>.Instance;
+            var statsProvider = Substitute.For<IEnvironmentStatisticsProvider>();
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+
+            var collector = new ActivationCollector(timeProvider, options, logger, statsProvider);
+            var timer = Substitute.For<IAsyncTimer>();
+            timer.NextTick().Returns(Task.FromResult(false));
+            var timerFactory = Substitute.For<IAsyncTimerFactory>();
+            timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>()).Returns(timer);
+
+            var wsLogger = NullLogger<ActivationWorkingSet>.Instance;
+            var workingSet = new ActivationWorkingSet(timerFactory, wsLogger, new[] { collector });
+
+            var now = DateTime.UtcNow;
+            var activation1 = Substitute.For<ICollectibleGrainContext, IActivationWorkingSetMember>();
+            activation1.CollectionAgeLimit.Returns(TimeSpan.FromMinutes(1));
+            activation1.IsValid.Returns(true);
+            activation1.IsExemptFromCollection.Returns(false);
+            activation1.IsInactive.Returns(true);
+            activation1.Deactivated.Returns(Task.CompletedTask).AndDoes(_ => { Interlocked.Decrement(ref collector._activationCount); });
+
+            var activation2 = Substitute.For<ICollectibleGrainContext, IActivationWorkingSetMember>();
+            activation2.CollectionAgeLimit.Returns(TimeSpan.FromMinutes(1));
+            activation2.IsValid.Returns(true);
+            activation2.IsExemptFromCollection.Returns(false);
+            activation2.IsInactive.Returns(true);
+            activation2.Deactivated.Returns(Task.CompletedTask).AndDoes(_ => { Interlocked.Decrement(ref collector._activationCount); });
+
+            var activation3 = Substitute.For<ICollectibleGrainContext, IActivationWorkingSetMember>();
+            activation3.CollectionAgeLimit.Returns(TimeSpan.FromMinutes(1));
+            activation3.IsValid.Returns(true);
+            activation3.IsExemptFromCollection.Returns(false);
+            activation3.IsInactive.Returns(true);
+            activation3.Deactivated.Returns(Task.CompletedTask).AndDoes(_ => { Interlocked.Decrement(ref collector._activationCount); });
+
+            ((IActivationWorkingSetMember)activation1).IsCandidateForRemoval(Arg.Any<bool>()).Returns(true);
+            ((IActivationWorkingSetMember)activation2).IsCandidateForRemoval(Arg.Any<bool>()).Returns(true);
+            ((IActivationWorkingSetMember)activation3).IsCandidateForRemoval(Arg.Any<bool>()).Returns(true);
+
+            workingSet.OnActivated(activation1 as IActivationWorkingSetMember);
+            workingSet.OnActivated(activation2 as IActivationWorkingSetMember);
+            workingSet.OnActivated(activation3 as IActivationWorkingSetMember);
+
+            await collector.DeactivateInDueTimeOrder(2, CancellationToken.None);
+
+            Assert.Equal(1, collector._activationCount);
         }
     }
 }
