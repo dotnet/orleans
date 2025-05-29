@@ -57,7 +57,10 @@ namespace Orleans.Runtime
 
             _environmentStatisticsProvider = environmentStatisticsProvider;
             _memoryBasedGrainCollectionOptions = options.Value.MemoryBasedOptions;
-            _memBasedDeactivationTimer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+            if (_memoryBasedGrainCollectionOptions is not null)
+            {
+                _memBasedDeactivationTimer = new PeriodicTimer(_memoryBasedGrainCollectionOptions.MemoryLoadValidationQuantum);
+            }
         }
 
         // Return the number of activations that were used (touched) in the last recencyPeriod.
@@ -352,11 +355,62 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Deactivates <param name="activationsNumber" /> activations in due time order
+        /// Deactivates <param name="deactivationsNumber" /> activations in due time order
         /// </summary>
-        private Task DeactivateInDueTimeOrder(int activationsNumber, CancellationToken cancellationToken)
+        private async Task DeactivateInDueTimeOrder(int deactivationsNumber, CancellationToken cancellationToken)
         {
-            throw new NotImplementedException();
+            if (deactivationsNumber <= 0)
+            {
+                LogNoDeactivationsFound();
+                return;
+            }
+
+            var watch = ValueStopwatch.StartNew();
+            var number = Interlocked.Increment(ref collectionNumber);
+            long memBefore = GC.GetTotalMemory(false) / (1024 * 1024);
+            LogBeforeCollection(number, memBefore, _activationCount, this);
+
+            var candidates = new List<ICollectibleGrainContext>(deactivationsNumber);
+            var selectedCount = 0;
+
+            foreach (var bucket in buckets.OrderBy(b => b.Key))
+            {
+                foreach (var item in bucket.Value.Items)
+                {
+                    var activation = item.Value;
+                    lock (activation)
+                    {
+                        if (!activation.IsValid || activation.CollectionTicket == default || IsExpired(activation.CollectionTicket))
+                        {
+                            continue;
+                        }
+                    }
+
+                    candidates.Add(activation);
+                    selectedCount++;
+
+                    if (selectedCount >= deactivationsNumber)
+                    {
+                        break;
+                    }
+                }
+
+                if (selectedCount >= deactivationsNumber)
+                {
+                    break;
+                }
+            }
+
+            CatalogInstruments.ActivationCollections.Add(1);
+            if (candidates is { Count: > 0 })
+            {
+                LogCollectActivations(new(candidates));
+                await DeactivateActivationsFromCollector(candidates, cancellationToken);
+            }
+
+            long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
+            watch.Stop();
+            LogAfterCollection(number, memAfter, _activationCount, candidates?.Count ?? 0, this, watch.Elapsed);
         }
 
         private static DeactivationReason GetDeactivationReason()
@@ -480,7 +534,7 @@ namespace Orleans.Runtime
         {
             using var registration = cancellationToken.Register(() => _shutdownCts.Cancel());
             _collectionTimer.Dispose();
-            _memBasedDeactivationTimer.Dispose();
+            _memBasedDeactivationTimer?.Dispose();
 
             if (_collectionLoopTask is Task task)
             {
@@ -639,6 +693,12 @@ namespace Orleans.Runtime
                 return result ?? nothing;
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "No activations found to deactivate."
+        )]
+        private partial void LogNoDeactivationsFound();
 
         [LoggerMessage(
             Level = LogLevel.Error,

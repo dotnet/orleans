@@ -61,7 +61,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Regulates the periodic check of memory load.
         /// </summary>
-        public TimeSpan MemoryStatsValidationQuantum { get; set; } = TimeSpan.FromSeconds(10);
+        public TimeSpan MemoryLoadValidationQuantum { get; set; } = TimeSpan.FromSeconds(10);
 
         /// <summary>
         /// Memory load percentage threshold above which grain collection will be triggered.
