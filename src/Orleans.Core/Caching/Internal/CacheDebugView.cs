@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 
@@ -11,9 +12,9 @@ namespace Orleans.Caching.Internal;
 internal sealed class CacheDebugView<K, V>
     where K : notnull
 {
-    private readonly ICache<K, V> _cache;
+    private readonly ConcurrentLruCache<K, V> _cache;
 
-    public CacheDebugView(ICache<K, V> cache)
+    public CacheDebugView(ConcurrentLruCache<K, V> cache)
     {
         ArgumentNullException.ThrowIfNull(cache);
         _cache = cache;

@@ -101,21 +101,13 @@ internal abstract class Striped64
     /// <summary>
     /// A wrapper for PaddedLong.
     /// </summary>
-    protected sealed class Cell
+    /// <param name="value">The value.</param>
+    protected sealed class Cell(long value)
     {
         /// <summary>
         /// The value of the cell.
         /// </summary>
-        public PaddedLong Value;
-
-        /// <summary>
-        /// Initializes a new cell with the specified value.
-        /// </summary>
-        /// <param name="x">The value.</param>
-        public Cell(long x)
-        {
-            Value = new PaddedLong() { Value = x };
-        }
+        public PaddedLong Value = new() { Value = value };
     }
 
     /**

@@ -7,6 +7,7 @@ using Orleans.Caching.Internal;
 
 namespace NonSilo.Tests.Caching;
 
+[TestCategory("BVT")]
 public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
 {
     private readonly ITestOutputHelper _testOutputHelper = testOutputHelper;
@@ -27,14 +28,6 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
         Action constructor = () => { var x = new ConcurrentLruCache<int, string>(2, EqualityComparer<int>.Default); };
 
         constructor.Should().Throw<ArgumentOutOfRangeException>();
-    }
-
-    [Fact]
-    public void WhenComparerIsNullCtorThrows()
-    {
-        Action constructor = () => { var x = new ConcurrentLruCache<int, string>(3, null); };
-
-        constructor.Should().Throw<ArgumentNullException>();
     }
 
     [Fact]

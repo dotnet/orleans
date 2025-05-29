@@ -174,7 +174,7 @@ public sealed class ConcurrentLruCacheSoakTests
             testOutputHelper.WriteLine($"{lruVT.HotCount} {lruVT.WarmCount} {lruVT.ColdCount}");
             testOutputHelper.WriteLine(string.Join(" ", lruVT.Keys));
 
-            new ConcurrentLruCacheIntegrityChecker<int, Guid>(lruVT).Validate();
+            ConcurrentLruCacheIntegrityChecker.Validate(lruVT);
         }
     }
 
@@ -288,7 +288,7 @@ public sealed class ConcurrentLruCacheSoakTests
         await setTask;
     }
 
-    private void Setter(ICache<int, Guid> cache, CancellationToken cancelToken, TaskCompletionSource<bool> started)
+    private void Setter(ConcurrentLruCache<int, Guid> cache, CancellationToken cancelToken, TaskCompletionSource<bool> started)
     {
         started.SetResult(true);
 
@@ -304,7 +304,7 @@ public sealed class ConcurrentLruCacheSoakTests
         }
     }
 
-    private void Checker(ICache<int, Guid> cache, CancellationTokenSource source)
+    private void Checker(ConcurrentLruCache<int, Guid> cache, CancellationTokenSource source)
     {
         for (var count = 0; count < 100_000; ++count)
         {
@@ -314,69 +314,46 @@ public sealed class ConcurrentLruCacheSoakTests
         source.Cancel();
     }
 
-    private void RunIntegrityCheck() => new ConcurrentLruCacheIntegrityChecker<int, string>(lru).Validate();
+    private void RunIntegrityCheck() => ConcurrentLruCacheIntegrityChecker.Validate(lru);
 
-    private class ConcurrentLruCacheIntegrityChecker<K, V>
+    private static class ConcurrentLruCacheIntegrityChecker
     {
-        private readonly ConcurrentLruCache<K, V> _cache;
-
-        private readonly ConcurrentDictionary<K, ConcurrentLruCache<K, V>.LruItem> dictionary;
-        private readonly ConcurrentQueue<ConcurrentLruCache<K, V>.LruItem> hotQueue;
-        private readonly ConcurrentQueue<ConcurrentLruCache<K, V>.LruItem> warmQueue;
-        private readonly ConcurrentQueue<ConcurrentLruCache<K, V>.LruItem> coldQueue;
-
-        private static FieldInfo dictionaryField = typeof(ConcurrentLruCache<K, V>).GetField("_dictionary", BindingFlags.NonPublic | BindingFlags.Instance);
-
-        private static FieldInfo hotQueueField = typeof(ConcurrentLruCache<K, V>).GetField("_hotQueue", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static FieldInfo warmQueueField = typeof(ConcurrentLruCache<K, V>).GetField("_warmQueue", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static FieldInfo coldQueueField = typeof(ConcurrentLruCache<K, V>).GetField("_coldQueue", BindingFlags.NonPublic | BindingFlags.Instance);
-
-        public ConcurrentLruCacheIntegrityChecker(ConcurrentLruCache<K, V> cache)
+        public static void Validate<K, V>(ConcurrentLruCache<K, V> cache)
         {
-            this._cache = cache;
-
-            // get queues via reflection
-            this.dictionary = (ConcurrentDictionary<K, ConcurrentLruCache<K, V>.LruItem>)dictionaryField.GetValue(cache);
-            this.hotQueue = (ConcurrentQueue<ConcurrentLruCache<K, V>.LruItem>)hotQueueField.GetValue(cache);
-            this.warmQueue = (ConcurrentQueue<ConcurrentLruCache<K, V>.LruItem>)warmQueueField.GetValue(cache);
-            this.coldQueue = (ConcurrentQueue<ConcurrentLruCache<K, V>.LruItem>)coldQueueField.GetValue(cache);
-        }
-
-        public void Validate()
-        {
+            ConcurrentLruCache<K, V>.ITestAccessor testAccessor = cache;
             // queue counters must be consistent with queues
-            this.hotQueue.Count.Should().Be(_cache.HotCount, "hot queue has a corrupted count");
-            this.warmQueue.Count.Should().Be(_cache.WarmCount, "warm queue has a corrupted count");
-            this.coldQueue.Count.Should().Be(_cache.ColdCount, "cold queue has a corrupted count");
+            testAccessor.HotQueue.Count.Should().Be(cache.HotCount, "hot queue has a corrupted count");
+            testAccessor.WarmQueue.Count.Should().Be(cache.WarmCount, "warm queue has a corrupted count");
+            testAccessor.ColdQueue.Count.Should().Be(cache.ColdCount, "cold queue has a corrupted count");
 
             // cache contents must be consistent with queued items
-            ValidateQueue(_cache, this.hotQueue, "hot");
-            ValidateQueue(_cache, this.warmQueue, "warm");
-            ValidateQueue(_cache, this.coldQueue, "cold");
+            ValidateQueue(testAccessor.HotQueue, "hot");
+            ValidateQueue(testAccessor.WarmQueue, "warm");
+            ValidateQueue(testAccessor.ColdQueue, "cold");
 
             // cache must be within capacity
-            _cache.Count.Should().BeLessThanOrEqualTo(_cache.Capacity + 1, "capacity out of valid range");
-        }
+            cache.Count.Should().BeLessThanOrEqualTo(cache.Capacity + 1, "capacity out of valid range");
 
-        private void ValidateQueue(ConcurrentLruCache<K, V> cache, ConcurrentQueue<ConcurrentLruCache<K, V>.LruItem> queue, string queueName)
-        {
-            foreach (var item in queue)
+            void ValidateQueue(ConcurrentQueue<ConcurrentLruCache<K, V>.LruItem> queue, string queueName)
             {
-                if (item.WasRemoved)
+                foreach (var item in queue)
                 {
-                    // It is possible for the queues to contain 2 (or more) instances of the same key/item. One that was removed,
-                    // and one that was added after the other was removed.
-                    // In this case, the dictionary may contain the value only if the queues contain an entry for that key marked as WasRemoved == false.
-                    if (dictionary.TryGetValue(item.Key, out var value))
+                    if (item.WasRemoved)
                     {
-                        hotQueue.Union(warmQueue).Union(coldQueue)
-                            .Any(i => i.Key.Equals(item.Key) && !i.WasRemoved)
-                            .Should().BeTrue($"{queueName} removed item {item.Key} was not removed");
+                        // It is possible for the queues to contain 2 (or more) instances of the same key/item. One that was removed,
+                        // and one that was added after the other was removed.
+                        // In this case, the dictionary may contain the value only if the queues contain an entry for that key marked as WasRemoved == false.
+                        if (testAccessor.Dictionary.TryGetValue(item.Key, out var value))
+                        {
+                            testAccessor.HotQueue.Union(testAccessor.WarmQueue).Union(testAccessor.ColdQueue)
+                                .Any(i => i.Key.Equals(item.Key) && !i.WasRemoved)
+                                .Should().BeTrue($"{queueName} removed item {item.Key} was not removed");
+                        }
                     }
-                }
-                else
-                {
-                    dictionary.TryGetValue(item.Key, out var value).Should().BeTrue($"{queueName} item {item.Key} was not present");
+                    else
+                    {
+                        testAccessor.Dictionary.TryGetValue(item.Key, out var value).Should().BeTrue($"{queueName} item {item.Key} was not present");
+                    }
                 }
             }
         }

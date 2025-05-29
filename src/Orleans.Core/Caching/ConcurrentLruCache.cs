@@ -43,7 +43,7 @@ namespace Orleans.Caching;
 /// <param name="comparer">The equality comparer.</param>
 internal class ConcurrentLruCache<K, V>(
     int capacity,
-    IEqualityComparer<K>? comparer) : ICache<K, V>, ICacheMetrics, ConcurrentLruCache<K, V>.ITestAccessor
+    IEqualityComparer<K>? comparer) : IEnumerable<KeyValuePair<K, V>>, ICacheMetrics, ConcurrentLruCache<K, V>.ITestAccessor
     where K : notnull
 {
     private readonly ConcurrentDictionary<K, LruItem> _dictionary = new(concurrencyLevel: -1, capacity: capacity, comparer: comparer);
