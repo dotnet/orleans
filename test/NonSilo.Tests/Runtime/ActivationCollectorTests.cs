@@ -1,7 +1,9 @@
-﻿using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
+using NSubstitute;
 using Orleans.Configuration;
+using Orleans.Statistics;
 using Xunit;
 
 namespace UnitTests.Runtime
@@ -18,7 +20,7 @@ namespace UnitTests.Runtime
             var logger = NullLogger<ActivationCollector>.Instance;
 
             this.timeProvider = new FakeTimeProvider(DateTimeOffset.Parse("2025-01-01T00:00:00.000+00:00"));
-            this.collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger);
+            this.collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, new EnvironmentStatisticsProvider());
         }
 
         [Theory, TestCategory("Activation")]
@@ -55,6 +57,57 @@ namespace UnitTests.Runtime
             {
                 var ticket = collector.MakeTicketFromDateTime(timestamp);
             });
+        }
+
+        [Theory, TestCategory("MemoryBasedDeactivations")]
+        [InlineData(80.0, 70.0, 1000, 150, 100, true, 18)] // Over threshold, need to deactivate
+        [InlineData(80.0, 70.0, 1000, 250, 100, false, 0)] // Below threshold, no deactivation
+        [InlineData(80.0, 70.0, 1000, 100, 200, true, 45)]  // More activations, smaller per-activation size
+        [InlineData(80.0, 70.0, 1000, 800, 100, false, 0)] // Well below threshold
+        [InlineData(80.0, 70.0, 1000, 50, 10, true, 3)]    // Few activations, large per-activation size
+        public void IsMemoryOverloaded_WorksAsExpected(
+            double memoryLoadThreshold,
+            double targetMemoryLoad,
+            long maxMemoryMb,
+            long availableMemoryMb,
+            int activationCount,
+            bool expectedOverloaded,
+            int expectedToDeactivate)
+        {
+            var options = new GrainCollectionOptions
+            {
+                MemoryBasedOptions = new MemoryBasedGrainCollectionOptions
+                {
+                    MemoryLoadThresholdPercentage = memoryLoadThreshold,
+                    TargetMemoryLoadPercentage = targetMemoryLoad
+                }
+            };
+
+            var statsProvider = Substitute.For<IEnvironmentStatisticsProvider>();
+            statsProvider.GetEnvironmentStatistics().Returns(
+                new EnvironmentStatistics(
+                    cpuUsagePercentage: 0,
+                    memoryUsageBytes: 0,
+                    availableMemoryBytes: availableMemoryMb * 1024 * 1024,
+                    maximumAvailableMemoryBytes: maxMemoryMb * 1024 * 1024
+                )
+            );
+
+            var logger = NullLogger<ActivationCollector>.Instance;
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+
+            var collector = new ActivationCollector(
+                timeProvider,
+                Options.Create(options),
+                logger,
+                statsProvider
+            );
+
+            collector._activationCount = activationCount;
+            var overloaded = collector.IsMemoryOverloaded(out var toDeactivate);
+
+            Assert.Equal(expectedOverloaded, overloaded);
+            Assert.Equal(expectedToDeactivate, toDeactivate);
         }
     }
 }

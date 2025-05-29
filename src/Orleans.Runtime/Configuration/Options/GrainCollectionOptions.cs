@@ -48,5 +48,30 @@ namespace Orleans.Configuration
         /// The default value for <see cref="DeactivationTimeout"/>.
         /// </summary>
         public static readonly TimeSpan DEFAULT_DEACTIVATION_TIMEOUT = TimeSpan.FromSeconds(30);
+
+        /// <summary>
+        /// Controls behavior of grain collection based on available memory.
+        /// Must be assigned to a non-null value to be enabled.
+        /// </summary>
+        public MemoryBasedGrainCollectionOptions MemoryBasedOptions { get; set; } = null!;
+    }
+
+    public class MemoryBasedGrainCollectionOptions
+    {
+        /// <summary>
+        /// Regulates the periodic check of memory load.
+        /// </summary>
+        public TimeSpan MemoryStatsValidationQuantum { get; set; } = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// Memory load percentage threshold above which grain collection will be triggered.
+        /// </summary>
+        public double MemoryLoadThresholdPercentage { get; set; } = 90;
+
+        /// <summary>
+        /// Controls how many of the grains should be collected when the <see cref="MemoryLoadThresholdPercentage"/> is exceeded.
+        /// Targets the memory load percentage which node will be running at after the grain collection happened.
+        /// </summary>
+        public double TargetMemoryLoadPercentage { get; set; } = 80;
     }
 }

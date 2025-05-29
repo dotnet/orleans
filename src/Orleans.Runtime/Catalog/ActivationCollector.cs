@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.Internal;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
@@ -23,10 +24,18 @@ namespace Orleans.Runtime
         private DateTime nextTicket;
         private static readonly List<ICollectibleGrainContext> nothing = new(0);
         private readonly ILogger logger;
+        private int collectionNumber;
+
+        // for testing
+        internal int _activationCount;
+
         private readonly PeriodicTimer _collectionTimer;
         private Task _collectionLoopTask;
-        private int collectionNumber;
-        private int _activationCount;
+
+        private readonly IEnvironmentStatisticsProvider _environmentStatisticsProvider;
+        private readonly MemoryBasedGrainCollectionOptions _memoryBasedGrainCollectionOptions;
+        private readonly PeriodicTimer _memBasedDeactivationTimer;
+        private Task _memBasedDeactivationLoopTask;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ActivationCollector"/> class.
@@ -37,13 +46,18 @@ namespace Orleans.Runtime
         public ActivationCollector(
             TimeProvider timeProvider,
             IOptions<GrainCollectionOptions> options,
-            ILogger<ActivationCollector> logger)
+            ILogger<ActivationCollector> logger,
+            IEnvironmentStatisticsProvider environmentStatisticsProvider)
         {
             quantum = options.Value.CollectionQuantum;
             shortestAgeLimit = new(options.Value.ClassSpecificCollectionAge.Values.Aggregate(options.Value.CollectionAge.Ticks, (a, v) => Math.Min(a, v.Ticks)));
             nextTicket = MakeTicketFromDateTime(timeProvider.GetUtcNow().UtcDateTime);
             this.logger = logger;
             _collectionTimer = new PeriodicTimer(quantum);
+
+            _environmentStatisticsProvider = environmentStatisticsProvider;
+            _memoryBasedGrainCollectionOptions = options.Value.MemoryBasedOptions;
+            _memBasedDeactivationTimer = new PeriodicTimer(TimeSpan.FromSeconds(5));
         }
 
         // Return the number of activations that were used (touched) in the last recencyPeriod.
@@ -302,6 +316,49 @@ namespace Orleans.Runtime
             return condemned ?? nothing;
         }
 
+        /// <summary>
+        /// Checks if current memory usage is above the configured threshold for deactivation.
+        /// Also calculates the target number of activations to deactivate if memory is overloaded to reach target memory usage.
+        /// </summary>
+        /// <param name="targetDeactivationNumber">number of deactivations to perform to bring back memory consumption to target value</param>
+        /// <returns></returns>
+        internal bool IsMemoryOverloaded(out int targetDeactivationNumber)
+        {
+            targetDeactivationNumber = 0;
+            var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
+
+            var usedMemory = stats.MaximumAvailableMemoryBytes - stats.AvailableMemoryBytes;
+            var memoryLoadPercentage = 100.0 * usedMemory / stats.MaximumAvailableMemoryBytes;
+            var threshold = _memoryBasedGrainCollectionOptions.MemoryLoadThresholdPercentage;
+            var targetThreshold = _memoryBasedGrainCollectionOptions.TargetMemoryLoadPercentage;
+
+            if (memoryLoadPercentage < threshold)
+            {
+                return false;
+            }
+
+            var targetUsedMemory = targetThreshold * stats.MaximumAvailableMemoryBytes / 100.0;
+            var memoryToFree = usedMemory - targetUsedMemory;
+
+            // Can't know for sure, but overestimating here
+            var activationSize = usedMemory / (double)_activationCount;
+            targetDeactivationNumber = (int)Math.Ceiling(memoryToFree / activationSize);
+            if (targetDeactivationNumber < 1)
+            {
+                targetDeactivationNumber = 1;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Deactivates <param name="activationsNumber" /> activations in due time order
+        /// </summary>
+        private Task DeactivateInDueTimeOrder(int activationsNumber, CancellationToken cancellationToken)
+        {
+            throw new NotImplementedException();
+        }
+
         private static DeactivationReason GetDeactivationReason()
         {
             var reasonText = "This activation has become idle.";
@@ -410,6 +467,12 @@ namespace Orleans.Runtime
         {
             using var _ = new ExecutionContextSuppressor();
             _collectionLoopTask = RunActivationCollectionLoop();
+
+            if (_memoryBasedGrainCollectionOptions is not null)
+            {
+                _memBasedDeactivationLoopTask = RunMemoryBasedDeactivationLoop();
+            }
+
             return Task.CompletedTask;
         }
 
@@ -417,10 +480,15 @@ namespace Orleans.Runtime
         {
             using var registration = cancellationToken.Register(() => _shutdownCts.Cancel());
             _collectionTimer.Dispose();
+            _memBasedDeactivationTimer.Dispose();
 
             if (_collectionLoopTask is Task task)
             {
                 await task.WaitAsync(cancellationToken);
+            }
+            if (_memBasedDeactivationLoopTask is Task deactivationLoopTask)
+            {
+                await deactivationLoopTask.WaitAsync(cancellationToken);
             }
         }
 
@@ -442,6 +510,26 @@ namespace Orleans.Runtime
                 try
                 {
                     await this.CollectActivationsImpl(true, ageLimit: default, cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    LogErrorWhileCollectingActivations(exception);
+                }
+            }
+        }
+
+        private async Task RunMemoryBasedDeactivationLoop()
+        {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+            var cancellationToken = _shutdownCts.Token;
+            while (await _memBasedDeactivationTimer.WaitForNextTickAsync())
+            {
+                try
+                {
+                    if (IsMemoryOverloaded(out var targetDeactivationNumber))
+                    {
+                        await this.DeactivateInDueTimeOrder(targetDeactivationNumber, cancellationToken);
+                    }
                 }
                 catch (Exception exception)
                 {
