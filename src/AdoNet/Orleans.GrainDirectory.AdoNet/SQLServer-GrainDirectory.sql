@@ -1,6 +1,12 @@
 /*
 Orleans Grain Directory.
 This table stores the location of all grains in the cluster.
+
+NOTE:
+The combination of ClusterId, ProviderId, and GrainId forms the primary key for the OrleansGrainDirectory table.
+Together, these columns reach the maximum allowed key size for SQL Server indexes (900 bytes).
+Care should be taken not to increase the length of these columns, as it may exceed SQL Server's key size limitation.
+
 */
 CREATE TABLE OrleansGrainDirectory
 (
