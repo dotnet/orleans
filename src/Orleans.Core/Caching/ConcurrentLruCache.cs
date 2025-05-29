@@ -36,14 +36,21 @@ namespace Orleans.Caching;
 ///   <item><description>When cold is full, cold tail is moved to warm head or removed from dictionary on depending on WasAccessed.</description></item>
 ///</list>
 /// </remarks>
-internal class ConcurrentLruCache<K, V> : ICache<K, V>, ICacheMetrics, ConcurrentLruCache<K, V>.ITestAccessor
+/// <remarks>
+/// Initializes a new instance of the ConcurrentLruCore class with the specified concurrencyLevel, capacity, equality comparer, item policy and telemetry policy.
+/// </remarks>
+/// <param name="capacity">The capacity.</param>
+/// <param name="comparer">The equality comparer.</param>
+internal class ConcurrentLruCache<K, V>(
+    int capacity,
+    IEqualityComparer<K>? comparer) : ICache<K, V>, ICacheMetrics, ConcurrentLruCache<K, V>.ITestAccessor
     where K : notnull
 {
-    private readonly ConcurrentDictionary<K, LruItem> _dictionary;
+    private readonly ConcurrentDictionary<K, LruItem> _dictionary = new(concurrencyLevel: -1, capacity: capacity, comparer: comparer);
     private readonly ConcurrentQueue<LruItem> _hotQueue = new();
     private readonly ConcurrentQueue<LruItem> _warmQueue = new();
     private readonly ConcurrentQueue<LruItem> _coldQueue = new();
-    private readonly CapacityPartition _capacity;
+    private readonly CapacityPartition _capacity = new(capacity);
     private readonly TelemetryPolicy _telemetryPolicy = new();
 
     // maintain count outside ConcurrentQueue, since ConcurrentQueue.Count holds a global lock
@@ -54,23 +61,8 @@ internal class ConcurrentLruCache<K, V> : ICache<K, V>, ICacheMetrics, Concurren
     /// Initializes a new instance of the ConcurrentLruCore class with the specified capacity.
     /// </summary>
     /// <param name="capacity">The capacity.</param>
-    public ConcurrentLruCache(int capacity) : this(capacity, EqualityComparer<K>.Default)
+    public ConcurrentLruCache(int capacity) : this(capacity, comparer: null)
     {
-    }
-
-    /// <summary>
-    /// Initializes a new instance of the ConcurrentLruCore class with the specified concurrencyLevel, capacity, equality comparer, item policy and telemetry policy.
-    /// </summary>
-    /// <param name="capacity">The capacity.</param>
-    /// <param name="comparer">The equality comparer.</param>
-    /// <exception cref="ArgumentNullException">One of the provided arguments was <see langword="null"/>.</exception>
-    public ConcurrentLruCache(
-        int capacity,
-        IEqualityComparer<K> comparer)
-    {
-        ArgumentNullException.ThrowIfNull(comparer);
-        _capacity = new CapacityPartition(capacity);
-        _dictionary = new ConcurrentDictionary<K, LruItem>(comparer);
     }
 
     // No lock count: https://arbel.net/2013/02/03/best-practices-for-using-concurrentdictionary/
