@@ -54,7 +54,6 @@ internal class ConcurrentLruCache<K, V> : ICache<K, V>, ICacheMetrics, Concurren
     /// Initializes a new instance of the ConcurrentLruCore class with the specified capacity.
     /// </summary>
     /// <param name="capacity">The capacity.</param>
-    /// <exception cref="ArgumentNullException"></exception>
     public ConcurrentLruCache(int capacity) : this(capacity, EqualityComparer<K>.Default)
     {
     }
@@ -64,16 +63,14 @@ internal class ConcurrentLruCache<K, V> : ICache<K, V>, ICacheMetrics, Concurren
     /// </summary>
     /// <param name="capacity">The capacity.</param>
     /// <param name="comparer">The equality comparer.</param>
-    /// <exception cref="ArgumentNullException"></exception>
+    /// <exception cref="ArgumentNullException">One of the provided arguments was <see langword="null"/>.</exception>
     public ConcurrentLruCache(
         int capacity,
         IEqualityComparer<K> comparer)
     {
         ArgumentNullException.ThrowIfNull(comparer);
         _capacity = new CapacityPartition(capacity);
-
-        var dictionaryCapacity = ConcurrentDictionarySize.Estimate(Capacity);
-        _dictionary = new ConcurrentDictionary<K, LruItem>(Environment.ProcessorCount, dictionaryCapacity, comparer);
+        _dictionary = new ConcurrentDictionary<K, LruItem>(comparer);
     }
 
     // No lock count: https://arbel.net/2013/02/03/best-practices-for-using-concurrentdictionary/
