@@ -380,6 +380,14 @@ namespace Orleans.Runtime
                     }
 
                     var activation = item.Value;
+                    lock (activation)
+                    {
+                        if (!activation.IsValid || !activation.IsInactive)
+                        {
+                            continue;
+                        }
+                    }
+
                     candidates.Add(activation);
                 }
 
