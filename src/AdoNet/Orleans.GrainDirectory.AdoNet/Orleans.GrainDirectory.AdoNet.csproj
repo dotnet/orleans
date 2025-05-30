@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.GrainDirectory.AdoNet</PackageId>
+    <Title>Microsoft Orleans ADO.NET Grain Directory Provider</Title>
+    <Description>Microsoft Orleans grain directory provider backed by ADO.NET</Description>
+    <PackageTags>$(PackageTags) ADO.NET SQL</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+    <Nullable>Enable</Nullable>
+    <ImplicitUsings>Enable</ImplicitUsings>
+    <NoWarn>CA2007</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.GrainDirectory.AdoNet</AssemblyName>
+    <RootNamespace>Orleans.GrainDirectory.AdoNet</RootNamespace>
+    <DefineConstants>$(DefineConstants);GRAINDIRECTORY_ADONET</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tester.AdoNet" />
+    <InternalsVisibleTo Include="Benchmarks.AdoNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Storage\*.cs" LinkBase="Storage" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+  </ItemGroup>
+
+</Project>
