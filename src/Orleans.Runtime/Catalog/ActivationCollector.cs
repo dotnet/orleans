@@ -36,6 +36,7 @@ namespace Orleans.Runtime
         private readonly MemoryBasedGrainCollectionOptions _memoryBasedGrainCollectionOptions;
         private readonly PeriodicTimer _memBasedDeactivationTimer;
         private Task _memBasedDeactivationLoopTask;
+        private int _lastGen2GcCount;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ActivationCollector"/> class.
@@ -360,6 +361,8 @@ namespace Orleans.Runtime
         /// </summary>
         internal async Task DeactivateInDueTimeOrder(int count, CancellationToken cancellationToken)
         {
+            LogHighMemoryPressureDeactivationStarted(count);
+
             var watch = ValueStopwatch.StartNew();
             var number = Interlocked.Increment(ref collectionNumber);
             long memBefore = GC.GetTotalMemory(false) / (1024 * 1024); // MB
@@ -377,16 +380,6 @@ namespace Orleans.Runtime
                     }
 
                     var activation = item.Value;
-                    lock (activation)
-                    {
-                        // TODO - do we need to check some properties of activation here?
-                        // IMO if memory is running very low, then we should forcefully deactivate all the activations regardless of their state.
-                        //if (!activation.IsValid || IsExpired(activation.CollectionTicket))
-                        //{
-                        //    continue;
-                        //}
-                    }
-
                     candidates.Add(activation);
                 }
 
@@ -397,7 +390,7 @@ namespace Orleans.Runtime
             }
 
             CatalogInstruments.ActivationCollections.Add(1);
-            if (candidates.Count > 0)
+            if (candidates.Count > 0) 
             {
                 LogCollectActivations(new(candidates));
 
@@ -585,6 +578,14 @@ namespace Orleans.Runtime
             {
                 try
                 {
+                    int currentGen2GcCount = GC.CollectionCount(2);
+                    if (currentGen2GcCount <= _lastGen2GcCount)
+                    {
+                        LogWaitingForGC2Run(currentGen2GcCount);
+                        continue;
+                    }
+
+                    _lastGen2GcCount = currentGen2GcCount;
                     if (IsMemoryOverloaded(out var targetDeactivationNumber))
                     {
                         await this.DeactivateInDueTimeOrder(targetDeactivationNumber, cancellationToken);
@@ -702,6 +703,18 @@ namespace Orleans.Runtime
                 return result ?? nothing;
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "High memory pressure detected. Starting {count} deactivations."
+        )]
+        private partial void LogHighMemoryPressureDeactivationStarted(int count);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "High memory pressure: forced deactivations and waiting for GC2 (count={Gc2Count}) collection"
+        )]
+        private partial void LogWaitingForGC2Run(int gc2Count);
 
         [LoggerMessage(
             Level = LogLevel.Error,
