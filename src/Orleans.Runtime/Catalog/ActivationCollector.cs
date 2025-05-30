@@ -355,29 +355,27 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Deactivates <param name="deactivationsNumber" /> activations in due time order
+        /// Deactivates <param name="count" /> activations in due time order
         /// <remarks>internal for testing</remarks>
         /// </summary>
-        internal async Task DeactivateInDueTimeOrder(int deactivationsNumber, CancellationToken cancellationToken)
+        internal async Task DeactivateInDueTimeOrder(int count, CancellationToken cancellationToken)
         {
-            if (deactivationsNumber <= 0)
-            {
-                LogNoDeactivationsFound();
-                return;
-            }
-
             var watch = ValueStopwatch.StartNew();
             var number = Interlocked.Increment(ref collectionNumber);
-            long memBefore = GC.GetTotalMemory(false) / (1024 * 1024);
+            long memBefore = GC.GetTotalMemory(false) / (1024 * 1024); // MB
             LogBeforeCollection(number, memBefore, _activationCount, this);
 
-            var candidates = new List<ICollectibleGrainContext>(deactivationsNumber);
-            var selectedCount = 0;
+            var candidates = new List<ICollectibleGrainContext>(count);
 
             foreach (var bucket in buckets.OrderBy(b => b.Key))
             {
                 foreach (var item in bucket.Value.Items)
                 {
+                    if (candidates.Count >= count)
+                    {
+                        break;
+                    }
+
                     var activation = item.Value;
                     lock (activation)
                     {
@@ -390,30 +388,29 @@ namespace Orleans.Runtime
                     }
 
                     candidates.Add(activation);
-                    selectedCount++;
-
-                    if (selectedCount >= deactivationsNumber)
-                    {
-                        break;
-                    }
                 }
 
-                if (selectedCount >= deactivationsNumber)
+                if (candidates.Count >= count)
                 {
                     break;
                 }
             }
 
             CatalogInstruments.ActivationCollections.Add(1);
-            if (candidates is { Count: > 0 })
+            if (candidates.Count > 0)
             {
                 LogCollectActivations(new(candidates));
-                await DeactivateActivationsFromCollector(candidates, cancellationToken, new DeactivationReason(DeactivationReasonCode.MemoryLow, "App is running on low memory"));
+
+                var reason = new DeactivationReason(
+                    DeactivationReasonCode.HighMemoryPressure,
+                    $"Process memory utilization exceeded the configured threshold of '{_memoryBasedGrainCollectionOptions.MemoryLoadThresholdPercentage}'. Detected memory usage is {memBefore} MB.");
+
+                await DeactivateActivationsFromCollector(candidates, cancellationToken, reason);
             }
 
             long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
             watch.Stop();
-            LogAfterCollection(number, memAfter, _activationCount, candidates?.Count ?? 0, this, watch.Elapsed);
+            LogAfterCollection(number, memAfter, _activationCount, candidates.Count, this, watch.Elapsed);
         }
 
         private static DeactivationReason GetDeactivationReason()
@@ -543,6 +540,7 @@ namespace Orleans.Runtime
             {
                 await task.WaitAsync(cancellationToken);
             }
+
             if (_memBasedDeactivationLoopTask is Task deactivationLoopTask)
             {
                 await deactivationLoopTask.WaitAsync(cancellationToken);
@@ -568,6 +566,10 @@ namespace Orleans.Runtime
                 {
                     await this.CollectActivationsImpl(true, ageLimit: default, cancellationToken);
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // most probably shutdown
+                }
                 catch (Exception exception)
                 {
                     LogErrorWhileCollectingActivations(exception);
@@ -587,6 +589,10 @@ namespace Orleans.Runtime
                     {
                         await this.DeactivateInDueTimeOrder(targetDeactivationNumber, cancellationToken);
                     }
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // most probably shutdown
                 }
                 catch (Exception exception)
                 {
@@ -696,12 +702,6 @@ namespace Orleans.Runtime
                 return result ?? nothing;
             }
         }
-
-        [LoggerMessage(
-            Level = LogLevel.Warning,
-            Message = "No activations found to deactivate."
-        )]
-        private partial void LogNoDeactivationsFound();
 
         [LoggerMessage(
             Level = LogLevel.Error,
