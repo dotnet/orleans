@@ -158,7 +158,7 @@ namespace Orleans.Runtime
 
         public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[]? types = null)
         {
-            var stats = GetDetailedGrainStatisticsCore();
+            var stats = GetDetailedGrainStatisticsCore(types);
             return Task.FromResult(stats);
         }
 
