@@ -6,6 +6,7 @@
     <Description>Microsoft Orleans hosting support for Kubernetes</Description>
     <PackageTags>$(PackageTags) Kubernetes k8s</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <ItemGroup>

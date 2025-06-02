@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Hosting;
 
-namespace Tester.AdoNet.Streaming.Fakes;
+namespace Tester.AdoNet.Fakes;
 
 /// <summary>
 /// A fake implementation of <see cref="IHostApplicationLifetime"/> for unit test use.
