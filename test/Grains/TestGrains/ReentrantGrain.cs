@@ -667,4 +667,47 @@ namespace UnitTests.Grains
             return Task.FromResult(++count);
         }
     }
+
+    [MayInterleave(nameof(WillInterleave))]
+    public class CallOrderingGrain : Grain, ICallOrderingGrain
+    {
+        private readonly List<string> _log = new();
+        private TaskCompletionSource _blocker = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public static bool WillInterleave(IInvokable req)
+        {
+            return req.GetMethodName() == nameof(MethodA)  // MethodA allows interleaving
+                || req.GetMethodName() == nameof(Unblock); // Unblock allows interleaving
+        }
+
+        public async Task MethodA()
+        {
+            _log.Add("enter:A");
+            await _blocker.Task;
+            _log.Add("exit:A");
+        }
+
+        public async Task MethodB()
+        {
+            _log.Add("enter:B");
+            await _blocker.Task;
+            _log.Add("exit:B");
+        }
+
+        public Task Unblock()
+        {
+            _blocker.TrySetResult();
+            return Task.CompletedTask;
+        }
+
+        public Task Reset()
+        {
+            _log.Clear();
+            _blocker = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            return Task.CompletedTask;
+        }
+
+        public Task<List<string>> GetLog() => Task.FromResult(_log.ToList());
+    }
+
 }
