@@ -1161,7 +1161,8 @@ internal sealed partial class ActivationData :
             {
                 try
                 {
-                    return canInterleave.MayInterleave(GrainInstance, incoming);
+                    return canInterleave.MayInterleave(GrainInstance, incoming)
+                        || canInterleave.MayInterleave(GrainInstance, _blockingRequest);
                 }
                 catch (Exception exception)
                 {
