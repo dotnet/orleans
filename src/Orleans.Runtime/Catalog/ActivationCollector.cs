@@ -36,7 +36,6 @@ namespace Orleans.Runtime
         private readonly MemoryBasedGrainCollectionOptions _memoryBasedGrainCollectionOptions;
         private readonly PeriodicTimer _memBasedDeactivationTimer;
         private Task _memBasedDeactivationLoopTask;
-        private int _lastGen2GcCount;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ActivationCollector"/> class.
@@ -322,13 +321,13 @@ namespace Orleans.Runtime
 
         /// <summary>
         /// Checks if current memory usage is above the configured threshold for deactivation.
-        /// Also calculates the target number of activations to deactivate if memory is overloaded to reach target memory usage.
+        /// Also calculates the target number of activations to keep active if memory is overloaded to reach target memory usage.
         /// </summary>
         /// <remarks>internal for testing</remarks>
-        /// <param name="targetDeactivationNumber">number of deactivations to perform to bring back memory consumption to target value</param>
-        internal bool IsMemoryOverloaded(out int targetDeactivationNumber)
+        /// <param name="targetActivationLimit">number of activations to keep active to bring back memory consumption to target value</param>
+        internal bool IsMemoryOverloaded(out int targetActivationLimit)
         {
-            targetDeactivationNumber = 0;
+            targetActivationLimit = 0;
             var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
 
             var usedMemory = stats.MaximumAvailableMemoryBytes - stats.AvailableMemoryBytes;
@@ -342,14 +341,15 @@ namespace Orleans.Runtime
             }
 
             var targetUsedMemory = targetThreshold * stats.MaximumAvailableMemoryBytes / 100.0;
-            var memoryToFree = usedMemory - targetUsedMemory;
 
-            // Can't know for sure, but overestimating here
-            var activationSize = usedMemory / (double)_activationCount;
-            targetDeactivationNumber = (int)Math.Ceiling(memoryToFree / activationSize);
-            if (targetDeactivationNumber < 1)
+            var safeActivationCount = _activationCount > 0 ? _activationCount : 1;
+            var activationSize = usedMemory / (double)safeActivationCount;
+
+            // Compute how many activations we can keep to reach the target memory usage
+            targetActivationLimit = (int)Math.Floor(targetUsedMemory / activationSize);
+            if (targetActivationLimit < 0)
             {
-                targetDeactivationNumber = 1;
+                targetActivationLimit = 0;
             }
 
             return true;
@@ -582,21 +582,26 @@ namespace Orleans.Runtime
         {
             await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
             var cancellationToken = _shutdownCts.Token;
+
+            int lastGen2GcCount = -1;
+            int activationLimit = int.MaxValue;
+            int newTargetActivationLimit = int.MaxValue;
+
             while (await _memBasedDeactivationTimer.WaitForNextTickAsync())
             {
                 try
                 {
-                    int currentGen2GcCount = GC.CollectionCount(2);
-                    if (currentGen2GcCount <= _lastGen2GcCount)
-                    {
-                        LogWaitingForGC2Run(currentGen2GcCount);
-                        continue;
-                    }
+                    var currentGen2GcCount = GC.CollectionCount(2);
+                    var surplusActivations = Math.Max(0, _activationCount - activationLimit);
 
-                    _lastGen2GcCount = currentGen2GcCount;
-                    if (IsMemoryOverloaded(out var targetDeactivationNumber))
+                    // either we know there are surplus activations to reach activation limit (calculated on previous iteration),
+                    // or memory is overloaded and we know gen2 gc was not invoked recently (GC.CollectionCount(2) returns a higher revision than remembered)
+                    if (surplusActivations > 0 ||
+                        currentGen2GcCount > lastGen2GcCount && IsMemoryOverloaded(out newTargetActivationLimit))
                     {
-                        await this.DeactivateInDueTimeOrder(targetDeactivationNumber, cancellationToken);
+                        activationLimit = newTargetActivationLimit;
+                        lastGen2GcCount = currentGen2GcCount;
+                        await DeactivateInDueTimeOrder(surplusActivations, cancellationToken);
                     }
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -719,7 +724,7 @@ namespace Orleans.Runtime
         private partial void LogHighMemoryPressureDeactivationStarted(int count);
 
         [LoggerMessage(
-            Level = LogLevel.Information,
+            Level = LogLevel.Debug,
             Message = "High memory pressure: forced deactivations and waiting for GC2 (count={Gc2Count}) collection"
         )]
         private partial void LogWaitingForGC2Run(int gc2Count);

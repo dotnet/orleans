@@ -62,11 +62,11 @@ namespace UnitTests.Runtime
         }
 
         [Theory, TestCategory("MemoryBasedDeactivations")]
-        [InlineData(80.0, 70.0, 1000, 150, 100, true, 18)] // Over threshold, need to deactivate
+        [InlineData(80.0, 70.0, 1000, 150, 100, true, 100 - 18)] // Over threshold, need to deactivate
         [InlineData(80.0, 70.0, 1000, 250, 100, false, 0)] // Below threshold, no deactivation
-        [InlineData(80.0, 70.0, 1000, 100, 200, true, 45)] // More activations, smaller per-activation size
+        [InlineData(80.0, 70.0, 1000, 100, 200, true, 200 - 45)] // More activations, smaller per-activation size
         [InlineData(80.0, 70.0, 1000, 800, 100, false, 0)] // Well below threshold
-        [InlineData(80.0, 70.0, 1000, 50,  10,  true,  3)] // Few activations, large per-activation size
+        [InlineData(80.0, 70.0, 1000, 50,  10,  true,  10 - 3)] // Few activations, large per-activation size
         public void IsMemoryOverloaded_WorksAsExpected(
             double memoryLoadThreshold,
             double targetMemoryLoad,
@@ -74,7 +74,7 @@ namespace UnitTests.Runtime
             long availableMemoryMb,
             int activationCount,
             bool expectedOverloaded,
-            int expectedToDeactivate)
+            int expectedActivationsTarget)
         {
             var options = new GrainCollectionOptions
             {
@@ -106,10 +106,10 @@ namespace UnitTests.Runtime
             );
 
             collector._activationCount = activationCount;
-            var overloaded = collector.IsMemoryOverloaded(out var toDeactivate);
+            var overloaded = collector.IsMemoryOverloaded(out var activationsTarget);
 
             Assert.Equal(expectedOverloaded, overloaded);
-            Assert.Equal(expectedToDeactivate, toDeactivate);
+            Assert.Equal(expectedActivationsTarget, activationsTarget);
         }
 
         [Fact]
