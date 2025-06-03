@@ -342,7 +342,7 @@ namespace Orleans
                 // We need to import the RequestContext here as well.
                 // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
                 // RequestContextExtensions.Import(response.RequestContextData);
-                callbackData.DoCallback(response);
+                callbackData.OnResponse(response);
             }
             else
             {
@@ -413,6 +413,12 @@ namespace Orleans
             Utils.SafeExecute(() => this.callbackTimer.Dispose());
 
             Utils.SafeExecute(() => MessageCenter?.Dispose());
+            foreach (var callback in callbacks)
+            {
+                var message = callback.Value.Message;
+                var response = messageFactory.CreateRejectionResponse(message, Message.RejectionTypes.Unrecoverable, "Client is shutting down.", null);
+                callback.Value.OnResponse(response);
+            }
 
             GC.SuppressFinalize(this);
             disposed = true;

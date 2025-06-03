@@ -25,5 +25,6 @@ namespace Orleans
 
         Task<object> SendControlCommandToProvider<T>(string providerName, int command, object arg) where T : IControllable;
         Task<List<GrainId>> GetActiveGrains(GrainType grainType);
+        Task DropDisconnectedClients(bool excludeRecent);
     }
 }

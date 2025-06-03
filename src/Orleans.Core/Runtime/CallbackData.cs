@@ -149,14 +149,14 @@ namespace Orleans.Runtime
             this.context.Complete(Response.FromException(exception));
         }
 
-        public void DoCallback(Message response)
+        public void OnResponse(Message response)
         {
             if (Interlocked.CompareExchange(ref this.completed, 1, 0) != 0)
             {
                 return;
             }
 
-            OrleansCallBackDataEvent.Log.DoCallback(this.Message);
+            OrleansCallBackDataEvent.Log.OnResponse(this.Message);
 
             this.stopwatch.Stop();
             _cancellationTokenRegistration.Dispose();

@@ -446,5 +446,14 @@ namespace Orleans.Runtime.Management
             Message = "Executing {Action} against {SiloAddresses}"
         )]
         private partial void LogDebugExecutingAction(string action, SiloAddressesKeysLogValue siloAddresses);
+
+        public async Task DropDisconnectedClients(bool excludeRecent)
+        {
+            var silos = GetSiloAddresses(null);
+            var actionPromises = PerformPerSiloAction(
+                silos,
+                s => GetSiloControlReference(s).DropDisconnectedClients(excludeRecent));
+            await Task.WhenAll(actionPromises);
+        }
     }
 }

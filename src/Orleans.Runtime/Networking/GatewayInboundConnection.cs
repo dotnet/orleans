@@ -173,7 +173,7 @@ namespace Orleans.Runtime.Messaging
                     msg,
                     Message.RejectionTypes.Transient,
                     $"Silo {this.myAddress} is rejecting message: {msg}. Reason = {reason}",
-                    new SiloUnavailableException());
+                    new ClientNotAvailableException(reason ?? "Connection terminated."));
             }
             else
             {

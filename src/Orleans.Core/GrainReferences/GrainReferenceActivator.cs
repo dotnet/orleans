@@ -24,20 +24,16 @@ namespace Orleans.GrainReferences
     public sealed class GrainReferenceActivator
     {
         private readonly object _lockObj = new object();
-        private readonly IServiceProvider _serviceProvider;
         private readonly IGrainReferenceActivatorProvider[] _providers;
         private Dictionary<(GrainType, GrainInterfaceType), IGrainReferenceActivator> _activators = new();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainReferenceActivator"/> class.
         /// </summary>
-        /// <param name="serviceProvider">The service provider.</param>
         /// <param name="providers">The collection of grain reference activator providers.</param>
         public GrainReferenceActivator(
-            IServiceProvider serviceProvider,
             IEnumerable<IGrainReferenceActivatorProvider> providers)
         {
-            _serviceProvider = serviceProvider;
             _providers = providers.ToArray();
         }
 

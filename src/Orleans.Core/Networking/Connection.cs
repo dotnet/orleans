@@ -228,13 +228,13 @@ namespace Orleans.Runtime.Messaging
             catch (Exception abortException)
             {
                 // Swallow any exceptions here.
-                this.Log.LogWarning(abortException, "Exception terminating connection {Connection}", this);
+                this.Log.LogWarning(abortException, "Exception terminating connection {Connection}.", this);
             }
 
             // Reject in-flight messages.
             foreach (var message in this.inflight)
             {
-                this.OnSendMessageFailure(message, "Connection terminated");
+                this.OnSendMessageFailure(message, "Connection terminated.");
             }
 
             this.inflight.Clear();
