@@ -149,7 +149,7 @@ internal class ConcurrentLruCache<K, V>(
             return true;
         }
 
-        (newItem.Value as IDisposable)?.Dispose();
+        DisposeValue(newItem.Value);
 
         return false;
     }
@@ -299,7 +299,7 @@ internal class ConcurrentLruCache<K, V>(
         // serialize dispose (common case dispose not thread safe)
         lock (item)
         {
-            (item.Value as IDisposable)?.Dispose();
+            DisposeValue(item.Value);
         }
     }
 
@@ -318,7 +318,7 @@ internal class ConcurrentLruCache<K, V>(
                     existing.Value = value;
 
                     _telemetryPolicy.IncrementUpdated();
-                    (oldValue as IDisposable)?.Dispose();
+                    DisposeValue(oldValue);
 
                     return true;
                 }
@@ -941,5 +941,14 @@ internal class ConcurrentLruCache<K, V>(
         public ConcurrentQueue<LruItem> ColdQueue { get; }
         public ConcurrentDictionary<K, LruItem> Dictionary { get; }
         public bool IsWarm { get; }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void DisposeValue(V value)
+    {
+        if (value is IDisposable d)
+        {
+            d.Dispose();
+        }
     }
 }
