@@ -29,9 +29,7 @@ public class DurableSetTests : StateMachineTestBase
         Assert.True(added3);
         Assert.False(duplicateAdded); // Should not add duplicates
         Assert.Equal(3, set.Count);
-        Assert.Contains("one", set);
-        Assert.Contains("two", set);
-        Assert.Contains("three", set);
+        Assert.Equal(["one", "two", "three"], set);
         
         // Act - Remove item
         bool removed = set.Remove("two");
@@ -42,9 +40,7 @@ public class DurableSetTests : StateMachineTestBase
         Assert.True(removed);
         Assert.False(removedNonExisting);
         Assert.Equal(2, set.Count);
-        Assert.Contains("one", set);
-        Assert.DoesNotContain("two", set);
-        Assert.Contains("three", set);
+        Assert.Equal(["one", "three"], set);
     }
     
     [Fact]
@@ -69,9 +65,7 @@ public class DurableSetTests : StateMachineTestBase
 
         // Assert - Set should be recovered
         Assert.Equal(3, set2.Count);
-        Assert.Contains("one", set2);
-        Assert.Contains("two", set2);
-        Assert.Contains("three", set2);
+        Assert.Equal(["one", "two", "three"], set2);
     }
     
     [Fact]
@@ -95,9 +89,9 @@ public class DurableSetTests : StateMachineTestBase
         await manager.WriteStateAsync(CancellationToken.None);
         
         // Assert
+        Assert.False(duplicateAdded);
         Assert.Equal(2, set.Count);
-        Assert.Contains(person1, set);
-        Assert.Contains(person2, set);
+        Assert.Equal([person1, person2], set);
     }
     
     [Fact]
@@ -121,7 +115,6 @@ public class DurableSetTests : StateMachineTestBase
         await manager.WriteStateAsync(CancellationToken.None);
         
         // Assert
-        Assert.Empty(set);
         Assert.Empty(set);
     }
     
@@ -189,7 +182,7 @@ public class DurableSetTests : StateMachineTestBase
         Assert.Equal(itemCount, set2.Count);
         for (int i = 0; i < itemCount; i++)
         {
-            Assert.Contains(i, set2);
+            Assert.Contains(i, (IReadOnlySet<int>)set2);
         }
     }
     
@@ -274,7 +267,7 @@ public class DurableSetTests : StateMachineTestBase
         Assert.Equal(5, set.Count);
         for (int i = 1; i < 10; i += 2)
         {
-            Assert.Contains(i, set);
+            Assert.Contains(i, (IReadOnlySet<int>)set);
         }
     }
 }

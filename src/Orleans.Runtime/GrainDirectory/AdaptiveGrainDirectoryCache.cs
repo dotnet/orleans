@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Orleans.Caching;
 using Orleans.Internal;
 
 namespace Orleans.Runtime.GrainDirectory
@@ -41,9 +42,9 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        private static readonly Func<GrainAddress, GrainDirectoryCacheEntry, bool> ActivationAddressesMatches = (addr, entry) => GrainAddress.MatchesGrainIdAndSilo(addr, entry.Address);
+        private static readonly Func<GrainDirectoryCacheEntry, GrainAddress, bool> ActivationAddressesMatches = (entry, addr) => GrainAddress.MatchesGrainIdAndSilo(addr, entry.Address);
 
-        private readonly LRU<GrainId, GrainDirectoryCacheEntry> cache;
+        private readonly ConcurrentLruCache<GrainId, GrainDirectoryCacheEntry> cache;
         /// controls the time the new entry is considered "fresh" (unit: ms)
         private readonly TimeSpan initialExpirationTimer;
         /// controls the exponential growth factor (i.e., x2, x4) for the freshness timer (unit: none)
@@ -59,7 +60,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public AdaptiveGrainDirectoryCache(TimeSpan initialExpirationTimer, TimeSpan maxExpirationTimer, double exponentialTimerGrowth, int maxCacheSize)
         {
-            cache = new(maxCacheSize, TimeSpan.MaxValue);
+            cache = new(maxCacheSize);
 
             this.initialExpirationTimer = initialExpirationTimer;
             this.maxExpirationTimer = maxExpirationTimer;
@@ -76,7 +77,7 @@ namespace Orleans.Runtime.GrainDirectory
             cache.AddOrUpdate(value.GrainId, entry);
         }
 
-        public bool Remove(GrainId key) => cache.RemoveKey(key);
+        public bool Remove(GrainId key) => cache.TryRemove(key);
 
         public bool Remove(GrainAddress key) => cache.TryRemove(key.GrainId, ActivationAddressesMatches, key);
 
@@ -89,7 +90,7 @@ namespace Orleans.Runtime.GrainDirectory
             // Here we do not check whether the found entry is expired.
             // It will be done by the thread managing the cache.
             // This is to avoid situation where the entry was just expired, but the manager still have not run and have not refreshed it.
-            if (!cache.TryGetValue(key, out var tmp))
+            if (!cache.TryGet(key, out var tmp))
             {
                 result = default;
                 version = default;
@@ -117,7 +118,7 @@ namespace Orleans.Runtime.GrainDirectory
         public bool MarkAsFresh(GrainId key)
         {
             GrainDirectoryCacheEntry result;
-            if (!cache.TryGetValue(key, out result)) return false;
+            if (!cache.TryGet(key, out result)) return false;
 
             TimeSpan newExpirationTimer = StandardExtensions.Min(maxExpirationTimer, result.ExpirationTimer.Multiply(exponentialTimerGrowth));
             result.Refresh(newExpirationTimer);
@@ -145,7 +146,7 @@ namespace Orleans.Runtime.GrainDirectory
             LastNumHits = NumHits;
 
             sb.Append("Adaptive cache statistics:").AppendLine();
-            sb.AppendFormat("   Cache size: {0} entries ({1} maximum)", cache.Count, cache.MaximumSize).AppendLine();
+            sb.AppendFormat("   Cache size: {0} entries ({1} maximum)", cache.Count, cache.Capacity).AppendLine();
             sb.AppendFormat("   Since last call:").AppendLine();
             sb.AppendFormat("      Accesses: {0}", curNumAccesses);
             sb.AppendFormat("      Hits: {0}", curNumHits);

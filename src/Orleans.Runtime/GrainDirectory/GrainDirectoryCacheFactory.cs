@@ -27,7 +27,7 @@ namespace Orleans.Runtime.GrainDirectory
                 case GrainDirectoryOptions.CachingStrategyType.None:
                     return new NullGrainDirectoryCache();
                 case GrainDirectoryOptions.CachingStrategyType.LRU:
-                    return new LRUBasedGrainDirectoryCache(options.CacheSize, options.MaximumCacheTTL);
+                    return new LruGrainDirectoryCache(options.CacheSize);
                 case GrainDirectoryOptions.CachingStrategyType.Adaptive:
                     return new AdaptiveGrainDirectoryCache(options.InitialCacheTTL, options.MaximumCacheTTL, options.CacheTTLExtensionFactor, options.CacheSize);
                 case GrainDirectoryOptions.CachingStrategyType.Custom:
@@ -45,7 +45,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
             else
             {
-                return new LRUBasedGrainDirectoryCache(options.CacheSize, options.MaximumCacheTTL);
+                return new LruGrainDirectoryCache(options.CacheSize);
             }
         }
 

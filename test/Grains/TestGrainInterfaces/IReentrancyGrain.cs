@@ -92,6 +92,15 @@ namespace UnitTests.GrainInterfaces
         Task<int> GetCounter();
     }
 
+    public interface ICallOrderingGrain : IGrainWithStringKey
+    {
+        Task Reset();
+        Task MethodA();
+        Task MethodB();
+        Task Unblock();
+        Task<List<string>> GetLog();
+    }
+
     public interface IFanOutGrain : IGrainWithIntegerKey
     {
         Task FanOutReentrant(int offset, int num);

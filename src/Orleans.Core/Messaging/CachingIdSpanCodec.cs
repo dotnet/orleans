@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Orleans.Serialization.Buffers;
+using Orleans.Caching;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -12,7 +13,7 @@ namespace Orleans.Runtime.Messaging
     /// </summary>
     internal sealed class CachingIdSpanCodec
     {
-        private static readonly LRU<IdSpan, IdSpan> SharedCache = new(maxSize: 128_000, maxAge: TimeSpan.FromHours(1));
+        private static readonly ConcurrentLruCache<IdSpan, IdSpan> SharedCache = new(capacity: 128_000);
 
         // Purge entries which have not been accessed in over 2 minutes. 
         private const long PurgeAfterMilliseconds = 2 * 60 * 1000;
@@ -55,7 +56,7 @@ namespace Orleans.Runtime.Messaging
                 result = IdSpan.UnsafeCreate(payloadArray ?? payloadSpan.ToArray(), hashCode);
 
                 // Before adding this value to the private cache and returning it, intern it via the shared cache to hopefully reduce duplicates.
-                result = SharedCache.GetOrAdd(result, static (_, key) => key, (object)null);
+                result = SharedCache.GetOrAdd(result, static (key, _) => key, (object)null);
 
                 // Update the cache. If there is a hash collision, the last entry wins.
                 cacheEntry.Value = IdSpan.UnsafeGetArray(result);
@@ -88,7 +89,7 @@ namespace Orleans.Runtime.Messaging
         public void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer, IdSpan value) where TBufferWriter : IBufferWriter<byte>
         {
             IdSpanCodec.WriteRaw(ref writer, value);
-            SharedCache.GetOrAdd(value, static (_, key) => key, (object)null);
+            SharedCache.GetOrAdd(value, static (key, _) => key, (object)null);
         }
     }
 }

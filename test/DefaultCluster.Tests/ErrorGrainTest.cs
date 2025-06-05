@@ -108,7 +108,7 @@ namespace DefaultCluster.Tests
 
         [Fact, TestCategory("BVT"), TestCategory("ErrorHandling")]
         // check that premature wait finishes on time but does not throw with false and later wait throws.
-        public async void ErrorHandlingTimedMethodWithError()
+        public async Task ErrorHandlingTimedMethodWithError()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
