@@ -51,51 +51,36 @@ namespace Orleans.Configuration
 
         /// <summary>
         /// Controls behavior of grain collection based on available memory.
-        /// Must be assigned to a non-null value to be enabled.
         /// </summary>
-        public MemoryBasedGrainCollectionOptions MemoryBasedOptions { get; set; } = null!;
-    }
-
-    public class MemoryBasedGrainCollectionOptions
-    {
-        /// <summary>
-        /// Regulates the periodic check of memory load.
-        /// </summary>
-        public TimeSpan MemoryLoadValidationQuantum { get; set; } = TimeSpan.FromSeconds(10);
-
-        /// <summary>
-        /// Memory load percentage threshold above which grain collection will be triggered.
-        /// </summary>
-        public double MemoryLoadThresholdPercentage { get; set; } = 90;
-
-        /// <summary>
-        /// Controls how many of the grains should be collected when the <see cref="MemoryLoadThresholdPercentage"/> is exceeded.
-        /// Targets the memory load percentage which node will be running at after the grain collection happened.
-        /// </summary>
-        public double TargetMemoryLoadPercentage { get; set; } = 80;
-
-        /// <summary>
-        /// Heap memory threshold in megabytes above which grain collection will be triggered.
-        /// </summary>
-        public double HeapMemoryThresholdMb { get; set; } = 0;
-
-        /// <summary>
-        /// Target heap memory in megabytes after grain collection.
-        /// </summary>
-        public double TargetHeapMemoryMb { get; set; } = 0;
-
-        /// <summary>
-        /// Determines which memory threshold mode to use.
-        /// </summary>
-        public MemoryThresholdMode ThresholdMode { get; set; } = MemoryThresholdMode.Relative;
+        public MemoryPressureGrainCollectionOptions MemoryPressureGrainCollectionOptions { get; set; } = new();
     }
 
     /// <summary>
-    /// Specifies the mode for memory threshold evaluation.
+    /// Options for grain collection based on memory pressure.
     /// </summary>
-    public enum MemoryThresholdMode
+    public class MemoryPressureGrainCollectionOptions
     {
-        Relative,
-        AbsoluteMb
+        /// <summary>
+        /// Indicates if memory-based grain collection is enabled.
+        /// Is enabled by default.
+        /// </summary>
+        public bool MemoryUsageCollectionEnabled { get; set; } = true;
+
+        /// <summary>
+        /// The interval at which memory usage is polled.
+        /// </summary>
+        public TimeSpan MemoryUsagePollingPeriod { get; set; } = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// The memory load percentage (0–100) at which grain collection is triggered.
+        /// Must be greater than 0 and less than or equal to 100.
+        /// </summary>
+        public double MemoryUsageLimitPercentage { get; set; } = 95;
+
+        /// <summary>
+        /// The target memory load percentage (0–100) to reach after grain collection.
+        /// Must be greater than 0, less than or equal to 100, and less than <see cref="MemoryUsageLimitPercentage"/>.
+        /// </summary>
+        public double MemoryUsageTargetPercentage { get; set; } = 90;
     }
 }

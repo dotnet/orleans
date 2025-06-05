@@ -78,10 +78,10 @@ namespace UnitTests.Runtime
         {
             var options = new GrainCollectionOptions
             {
-                MemoryBasedOptions = new MemoryBasedGrainCollectionOptions
+                MemoryPressureGrainCollectionOptions = new MemoryPressureGrainCollectionOptions
                 {
-                    MemoryLoadThresholdPercentage = memoryLoadThreshold,
-                    TargetMemoryLoadPercentage = targetMemoryLoad
+                    MemoryUsageLimitPercentage = memoryLoadThreshold,
+                    MemoryUsageTargetPercentage = targetMemoryLoad
                 }
             };
 
@@ -117,7 +117,7 @@ namespace UnitTests.Runtime
         {
             var options = Options.Create(new GrainCollectionOptions
             {
-                MemoryBasedOptions = new MemoryBasedGrainCollectionOptions()
+                MemoryPressureGrainCollectionOptions = new MemoryPressureGrainCollectionOptions()
             });
             var logger = NullLogger<ActivationCollector>.Instance;
             var statsProvider = Substitute.For<IEnvironmentStatisticsProvider>();

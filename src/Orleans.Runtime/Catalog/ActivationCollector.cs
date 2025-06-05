@@ -33,7 +33,7 @@ namespace Orleans.Runtime
         private Task _collectionLoopTask;
 
         private readonly IEnvironmentStatisticsProvider _environmentStatisticsProvider;
-        private readonly MemoryBasedGrainCollectionOptions _memoryBasedGrainCollectionOptions;
+        private readonly MemoryPressureGrainCollectionOptions _memoryBasedGrainCollectionOptions;
         private readonly PeriodicTimer _memBasedDeactivationTimer;
         private Task _memBasedDeactivationLoopTask;
 
@@ -56,10 +56,10 @@ namespace Orleans.Runtime
             _collectionTimer = new PeriodicTimer(quantum);
 
             _environmentStatisticsProvider = environmentStatisticsProvider;
-            _memoryBasedGrainCollectionOptions = options.Value.MemoryBasedOptions;
-            if (_memoryBasedGrainCollectionOptions is not null)
+            _memoryBasedGrainCollectionOptions = options.Value.MemoryPressureGrainCollectionOptions;
+            if (_memoryBasedGrainCollectionOptions.MemoryUsageCollectionEnabled)
             {
-                _memBasedDeactivationTimer = new PeriodicTimer(_memoryBasedGrainCollectionOptions.MemoryLoadValidationQuantum);
+                _memBasedDeactivationTimer = new PeriodicTimer(_memoryBasedGrainCollectionOptions.MemoryUsagePollingPeriod);
             }
         }
 
@@ -336,49 +336,23 @@ namespace Orleans.Runtime
             var activationSize = usedMemory / (double)activationCount;
 
             var options = _memoryBasedGrainCollectionOptions;
-            switch (_memoryBasedGrainCollectionOptions.ThresholdMode)
+
+            var threshold = options.MemoryUsageLimitPercentage;
+            var targetThreshold = options.MemoryUsageTargetPercentage;
+            var memoryLoadPercentage = 100.0 * usedMemory / stats.MaximumAvailableMemoryBytes;
+            if (memoryLoadPercentage < threshold)
             {
-                case MemoryThresholdMode.AbsoluteMb:
-                    {
-                        var heapThresholdBytes = options.HeapMemoryThresholdMb > 0 ? options.HeapMemoryThresholdMb * 1024 * 1024 : 0;
-                        var targetHeapBytes = options.TargetHeapMemoryMb > 0 ? options.TargetHeapMemoryMb * 1024 * 1024 : 0;
-
-                        if (usedMemory < heapThresholdBytes)
-                        {
-                            return false;
-                        }
-
-                        var targetUsedMemory = targetHeapBytes > 0 ? targetHeapBytes : heapThresholdBytes;
-                        targetActivationLimit = (int)Math.Floor(targetUsedMemory / activationSize);
-                        if (targetActivationLimit < 0)
-                        {
-                            targetActivationLimit = 0;
-                        }
-
-                        return true;
-                    }
-
-                case MemoryThresholdMode.Relative:
-                default:
-                    {
-                        var threshold = options.MemoryLoadThresholdPercentage;
-                        var targetThreshold = options.TargetMemoryLoadPercentage;
-                        var memoryLoadPercentage = 100.0 * usedMemory / stats.MaximumAvailableMemoryBytes;
-                        if (memoryLoadPercentage < threshold)
-                        {
-                            return false;
-                        }
-
-                        var targetUsedMemory = targetThreshold * stats.MaximumAvailableMemoryBytes / 100.0;
-                        targetActivationLimit = (int)Math.Floor(targetUsedMemory / activationSize);
-                        if (targetActivationLimit < 0)
-                        {
-                            targetActivationLimit = 0;
-                        }
-
-                        return true;
-                    }
+                return false;
             }
+
+            var targetUsedMemory = targetThreshold * stats.MaximumAvailableMemoryBytes / 100.0;
+            targetActivationLimit = (int)Math.Floor(targetUsedMemory / activationSize);
+            if (targetActivationLimit < 0)
+            {
+                targetActivationLimit = 0;
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -430,7 +404,7 @@ namespace Orleans.Runtime
 
                 var reason = new DeactivationReason(
                     DeactivationReasonCode.HighMemoryPressure,
-                    $"Process memory utilization exceeded the configured threshold of '{_memoryBasedGrainCollectionOptions.MemoryLoadThresholdPercentage}'. Detected memory usage is {memBefore} MB.");
+                    $"Process memory utilization exceeded the configured limit of '{_memoryBasedGrainCollectionOptions.MemoryUsageLimitPercentage}'. Detected memory usage is {memBefore} MB.");
 
                 await DeactivateActivationsFromCollector(candidates, cancellationToken, reason);
             }
@@ -547,7 +521,7 @@ namespace Orleans.Runtime
             using var _ = new ExecutionContextSuppressor();
             _collectionLoopTask = RunActivationCollectionLoop();
 
-            if (_memoryBasedGrainCollectionOptions is not null)
+            if (_memoryBasedGrainCollectionOptions.MemoryUsageCollectionEnabled)
             {
                 _memBasedDeactivationLoopTask = RunMemoryBasedDeactivationLoop();
             }
