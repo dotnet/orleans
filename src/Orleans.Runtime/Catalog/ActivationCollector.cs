@@ -26,7 +26,7 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private int collectionNumber;
 
-        // for testing
+        // internal for testing
         internal int _activationCount;
 
         private readonly PeriodicTimer _collectionTimer;
