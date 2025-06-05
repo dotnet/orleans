@@ -127,6 +127,7 @@ namespace Orleans.Runtime
         /// <returns><see langword="true"/> if collection was canceled, <see langword="false"/> otherwise.</returns>
         public bool TryCancelCollection(ICollectibleGrainContext item)
         {
+            if (item is null) return false;
             if (item.IsExemptFromCollection) return false;
 
             lock (item)
@@ -331,28 +332,53 @@ namespace Orleans.Runtime
             var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
 
             var usedMemory = stats.MaximumAvailableMemoryBytes - stats.AvailableMemoryBytes;
-            var memoryLoadPercentage = 100.0 * usedMemory / stats.MaximumAvailableMemoryBytes;
-            var threshold = _memoryBasedGrainCollectionOptions.MemoryLoadThresholdPercentage;
-            var targetThreshold = _memoryBasedGrainCollectionOptions.TargetMemoryLoadPercentage;
+            var activationCount = _activationCount > 0 ? _activationCount : 1;
+            var activationSize = usedMemory / (double)activationCount;
 
-            if (memoryLoadPercentage < threshold)
+            var options = _memoryBasedGrainCollectionOptions;
+            switch (_memoryBasedGrainCollectionOptions.ThresholdMode)
             {
-                return false;
+                case MemoryThresholdMode.AbsoluteMb:
+                    {
+                        var heapThresholdBytes = options.HeapMemoryThresholdMb > 0 ? options.HeapMemoryThresholdMb * 1024 * 1024 : 0;
+                        var targetHeapBytes = options.TargetHeapMemoryMb > 0 ? options.TargetHeapMemoryMb * 1024 * 1024 : 0;
+
+                        if (usedMemory < heapThresholdBytes)
+                        {
+                            return false;
+                        }
+
+                        var targetUsedMemory = targetHeapBytes > 0 ? targetHeapBytes : heapThresholdBytes;
+                        targetActivationLimit = (int)Math.Floor(targetUsedMemory / activationSize);
+                        if (targetActivationLimit < 0)
+                        {
+                            targetActivationLimit = 0;
+                        }
+
+                        return true;
+                    }
+
+                case MemoryThresholdMode.Relative:
+                default:
+                    {
+                        var threshold = options.MemoryLoadThresholdPercentage;
+                        var targetThreshold = options.TargetMemoryLoadPercentage;
+                        var memoryLoadPercentage = 100.0 * usedMemory / stats.MaximumAvailableMemoryBytes;
+                        if (memoryLoadPercentage < threshold)
+                        {
+                            return false;
+                        }
+
+                        var targetUsedMemory = targetThreshold * stats.MaximumAvailableMemoryBytes / 100.0;
+                        targetActivationLimit = (int)Math.Floor(targetUsedMemory / activationSize);
+                        if (targetActivationLimit < 0)
+                        {
+                            targetActivationLimit = 0;
+                        }
+
+                        return true;
+                    }
             }
-
-            var targetUsedMemory = targetThreshold * stats.MaximumAvailableMemoryBytes / 100.0;
-
-            var safeActivationCount = _activationCount > 0 ? _activationCount : 1;
-            var activationSize = usedMemory / (double)safeActivationCount;
-
-            // Compute how many activations we can keep to reach the target memory usage
-            targetActivationLimit = (int)Math.Floor(targetUsedMemory / activationSize);
-            if (targetActivationLimit < 0)
-            {
-                targetActivationLimit = 0;
-            }
-
-            return true;
         }
 
         /// <summary>
@@ -512,10 +538,8 @@ namespace Orleans.Runtime
 
         void IActivationWorkingSetObserver.OnDeactivated(IActivationWorkingSetMember member)
         {
-            if (member is ICollectibleGrainContext activation && TryCancelCollection(activation))
-            {
-                Interlocked.Decrement(ref _activationCount);
-            }
+            Interlocked.Decrement(ref _activationCount);
+            _ = TryCancelCollection(member as ICollectibleGrainContext);
         }
 
         private Task Start(CancellationToken cancellationToken)
@@ -596,9 +620,17 @@ namespace Orleans.Runtime
 
                     // either we know there are surplus activations to reach activation limit (calculated on previous iteration),
                     // or memory is overloaded and we know gen2 gc was not invoked recently (GC.CollectionCount(2) returns a higher revision than remembered)
+                    // ---
+                    // also even if app scales, we would need to wait until "IsMemoryOverloaded" returns true to really trigger deactivations.
                     if (surplusActivations > 0 ||
                         currentGen2GcCount > lastGen2GcCount && IsMemoryOverloaded(out newTargetActivationLimit))
                     {
+                        if (surplusActivations == 0)
+                        {
+                            // recalculate the surplus activations based on the new target activation limit
+                            surplusActivations = Math.Max(0, _activationCount - newTargetActivationLimit);
+                        }
+
                         activationLimit = newTargetActivationLimit;
                         lastGen2GcCount = currentGen2GcCount;
                         await DeactivateInDueTimeOrder(surplusActivations, cancellationToken);

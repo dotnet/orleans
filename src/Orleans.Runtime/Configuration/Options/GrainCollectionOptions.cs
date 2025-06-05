@@ -73,5 +73,29 @@ namespace Orleans.Configuration
         /// Targets the memory load percentage which node will be running at after the grain collection happened.
         /// </summary>
         public double TargetMemoryLoadPercentage { get; set; } = 80;
+
+        /// <summary>
+        /// Heap memory threshold in megabytes above which grain collection will be triggered.
+        /// </summary>
+        public double HeapMemoryThresholdMb { get; set; } = 0;
+
+        /// <summary>
+        /// Target heap memory in megabytes after grain collection.
+        /// </summary>
+        public double TargetHeapMemoryMb { get; set; } = 0;
+
+        /// <summary>
+        /// Determines which memory threshold mode to use.
+        /// </summary>
+        public MemoryThresholdMode ThresholdMode { get; set; } = MemoryThresholdMode.Relative;
+    }
+
+    /// <summary>
+    /// Specifies the mode for memory threshold evaluation.
+    /// </summary>
+    public enum MemoryThresholdMode
+    {
+        Relative,
+        AbsoluteMb
     }
 }
