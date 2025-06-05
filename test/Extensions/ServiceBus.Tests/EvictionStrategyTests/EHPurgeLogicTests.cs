@@ -266,6 +266,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private class NoOpEnvironmentStatisticsProvider : IEnvironmentStatisticsProvider
         {
             public EnvironmentStatistics GetEnvironmentStatistics() => new();
+            public EnvironmentStatistics GetRawEnvironmentStatistics() => new();
         }
     }
 }

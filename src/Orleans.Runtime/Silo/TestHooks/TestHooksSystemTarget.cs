@@ -19,6 +19,7 @@ namespace Orleans.Runtime.TestHooks
         private EnvironmentStatistics? _currentStats = null;
 
         public EnvironmentStatistics GetEnvironmentStatistics() => _currentStats ?? new();
+        public EnvironmentStatistics GetRawEnvironmentStatistics() => _currentStats ?? new();
         public void SetHardwareStatistics(EnvironmentStatistics stats) => _currentStats = stats;
     }
 

@@ -9,9 +9,14 @@ namespace Orleans.Statistics;
 public interface IEnvironmentStatisticsProvider
 {
     /// <summary>
-    /// Gets the current environment statistics.
+    /// Gets the current environment statistics. May apply filtering or processing based on the runtime configuration.
     /// </summary>
     EnvironmentStatistics GetEnvironmentStatistics();
+
+    /// <summary>
+    /// Gets raw environment statistics as they are reported by the runtime, without any filtering or processing.
+    /// </summary>
+    EnvironmentStatistics GetRawEnvironmentStatistics();
 }
 
 // This struct is intentionally 'packed' in order to avoid extra padding.

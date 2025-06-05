@@ -38,6 +38,27 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
     /// <inheritdoc />
     public EnvironmentStatistics GetEnvironmentStatistics()
     {
+        var (cpuUsage, memoryUsage, availableMemory, maxAvailableMemory) = GetRawStatistics();
+
+        var filteredCpuUsage = _cpuUsageFilter.Filter(cpuUsage);
+        var filteredMemoryUsage = (long)_memoryUsageFilter.Filter(memoryUsage);
+        var filteredAvailableMemory = (long)_availableMemoryFilter.Filter(availableMemory);
+        // no need to filter 'maxAvailableMemory' as it will almost always be a steady value.
+
+        _availableMemoryBytes = filteredAvailableMemory;
+        _maximumAvailableMemoryBytes = maxAvailableMemory;
+
+        return new(filteredCpuUsage, filteredMemoryUsage, filteredAvailableMemory, maxAvailableMemory);
+    }
+
+    public EnvironmentStatistics GetRawEnvironmentStatistics()
+    {
+        var (cpuUsage, memoryUsage, availableMemory, maxAvailableMemory) = GetRawStatistics();
+        return new(cpuUsage, (long)memoryUsage, (long)availableMemory, maxAvailableMemory);
+    }
+
+    private (float cpuUsage, float memoryUsage, float availableMemory, long maxAvailableMemory) GetRawStatistics()
+    {
         var memoryInfo = GC.GetGCMemoryInfo();
 
         var cpuUsage = _eventCounterListener.CpuUsage;
@@ -50,15 +71,7 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
         var availableMemory = systemAvailable + processAvailable;
         var maxAvailableMemory = Math.Min(memoryInfo.TotalAvailableMemoryBytes, memoryInfo.HighMemoryLoadThresholdBytes);
 
-        var filteredCpuUsage = _cpuUsageFilter.Filter(cpuUsage);
-        var filteredMemoryUsage = (long)_memoryUsageFilter.Filter(memoryUsage);
-        var filteredAvailableMemory = (long)_availableMemoryFilter.Filter(availableMemory);
-        // no need to filter 'maxAvailableMemory' as it will almost always be a steady value.
-
-        _availableMemoryBytes = filteredAvailableMemory;
-        _maximumAvailableMemoryBytes = maxAvailableMemory;
-
-        return new(filteredCpuUsage, filteredMemoryUsage, filteredAvailableMemory, maxAvailableMemory / 1024 / 1024);
+        return (cpuUsage, memoryUsage, availableMemory, maxAvailableMemory);
     }
 
     public void Dispose() => _eventCounterListener.Dispose();

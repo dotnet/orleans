@@ -33,7 +33,7 @@ namespace Orleans.Runtime
         private Task _collectionLoopTask;
 
         private readonly IEnvironmentStatisticsProvider _environmentStatisticsProvider;
-        private readonly MemoryPressureGrainCollectionOptions _memoryBasedGrainCollectionOptions;
+        private readonly MemoryPressureGrainCollectionOptions _memoryPressureGrainCollectionOptions;
         private readonly PeriodicTimer _memBasedDeactivationTimer;
         private Task _memBasedDeactivationLoopTask;
 
@@ -56,10 +56,10 @@ namespace Orleans.Runtime
             _collectionTimer = new PeriodicTimer(quantum);
 
             _environmentStatisticsProvider = environmentStatisticsProvider;
-            _memoryBasedGrainCollectionOptions = options.Value.MemoryPressureGrainCollectionOptions;
-            if (_memoryBasedGrainCollectionOptions.MemoryUsageCollectionEnabled)
+            _memoryPressureGrainCollectionOptions = options.Value.MemoryPressureGrainCollectionOptions;
+            if (_memoryPressureGrainCollectionOptions.MemoryUsageCollectionEnabled)
             {
-                _memBasedDeactivationTimer = new PeriodicTimer(_memoryBasedGrainCollectionOptions.MemoryUsagePollingPeriod);
+                _memBasedDeactivationTimer = new PeriodicTimer(_memoryPressureGrainCollectionOptions.MemoryUsagePollingPeriod);
             }
         }
 
@@ -329,13 +329,15 @@ namespace Orleans.Runtime
         internal bool IsMemoryOverloaded(out int targetActivationLimit)
         {
             targetActivationLimit = 0;
-            var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
+
+            // filtering harms here: we need raw and precise statistics to calculate memory usage correctly
+            var stats = _environmentStatisticsProvider.GetRawEnvironmentStatistics();
 
             var usedMemory = stats.MaximumAvailableMemoryBytes - stats.AvailableMemoryBytes;
             var activationCount = _activationCount > 0 ? _activationCount : 1;
             var activationSize = usedMemory / (double)activationCount;
 
-            var options = _memoryBasedGrainCollectionOptions;
+            var options = _memoryPressureGrainCollectionOptions;
 
             var threshold = options.MemoryUsageLimitPercentage;
             var targetThreshold = options.MemoryUsageTargetPercentage;
@@ -404,7 +406,7 @@ namespace Orleans.Runtime
 
                 var reason = new DeactivationReason(
                     DeactivationReasonCode.HighMemoryPressure,
-                    $"Process memory utilization exceeded the configured limit of '{_memoryBasedGrainCollectionOptions.MemoryUsageLimitPercentage}'. Detected memory usage is {memBefore} MB.");
+                    $"Process memory utilization exceeded the configured limit of '{_memoryPressureGrainCollectionOptions.MemoryUsageLimitPercentage}'. Detected memory usage is {memBefore} MB.");
 
                 await DeactivateActivationsFromCollector(candidates, cancellationToken, reason);
             }
@@ -521,7 +523,7 @@ namespace Orleans.Runtime
             using var _ = new ExecutionContextSuppressor();
             _collectionLoopTask = RunActivationCollectionLoop();
 
-            if (_memoryBasedGrainCollectionOptions.MemoryUsageCollectionEnabled)
+            if (_memoryPressureGrainCollectionOptions.MemoryUsageCollectionEnabled)
             {
                 _memBasedDeactivationLoopTask = RunMemoryBasedDeactivationLoop();
             }
