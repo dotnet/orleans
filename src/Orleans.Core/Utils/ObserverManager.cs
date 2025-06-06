@@ -37,7 +37,7 @@ namespace Orleans.Utilities
     /// <typeparam name="TObserver">
     /// The observer type.
     /// </typeparam>
-    public class ObserverManager<TIdentity, TObserver> : IEnumerable<TObserver> where TIdentity : notnull
+    public partial class ObserverManager<TIdentity, TObserver> : IEnumerable<TObserver> where TIdentity : notnull
     {
         /// <summary>
         /// The observers.
@@ -107,18 +107,12 @@ namespace Orleans.Utilities
             {
                 entry.LastSeen = now;
                 entry.Observer = observer;
-                if (_log.IsEnabled(LogLevel.Debug))
-                {
-                    _log.LogDebug("Updating entry for {Id}/{Observer}. {Count} total observers.", id, observer, _observers.Count);
-                }
+                LogDebugUpdatingEntry(id, observer, _observers.Count);
             }
             else
             {
                 _observers[id] = new ObserverEntry { LastSeen = now, Observer = observer };
-                if (_log.IsEnabled(LogLevel.Debug))
-                {
-                    _log.LogDebug("Adding entry for {Id}/{Observer}. {Count} total observers after add.", id, observer, _observers.Count);
-                }
+                LogDebugAddingEntry(id, observer, _observers.Count);
             }
         }
 
@@ -131,10 +125,7 @@ namespace Orleans.Utilities
         public void Unsubscribe(TIdentity id)
         {
             _observers.Remove(id, out _);
-            if (_log.IsEnabled(LogLevel.Debug))
-            {
-                _log.LogDebug("Removed entry for {Id}. {Count} total observers after remove.", id, _observers.Count);
-            }
+            LogDebugRemovedEntry(id, _observers.Count);
         }
 
         /// <summary>
@@ -164,7 +155,7 @@ namespace Orleans.Utilities
                 }
 
                 // Skip observers which don't match the provided predicate.
-                if (predicate != null && !predicate(observer.Value.Observer))
+                if (predicate is not null && !predicate(observer.Value.Observer))
                 {
                     continue;
                 }
@@ -187,10 +178,7 @@ namespace Orleans.Utilities
                 foreach (var observer in defunct)
                 {
                     _observers.Remove(observer, out _);
-                    if (_log.IsEnabled(LogLevel.Debug))
-                    {
-                        _log.LogDebug("Removing defunct entry for {Id}. {Count} total observers after remove.", observer, _observers.Count);
-                    }
+                    LogDebugRemovingDefunctEntry(observer, _observers.Count);
                 }
             }
         }
@@ -219,7 +207,7 @@ namespace Orleans.Utilities
                 }
 
                 // Skip observers which don't match the provided predicate.
-                if (predicate != null && !predicate(observer.Value.Observer))
+                if (predicate is not null && !predicate(observer.Value.Observer))
                 {
                     continue;
                 }
@@ -242,10 +230,7 @@ namespace Orleans.Utilities
                 foreach (var observer in defunct)
                 {
                     _observers.Remove(observer, out _);
-                    if (_log.IsEnabled(LogLevel.Debug))
-                    {
-                        _log.LogDebug("Removing defunct entry for {Id}. {Count} total observers after remove.", observer, _observers.Count);
-                    }
+                    LogDebugRemovingDefunctEntry(observer, _observers.Count);
                 }
             }
         }
@@ -270,7 +255,7 @@ namespace Orleans.Utilities
             // Remove defunct observers.
             if (defunct is { Count: > 0 })
             {
-                _log.LogInformation("Removing {Count} defunct observers entries.", defunct.Count);
+                LogInformationRemovingDefunctObservers(defunct.Count);
                 foreach (var observer in defunct)
                 {
                     _observers.Remove(observer, out _);
@@ -309,6 +294,35 @@ namespace Orleans.Utilities
             /// </summary>
             public DateTime LastSeen { get; set; }
         }
-    }
 
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Updating entry for {Id}/{Observer}. {Count} total observers."
+        )]
+        private partial void LogDebugUpdatingEntry(TIdentity id, TObserver observer, int count);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Adding entry for {Id}/{Observer}. {Count} total observers after add."
+        )]
+        private partial void LogDebugAddingEntry(TIdentity id, TObserver observer, int count);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Removed entry for {Id}. {Count} total observers after remove."
+        )]
+        private partial void LogDebugRemovedEntry(TIdentity id, int count);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Removing defunct entry for {Id}. {Count} total observers after remove."
+        )]
+        private partial void LogDebugRemovingDefunctEntry(TIdentity id, int count);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Removing {Count} defunct observers entries."
+        )]
+        private partial void LogInformationRemovingDefunctObservers(int count);
+    }
 }
