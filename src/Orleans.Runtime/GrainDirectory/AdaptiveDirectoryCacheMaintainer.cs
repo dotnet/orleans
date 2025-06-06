@@ -14,6 +14,7 @@ namespace Orleans.Runtime.GrainDirectory
     {
         private static readonly TimeSpan SLEEP_TIME_BETWEEN_REFRESHES = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromMinutes(1); // this should be something like minTTL/4
 
+        private readonly ILogger<AdaptiveDirectoryCacheMaintainer> _log;
         private readonly AdaptiveGrainDirectoryCache cache;
         private readonly LocalGrainDirectory router;
         private readonly IInternalGrainFactory grainFactory;
@@ -29,7 +30,7 @@ namespace Orleans.Runtime.GrainDirectory
             IInternalGrainFactory grainFactory,
             ILoggerFactory loggerFactory)
         {
-            Log = loggerFactory.CreateLogger<AdaptiveDirectoryCacheMaintainer>();
+            _log = loggerFactory.CreateLogger<AdaptiveDirectoryCacheMaintainer>();
             this.grainFactory = grainFactory;
             this.router = router;
             this.cache = cache;
@@ -37,8 +38,6 @@ namespace Orleans.Runtime.GrainDirectory
             lastNumAccesses = 0;
             lastNumHits = 0;
         }
-
-        private ILogger<AdaptiveDirectoryCacheMaintainer> Log { get; }
 
         public void Start()
         {
@@ -135,7 +134,7 @@ namespace Orleans.Runtime.GrainDirectory
                         }
                     }
 
-                    LogTraceSelfOwnedAndRemoved(Log, router.MyAddress, ownedAndRemovedCount, keptCount, removedCount, refreshedCount);
+                    LogTraceSelfOwnedAndRemoved(_log, router.MyAddress, ownedAndRemovedCount, keptCount, removedCount, refreshedCount);
 
                     // Send batch requests
                     SendBatchCacheRefreshRequests(fetchInBatchList);
@@ -167,7 +166,7 @@ namespace Orleans.Runtime.GrainDirectory
                     ProcessCacheRefreshResponse(silo, response);
                 }).Ignore();
 
-                LogTraceSendingRequest(Log, router.MyAddress, silo, cachedGrainAndETagList.Count);
+                LogTraceSendingRequest(_log, router.MyAddress, silo, cachedGrainAndETagList.Count);
             }
         }
 
@@ -175,7 +174,7 @@ namespace Orleans.Runtime.GrainDirectory
             SiloAddress silo,
             List<AddressAndTag> refreshResponse)
         {
-            LogTraceReceivedProcessCacheRefreshResponse(Log, router.MyAddress, refreshResponse.Count);
+            LogTraceReceivedProcessCacheRefreshResponse(_log, router.MyAddress, refreshResponse.Count);
 
             int otherSiloCount = 0, updatedCount = 0, unchangedCount = 0;
 
@@ -211,7 +210,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
             }
 
-            LogTraceProcessedRefreshResponse(Log, router.MyAddress, silo, otherSiloCount, updatedCount, unchangedCount);
+            LogTraceProcessedRefreshResponse(_log, router.MyAddress, silo, otherSiloCount, updatedCount, unchangedCount);
         }
 
         /// <summary>
@@ -255,7 +254,7 @@ namespace Orleans.Runtime.GrainDirectory
             long numAccesses = curNumAccesses - lastNumAccesses;
             long numHits = curNumHits - lastNumHits;
 
-            if (Log.IsEnabled(LogLevel.Trace)) Log.LogTrace("#accesses: {AccessCount}, hit-ratio: {HitRatio}%", numAccesses, (numHits / Math.Max(numAccesses, 0.00001)) * 100);
+            if (_log.IsEnabled(LogLevel.Trace)) _log.LogTrace("#accesses: {AccessCount}, hit-ratio: {HitRatio}%", numAccesses, (numHits / Math.Max(numAccesses, 0.00001)) * 100);
 
             lastNumAccesses = curNumAccesses;
             lastNumHits = curNumHits;
