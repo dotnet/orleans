@@ -60,7 +60,7 @@ namespace UnitTests.MembershipTests
             const int maxRetry = 10;
             for (int i = 0; i < maxRetry; i++)
             {
-                RequestContext.Set(IPlacementDirector.PlacementHintKey, siloHandle);
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, siloHandle.SiloAddress);
                 var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
                 var instanceId = await grain.GetRuntimeInstanceId();
                 if (instanceId.Contains(siloHandle.SiloAddress.Endpoint.ToString()))
