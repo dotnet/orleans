@@ -10,10 +10,10 @@ namespace UnitTests.General
         private readonly DefaultClusterFixture _fixture = fixture;
 
         [Fact, TestCategory("Placement"), TestCategory("Functional")]
-        public async Task DefaultPlacementShouldBeRandom()
+        public async Task VerifyDefaultPlacement()
         {
             var actual = await _fixture.GrainFactory.GetGrain<IDefaultPlacementGrain>(Random.Shared.Next()).GetDefaultPlacement();
-            Assert.IsType<RandomPlacement>(actual);
+            Assert.IsType<ResourceOptimizedPlacement>(actual);
         }
 
         [Fact, TestCategory("Placement"), TestCategory("Functional")]

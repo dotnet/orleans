@@ -1,9 +1,11 @@
 using Microsoft.Extensions.Logging;
+using Orleans.Placement;
 using TestVersionGrainInterfaces;
 using UnitTests.GrainInterfaces;
 
 namespace TestVersionGrains
 {
+    [RandomPlacement]
     public class VersionUpgradeTestGrain : Grain, IVersionUpgradeTestGrain
     {
         private const int Version =
