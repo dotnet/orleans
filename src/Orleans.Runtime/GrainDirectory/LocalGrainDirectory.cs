@@ -16,7 +16,6 @@ namespace Orleans.Runtime.GrainDirectory
 {
     internal sealed partial class LocalGrainDirectory : ILocalGrainDirectory, ISiloStatusListener, ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly AdaptiveDirectoryCacheMaintainer maintainer;
         private readonly ILogger log;
         private readonly SiloAddress? seed;
         private readonly ISiloStatusOracle siloStatusOracle;
@@ -60,12 +59,6 @@ namespace Orleans.Runtime.GrainDirectory
             this.grainFactory = grainFactory;
 
             DirectoryCache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value);
-            maintainer =
-                GrainDirectoryCacheFactory.CreateGrainDirectoryCacheMaintainer(
-                    this,
-                    this.DirectoryCache,
-                    grainFactory,
-                    loggerFactory);
 
             var primarySiloEndPoint = developmentClusterMembershipOptions.Value.PrimarySiloEndpoint;
             if (primarySiloEndPoint != null)
@@ -99,10 +92,6 @@ namespace Orleans.Runtime.GrainDirectory
             LogDebugStart();
 
             Running = true;
-            if (maintainer != null)
-            {
-                CacheValidator.WorkItemGroup.QueueAction(maintainer.Start);
-            }
 
             siloStatusOracle.SubscribeToSiloStatusEvents(this);
         }
@@ -113,7 +102,7 @@ namespace Orleans.Runtime.GrainDirectory
         // The alternative would be to allow the silo to process requests after it has handed off its partition, in which case those changes
         // would receive successful responses but would not be reflected in the eventual state of the directory.
         // It's easy to change this, if we think the trade-off is better the other way.
-        public async Task StopAsync()
+        public Task StopAsync()
         {
             // This will cause remote write requests to be forwarded to the silo that will become the new owner.
             // Requests might bounce back and forth for a while as membership stabilizes, but they will either be served by the
@@ -123,13 +112,9 @@ namespace Orleans.Runtime.GrainDirectory
             //mark Running as false will exclude myself from CalculateGrainDirectoryPartition(grainId)
             Running = false;
 
-            if (maintainer is { } directoryCacheMaintainer)
-            {
-                await CacheValidator.QueueTask(directoryCacheMaintainer.StopAsync);
-            }
-
             DirectoryPartition.Clear();
             DirectoryCache.Clear();
+            return Task.CompletedTask;
         }
 
         private void AddServer(SiloAddress silo)
