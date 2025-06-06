@@ -3,32 +3,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Networking.Shared
 {
-    internal class SocketsTrace : ISocketsTrace
+    internal partial class SocketsTrace : ISocketsTrace
     {
         // ConnectionRead: Reserved: 3
-
-        private static readonly Action<ILogger, string, Exception> _connectionPause =
-            LoggerMessage.Define<string>(LogLevel.Debug, new EventId(4, nameof(ConnectionPause)), @"Connection id ""{ConnectionId}"" paused.");
-
-        private static readonly Action<ILogger, string, Exception> _connectionResume =
-            LoggerMessage.Define<string>(LogLevel.Debug, new EventId(5, nameof(ConnectionResume)), @"Connection id ""{ConnectionId}"" resumed.");
-
-        private static readonly Action<ILogger, string, Exception> _connectionReadFin =
-            LoggerMessage.Define<string>(LogLevel.Debug, new EventId(6, nameof(ConnectionReadFin)), @"Connection id ""{ConnectionId}"" received FIN.");
-
-        private static readonly Action<ILogger, string, string, Exception> _connectionWriteFin =
-            LoggerMessage.Define<string, string>(LogLevel.Debug, new EventId(7, nameof(ConnectionWriteFin)), @"Connection id ""{ConnectionId}"" sending FIN because: ""{Reason}""");
-
-        // ConnectionWrite: Reserved: 11
-
-        // ConnectionWriteCallback: Reserved: 12
-
-        private static readonly Action<ILogger, string, Exception> _connectionError =
-            LoggerMessage.Define<string>(LogLevel.Information, new EventId(14, nameof(ConnectionError)), @"Connection id ""{ConnectionId}"" communication error.");
-
-        private static readonly Action<ILogger, string, Exception> _connectionReset =
-            LoggerMessage.Define<string>(LogLevel.Debug, new EventId(19, nameof(ConnectionReset)), @"Connection id ""{ConnectionId}"" reset.");
-
         private readonly ILogger _logger;
 
         public SocketsTrace(ILogger logger)
@@ -42,15 +19,19 @@ namespace Orleans.Networking.Shared
             // Reserved: Event ID 3
         }
 
-        public void ConnectionReadFin(string connectionId)
-        {
-            _connectionReadFin(_logger, connectionId, null);
-        }
+        [LoggerMessage(
+            EventId = 6,
+            Level = LogLevel.Debug,
+            Message = @"Connection id ""{ConnectionId}"" received FIN."
+        )]
+        public partial void ConnectionReadFin(string connectionId);
 
-        public void ConnectionWriteFin(string connectionId, string reason)
-        {
-            _connectionWriteFin(_logger, connectionId, reason, null);
-        }
+        [LoggerMessage(
+            EventId = 7,
+            Level = LogLevel.Debug,
+            Message = @"Connection id ""{ConnectionId}"" sending FIN because: ""{Reason}"""
+        )]
+        public partial void ConnectionWriteFin(string connectionId, string reason);
 
         public void ConnectionWrite(string connectionId, int count)
         {
@@ -64,25 +45,33 @@ namespace Orleans.Networking.Shared
             // Reserved: Event ID 12
         }
 
-        public void ConnectionError(string connectionId, Exception ex)
-        {
-            _connectionError(_logger, connectionId, ex);
-        }
+        [LoggerMessage(
+            EventId = 13,
+            Level = LogLevel.Debug,
+            Message = @"Connection id ""{ConnectionId}"" sending FIN."
+        )]
+        public partial void ConnectionError(string connectionId, Exception ex);
 
-        public void ConnectionReset(string connectionId)
-        {
-            _connectionReset(_logger, connectionId, null);
-        }
+        [LoggerMessage(
+            EventId = 19,
+            Level = LogLevel.Debug,
+            Message = @"Connection id ""{ConnectionId}"" reset."
+        )]
+        public partial void ConnectionReset(string connectionId);
 
-        public void ConnectionPause(string connectionId)
-        {
-            _connectionPause(_logger, connectionId, null);
-        }
+        [LoggerMessage(
+            EventId = 4,
+            Level = LogLevel.Debug,
+            Message = @"Connection id ""{ConnectionId}"" paused."
+        )]
+        public partial void ConnectionPause(string connectionId);
 
-        public void ConnectionResume(string connectionId)
-        {
-            _connectionResume(_logger, connectionId, null);
-        }
+        [LoggerMessage(
+            EventId = 5,
+            Level = LogLevel.Debug,
+            Message = @"Connection id ""{ConnectionId}"" resumed."
+        )]
+        public partial void ConnectionResume(string connectionId);
 
         public IDisposable BeginScope<TState>(TState state) => _logger.BeginScope(state);
 
