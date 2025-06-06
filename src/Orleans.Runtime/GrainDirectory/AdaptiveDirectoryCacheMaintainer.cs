@@ -144,7 +144,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
                 catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
                 {
-                    Log.LogError(ex, $"Error in {nameof(AdaptiveDirectoryCacheMaintainer)}.");
+                    LogErrorAdaptiveDirectoryCacheMaintainer(ex);
                 }
             }
         }
@@ -237,10 +237,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     // this may happen only if the LRU cache is full and decided to drop this grain
                     // while we try to refresh it
-                    Log.LogWarning(
-                        (int)ErrorCode.Runtime_Error_100199,
-                        "Grain {GrainId} disappeared from the cache during maintenance",
-                        grain);
+                    LogWarningGrainDisappearedFromCache(grain);
                 }
             }
 
@@ -263,6 +260,19 @@ namespace Orleans.Runtime.GrainDirectory
             lastNumAccesses = curNumAccesses;
             lastNumHits = curNumHits;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = $"Error in {nameof(AdaptiveDirectoryCacheMaintainer)}."
+        )]
+        private partial void LogErrorAdaptiveDirectoryCacheMaintainer(Exception ex);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100199,
+            Level = LogLevel.Warning,
+            Message = "Grain {GrainId} disappeared from the cache during maintenance"
+        )]
+        private partial void LogWarningGrainDisappearedFromCache(GrainId grainId);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
