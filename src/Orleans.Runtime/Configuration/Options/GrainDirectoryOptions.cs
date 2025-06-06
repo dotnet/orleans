@@ -16,7 +16,7 @@ namespace Orleans.Configuration
             /// <summary>Standard fixed-size LRU.</summary>
             LRU,
             /// <summary>Adaptive caching with fixed maximum size and refresh. This option should be used in production.</summary>
-            [Obsolete("Adaptive caching is deprecated in favor of LRU and will be removed in a future version.")]
+            [Obsolete("Adaptive caching is deprecated in favor of LRU and will be removed in a future version. This value is now an alias for LRU.")]
             Adaptive,
             /// <summary>Custom cache implementation, configured by registering an <see cref="IGrainDirectoryCache"/> implementation in the dependency injection container.</summary>
             Custom
