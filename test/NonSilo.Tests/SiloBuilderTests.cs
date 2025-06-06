@@ -217,7 +217,6 @@ namespace NonSilo.Tests
         private class FakeEnvironmentStatisticsProvider : IEnvironmentStatisticsProvider
         {
             public EnvironmentStatistics GetEnvironmentStatistics() => new();
-            public EnvironmentStatistics GetRawEnvironmentStatistics() => new();
         }
 
         private class MyService

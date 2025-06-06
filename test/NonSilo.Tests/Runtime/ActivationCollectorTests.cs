@@ -89,8 +89,11 @@ namespace UnitTests.Runtime
             statsProvider.GetEnvironmentStatistics().Returns(
                 new EnvironmentStatistics(
                     cpuUsagePercentage: 0,
+                    rawCpuUsagePercentage: 0,
                     memoryUsageBytes: 0,
+                    rawMemoryUsageBytes: 0,
                     availableMemoryBytes: availableMemoryMb * 1024 * 1024,
+                    rawAvailableMemoryBytes: availableMemoryMb * 1024 * 1024,
                     maximumAvailableMemoryBytes: maxMemoryMb * 1024 * 1024
                 )
             );

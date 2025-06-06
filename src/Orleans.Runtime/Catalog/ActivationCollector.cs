@@ -329,11 +329,10 @@ namespace Orleans.Runtime
         internal bool IsMemoryOverloaded(out int targetActivationLimit)
         {
             targetActivationLimit = 0;
+            var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
 
             // filtering harms here: we need raw and precise statistics to calculate memory usage correctly
-            var stats = _environmentStatisticsProvider.GetRawEnvironmentStatistics();
-
-            var usedMemory = stats.MaximumAvailableMemoryBytes - stats.AvailableMemoryBytes;
+            var usedMemory = stats.MaximumAvailableMemoryBytes - stats.RawAvailableMemoryBytes;
             var activationCount = _activationCount > 0 ? _activationCount : 1;
             var activationSize = usedMemory / (double)activationCount;
 
@@ -592,20 +591,12 @@ namespace Orleans.Runtime
                 try
                 {
                     var currentGen2GcCount = GC.CollectionCount(2);
-                    var surplusActivations = Math.Max(0, _activationCount - activationLimit);
 
-                    // either we know there are surplus activations to reach activation limit (calculated on previous iteration),
-                    // or memory is overloaded and we know gen2 gc was not invoked recently (GC.CollectionCount(2) returns a higher revision than remembered)
-                    // ---
-                    // also even if app scales, we would need to wait until "IsMemoryOverloaded" returns true to really trigger deactivations.
-                    if (surplusActivations > 0 ||
-                        currentGen2GcCount > lastGen2GcCount && IsMemoryOverloaded(out newTargetActivationLimit))
+                    // only when memory is overloaded and we know gen2 gc was not invoked recently (GC.CollectionCount(2) returns a higher revision than remembered)
+                    if (currentGen2GcCount > lastGen2GcCount && IsMemoryOverloaded(out newTargetActivationLimit))
                     {
-                        if (surplusActivations == 0)
-                        {
-                            // recalculate the surplus activations based on the new target activation limit
-                            surplusActivations = Math.Max(0, _activationCount - newTargetActivationLimit);
-                        }
+                        // recalculate the surplus activations based on the new target activation limit
+                        var surplusActivations = Math.Max(0, _activationCount - newTargetActivationLimit);
 
                         activationLimit = newTargetActivationLimit;
                         lastGen2GcCount = currentGen2GcCount;
