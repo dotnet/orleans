@@ -7,6 +7,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Azure.Data.Tables;
 using Azure.Identity;
+using Orleans.Runtime.Placement;
 
 namespace Tester.Forwarding
 {
@@ -123,6 +124,7 @@ namespace Tester.Forwarding
         {
             while (true)
             {
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, HostedCluster.SecondarySilos[0].SiloAddress);
                 var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<T>>(Guid.NewGuid());
                 var instanceId = await grain.GetRuntimeInstanceId();
                 if (instanceId.Contains(HostedCluster.SecondarySilos[0].SiloAddress.Endpoint.ToString()))
@@ -137,6 +139,7 @@ namespace Tester.Forwarding
             var i = 0;
             while (true)
             {
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, HostedCluster.SecondarySilos[0].SiloAddress);
                 var grain = GrainFactory.GetGrain<ITimerRequestGrain>(i++);
                 var instanceId = await grain.GetRuntimeInstanceId();
                 if (instanceId.Contains(HostedCluster.SecondarySilos[0].SiloAddress.Endpoint.ToString()))
