@@ -8,7 +8,7 @@ using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class GatewayInboundConnection : Connection
+    internal sealed partial class GatewayInboundConnection : Connection
     {
         private readonly MessageCenter messageCenter;
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
@@ -70,7 +70,7 @@ namespace Orleans.Runtime.Messaging
                 MessagingInstruments.OnRejectedMessage(msg);
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
                 this.messageCenter.TryDeliverToProxy(rejection);
-                if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.LogDebug("Rejecting a request due to overloading: {Message}", msg.ToString());
+                LogRejectingRequestDueToOverloading(this.Log, msg);
                 GatewayInstruments.GatewayLoadShedding.Add(1);
                 return;
             }
@@ -160,13 +160,7 @@ namespace Orleans.Runtime.Messaging
             MessagingInstruments.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
-                if (this.Log.IsEnabled(LogLevel.Debug))
-                    this.Log.LogDebug(
-                        (int)ErrorCode.MessagingSendingRejection,
-                        "Silo {SiloAddress} is rejecting message: {Message}. Reason = {Reason}",
-                        this.myAddress,
-                        msg,
-                        reason);
+                LogSiloRejectingMessage(this.Log, this.myAddress, msg, reason);
 
                 // Done retrying, send back an error instead
                 this.messageCenter.SendRejection(
@@ -177,12 +171,7 @@ namespace Orleans.Runtime.Messaging
             }
             else
             {
-                this.Log.LogInformation(
-                    (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,
-                    "Silo {SiloAddress} is dropping message: {Message}. Reason = {Reason}",
-                    this.myAddress,
-                    msg,
-                    reason);
+                LogSiloDroppingMessage(this.Log, this.myAddress, msg, reason);
                 MessagingInstruments.OnDroppedSentMessage(msg);
             }
         }
@@ -213,5 +202,25 @@ namespace Orleans.Runtime.Messaging
         {
             this.FailMessage(message, error);
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Rejecting a request due to overloading: {Message}"
+        )]
+        private static partial void LogRejectingRequestDueToOverloading(ILogger logger, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            EventId = (int)ErrorCode.MessagingSendingRejection,
+            Message = "Silo {SiloAddress} is rejecting message: {Message}. Reason = {Reason}"
+        )]
+        private static partial void LogSiloRejectingMessage(ILogger logger, SiloAddress siloAddress, Message message, string reason);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,
+            Message = "Silo {SiloAddress} is dropping message: {Message}. Reason = {Reason}"
+        )]
+        private static partial void LogSiloDroppingMessage(ILogger logger, SiloAddress siloAddress, Message message, string reason);
     }
 }
