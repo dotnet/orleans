@@ -150,5 +150,12 @@ namespace Orleans.Runtime
         {
             return this.grainFactory.GetGrain(grainId, interfaceId);
         }
+
+        /// <inheritdoc />
+        public GrainInterfaceType GetGrainInterfaceType(Type interfaceType) => grainFactory.GetGrainInterfaceType(interfaceType);
+
+        /// <inheritdoc />
+        public GrainType GetGrainType(GrainInterfaceType grainInterfaceType, string grainClassNamePrefix = null) => grainFactory.GetGrainType(grainInterfaceType, grainClassNamePrefix);
+
     }
 }

@@ -190,5 +190,24 @@ namespace Orleans
         /// A reference for the provided grain id which implements the specified interface type.
         /// </returns>
         IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType);
+
+        /// <summary>
+        /// Returns the unique <see cref="GrainInterfaceType"/> for the specified grain interface <paramref name="interfaceType"/>.
+        /// </summary>
+        /// <param name="interfaceType">The grain interface type to retrieve the identifier for.</param>
+        /// <returns>
+        /// The <see cref="GrainInterfaceType"/> that uniquely identifies the specified grain interface type.
+        /// </returns>
+        GrainInterfaceType GetGrainInterfaceType(Type interfaceType);
+
+        /// <summary>
+        /// Returns the grain type for the specified grain interface type and optional class name prefix.
+        /// </summary>
+        /// <param name="grainInterfaceType">The grain interface type.</param>
+        /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
+        /// <returns>
+        /// The <see cref="GrainType"/> corresponding to the specified interface type and class name prefix.
+        /// </returns>
+        GrainType GetGrainType(GrainInterfaceType grainInterfaceType, string grainClassNamePrefix = null);
     }
 }
