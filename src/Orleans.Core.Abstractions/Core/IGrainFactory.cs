@@ -4,6 +4,24 @@ using Orleans.Runtime;
 
 namespace Orleans
 {
+    public static class GrainFactoryExtensions
+    {
+        /// <summary>
+        /// Returns a reference for the provided grain id which implements the specified interface type.
+        /// </summary>
+        /// <param name="grainFactory">The grain factory.</param>
+        /// <param name="grainPrimaryKey">The primary key of the grain</param>
+        /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
+        /// <typeparam name="TGrainInterface">The grain interface type which the returned grain reference must implement.</typeparam>
+        /// <returns>
+        /// A reference for the provided grain id which implements the specified interface type.
+        /// </returns>
+        public static TGrainInterface GetGrain<TGrainInterface>(this IGrainFactory grainFactory, IdSpan grainPrimaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrain
+        {
+            ArgumentNullException.ThrowIfNull(grainFactory);
+            return grainFactory.GetGrain(typeof(TGrainInterface), grainPrimaryKey, grainClassNamePrefix).AsReference<TGrainInterface>();
+        }
+    }
     /// <summary>
     /// Functionality for creating references to grains.
     /// </summary>
@@ -192,22 +210,14 @@ namespace Orleans
         IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType);
 
         /// <summary>
-        /// Returns the unique <see cref="GrainInterfaceType"/> for the specified grain interface <paramref name="interfaceType"/>.
+        /// Returns a reference for the provided grain id which implements the specified interface type.
         /// </summary>
-        /// <param name="interfaceType">The grain interface type to retrieve the identifier for.</param>
-        /// <returns>
-        /// The <see cref="GrainInterfaceType"/> that uniquely identifies the specified grain interface type.
-        /// </returns>
-        GrainInterfaceType GetGrainInterfaceType(Type interfaceType);
-
-        /// <summary>
-        /// Returns the grain type for the specified grain interface type and optional class name prefix.
-        /// </summary>
-        /// <param name="grainInterfaceType">The grain interface type.</param>
+        /// <param name="interfaceType">The grain interface type which the returned grain reference must implement.</param>
+        /// <param name="grainKey">The primary key of the grain</param>
         /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
         /// <returns>
-        /// The <see cref="GrainType"/> corresponding to the specified interface type and class name prefix.
+        /// A reference for the provided grain id which implements the specified interface type.
         /// </returns>
-        GrainType GetGrainType(GrainInterfaceType grainInterfaceType, string grainClassNamePrefix = null);
+        IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string grainClassNamePrefix = null);
     }
 }

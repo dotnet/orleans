@@ -139,5 +139,19 @@ namespace DefaultCluster.Tests
             var g = this.GrainFactory.GetGrain<IGuidGrain>(Guid.NewGuid());
             Assert.True(await g.Foo());
         }
+
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
+        public async Task GetGrainIdSpanGeneric()
+        {
+            var g = GrainFactory.GetGrain<IDerivedFromBase>(GrainIdKeyExtensions.CreateIntegerKey(0));
+            await g.Foo();
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
+        public async Task GetGrainIdSpan()
+        {
+            var g = GrainFactory.GetGrain(typeof(IDerivedFromBase), GrainIdKeyExtensions.CreateIntegerKey(0));
+            await g.AsReference<IBase>().Foo();
+        }
     }
 }
