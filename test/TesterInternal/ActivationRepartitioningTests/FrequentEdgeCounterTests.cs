@@ -20,6 +20,9 @@ public interface IMyActiveBalancingGrain<T> : IGrainWithStringKey
     Task<T> GetValue();
 }
 
+/// <summary>
+/// Tests for the frequent edge counter used to track communication patterns in activation repartitioning.
+/// </summary>
 [TestCategory("Functional"), TestCategory("ActivationRepartitioning")]
 public class FrequentEdgeCounterTests
 {

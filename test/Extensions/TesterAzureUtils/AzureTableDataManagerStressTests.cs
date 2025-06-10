@@ -8,6 +8,9 @@ using AzureStoragePolicyOptions = Orleans.Clustering.AzureStorage.AzureStoragePo
 
 namespace Tester.AzureUtils
 {
+    /// <summary>
+    /// Stress tests for Azure Table Storage data manager testing high-volume read/write operations and performance.
+    /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Stress")]
     public class AzureTableDataManagerStressTests : AzureStorageBasicTests
     {

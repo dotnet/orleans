@@ -4,6 +4,9 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
+    /// <summary>
+    /// Tests for Transaction Orchestration Coordinator (TOC) golden path scenarios with Azure Storage.
+    /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("Functional")]
     public class TocGoldenPathTests : TocGoldenPathTestRunnerxUnit, IClassFixture<TestFixture>
     {

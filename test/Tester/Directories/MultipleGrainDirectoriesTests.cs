@@ -7,6 +7,9 @@ using Xunit;
 
 namespace Tester.Directories
 {
+    /// <summary>
+    /// Base class for testing multiple grain directory implementations across cluster silos.
+    /// </summary>
     public abstract class MultipleGrainDirectoriesTests : TestClusterPerTest
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)

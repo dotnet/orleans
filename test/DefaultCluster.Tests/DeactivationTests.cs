@@ -6,12 +6,29 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
+    /// <summary>
+    /// Tests grain deactivation and reactivation behaviors in Orleans.
+    /// Grain deactivation is a key part of Orleans' resource management:
+    /// - Grains can be explicitly deactivated or automatically deactivated when idle
+    /// - Deactivation releases memory and other resources
+    /// - Reactivation occurs transparently when a deactivated grain is called again
+    /// - State is preserved across deactivation/reactivation cycles
+    /// These tests verify the performance and correctness of this mechanism.
+    /// </summary>
     public class DeactivationTests : HostedTestClusterEnsureDefaultStarted
     {
         public DeactivationTests(DefaultClusterFixture fixture) : base(fixture)
         {
         }
 
+        /// <summary>
+        /// Tests the timing of grain deactivation and reactivation.
+        /// Verifies that:
+        /// - Explicit deactivation followed by reactivation completes quickly (under 1 second)
+        /// - The grain gets a new activation (new version) after deactivation
+        /// - State is preserved across the deactivation/reactivation cycle
+        /// This ensures Orleans can efficiently manage grain lifecycle without significant overhead.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task DeactivateReactivateTiming()
         {

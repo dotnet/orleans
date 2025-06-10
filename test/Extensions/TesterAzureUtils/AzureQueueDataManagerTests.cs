@@ -8,6 +8,9 @@ using Xunit;
 
 namespace Tester.AzureUtils
 {
+    /// <summary>
+    /// Tests for Azure Queue Storage data manager operations including queue message handling and visibility timeouts.
+    /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("AzureQueue")]
     public class AzureQueueDataManagerTests : IAsyncLifetime
     {

@@ -3,6 +3,9 @@ using Xunit;
 
 namespace UnitTests.ActivationRepartitioningTests;
 
+/// <summary>
+/// Tests for the blocked bloom filter used in activation repartitioning.
+/// </summary>
 public class BlockedBloomFilterTests
 {
     [Fact]

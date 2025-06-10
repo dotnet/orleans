@@ -13,6 +13,9 @@ using Xunit;
 
 namespace ServiceBus.Tests.StreamingTests
 {
+    /// <summary>
+    /// Tests for EventHub stream recovery with implicit subscriptions handling transient and non-transient errors.
+    /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
     public class EHImplicitSubscriptionStreamRecoveryTests : OrleansTestingBase, IClassFixture<EHImplicitSubscriptionStreamRecoveryTests.Fixture>
     {

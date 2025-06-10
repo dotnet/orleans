@@ -9,7 +9,10 @@ using Xunit;
 namespace DefaultCluster.Tests.General
 {
     /// <summary>
-    /// Unit tests for grains implementing generic interfaces
+    /// Comprehensive tests for Orleans' support of generic grains and interfaces.
+    /// Validates that Orleans can correctly handle grain classes and interfaces with type parameters,
+    /// including complex scenarios like multiple type parameters, inheritance hierarchies, type constraints,
+    /// and proper grain activation/routing based on generic type arguments.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Generics")]
     public class GenericGrainTests : HostedTestClusterEnsureDefaultStarted
@@ -30,8 +33,11 @@ namespace DefaultCluster.Tests.General
             return this.GrainFactory.GetGrain<TGrainInterface>(GetRandomGrainId());
         }
 
-        /// Can instantiate multiple concrete grain types that implement
-        /// different specializations of the same generic interface
+        /// <summary>
+        /// Tests that Orleans can instantiate multiple concrete grain types implementing different
+        /// specializations of the same generic interface. Validates that type-specific grain
+        /// implementations are correctly resolved and activated based on generic type arguments.
+        /// </summary>
         [Fact]
         public async Task GenericGrainTests_ConcreteGrainWithGenericInterfaceGetGrain()
         {
@@ -52,7 +58,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("789", stringResult);
         }
 
-        /// Multiple GetGrain requests with the same id return the same concrete grain
+        /// <summary>
+        /// Validates grain identity preservation: multiple GetGrain calls with the same ID
+        /// return references to the same grain activation. This ensures Orleans' single-activation
+        /// guarantee holds for generic grains.
+        /// </summary>
         [Fact]
         public async Task GenericGrainTests_ConcreteGrainWithGenericInterfaceMultiplicity()
         {
@@ -67,7 +77,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(123f, floatResult);
         }
 
-        /// Can instantiate generic grain specializations
+        /// <summary>
+        /// Tests Orleans' ability to instantiate generic grain specializations with various type arguments.
+        /// Uses theory-based testing to validate that generic grains work correctly with different
+        /// primitive types (float, string), demonstrating type parameter flexibility.
+        /// </summary>
         [Theory]
         [InlineData(1.2f)]
         [InlineData(3.4f)]
@@ -87,6 +101,10 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(setValue, result);
         }
 
+        /// <summary>
+        /// Tests generic grains with array type parameters.
+        /// Validates that Orleans can handle complex type arguments like arrays in generic grain interfaces.
+        /// </summary>
         [Fact]
         public async Task GenericGrainTests_SimpleGenericGrainGetGrain_ArrayTypeParameter()
         {
@@ -103,6 +121,10 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(expected, result);
         }
 
+        /// <summary>
+        /// Tests generic grains that work with arrays through inheritance.
+        /// Validates Orleans' handling of generic grains that register and manage array-based state.
+        /// </summary>
         [Fact]
         public async Task GenericGrainTests_GenericGrainInheritingArray()
         {
@@ -116,7 +138,10 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(expected, result);
         }
 
-        /// Can instantiate grains that implement generic interfaces with generic type parameters
+        /// <summary>
+        /// Tests grains implementing generic interfaces with nested generic type parameters.
+        /// Validates Orleans' ability to handle complex generic scenarios like List<T> as a type argument.
+        /// </summary>
         [Fact]
         public async Task GenericGrainTests_GenericInterfaceWithGenericParametersGetGrain()
         {
@@ -133,7 +158,10 @@ namespace DefaultCluster.Tests.General
         }
 
 
-        /// Multiple GetGrain requests with the same id return the same generic grain specialization
+        /// <summary>
+        /// Validates that multiple GetGrain calls for the same generic grain type and ID
+        /// return the same activation. Ensures Orleans' single-activation semantics apply to generic grains.
+        /// </summary>
         [Fact]
         public async Task GenericGrainTests_SimpleGenericGrainMultiplicity()
         {
@@ -149,8 +177,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(1.2f, floatResult);
         }
 
-        /// If both a concrete implementation and a generic implementation of a
-        /// generic interface exist, prefer the concrete implementation.
+        /// <summary>
+        /// Tests Orleans' type resolution preference rules: when both a concrete implementation
+        /// and a generic implementation exist for a generic interface, Orleans should prefer
+        /// the more specific concrete implementation. This validates proper type matching precedence.
+        /// </summary>
         [Fact]
         public async Task GenericGrainTests_PreferConcreteGrainImplementationOfGenericInterface()
         {
@@ -171,7 +202,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(4.0, result2);
         }
 
-        /// Multiple GetGrain requests with the same id return the same concrete grain implementation
+        /// <summary>
+        /// Validates activation identity when Orleans prefers concrete implementations.
+        /// Ensures that the preference for concrete implementations doesn't break
+        /// the single-activation guarantee.
+        /// </summary>
         [Fact]
         public async Task GenericGrainTests_PreferConcreteGrainImplementationOfGenericInterfaceMultiplicity()
         {
@@ -189,7 +224,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(4.0f, floatResult);
         }
 
-        /// Can instantiate concrete grains that implement multiple generic interfaces
+        /// <summary>
+        /// Tests grains implementing multiple generic interfaces.
+        /// Validates that Orleans correctly handles grains with complex interface hierarchies
+        /// involving multiple generic interfaces.
+        /// </summary>
         [Fact]
         public async Task GenericGrainTests_ConcreteGrainWithMultipleGenericInterfacesGetGrain()
         {
@@ -210,7 +249,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(20, result2);
         }
 
-        /// Multiple GetGrain requests with the same id and interface return the same concrete grain implementation
+        /// <summary>
+        /// Validates single-activation semantics for grains with multiple interfaces.
+        /// Tests that repeated GetGrain calls with the same interface return the same activation
+        /// even when the grain implements multiple interfaces.
+        /// </summary>
         [Fact]
         public async Task GenericGrainTests_ConcreteGrainWithMultipleGenericInterfacesMultiplicity1()
         {
@@ -230,7 +273,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(100, floatResult);
         }
 
-        /// Multiple GetGrain requests with the same id and different interfaces return the same concrete grain implementation
+        /// <summary>
+        /// Tests grain identity across different interface references.
+        /// Validates that accessing the same grain through different interfaces it implements
+        /// still references the same underlying activation, maintaining state consistency.
+        /// </summary>
         [Fact]
         public async Task GenericGrainTests_ConcreteGrainWithMultipleGenericInterfacesMultiplicity2()
         {
@@ -249,6 +296,10 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("100", floatResult);
         }
 
+        /// <summary>
+        /// Tests that grains can use the grain factory to create references to other generic grains.
+        /// Validates that grain factory operations work correctly within grain code for generic types.
+        /// </summary>
         [Fact]
         public async Task GenericGrainTests_UseGenericFactoryInsideGrain()
         {
@@ -486,6 +537,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(c, r3);
         }
 
+        /// <summary>
+        /// Tests generic grains with non-primitive type arguments like Guid and byte arrays.
+        /// Validates that Orleans correctly differentiates grain activations based on complex
+        /// generic type arguments, ensuring proper type-based routing.
+        /// </summary>
         [Fact]
         public async Task Generic_Non_Primitive_Type_Argument()
         {
@@ -599,6 +655,11 @@ namespace DefaultCluster.Tests.General
             Assert.Throws<ArgumentException>(() => this.GrainFactory.GetGrain<INonGenericBase>(id, "UnitTests.Grains.Generic1ArgumentGrain"));
         }
 
+        /// <summary>
+        /// Validates that grains with different generic type arguments create independent activations.
+        /// This is crucial for ensuring that IDbGrain<int> and IDbGrain<string> are treated as
+        /// completely separate grain types with independent state.
+        /// </summary>
         [Fact]
         public async Task DifferentTypeArgsProduceIndependentActivations()
         {
@@ -610,6 +671,10 @@ namespace DefaultCluster.Tests.General
             Assert.Null(v);
         }
 
+        /// <summary>
+        /// Tests generic grains making calls to themselves.
+        /// Validates that self-referential calls work correctly in generic grain contexts.
+        /// </summary>
         [Fact, TestCategory("Echo")]
         public async Task Generic_PingSelf()
         {
@@ -620,6 +685,10 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(s1, s2);
         }
 
+        /// <summary>
+        /// Tests generic grains making calls to other generic grains of the same type.
+        /// Validates grain-to-grain communication for generic grain types.
+        /// </summary>
         [Fact, TestCategory("Echo")]
         public async Task Generic_PingOther()
         {
@@ -632,6 +701,10 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(s1, s2);
         }
 
+        /// <summary>
+        /// Tests complex call chains where a generic grain calls itself through another grain.
+        /// Validates that grain references remain valid when passed between generic grains.
+        /// </summary>
         [Fact, TestCategory("Echo")]
         public async Task Generic_PingSelfThroughOther()
         {
@@ -644,6 +717,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(s1, s2);
         }
 
+        /// <summary>
+        /// Tests scheduled operations and deactivation for generic grains.
+        /// Validates that Orleans' activation lifecycle management works correctly with generic grains,
+        /// including delayed operations and explicit deactivation.
+        /// </summary>
         [Fact, TestCategory("ActivateDeactivate")]
         public async Task Generic_ScheduleDelayedPingAndDeactivate()
         {
@@ -658,6 +736,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(s1, s2);
         }
 
+        /// <summary>
+        /// Tests serialization of generic grains with circular references in their state.
+        /// Validates that Orleans' serialization system can handle complex object graphs
+        /// in generic grain contexts without infinite loops.
+        /// </summary>
         [Fact, TestCategory("Serialization")]
         public async Task SerializationTests_Generic_CircularReferenceTest()
         {
@@ -666,6 +749,11 @@ namespace DefaultCluster.Tests.General
             _ = await grain.GetState();
         }
 
+        /// <summary>
+        /// Tests generic grains with type constraints (where T : class, new(), etc.).
+        /// Validates that Orleans correctly enforces and works with C# generic type constraints,
+        /// including unmanaged constraints and reference type constraints.
+        /// </summary>
         [Fact]
         public async Task Generic_GrainWithTypeConstraints()
         {
@@ -694,6 +782,11 @@ namespace DefaultCluster.Tests.General
             }
         }
 
+        /// <summary>
+        /// Tests generic grains with value type state persistence.
+        /// Validates that Orleans' persistence system correctly handles value types (structs)
+        /// as grain state in generic grain contexts.
+        /// </summary>
         [Fact, TestCategory("Persistence")]
         public async Task Generic_GrainWithValueTypeState()
         {
@@ -710,6 +803,10 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(expectedValue, await grain.GetStateData());
         }
 
+        /// <summary>
+        /// Tests casting non-generic grain references to generic interfaces after activation.
+        /// Validates Orleans' support for late-bound interface discovery on already-activated grains.
+        /// </summary>
         [Fact, TestCategory("Cast")]
         public async Task Generic_CastToGenericInterfaceAfterActivation()
         {
@@ -723,6 +820,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("Hello!", result);
         }
 
+        /// <summary>
+        /// Tests casting to generic interfaces with different type arguments before activation.
+        /// Validates that Orleans can handle interface casts that involve different generic
+        /// type specializations before the grain is activated.
+        /// </summary>
         [Fact, TestCategory("Cast")]
         public async Task Generic_CastToDifferentlyConcretizedGenericInterfaceBeforeActivation()
         {
@@ -735,6 +837,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("Hello!", result);
         }
 
+        /// <summary>
+        /// Tests casting between independently concretized generic interfaces.
+        /// Validates Orleans' ability to handle complex interface hierarchies where interfaces
+        /// are specialized independently of the grain's generic parameters.
+        /// </summary>
         [Fact, TestCategory("Cast")]
         public async Task Generic_CastToDifferentlyConcretizedInterfaceBeforeActivation()
         {
@@ -747,6 +854,10 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("Hello!", result);
         }
 
+        /// <summary>
+        /// Tests casting from generic to non-generic interfaces.
+        /// Validates that Orleans supports interface casts that cross the generic/non-generic boundary.
+        /// </summary>
         [Fact, TestCategory("Cast")]
         public async Task Generic_CastGenericInterfaceToNonGenericInterfaceBeforeActivation()
         {
@@ -760,10 +871,10 @@ namespace DefaultCluster.Tests.General
         }
 
         /// <summary>
-        /// Tests that generic grains can have generic state and that the parameters to the Grain{TState}
-        /// class do not have to match the parameters to the grain class itself.
+        /// Tests that generic grains can have generic state with different type parameters.
+        /// Validates that the type parameters for Grain<TState> don't need to match the grain's
+        /// own type parameters, allowing flexible state modeling in generic grain implementations.
         /// </summary>
-        /// <returns></returns>
         [Fact]
         public async Task GenericGrainStateParameterMismatchTest()
         {
@@ -778,6 +889,12 @@ namespace DefaultCluster.Tests.General
         using UnitTests.GrainInterfaces.Generic.EdgeCases;
         using UnitTests.Grains.Generic.EdgeCases;
 
+        /// <summary>
+        /// Tests for edge cases in Orleans' generic grain type system.
+        /// Validates complex scenarios including partial type specialization, repeated type parameters,
+        /// rearranged generic arguments, type parameter constraints in inheritance hierarchies,
+        /// and advanced type inference scenarios that push the boundaries of the generic type resolver.
+        /// </summary>
         [TestCategory("BVT"), TestCategory("Generics")]
         public class GenericEdgeCaseTests : HostedTestClusterEnsureDefaultStarted
         {
@@ -791,6 +908,12 @@ namespace DefaultCluster.Tests.General
                 return genArgTypeNames.Select(Type.GetType).ToArray();
             }
 
+            /// <summary>
+            /// Tests partial specialization of generic grain types.
+            /// Validates Orleans' ability to handle grains that partially specify generic parameters,
+            /// leaving some to be inferred from the interface implementation.
+            /// Note: Currently unsupported feature.
+            /// </summary>
             [Fact(Skip = "Currently unsupported")]
             public async Task Generic_PartiallySpecifyingGenericGrainFulfilsInterface()
             {
@@ -799,6 +922,12 @@ namespace DefaultCluster.Tests.General
                 Assert.True(concreteGenArgs.SequenceEqual(new[] { typeof(int) }));
             }
 
+            /// <summary>
+            /// Tests grains that reuse the same generic parameter multiple times.
+            /// Validates handling of scenarios where a single type parameter appears
+            /// multiple times in the grain's interface hierarchy.
+            /// Note: Currently unsupported - fails with too many generic arguments.
+            /// </summary>
             [Fact(Skip = "Currently unsupported")]
             public async Task Generic_GenericGrainCanReuseOwnGenArgRepeatedly()
             {
@@ -808,6 +937,11 @@ namespace DefaultCluster.Tests.General
                 Assert.True(concreteGenArgs.SequenceEqual(new[] { typeof(int) }));
             }
 
+            /// <summary>
+            /// Tests casting with partially specified generic interfaces.
+            /// Validates that interfaces with partial generic specialization can be
+            /// cast to their fully specified counterparts.
+            /// </summary>
             [Fact]
             public async Task Generic_PartiallySpecifyingGenericInterfaceIsCastable()
             {
@@ -818,6 +952,11 @@ namespace DefaultCluster.Tests.General
                 Assert.Equal("Hello!", response);
             }
 
+            /// <summary>
+            /// Tests casting with partial generic specialization before activation.
+            /// Validates that the casting mechanism works correctly even when the grain
+            /// hasn't been activated yet.
+            /// </summary>
             [Fact]
             public async Task Generic_PartiallySpecifyingGenericInterfaceIsCastable_Activating()
             {
@@ -828,6 +967,12 @@ namespace DefaultCluster.Tests.General
             }
 
 
+            /// <summary>
+            /// Tests resolution of generic arguments that are both repeated and rearranged.
+            /// Validates complex type parameter mapping where arguments appear multiple times
+            /// in different positions.
+            /// Note: Currently unsupported - type inference fails.
+            /// </summary>
             [Fact(Skip = "Currently unsupported")]
             public async Task Generic_RepeatedRearrangedGenArgsResolved()
             {
@@ -838,6 +983,11 @@ namespace DefaultCluster.Tests.General
                 Assert.True(concreteGenArgs.SequenceEqual(new[] { typeof(string), typeof(int) }));
             }
 
+            /// <summary>
+            /// Tests type resolution with repeated generic arguments across interfaces.
+            /// Validates that Orleans correctly handles scenarios where the same type parameter
+            /// is used multiple times across different interfaces in the hierarchy.
+            /// </summary>
             [Fact]
             public async Task Generic_RepeatedGenArgsWorkAmongstInterfacesInTypeResolution()
             {
@@ -846,6 +996,11 @@ namespace DefaultCluster.Tests.General
                 Assert.True(concreteGenArgs.SequenceEqual(Enumerable.Empty<Type>()));
             }
 
+            /// <summary>
+            /// Tests casting between interfaces with repeated generic arguments.
+            /// Validates that grains can be cast between interfaces that use the same
+            /// type parameter multiple times in their definitions.
+            /// </summary>
             [Fact]
             public async Task Generic_RepeatedGenArgsWorkAmongstInterfacesInCasting()
             {
@@ -856,6 +1011,11 @@ namespace DefaultCluster.Tests.General
                 Assert.Equal("Hello!", response);
             }
 
+            /// <summary>
+            /// Tests casting with repeated generic arguments before activation.
+            /// Validates pre-activation casting behavior for complex generic hierarchies
+            /// with repeated type parameters.
+            /// </summary>
             [Fact]
             public async Task Generic_RepeatedGenArgsWorkAmongstInterfacesInCasting_Activating()
             {
@@ -865,6 +1025,12 @@ namespace DefaultCluster.Tests.General
                 Assert.Equal("Hello!", response);
             }
 
+            /// <summary>
+            /// Tests resolution of rearranged generic arguments.
+            /// Validates that Orleans can handle interfaces where generic parameters
+            /// appear in different orders than in the grain implementation.
+            /// Note: Currently unsupported feature.
+            /// </summary>
             [Fact(Skip = "Currently unsupported")]
             public async Task Generic_RearrangedGenArgsOfCorrectArityAreResolved()
             {
@@ -873,6 +1039,11 @@ namespace DefaultCluster.Tests.General
                 Assert.True(concreteGenArgs.SequenceEqual(new[] { typeof(long), typeof(int) }));
             }
 
+            /// <summary>
+            /// Tests casting between interfaces with rearranged generic arguments.
+            /// Validates that casting works when generic parameters are in different
+            /// positions but the total count matches.
+            /// </summary>
             [Fact]
             public async Task Generic_RearrangedGenArgsOfCorrectNumberAreCastable()
             {
@@ -883,6 +1054,11 @@ namespace DefaultCluster.Tests.General
                 Assert.Equal("Hello!", response);
             }
 
+            /// <summary>
+            /// Tests pre-activation casting with rearranged generic arguments.
+            /// Validates that parameter rearrangement doesn't break casting before
+            /// the grain is activated.
+            /// </summary>
             [Fact]
             public async Task Generic_RearrangedGenArgsOfCorrectNumberAreCastable_Activating()
             {
@@ -901,6 +1077,11 @@ namespace DefaultCluster.Tests.General
             public class GrainFulfillingMultipleSpecializationsOfSameInterfaceViaIntermediate : BasicGrain, IDerivedFromMultipleSpecializationsOfSameInterface
             { }
 
+            /// <summary>
+            /// Tests casting between multiple specializations of the same generic interface.
+            /// Validates that a grain implementing multiple concrete versions of a generic
+            /// interface can be cast between those specializations.
+            /// </summary>
             [Fact]
             public async Task CastingBetweenFullySpecifiedGenericInterfaces()
             {
@@ -912,6 +1093,11 @@ namespace DefaultCluster.Tests.General
                 await castRef2.Hello();
             }
 
+            /// <summary>
+            /// Tests casting to interfaces with unrelated generic parameters.
+            /// Validates that grains can be cast to interfaces whose generic parameters
+            /// have no relationship to the grain's concrete type arguments.
+            /// </summary>
             [Fact]
             public async Task Generic_CanCastToFullySpecifiedInterfaceUnrelatedToConcreteGenArgs()
             {
@@ -923,6 +1109,11 @@ namespace DefaultCluster.Tests.General
             }
 
 
+            /// <summary>
+            /// Tests pre-activation casting to unrelated generic interfaces.
+            /// Validates that casting to interfaces with independent generic parameters
+            /// works before grain activation.
+            /// </summary>
             [Fact]
             public async Task Generic_CanCastToFullySpecifiedInterfaceUnrelatedToConcreteGenArgs_Activating()
             {
@@ -932,6 +1123,12 @@ namespace DefaultCluster.Tests.General
                 Assert.Equal("Hello!", response);
             }
 
+            /// <summary>
+            /// Tests further specialization of already-generic type arguments.
+            /// Validates handling of nested generics like List<T> where T itself is
+            /// a type parameter to be resolved.
+            /// Note: Currently unsupported feature.
+            /// </summary>
             [Fact(Skip = "Currently unsupported")]
             public async Task Generic_GenArgsCanBeFurtherSpecialized()
             {
@@ -940,6 +1137,12 @@ namespace DefaultCluster.Tests.General
                 Assert.True(concreteGenArgs.SequenceEqual(new[] { typeof(int) }));
             }
 
+            /// <summary>
+            /// Tests specialization of generic parameters into array types.
+            /// Validates that Orleans can handle scenarios where generic parameters
+            /// are specialized as array types (T[]).
+            /// Note: Currently unsupported feature.
+            /// </summary>
             [Fact(Skip = "Currently unsupported")]
             public async Task Generic_GenArgsCanBeFurtherSpecializedIntoArrays()
             {
@@ -948,6 +1151,12 @@ namespace DefaultCluster.Tests.General
                 Assert.True(concreteGenArgs.SequenceEqual(new[] { typeof(long) }));
             }
 
+            /// <summary>
+            /// Tests casting between interfaces with nested generic specializations.
+            /// Validates casting when interfaces use complex generic types like List<T>
+            /// with different but compatible specializations.
+            /// Note: Currently unsupported feature.
+            /// </summary>
             [Fact(Skip = "Currently unsupported")]
             public async Task Generic_CanCastBetweenInterfacesWithFurtherSpecializedGenArgs()
             {
@@ -958,6 +1167,11 @@ namespace DefaultCluster.Tests.General
                 Assert.Equal("Hello!", response);
             }
 
+            /// <summary>
+            /// Tests pre-activation casting with nested generic specializations.
+            /// Validates that complex generic casting scenarios work before grain activation.
+            /// Note: Currently unsupported feature.
+            /// </summary>
             [Fact(Skip = "Currently unsupported")]
             public async Task Generic_CanCastBetweenInterfacesWithFurtherSpecializedGenArgs_Activating()
             {

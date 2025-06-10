@@ -11,6 +11,9 @@ using Microsoft.Extensions.Logging;
 
 namespace ServiceBus.Tests.StreamingTests
 {
+    /// <summary>
+    /// Tests for EventHub stream-per-partition data adapter functionality.
+    /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
     public class EHStreamPerPartitionTests : OrleansTestingBase, IClassFixture<EHStreamPerPartitionTests.Fixture>
     {

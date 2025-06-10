@@ -6,6 +6,9 @@ using Xunit;
 
 namespace UnitTests.Runtime
 {
+    /// <summary>
+    /// Tests for activation collector functionality including ticket generation from timestamps.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("Runtime")]
     public class ActivationCollectorTests
     {

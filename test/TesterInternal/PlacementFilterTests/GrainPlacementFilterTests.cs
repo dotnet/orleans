@@ -6,6 +6,9 @@ using Xunit;
 
 namespace UnitTests.PlacementFilterTests;
 
+/// <summary>
+/// Tests for grain placement filter registration, ordering, and execution.
+/// </summary>
 [TestCategory("Placement"), TestCategory("Filters")]
 public class GrainPlacementFilterTests(GrainPlacementFilterTests.Fixture fixture) : IClassFixture<GrainPlacementFilterTests.Fixture>
 {

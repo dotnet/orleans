@@ -12,6 +12,9 @@ using SerializerSession = Orleans.Serialization.Session.SerializerSession;
 
 namespace Benchmarks
 {
+    /// <summary>
+    /// Benchmarks Orleans serialization performance for very large object graphs with hundreds of thousands of items.
+    /// </summary>
     [Trait("Category", "Benchmark")]
     [Config(typeof(BenchmarkConfig))]
     public class MegaGraphBenchmark

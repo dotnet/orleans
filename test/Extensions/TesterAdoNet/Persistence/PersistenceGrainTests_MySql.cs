@@ -10,6 +10,9 @@ using Xunit.Abstractions;
 
 namespace Tester.AdoNet.Persistence
 {
+    /// <summary>
+    /// Tests for Orleans grain state persistence functionality using MySQL as the storage provider.
+    /// </summary>
     [TestCategory("Persistence"), TestCategory("MySql")]
     public class PersistenceGrainTests_MySql : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_MySql.Fixture>
     {

@@ -4,12 +4,20 @@ using Xunit;
 
 namespace Analyzers.Tests
 {
+    /// <summary>
+    /// Tests for the AlwaysInterleaveDiagnosticAnalyzer which ensures that the [AlwaysInterleave] attribute
+    /// is only used on grain interface methods, not on grain implementation methods. The attribute must be
+    /// declared on the interface to properly configure interleaving behavior for all implementations.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("Analyzer")]
     public class AlwaysInterleaveDiagnosticAnalyzerTest : DiagnosticAnalyzerTestBase<AlwaysInterleaveDiagnosticAnalyzer>
     {
         protected override Task<(Diagnostic[], string)> GetDiagnosticsAsync(string source, params string[] extraUsings)
             => base.GetDiagnosticsAsync(source, extraUsings.Concat(new[] { "Orleans.Concurrency" }).ToArray());
 
+        /// <summary>
+        /// Verifies that no diagnostic is reported when the [AlwaysInterleave] attribute is not used at all.
+        /// </summary>
         [Fact]
         public async Task AlwaysInterleave_Analyzer_NoWarningsIfAttributeIsNotUsed() => await this.AssertNoDiagnostics(@"
 class C
@@ -18,6 +26,10 @@ class C
 }
 ");
 
+        /// <summary>
+        /// Verifies that no diagnostic is reported when the [AlwaysInterleave] attribute is correctly used on a grain interface method.
+        /// This is the correct usage pattern for the attribute.
+        /// </summary>
         [Fact]
         public async Task AlwaysInterleave_Analyzer_NoWarningsIfAttributeIsUsedOnInterface() => await this.AssertNoDiagnostics(@"
 public interface I : IGrain
@@ -27,6 +39,11 @@ public interface I : IGrain
 }
 ");
 
+        /// <summary>
+        /// Verifies that a diagnostic error is reported when the [AlwaysInterleave] attribute is incorrectly used
+        /// on a grain implementation method instead of the interface method. This is an error because interleaving
+        /// behavior must be specified at the interface level.
+        /// </summary>
         [Fact]
         public async Task AlwaysInterleave_Analyzer_WarningIfAttributeisUsedOnGrainClass()
         {

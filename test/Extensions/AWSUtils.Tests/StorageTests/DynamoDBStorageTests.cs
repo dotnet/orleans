@@ -3,6 +3,10 @@ using Xunit;
 
 namespace AWSUtils.Tests.StorageTests.AWSUtils
 {
+    /// <summary>
+    /// Tests for DynamoDB storage operations.
+    /// Verifies CRUD operations, conditional updates, and etag-based concurrency control.
+    /// </summary>
     [TestCategory("Storage"), TestCategory("AWS"), TestCategory("DynamoDb")]
     public class DynamoDBStorageTests : IClassFixture<DynamoDBStorageTestsFixture>
     {
@@ -23,6 +27,10 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
             return new UnitTestDynamoDBTableData("JustData", PartitionKey, "RK-" + Guid.NewGuid());
         }
 
+        /// <summary>
+        /// Tests creating a new item with conditional check to prevent duplicates.
+        /// Verifies that the conditional expression prevents overwriting existing items.
+        /// </summary>
         [SkippableFact,  TestCategory("Functional")]
         public async Task DynamoDBDataManager_CreateItemAsync()
         {
@@ -42,6 +50,10 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
             });
         }
 
+        /// <summary>
+        /// Tests upserting items (insert or update).
+        /// Verifies that items can be created and then updated in subsequent operations.
+        /// </summary>
         [SkippableFact,  TestCategory("Functional")]
         public async Task DynamoDBDataManager_UpsertItemAsync()
         {

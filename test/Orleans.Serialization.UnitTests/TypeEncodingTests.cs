@@ -13,6 +13,27 @@ using Xunit;
 
 namespace Orleans.Serialization.UnitTests
 {
+    /// <summary>
+    /// Tests for Orleans' type encoding and type manifest system.
+    /// 
+    /// Orleans uses an efficient type encoding system that:
+    /// - Maps types to compact identifiers for wire efficiency
+    /// - Supports type aliases for human-readable debugging
+    /// - Handles generic types with proper parameter encoding
+    /// - Manages compound types (generics with multiple parameters)
+    /// 
+    /// Key features tested:
+    /// - Type alias resolution and encoding
+    /// - Generic type parameter serialization
+    /// - Interface proxy type generation and naming
+    /// - Type manifest configuration and well-known types
+    /// 
+    /// The type encoding system is fundamental to Orleans' ability to:
+    /// - Minimize bandwidth usage through compact type representations
+    /// - Support debugging through readable type aliases
+    /// - Enable cross-version compatibility through stable type identifiers
+    /// - Provide efficient polymorphic serialization
+    /// </summary>
     public class TypeEncodingTests
     {
         private readonly IServiceProvider _serviceProvider;

@@ -5,6 +5,9 @@ using System.Data;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
+    /// <summary>
+    /// Tests for round-robin resource selector including selection distribution and duplicate handling.
+    /// </summary>
     [TestCategory("BVT")]
     public class RoundRobinSelectorTests : ResourceSelectorTestRunner
     {

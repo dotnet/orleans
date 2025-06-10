@@ -5,6 +5,9 @@ using Orleans.Runtime;
 
 namespace Tester.EventSourcingTests
 {
+    /// <summary>
+    /// Tests for event-sourced counters grain functionality including concurrent increments and state management.
+    /// </summary>
     public partial class CountersGrainTests : IClassFixture<EventSourcingClusterFixture>
     {
         private readonly EventSourcingClusterFixture fixture;

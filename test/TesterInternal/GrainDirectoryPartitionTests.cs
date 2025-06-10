@@ -8,6 +8,25 @@ using Xunit;
 
 namespace UnitTests;
 
+/// <summary>
+/// Tests for the Orleans grain directory partition functionality.
+/// 
+/// The grain directory is a distributed data structure that maps grain identities
+/// to their current activation locations (silo addresses). Key concepts:
+/// 
+/// - Single activation constraint: Each grain ID should have at most one activation
+/// - Directory partitioning: The directory is partitioned across silos for scalability
+/// - Silo death handling: Dead silo entries must be cleaned up to allow new activations
+/// - Race condition handling: Concurrent activation requests must be properly synchronized
+/// 
+/// These tests verify critical scenarios:
+/// - Overriding entries pointing to dead silos
+/// - Preventing duplicate activations on live silos
+/// - Conditional updates using previousAddress parameter
+/// - Filtering out entries for dead silos during lookups
+/// 
+/// This is essential for maintaining Orleans' single activation guarantee.
+/// </summary>
 [TestCategory("BVT"), TestCategory("GrainDirectory")]
 public class GrainDirectoryPartitionTests
 {
@@ -25,6 +44,12 @@ public class GrainDirectoryPartitionTests
             new LoggerFactory());
     }
 
+    /// <summary>
+    /// Tests that directory entries pointing to dead silos can be overridden.
+    /// When a silo dies, its grain activations become invalid. The directory
+    /// must allow new activations to replace these dead entries to maintain
+    /// availability. This is crucial for recovery after silo failures.
+    /// </summary>
     [Fact]
     public void OverrideDeadEntryTest()
     {
@@ -45,6 +70,12 @@ public class GrainDirectoryPartitionTests
         Assert.Equal(secondGrainAddress, secondRegister.Address);
     }
 
+    /// <summary>
+    /// Verifies that the directory rejects attempts to register activations
+    /// on silos that are already known to be dead. This prevents creating
+    /// entries that would immediately be invalid, avoiding unnecessary
+    /// cleanup work and potential race conditions.
+    /// </summary>
     [Fact]
     public void DoNotInsertInvalidEntryTest()
     {
@@ -57,6 +88,12 @@ public class GrainDirectoryPartitionTests
        Assert.Throws<OrleansException>(() => _target.AddSingleActivation(grainAddress, previousAddress: null));
     }
 
+    /// <summary>
+    /// Tests the single activation guarantee by ensuring valid entries
+    /// cannot be overridden by new activation attempts. This prevents
+    /// duplicate activations when multiple silos try to activate the
+    /// same grain concurrently.
+    /// </summary>
     [Fact]
     public void DoNotOverrideValidEntryTest()
     {
@@ -75,6 +112,12 @@ public class GrainDirectoryPartitionTests
         Assert.Equal(grainAddress, newRegister.Address);
     }
 
+    /// <summary>
+    /// Tests conditional update functionality using the previousAddress parameter.
+    /// This allows explicit handoff scenarios where an activation is intentionally
+    /// moved from one silo to another, but only if the current state matches
+    /// expectations (optimistic concurrency control).
+    /// </summary>
     [Fact]
     public void OverrideValidEntryIfMatchesTest()
     {
@@ -93,6 +136,12 @@ public class GrainDirectoryPartitionTests
         Assert.Equal(newGrainAddress, newRegister.Address);
     }
 
+    /// <summary>
+    /// Verifies that conditional updates fail when the previousAddress doesn't
+    /// match the current entry. This prevents race conditions where the directory
+    /// state changed between read and update operations, ensuring consistency
+    /// in distributed scenarios.
+    /// </summary>
     [Fact]
     public void DoNotOverrideValidEntryIfNoMatchTest()
     {
@@ -118,6 +167,12 @@ public class GrainDirectoryPartitionTests
         Assert.Equal(grainAddress, newRegister.Address);
     }
 
+    /// <summary>
+    /// Tests that lookups filter out entries pointing to dead silos.
+    /// Even if the directory contains stale entries, lookups should
+    /// return null rather than invalid addresses, allowing the caller
+    /// to create a new activation on a healthy silo.
+    /// </summary>
     [Fact]
     public void DoNotReturnInvalidEntryTest()
     {
@@ -137,6 +192,12 @@ public class GrainDirectoryPartitionTests
         Assert.Null(lookup.Address);
     }
 
+    /// <summary>
+    /// Mock implementation of ISiloStatusOracle for testing.
+    /// The silo status oracle provides membership information about
+    /// which silos are alive, dead, or in other states. The grain
+    /// directory uses this to validate entries and make placement decisions.
+    /// </summary>
     private class MockSiloStatusOracle : ISiloStatusOracle
     {
         private readonly Dictionary<SiloAddress, SiloStatus> _content = new();

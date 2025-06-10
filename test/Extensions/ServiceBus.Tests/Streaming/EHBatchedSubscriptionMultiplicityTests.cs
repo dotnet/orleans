@@ -6,6 +6,9 @@ using Xunit;
 
 namespace ServiceBus.Tests.StreamingTests
 {
+    /// <summary>
+    /// Tests for EventHub subscription multiplicity scenarios with batched message processing.
+    /// </summary>
     public class EHBatchedSubscriptionMultiplicityTests : OrleansTestingBase, IClassFixture<EHBatchedSubscriptionMultiplicityTests.Fixture>
     {
         private const string StreamProviderName = "EHStreamPerPartition";

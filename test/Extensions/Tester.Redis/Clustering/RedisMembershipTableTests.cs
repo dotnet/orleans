@@ -10,9 +10,9 @@ using StackExchange.Redis;
 
 namespace Tester.Redis.Clustering
 {
-    // <summary>
-    // Tests for operation of Orleans Membership Table using Redis
-    // </summary>
+    /// <summary>
+    /// Tests for Orleans membership table operations using Redis as the backing store.
+    /// </summary>
     [TestCategory("Redis"), TestCategory("Clustering"), TestCategory("Functional")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class RedisMembershipTableTests : MembershipTableTestsBase

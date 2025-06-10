@@ -12,6 +12,9 @@ using Xunit;
 
 namespace ServiceBus.Tests.SlowConsumingTests
 {
+    /// <summary>
+    /// Tests for EventHub slow consumer detection and back pressure algorithm behavior.
+    /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming")]
     public class EHSlowConsumingTests : OrleansTestingBase, IClassFixture<EHSlowConsumingTests.Fixture>
     {

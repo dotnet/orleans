@@ -21,6 +21,9 @@ using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Persistence
 {
+    /// <summary>
+    /// Tests for Azure Table Storage persistence provider, including serialization formats and storage conversions.
+    /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     [TestCategory("Persistence")]
     public class PersistenceProviderTests_Local

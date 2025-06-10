@@ -14,6 +14,9 @@ using Orleans.Statistics;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {
+    /// <summary>
+    /// Tests for EventHub cache purge logic and eviction strategy behavior under pressure conditions.
+    /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming")]
     public class EHPurgeLogicTests
     {

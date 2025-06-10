@@ -11,6 +11,9 @@ using Xunit;
 
 namespace Tester.ClientConnectionTests
 {
+    /// <summary>
+    /// Tests for handling stalled connections to gateways and silos during client reconnection and cluster joins.
+    /// </summary>
     public class StallConnectionTests : TestClusterPerTest
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);

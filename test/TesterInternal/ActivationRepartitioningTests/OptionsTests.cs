@@ -5,6 +5,9 @@ using Xunit;
 
 namespace UnitTests.ActivationRepartitioningTests;
 
+/// <summary>
+/// Tests for activation repartitioner configuration options validation.
+/// </summary>
 [TestCategory("Functional"), TestCategory("ActivationRepartitioning")]
 public class OptionsTests
 {

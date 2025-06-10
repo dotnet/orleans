@@ -9,6 +9,9 @@ using Orleans.Serialization.Session;
 
 namespace Benchmarks.Serialization.Comparison;
 
+/// <summary>
+/// Benchmarks Orleans deep copy performance for various object types including arrays and value types.
+/// </summary>
 [Config(typeof(BenchmarkConfig))]
 public class CopierBenchmark
 {

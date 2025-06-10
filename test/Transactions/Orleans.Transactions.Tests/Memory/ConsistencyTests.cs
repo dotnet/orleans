@@ -4,6 +4,9 @@ using Xunit;
 
 namespace Orleans.Transactions.Tests
 {
+    /// <summary>
+    /// Tests for transaction consistency behavior with in-memory storage.
+    /// </summary>
     [TestCategory("Transactions-dev")]
     public class ConsistencyTests : ConsistencyTransactionTestRunnerxUnit, IClassFixture<MemoryTransactionsFixture>
     {

@@ -15,6 +15,9 @@ using Orleans.Reminders.AzureStorage;
 
 namespace Tester.AzureUtils.TimerTests
 {
+    /// <summary>
+    /// Standalone tests for Azure Table Storage reminder functionality, including insert rate performance and data persistence.
+    /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     [TestCategory("AzureStorage")]
     public class ReminderTests_Azure_Standalone : AzureStorageBasicTests

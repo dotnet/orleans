@@ -10,6 +10,25 @@ using Xunit.Abstractions;
 
 namespace Orleans.Serialization.UnitTests;
 
+/// <summary>
+/// Tests for Orleans' MessagePack serialization support.
+/// 
+/// MessagePack is a binary serialization format that provides:
+/// - More compact representation than JSON
+/// - Faster serialization/deserialization than text formats
+/// - Cross-platform and cross-language support
+/// 
+/// Orleans' MessagePack integration:
+/// - Leverages the MessagePack-CSharp library
+/// - Supports union types (discriminated unions)
+/// - Provides both serialization and deep copy functionality
+/// - Can be used for specific types while using Orleans' native format for others
+/// 
+/// This is useful when:
+/// - Interoperating with systems that use MessagePack
+/// - Requiring a compact binary format with broad language support
+/// - Needing better performance than JSON but more portability than Orleans' native format
+/// </summary>
 [Trait("Category", "BVT")]
 public class MessagePackCodecTests : FieldCodecTester<MyMessagePackClass?, IFieldCodec<MyMessagePackClass?>>
 {

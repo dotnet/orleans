@@ -8,6 +8,9 @@ using Xunit;
 
 namespace UnitTests.StreamingTests
 {
+    /// <summary>
+    /// Tests for stream subscription behavior with stateless worker grains, verifying subscription restrictions.
+    /// </summary>
     [TestCategory("Streaming")]
     public class StatelessWorkersStreamTests : OrleansTestingBase, IClassFixture<StatelessWorkersStreamTests.Fixture>
     {
@@ -58,6 +61,9 @@ namespace UnitTests.StreamingTests
         }
     }
 
+    /// <summary>
+    /// Test runner class for executing stateless worker stream tests with producer and consumer functionality.
+    /// </summary>
     public class StatelessWorkersStreamTestsRunner
     {
         private const string StreamNamespace = "SampleStreamNamespace";

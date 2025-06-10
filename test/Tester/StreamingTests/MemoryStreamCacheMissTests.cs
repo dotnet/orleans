@@ -5,6 +5,9 @@ using Xunit.Abstractions;
 
 namespace Tester.StreamingTests
 {
+    /// <summary>
+    /// Tests memory stream cache miss scenarios with custom cache eviction settings and stream filters.
+    /// </summary>
     [TestCategory("Functional"), TestCategory("Streaming"), TestCategory("StreamingCacheMiss")]
     public class MemoryStreamCacheMissTests : StreamingCacheMissTests
     {
