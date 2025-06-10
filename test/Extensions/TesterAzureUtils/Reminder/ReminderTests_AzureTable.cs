@@ -46,7 +46,7 @@ namespace Tester.AzureUtils.TimerTests
             await Test_Reminders_Basic_StopByRef();
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9337"), TestCategory("Functional")]
+        [SkippableFact, Quarantine("https://github.com/dotnet/orleans/issues/9337"), TestCategory("Functional")]
         public async Task Rem_Azure_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
@@ -66,7 +66,7 @@ namespace Tester.AzureUtils.TimerTests
             await Test_Reminders_ReminderNotFound();
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9344"), TestCategory("Functional")]
+        [SkippableFact, Quarantine("https://github.com/dotnet/orleans/issues/9344"), TestCategory("Functional")]
         public async Task Rem_Azure_Basic()
         {
             // start up a test grain and get the period that it's programmed to use.
@@ -303,7 +303,7 @@ namespace Tester.AzureUtils.TimerTests
             Assert.Equal(4, curr2); // CopyGrain fault
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
+        [SkippableFact, Quarantine("https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
         public async Task Rem_Azure_GT_1F1J_MultiGrain()
         {
             List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(1);

@@ -49,7 +49,7 @@ namespace Tester.StreamingTests
             this.fixture = fixture;
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4320"), TestCategory("Functional"), TestCategory("Streaming")]
+        [SkippableFact, Quarantine("https://github.com/dotnet/orleans/issues/4320"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task PersistentStreamingOverSingleGatewayTest()
         {
             const int streamCount = 100;

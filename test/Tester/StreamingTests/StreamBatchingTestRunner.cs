@@ -19,7 +19,7 @@ namespace UnitTests.StreamingTests
             this.output = output;
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5649"), TestCategory("Functional"), TestCategory("Streaming")]
+        [SkippableFact, Quarantine("https://github.com/dotnet/orleans/issues/5649"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SingleSendBatchConsume()
         {
             const int ExpectedConsumed = 30;
@@ -53,7 +53,7 @@ namespace UnitTests.StreamingTests
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(consumer, ExpectedConsumed, 1, lastTry), Timeout);
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5632"), TestCategory("Functional"), TestCategory("Streaming")]
+        [SkippableFact, Quarantine("https://github.com/dotnet/orleans/issues/5632"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task BatchSendBatchConsume()
         {
             const int BatchesSent = 3;

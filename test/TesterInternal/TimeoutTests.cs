@@ -90,7 +90,7 @@ namespace UnitTests
             Assert.True(promise.Status == TaskStatus.Faulted);
         }
 
-        [SkippableFact(Skip= "https://github.com/dotnet/orleans/issues/3995"), TestCategory("SlowBVT")]
+        [SkippableFact, Quarantine("https://github.com/dotnet/orleans/issues/3995"), TestCategory("SlowBVT")]
         public async Task CallThatShouldHaveBeenDroppedNotExecutedTest()
         {
             var responseTimeout = TimeSpan.FromSeconds(2);

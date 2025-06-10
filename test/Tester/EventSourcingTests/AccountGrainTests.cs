@@ -52,7 +52,7 @@ namespace Tester.EventSourcingTests
             }
         }
 
-        [Fact(Skip = "Flaky test. See https://github.com/dotnet/orleans/issues/5605"), TestCategory("EventSourcing"), TestCategory("Functional")]
+        [Fact, Quarantine("https://github.com/dotnet/orleans/issues/5605"), TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task AccountWithLog()
         {
             var account = this.fixture.GrainFactory.GetGrain<IAccountGrain>($"Account-{Guid.NewGuid()}", "TestGrains.AccountGrain");
