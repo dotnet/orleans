@@ -21,10 +21,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          8.0.x
+        global-json-file: global.json
     - name: Build
       run: dotnet build -bl
     - uses: actions/upload-artifact@v4
@@ -54,10 +53,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          8.0.x
+        global-json-file: global.json
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
@@ -89,10 +87,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          8.0.x
+        global-json-file: global.json
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
@@ -136,10 +133,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          8.0.x
+        global-json-file: global.json
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
@@ -179,10 +175,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          8.0.x
+        global-json-file: global.json
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
@@ -224,10 +219,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          8.0.x
+        global-json-file: global.json
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
@@ -266,10 +260,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          8.0.x
+        global-json-file: global.json
     - name: Test
       run: dotnet test
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
@@ -304,10 +297,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          8.0.x
+        global-json-file: global.json
     # - name: Install emulator certificate
     #   run: |
     #     sleep 90s
@@ -364,10 +356,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          8.0.x
+        global-json-file: global.json
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
@@ -408,10 +399,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          8.0.x
+        global-json-file: global.json
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
@@ -453,10 +443,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          8.0.x
+        global-json-file: global.json
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
@@ -492,10 +481,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          8.0.x
+        global-json-file: global.json
     - name: Build
       run: dotnet build
     - name: Test
@@ -526,10 +514,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          8.0.x
+        global-json-file: global.json
     - name: Test Code Generator
       run: dotnet test
         test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj
