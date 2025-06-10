@@ -88,6 +88,7 @@ namespace Tester.AzureUtils.TimerTests
         }
 
         [SkippableFact, TestCategory("Functional")]
+        [Quarantine("https://github.com/dotnet/orleans/issues/9557")]
         public async Task Rem_Azure_Basic_Restart()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -277,6 +278,7 @@ namespace Tester.AzureUtils.TimerTests
         }
 
         [SkippableFact, TestCategory("Functional")]
+        [Quarantine("https://github.com/dotnet/orleans/issues/9557")]
         public async Task Rem_Azure_GT_Basic()
         {
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());

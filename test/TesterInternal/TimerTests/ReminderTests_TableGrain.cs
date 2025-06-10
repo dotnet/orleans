@@ -49,6 +49,7 @@ namespace UnitTests.TimerTests
         }
 
         [Fact]
+        [Quarantine("https://github.com/dotnet/orleans/issues/9555")]
         public async Task Rem_Grain_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();

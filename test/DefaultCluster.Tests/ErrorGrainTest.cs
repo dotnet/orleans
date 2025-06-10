@@ -83,6 +83,7 @@ namespace DefaultCluster.Tests
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ErrorHandling")]
+        [Quarantine("https://github.com/dotnet/orleans/issues/9558")]
         // check that premature wait finishes on time with false.
         public async Task ErrorHandlingTimedMethod()
         {
