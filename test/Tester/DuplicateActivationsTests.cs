@@ -13,9 +13,8 @@ namespace UnitTests.CatalogTests
     /// in the cluster at any time. This test stress-tests this guarantee by having multiple runner grains
     /// simultaneously make calls to the same set of target grains.
     /// 
-    /// The catalog (grain directory) is responsible for coordinating activation placement and ensuring
-    /// that concurrent activation requests for the same grain don't result in multiple activations.
-    /// This is critical for maintaining grain state consistency and correctness.
+    /// The catalog is responsible for ensuring that concurrent activation requests for the same grain
+    /// don't result in multiple activations within a single silo.
     /// </summary>
     public class DuplicateActivationsTests : IClassFixture<DuplicateActivationsTests.Fixture>
     {
