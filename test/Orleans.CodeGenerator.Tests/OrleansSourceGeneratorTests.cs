@@ -23,9 +23,6 @@ namespace Orleans.CodeGenerator.Tests;
 /// - Grain proxy generation for different grain key types
 /// - Proper handling of generic types
 /// - Diagnostics for incorrect usage
-///
-/// Source generation is crucial for Orleans' performance and developer experience,
-/// eliminating reflection overhead and providing compile-time safety.
 /// </summary>
 public class OrleansSourceGeneratorTests
 {
