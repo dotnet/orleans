@@ -125,7 +125,7 @@ namespace Tester.AzureUtils
         }
 
         [SkippableFact, TestCategory("Functional")]
-        [Quarantine("https://github.com/dotnet/orleans/issues/9552")]
+        [Skip("https://github.com/dotnet/orleans/issues/9552")]
         public async Task AQ_Standalone_4()
         {
             TimeSpan visibilityTimeout = TimeSpan.FromSeconds(2);

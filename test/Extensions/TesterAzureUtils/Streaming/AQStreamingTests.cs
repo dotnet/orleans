@@ -173,7 +173,7 @@ namespace Tester.AzureUtils.Streaming
             await fixture.Runner.StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients();
         }
 
-        [SkippableFact, Quarantine("https://github.com/dotnet/orleans/issues/5648"), TestCategory("Functional")]
+        [SkippableFact, Skip("https://github.com/dotnet/orleans/issues/5648"), TestCategory("Functional")]
         public async Task AQ_07_ManyDifferent_ManyProducerClientsManyConsumerGrains()
         {
             await fixture.Runner.StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains();

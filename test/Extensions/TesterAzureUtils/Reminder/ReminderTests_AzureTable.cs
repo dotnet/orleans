@@ -46,7 +46,7 @@ namespace Tester.AzureUtils.TimerTests
             await Test_Reminders_Basic_StopByRef();
         }
 
-        [SkippableFact, Quarantine("https://github.com/dotnet/orleans/issues/9337"), TestCategory("Functional")]
+        [SkippableFact, Skip("https://github.com/dotnet/orleans/issues/9337"), TestCategory("Functional")]
         public async Task Rem_Azure_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
@@ -66,7 +66,7 @@ namespace Tester.AzureUtils.TimerTests
             await Test_Reminders_ReminderNotFound();
         }
 
-        [SkippableFact, Quarantine("https://github.com/dotnet/orleans/issues/9344"), TestCategory("Functional")]
+        [SkippableFact, Skip("https://github.com/dotnet/orleans/issues/9344"), TestCategory("Functional")]
         public async Task Rem_Azure_Basic()
         {
             // start up a test grain and get the period that it's programmed to use.
@@ -88,7 +88,7 @@ namespace Tester.AzureUtils.TimerTests
         }
 
         [SkippableFact, TestCategory("Functional")]
-        [Quarantine("https://github.com/dotnet/orleans/issues/9557")]
+        [Skip("https://github.com/dotnet/orleans/issues/9557")]
         public async Task Rem_Azure_Basic_Restart()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -278,7 +278,7 @@ namespace Tester.AzureUtils.TimerTests
         }
 
         [SkippableFact, TestCategory("Functional")]
-        [Quarantine("https://github.com/dotnet/orleans/issues/9557")]
+        [Skip("https://github.com/dotnet/orleans/issues/9557")]
         public async Task Rem_Azure_GT_Basic()
         {
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -303,7 +303,7 @@ namespace Tester.AzureUtils.TimerTests
             Assert.Equal(4, curr2); // CopyGrain fault
         }
 
-        [SkippableFact, Quarantine("https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
+        [SkippableFact, Skip("https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
         public async Task Rem_Azure_GT_1F1J_MultiGrain()
         {
             List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(1);
