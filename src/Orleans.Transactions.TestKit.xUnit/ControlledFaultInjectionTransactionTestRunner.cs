@@ -23,6 +23,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         }
 
         [SkippableTheory]
+        [Quarantine("https://github.com/dotnet/orleans/issues/9551")]
         [InlineData(TransactionFaultInjectPhase.AfterPrepare, FaultInjectionType.Deactivation)]
         [InlineData(TransactionFaultInjectPhase.AfterConfirm, FaultInjectionType.Deactivation)]
         [InlineData(TransactionFaultInjectPhase.AfterPrepared, FaultInjectionType.Deactivation)]
