@@ -12,7 +12,7 @@ using Orleans.Internal;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class ConnectionManager
+    internal sealed partial class ConnectionManager
     {
         [ThreadStatic]
         private static uint nextConnection;
@@ -130,7 +130,7 @@ namespace Orleans.Runtime.Messaging
                 entry.PendingConnection = null;
             }
 
-            this.trace.LogInformation("Connection {Connection} established with {Silo}", connection, address);
+            LogInformationConnectionEstablished(this.trace, connection, address);
         }
 
         public void OnConnectionTerminated(SiloAddress address, Connection connection, Exception exception)
@@ -157,16 +157,11 @@ namespace Orleans.Runtime.Messaging
 
             if (exception != null && !this.shutdownCancellation.IsCancellationRequested)
             {
-                this.trace.LogWarning(
-                    exception,
-                    "Connection {Connection} terminated",
-                    connection);
+                LogWarningConnectionTerminated(this.trace, exception, connection);
             }
             else
             {
-                this.trace.LogDebug(
-                    "Connection {Connection} closed",
-                    connection);
+                LogDebugConnectionClosed(this.trace, connection);
             }
         }
 
@@ -179,12 +174,7 @@ namespace Orleans.Runtime.Messaging
 
             try
             {
-                if (this.trace.IsEnabled(LogLevel.Information))
-                {
-                    this.trace.LogInformation(
-                        "Establishing connection to endpoint {EndPoint}",
-                        address);
-                }
+                LogInformationEstablishingConnection(this.trace, address);
 
                 // Cancel pending connection attempts either when the host terminates or after the configured time limit.
                 openConnectionCancellation = CancellationTokenSource.CreateLinkedTokenSource(this.shutdownCancellation.Token, default);
@@ -192,12 +182,7 @@ namespace Orleans.Runtime.Messaging
 
                 var connection = await this.connectionFactory.ConnectAsync(address, openConnectionCancellation.Token);
 
-                if (this.trace.IsEnabled(LogLevel.Information))
-                {
-                    this.trace.LogInformation(
-                        "Connected to endpoint {EndPoint}",
-                        address);
-                }
+                LogInformationConnectedToEndpoint(this.trace, address);
 
                 this.StartConnection(address, connection);
 
@@ -210,10 +195,7 @@ namespace Orleans.Runtime.Messaging
             {
                 this.OnConnectionFailed(entry);
 
-                this.trace.LogWarning(
-                    exception,
-                    "Connection attempt to endpoint {EndPoint} failed",
-                    address);
+                LogWarningConnectionAttemptFailed(this.trace, exception, address);
 
                 if (exception is OperationCanceledException && openConnectionCancellation?.IsCancellationRequested == true && !shutdownCancellation.IsCancellationRequested)
                     throw new ConnectionFailedException($"Connection attempt to endpoint {address} timed out after {connectionOptions.OpenConnectionTimeout}");
@@ -270,10 +252,7 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
-                if (this.trace.IsEnabled(LogLevel.Debug))
-                {
-                    this.trace.LogDebug("Shutting down connections");
-                }
+                LogDebugShuttingDownConnections(this.trace);
 
                 this.shutdownCancellation.Cancel(throwOnFirstException: false);
 
@@ -306,13 +285,13 @@ namespace Orleans.Runtime.Messaging
                     await Task.Delay(10);
                     if (++cycles > 100 && cycles % 500 == 0 && this.ConnectionCount is var remaining and > 0)
                     {
-                        this.trace.LogWarning("Waiting for {NumRemaining} connections to terminate", remaining);
+                        LogWarningWaitingForConnectionsToTerminate(this.trace, remaining);
                     }
                 }
             }
             catch (Exception exception)
             {
-                this.trace.LogWarning(exception, "Exception during shutdown");
+                LogWarningExceptionDuringShutdown(this.trace, exception);
             }
             finally
             {
@@ -397,5 +376,59 @@ namespace Orleans.Runtime.Messaging
 
             public void RemoveDefunct() => Connections = Connections.RemoveAll(c => !c.IsValid);
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Connection {Connection} established with {Silo}"
+        )]
+        private static partial void LogInformationConnectionEstablished(ILogger logger, Connection connection, SiloAddress silo);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Connection {Connection} terminated"
+        )]
+        private static partial void LogWarningConnectionTerminated(ILogger logger, Exception exception, Connection connection);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Connection {Connection} closed"
+        )]
+        private static partial void LogDebugConnectionClosed(ILogger logger, Connection connection);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Establishing connection to endpoint {EndPoint}"
+        )]
+        private static partial void LogInformationEstablishingConnection(ILogger logger, SiloAddress endPoint);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Connected to endpoint {EndPoint}"
+        )]
+        private static partial void LogInformationConnectedToEndpoint(ILogger logger, SiloAddress endPoint);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Connection attempt to endpoint {EndPoint} failed"
+        )]
+        private static partial void LogWarningConnectionAttemptFailed(ILogger logger, Exception exception, SiloAddress endPoint);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Shutting down connections"
+        )]
+        private static partial void LogDebugShuttingDownConnections(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Waiting for {NumRemaining} connections to terminate"
+        )]
+        private static partial void LogWarningWaitingForConnectionsToTerminate(ILogger logger, int numRemaining);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Exception during shutdown"
+        )]
+        private static partial void LogWarningExceptionDuringShutdown(ILogger logger, Exception exception);
     }
 }

@@ -34,6 +34,7 @@ namespace Orleans.Internal
             }
             catch (Exception exc)
             {
+                // TODO: pending on https://github.com/dotnet/runtime/issues/110570
                 logger.LogError((int)errorCode, exc, "{Message}", message);
                 throw;
             }
