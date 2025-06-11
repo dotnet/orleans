@@ -24,7 +24,38 @@ public class DemoData
 }");
 
     [Fact]
-    public Task TestBasicClassWithFields() => AssertSuccessfulSourceGeneration(
+    public Task TestBasicClassWithoutNamespace() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+[GenerateSerializer]
+public class DemoData
+{
+    [Id(0)]
+    public string Value { get; set; } = string.Empty;
+}");
+
+    [Fact]
+    public Task TestBasicClassWithDifferentAccessModifiers() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public class PublicDemoData
+{
+    [Id(0)]
+    public string Value { get; set; } = string.Empty;
+}
+
+[GenerateSerializer]
+internal class InternalDemoData
+{
+    [Id(0)]
+    public string Value { get; set; } = string.Empty;
+}");
+
+    [Fact]
+    public Task TestBasicClassWithAnnotatedFields() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
 
 namespace TestProject;
@@ -38,6 +69,7 @@ public class DemoDataWithFields
     [Id(1)]
     private readonly string _stringValue;
 
+    [GeneratedActivatorConstructor]
     public DemoDataWithFields(int intValue, string stringValue)
     {
         _intValue = intValue;
@@ -47,6 +79,37 @@ public class DemoDataWithFields
     public int IntValue => _intValue;
 
     public string StringValue => _stringValue;
+}");
+
+    [Fact]
+    public Task TestBasicClassWithInheritance() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public abstract class BaseData
+{
+    [Id(0)]
+    public string BaseValue { get; set; } = string.Empty;
+
+    protected BaseData(string value)
+    {
+        BaseValue = value;
+    }
+}
+
+[GenerateSerializer]
+public class DerivedData : BaseData
+{
+    [Id(1)]
+    public string DerivedValue { get; set; } = string.Empty;
+
+    [OrleansConstructor]
+    public DerivedData(string baseValue, string derivedValue) : base(baseValue)
+    {
+        DerivedValue = derivedValue;
+    }
 }");
 
     [Fact]
@@ -303,7 +366,6 @@ public class CyclicClass
     public string Value { get; set; }
 }");
 
-
     [Fact]
     public Task TestAlias() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
@@ -386,6 +448,164 @@ public class RootType
 {
     [Id(0)]
     public MyServiceConsumer Consumer { get; set; }
+}");
+
+    [Fact]
+    public Task TestGenericClassWithConstructorParameters() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public class GenericWithCtor<T>
+{
+    [Id(0)]
+    private readonly T _value;
+    [Id(1)]
+    private readonly int _id;
+
+    public GenericWithCtor(T value, int id)
+    {
+        _value = value;
+        _id = id;
+    }
+
+    public T Value => _value;
+    public int Id => _id;
+}
+
+[GenerateSerializer]
+public class UsesGenericWithCtor
+{
+    [Id(0)]
+    public GenericWithCtor<string> StringGen { get; set; }
+}");
+
+    [Fact]
+    public Task TestClassWithNoPublicConstructors() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public class NoPublicCtor
+{
+    [OrleansConstructor]
+    private NoPublicCtor() { }
+
+    [Id(0)]
+    public int Value { get; set; }
+}");
+
+    [Fact]
+    public Task TestClassWithOptionalConstructorParameters() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public class OptionalCtorParams
+{
+    [Id(0)]
+    private readonly int _x;
+    [Id(1)]
+    private readonly string _y;
+
+    public OptionalCtorParams(int x = 42, string y = ""default"")
+    {
+        _x = x;
+        _y = y;
+    }
+
+    public int X => _x;
+    public string Y => _y;
+}");
+
+    [Fact]
+    public Task TestClassWithInterfaceConstructorParameter() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+public interface IMyInterface { }
+
+[GenerateSerializer]
+public class InterfaceCtorParam
+{
+    [Id(0)]
+    private readonly IMyInterface _iface;
+
+    public InterfaceCtorParam(IMyInterface iface)
+    {
+        _iface = iface;
+    }
+
+    public IMyInterface Iface => _iface;
+}");
+
+    [Fact]
+    public Task TestClassesWithOrleansConstructorAnnotation() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+public class ClassWithOrleansConstructor
+{
+    [Id(0)]
+    public int Value { get; set; }
+
+    [Id(1)]
+    public string Name { get; set; } = string.Empty;
+
+    [OrleansConstructor]
+    public ClassWithOrleansConstructor(int value, string name)
+    {
+        Value = value;
+        Name = name;
+    }
+
+    public ClassWithOrleansConstructor() { }
+}");
+
+    [Fact]
+    public Task TestClassWithGenerateMethodSerializersAnnotation() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+using Orleans.Runtime;
+using System.Threading.Tasks;
+
+[GenerateMethodSerializers(typeof(GrainReference))]
+public interface IMyGrain : IGrainWithIntegerKey
+{
+    Task<string> SayHello(string name);
+}");
+
+    [Fact]
+    public Task TestClassWithGenerateSerializerAnnotation() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer]
+public enum MyCustomEnum
+{
+    None,
+    One,
+    Two,
+    Three
+}
+
+[GenerateSerializer(GenerateFieldIds = GenerateFieldIds.PublicProperties), Immutable]
+public class ClassWithImplicitFieldIds
+{
+    public string StringValue { get; }
+    public MyCustomEnum EnumValue { get; }
+
+    [OrleansConstructor]
+    public ClassWithImplicitFieldIds(string stringValue, MyCustomEnum enumValue)
+    {
+        StringValue = stringValue;
+        EnumValue = enumValue;
+    }
 }");
 
     [Fact]
@@ -472,6 +692,7 @@ public class GrainWithIntegerCompoundKey : Grain, IMyGrainWithIntegerCompoundKey
     [Fact]
     public Task TestGrainComplexGrain() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace TestProject;
@@ -488,13 +709,13 @@ public class ComplexData
 
 public interface IComplexGrain : IGrainWithIntegerKey
 {
-    Task<ComplexData> ProcessData(int inputInt, string inputString, ComplexData data);
+    Task<ComplexData> ProcessData(int inputInt, string inputString, ComplexData data, CancellationToken ctx);
 }
 
 [GenerateSerializer]
 public class ComplexGrain : Grain, IComplexGrain
 {
-    public Task<ComplexData> ProcessData(int inputInt, string inputString, ComplexData data)
+    public Task<ComplexData> ProcessData(int inputInt, string inputString, ComplexData data, CancellationToken ctx)
     {
         var result = new ComplexData
         {
@@ -503,6 +724,155 @@ public class ComplexGrain : Grain, IComplexGrain
         };
         return Task.FromResult(result);
     }
+}");
+
+    [Fact]
+    public Task TestGrainWithMultipleInterfaces() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+using System.Threading.Tasks;
+
+namespace TestProject;
+
+public interface IGrainA : IGrainWithIntegerKey
+{
+    Task<string> MethodA(string input);
+}
+
+public interface IGrainB : IGrainWithIntegerKey
+{
+    Task<string> MethodB(string input);
+}
+
+public class RealGrain : Grain, IGrainA, IGrainB
+{
+    public Task<string> MethodA(string input)
+    {
+        return Task.FromResult($""GrainA: {input}!"");
+    }
+
+    public Task<string> MethodB(string input)
+    {
+        return Task.FromResult($""GrainB: {input}!"");
+    }
+}");
+
+    [Fact]
+    public Task TestGrainMethodAnnotatedWithResponseTimeout() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+using System.Threading.Tasks;
+
+namespace TestProject;
+
+public interface IResponseTimeoutGrain : IGrainWithIntegerKey
+{
+    [ResponseTimeout(""00:00:10"")]
+    Task<string> LongRunningMethod(string input);
+}
+
+public class ResponseTimeoutGrain : Grain, IResponseTimeoutGrain
+{
+    public Task<string> LongRunningMethod(string input)
+    {
+        // Simulate a long-running operation
+        return Task.FromResult($""ResponseTimeoutGrain: {input}!"");
+    }
+}");
+
+    [Fact]
+    public Task TestGrainMethodAnnotatedWithInvokableBaseType() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+using Orleans.Runtime;
+
+using System;
+using System.Threading.Tasks;
+
+namespace TestProject;
+
+[InvokableCustomInitializer(nameof(LoggerRequest.SetLoggingOptions))]
+[InvokableBaseType(typeof(GrainReference), typeof(Task), typeof(LoggerRequest))]
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class LoggingRcpAttribute : Attribute
+{
+    public LoggingRcpAttribute(string options)
+    {
+    }
+}
+
+public abstract class LoggerRequest : RequestBase
+{
+    public void SetLoggingOptions(string options)
+    {
+    }
+}
+
+public interface IHelloGrain : IGrainWithIntegerKey
+{
+    [LoggingRcp(""Hello"")]
+    Task<string> SayHello(string greeting);
+}
+
+[GenerateSerializer]
+public class HelloGrain : Grain, IHelloGrain
+{
+    public Task<string> SayHello(string greeting)
+    {
+        return Task.FromResult($""Hello, {greeting}!"");
+    }
+}");
+
+    [Fact]
+    public Task TestWithUseActivatorAnnotation() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+using Orleans.Serialization.Activators;
+
+namespace TestProject;
+
+[UseActivator]
+public class DemoClass
+{
+}
+
+[RegisterActivator]
+internal sealed class DemoClassActivator : IActivator<DemoClass>
+{
+    public DemoClass Create() => new DemoClass();
+}");
+
+    [Fact]
+    public Task TestWithSerializerTransparentAnnotation() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[SerializerTransparent]
+public abstract class DemoTransparentClass
+{
+}");
+
+    [Fact]
+    public Task TestWithSuppressReferenceTrackingAttribute() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer, SuppressReferenceTracking]
+public class DemoClass
+{
+    [Id(0)]
+    public string Value { get; set; } = string.Empty;
+}");
+
+    [Fact]
+    public Task TestWithOmitDefaultMemberValuesAnnotation() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+
+namespace TestProject;
+
+[GenerateSerializer, OmitDefaultMemberValues]
+public class DemoClass
+{
+    [Id(0)]
+    public string Value { get; set; }
 }");
 
     [Fact]
@@ -532,7 +902,7 @@ public class ComplexGrain : Grain, IComplexGrain
         var root = (CSharpSyntaxNode)compilation.SyntaxTrees[0].GetRoot();
         var newRoot = ((CompilationUnitSyntax)root).AddAttributeLists(assemblyAttr);
         var newTree = compilation.SyntaxTrees[0].WithRootAndOptions(newRoot, compilation.SyntaxTrees[0].Options);
-        
+
         // leave only syntaxTree with the ReferenceAssemblyAttribute
         compilation = compilation.RemoveSyntaxTrees(compilation.SyntaxTrees[0]).AddSyntaxTrees(newTree);
 
