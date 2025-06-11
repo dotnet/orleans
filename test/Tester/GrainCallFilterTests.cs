@@ -61,8 +61,7 @@ namespace UnitTests.General
     /// Orleans supports both incoming filters (executed on the target grain/silo) and
     /// outgoing filters (executed on the calling grain/client). Filters can be registered:
     /// - System-wide (all grains)
-    /// - Per-grain-type (using attributes)
-    /// - With dependency injection support
+    /// - Per-grain-type
     /// 
     /// These tests verify filter execution order, context propagation, exception handling,
     /// and integration with various Orleans features like streaming and observers.
@@ -238,12 +237,12 @@ namespace UnitTests.General
             }
         }
 
-        [SuppressMessage("ReSharper", "NotAccessedField.Local")]
         /// <summary>
         /// Demonstrates that grain call filters can use dependency injection.
         /// This filter receives IGrainFactory through constructor injection,
         /// showing that filters are full participants in the DI container.
         /// </summary>
+        [SuppressMessage("ReSharper", "NotAccessedField.Local")]
         public class GrainCallFilterWithDependencies(IGrainFactory grainFactory) : IIncomingGrainCallFilter
         {
             public Task Invoke(IIncomingGrainCallContext context)
@@ -381,7 +380,7 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// Tests grain-specific filters applied via attributes.
+        /// Tests grain-specific filters.
         /// These filters only execute for specific grain types, not system-wide.
         /// Demonstrates:
         /// - Method interception with custom logic
