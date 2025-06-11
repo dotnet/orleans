@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class SiloConnectionMaintainer : ILifecycleParticipant<ISiloLifecycle>, ISiloStatusListener, ILifecycleObserver
+    internal partial class SiloConnectionMaintainer : ILifecycleParticipant<ISiloLifecycle>, ISiloStatusListener, ILifecycleObserver
     {
         private readonly ConnectionManager connectionManager;
         private readonly ISiloStatusOracle siloStatusOracle;
@@ -57,8 +57,15 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exception)
             {
-                this.log.LogInformation(exception, "Exception while closing connections to defunct silo {SiloAddress}", silo);
+                LogExceptionWhileClosingConnections(this.log, silo, exception);
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = 1001,
+            Message = "Exception while closing connections to defunct silo {SiloAddress}"
+        )]
+        private static partial void LogExceptionWhileClosingConnections(ILogger logger, SiloAddress siloAddress, Exception exception);
     }
 }
