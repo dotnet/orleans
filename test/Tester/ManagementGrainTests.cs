@@ -25,8 +25,6 @@ namespace UnitTests.Management
     /// - Debugging activation distribution
     /// - Building management dashboards
     /// - Implementing custom placement strategies based on current load
-    /// 
-    /// The tests use AppDomain isolation for silos to ensure CounterStatistic isolation.
     /// </summary>
     public class ManagementGrainTests :  OrleansTestingBase, IClassFixture<ManagementGrainTests.Fixture>
     {
@@ -48,7 +46,7 @@ namespace UnitTests.Management
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 // The ActivationCount tests rely on CounterStatistic, which is a shared static value, so isolation
-                // between silos is obtained using AppDomains. This ensures each silo maintains independent
+                // between silos is obtained using external processes. This ensures each silo maintains independent
                 // statistics rather than sharing them through static fields in the same process.
                 builder.CreateSiloAsync = StandaloneSiloHandle.CreateForAssembly(this.GetType().Assembly);
                 builder.Properties["GrainAssembly"] = $"{typeof(SimpleGrain).Assembly}";

@@ -20,8 +20,6 @@ namespace UnitTests.General;
 /// - Single activation behavior when load is low
 /// - Automatic scaling up to MaxLocalWorkers under concurrent load
 /// - Proper cleanup when activations are deactivated
-/// 
-/// This is crucial for understanding Orleans' automatic load balancing for stateless operations.
 /// </summary>
 public class StatelessWorkerActivationTests : IClassFixture<StatelessWorkerActivationTests.Fixture>
 {
