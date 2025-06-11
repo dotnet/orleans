@@ -63,7 +63,7 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                LogErrorSignalingShutdownToken(exc);
+                LogErrorSignalingShutdownToken(Logger, exc);
             }
 
             await _listenForClusterChangesTask.SuppressThrowing();
@@ -126,7 +126,7 @@ namespace Orleans.Streams
                 }
                 catch (Exception exception)
                 {
-                    LogErrorProcessingClusterMembershipUpdate(exception);
+                    LogErrorProcessingClusterMembershipUpdate(Logger, exception);
                 }
             }
         }
@@ -137,12 +137,12 @@ namespace Orleans.Streams
             Level = LogLevel.Error,
             Message = "Error signaling shutdown token."
         )]
-        private partial void LogErrorSignalingShutdownToken(Exception exception);
+        private static partial void LogErrorSignalingShutdownToken(ILogger logger, Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Error,
             Message = "Error processing cluster membership update."
         )]
-        private partial void LogErrorProcessingClusterMembershipUpdate(Exception exception);
+        private static partial void LogErrorProcessingClusterMembershipUpdate(ILogger logger, Exception exception);
     }
 }
