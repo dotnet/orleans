@@ -82,8 +82,7 @@ namespace DefaultCluster.Tests
             Assert.True(intPromise.Status == TaskStatus.Faulted);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("ErrorHandling")]
-        [Skip("https://github.com/dotnet/orleans/issues/9558")]
+        [Fact(Skip = "https://github.com/dotnet/orleans/issues/9558"), TestCategory("BVT"), TestCategory("ErrorHandling")]
         // check that premature wait finishes on time with false.
         public async Task ErrorHandlingTimedMethod()
         {

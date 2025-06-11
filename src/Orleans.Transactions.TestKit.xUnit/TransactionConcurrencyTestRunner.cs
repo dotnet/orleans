@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -14,8 +14,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         /// </summary>
         /// <param name="grainStates"></param>
         /// <returns></returns>
-        [SkippableTheory]
-        [Quarantine("https://github.com/dotnet/orleans/issues/9554")]
+        [SkippableTheory(Skip = "https://github.com/dotnet/orleans/issues/9554")]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -29,8 +28,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         /// </summary>
         /// <param name="grainStates"></param>
         /// <returns></returns>
-        [SkippableTheory]
-        [Quarantine("https://github.com/dotnet/orleans/issues/9554")]
+        [SkippableTheory(Skip = "https://github.com/dotnet/orleans/issues/9554")]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -44,8 +42,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         /// </summary>
         /// <param name="grainStates"></param>
         /// <returns></returns>
-        [SkippableTheory]
-        [Quarantine("https://github.com/dotnet/orleans/issues/9554")]
+        [SkippableTheory(Skip = "https://github.com/dotnet/orleans/issues/9554")]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]

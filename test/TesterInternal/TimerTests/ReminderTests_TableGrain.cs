@@ -48,8 +48,7 @@ namespace UnitTests.TimerTests
             await Test_Reminders_Basic_StopByRef();
         }
 
-        [Fact]
-        [Skip("https://github.com/dotnet/orleans/issues/9555")]
+        [Fact(Skip = "https://github.com/dotnet/orleans/issues/9555")]
         public async Task Rem_Grain_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
@@ -64,7 +63,7 @@ namespace UnitTests.TimerTests
 
         // Single join tests ... multi grain, multi reminders
 
-        [SkippableFact, Skip("https://github.com/dotnet/orleans/issues/4318")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4318")]
         public async Task Rem_Grain_1J_MultiGrainMultiReminders()
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();
