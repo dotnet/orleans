@@ -19,9 +19,7 @@ namespace Orleans.TestingHost.Tests
     /// - Configure and customize the test environment
     /// 
     /// These tests verify TestCluster initialization, configuration, and lifecycle management.
-    /// </summary>
-    /// <summary>
-    /// Basic test class verifying TestCluster can be initialized and deployed.
+    /// 
     /// Each T0-T9 class tests cluster initialization in isolation to ensure
     /// no static state interference between tests.
     /// </summary>
@@ -240,11 +238,6 @@ namespace Orleans.TestingHost.Tests
         }
     }
 
-    /// <summary>
-    /// Main test class for TestCluster functionality.
-    /// Implements IAsyncLifetime to properly manage cluster lifecycle
-    /// and ensure cleanup after tests complete.
-    /// </summary>
     /// <summary>
     /// Main test class for TestCluster functionality.
     /// Implements IAsyncLifetime to properly manage cluster lifecycle

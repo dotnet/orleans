@@ -11,11 +11,8 @@ namespace Tester.Cosmos.Clustering;
 /// <summary>
 /// Tests for operation of Orleans Membership Table using Azure Cosmos DB - Requires access to external Azure Cosmos DB account
 /// 
-/// Azure Cosmos DB provides a globally distributed, multi-model database service that Orleans uses for:
-/// - Membership management with global distribution and multi-region writes
-/// - Automatic indexing and querying capabilities
-/// - Tunable consistency levels for different deployment scenarios
-/// - Built-in partition management and scalability
+/// Azure Cosmos DB provides a globally distributed, multi-model database service that Orleans can use for cluster membership
+/// management.
 /// 
 /// These tests verify the Cosmos DB membership provider correctly implements
 /// all membership operations with Cosmos DB's unique features like:
