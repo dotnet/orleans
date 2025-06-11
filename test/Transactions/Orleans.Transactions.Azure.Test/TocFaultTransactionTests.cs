@@ -6,7 +6,7 @@ using Xunit.Abstractions;
 namespace Orleans.Transactions.AzureStorage.Tests
 {
     /// <summary>
-    /// Tests for Transaction Orchestration Coordinator (TOC) fault scenarios with Azure Storage.
+    /// Tests for Transfer of Coordination (TOC) fault scenarios with Azure Storage.
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("Functional")]
     public class TocFaultTransactionTests : TocFaultTransactionTestRunnerxUnit, IClassFixture<TestFixture>
