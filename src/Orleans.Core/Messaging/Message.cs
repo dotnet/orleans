@@ -276,14 +276,9 @@ namespace Orleans.Runtime
 
         internal void AddToCacheInvalidationHeader(GrainAddress invalidAddress, GrainAddress validAddress)
         {
-            var list = new List<GrainAddressCacheUpdate>();
-            if (CacheInvalidationHeader != null)
-            {
-                list.AddRange(CacheInvalidationHeader);
-            }
-
-            list.Add(new GrainAddressCacheUpdate(invalidAddress, validAddress));
-            CacheInvalidationHeader = list;
+            CacheInvalidationHeader ??= [];
+            var grainAddressCacheUpdate = new GrainAddressCacheUpdate(invalidAddress, validAddress);
+            CacheInvalidationHeader.Add(grainAddressCacheUpdate);
         }
 
         public override string ToString() => $"{this}";
