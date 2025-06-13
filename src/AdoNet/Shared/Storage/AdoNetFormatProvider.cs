@@ -1,6 +1,8 @@
 using System;
 using System.Globalization;
 
+#nullable disable
+
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
 #elif PERSISTENCE_ADONET
@@ -9,6 +11,8 @@ namespace Orleans.Persistence.AdoNet.Storage
 namespace Orleans.Reminders.AdoNet.Storage
 #elif STREAMING_ADONET
 namespace Orleans.Streaming.AdoNet.Storage
+#elif GRAINDIRECTORY_ADONET
+namespace Orleans.GrainDirectory.AdoNet.Storage
 #elif TESTER_SQLUTILS
 namespace Orleans.Tests.SqlUtils
 #else
@@ -68,3 +72,5 @@ namespace Orleans.Tests.SqlUtils
         }
     }
 }
+
+#nullable restore

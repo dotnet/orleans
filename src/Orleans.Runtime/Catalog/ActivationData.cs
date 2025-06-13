@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -452,27 +453,45 @@ internal sealed partial class ActivationData :
         lock (this)
         {
             // If the grain is currently activating, cancel that operation.
-            if (_pendingOperations is not { } operations)
+            if (_pendingOperations is not { Count: > 0 } operations)
             {
                 return;
             }
 
-            foreach (var op in operations)
+            var opCount = operations.Count;
+            // We could be using an ArrayPool<Command> here, but we would need to filter out the
+            // non-command types, which means we would need to loop over _pendingOperations, which
+            // defeats the purpose of making a snapshot.
+            // Note: CopyTo does not use the queue's enumerator, so its safe to take a snapshot this way.
+            var array = ArrayPool<object>.Shared.Rent(opCount);
+
+            operations.CopyTo(array, 0);
+
+            var snapshot = new Span<object>(array, 0, opCount);
+
+            try
             {
-                if (op is Command cmd)
+                foreach (var op in snapshot)
                 {
-                    try
+                    if (op is Command cmd)
                     {
-                        cmd.Cancel();
-                    }
-                    catch (Exception exception)
-                    {
-                        if (exception is not ObjectDisposedException)
+                        try
                         {
-                            LogErrorCancellingOperation(_shared.Logger, exception, cmd);
+                            cmd.Cancel();
+                        }
+                        catch (Exception exception)
+                        {
+                            if (exception is not ObjectDisposedException)
+                            {
+                                LogErrorCancellingOperation(_shared.Logger, exception, cmd);
+                            }
                         }
                     }
                 }
+            }
+            finally
+            {
+                ArrayPool<object>.Shared.Return(array, true);
             }
         }
     }
@@ -1142,7 +1161,8 @@ internal sealed partial class ActivationData :
             {
                 try
                 {
-                    return canInterleave.MayInterleave(GrainInstance, incoming);
+                    return canInterleave.MayInterleave(GrainInstance, incoming)
+                        || canInterleave.MayInterleave(GrainInstance, _blockingRequest);
                 }
                 catch (Exception exception)
                 {
@@ -1535,18 +1555,15 @@ internal sealed partial class ActivationData :
 
                             success = false;
                             CatalogInstruments.ActivationConcurrentRegistrationAttempts.Add(1);
-                            if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                            {
-                                // If this was a duplicate, it's not an error, just a race.
-                                // Forward on all of the pending messages, and then forget about this activation.
-                                LogDuplicateActivation(
-                                    _shared.Logger,
-                                    Address,
-                                    ForwardingAddress,
-                                    GrainInstance?.GetType(),
-                                    Address.ToFullString(),
-                                    WaitingCount);
-                            }
+                            // If this was a duplicate, it's not an error, just a race.
+                            // Forward on all of the pending messages, and then forget about this activation.
+                            LogDuplicateActivation(
+                                _shared.Logger,
+                                Address,
+                                ForwardingAddress,
+                                GrainInstance?.GetType(),
+                                new(Address),
+                                WaitingCount);
                         }
 
                         break;
@@ -1579,10 +1596,7 @@ internal sealed partial class ActivationData :
                 SetState(ActivationState.Activating);
             }
 
-            if (_shared.Logger.IsEnabled(LogLevel.Debug))
-            {
-                LogActivatingGrain(_shared.Logger, this);
-            }
+            LogActivatingGrain(_shared.Logger, this);
 
             // Start grain lifecycle within try-catch wrapper to safely capture any exceptions thrown from called function
             try
@@ -1623,10 +1637,7 @@ internal sealed partial class ActivationData :
                     }
                 }
 
-                if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                {
-                    LogFinishedActivatingGrain(_shared.Logger, this);
-                }
+                LogFinishedActivatingGrain(_shared.Logger, this);
             }
             catch (Exception exception)
             {
@@ -1676,10 +1687,7 @@ internal sealed partial class ActivationData :
         var encounteredError = false;
         try
         {
-            if (_shared.Logger.IsEnabled(LogLevel.Trace))
-            {
-                LogCompletingDeactivation(_shared.Logger, this);
-            }
+            LogCompletingDeactivation(_shared.Logger, this);
 
             // Stop timers from firing.
             DisposeTimers();
@@ -1691,13 +1699,11 @@ internal sealed partial class ActivationData :
                 {
                     try
                     {
-                        if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                            LogBeforeOnDeactivateAsync(_shared.Logger, this);
+                        LogBeforeOnDeactivateAsync(_shared.Logger, this);
 
                         await grainBase.OnDeactivateAsync(DeactivationReason, cancellationToken).WaitAsync(cancellationToken);
 
-                        if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                            LogAfterOnDeactivateAsync(_shared.Logger, this);
+                        LogAfterOnDeactivateAsync(_shared.Logger, this);
                     }
                     catch (Exception exception)
                     {
@@ -2390,6 +2396,11 @@ internal sealed partial class ActivationData :
         Message = "Failed to migrate activation '{Activation}'")]
     private static partial void LogFailedToMigrateActivation(ILogger logger, Exception exception, ActivationData activation);
 
+    private readonly struct FullAddressLogRecord(GrainAddress address)
+    {
+        public override string ToString() => address.ToFullString();
+    }
+
     [LoggerMessage(
         EventId = (int)ErrorCode.Catalog_DuplicateActivation,
         Level = LogLevel.Debug,
@@ -2399,7 +2410,7 @@ internal sealed partial class ActivationData :
         GrainAddress address,
         SiloAddress? forwardingAddress,
         Type? grainInstanceType,
-        string fullAddress,
+        FullAddressLogRecord fullAddress,
         int waitingCount);
 
     [LoggerMessage(

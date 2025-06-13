@@ -9,7 +9,7 @@ using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class ClientOutboundConnection : Connection
+    internal sealed partial class ClientOutboundConnection : Connection
     {
         private readonly ClientMessageCenter messageCenter;
         private readonly ConnectionManager connectionManager;
@@ -77,10 +77,7 @@ namespace Orleans.Runtime.Messaging
                     });
 
                 var preamble = await connectionPreambleHelper.Read(this.Context);
-                this.Log.LogInformation(
-                    "Established connection to {Silo} with protocol version {ProtocolVersion}",
-                    preamble.SiloAddress,
-                    preamble.NetworkProtocolVersion.ToString());
+                LogInformationEstablishedConnection(this.Log, preamble.SiloAddress, preamble.NetworkProtocolVersion.ToString());
 
                 if (preamble.ClusterId != myClusterId)
                 {
@@ -154,13 +151,13 @@ namespace Orleans.Runtime.Messaging
             MessagingInstruments.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
-                if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.LogDebug((int)ErrorCode.MessagingSendingRejection, "Client is rejecting message: {Message}. Reason = {Reason}", msg, reason);
+                LogDebugClientIsRejectingMessage(this.Log, msg, reason);
                 // Done retrying, send back an error instead
                 this.SendRejection(msg, Message.RejectionTypes.Transient, $"Client is rejecting message: {msg}. Reason = {reason}");
             }
             else
             {
-                this.Log.LogInformation((int)ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Client is dropping message: {Message}. Reason = {Reason}", msg, reason);
+                LogInformationClientIsDroppingMessage(this.Log, msg, reason);
                 MessagingInstruments.OnDroppedSentMessage(msg);
             }
         }
@@ -170,5 +167,25 @@ namespace Orleans.Runtime.Messaging
             message.TargetSilo = null;
             this.messageCenter.SendMessage(message);
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Established connection to {Silo} with protocol version {ProtocolVersion}"
+        )]
+        private static partial void LogInformationEstablishedConnection(ILogger logger, SiloAddress silo, string protocolVersion);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            EventId = (int)ErrorCode.MessagingSendingRejection,
+            Message = "Client is rejecting message: {Message}. Reason = {Reason}"
+        )]
+        private static partial void LogDebugClientIsRejectingMessage(ILogger logger, Message message, string reason);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            EventId = (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,
+            Message = "Client is dropping message: {Message}. Reason = {Reason}"
+        )]
+        private static partial void LogInformationClientIsDroppingMessage(ILogger logger, Message message, string reason);
     }
 }

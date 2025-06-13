@@ -14,6 +14,7 @@ using System.Text;
 using Xunit;
 using Orleans.Serialization.Serializers;
 using Xunit.Abstractions;
+using Orleans.Serialization.GeneratedCodeHelpers;
 
 namespace Orleans.Serialization.TestKit
 {
@@ -882,6 +883,15 @@ namespace Orleans.Serialization.TestKit
                 var readField = reader.ReadFieldHeader();
                 var shouldBeNull = codec.ReadValue(ref reader, readField);
                 Assert.Null(shouldBeNull);
+                Assert.Equal(expectedLength, reader.Position);
+                Assert.Equal(writerSession.ReferencedObjects.CurrentReferenceId, readerSession.ReferencedObjects.CurrentReferenceId);
+            }
+
+            {
+                using var readerSession = _sessionPool.GetSession();
+                var reader = Reader.Create(readResult.Buffer, readerSession);
+                var readField = reader.ReadFieldHeader();
+                reader.ConsumeUnknownField(readField);
                 Assert.Equal(expectedLength, reader.Position);
                 Assert.Equal(writerSession.ReferencedObjects.CurrentReferenceId, readerSession.ReferencedObjects.CurrentReferenceId);
             }

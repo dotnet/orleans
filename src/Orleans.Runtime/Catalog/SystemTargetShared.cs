@@ -26,7 +26,7 @@ internal sealed class SystemTargetShared(
     public GrainReferenceActivator GrainReferenceActivator => grainReferenceActivator;
     public ITimerRegistry TimerRegistry => timerRegistry;
 
-    public RuntimeMessagingTrace MessagingTrace => new(loggerFactory);
+    public RuntimeMessagingTrace MessagingTrace { get; } = new(loggerFactory);
     public InsideRuntimeClient RuntimeClient => runtimeClient;
     public ActivationDirectory ActivationDirectory => activations;
     public WorkItemGroup CreateWorkItemGroup(SystemTarget systemTarget)

@@ -1,4 +1,5 @@
 using Orleans.Internal;
+using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces.Directories;
@@ -42,6 +43,7 @@ namespace Tester.Directories
         {
             while (true)
             {
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, HostedCluster.Primary.SiloAddress);
                 var grain = this.GrainFactory.GetGrain<ICustomDirectoryGrain>(Guid.NewGuid());
                 var instanceId = await grain.GetRuntimeInstanceId();
                 if (instanceId.Contains(HostedCluster.Primary.SiloAddress.Endpoint.ToString()))
@@ -53,6 +55,7 @@ namespace Tester.Directories
         {
             while (true)
             {
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, HostedCluster.SecondarySilos[0].SiloAddress);
                 var grain = this.GrainFactory.GetGrain<ICustomDirectoryGrain>(Guid.NewGuid());
                 var instanceId = await grain.GetRuntimeInstanceId();
                 if (instanceId.Contains(HostedCluster.SecondarySilos[0].SiloAddress.Endpoint.ToString()))

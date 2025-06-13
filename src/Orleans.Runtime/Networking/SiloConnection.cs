@@ -14,7 +14,7 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class SiloConnection : Connection
+    internal sealed partial class SiloConnection : Connection
     {
         private static readonly Response PingResponse = Response.Completed;
         private readonly MessageCenter messageCenter;
@@ -113,7 +113,7 @@ namespace Orleans.Runtime.Messaging
             if (!msg.TargetSilo.Endpoint.Equals(this.LocalSiloAddress.Endpoint))
             {
                 // If the message is for some other silo altogether, then we need to forward it.
-                if (this.Log.IsEnabled(LogLevel.Trace)) this.Log.LogTrace("Forwarding message {Message} from {SendingSilo} to silo {TargetSilo}", msg.Id, msg.SendingSilo, msg.TargetSilo);
+                LogTraceForwardingMessage(this.Log, msg.Id, msg.SendingSilo, msg.TargetSilo);
                 messageCenter.SendMessage(msg);
                 return;
             }
@@ -136,14 +136,7 @@ namespace Orleans.Runtime.Messaging
 
                 this.Send(rejection);
 
-                if (this.Log.IsEnabled(LogLevel.Debug))
-                {
-                    this.Log.LogDebug(
-                        "Rejecting an obsolete request; target was {TargetSilo}, but this silo is {SiloAddress}. The rejected message is {Message}.",
-                        msg.TargetSilo?.ToString() ?? "null",
-                        this.LocalSiloAddress.ToString(),
-                        msg);
-                }
+                LogDebugRejectingObsoleteRequest(this.Log, msg.TargetSilo?.ToString() ?? "null", this.LocalSiloAddress.ToString(), msg);
             }
         }
 
@@ -151,11 +144,8 @@ namespace Orleans.Runtime.Messaging
         {
             MessagingInstruments.OnPingReceive(msg.SendingSilo);
 
-            if (this.Log.IsEnabled(LogLevel.Trace))
-            {
-                var objectId = RuntimeHelpers.GetHashCode(msg);
-                this.Log.LogTrace("Responding to Ping from {Silo} with object id {ObjectId}. Message {Message}", msg.SendingSilo, objectId, msg);
-            }
+            var objectId = RuntimeHelpers.GetHashCode(msg);
+            LogTraceRespondingToPing(this.Log, msg.SendingSilo, objectId, msg);
 
             if (!msg.TargetSilo.Equals(this.LocalSiloAddress))
             {
@@ -178,7 +168,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (message.IsPing())
             {
-                this.Log.LogWarning("Failed to send ping message {Message}", message);
+                LogWarningFailedToSendPingMessage(this.Log, message);
             }
 
             this.FailMessage(message, error);
@@ -248,7 +238,7 @@ namespace Orleans.Runtime.Messaging
 
                 if (msg.IsPing())
                 {
-                    this.Log.LogWarning("Dropping expired ping message {Message}", msg);
+                    LogWarningDroppingExpiredPingMessage(this.Log, msg);
                 }
 
                 return false;
@@ -257,18 +247,14 @@ namespace Orleans.Runtime.Messaging
             // Fill in the outbound message with our silo address, if it's not already set
             msg.SendingSilo ??= this.LocalSiloAddress;
 
-            if (this.Log.IsEnabled(LogLevel.Debug) && msg.IsPing())
+            if (msg.IsPing())
             {
-                this.Log.LogDebug("Sending ping message {Message}", msg);
+                LogDebugSendingPingMessage(this.Log, msg);
             }
 
             if (this.RemoteSiloAddress is not null && msg.TargetSilo is not null && !this.RemoteSiloAddress.Matches(msg.TargetSilo))
             {
-                this.Log.LogWarning(
-                    "Attempting to send message addressed to {TargetSilo} to connection with {RemoteSiloAddress}. Message {Message}",
-                    msg.TargetSilo,
-                    this.RemoteSiloAddress,
-                    msg);
+                LogWarningAttemptingToSendMessageToWrongConnection(this.Log, msg.TargetSilo, this.RemoteSiloAddress, msg);
             }
 
             return true;
@@ -278,13 +264,13 @@ namespace Orleans.Runtime.Messaging
         {
             if (msg.IsPing())
             {
-                this.Log.LogWarning("Failed ping message {Message}", msg);
+                LogWarningFailedPingMessage(this.Log, msg);
             }
 
             MessagingInstruments.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
-                if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.LogDebug((int)ErrorCode.MessagingSendingRejection, "Silo {SiloAddress} is rejecting message: {Message}. Reason = {Reason}", this.LocalSiloAddress, msg, reason);
+                LogDebugSiloRejectingMessage(this.Log, this.LocalSiloAddress, msg, reason);
 
                 // Done retrying, send back an error instead
                 this.messageCenter.SendRejection(
@@ -303,7 +289,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (msg.IsPing())
             {
-                this.Log.LogWarning("Retrying ping message {Message}", msg);
+                LogWarningRetryingPingMessage(this.Log, msg);
             }
 
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
@@ -322,5 +308,66 @@ namespace Orleans.Runtime.Messaging
                 FailMessage(msg, reason.ToString());
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Forwarding message {MessageId} from {SendingSilo} to silo {TargetSilo}"
+        )]
+        private static partial void LogTraceForwardingMessage(ILogger logger, CorrelationId messageId, SiloAddress sendingSilo, SiloAddress targetSilo);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Rejecting an obsolete request; target was {TargetSilo}, but this silo is {SiloAddress}. The rejected message is {Message}."
+        )]
+        private static partial void LogDebugRejectingObsoleteRequest(ILogger logger, string targetSilo, string siloAddress, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Responding to Ping from {Silo} with object id {ObjectId}. Message {Message}"
+        )]
+        private static partial void LogTraceRespondingToPing(ILogger logger, SiloAddress silo, int objectId, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Failed to send ping message {Message}"
+        )]
+        private static partial void LogWarningFailedToSendPingMessage(ILogger logger, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Dropping expired ping message {Message}"
+        )]
+        private static partial void LogWarningDroppingExpiredPingMessage(ILogger logger, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Sending ping message {Message}"
+        )]
+        private static partial void LogDebugSendingPingMessage(ILogger logger, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Attempting to send message addressed to {TargetSilo} to connection with {RemoteSiloAddress}. Message {Message}"
+        )]
+        private static partial void LogWarningAttemptingToSendMessageToWrongConnection(ILogger logger, SiloAddress targetSilo, SiloAddress remoteSiloAddress, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Failed ping message {Message}"
+        )]
+        private static partial void LogWarningFailedPingMessage(ILogger logger, Message message);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.MessagingSendingRejection,
+            Level = LogLevel.Debug,
+            Message = "Silo {SiloAddress} is rejecting message: {Message}. Reason = {Reason}"
+        )]
+        private static partial void LogDebugSiloRejectingMessage(ILogger logger, SiloAddress siloAddress, Message message, string reason);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Retrying ping message {Message}"
+        )]
+        private static partial void LogWarningRetryingPingMessage(ILogger logger, Message message);
     }
 }

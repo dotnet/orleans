@@ -25,16 +25,16 @@ namespace Orleans
         public TransactionAttribute(TransactionOption requirement)
         {
             Requirement = requirement;
-            ReadOnly = false;
         }
 
         public TransactionAttribute(TransactionOptionAlias alias)
         {
             Requirement = (TransactionOption)(int)alias;
-            ReadOnly = false;
         }
 
         public TransactionOption Requirement { get; }
+
+        [Obsolete("Use [ReadOnly] attribute instead.")]
         public bool ReadOnly { get; set; }
     }
 
@@ -132,7 +132,7 @@ namespace Orleans
         }
 
         private TransactionInfo SetTransactionInfo()
-        { 
+        {
             // Clear transaction info if transaction operation requires new transaction.
             var transactionInfo = TransactionContext.GetTransactionInfo();
 
@@ -180,7 +180,7 @@ namespace Orleans
                     var transactionTimeout = Debugger.IsAttached ? TimeSpan.FromMinutes(30) : TimeSpan.FromSeconds(10);
 
                     // Start a new transaction
-                    var isReadOnly = (this.Options | InvokeMethodOptions.ReadOnly) == InvokeMethodOptions.ReadOnly;
+                    var isReadOnly = this.Options.HasFlag(InvokeMethodOptions.ReadOnly);
                     transactionInfo = await TransactionAgent.StartTransaction(isReadOnly, transactionTimeout);
                     startedNewTransaction = true;
                 }
@@ -312,7 +312,7 @@ namespace Orleans
     }
 
     [SerializerTransparent]
-    public abstract class TransactionRequest : TransactionRequestBase 
+    public abstract class TransactionRequest : TransactionRequestBase
     {
         protected TransactionRequest(Serializer<OrleansTransactionAbortedException> exceptionSerializer, IServiceProvider serviceProvider) : base(exceptionSerializer, serviceProvider)
         {

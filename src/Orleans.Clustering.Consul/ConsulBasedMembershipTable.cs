@@ -15,7 +15,7 @@ namespace Orleans.Runtime.Membership
     /// <summary>
     /// A Membership Table implementation using Consul 0.6.0  https://consul.io/
     /// </summary>
-    public class ConsulBasedMembershipTable : IMembershipTable
+    public partial class ConsulBasedMembershipTable : IMembershipTable
     {
         private static readonly TableVersion NotFoundTableVersion = new TableVersion(0, "0");
         private readonly ILogger _logger;
@@ -70,7 +70,7 @@ namespace Orleans.Runtime.Membership
             var deploymentKVAddresses = await consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(clusterId, kvRootFolder));
             if (deploymentKVAddresses.Response == null)
             {
-                logger.LogDebug("Could not find any silo registrations for deployment {ClusterId}.", clusterId);
+                LogDebugCouldNotFindSiloRegistrations(logger, clusterId);
                 return new MembershipTableData(NotFoundTableVersion);
             }
 
@@ -102,7 +102,7 @@ namespace Orleans.Runtime.Membership
                 var responses = await _consulClient.KV.Txn(new List<KVTxnOp> { rowInsert, versionUpdate });
                 if (!responses.Response.Success)
                 {
-                    _logger.LogDebug("ConsulMembershipProvider failed to insert the row {SiloAddress}.", entry.SiloAddress);
+                    LogDebugConsulMembershipProviderFailedToInsertRow(entry.SiloAddress);
                     return false;
                 }
 
@@ -110,7 +110,7 @@ namespace Orleans.Runtime.Membership
             }
             catch (Exception ex)
             {
-                _logger.LogInformation(ex, "ConsulMembershipProvider failed to insert registration for silo {SiloAddress}", entry.SiloAddress);
+                LogInformationConsulMembershipProviderFailedToInsertRegistration(ex, entry.SiloAddress);
                 throw;
             }
         }
@@ -129,7 +129,7 @@ namespace Orleans.Runtime.Membership
                 var responses = await _consulClient.KV.Txn(new List<KVTxnOp> { rowUpdate, versionUpdate });
                 if (!responses.Response.Success)
                 {
-                    _logger.LogDebug("ConsulMembershipProvider failed the CAS check when updating the registration for silo {SiloAddress}.", entry.SiloAddress);
+                    LogDebugConsulMembershipProviderFailedCASCheck(entry.SiloAddress);
                     return false;
                 }
 
@@ -137,7 +137,7 @@ namespace Orleans.Runtime.Membership
             }
             catch (Exception ex)
             {
-                _logger.LogInformation(ex, "ConsulMembershipProvider failed to update the registration for silo {SiloAddress}", entry.SiloAddress);
+                LogInformationConsulMembershipProviderFailedToUpdateRegistration(ex, entry.SiloAddress);
                 throw;
             }
         }
@@ -213,7 +213,7 @@ namespace Orleans.Runtime.Membership
             var allKVs = await _consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, this.kvRootFolder));
             if (allKVs.Response == null)
             {
-                _logger.LogDebug("Could not find any silo registrations for deployment {ClusterId}.", this.clusterId);
+                LogDebugCouldNotFindSiloRegistrationsForCleanup(this.clusterId);
                 return;
             }
 
@@ -239,5 +239,41 @@ namespace Orleans.Runtime.Membership
                 }
             }
         }
+
+        [LoggerMessage(
+            Level = Microsoft.Extensions.Logging.LogLevel.Debug,
+            Message = "Could not find any silo registrations for deployment {ClusterId}."
+        )]
+        private static partial void LogDebugCouldNotFindSiloRegistrations(ILogger logger, string clusterId);
+
+        [LoggerMessage(
+            Level = Microsoft.Extensions.Logging.LogLevel.Debug,
+            Message = "ConsulMembershipProvider failed to insert the row {SiloAddress}."
+        )]
+        private partial void LogDebugConsulMembershipProviderFailedToInsertRow(SiloAddress siloAddress);
+
+        [LoggerMessage(
+            Level = Microsoft.Extensions.Logging.LogLevel.Information,
+            Message = "ConsulMembershipProvider failed to insert registration for silo {SiloAddress}"
+        )]
+        private partial void LogInformationConsulMembershipProviderFailedToInsertRegistration(Exception ex, SiloAddress siloAddress);
+
+        [LoggerMessage(
+            Level = Microsoft.Extensions.Logging.LogLevel.Debug,
+            Message = "ConsulMembershipProvider failed the CAS check when updating the registration for silo {SiloAddress}."
+        )]
+        private partial void LogDebugConsulMembershipProviderFailedCASCheck(SiloAddress siloAddress);
+
+        [LoggerMessage(
+            Level = Microsoft.Extensions.Logging.LogLevel.Information,
+            Message = "ConsulMembershipProvider failed to update the registration for silo {SiloAddress}"
+        )]
+        private partial void LogInformationConsulMembershipProviderFailedToUpdateRegistration(Exception ex, SiloAddress siloAddress);
+
+        [LoggerMessage(
+            Level = Microsoft.Extensions.Logging.LogLevel.Debug,
+            Message = "Could not find any silo registrations for deployment {ClusterId}."
+        )]
+        private partial void LogDebugCouldNotFindSiloRegistrationsForCleanup(string clusterId);
     }
 }

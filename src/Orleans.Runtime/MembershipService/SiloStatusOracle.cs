@@ -5,7 +5,7 @@ using System.Collections.Immutable;
 
 namespace Orleans.Runtime.MembershipService
 {
-    internal class SiloStatusOracle : ISiloStatusOracle
+    internal partial class SiloStatusOracle : ISiloStatusOracle
     {
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly MembershipTableManager membershipTableManager;
@@ -39,12 +39,9 @@ namespace Orleans.Runtime.MembershipService
 
             if (status == SiloStatus.None)
             {
-                if (this.CurrentStatus == SiloStatus.Active && this.log.IsEnabled(LogLevel.Debug))
+                if (this.CurrentStatus == SiloStatus.Active)
                 {
-                    this.log.LogDebug(
-                        (int)ErrorCode.Runtime_Error_100209,
-                        "The given SiloAddress {SiloAddress} is not registered in this MembershipOracle.",
-                        silo);
+                    LogSiloAddressNotRegistered(this.log, silo);
                 }
             }
 
@@ -135,5 +132,11 @@ namespace Orleans.Runtime.MembershipService
 
         public bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener listener) => this.listenerManager.Unsubscribe(listener);
     
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            EventId = (int)ErrorCode.Runtime_Error_100209,
+            Message = "The given SiloAddress {SiloAddress} is not registered in this MembershipOracle."
+        )]
+        private static partial void LogSiloAddressNotRegistered(ILogger logger, SiloAddress siloAddress);
     }
 }

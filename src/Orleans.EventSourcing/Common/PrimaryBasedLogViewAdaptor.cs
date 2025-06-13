@@ -194,6 +194,7 @@ namespace Orleans.EventSourcing.Common
 
             while (!worker.IsIdle())
             {
+                await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
                 await worker.WaitForCurrentWorkToBeServiced();
             }
 
