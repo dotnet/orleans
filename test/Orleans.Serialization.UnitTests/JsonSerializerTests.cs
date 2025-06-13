@@ -89,6 +89,36 @@ namespace Orleans.Serialization.UnitTests
             var deserializedObject = RoundTripThroughUntypedSerializer(jsonObject, out _);
             Assert.Equal(System.Text.Json.JsonSerializer.Serialize(jsonObject), System.Text.Json.JsonSerializer.Serialize(deserializedObject));
         }
+
+        [Fact]
+        public void CanSerializeJsonValue_CreatedWithPrimitives()
+        {
+            // This reproduces the issue described in GitHub issue #9568
+            var jsonValueInt = JsonValue.Create(1);
+            var jsonValueString = JsonValue.Create("hello");
+            var jsonValueBool = JsonValue.Create(true);
+
+            // These should not throw InvalidCastException
+            var deserializedInt = RoundTripThroughUntypedSerializer(jsonValueInt, out _);
+            Assert.Equal(System.Text.Json.JsonSerializer.Serialize(jsonValueInt), System.Text.Json.JsonSerializer.Serialize(deserializedInt));
+
+            var deserializedString = RoundTripThroughUntypedSerializer(jsonValueString, out _);
+            Assert.Equal(System.Text.Json.JsonSerializer.Serialize(jsonValueString), System.Text.Json.JsonSerializer.Serialize(deserializedString));
+
+            var deserializedBool = RoundTripThroughUntypedSerializer(jsonValueBool, out _);
+            Assert.Equal(System.Text.Json.JsonSerializer.Serialize(jsonValueBool), System.Text.Json.JsonSerializer.Serialize(deserializedBool));
+        }
+
+        [Fact]
+        public void CanSerializeJsonNode_AsJsonValue()
+        {
+            // This reproduces the grain scenario described in GitHub issue #9568
+            JsonNode jsonNode = JsonValue.Create(1);
+
+            // This should not throw InvalidCastException when the parameter is JsonNode but the value is JsonValue
+            var deserialized = RoundTripThroughUntypedSerializer(jsonNode, out _);
+            Assert.Equal(System.Text.Json.JsonSerializer.Serialize(jsonNode), System.Text.Json.JsonSerializer.Serialize(deserialized));
+        }
     }
 
     [Trait("Category", "BVT")]
