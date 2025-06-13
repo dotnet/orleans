@@ -154,5 +154,25 @@ namespace Orleans.Serialization.UnitTests
             var deserializedObject = copier.Copy(jsonObject);
             Assert.Equal(System.Text.Json.JsonSerializer.Serialize(jsonObject), System.Text.Json.JsonSerializer.Serialize(deserializedObject));
         }
+
+        [Fact]
+        public void CanCopyJsonValue_CreatedWithPrimitives()
+        {
+            // This reproduces the issue described in GitHub issue #9568 for copying
+            var jsonValueInt = JsonValue.Create(1);
+            var jsonValueString = JsonValue.Create("hello");
+            var jsonValueBool = JsonValue.Create(true);
+            var copier = ServiceProvider.GetRequiredService<DeepCopier>();
+
+            // These should not throw InvalidCastException
+            var copiedInt = copier.Copy(jsonValueInt);
+            Assert.Equal(System.Text.Json.JsonSerializer.Serialize(jsonValueInt), System.Text.Json.JsonSerializer.Serialize(copiedInt));
+
+            var copiedString = copier.Copy(jsonValueString);
+            Assert.Equal(System.Text.Json.JsonSerializer.Serialize(jsonValueString), System.Text.Json.JsonSerializer.Serialize(copiedString));
+
+            var copiedBool = copier.Copy(jsonValueBool);
+            Assert.Equal(System.Text.Json.JsonSerializer.Serialize(jsonValueBool), System.Text.Json.JsonSerializer.Serialize(copiedBool));
+        }
     }
 }

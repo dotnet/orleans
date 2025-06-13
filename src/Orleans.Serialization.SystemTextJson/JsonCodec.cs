@@ -135,7 +135,11 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
                         reader.ReadBytes(ref tempBuffer, (int)length);
                         var sequence = tempBuffer.AsReadOnlySequence();
                         var jsonReader = new Utf8JsonReader(sequence, _options.ReaderOptions);
-                        result = JsonSerializer.Deserialize(ref jsonReader, type, _options.SerializerOptions);
+                        
+                        // For JsonValue subtypes created by JsonValue.Create(), deserialize as JsonNode
+                        // to avoid InvalidCastException with internal JsonValue types
+                        var deserializationType = ShouldDeserializeAsJsonNode(type) ? typeof(JsonNode) : type;
+                        result = JsonSerializer.Deserialize(ref jsonReader, deserializationType, _options.SerializerOptions);
                     }
                     finally
                     {
@@ -199,6 +203,14 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
             || typeof(JsonValue).IsAssignableFrom(type);
     }
 
+    private static bool ShouldDeserializeAsJsonNode(Type type)
+    {
+        // JsonValue.Create() methods produce internal types like JsonValueOfElement<T> 
+        // that cannot be directly deserialized to. Instead, deserialize to JsonNode
+        // and let System.Text.Json create the appropriate JsonValue subtype.
+        return typeof(JsonValue).IsAssignableFrom(type) && type != typeof(JsonValue);
+    }
+
     /// <inheritdoc/>
     object IDeepCopier.DeepCopy(object input, CopyContext context)
     {
@@ -215,7 +227,11 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
 
             var sequence = bufferWriter.Value.AsReadOnlySequence();
             var jsonReader = new Utf8JsonReader(sequence, _options.ReaderOptions);
-            result = JsonSerializer.Deserialize(ref jsonReader, input.GetType(), _options.SerializerOptions);
+            
+            // For JsonValue subtypes created by JsonValue.Create(), deserialize as JsonNode
+            // to avoid InvalidCastException with internal JsonValue types
+            var deserializationType = ShouldDeserializeAsJsonNode(input.GetType()) ? typeof(JsonNode) : input.GetType();
+            result = JsonSerializer.Deserialize(ref jsonReader, deserializationType, _options.SerializerOptions);
         }
         finally
         {
