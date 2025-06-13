@@ -34,7 +34,7 @@ namespace Orleans.Runtime.Membership
     /// the table version is the version of /UniqueDeploymentId
     /// the silo entry version is the version of /UniqueDeploymentId/IP:Port@Gen
     /// </remarks>
-    public class ZooKeeperBasedMembershipTable : IMembershipTable
+    public partial class ZooKeeperBasedMembershipTable : IMembershipTable
     {
         private readonly ILogger logger;
 
@@ -88,11 +88,11 @@ namespace Orleans.Runtime.Membership
                     await zk.createAsync(this.clusterPath, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                     await zk.sync(this.clusterPath);
                     //if we got here we know that we've just created the deployment path with version=0
-                    this.logger.LogInformation("Created new deployment path: {DeploymentPath}", this.clusterPath);
+                    LogInformationCreatedNewDeploymentPath(this.clusterPath);
                 }
                 catch (KeeperException.NodeExistsException)
                 {
-                    this.logger.LogDebug("Deployment path already exists: {DeploymentPath}", this.clusterPath);
+                    LogDebugDeploymentPathAlreadyExists(this.clusterPath);
                 }
             });
         }
@@ -337,13 +337,25 @@ namespace Orleans.Runtime.Membership
         {
             throw new NotImplementedException();
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Created new deployment path: {DeploymentPath}"
+        )]
+        private partial void LogInformationCreatedNewDeploymentPath(string deploymentPath);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Deployment path already exists: {DeploymentPath}"
+        )]
+        private partial void LogDebugDeploymentPathAlreadyExists(string deploymentPath);
     }
 
     /// <summary>
     /// the state of every ZooKeeper client and its push notifications are published using watchers.
     /// in orleans the watcher is only for debugging purposes
     /// </summary>
-    internal class ZooKeeperWatcher : Watcher
+    internal partial class ZooKeeperWatcher : Watcher
     {
         private readonly ILogger logger;
         public ZooKeeperWatcher(ILogger logger)
@@ -353,11 +365,14 @@ namespace Orleans.Runtime.Membership
 
         public override Task process(WatchedEvent @event)
         {
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                logger.LogDebug(@event.ToString());
-            }
+            LogDebugWatchedEvent(@event);
             return Task.CompletedTask;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "{EventString}"
+        )]
+        private partial void LogDebugWatchedEvent(WatchedEvent eventString);
     }
 }
