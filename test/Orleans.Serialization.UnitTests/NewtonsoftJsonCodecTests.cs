@@ -10,6 +10,23 @@ using Xunit.Abstractions;
 
 namespace Orleans.Serialization.UnitTests
 {
+    /// <summary>
+    /// Tests for Orleans' Newtonsoft.Json serialization support.
+    /// 
+    /// Orleans provides integration with Newtonsoft.Json (Json.NET) for scenarios requiring:
+    /// - Compatibility with existing Newtonsoft.Json configurations
+    /// - Advanced JSON features not available in System.Text.Json
+    /// - Integration with systems already using Newtonsoft.Json
+    /// 
+    /// The Newtonsoft.Json codec in Orleans:
+    /// - Supports all Json.NET features including custom converters
+    /// - Can be selectively applied using type predicates
+    /// - Provides both serialization and deep copy functionality
+    /// - Handles Json.NET specific types like JObject, JArray, etc.
+    /// 
+    /// This integration is particularly useful when migrating existing systems
+    /// to Orleans that already have complex Newtonsoft.Json configurations.
+    /// </summary>
     [Trait("Category", "BVT")]
     public class NewtonsoftJsonCodecTests : FieldCodecTester<MyNewtonsoftJsonClass, IFieldCodec<MyNewtonsoftJsonClass>>
     {

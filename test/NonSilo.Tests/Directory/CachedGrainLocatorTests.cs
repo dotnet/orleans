@@ -19,6 +19,11 @@ using Xunit.Abstractions;
 
 namespace UnitTests.Directory
 {
+    /// <summary>
+    /// Tests for the CachedGrainLocator, which is Orleans' primary mechanism for locating grain activations across the cluster.
+    /// The locator maintains a local cache of grain locations to minimize directory lookups and improve performance.
+    /// It handles registration, lookup, and cleanup of grain activations while maintaining consistency with the distributed directory.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("Directory")]
     public class CachedGrainLocatorTests
     {
@@ -65,6 +70,10 @@ namespace UnitTests.Directory
         //    Assert.Equal(expected, grainAddress.ToActivationAddress());
         //}
 
+        /// <summary>
+        /// Tests basic registration of a grain activation when no prior registration exists.
+        /// Verifies that the activation is registered in the directory and cached locally.
+        /// </summary>
         [Fact]
         public async Task RegisterWhenNoOtherEntryExists()
         {
@@ -301,6 +310,10 @@ namespace UnitTests.Directory
             await this.lifecycle.OnStop();
         }
 
+        /// <summary>
+        /// Tests that the locator properly cleans up cached entries when a silo dies.
+        /// This is critical for preventing requests from being sent to dead silos.
+        /// </summary>
         [Fact]
         public async Task CleanupWhenSiloIsDead()
         {

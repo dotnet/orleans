@@ -20,6 +20,9 @@ using Xunit.Abstractions;
 
 namespace NonSilo.Tests.Directory
 {
+    /// <summary>
+    /// Tests for grain locator resolver functionality including DHT, cached, and client grain locator resolution.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("Directory")]
     public class GrainLocatorResolverTests
     {

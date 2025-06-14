@@ -16,6 +16,9 @@ using Microsoft.Extensions.Hosting;
 
 namespace Tester.AdoNet.Reminders
 {
+    /// <summary>
+    /// Integration tests for Orleans reminders functionality using SQL Server as the reminder service backend.
+    /// </summary>
     [TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("SqlServer")]
     public class ReminderTests_AdoNet_SqlServer : ReminderTests_Base, IClassFixture<ReminderTests_AdoNet_SqlServer.Fixture>
     {

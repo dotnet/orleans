@@ -9,6 +9,9 @@ using Xunit;
 
 namespace UnitTests.General
 {
+    /// <summary>
+    /// Tests for load shedding functionality when the gateway is overloaded.
+    /// </summary>
     // if we parallelize tests, each test should run in isolation 
     public class LoadSheddingTest : OrleansTestingBase, IClassFixture<LoadSheddingTest.Fixture>
     {

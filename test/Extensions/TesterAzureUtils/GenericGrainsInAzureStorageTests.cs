@@ -7,6 +7,9 @@ using Xunit;
 
 namespace Tester.AzureUtils.General
 {
+    /// <summary>
+    /// Tests for generic grain types using Azure Table Storage as the persistence provider.
+    /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Generics")]
     public class GenericGrainsInAzureTableStorageTests : OrleansTestingBase, IClassFixture<GenericGrainsInAzureTableStorageTests.Fixture>
     {
@@ -63,6 +66,9 @@ namespace Tester.AzureUtils.General
         }
     }
 
+    /// <summary>
+    /// Tests for generic grain types using Azure Blob Storage as the persistence provider.
+    /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Generics")]
     public class GenericGrainsInAzureBlobStorageTests : OrleansTestingBase, IClassFixture<GenericGrainsInAzureBlobStorageTests.Fixture>
     {

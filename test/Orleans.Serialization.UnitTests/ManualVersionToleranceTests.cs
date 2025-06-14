@@ -14,6 +14,21 @@ using System.Threading.Tasks;
 
 namespace Orleans.Serialization.UnitTests
 {
+    /// <summary>
+    /// Tests for Orleans' version tolerance capabilities in serialization.
+    /// 
+    /// Version tolerance is a critical feature of Orleans that allows:
+    /// - Adding new fields to types without breaking existing serialized data
+    /// - Removing fields gracefully (old data with removed fields can still be deserialized)
+    /// - Changing type hierarchies while maintaining compatibility
+    /// - Rolling upgrades in distributed systems without downtime
+    /// 
+    /// Orleans achieves version tolerance through:
+    /// - Field-based serialization (not order-dependent)
+    /// - Explicit field IDs that remain stable across versions
+    /// - Graceful handling of unknown fields during deserialization
+    /// - Support for schema evolution patterns
+    /// </summary>
     public class ManualVersionToleranceTests
     {
         private const string TestString = "hello, Orleans.Serialization";

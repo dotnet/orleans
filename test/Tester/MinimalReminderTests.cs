@@ -5,6 +5,9 @@ using Xunit;
 
 namespace UnitTests.CatalogTests
 {
+    /// <summary>
+    /// Tests reminder functionality with minimal interval configuration (100ms) using in-memory reminder service.
+    /// </summary>
     public class MinimalReminderTests : IClassFixture<MinimalReminderTests.Fixture>
     {
         private readonly Fixture fixture;

@@ -6,6 +6,9 @@ using TestGrains;
 
 namespace Tester.EventSourcingTests
 {
+    /// <summary>
+    /// Tests for event-sourced chat grain functionality including post creation, editing, deletion, and truncation.
+    /// </summary>
     public class ChatGrainTests : IClassFixture<EventSourcingClusterFixture>
     {
         private readonly EventSourcingClusterFixture fixture;

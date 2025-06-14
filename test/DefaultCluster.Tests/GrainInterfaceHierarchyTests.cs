@@ -4,6 +4,12 @@ using Xunit;
 
 namespace DefaultCluster.Tests
 {
+    /// <summary>
+    /// Tests for Orleans' support of grain interface inheritance hierarchies.
+    /// Validates that grains can properly implement interfaces that extend other interfaces,
+    /// support multiple inheritance paths, and correctly expose methods from all levels
+    /// of the interface hierarchy.
+    /// </summary>
     public class GrainInterfaceHierarchyTests : HostedTestClusterEnsureDefaultStarted
     {
         public GrainInterfaceHierarchyTests(DefaultClusterFixture fixture) : base(fixture)
@@ -15,6 +21,11 @@ namespace DefaultCluster.Tests
             return GrainFactory.GetGrain<T>(GetRandomGrainId());
         }
 
+        /// <summary>
+        /// Tests a grain implementing a simple interface hierarchy.
+        /// Validates basic interface inheritance where a grain implements an interface
+        /// that extends a base interface.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task DoSomethingGrainEmptyTest()
         {
@@ -22,6 +33,11 @@ namespace DefaultCluster.Tests
             Assert.Equal("DoSomethingEmptyGrain", await doSomething.DoIt());
         }
 
+        /// <summary>
+        /// Tests a grain implementing an extended interface hierarchy.
+        /// Validates that grains can implement interfaces that add additional methods
+        /// to their base interface, exposing both sets of functionality.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task DoSomethingGrainEmptyWithMoreTest()
         {
@@ -30,6 +46,11 @@ namespace DefaultCluster.Tests
             Assert.Equal("DoSomethingEmptyWithMoreGrain", await doSomething.DoMore());
         }
 
+        /// <summary>
+        /// Tests a grain implementing an interface with multiple method extensions.
+        /// Validates proper method resolution when interfaces extend base interfaces
+        /// with additional functionality.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task DoSomethingWithMoreEmptyGrainTest()
         {
@@ -38,6 +59,11 @@ namespace DefaultCluster.Tests
             Assert.Equal("DoSomethingWithMoreEmptyGrain", await doSomething.DoMore());
         }
 
+        /// <summary>
+        /// Tests a grain with a different interface extension pattern.
+        /// Validates that grains correctly implement alternative method sets
+        /// when extending base interfaces.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task DoSomethingWithMoreGrainTest()
         {
@@ -46,6 +72,11 @@ namespace DefaultCluster.Tests
             Assert.Equal("DoSomethingWithMoreGrain", await doSomething.DoThat());
         }
 
+        /// <summary>
+        /// Tests a grain implementing multiple interface inheritance paths.
+        /// Validates that grains can implement complex interface hierarchies where
+        /// multiple interfaces are combined, exposing all inherited methods.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task DoSomethingCombinedGrainTest()
         {
@@ -55,6 +86,11 @@ namespace DefaultCluster.Tests
             Assert.Equal("DoSomethingCombinedGrain", await doSomething.DoThat());
         }
 
+        /// <summary>
+        /// Tests state management across different interface hierarchy implementations.
+        /// Validates that grains with different interface hierarchies maintain independent
+        /// state and that state operations work correctly through inherited interfaces.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task DoSomethingValidateSingleGrainTest()
         {

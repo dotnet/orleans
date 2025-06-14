@@ -4,6 +4,9 @@ using Xunit;
 
 namespace UnitTests.Serialization
 {
+    /// <summary>
+    /// Tests for serialization of immutable collections.
+    /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class SerializationTestsImmutableCollections
     {

@@ -15,6 +15,20 @@ namespace UnitTests
 {
     /// <summary>
     /// Tests that grain activation can recover from invalid grain directory entries.
+    /// 
+    /// The grain directory can contain stale or "poison" entries that point to
+    /// non-existent activations. This can happen due to:
+    /// - Silo crashes before cleaning up directory entries
+    /// - Network partitions causing inconsistent state
+    /// - Race conditions during activation/deactivation
+    /// 
+    /// Orleans must be resilient to these scenarios by:
+    /// - Detecting invalid entries during activation
+    /// - Retrying registration with proper previousRegistration parameter
+    /// - Forwarding calls to the correct silo based on directory entries
+    /// 
+    /// These tests verify Orleans can recover from poison directory entries
+    /// and maintain the single activation constraint.
     /// </summary>
     public class GrainLocatorActivationResiliencyTests : HostedTestClusterEnsureDefaultStarted
     {
@@ -23,7 +37,16 @@ namespace UnitTests
         }
 
         /// <summary>
-        /// Tests that a grain can be activated even if the grain locator indicates that there is an existing registration for that grain on the same silo.
+        /// Tests recovery when the grain directory contains an invalid entry pointing
+        /// to the same silo where activation will occur.
+        /// 
+        /// Scenario:
+        /// 1. Insert a "poison" directory entry pointing to a non-existent activation on the primary silo
+        /// 2. Attempt to activate the grain on the same silo
+        /// 3. The activation should detect the invalid entry (same silo, different activation ID)
+        /// 4. Retry registration with the poison entry as previousRegistration to update it
+        /// 
+        /// This tests the local silo's ability to self-heal invalid directory state.
         /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task ReactivateGrainWithPoisonGrainDirectoryEntry_LocalSilo()
@@ -32,17 +55,17 @@ namespace UnitTests
             var primarySiloAddress = primarySilo.SiloAddress;
             var grain = GrainFactory.GetGrain<IGuidTestGrain>(Guid.NewGuid());
 
-            // Insert an entry into the grain directory which points to a grain which is not active.
-            // The entry points to the silo which the activation will be created on, but it points to a different activation.
-            // This will cause the first registration attempt to fail, but the activation should recognize that the grain
-            // directory entry is incorrect (points to the current silo, but an activation which must be defunct) and retry
-            // registration, passing the previous registration so that the grain directory entry is updated.
+            // Create a poison directory entry:
+            // - Points to the correct silo (primary)
+            // - But with a fake activation ID that doesn't exist
+            // This simulates a stale entry from a crashed/deactivated grain
             var grainLocator = primarySilo.SiloHost.Services.GetRequiredService<GrainLocator>();
             var badAddress = GrainAddress.GetAddress(primarySiloAddress, grain.GetGrainId(), ActivationId.NewId());
             await grainLocator.Register(badAddress, previousRegistration: null);
 
             {
-                // Rig placement to occurs on the primary silo.
+                // Force placement on the primary silo using placement hint
+                // Despite the poison entry, the grain should successfully activate
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, primarySiloAddress);
                 var silo = await grain.GetSiloAddress();
                 Assert.Equal(primarySiloAddress, silo);
@@ -50,8 +73,16 @@ namespace UnitTests
         }
         
         /// <summary>
-        /// Similar to <see cref="ReactivateGrainWithPoisonGrainDirectoryEntry_LocalSilo"/>, except this test attempts to activate the grain on a different silo
-        /// from the one specified in the grain directory entry, to ensure that the call will be forwarded to the correct silo.
+        /// Tests recovery when activation is attempted on a different silo than the poison entry.
+        /// 
+        /// Scenario:
+        /// 1. Insert poison entry pointing to primary silo
+        /// 2. Attempt to activate on secondary silo
+        /// 3. Secondary silo sees the directory entry and forwards the call to primary
+        /// 4. Primary silo detects invalid entry and updates it during activation
+        /// 
+        /// This tests cross-silo coordination and forwarding behavior when dealing
+        /// with invalid directory entries, ensuring calls reach the right silo.
         /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task ReactivateGrainWithPoisonGrainDirectoryEntry_RemoteSilo()
@@ -61,18 +92,19 @@ namespace UnitTests
             var primarySiloAddress = primarySilo.SiloAddress;
             var grain = GrainFactory.GetGrain<IGuidTestGrain>(Guid.NewGuid());
 
-            // Insert an entry into the grain directory which points to a grain which is not active.
-            // The entry points to another silo, but that silo also does not host the registered activation.
-            // This will cause the first registration attempt to fail, but the activation will forward messages to the
-            // silo which the registration points to and the subsequent activation will also initially fail registration,
-            // but succeed later.
+            // Create poison entry pointing to primary silo with fake activation ID
+            // This tests the forwarding mechanism: secondary silo will see this entry
+            // and forward the request to primary, where recovery will occur
             var grainLocator = primarySilo.SiloHost.Services.GetRequiredService<GrainLocator>();
             var badAddress = GrainAddress.GetAddress(primarySiloAddress, grain.GetGrainId(), ActivationId.NewId());
             await grainLocator.Register(badAddress, previousRegistration: null);
 
             {
-                // Rig placement to occurs on the secondary silo, but since there is a directory entry pointing to the primary silo,
-                // the call should be forwarded to the primary silo where the grain will be activated.
+                // Attempt placement on secondary silo, but the directory entry
+                // will cause forwarding to primary silo. This verifies:
+                // 1. Secondary recognizes it shouldn't activate due to existing entry
+                // 2. Call is forwarded to primary based on directory
+                // 3. Primary recovers from poison entry and activates successfully
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, secondarySiloAddress);
                 var silo = await grain.GetSiloAddress();
                 Assert.Equal(primarySiloAddress, silo);

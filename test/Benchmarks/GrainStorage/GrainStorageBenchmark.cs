@@ -5,6 +5,9 @@ using BenchmarkGrainInterfaces.GrainStorage;
 
 namespace Benchmarks.GrainStorage
 {
+    /// <summary>
+    /// Benchmarks grain storage providers by measuring read/write operations against different storage backends.
+    /// </summary>
     public class GrainStorageBenchmark : IDisposable
     {
         private TestCluster host;

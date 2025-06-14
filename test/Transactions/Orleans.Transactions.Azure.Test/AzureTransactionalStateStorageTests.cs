@@ -22,6 +22,9 @@ namespace Orleans.Transactions.Azure.Tests
         }
     }
 
+    /// <summary>
+    /// Tests for Azure Table Storage implementation of transactional state storage.
+    /// </summary>
     public class AzureTransactionalStateStorageTests : TransactionalStateStorageTestRunnerxUnit<TestState>, IClassFixture<TestFixture>
     {
         private const string tableName = "StateStorageTests";

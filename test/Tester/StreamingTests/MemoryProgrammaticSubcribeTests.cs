@@ -7,6 +7,9 @@ using Xunit;
 
 namespace UnitTests.StreamingTests
 {
+    /// <summary>
+    /// Tests programmatic stream subscriptions using memory streams with multiple stream providers.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("Streaming")]
     public class MemoryProgrammaticSubcribeTests : ProgrammaticSubscribeTestsRunner, IClassFixture<MemoryProgrammaticSubcribeTests.Fixture>
     {

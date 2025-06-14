@@ -4,6 +4,9 @@ using Xunit;
 
 namespace NonSilo.Tests.Directory;
 
+/// <summary>
+/// Tests for ring range operations including difference, complement, intersection, and containment logic.
+/// </summary>
 [TestCategory("BVT")]
 public sealed class RingRangeTests
 {

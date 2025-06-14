@@ -10,6 +10,9 @@ using Orleans.Reminders.Cosmos;
 
 namespace Tester.Cosmos.Reminders;
 
+/// <summary>
+/// Standalone tests for Cosmos DB reminder table operations including performance benchmarks and table-level operations.
+/// </summary>
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 [TestCategory("Cosmos")]
 public class ReminderTests_Cosmos_Standalone

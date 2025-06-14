@@ -9,10 +9,16 @@ using static System.String;
 
 namespace Tester.AdoNet.Streaming;
 
+/// <summary>
+/// Tests for SQL Server ADO.NET subscription multiplicity.
+/// </summary>
 public class SqlServerAdoNetSubscriptionMultiplicityTests() : AdoNetSubscriptionMultiplicityTests(AdoNetInvariants.InvariantNameSqlServer)
 {
 }
 
+/// <summary>
+/// Tests for MySQL ADO.NET subscription multiplicity.
+/// </summary>
 public class MySqlAdoNetSubscriptionMultiplicityTests : AdoNetSubscriptionMultiplicityTests
 {
     public MySqlAdoNetSubscriptionMultiplicityTests() : base(AdoNetInvariants.InvariantNameMySql)
@@ -21,10 +27,16 @@ public class MySqlAdoNetSubscriptionMultiplicityTests : AdoNetSubscriptionMultip
     }
 }
 
+/// <summary>
+/// Tests for PostgreSQL ADO.NET subscription multiplicity.
+/// </summary>
 public class PostgreSqlAdoNetSubscriptionMultiplicityTests() : AdoNetSubscriptionMultiplicityTests(AdoNetInvariants.InvariantNamePostgreSql)
 {
 }
 
+/// <summary>
+/// Base class for ADO.NET subscription multiplicity tests.
+/// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
 public abstract class AdoNetSubscriptionMultiplicityTests : TestClusterPerTest
 {

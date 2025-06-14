@@ -7,6 +7,16 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
+    /// <summary>
+    /// Tests fundamental grain activation and lifecycle behaviors in Orleans.
+    /// These tests verify core functionality including:
+    /// - Grain activation and identity management
+    /// - State persistence across activations
+    /// - Error handling during activation
+    /// - Support for different key types (long, Guid, ulong)
+    /// - Request context propagation
+    /// Orleans uses an activation model where grains are activated on-demand and can be deactivated when idle.
+    /// </summary>
     public class BasicActivationTests : HostedTestClusterEnsureDefaultStarted
     {
         public BasicActivationTests(DefaultClusterFixture fixture) : base(fixture)
@@ -16,6 +26,14 @@ namespace DefaultCluster.Tests.General
         private TimeSpan GetResponseTimeout() => this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>().GetResponseTimeout();
         private void SetResponseTimeout(TimeSpan value) => this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>().SetResponseTimeout(value);
 
+        /// <summary>
+        /// Tests basic grain activation with long keys and state updates.
+        /// Verifies that:
+        /// - Grains are properly activated when accessed
+        /// - State changes persist within the same activation
+        /// - Multiple grain references to the same identity share the same activation
+        /// This demonstrates Orleans' virtual actor model where grains exist logically even when not activated.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task BasicActivation_ActivateAndUpdate()
         {
@@ -37,6 +55,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("one", await g1a.GetLabel());
         }
 
+        /// <summary>
+        /// Tests grain activation using Guid keys instead of long keys.
+        /// Verifies that the grain system properly handles Guid-based grain identities.
+        /// GUIDs are commonly used for grain keys when natural numeric identifiers don't exist.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task BasicActivation_Guid_ActivateAndUpdate()
         {
@@ -59,6 +82,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("one", await g1a.GetLabel());
         }
 
+        /// <summary>
+        /// Tests error handling when grain activation fails due to invalid parameters.
+        /// Verifies that grains can enforce constraints during activation (e.g., rejecting certain key values).
+        /// This demonstrates Orleans' ability to fail fast when grain invariants are violated.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("ErrorHandling"), TestCategory("GetGrain")]
         public async Task BasicActivation_Fail()
         {
@@ -79,6 +107,11 @@ namespace DefaultCluster.Tests.General
             if (!failed) Assert.Fail("Should have failed, but instead returned " + key);
         }
 
+        /// <summary>
+        /// Tests error handling when multiple concurrent requests fail during grain activation.
+        /// Verifies that Orleans properly handles burst failures without resource leaks or deadlocks.
+        /// All concurrent requests should receive the same activation failure.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("ErrorHandling"), TestCategory("GetGrain")]
         public async Task BasicActivation_BurstFail()
         {
@@ -108,6 +141,11 @@ namespace DefaultCluster.Tests.General
             if (!failed) Assert.Fail("Should have failed, but instead returned " + key);
         }
 
+        /// <summary>
+        /// Tests grain activation with ulong.MaxValue cast to long (results in -1).
+        /// Verifies proper handling of edge cases in numeric grain keys.
+        /// This ensures the grain system correctly handles the full range of long values.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task BasicActivation_ULong_MaxValue()
         {
@@ -129,6 +167,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal((long)key1AsUlong, await g1a.GetKey());
         }
 
+        /// <summary>
+        /// Tests grain activation with ulong.MinValue (0) cast to long.
+        /// Verifies proper handling of zero as a grain key.
+        /// Zero is a valid grain key and should work like any other numeric identifier.
+        /// </summary>
         [Fact, TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task BasicActivation_ULong_MinValue()
         {
@@ -151,6 +194,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal((long)key1AsUlong, await g1a.GetKey());
         }
 
+        /// <summary>
+        /// Tests grain activation with int.MaxValue as the grain key.
+        /// Verifies proper handling of large positive grain keys.
+        /// This ensures no overflow or precision issues with large numeric identifiers.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task BasicActivation_Long_MaxValue()
         {
@@ -172,6 +220,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal((long)key1AsUlong, await g1a.GetKey());
         }
 
+        /// <summary>
+        /// Tests grain activation with long.MinValue as the grain key.
+        /// Verifies proper handling of the most negative possible grain key.
+        /// This ensures the grain system handles the full range of signed long values.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task BasicActivation_Long_MinValue()
         {
@@ -193,6 +246,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal((long)key1AsUlong, await g1a.GetKey());
         }
 
+        /// <summary>
+        /// Tests grain activation when grains implement multiple interfaces.
+        /// Verifies that grains can return references to other grains through various collection types.
+        /// This demonstrates Orleans' support for complex grain interface hierarchies.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task BasicActivation_MultipleGrainInterfaces()
         {
@@ -206,6 +264,14 @@ namespace DefaultCluster.Tests.General
             this.Logger.LogInformation("GetMultipleGrainInterfaces_Array() worked");
         }
 
+        /// <summary>
+        /// Tests recovery after message timeout in reentrant grains.
+        /// Verifies that:
+        /// - Grains can recover from expired messages in their queues
+        /// - Subsequent valid requests succeed after timeouts
+        /// - The system properly cleans up expired messages
+        /// This tests Orleans' resilience to transient failures and timeout conditions.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("ActivateDeactivate"),
          TestCategory("Reentrancy")]
         public async Task BasicActivation_Reentrant_RecoveryAfterExpiredMessage()
@@ -253,6 +319,12 @@ namespace DefaultCluster.Tests.General
             }
         }
 
+        /// <summary>
+        /// Tests request context propagation from client to grain.
+        /// Verifies that Orleans properly flows ambient context (like trace IDs or user context)
+        /// from the client through to grain method executions.
+        /// Request context is essential for distributed tracing and multi-tenancy scenarios.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("RequestContext"), TestCategory("GetGrain")]
         public async Task BasicActivation_TestRequestContext()
         {

@@ -16,6 +16,9 @@ using Google.Protobuf;
 
 namespace Benchmarks.Comparison
 {
+    /// <summary>
+    /// Compares Orleans serialization performance against other popular serializers for class types.
+    /// </summary>
     [Trait("Category", "Benchmark")]
     [Config(typeof(BenchmarkConfig))]
     [PayloadSizeColumn]

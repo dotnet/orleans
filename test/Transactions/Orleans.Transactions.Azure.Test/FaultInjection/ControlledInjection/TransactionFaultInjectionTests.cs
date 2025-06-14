@@ -5,6 +5,9 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Azure.Tests
 {
+    /// <summary>
+    /// Tests for transaction behavior under controlled fault injection scenarios with Azure Storage.
+    /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("Functional")]
     public class TransactionFaultInjectionTests : ControlledFaultInjectionTransactionTestRunnerxUnit, IClassFixture<ControlledFaultInjectionTestFixture>
     {

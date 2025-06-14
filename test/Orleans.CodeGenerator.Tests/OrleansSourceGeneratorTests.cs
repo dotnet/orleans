@@ -8,8 +8,28 @@ using Orleans.Serialization;
 
 namespace Orleans.CodeGenerator.Tests;
 
+/// <summary>
+/// Tests for the Orleans source generator that generates serialization and RPC code.
+///
+/// The Orleans source generator uses Roslyn source generators to:
+/// - Generate serializers for types marked with [GenerateSerializer]
+/// - Generate proxy classes for grain interfaces
+/// - Generate invokable wrappers for grain methods
+/// - Generate metadata for Orleans runtime
+///
+/// Key features tested:
+/// - Serialization code generation for various type patterns
+/// - Support for different C# language features (records, nullable reference types, etc.)
+/// - Grain proxy generation for different grain key types
+/// - Proper handling of generic types
+/// - Diagnostics for incorrect usage
+/// </summary>
 public class OrleansSourceGeneratorTests
 {
+    /// <summary>
+    /// Tests basic serializer generation for a simple class with a string property.
+    /// This is the most common scenario - a POCO with properties marked with [Id] attributes.
+    /// </summary>
     [Fact]
     public Task TestBasicClass() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
@@ -23,6 +43,13 @@ public class DemoData
     public string Value { get; set; } = string.Empty;
 }");
 
+    /// <summary>
+    /// Tests serializer generation for classes with private readonly fields.
+    /// Verifies that the generator can handle:
+    /// - Private fields (not just public properties)
+    /// - Readonly fields that must be set via constructor
+    /// - Property getters that expose private field values
+    /// </summary>
     [Fact]
     public Task TestBasicClassWithoutNamespace() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
@@ -54,6 +81,13 @@ internal class InternalDemoData
     public string Value { get; set; } = string.Empty;
 }");
 
+    /// <summary>
+    /// Tests serializer generation for classes with private readonly fields.
+    /// Verifies that the generator can handle:
+    /// - Private fields (not just public properties)
+    /// - Readonly fields that must be set via constructor
+    /// - Property getters that expose private field values
+    /// </summary>
     [Fact]
     public Task TestBasicClassWithAnnotatedFields() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
@@ -112,6 +146,11 @@ public class DerivedData : BaseData
     }
 }");
 
+    /// <summary>
+    /// Tests serializer generation for value types (structs).
+    /// Structs have different semantics than classes (value vs reference types)
+    /// and the generator must handle them appropriately.
+    /// </summary>
     [Fact]
     public Task TestBasicStruct() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
@@ -125,6 +164,14 @@ public struct DemoData
     public string Value { get; set; }
 }");
 
+    /// <summary>
+    /// Tests serializer generation for C# 9+ record types.
+    /// Records are immutable by default and use positional parameters,
+    /// requiring special handling for:
+    /// - Record structs vs record classes
+    /// - Property attributes on positional parameters
+    /// - Init-only properties
+    /// </summary>
     [Fact]
     public Task TestRecords() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
@@ -140,6 +187,13 @@ public record class DemoDataRecordClass([property: Id(0)] string Value);
 [GenerateSerializer]
 public record DemoDataRecord([property: Id(0)] string Value);");
 
+    /// <summary>
+    /// Tests serializer generation for generic types.
+    /// Generic types require:
+    /// - Generating specialized serializers for each concrete type usage
+    /// - Handling type parameters in serialization logic
+    /// - Supporting nested generic types
+    /// </summary>
     [Fact]
     public Task TestGenericClass() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
@@ -167,6 +221,13 @@ public class ConcreteUsage
     public GenericData<string> StringData { get; set; }
 }");
 
+    /// <summary>
+    /// Tests serializer generation for classes with nullable reference types.
+    /// Verifies support for C# 8+ nullable reference types including:
+    /// - Nullable and non-nullable reference properties
+    /// - Required properties (C# 11+)
+    /// - Init-only setters
+    /// </summary>
     [Fact]
     public Task TestClassReferenceProperties() => AssertSuccessfulSourceGeneration(
 @"#nullable enable
@@ -190,6 +251,14 @@ public class DemoData
     public required string RequiredStringPropInitOnly { get; init; }
 }");
 
+    /// <summary>
+    /// Tests serializer generation for all primitive .NET types.
+    /// Ensures the generator has built-in support for:
+    /// - Numeric types (int, long, float, double, decimal, etc.)
+    /// - Boolean, char, string
+    /// - Date/time types (DateTime, DateTimeOffset, TimeSpan)
+    /// - GUID and arrays
+    /// </summary>
     [Fact]
     public Task TestClassPrimitiveTypes() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
@@ -319,6 +388,13 @@ public class DemoData
     public System.Int32[] IntArrayProp { get; set; }
 }");
 
+    /// <summary>
+    /// Tests serializer generation for complex object graphs.
+    /// Verifies handling of:
+    /// - Nested object references
+    /// - Collections of custom types
+    /// - Cyclic references (important for preventing stack overflow)
+    /// </summary>
     [Fact]
     public Task TestClassNestedTypes() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
@@ -366,6 +442,11 @@ public class CyclicClass
     public string Value { get; set; }
 }");
 
+    /// <summary>
+    /// Tests the [Alias] attribute for type name aliases.
+    /// Aliases allow types to be renamed without breaking serialization compatibility,
+    /// essential for versioning and refactoring scenarios.
+    /// </summary>
     [Fact]
     public Task TestAlias() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
@@ -387,6 +468,11 @@ public struct MyTypeAliasStruct
 }
 ");
 
+    /// <summary>
+    /// Tests the [CompoundTypeAlias] attribute for complex type aliases.
+    /// Compound aliases can include multiple type components and versions,
+    /// supporting advanced versioning scenarios like type migrations.
+    /// </summary>
     [Fact]
     public Task TestCompoundTypeAlias() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
@@ -608,6 +694,13 @@ public class ClassWithImplicitFieldIds
     }
 }");
 
+    /// <summary>
+    /// Tests proxy generation for a basic grain interface.
+    /// Verifies that the generator creates:
+    /// - Proxy class implementing the grain interface
+    /// - Method invokers for RPC calls
+    /// - Proper integration with Orleans runtime
+    /// </summary>
     [Fact]
     public Task TestBasicGrain() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
@@ -629,6 +722,15 @@ public class BasicGrain : Grain, IBasicGrain
     }
 }");
 
+    /// <summary>
+    /// Tests proxy generation for grains with different key types.
+    /// Orleans supports multiple grain key types:
+    /// - Integer keys
+    /// - GUID keys
+    /// - String keys
+    /// - Compound keys (primary key + extension)
+    /// Each requires different proxy generation logic.
+    /// </summary>
     [Fact]
     public Task TestGrainWithDifferentKeyTypes() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
@@ -689,6 +791,13 @@ public class GrainWithIntegerCompoundKey : Grain, IMyGrainWithIntegerCompoundKey
     }
 }");
 
+    /// <summary>
+    /// Tests grain proxy generation with complex method signatures.
+    /// Verifies that the generator correctly handles:
+    /// - Multiple parameters
+    /// - Custom types as parameters and return values
+    /// - Async Task return types
+    /// </summary>
     [Fact]
     public Task TestGrainComplexGrain() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
@@ -875,6 +984,11 @@ public class DemoClass
     public string Value { get; set; }
 }");
 
+    /// <summary>
+    /// Tests that the generator emits a warning when [GenerateSerializer] is used in a reference assembly.
+    /// Reference assemblies contain only metadata, no implementation, so generating serializers
+    /// in them is incorrect. This test ensures developers get proper diagnostics for this mistake.
+    /// </summary>
     [Fact]
     public async Task EmitsWarningForGenerateSerializerInReferenceAssembly()
     {
@@ -916,6 +1030,11 @@ public class DemoClass
         Assert.Contains(result.Diagnostics, d => d.Id == DiagnosticRuleId.ReferenceAssemblyWithGenerateSerializer);
     }
 
+    /// <summary>
+    /// Helper method that runs the Orleans source generator on the provided code
+    /// and verifies successful generation without errors.
+    /// Uses snapshot testing to verify the generated code matches expectations.
+    /// </summary>
     private static async Task AssertSuccessfulSourceGeneration(string code)
     {
         var projectName = "TestProject";
@@ -940,6 +1059,11 @@ public class DemoClass
         await Verify(generatedSource, extension: "cs").UseDirectory("snapshots");
     }
 
+    /// <summary>
+    /// Creates a Roslyn compilation with the necessary Orleans references.
+    /// This simulates the build environment where the source generator runs,
+    /// including all required Orleans assemblies and .NET framework references.
+    /// </summary>
     private static async Task<CSharpCompilation> CreateCompilation(string sourceCode, string assemblyName = "TestProject")
     {
         var references = await ReferenceAssemblies.Net.Net80.ResolveAsync(LanguageNames.CSharp, default);

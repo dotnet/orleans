@@ -5,6 +5,12 @@ using Xunit;
 
 namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 {
+    /// <summary>
+    /// Tests for Orleans grain activation and deactivation lifecycle.
+    /// Validates that grains properly execute OnActivateAsync and OnDeactivateAsync methods,
+    /// handle activation failures, support reactivation after deactivation, and manage
+    /// complex scenarios like deactivation during activation or with long-running operations.
+    /// </summary>
     public class GrainActivateDeactivateTests : HostedTestClusterEnsureDefaultStarted, IDisposable
     {
         private readonly IActivateDeactivateWatcherGrain watcher;
@@ -20,6 +26,10 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             watcher.Clear().Wait();
         }
 
+        /// <summary>
+        /// Tests basic grain reference creation for the watcher grain.
+        /// Validates that the test infrastructure's watcher grain can be properly instantiated.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task WatcherGrain_GetGrain()
         {
@@ -27,6 +37,10 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await grain.Clear();
         }
 
+        /// <summary>
+        /// Tests basic grain activation lifecycle.
+        /// Validates that OnActivateAsync is called exactly once when a grain is first accessed.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Activate_Simple()
         {
@@ -38,6 +52,11 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 0, activation, "After activation");
         }
 
+        /// <summary>
+        /// Tests basic grain deactivation lifecycle.
+        /// Validates that OnDeactivateAsync is called when a grain is explicitly deactivated,
+        /// and that both activation and deactivation hooks are called exactly once.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Deactivate_Simple()
         {
@@ -54,6 +73,11 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
         }
 
+        /// <summary>
+        /// Tests grain reactivation after deactivation.
+        /// Validates that a new activation is created when accessing a deactivated grain,
+        /// with OnActivateAsync called again for the new activation.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Reactivate_Simple()
         {
@@ -75,6 +99,10 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
         }
 
+        /// <summary>
+        /// Tests activation with tail call optimization patterns.
+        /// Validates that grains using tail calls in their activation logic properly execute OnActivateAsync.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Activate_TailCall()
         {
@@ -86,6 +114,10 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 0, activation, "After activation");
         }
 
+        /// <summary>
+        /// Tests deactivation with tail call optimization patterns.
+        /// Validates proper lifecycle management for grains using tail call patterns.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Deactivate_TailCall()
         {
@@ -102,6 +134,10 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
         }
 
+        /// <summary>
+        /// Tests reactivation for grains using tail call patterns.
+        /// Validates that tail call grains can be properly deactivated and reactivated.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Reactivate_TailCall()
         {
@@ -123,6 +159,11 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
         }
 
+        /// <summary>
+        /// Tests deactivation of grains with long-running operations.
+        /// Validates that grains with reentrant long-running tasks can be properly deactivated
+        /// and that a new activation is created on subsequent access.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("Reentrancy")]
         public async Task LongRunning_Deactivate()
         {
@@ -148,6 +189,11 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
         }
 
+        /// <summary>
+        /// Tests handling of exceptions thrown during grain activation.
+        /// Validates that exceptions in OnActivateAsync are properly propagated to the caller
+        /// and that the grain fails to activate.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task BadActivate_Await()
         {
@@ -166,6 +212,10 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             }
         }
 
+        /// <summary>
+        /// Tests that grain methods fail when activation throws an exception.
+        /// Validates that all grain method calls fail appropriately when OnActivateAsync fails.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task BadActivate_GetValue()
         {
@@ -184,6 +234,11 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             }
         }
 
+        /// <summary>
+        /// Tests activation failure propagation through grain-to-grain calls.
+        /// Validates that activation exceptions are properly propagated when a grain
+        /// is activated indirectly through another grain's method call.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task BadActivate_Await_ViaOtherGrain()
         {
@@ -202,6 +257,11 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             }
         }
 
+        /// <summary>
+        /// Tests handling of exceptions thrown in grain constructors.
+        /// Validates that constructor failures are properly handled and don't result in
+        /// invalid operation exceptions, ensuring clean failure semantics.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Constructor_Bad_Await()
         {
@@ -225,6 +285,10 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             }
         }
 
+        /// <summary>
+        /// Tests that grains can create grain references in their constructors.
+        /// Validates that grain reference creation is allowed during grain construction phase.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Constructor_CreateGrainReference()
         {
@@ -235,6 +299,10 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             Assert.NotNull(activation);
         }
 
+        /// <summary>
+        /// Tests deactivation of grains using Task-based activation patterns.
+        /// Validates proper lifecycle management for grains with Task Action activation logic.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task TaskAction_Deactivate()
         {
@@ -251,6 +319,11 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 1, activation.ToString());
         }
 
+        /// <summary>
+        /// Tests the scenario where a grain attempts to deactivate during activation.
+        /// Validates that Orleans properly handles and rejects this invalid state transition,
+        /// preventing race conditions in the activation lifecycle.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task DeactivateOnIdleWhileActivate()
         {

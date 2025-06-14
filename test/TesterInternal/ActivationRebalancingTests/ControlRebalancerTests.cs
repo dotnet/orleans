@@ -5,6 +5,9 @@ using Xunit.Abstractions;
 
 namespace UnitTests.ActivationRebalancingTests;
 
+/// <summary>
+/// Tests for controlling the activation rebalancer, including suspend/resume operations and report subscription.
+/// </summary>
 [TestCategory("Functional"), TestCategory("ActivationRebalancing")]
 public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper output)
     : RebalancingTestBase<RebalancerFixture>(fixture, output), IClassFixture<RebalancerFixture>

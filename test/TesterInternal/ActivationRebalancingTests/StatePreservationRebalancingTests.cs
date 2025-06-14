@@ -13,6 +13,9 @@ using SPFixture = UnitTests.ActivationRebalancingTests.StatePreservationRebalanc
 
 namespace UnitTests.ActivationRebalancingTests;
 
+/// <summary>
+/// Tests for activation rebalancing with state preservation when the hosting silo dies.
+/// </summary>
 [TestCategory("Functional"), TestCategory("ActivationRebalancing")]
 public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHelper output)
     : RebalancingTestBase<SPFixture>(fixture, output), IClassFixture<SPFixture>

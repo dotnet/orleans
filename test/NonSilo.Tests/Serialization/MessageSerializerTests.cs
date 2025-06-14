@@ -17,6 +17,9 @@ using Xunit.Abstractions;
 
 namespace UnitTests.Serialization
 {
+    /// <summary>
+    /// Tests for Orleans message serialization functionality.
+    /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class MessageSerializerTests
     {

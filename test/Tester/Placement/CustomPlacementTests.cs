@@ -9,6 +9,9 @@ using Orleans.Configuration;
 
 namespace Tester.CustomPlacementTests
 {
+    /// <summary>
+    /// Tests custom grain placement strategies including fixed silo placement, exclusion-based placement, and hash-based placement.
+    /// </summary>
     [TestCategory("Functional"), TestCategory("Placement")]
     public class CustomPlacementTests : OrleansTestingBase, IClassFixture<CustomPlacementTests.Fixture>
     {

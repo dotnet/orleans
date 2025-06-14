@@ -5,12 +5,24 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
+    /// <summary>
+    /// Tests for polymorphic grain interfaces in Orleans.
+    /// Demonstrates how grains can implement multiple interfaces with inheritance
+    /// hierarchies, and how grain references can be cast between compatible interfaces.
+    /// This enables object-oriented patterns where grains expose different levels
+    /// of functionality through interface inheritance.
+    /// </summary>
     public class PolymorphicInterfaceTest : HostedTestClusterEnsureDefaultStarted
     {
         public PolymorphicInterfaceTest(DefaultClusterFixture fixture) : base(fixture)
         {
         }
 
+        /// <summary>
+        /// Tests basic polymorphic interface method calls.
+        /// Verifies that a grain implementing interface IA can be accessed
+        /// through that interface and all methods are properly dispatched.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task Polymorphic_SimpleTest()
         {
@@ -21,6 +33,12 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("A3", await IARef.A3Method());
         }
 
+        /// <summary>
+        /// Tests upcasting grain references through interface inheritance hierarchies.
+        /// Verifies that a grain reference can be cast to any interface in its
+        /// inheritance chain and that methods from all interfaces remain accessible
+        /// after casting. Demonstrates interface covariance in grain references.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task Polymorphic_UpCastTest()
         {
@@ -49,6 +67,12 @@ namespace DefaultCluster.Tests.General
             
         }
 
+        /// <summary>
+        /// Tests factory methods that return polymorphic grain references.
+        /// Verifies that grain factory can create grains using one interface type
+        /// but return them as a different compatible interface type,
+        /// enabling factory patterns with interface abstraction.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task Polymorphic_FactoryMethods()
         {
@@ -60,6 +84,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("A1", await IARef.A1Method());
         }
 
+        /// <summary>
+        /// Tests a service-style grain that implements multiple interfaces.
+        /// Verifies that a single grain can expose multiple sets of functionality
+        /// through different interfaces, similar to a service exposing multiple contracts.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task Polymorphic_ServiceType()
         {
@@ -73,6 +102,12 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("B3", await serviceRef.B3Method());
         }
 
+        /// <summary>
+        /// Tests resolution of ambiguous methods in diamond inheritance scenarios.
+        /// When multiple interfaces define the same method signature, verifies that
+        /// casting to specific interfaces correctly resolves which implementation
+        /// is called, following C# interface inheritance rules.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task Polymorphic_InheritedMethodAmbiguity()
         {
@@ -88,7 +123,13 @@ namespace DefaultCluster.Tests.General
         }
 
         /// <summary>
-        /// This unit test should consolidate all the use cases we are trying to cover with regard to polymorphic grain references
+        /// Comprehensive test for complex polymorphic grain scenarios.
+        /// Tests a derived service type that implements multiple interface hierarchies,
+        /// verifying that:
+        /// - All interfaces in the inheritance chain are accessible
+        /// - Cross-casting between unrelated interfaces works when supported
+        /// - Derived interface methods are available alongside base methods
+        /// This consolidates all polymorphic grain reference use cases.
         /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task Polymorphic__DerivedServiceType()

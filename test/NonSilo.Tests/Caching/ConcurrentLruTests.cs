@@ -7,6 +7,11 @@ using Orleans.Caching.Internal;
 
 namespace NonSilo.Tests.Caching;
 
+/// <summary>
+/// Tests for the ConcurrentLruCache, which is a thread-safe LRU (Least Recently Used) cache implementation used in Orleans.
+/// This cache is designed with a multi-generation architecture (Hot, Warm, Cold) to efficiently manage frequently accessed items.
+/// It's used throughout Orleans for caching grain directory entries, grain references, and other frequently accessed data.
+/// </summary>
 [TestCategory("BVT")]
 public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
 {
@@ -22,6 +27,9 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
 
     private static ConcurrentLruCache<int, string>.ITestAccessor GetTestAccessor(ConcurrentLruCache<int, string> lru) => lru;
 
+    /// <summary>
+    /// Verifies that the cache requires a minimum capacity of 3 to support its multi-generation architecture.
+    /// </summary>
     [Fact]
     public void WhenCapacityIsLessThan3CtorThrows()
     {
@@ -69,6 +77,9 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
         x.GetOrAdd(1, k => k).Should().Be(1);
     }
 
+    /// <summary>
+    /// Tests that the cache correctly tracks the count of items when new entries are added.
+    /// </summary>
     [Fact]
     public void WhenItemIsAddedCountIsCorrect()
     {
@@ -267,6 +278,10 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
         }
     }
 
+    /// <summary>
+    /// Tests the multi-generation eviction policy: items not accessed in the Hot generation are demoted to Cold.
+    /// This tests the cache's ability to distinguish between frequently and infrequently accessed items.
+    /// </summary>
     [Fact]
     public void WhenValueIsNotTouchedAndExpiresFromHotValueIsBumpedToCold()
     {
@@ -896,6 +911,10 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
         _lru.Count.Should().Be(_lru.Capacity);
     }
 
+    /// <summary>
+    /// Verifies that the cache properly disposes IDisposable items when they are removed via Clear().
+    /// This is important for preventing resource leaks when caching disposable objects.
+    /// </summary>
     [Fact]
     public void WhenItemsAreDisposableClearDisposesItemsOnRemove()
     {

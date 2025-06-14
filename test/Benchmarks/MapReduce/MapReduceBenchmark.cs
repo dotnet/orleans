@@ -5,6 +5,9 @@ using Orleans.TestingHost;
 
 namespace Benchmarks.MapReduce
 {
+    /// <summary>
+    /// Benchmarks Orleans' capability to perform map-reduce operations with complex processing pipelines.
+    /// </summary>
     public class MapReduceBenchmark : IDisposable
     {
         private static TestCluster _host;

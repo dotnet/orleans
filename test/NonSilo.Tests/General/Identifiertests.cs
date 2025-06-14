@@ -10,6 +10,9 @@ using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
+    /// <summary>
+    /// Tests for various Orleans identifier types including GrainId, UniqueKey, SiloAddress, and related functionality.
+    /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class IdentifierTests
     {
@@ -27,6 +30,9 @@ namespace UnitTests.General
             this.environment = fixture;
         }
 
+        /// <summary>
+        /// Verifies that GrainId.GetUniformHashCode returns a stable value.
+        /// </summary>
         [Fact]
         public void GrainIdUniformHashCodeIsStable()
         {
@@ -98,6 +104,9 @@ namespace UnitTests.General
             }
         }
 
+        /// <summary>
+        /// Tests GrainId serialization and deserialization through printable string representation.
+        /// </summary>
         [Theory, TestCategory("SlowBVT"), TestCategory("Identifiers")]
         [MemberData(nameof(TestGrainIds))]
         public void GrainId_ToFromPrintableString(GrainId grainId)
@@ -119,6 +128,9 @@ namespace UnitTests.General
             Assert.Equal(grainId, roundTripped);
         }
 
+        /// <summary>
+        /// Tests GrainId JSON serialization and deserialization round-trip.
+        /// </summary>
         [Theory, TestCategory("SlowBVT"), TestCategory("Identifiers")]
         [MemberData(nameof(TestGrainIds))]
         public void GrainId_RoundTripJsonConverter(GrainId grainId)
@@ -199,6 +211,9 @@ namespace UnitTests.General
             Assert.Equal(expectedKeyExt, actualKeyExt); // "UniqueKey objects should preserve the value of their key extension (long case).");
         }
 
+        /// <summary>
+        /// Tests GrainId interning functionality to ensure identical IDs reference the same object.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void ID_Interning_GrainID()
         {
@@ -263,6 +278,9 @@ namespace UnitTests.General
             Assert.Same(obj2, r5); // FindOrCreate return previously cached object
         }
 
+        /// <summary>
+        /// Tests SiloAddress interning to ensure identical addresses reference the same object.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void Interning_SiloAddress()
         {
@@ -323,6 +341,9 @@ namespace UnitTests.General
 
             Assert.Equal(addressStr2, addressStr2Out); // SiloAddress equal after From-To-ParsableString
         }
+        /// <summary>
+        /// Tests GrainReference creation, serialization, and round-trip operations.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Identifiers"), TestCategory("GrainReference")]
         public void GrainReference_Test1()
         {

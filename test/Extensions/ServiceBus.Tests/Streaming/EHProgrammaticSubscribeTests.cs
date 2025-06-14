@@ -7,6 +7,9 @@ using Xunit.Abstractions;
 
 namespace ServiceBus.Tests.Streaming
 {
+    /// <summary>
+    /// Tests for EventHub programmatic subscription functionality with multiple stream providers.
+    /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
     public class EHProgrammaticSubscribeTest : ProgrammaticSubscribeTestsRunner, IClassFixture<EHProgrammaticSubscribeTest.Fixture>
     {
