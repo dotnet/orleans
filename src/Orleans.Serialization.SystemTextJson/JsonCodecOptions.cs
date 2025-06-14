@@ -19,6 +19,11 @@ public class JsonCodecOptions
     public JsonReaderOptions ReaderOptions { get; set; }
 
     /// <summary>
+    /// Gets or sets the <see cref="JsonWriterOptions"/>.
+    /// </summary>
+    public JsonWriterOptions WriterOptions { get; set; }
+
+    /// <summary>
     /// Gets or sets a delegate used to determine if a type is supported by the JSON serializer for serialization and deserialization.
     /// </summary>
     public Func<Type, bool?> IsSerializableType { get; set; }

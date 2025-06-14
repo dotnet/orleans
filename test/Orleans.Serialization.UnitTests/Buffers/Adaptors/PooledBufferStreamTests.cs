@@ -765,7 +765,7 @@ public class PooledBufferStreamTests
     [MemberData(nameof(InvalidWriteParameters))]
     public void Write_InvalidParameters_ThrowsException(byte[] buffer, int offset, int count, Type expectedException)
     {
-        using var stream = new MemoryStream();
+        using var stream = new PooledBufferStream();
         Assert.Throws(expectedException, () => stream.Write(buffer, offset, count));
     }
 
