@@ -190,6 +190,9 @@ namespace Orleans
             return this.referenceActivator.CreateReference(grainId, interfaceType);
         }
 
+        /// <inheritdoc />
+        public IAddressable GetGrain(Type interfaceType, IdSpan grainKey) => GetGrain(interfaceType, grainKey, null);
+
         /// <summary>
         /// Gets a grain reference which implements the specified grain interface type and has the specified grain key, without specifying the grain type directly.
         /// </summary>

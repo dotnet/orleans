@@ -154,8 +154,12 @@ namespace Orleans
             => _runtimeClient.InternalGrainFactory.GetGrain(grainId, interfaceType);
 
         /// <inheritdoc />
-        public IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string grainClassNamePrefix = null)
+        public IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string grainClassNamePrefix)
             => _runtimeClient.InternalGrainFactory.GetGrain(interfaceType, grainKey, grainClassNamePrefix);
+
+        /// <inheritdoc />
+        public IAddressable GetGrain(Type interfaceType, IdSpan grainKey)
+            => _runtimeClient.InternalGrainFactory.GetGrain(interfaceType, grainKey);
 
         [LoggerMessage(
             Level = LogLevel.Information,
