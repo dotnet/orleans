@@ -103,7 +103,14 @@ namespace UnitTests.Streaming.Reliability
                 {
                     options.ConfigureTestDefaults();
                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}2", QueueCount);
-                }));
+                }))
+                .Configure<GrainCollectionOptions>(options =>
+                {
+                    options.MemoryPressureGrainCollectionOptions = new()
+                    {
+                        MemoryUsageCollectionEnabled = false
+                    };
+                });
             }
         }
 
