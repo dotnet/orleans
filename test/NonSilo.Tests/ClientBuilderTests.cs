@@ -9,6 +9,10 @@ using Xunit;
 
 namespace NonSilo.Tests
 {
+    /// <summary>
+    /// A no-op implementation of IGatewayListProvider used for testing client configuration
+    /// without requiring actual gateway connectivity.
+    /// </summary>
     public class NoOpGatewaylistProvider : IGatewayListProvider
     {
         public TimeSpan MaxStaleness => throw new NotImplementedException();
@@ -27,7 +31,9 @@ namespace NonSilo.Tests
     }
 
     /// <summary>
-    /// Tests for <see cref="ClientBuilder"/>.
+    /// Tests for the Orleans ClientBuilder, which is responsible for configuring and building Orleans client instances.
+    /// These tests verify client configuration validation, service registration, and proper initialization of client components
+    /// without requiring a full Orleans cluster.
     /// </summary>
     [TestCategory("BVT")]
     [TestCategory("ClientBuilder")]
@@ -132,6 +138,10 @@ namespace NonSilo.Tests
             Assert.NotNull(client);
         }
 
+        /// <summary>
+        /// Verifies that the client throws an exception during startup if no grain interfaces are registered.
+        /// This ensures that clients have at least one grain interface to communicate with.
+        /// </summary>
         [Fact]
         public void ClientBuilder_ThrowsDuringStartupIfNoGrainInterfacesAdded()
         {
@@ -204,6 +214,10 @@ namespace NonSilo.Tests
             Assert.Equal(2, client.ServiceProvider.GetRequiredService<MyService>().Id);
         }
 
+        /// <summary>
+        /// Tests that attempting to configure both a silo and a client in the same host throws an exception.
+        /// Orleans requires separate hosts for silos and clients.
+        /// </summary>
         [Fact]
         public void ClientBuilderThrowsDuringStartupIfSiloBuildersAdded()
         {
@@ -221,6 +235,10 @@ namespace NonSilo.Tests
             });
         }
 
+        /// <summary>
+        /// Tests that attempting to configure both a silo and a client using the Host.CreateApplicationBuilder API throws an exception.
+        /// This verifies that the same restriction applies to the modern hosting API.
+        /// </summary>
         [Fact]
         public void ClientBuilderWithHotApplicationBuilderThrowsDuringStartupIfSiloBuildersAdded()
         {

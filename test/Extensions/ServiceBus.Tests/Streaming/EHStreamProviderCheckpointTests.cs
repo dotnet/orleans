@@ -17,6 +17,9 @@ using Tester.AzureUtils;
 
 namespace ServiceBus.Tests.StreamingTests
 {
+    /// <summary>
+    /// Tests for EventHub stream provider checkpoint and recovery functionality after agent restarts or silo failures.
+    /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
     public class EHStreamProviderCheckpointTests : TestClusterPerTest
     {

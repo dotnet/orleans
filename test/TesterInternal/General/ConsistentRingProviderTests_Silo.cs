@@ -11,6 +11,9 @@ using Xunit.Sdk;
 
 namespace UnitTests.General
 {
+    /// <summary>
+    /// Tests for the consistent ring provider's behavior during silo failures and joins.
+    /// </summary>
     public class ConsistentRingProviderTests_Silo : TestClusterPerTest
     {
         private const int numAdditionalSilos = 3;

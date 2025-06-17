@@ -17,6 +17,12 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
+    /// <summary>
+    /// Tests for hosted client functionality in Orleans.
+    /// A hosted client is an Orleans client that runs within the same process as the silo,
+    /// enabling in-process communication between application code and grains.
+    /// This pattern is common in ASP.NET Core applications hosting Orleans.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("HostedClient")]
     public class HostedClientTests : IClassFixture<HostedClientTests.Fixture>
     {
@@ -73,6 +79,11 @@ namespace DefaultCluster.Tests.General
             _host = fixture.Host;
         }
 
+        /// <summary>
+        /// Tests basic grain invocation from a hosted client.
+        /// Verifies that an in-process client can successfully communicate with grains
+        /// running in the same process, demonstrating the core hosted client pattern.
+        /// </summary>
         [Fact]
         public async Task HostedClient_GrainCallTest()
         {
@@ -84,6 +95,12 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(23, val);
         }
 
+        /// <summary>
+        /// Tests timeout behavior for grain calls from a hosted client.
+        /// Verifies that response timeouts are properly enforced and that
+        /// the runtime correctly tracks running requests during timeout scenarios.
+        /// This ensures reliability when grains become unresponsive.
+        /// </summary>
         [Fact]
         public async Task HostedClient_TimeoutTest()
         {
@@ -127,6 +144,12 @@ namespace DefaultCluster.Tests.General
             }
         }
 
+        /// <summary>
+        /// Tests reference equality semantics for objects passed through grain calls.
+        /// Verifies that immutable objects (strings, grain references) maintain reference equality,
+        /// while mutable objects (arrays) are copied. Also demonstrates the Immutable<T> wrapper
+        /// for preserving reference equality of mutable objects when needed.
+        /// </summary>
         [Fact]
         public async Task HostedClient_ReferenceEquality_GrainCallTest()
         {
@@ -153,6 +176,12 @@ namespace DefaultCluster.Tests.General
             Assert.Same(expectedImmutable.Value, actualImmutable.Value);
         }
 
+        /// <summary>
+        /// Tests the observer pattern from a hosted client.
+        /// Demonstrates how clients can register observer objects to receive
+        /// notifications from grains, enabling push-based communication patterns.
+        /// Verifies that callbacks are properly invoked with the correct context.
+        /// </summary>
         [Fact]
         public async Task HostedClient_ObserverTest()
         {
@@ -205,6 +234,12 @@ namespace DefaultCluster.Tests.General
             Assert.NotNull(observer);
         }
 
+        /// <summary>
+        /// Tests streaming functionality from a hosted client.
+        /// Verifies that clients can subscribe to Orleans streams and receive
+        /// messages published to those streams, demonstrating the streaming
+        /// abstraction for event-driven communication patterns.
+        /// </summary>
         [Fact]
         public async Task HostedClient_StreamTest()
         {

@@ -16,7 +16,7 @@ namespace Orleans.Runtime;
 /// <summary>
 /// Grain-side support for returning <see cref="IAsyncEnumerable{T}"/> from grain methods.
 /// </summary>
-internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExtension, IAsyncDisposable, IDisposable
+internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExtension, IAsyncDisposable, IDisposable
 {
     private static readonly DiagnosticListener DiagnosticListener = new("Orleans.Runtime.AsyncEnumerableGrainExtension");
     private readonly Dictionary<Guid, EnumeratorState> _enumerators = [];
@@ -332,7 +332,7 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
         }
         catch (Exception exception)
         {
-            _logger.LogWarning(exception, "Error cancelling enumerator.");
+            LogWarningErrorCancellingEnumerator(exception);
         }
 
         try
@@ -350,7 +350,7 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
         }
         catch (Exception exception)
         {
-            _logger.LogWarning(exception, "Error disposing enumerator.");
+            LogWarningErrorDisposingEnumerator(exception);
         }
     }
 
@@ -396,4 +396,16 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
             return isExpired;
         }
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Error cancelling enumerator."
+    )]
+    private partial void LogWarningErrorCancellingEnumerator(Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Error disposing enumerator."
+    )]
+    private partial void LogWarningErrorDisposingEnumerator(Exception exception);
 }

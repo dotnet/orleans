@@ -10,6 +10,9 @@ using Orleans.Configuration;
 
 namespace Benchmarks.Ping
 {
+    /// <summary>
+    /// Benchmarks grain communication with fanout patterns across multiple silos.
+    /// </summary>
     [MemoryDiagnoser]
     public class FanoutBenchmark : IDisposable
     {

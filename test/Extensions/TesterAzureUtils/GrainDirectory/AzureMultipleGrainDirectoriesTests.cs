@@ -5,6 +5,9 @@ using UnitTests.Grains.Directories;
 
 namespace Tester.Directories
 {
+    /// <summary>
+    /// Tests for custom grain directory functionality using Azure Table Storage as the directory backend.
+    /// </summary>
     [TestCategory("AzureStorage")]
     public class AzureMultipleGrainDirectoriesTests : MultipleGrainDirectoriesTests
     {

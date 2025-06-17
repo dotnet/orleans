@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Orleans.Core.Internal;
+using Orleans.Placement;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 using TestExtensions;
@@ -26,16 +27,14 @@ namespace DefaultCluster.Tests.General
                 var expectedState = Random.Shared.Next();
                 await grain.SetState(expectedState);
                 var originalAddress = await grain.GetGrainAddress();
-                var originalHost = originalAddress.SiloAddress;
-                SiloAddress newHost;
+                GrainAddress newAddress;
                 do
                 {
                     // Trigger migration without setting a placement hint, so the grain placement provider will be
                     // free to select any location including the existing one.
                     await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
-                    var newAddress = await grain.GetGrainAddress();
-                    newHost = newAddress.SiloAddress;
-                } while (newHost == originalHost);
+                    newAddress = await grain.GetGrainAddress();
+                } while (originalAddress == newAddress);
 
                 var newState = await grain.GetState();
                 Assert.Equal(expectedState, newState);
@@ -294,6 +293,8 @@ namespace DefaultCluster.Tests.General
         ValueTask MigrateDuringDeactivation(SiloAddress targetHost);
     }
 
+    // Use random placement because this is used to test undirected migration.
+    [RandomPlacement]
     public class MigrationTestGrain : Grain, IMigrationTestGrain, IGrainMigrationParticipant
     {
         private int _state;
@@ -336,6 +337,7 @@ namespace DefaultCluster.Tests.General
         }
 
         public ValueTask<GrainAddress> GetGrainAddress() => new(GrainContext.Address);
+
         public ValueTask MigrateDuringDeactivation(SiloAddress targetHost)
         {
             _migrateDuringDeactivationTargetHost = targetHost;

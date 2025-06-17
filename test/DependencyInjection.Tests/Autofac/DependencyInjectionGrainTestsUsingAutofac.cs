@@ -9,6 +9,9 @@ namespace DependencyInjection.Tests.Autofac
 {
 // Autofac doesn't support keyed service yet
 #if false
+    /// <summary>
+    /// Tests dependency injection functionality using Autofac as the DI container for Orleans grains.
+    /// </summary>
     [TestCategory("DI"), TestCategory("Functional")]
     public class DependencyInjectionGrainTestsUsingAutofac : DependencyInjectionGrainTestRunner, IClassFixture<DependencyInjectionGrainTestsUsingAutofac.Fixture>
     {
@@ -36,6 +39,9 @@ namespace DependencyInjection.Tests.Autofac
         }
     }
 
+    /// <summary>
+    /// Tests that Orleans silos can start successfully when configured to use Autofac as the DI container.
+    /// </summary>
     [TestCategory("DI"), TestCategory("Functional")]
     public class DependencyInjectionSiloStartsUsingAutofac : IClassFixture<DependencyInjectionSiloStartsUsingAutofac.Fixture>
     {

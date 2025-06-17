@@ -10,6 +10,15 @@ namespace Tester.Cosmos.Clustering;
 
 /// <summary>
 /// Tests for operation of Orleans Membership Table using Azure Cosmos DB - Requires access to external Azure Cosmos DB account
+/// 
+/// Azure Cosmos DB provides a globally distributed, multi-model database service that Orleans can use for cluster membership
+/// management.
+/// 
+/// These tests verify the Cosmos DB membership provider correctly implements
+/// all membership operations with Cosmos DB's unique features like:
+/// - Document-based storage with SQL querying
+/// - Optimistic concurrency using ETags
+/// - Partition key strategies for cluster isolation
 /// </summary>
 [TestCategory("Membership"), TestCategory("Cosmos")]
 public class CosmosMembershipTableTests : MembershipTableTestsBase
@@ -26,6 +35,11 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
         return filters;
     }
 
+    /// <summary>
+    /// Creates a Cosmos DB-based membership table for testing.
+    /// Configures the Cosmos DB client with test-specific settings
+    /// including database/container names and consistency levels.
+    /// </summary>
     protected override IMembershipTable CreateMembershipTable(ILogger logger)
     {
         CosmosTestUtils.CheckCosmosStorage();
@@ -34,6 +48,11 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
         return new CosmosMembershipTable(loggerFactory, Services, Options.Create(options), _clusterOptions);
     }
 
+    /// <summary>
+    /// Creates a Cosmos DB-based gateway list provider.
+    /// Uses Cosmos DB's querying capabilities to efficiently
+    /// retrieve available gateway silos for client connections.
+    /// </summary>
     protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
     {
         var options = new CosmosClusteringOptions();
@@ -63,6 +82,11 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
         await MembershipTable_ReadAll_EmptyTable();
     }
 
+    /// <summary>
+    /// Tests inserting a silo entry as a Cosmos DB document.
+    /// Verifies document creation with proper partition key assignment
+    /// and automatic indexing for efficient queries.
+    /// </summary>
     [SkippableFact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_InsertRow()
     {
@@ -87,12 +111,22 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
         await MembershipTable_UpdateRow();
     }
 
+    /// <summary>
+    /// Tests concurrent updates using Cosmos DB's ETag-based concurrency.
+    /// Verifies that optimistic concurrency control prevents
+    /// conflicting updates and ensures data consistency.
+    /// </summary>
     [SkippableFact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_UpdateRowInParallel()
     {
         await MembershipTable_UpdateRowInParallel();
     }
 
+    /// <summary>
+    /// Tests heartbeat updates in Cosmos DB.
+    /// Verifies efficient partial document updates for liveness
+    /// information without rewriting entire membership entries.
+    /// </summary>
     [SkippableFact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_UpdateIAmAlive()
     {

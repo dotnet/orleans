@@ -6,6 +6,9 @@ using Xunit;
 
 namespace UnitTests.StorageTests.AdoNet
 {
+    /// <summary>
+    /// Test data model for streaming tests.
+    /// </summary>
     public class StreamingTest
     {
         public int Id { get; set; }
@@ -13,6 +16,9 @@ namespace UnitTests.StorageTests.AdoNet
         public byte[] StreamData { get; set; }
     }
 
+    /// <summary>
+    /// Base class for relational storage tests.
+    /// </summary>
     public abstract class RelationalStoreTestsBase
     {
         //This timeout limit should be clearly less than that defined in RelationalStorageForTesting.CancellationTestQuery. 

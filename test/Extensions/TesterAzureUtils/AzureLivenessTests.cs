@@ -6,6 +6,9 @@ using Xunit.Abstractions;
 
 namespace Tester.AzureUtils
 {
+    /// <summary>
+    /// Tests for silo liveness and membership functionality using Azure Table Storage as the membership table.
+    /// </summary>
     [TestCategory("Membership"), TestCategory("AzureStorage")]
     public class LivenessTests_AzureTable : LivenessTestsBase
     {

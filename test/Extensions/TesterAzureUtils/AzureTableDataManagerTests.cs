@@ -7,6 +7,9 @@ using Xunit;
 
 namespace Tester.AzureUtils
 {
+    /// <summary>
+    /// Tests for Azure Table Storage data manager CRUD operations and conditional updates.
+    /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Storage")]
     public class AzureTableDataManagerTests : AzureStorageBasicTests
     {

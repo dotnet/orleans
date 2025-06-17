@@ -3,9 +3,22 @@ using Xunit;
 
 namespace Orleans.Journaling.Tests;
 
+/// <summary>
+/// Tests for StateMachineManager, the core component of Orleans' journaling infrastructure.
+/// 
+/// StateMachineManager coordinates multiple durable data structures (DurableDictionary, DurableList, etc.)
+/// within a single grain, ensuring that all state changes are atomically journaled and can be
+/// recovered together. It manages the lifecycle of state machines, handles persistence through
+/// WriteStateAsync calls, and ensures consistent recovery after failures.
+/// </summary>
 [TestCategory("BVT")]
 public class StateMachineManagerTests : StateMachineTestBase
 {
+    /// <summary>
+    /// Tests the registration and basic operation of multiple state machines.
+    /// Verifies that different types of durable collections can be registered
+    /// with the manager and operate independently.
+    /// </summary>
     [Fact]
     public async Task StateMachineManager_RegisterStateMachine_Test()
     {
@@ -34,6 +47,11 @@ public class StateMachineManagerTests : StateMachineTestBase
         Assert.Equal(42, queue.Peek());
     }
 
+    /// <summary>
+    /// Tests that all registered state machines are correctly recovered together.
+    /// Verifies that the manager maintains consistency across multiple collections
+    /// during recovery from persisted state.
+    /// </summary>
     [Fact]
     public async Task StateMachineManager_StateRecovery_Test()
     {
@@ -68,6 +86,11 @@ public class StateMachineManagerTests : StateMachineTestBase
         Assert.Equal("item2", recoveredList[1]);
     }
 
+    /// <summary>
+    /// Tests multiple WriteStateAsync calls with operations in between.
+    /// Verifies that each WriteStateAsync creates a consistent checkpoint
+    /// and that the final state is correctly recovered.
+    /// </summary>
     [Fact]
     public async Task StateMachineManager_MultipleWriteStates_Test()
     {
@@ -106,6 +129,11 @@ public class StateMachineManagerTests : StateMachineTestBase
         Assert.False(recoveredDict.ContainsKey("key2"));
     }
 
+    /// <summary>
+    /// Tests managing multiple state machines of different types simultaneously.
+    /// Verifies that the manager correctly handles diverse data structures
+    /// (dictionaries with different key/value types, lists, values) in a single grain.
+    /// </summary>
     [Fact]
     public async Task StateMachineManager_MultipleStateMachines_Test()
     {
@@ -160,6 +188,10 @@ public class StateMachineManagerTests : StateMachineTestBase
         Assert.Equal("Test Person", recoveredPersonValue.Value.Name);
     }
 
+    /// <summary>
+    /// Tests that multiple state machines can operate independently without interference.
+    /// Verifies namespace isolation between different state machines with similar keys.
+    /// </summary>
     [Fact]
     public async Task StateMachineManager_Concurrency_Test()
     {
@@ -190,6 +222,11 @@ public class StateMachineManagerTests : StateMachineTestBase
         Assert.Equal(200, dict2["key2"]);
     }
 
+    /// <summary>
+    /// Stress test for state recovery with large amounts of data.
+    /// Verifies that the journaling system can handle and recover state machines
+    /// containing thousands of entries without data loss or corruption.
+    /// </summary>
     [Fact]
     public async Task StateMachineManager_LargeStateRecovery_Test()
     {

@@ -7,6 +7,9 @@ using Xunit;
 
 namespace Tester
 {
+    /// <summary>
+    /// Tests for custom option formatters and formatter resolution, including support for named options and redaction of sensitive data.
+    /// </summary>
     [TestCategory("BVT")]
     public class LogFomatterTests
     {

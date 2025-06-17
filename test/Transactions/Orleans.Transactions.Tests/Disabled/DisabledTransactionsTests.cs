@@ -5,6 +5,9 @@ using TestExtensions;
 
 namespace Orleans.Transactions.Tests
 {
+    /// <summary>
+    /// Tests for behavior when transactions are disabled.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("Transactions")]
     public class DisabledTransactionsTests : DisabledTransactionsTestRunnerxUnit, IClassFixture<DefaultClusterFixture>
     {

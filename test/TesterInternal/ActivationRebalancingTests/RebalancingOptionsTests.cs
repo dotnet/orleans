@@ -4,6 +4,9 @@ using Xunit;
 
 namespace UnitTests.ActivationRebalancingTests;
 
+/// <summary>
+/// Tests for activation rebalancer configuration options validation.
+/// </summary>
 [TestCategory("Functional"), TestCategory("ActivationRebalancing")]
 public class RebalancingOptionsTests
 {

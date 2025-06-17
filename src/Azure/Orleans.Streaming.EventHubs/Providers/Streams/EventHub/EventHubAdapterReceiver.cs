@@ -186,7 +186,7 @@ namespace Orleans.Streaming.EventHubs
             if (!this.checkpointer.CheckpointExists)
             {
                 this.checkpointer.Update(
-                    messages[0].Offset.ToString(),
+                    messages[0].OffsetString,
                     DateTime.UtcNow);
             }
             return batches;

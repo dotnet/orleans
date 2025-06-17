@@ -7,6 +7,9 @@ using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
+    /// <summary>
+    /// Tests for grain placement behavior when cluster topology changes.
+    /// </summary>
     public sealed class GrainPlacementClusterChangeTests(ITestOutputHelper output) : TestClusterPerTest
     {
         [Theory]

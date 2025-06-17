@@ -17,7 +17,7 @@ namespace Orleans.Hosting.Kubernetes
     /// <summary>
     /// Reflects cluster configuration changes between Orleans and Kubernetes.
     /// </summary>
-    public sealed class KubernetesClusterAgent : ILifecycleParticipant<ISiloLifecycle>
+    public sealed partial class KubernetesClusterAgent : ILifecycleParticipant<ISiloLifecycle>
     {
         private const string ExampleRoleBinding =
             """
@@ -130,7 +130,7 @@ namespace Orleans.Hosting.Kubernetes
                     unknownPods.Sort();
                     foreach (var pod in unknownPods)
                     {
-                        _logger.LogWarning("Pod {PodName} does not correspond to any known silos", pod);
+                        LogWarningUnknownPod(pod);
 
                         // Delete the pod once it has been active long enough?
                     }
@@ -145,7 +145,7 @@ namespace Orleans.Hosting.Kubernetes
                             continue;
                         }
 
-                        _logger.LogWarning("Silo {SiloAddress} does not correspond to any known pod. Marking it as dead.", siloAddress);
+                        LogWarningSiloWithoutPod(siloAddress);
                         await _clusterMembershipService.TryKill(siloAddress.SiloAddress);
                     }
 
@@ -153,11 +153,11 @@ namespace Orleans.Hosting.Kubernetes
                 }
                 catch (HttpOperationException exception) when (exception.Response.StatusCode is System.Net.HttpStatusCode.Forbidden)
                 {
-                    _logger.LogError(exception, $"Unable to monitor pods due to insufficient permissions. Ensure that this pod has an appropriate Kubernetes role binding. Here is an example role binding:\n{ExampleRoleBinding}");
+                    LogErrorInsufficientPermissions(exception);
                 }
                 catch (Exception exception)
                 {
-                    _logger.LogError(exception, "Error while initializing Kubernetes cluster agent");
+                    LogErrorInitializing(exception);
                     if (++attempts > _options.CurrentValue.MaxKubernetesApiRetryAttempts)
                     {
                         throw;
@@ -249,10 +249,7 @@ namespace Orleans.Hosting.Kubernetes
                                 {
                                     try
                                     {
-                                        if (_logger.IsEnabled(LogLevel.Information))
-                                        {
-                                            _logger.LogInformation("Silo {SiloAddress} is dead, proceeding to delete the corresponding pod, {PodName}, in namespace {PodNamespace}", change.SiloAddress, change.Name, _podNamespace);
-                                        }
+                                        LogInformationDeletingDeadSiloPod(change.SiloAddress, change.Name, _podNamespace);
 
                                         await _client.DeleteNamespacedPodAsync(change.Name, _podNamespace);
                                     }
@@ -261,7 +258,7 @@ namespace Orleans.Hosting.Kubernetes
                                         // Ignore NotFound errors, as the pod may have already been deleted by other means
                                         if (exception is not HttpOperationException { Response.StatusCode: HttpStatusCode.NotFound })
                                         {
-                                            _logger.LogError(exception, "Error deleting pod {PodName} in namespace {PodNamespace} corresponding to defunct silo {SiloAddress}", change.Name, _podNamespace, change.SiloAddress);
+                                            LogErrorDeletingPod(exception, change.Name, _podNamespace, change.SiloAddress);
                                         }
                                     }
                                 }
@@ -276,10 +273,7 @@ namespace Orleans.Hosting.Kubernetes
                 }
                 catch (Exception exception)
                 {
-                    if (_logger.IsEnabled(LogLevel.Debug))
-                    {
-                        _logger.LogDebug(exception, "Error while monitoring cluster changes");
-                    }
+                    LogDebugErrorMonitoringCluster(exception);
 
                     if (!_shutdownToken.IsCancellationRequested)
                     {
@@ -335,10 +329,7 @@ namespace Orleans.Hosting.Kubernetes
                         {
                             if (this.TryMatchSilo(pod, out var member) && member.Status != SiloStatus.Dead)
                             {
-                                if (_logger.IsEnabled(LogLevel.Information))
-                                {
-                                    _logger.LogInformation("Declaring server {Silo} dead since its corresponding pod, {Pod}, has been deleted", member.SiloAddress, pod.Metadata.Name);
-                                }
+                                LogInformationDeclaringServerDead(member.SiloAddress, pod.Metadata.Name);
 
                                 await _clusterMembershipService.TryKill(member.SiloAddress);
                             }
@@ -347,17 +338,14 @@ namespace Orleans.Hosting.Kubernetes
 
                     if (_enableMonitoring && !_shutdownToken.IsCancellationRequested)
                     {
-                        if (_logger.IsEnabled(LogLevel.Debug))
-                        {
-                            _logger.LogDebug("Unexpected end of stream from Kubernetes API. Will try again.");
-                        }
+                        LogDebugUnexpectedEndOfStream();
 
                         await Task.Delay(5000);
                     }
                 }
                 catch (Exception exception) when (!(_shutdownToken.IsCancellationRequested && exception is OperationCanceledException))
                 {
-                    _logger.LogError(exception, "Error monitoring Kubernetes pods");
+                    LogErrorMonitoringPods(exception);
                     if (!_shutdownToken.IsCancellationRequested)
                     {
                         await Task.Delay(5000);
@@ -381,5 +369,65 @@ namespace Orleans.Hosting.Kubernetes
             server = default;
             return false;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Pod {PodName} does not correspond to any known silos"
+        )]
+        private partial void LogWarningUnknownPod(string podName);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Silo {SiloAddress} does not correspond to any known pod. Marking it as dead."
+        )]
+        private partial void LogWarningSiloWithoutPod(ClusterMember siloAddress);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = $"Unable to monitor pods due to insufficient permissions. Ensure that this pod has an appropriate Kubernetes role binding. Here is an example role binding:\n{ExampleRoleBinding}"
+        )]
+        private partial void LogErrorInsufficientPermissions(Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error while initializing Kubernetes cluster agent"
+        )]
+        private partial void LogErrorInitializing(Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Silo {SiloAddress} is dead, proceeding to delete the corresponding pod, {PodName}, in namespace {PodNamespace}"
+        )]
+        private partial void LogInformationDeletingDeadSiloPod(SiloAddress siloAddress, string podName, string podNamespace);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error deleting pod {PodName} in namespace {PodNamespace} corresponding to defunct silo {SiloAddress}"
+        )]
+        private partial void LogErrorDeletingPod(Exception exception, string podName, string podNamespace, SiloAddress siloAddress);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Error while monitoring cluster changes"
+        )]
+        private partial void LogDebugErrorMonitoringCluster(Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Unexpected end of stream from Kubernetes API. Will try again."
+        )]
+        private partial void LogDebugUnexpectedEndOfStream();
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error monitoring Kubernetes pods"
+        )]
+        private partial void LogErrorMonitoringPods(Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Declaring server {Silo} dead since its corresponding pod, {Pod}, has been deleted"
+        )]
+        private partial void LogInformationDeclaringServerDead(SiloAddress silo, string pod);
     }
 }

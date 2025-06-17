@@ -9,6 +9,9 @@ using Xunit;
 
 namespace Tester
 {
+    /// <summary>
+    /// Tests for client connection events using registered service event notification patterns.
+    /// </summary>
     public class ClientConnectionRegisteredServiceEventTests : TestClusterPerTest
     {
         private EventNotifier<EventArgs> clusterConnectionLostNotifier;

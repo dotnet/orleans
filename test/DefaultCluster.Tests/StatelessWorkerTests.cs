@@ -11,6 +11,14 @@ using Xunit.Abstractions;
 
 namespace DefaultCluster.Tests.General
 {
+    /// <summary>
+    /// Tests for Orleans Stateless Worker grains.
+    /// Stateless workers are a special grain type that can have multiple activations
+    /// per silo for parallel processing. They're ideal for functional operations
+    /// that don't maintain state between calls. The [StatelessWorker] attribute
+    /// controls the maximum number of local activations, enabling horizontal
+    /// scaling within a silo for CPU-bound or I/O-bound operations.
+    /// </summary>
     public class StatelessWorkerTests : HostedTestClusterEnsureDefaultStarted
     {
         private readonly int ExpectedMaxLocalActivations = StatelessWorkerGrain.MaxLocalWorkers; // System.Environment.ProcessorCount;
@@ -21,6 +29,12 @@ namespace DefaultCluster.Tests.General
             this.output = output;
         }
 
+        /// <summary>
+        /// Tests stateless worker behavior when constructor throws an exception.
+        /// Verifies that construction failures are properly reported to callers
+        /// and that the system remains stable even when workers fail to instantiate.
+        /// This ensures robust error handling for worker initialization.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerThrowExceptionConstructor()
         {
@@ -35,6 +49,13 @@ namespace DefaultCluster.Tests.General
             }
         }
 
+        /// <summary>
+        /// Verifies that stateless worker activations respect the maximum limit per silo.
+        /// Tests that when multiple concurrent requests are made to a stateless worker,
+        /// the number of local activations doesn't exceed the configured maximum.
+        /// This ensures the [StatelessWorker(maxLocalWorkers)] attribute is enforced,
+        /// preventing resource exhaustion from unlimited parallelism.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerActivationsPerSiloDoNotExceedMaxLocalWorkersCount()
         {
@@ -95,6 +116,13 @@ namespace DefaultCluster.Tests.General
             }
         }
 
+        /// <summary>
+        /// Tests system stability under high concurrency with limited worker activations.
+        /// Verifies that when concurrent invocations significantly exceed the local
+        /// worker limit, the system handles message forwarding correctly without
+        /// failures. This addresses issue #6795 regarding excessive message forwards
+        /// under high concurrency.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task ManyConcurrentInvocationsOnActivationLimitedStatelessWorkerDoesNotFail()
         {
@@ -109,6 +137,13 @@ namespace DefaultCluster.Tests.General
             }
         }
 
+        /// <summary>
+        /// Tests stateless worker behavior in multi-silo deployments.
+        /// Verifies that rapid concurrent activations across multiple silos
+        /// don't cause forwarding failures. This ensures load distribution
+        /// works correctly when workers are spread across the cluster.
+        /// NOTE: Currently skipped due to a known issue with forwarding.
+        /// </summary>
         [SkippableFact(Skip = "Skipping test for now, since there seems to be a bug"), TestCategory("Functional"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerFastActivationsDontFailInMultiSiloDeployment()
         {
@@ -133,6 +168,12 @@ namespace DefaultCluster.Tests.General
             // Calls should not have thrown ForwardingFailed exceptions.
         }
 
+        /// <summary>
+        /// Tests that stateless workers can use [MayInterleave] for specific methods.
+        /// Verifies that methods marked with MayInterleave can process concurrently
+        /// even within a single activation, allowing fine-grained concurrency control
+        /// for stateless workers beyond the default turn-based model.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task StatelessWorker_DoesNotThrow_IfMarkedWithMayInterleave()
         {
@@ -145,6 +186,12 @@ namespace DefaultCluster.Tests.General
             await task;
         }
 
+        /// <summary>
+        /// Tests that MayInterleave predicates are properly evaluated for stateless workers.
+        /// Verifies that when the MayInterleave predicate returns false, calls are
+        /// not interleaved and execute sequentially, maintaining Orleans' turn-based
+        /// concurrency for those specific calls even in stateless workers.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task StatelessWorker_ShouldNotInterleaveCalls_IfMayInterleavePredicatedDoesntMatch()
         {
@@ -162,6 +209,12 @@ namespace DefaultCluster.Tests.General
             await Task.WhenAll(completions).WaitAsync(TimeSpan.FromSeconds(10));
         }
 
+        /// <summary>
+        /// Tests that MayInterleave allows concurrent execution when predicate matches.
+        /// Verifies that when the MayInterleave predicate returns true, multiple calls
+        /// can execute concurrently within the same stateless worker activation,
+        /// enabling maximum parallelism for suitable operations.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task StatelessWorker_ShouldInterleaveCalls_IfMayInterleavePredicatedMatches()
         {

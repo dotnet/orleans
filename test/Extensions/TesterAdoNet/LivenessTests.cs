@@ -6,6 +6,9 @@ using Microsoft.Extensions.Hosting;
 
 namespace UnitTests.MembershipTests
 {
+    /// <summary>
+    /// Tests for Orleans silo membership liveness functionality using SQL Server as the membership provider.
+    /// </summary>
     [TestCategory("SqlServer"), TestCategory("Functional"), TestCategory("Membership"), TestCategory("AdoNet")]
     public class LivenessTests_SqlServer : LivenessTestsBase
     {
@@ -73,6 +76,9 @@ namespace UnitTests.MembershipTests
         }
     }
 
+    /// <summary>
+    /// Tests for Orleans silo membership liveness functionality using PostgreSQL as the membership provider.
+    /// </summary>
     [TestCategory("PostgreSql"), TestCategory("Functional"), TestCategory("Membership"), TestCategory("AdoNet")]
     public class LivenessTests_PostgreSql : LivenessTestsBase
     {
@@ -140,6 +146,9 @@ namespace UnitTests.MembershipTests
         }
     }
 
+    /// <summary>
+    /// Tests for Orleans silo membership liveness functionality using MySQL as the membership provider.
+    /// </summary>
     [TestCategory("MySql"), TestCategory("Functional"), TestCategory("Membership"), TestCategory("AdoNet")]
     public class LivenessTests_MySql : LivenessTestsBase
     {

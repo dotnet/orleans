@@ -7,6 +7,13 @@ using UnitTests.Grains;
 
 namespace DefaultCluster.Tests
 {
+    /// <summary>
+    /// Tests for Orleans providers and grain extensions.
+    /// Providers are pluggable components that extend grain functionality,
+    /// while grain extensions allow grains to expose additional interfaces
+    /// that can be dynamically installed. This enables modular grain design
+    /// where optional functionality can be added as needed.
+    /// </summary>
     public class ProviderTests : OrleansTestingBase, IClassFixture<ProviderTests.Fixture>
     {
         private readonly Fixture fixture;
@@ -32,6 +39,14 @@ namespace DefaultCluster.Tests
             }
         }
 
+        /// <summary>
+        /// Tests grain extension installation and invocation.
+        /// Verifies that:
+        /// - Calling uninstalled extensions throws GrainExtensionNotInstalledException
+        /// - Extensions can be dynamically installed on grains
+        /// - Installed extensions can be invoked through their interfaces
+        /// This demonstrates the dynamic nature of grain extensions.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Providers")]
         public async Task Providers_TestExtensions()
         {
@@ -97,6 +112,12 @@ namespace DefaultCluster.Tests
             }
         }
 
+        /// <summary>
+        /// Tests activating a non-generic extension on a generic grain interface.
+        /// Verifies that when a generic grain has a non-generic extension,
+        /// the grain can be activated through the extension reference without
+        /// issues, demonstrating extension compatibility with generic grains.
+        /// </summary>
         [Fact, TestCategory("Providers"), TestCategory("BVT"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Providers_ActivateNonGenericExtensionOfGenericInterface()
         {
@@ -115,6 +136,12 @@ namespace DefaultCluster.Tests
             Assert.True(true);
         }
 
+        /// <summary>
+        /// Tests referencing a non-generic extension after generic grain activation.
+        /// Verifies that after a generic grain is activated normally,
+        /// its non-generic extension can still be obtained and invoked,
+        /// ensuring extensions work correctly with already-activated generic grains.
+        /// </summary>
         [Fact, TestCategory("Providers"), TestCategory("BVT"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Providers_ReferenceNonGenericExtensionOfGenericInterface() {
             var grain = this.fixture.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
@@ -131,6 +158,13 @@ namespace DefaultCluster.Tests
             Assert.True(true);
         }
 
+        /// <summary>
+        /// Tests automatic installation of grain extensions.
+        /// Verifies that extensions configured with AddGrainExtension are
+        /// automatically available on grains without manual installation,
+        /// while non-configured extensions still require explicit installation.
+        /// This demonstrates the auto-wiring capability for common extensions.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Providers")]
         public async Task Providers_AutoInstallExtensionTest()
         {

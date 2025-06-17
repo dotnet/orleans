@@ -5,6 +5,9 @@ using Xunit;
 
 namespace Tester.TransportTests;
 
+/// <summary>
+/// Tests for Orleans cluster communication using Unix domain socket transport.
+/// </summary>
 public class UnixSocketTransportTests : TransportTestsBase, IClassFixture<UnixSocketTransportTests.Fixture>
 {
     public UnixSocketTransportTests(Fixture fixture) : base(fixture)

@@ -205,7 +205,7 @@ namespace Orleans.Hosting
             services.AddSingleton<IPlacementStrategyResolver, ClientObserverPlacementStrategyResolver>();
 
             // Configure the default placement strategy.
-            services.TryAddSingleton<PlacementStrategy, RandomPlacement>();
+            services.TryAddSingleton<PlacementStrategy, ResourceOptimizedPlacement>();
 
             // Placement filters
             services.AddSingleton<PlacementFilterStrategyResolver>();

@@ -102,7 +102,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
     }
 
-    internal sealed class LocalGrainDirectoryPartition
+    internal sealed partial class LocalGrainDirectoryPartition
     {
         // Should we change this to SortedList<> or SortedDictionary so we can extract chunks better for shipping the full
         // partition to a follower, or should we leave it as a Dictionary to get O(1) lookups instead of O(log n), figuring we do
@@ -155,7 +155,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <returns>The registered ActivationAddress and version associated with this directory mapping</returns>
         internal AddressAndTag AddSingleActivation(GrainAddress address, GrainAddress? previousAddress)
         {
-            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Adding single activation for grain {SiloAddress} {GrainId} {ActivationId}", address.SiloAddress, address.GrainId, address.ActivationId);
+            LogTraceAddingSingleActivation(address.SiloAddress, address.GrainId, address.ActivationId);
 
             if (!IsValidSilo(address.SiloAddress))
             {
@@ -202,9 +202,8 @@ namespace Orleans.Runtime.GrainDirectory
                 }
             }
 
-            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Removing activation for grain {GrainId} cause={Cause} was_removed={WasRemoved}", grain.ToString(), cause, wasRemoved);
+            LogTraceRemovingActivation(grain, cause, wasRemoved);
         }
-
 
         /// <summary>
         /// Removes the grain (and, effectively, all its activations) from the directory
@@ -216,7 +215,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 partitionData.Remove(grain);
             }
-            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Removing grain {GrainId}", grain.ToString());
+            LogTraceRemovingGrain(grain);
         }
 
         internal AddressAndTag LookUpActivation(GrainId grain)
@@ -270,10 +269,7 @@ namespace Orleans.Runtime.GrainDirectory
                     ref var grainInfo = ref CollectionsMarshal.GetValueRefOrAddDefault(partitionData, pair.Key, out _);
                     if (grainInfo is { } existing)
                     {
-                        if (log.IsEnabled(LogLevel.Debug))
-                        {
-                            log.LogDebug("While merging two disjoint partitions, same grain {GrainId} was found in both partitions", pair.Key);
-                        }
+                        LogDebugMergingDisjointPartitions(pair.Key);
 
                         var activationToDrop = existing.Merge(pair.Value);
                         if (activationToDrop == null) continue;
@@ -377,5 +373,29 @@ namespace Orleans.Runtime.GrainDirectory
 
             return sb.ToString();
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Adding single activation for grain {SiloAddress} {GrainId} {ActivationId}"
+        )]
+        private partial void LogTraceAddingSingleActivation(SiloAddress? siloAddress, GrainId grainId, ActivationId activationId);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Removing activation for grain {GrainId} cause={Cause} was_removed={WasRemoved}"
+        )]
+        private partial void LogTraceRemovingActivation(GrainId grainId, UnregistrationCause cause, bool wasRemoved);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Removing grain {GrainId}"
+        )]
+        private partial void LogTraceRemovingGrain(GrainId grainId);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "While merging two disjoint partitions, same grain {GrainId} was found in both partitions"
+        )]
+        private partial void LogDebugMergingDisjointPartitions(GrainId grainId);
     }
 }

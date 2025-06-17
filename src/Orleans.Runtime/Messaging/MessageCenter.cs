@@ -13,7 +13,7 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class MessageCenter : IMessageCenter, IAsyncDisposable
+    internal partial class MessageCenter : IMessageCenter, IAsyncDisposable
     {
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly MessageFactory messageFactory;
@@ -98,20 +98,13 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         public void BlockApplicationMessages()
         {
-            if (log.IsEnabled(LogLevel.Debug))
-            {
-                log.LogDebug("BlockApplicationMessages");
-            }
-
+            LogDebugBlockApplicationMessages(log);
             IsBlockingApplicationMessages = true;
         }
 
         public async Task StopAcceptingClientMessages()
         {
-            if (log.IsEnabled(LogLevel.Debug))
-            {
-                log.LogDebug("StopClientMessages");
-            }
+            LogDebugStopClientMessages(log);
 
             try
             {
@@ -122,7 +115,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exc)
             {
-                log.LogError((int)ErrorCode.Runtime_Error_100109, exc, "Stop failed");
+                LogErrorStopFailed(log, exc);
             }
         }
 
@@ -157,7 +150,7 @@ namespace Orleans.Runtime.Messaging
 
                 if (stopped)
                 {
-                    log.LogInformation((int)ErrorCode.Runtime_Error_100115, "Message was queued for sending after outbound queue was stopped: {Message}", msg);
+                    LogInformationMessageQueuedAfterStop(log, msg);
                     SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message was queued for sending after outbound queue was stopped");
                     return;
                 }
@@ -178,7 +171,7 @@ namespace Orleans.Runtime.Messaging
 
                 if (msg.TargetSilo is not { } targetSilo)
                 {
-                    log.LogError((int)ErrorCode.Runtime_Error_100113, "Message does not have a target silo: '{Message}'. Call stack: {StackTrace}", msg, Utils.GetStackTrace());
+                    LogErrorMessageNoTargetSilo(log, msg, new());
                     SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message to be sent does not have a target silo.");
                     return;
                 }
@@ -187,10 +180,7 @@ namespace Orleans.Runtime.Messaging
 
                 if (targetSilo.Matches(_siloAddress))
                 {
-                    if (log.IsEnabled(LogLevel.Trace))
-                    {
-                        log.LogTrace("Message has been looped back to this silo: {Message}", msg);
-                    }
+                    LogTraceMessageLoopedBack(log, msg);
 
                     MessagingInstruments.LocalMessagesSentCounterAggregator.Add(1);
 
@@ -370,7 +360,7 @@ namespace Orleans.Runtime.Messaging
                     message.AddToCacheInvalidationHeader(oldAddress, validAddress: destination);
                 }
 
-                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug(exc, "Forwarding {Message} to '{ForwardingAddress}' after '{FailedOperation}'", message, forwardingAddress, failedOperation);
+                LogDebugForwarding(log, exc, message, forwardingAddress, failedOperation);
                 forwardingSucceeded = this.TryForwardMessage(message, forwardingAddress);
             }
             catch (Exception exc2)
@@ -427,7 +417,7 @@ namespace Orleans.Runtime.Messaging
 
         private void ResendMessageImpl(Message message, SiloAddress? forwardingAddress = null)
         {
-            if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Resend {Message}", message);
+            LogDebugResend(log, message);
 
             if (message.TargetGrain.IsSystemTarget())
             {
@@ -554,13 +544,7 @@ namespace Orleans.Runtime.Messaging
             void HandleReceiveFailure(Message msg, Exception ex)
             {
                 MessagingProcessingInstruments.OnDispatcherMessageProcessedError(msg);
-                log.LogError(
-                    (int)ErrorCode.Dispatcher_ErrorCreatingActivation,
-                    ex,
-                    "Error creating activation for grain {TargetGrain} (interface: {InterfaceType}). Message {Message}",
-                    msg.TargetGrain,
-                    msg.InterfaceType,
-                    msg);
+                LogErrorCreatingActivation(log, ex, msg.TargetGrain, msg.InterfaceType, msg);
 
                 this.RejectMessage(msg, Message.RejectionTypes.Transient, ex);
             }
@@ -572,11 +556,7 @@ namespace Orleans.Runtime.Messaging
             if (target.IsSystemTarget())
             {
                 MessagingInstruments.OnRejectedMessage(msg);
-                this.log.LogWarning(
-                    (int)ErrorCode.MessagingMessageFromUnknownActivation,
-                    "Received a message {Message} for an unknown SystemTarget: {Target}",
-                     msg,
-                     msg.TargetGrain);
+                LogWarningUnknownSystemTarget(log, msg, msg.TargetGrain);
 
                 // Send a rejection only on a request
                 if (msg.Direction == Message.Directions.Request)
@@ -592,13 +572,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 // Activation does not exists and is not a new placement.
-                if (log.IsEnabled(LogLevel.Debug))
-                {
-                    log.LogDebug(
-                        (int)ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
-                        "Unable to create local activation for message {Message}.",
-                        msg);
-                }
+                LogDebugUnableToCreateActivation(log, msg);
 
                 var partialAddress = new GrainAddress { SiloAddress = msg.TargetSilo, GrainId = msg.TargetGrain };
                 ProcessRequestToInvalidActivation(msg, partialAddress, null, "Unable to create local activation");
@@ -613,7 +587,7 @@ namespace Orleans.Runtime.Messaging
             {
                 // Do not send reject a rejection locally, it will create a stack overflow
                 MessagingInstruments.OnDroppedSentMessage(msg);
-                if (this.log.IsEnabled(LogLevel.Debug)) log.LogDebug("Dropping rejection {Message}", msg);
+                LogDebugDroppingRejection(log, msg);
             }
             else
             {
@@ -628,5 +602,88 @@ namespace Orleans.Runtime.Messaging
         {
             await StopAsync();
         }
+
+        private readonly struct StackTraceLogValue()
+        {
+            public override string ToString() => Utils.GetStackTrace(1);
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "BlockApplicationMessages"
+        )]
+        private static partial void LogDebugBlockApplicationMessages(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "StopClientMessages"
+        )]
+        private static partial void LogDebugStopClientMessages(ILogger logger);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100109,
+            Level = LogLevel.Error,
+            Message = "Stop failed"
+        )]
+        private static partial void LogErrorStopFailed(ILogger logger, Exception exc);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100115,
+            Level = LogLevel.Information,
+            Message = "Message was queued for sending after outbound queue was stopped: {Message}"
+        )]
+        private static partial void LogInformationMessageQueuedAfterStop(ILogger logger, Message message);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100113,
+            Level = LogLevel.Error,
+            Message = "Message does not have a target silo: '{Message}'. Call stack: {StackTrace}"
+        )]
+        private static partial void LogErrorMessageNoTargetSilo(ILogger logger, Message message, StackTraceLogValue stackTrace);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Message has been looped back to this silo: {Message}"
+        )]
+        private static partial void LogTraceMessageLoopedBack(ILogger logger, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Forwarding {Message} to '{ForwardingAddress}' after '{FailedOperation}'"
+        )]
+        private static partial void LogDebugForwarding(ILogger logger, Exception? exc, Message message, SiloAddress? forwardingAddress, string? failedOperation);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Resend {Message}"
+        )]
+        private static partial void LogDebugResend(ILogger logger, Message message);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Dispatcher_ErrorCreatingActivation,
+            Level = LogLevel.Error,
+            Message = "Error creating activation for grain {TargetGrain} (interface: {InterfaceType}). Message {Message}"
+        )]
+        private static partial void LogErrorCreatingActivation(ILogger logger, Exception ex, GrainId targetGrain, GrainInterfaceType interfaceType, Message message);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.MessagingMessageFromUnknownActivation,
+            Level = LogLevel.Warning,
+            Message = "Received a message {Message} for an unknown SystemTarget: {Target}"
+        )]
+        private static partial void LogWarningUnknownSystemTarget(ILogger logger, Message message, GrainId target);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
+            Level = LogLevel.Debug,
+            Message = "Unable to create local activation for message {Message}."
+        )]
+        private static partial void LogDebugUnableToCreateActivation(ILogger logger, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Dropping rejection {Message}"
+        )]
+        private static partial void LogDebugDroppingRejection(ILogger logger, Message message);
     }
 }

@@ -10,6 +10,9 @@ using Xunit;
 
 namespace Tester.AzureUtils.Lease
 {
+    /// <summary>
+    /// Tests for lease-based queue balancer functionality in Azure Storage, including auto-scaling and node failure scenarios.
+    /// </summary>
     [TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Lease")]
     public class LeaseBasedQueueBalancerTests : TestClusterPerTest
     {

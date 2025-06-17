@@ -4,6 +4,9 @@ using Xunit;
 
 namespace UnitTests.SerializerTests
 {
+    /// <summary>
+    /// Tests serialization round-trip for various data types including records, enums, and inherited generics.
+    /// </summary>
     [TestCategory("Serialization"), TestCategory("BVT")]
     public class RoundTripSerializerTests : HostedTestClusterEnsureDefaultStarted
     {

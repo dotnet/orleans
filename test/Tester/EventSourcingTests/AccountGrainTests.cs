@@ -4,6 +4,9 @@ using Assert = Xunit.Assert;
 
 namespace Tester.EventSourcingTests
 {
+    /// <summary>
+    /// Tests for event-sourced account grain functionality including balance operations and transaction logging.
+    /// </summary>
     public class AccountGrainTests : IClassFixture<EventSourcingClusterFixture>
     {
         private readonly EventSourcingClusterFixture fixture;

@@ -15,6 +15,9 @@ using Orleans.Configuration;
 
 namespace AWSUtils.Tests.Streaming
 {
+    /// <summary>
+    /// Tests SQS queue adapter functionality for sending and receiving messages through Orleans streaming.
+    /// </summary>
     [TestCategory("AWS"), TestCategory("SQS")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class SQSAdapterTests : IAsyncLifetime

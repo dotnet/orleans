@@ -6,6 +6,9 @@ using Xunit;
 
 namespace AWSUtils.Tests.MembershipTests
 {
+    /// <summary>
+    /// Tests DynamoDB silo instance record key generation and retrieval for membership table entries.
+    /// </summary>
     [TestCategory("Membership"), TestCategory("AWS"), TestCategory("DynamoDb")]
     public class SiloInstanceRecordTests
     {

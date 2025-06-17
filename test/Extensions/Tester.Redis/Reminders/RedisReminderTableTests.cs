@@ -10,6 +10,9 @@ using Xunit;
 
 namespace Tester.Redis.Reminders
 {
+    /// <summary>
+    /// Tests for Redis reminder table implementation.
+    /// </summary>
     [TestCategory("Redis"), TestCategory("Reminders"), TestCategory("Functional")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class RedisRemindersTableTests : ReminderTableTestsBase

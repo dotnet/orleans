@@ -13,6 +13,27 @@ using Xunit.Abstractions;
 
 namespace Orleans.Serialization.UnitTests;
 
+/// <summary>
+/// Tests for Orleans' Protocol Buffers (protobuf) serialization support.
+/// 
+/// Protocol Buffers is Google's language-neutral, platform-neutral serialization format that provides:
+/// - Compact binary encoding
+/// - Strong schema definition through .proto files
+/// - Excellent cross-language support
+/// - Forward and backward compatibility
+/// 
+/// Orleans' protobuf integration:
+/// - Supports Google.Protobuf generated classes
+/// - Handles protobuf collections and nested messages
+/// - Provides both serialization and deep copy functionality
+/// - Integrates with Orleans' type system for polymorphism
+/// 
+/// This integration is valuable when:
+/// - Interfacing with gRPC services
+/// - Sharing data with non-.NET systems
+/// - Requiring schema-first development
+/// - Needing highly optimized wire format
+/// </summary>
 [Trait("Category", "BVT")]
 public class ProtobufSerializerTests : FieldCodecTester<MyProtobufClass?, IFieldCodec<MyProtobufClass?>>
 {

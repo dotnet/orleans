@@ -16,7 +16,10 @@ namespace DefaultCluster.Tests.General
     public class FooGrain : Grain, IFooGrain { }
 
     /// <summary>
-    /// Summary description for GrainReferenceTest
+    /// Tests for Orleans grain reference functionality.
+    /// Validates grain reference equality, comparison, serialization (including JSON),
+    /// passing grain references between grains, handling null references,
+    /// and proper hash code generation for distributed systems.
     /// </summary>
     [TestCategory("BVT"), TestCategory("GrainReference")]
     public class GrainReferenceTest : HostedTestClusterEnsureDefaultStarted
@@ -25,6 +28,11 @@ namespace DefaultCluster.Tests.General
         {
         }
 
+        /// <summary>
+        /// Tests that grain references produce consistent uniform hash codes.
+        /// Validates that the hash code generation is deterministic and stable,
+        /// which is crucial for consistent grain placement and routing in the cluster.
+        /// </summary>
         [Fact]
         public void GrainReferenceComparison_ShouldProduceUniformHashCode()
         {
@@ -39,6 +47,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(3643965955u, r.GetUniformHashCode());
         }
 
+        /// <summary>
+        /// Tests grain reference equality and comparison operators.
+        /// Validates that different grain references are properly distinguished
+        /// using equality operators, Equals method, and inequality checks.
+        /// </summary>
         [Fact]
         public void GrainReferenceComparison_DifferentReference()
         {
@@ -52,6 +65,11 @@ namespace DefaultCluster.Tests.General
             Assert.False(ref2.Equals(ref1));
         }
 
+        /// <summary>
+        /// Tests passing grain's own reference (this) to another grain.
+        /// Validates that grains can pass references to themselves as method parameters,
+        /// enabling callback patterns and grain interconnections.
+        /// </summary>
         [Fact]
         public async Task GrainReference_Pass_this()
         {
@@ -61,6 +79,11 @@ namespace DefaultCluster.Tests.General
             await g1.PassThis(g2);
         }
 
+        /// <summary>
+        /// Tests passing grain references within nested data structures.
+        /// Validates that grain references embedded in complex objects are properly
+        /// serialized and maintain their identity when passed between grains.
+        /// </summary>
         [Fact]
         public async Task GrainReference_Pass_this_Nested()
         {
@@ -70,6 +93,11 @@ namespace DefaultCluster.Tests.General
             await g1.PassThisNested(new ChainGrainHolder { Next = g2 });
         }
 
+        /// <summary>
+        /// Tests passing null grain references between grains.
+        /// Validates that null references are properly handled in both direct
+        /// parameter passing and when embedded in data structures.
+        /// </summary>
         [Fact]
         public async Task GrainReference_Pass_Null()
         {
@@ -83,6 +111,11 @@ namespace DefaultCluster.Tests.General
             Assert.Null(await g2.GetNext());
         }
 
+        /// <summary>
+        /// Tests JSON serialization of grain references.
+        /// Validates that grain references can be serialized to JSON and deserialized
+        /// back while maintaining their identity and functionality.
+        /// </summary>
         [Fact, TestCategory("Serialization"), TestCategory("JSON")]
         public void GrainReference_Json_Serialization()
         {
@@ -90,6 +123,11 @@ namespace DefaultCluster.Tests.General
             TestGrainReferenceSerialization(id, true);
         }
 
+        /// <summary>
+        /// Tests JSON serialization of grain references within complex objects.
+        /// Validates that grain references nested in data structures are properly
+        /// serialized/deserialized and remain functional after round-trip.
+        /// </summary>
         [Fact, TestCategory("Serialization"), TestCategory("JSON")]
         public async Task GrainReference_Json_Serialization_Nested()
         {
@@ -119,6 +157,11 @@ namespace DefaultCluster.Tests.General
             public GrainReference Reference { get; set; }
         }
 
+        /// <summary>
+        /// Tests JSON serialization of unresolved grain references.
+        /// Validates that grain references can be serialized even before they are
+        /// resolved (activated), maintaining lazy resolution semantics.
+        /// </summary>
         [Fact, TestCategory("Serialization"), TestCategory("JSON")]
         public void GrainReference_Json_Serialization_Unresolved()
         {
@@ -126,6 +169,12 @@ namespace DefaultCluster.Tests.General
             TestGrainReferenceSerialization(id, false);
         }
 
+        /// <summary>
+        /// Tests grain reference interning for system grains.
+        /// Validates that multiple requests for the same grain return the same
+        /// reference object (interning), optimizing memory usage.
+        /// Note: Currently skipped as grain reference interning is not implemented.
+        /// </summary>
         [Fact(Skip = "GrainReference interning is not currently implemented."), TestCategory("Serialization"), TestCategory("Interner")]
         public void GrainReference_Interning_Sys_StoreGrain()
         {

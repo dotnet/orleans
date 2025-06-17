@@ -27,9 +27,10 @@ namespace Orleans.Runtime.GrainDirectory
                 case GrainDirectoryOptions.CachingStrategyType.None:
                     return new NullGrainDirectoryCache();
                 case GrainDirectoryOptions.CachingStrategyType.LRU:
-                    return new LruGrainDirectoryCache(options.CacheSize);
+#pragma warning disable CS0618 // Type or member is obsolete
                 case GrainDirectoryOptions.CachingStrategyType.Adaptive:
-                    return new AdaptiveGrainDirectoryCache(options.InitialCacheTTL, options.MaximumCacheTTL, options.CacheTTLExtensionFactor, options.CacheSize);
+#pragma warning restore CS0618 // Type or member is obsolete
+                    return new LruGrainDirectoryCache(options.CacheSize);
                 case GrainDirectoryOptions.CachingStrategyType.Custom:
                 default:
                     return services.GetRequiredService<IGrainDirectoryCache>();
@@ -47,18 +48,6 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 return new LruGrainDirectoryCache(options.CacheSize);
             }
-        }
-
-        internal static AdaptiveDirectoryCacheMaintainer CreateGrainDirectoryCacheMaintainer(
-            LocalGrainDirectory router,
-            IGrainDirectoryCache cache,
-            IInternalGrainFactory grainFactory,
-            ILoggerFactory loggerFactory)
-        {
-            var adaptiveCache = cache as AdaptiveGrainDirectoryCache;
-            return adaptiveCache != null
-                ? new AdaptiveDirectoryCacheMaintainer(router, adaptiveCache, grainFactory, loggerFactory)
-                : null;
         }
     }
 

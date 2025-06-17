@@ -14,9 +14,8 @@ using Orleans.Runtime.Scheduler;
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal sealed class LocalGrainDirectory : ILocalGrainDirectory, ISiloStatusListener, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed partial class LocalGrainDirectory : ILocalGrainDirectory, ISiloStatusListener, ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly AdaptiveDirectoryCacheMaintainer maintainer;
         private readonly ILogger log;
         private readonly SiloAddress? seed;
         private readonly ISiloStatusOracle siloStatusOracle;
@@ -60,12 +59,6 @@ namespace Orleans.Runtime.GrainDirectory
             this.grainFactory = grainFactory;
 
             DirectoryCache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value);
-            maintainer =
-                GrainDirectoryCacheFactory.CreateGrainDirectoryCacheMaintainer(
-                    this,
-                    this.DirectoryCache,
-                    grainFactory,
-                    loggerFactory);
 
             var primarySiloEndPoint = developmentClusterMembershipOptions.Value.PrimarySiloEndpoint;
             if (primarySiloEndPoint != null)
@@ -96,16 +89,9 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void Start()
         {
-            if (log.IsEnabled(LogLevel.Debug))
-            {
-                log.LogDebug("Start");
-            }
+            LogDebugStart();
 
             Running = true;
-            if (maintainer != null)
-            {
-                CacheValidator.WorkItemGroup.QueueAction(maintainer.Start);
-            }
 
             siloStatusOracle.SubscribeToSiloStatusEvents(this);
         }
@@ -116,7 +102,7 @@ namespace Orleans.Runtime.GrainDirectory
         // The alternative would be to allow the silo to process requests after it has handed off its partition, in which case those changes
         // would receive successful responses but would not be reflected in the eventual state of the directory.
         // It's easy to change this, if we think the trade-off is better the other way.
-        public async Task StopAsync()
+        public Task StopAsync()
         {
             // This will cause remote write requests to be forwarded to the silo that will become the new owner.
             // Requests might bounce back and forth for a while as membership stabilizes, but they will either be served by the
@@ -126,13 +112,9 @@ namespace Orleans.Runtime.GrainDirectory
             //mark Running as false will exclude myself from CalculateGrainDirectoryPartition(grainId)
             Running = false;
 
-            if (maintainer is { } directoryCacheMaintainer)
-            {
-                await CacheValidator.QueueTask(directoryCacheMaintainer.StopAsync);
-            }
-
             DirectoryPartition.Clear();
             DirectoryCache.Clear();
+            return Task.CompletedTask;
         }
 
         private void AddServer(SiloAddress silo)
@@ -163,7 +145,7 @@ namespace Orleans.Runtime.GrainDirectory
                 AdjustLocalDirectory(silo, dead: false);
                 AdjustLocalCache(silo, dead: false);
 
-                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Silo {SiloAddress} added silo {OtherSiloAddress}", MyAddress, silo);
+                LogDebugSiloAddedSilo(MyAddress, silo);
             }
         }
 
@@ -179,11 +161,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
                 catch (Exception exc)
                 {
-                    log.LogError(
-                        (int)ErrorCode.Directory_SiloStatusChangeNotification_Exception,
-                        exc,
-                        "CatalogSiloStatusListener.SiloStatusChangeNotification has thrown an exception when notified about removed silo {Silo}.",
-                        silo.ToStringWithHashCode());
+                    LogErrorCatalogSiloStatusChangeNotificationException(exc, new(silo));
                 }
 
                 var existing = this.directoryMembership;
@@ -200,7 +178,7 @@ namespace Orleans.Runtime.GrainDirectory
                 AdjustLocalDirectory(silo, dead: true);
                 AdjustLocalCache(silo, dead: true);
 
-                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Silo {LocalSilo} removed silo {OtherSilo}", MyAddress, silo);
+                LogDebugSiloRemovedSilo(MyAddress, silo);
             }
         }
 
@@ -268,10 +246,7 @@ namespace Orleans.Runtime.GrainDirectory
             int index = existing.IndexOf(silo);
             if (index == -1)
             {
-                log.LogWarning(
-                    (int)ErrorCode.Runtime_Error_100201,
-                    "Got request to find predecessors of silo {SiloAddress}, which is not in the list of members",
-                    silo);
+                LogWarningFindPredecessorSiloNotInList(silo);
                 return null;
             }
 
@@ -284,10 +259,7 @@ namespace Orleans.Runtime.GrainDirectory
             int index = existing.IndexOf(silo);
             if (index == -1)
             {
-                log.LogWarning(
-                    (int)ErrorCode.Runtime_Error_100203,
-                    "Got request to find successors of silo {SiloAddress}, which is not in the list of members",
-                    silo);
+                LogWarningFindSuccessorSiloNotInList(silo);
                 return null;
             }
 
@@ -338,7 +310,7 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
 
-                if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Silo {SiloAddress} looked for a system target {GrainId}, returned {TargetSilo}", MyAddress, grainId, MyAddress);
+                LogTraceSystemTargetLookup(MyAddress, grainId, MyAddress);
 
                 // every silo owns its system targets
                 return MyAddress;
@@ -383,8 +355,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             if (log.IsEnabled(LogLevel.Trace))
-                log.LogTrace(
-                    "Silo {SiloAddress} calculated directory partition owner silo {OwnerAddress} for grain {GrainId}: {GrainIdHash} --> {OwnerAddressHash}",
+                LogTraceCalculatedDirectoryPartitionOwner(
                     MyAddress,
                     siloAddress,
                     grainId,
@@ -439,10 +410,9 @@ namespace Orleans.Runtime.GrainDirectory
                 if (forwardAddress is not null)
                 {
                     int hash = unchecked((int)address.GrainId.GetUniformHashCode());
-                    this.log.LogWarning(
-                        "RegisterAsync - It seems we are not the owner of activation {Address} (hash: {Hash}), trying to forward it to {ForwardAddress} (hopCount={HopCount})",
+                    LogWarningRegisterAsyncNotOwner(
                         address,
-                        hash.ToString("X"),
+                        hash,
                         forwardAddress,
                         hopCount);
                 }
@@ -481,7 +451,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public Task UnregisterAfterNonexistingActivation(GrainAddress addr, SiloAddress origin)
         {
-            log.LogTrace("UnregisterAfterNonexistingActivation addr={Address} origin={Origin}", addr, origin);
+            LogTraceUnregisterAfterNonexistingActivation(addr, origin);
 
             if (origin == null || this.directoryMembership.MembershipCache.Contains(origin))
             {
@@ -518,8 +488,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 await Task.Delay(RETRY_DELAY);
                 forwardAddress = this.CheckIfShouldForward(address.GrainId, hopCount, "UnregisterAsync");
-                this.log.LogWarning(
-                    "UnregisterAsync - It seems we are not the owner of activation {Address}, trying to forward it to {ForwardAddress} (hopCount={HopCount})",
+                LogWarningUnregisterAsyncNotOwner(
                     address,
                     forwardAddress,
                     hopCount);
@@ -590,8 +559,7 @@ namespace Orleans.Runtime.GrainDirectory
                 forwardlist = forwardlist2;
                 if (forwardlist != null)
                 {
-                    this.log.LogWarning(
-                        "RegisterAsync - It seems we are not the owner of some activations, trying to forward it to {Count} silos (hopCount={HopCount})",
+                    LogWarningUnregisterManyAsyncNotOwner(
                         forwardlist.Count,
                         hopCount);
                 }
@@ -619,19 +587,17 @@ namespace Orleans.Runtime.GrainDirectory
 
             var silo = CalculateGrainDirectoryPartition(grain);
 
-            if (log.IsEnabled(LogLevel.Debug))
-                log.LogDebug(
-                    "Silo {SiloAddress} tries to lookup for {Grain}-->{PartitionOwner} ({GrainHashCode}-->{PartitionOwnerHashCode})",
-                    MyAddress,
-                    grain,
-                    silo,
-                    grain.GetUniformHashCode(),
-                    silo?.GetConsistentHashCode());
+            LogDebugLocalLookupAttempt(
+                MyAddress,
+                grain,
+                silo,
+                new(grain),
+                new(silo));
 
             //this will only happen if I'm the only silo in the cluster and I'm shutting down
             if (silo == null)
             {
-                if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("LocalLookup mine {GrainId}=null", grain);
+                LogTraceLocalLookupMineNull(grain);
                 result = default;
                 return false;
             }
@@ -643,7 +609,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 result = new(address, 0);
 
-                if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("LocalLookup cache {GrainId}={TargetAddress}", grain, result.Address);
+                LogTraceLocalLookupCache(grain, result.Address);
                 DirectoryInstruments.LookupsCacheSuccesses.Add(1);
                 DirectoryInstruments.LookupsLocalSuccesses.Add(1);
                 return true;
@@ -658,16 +624,16 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     // it can happen that we cannot find the grain in our partition if there were
                     // some recent changes in the membership
-                    if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("LocalLookup mine {GrainId}=null", grain);
+                    LogTraceLocalLookupMineNull(grain);
                     return false;
                 }
-                if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("LocalLookup mine {GrainId}={Address}", grain, result.Address);
+                LogTraceLocalLookupMine(grain, result.Address);
                 DirectoryInstruments.LookupsLocalDirectorySuccesses.Add(1);
                 DirectoryInstruments.LookupsLocalSuccesses.Add(1);
                 return true;
             }
 
-            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("TryFullLookup else {GrainId}=null", grain);
+            LogTraceTryFullLookupElse(grain);
             result = default;
             return false;
         }
@@ -698,10 +664,9 @@ namespace Orleans.Runtime.GrainDirectory
                 if (forwardAddress is not null)
                 {
                     int hash = unchecked((int)grainId.GetUniformHashCode());
-                    this.log.LogWarning(
-                        "LookupAsync - It seems we are not the owner of grain {GrainId} (hash: {Hash}), trying to forward it to {ForwardAddress} (hopCount={HopCount})",
+                    LogWarningLookupAsyncNotOwner(
                         grainId,
-                        hash.ToString("X"),
+                        hash,
                         forwardAddress,
                         hopCount);
                 }
@@ -716,11 +681,11 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     // it can happen that we cannot find the grain in our partition if there were
                     // some recent changes in the membership
-                    if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("FullLookup mine {GrainId}=none", grainId);
+                    LogTraceFullLookupMineNone(grainId);
                     return new(default, GrainInfo.NO_ETAG);
                 }
 
-                if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("FullLookup mine {GrainId}={Address}", grainId, localResult.Address);
+                LogTraceFullLookupMine(grainId, localResult.Address);
                 DirectoryInstruments.LookupsLocalDirectorySuccesses.Add(1);
                 return localResult;
             }
@@ -741,7 +706,7 @@ namespace Orleans.Runtime.GrainDirectory
                     DirectoryCache.AddOrUpdate(address, result.VersionTag);
                 }
 
-                if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("FullLookup remote {GrainId}={Address}", grainId, result.Address);
+                LogTraceFullLookupRemote(grainId, result.Address);
 
                 return result;
             }
@@ -757,8 +722,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 await Task.Delay(RETRY_DELAY);
                 forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "DeleteGrainAsync");
-                this.log.LogWarning(
-                    "DeleteGrainAsync - It seems we are not the owner of grain {GrainId}, trying to forward it to {ForwardAddress} (hopCount={HopCount})",
+                LogWarningDeleteGrainAsyncNotOwner(
                     grainId,
                     forwardAddress,
                     hopCount);
@@ -831,6 +795,156 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lifecycle.Subscribe<LocalGrainDirectory>(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => Start()), (ct) => Task.Run(() => StopAsync()));
         }
+
+        private readonly struct SiloAddressLogValue(SiloAddress silo)
+        {
+            public override string ToString() => silo.ToStringWithHashCode();
+        }
+
+        private readonly struct GrainHashLogValue(GrainId grain)
+        {
+            public override string ToString() => grain.GetUniformHashCode().ToString();
+        }
+
+        private readonly struct SiloHashLogValue(SiloAddress? silo)
+        {
+            public override string ToString() => silo?.GetConsistentHashCode().ToString() ?? "null";
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Start"
+        )]
+        private partial void LogDebugStart();
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Silo {SiloAddress} added silo {OtherSiloAddress}"
+        )]
+        private partial void LogDebugSiloAddedSilo(SiloAddress siloAddress, SiloAddress otherSiloAddress);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Directory_SiloStatusChangeNotification_Exception,
+            Level = LogLevel.Error,
+            Message = "CatalogSiloStatusListener.SiloStatusChangeNotification has thrown an exception when notified about removed silo {Silo}."
+        )]
+        private partial void LogErrorCatalogSiloStatusChangeNotificationException(Exception exception, SiloAddressLogValue silo);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Silo {LocalSilo} removed silo {OtherSilo}"
+        )]
+        private partial void LogDebugSiloRemovedSilo(SiloAddress localSilo, SiloAddress otherSilo);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100201,
+            Level = LogLevel.Warning,
+            Message = "Got request to find predecessors of silo {SiloAddress}, which is not in the list of members"
+        )]
+        private partial void LogWarningFindPredecessorSiloNotInList(SiloAddress siloAddress);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100203,
+            Level = LogLevel.Warning,
+            Message = "Got request to find successors of silo {SiloAddress}, which is not in the list of members"
+        )]
+        private partial void LogWarningFindSuccessorSiloNotInList(SiloAddress siloAddress);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Silo {SiloAddress} looked for a system target {GrainId}, returned {TargetSilo}"
+        )]
+        private partial void LogTraceSystemTargetLookup(SiloAddress siloAddress, GrainId grainId, SiloAddress targetSilo);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Silo {SiloAddress} calculated directory partition owner silo {OwnerAddress} for grain {GrainId}: {GrainIdHash} --> {OwnerAddressHash}"
+        )]
+        private partial void LogTraceCalculatedDirectoryPartitionOwner(SiloAddress siloAddress, SiloAddress? ownerAddress, GrainId grainId, int grainIdHash, long? ownerAddressHash);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "RegisterAsync - It seems we are not the owner of activation {Address} (hash: {Hash:X}), trying to forward it to {ForwardAddress} (hopCount={HopCount})"
+        )]
+        private partial void LogWarningRegisterAsyncNotOwner(GrainAddress address, int hash, SiloAddress forwardAddress, int hopCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "UnregisterAfterNonexistingActivation addr={Address} origin={Origin}"
+        )]
+        private partial void LogTraceUnregisterAfterNonexistingActivation(GrainAddress address, SiloAddress origin);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "UnregisterAsync - It seems we are not the owner of activation {Address}, trying to forward it to {ForwardAddress} (hopCount={HopCount})"
+        )]
+        private partial void LogWarningUnregisterAsyncNotOwner(GrainAddress address, SiloAddress? forwardAddress, int hopCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "RegisterAsync - It seems we are not the owner of some activations, trying to forward it to {Count} silos (hopCount={HopCount})"
+        )]
+        private partial void LogWarningUnregisterManyAsyncNotOwner(int count, int hopCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Silo {SiloAddress} tries to lookup for {Grain}-->{PartitionOwner} ({GrainHashCode}-->{PartitionOwnerHashCode})"
+        )]
+        private partial void LogDebugLocalLookupAttempt(SiloAddress siloAddress, GrainId grain, SiloAddress? partitionOwner, GrainHashLogValue grainHashCode, SiloHashLogValue partitionOwnerHashCode);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "LocalLookup mine {GrainId}=null"
+        )]
+        private partial void LogTraceLocalLookupMineNull(GrainId grainId);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "LocalLookup cache {GrainId}={TargetAddress}"
+        )]
+        private partial void LogTraceLocalLookupCache(GrainId grainId, GrainAddress? targetAddress);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "LocalLookup mine {GrainId}={Address}"
+        )]
+        private partial void LogTraceLocalLookupMine(GrainId grainId, GrainAddress? address);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "TryFullLookup else {GrainId}=null"
+        )]
+        private partial void LogTraceTryFullLookupElse(GrainId grainId);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "LookupAsync - It seems we are not the owner of grain {GrainId} (hash: {Hash:X}), trying to forward it to {ForwardAddress} (hopCount={HopCount})"
+        )]
+        private partial void LogWarningLookupAsyncNotOwner(GrainId grainId, int hash, SiloAddress forwardAddress, int hopCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "FullLookup mine {GrainId}=none"
+        )]
+        private partial void LogTraceFullLookupMineNone(GrainId grainId);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "FullLookup mine {GrainId}={Address}"
+        )]
+        private partial void LogTraceFullLookupMine(GrainId grainId, GrainAddress? address);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "FullLookup remote {GrainId}={Address}"
+        )]
+        private partial void LogTraceFullLookupRemote(GrainId grainId, GrainAddress? address);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "DeleteGrainAsync - It seems we are not the owner of grain {GrainId}, trying to forward it to {ForwardAddress} (hopCount={HopCount})"
+        )]
+        private partial void LogWarningDeleteGrainAsyncNotOwner(GrainId grainId, SiloAddress? forwardAddress, int hopCount);
 
         private class DirectoryMembership
         {

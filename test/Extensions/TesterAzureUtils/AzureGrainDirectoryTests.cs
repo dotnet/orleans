@@ -9,6 +9,9 @@ using Xunit.Abstractions;
 
 namespace Tester.AzureUtils
 {
+    /// <summary>
+    /// Tests for Azure Table-based grain directory functionality, including registration, lookup, and unregistration operations.
+    /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Directory")]
     public class AzureTableGrainDirectoryTests(ITestOutputHelper testOutput) : GrainDirectoryTests<AzureTableGrainDirectory>(testOutput)
     {
@@ -34,6 +37,9 @@ namespace Tester.AzureUtils
             return directory;
         }
 
+        /// <summary>
+        /// Tests batch unregistration of multiple grain addresses, including handling of concurrent modifications.
+        /// </summary>
         [SkippableFact]
         public async Task UnregisterMany()
         {
@@ -85,6 +91,9 @@ namespace Tester.AzureUtils
             }
         }
 
+        /// <summary>
+        /// Tests conversion between GrainAddress and Azure Table entity representations.
+        /// </summary>
         [Fact]
         public void ConversionTest()
         {

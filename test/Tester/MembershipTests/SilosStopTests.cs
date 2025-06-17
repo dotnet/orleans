@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.Extensions.Configuration;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -9,6 +10,9 @@ using Xunit;
 
 namespace UnitTests.MembershipTests
 {
+    /// <summary>
+    /// Tests handling of ungraceful silo shutdowns and their impact on outstanding grain requests.
+    /// </summary>
     public class SilosStopTests : TestClusterPerTest
     {
         private class BuilderConfigurator : ISiloConfigurator, IClientBuilderConfigurator
@@ -59,6 +63,7 @@ namespace UnitTests.MembershipTests
             const int maxRetry = 10;
             for (int i = 0; i < maxRetry; i++)
             {
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, siloHandle.SiloAddress);
                 var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
                 var instanceId = await grain.GetRuntimeInstanceId();
                 if (instanceId.Contains(siloHandle.SiloAddress.Endpoint.ToString()))

@@ -7,6 +7,9 @@ using Xunit;
 
 namespace Tester.StreamingTests.BroadcastChannel
 {
+    /// <summary>
+    /// Tests broadcast channel functionality including fire-and-forget and non-fire-and-forget delivery modes with multiple subscribers.
+    /// </summary>
     [TestCategory("BVT")]
     public class BroadcastChannelTests : OrleansTestingBase, IClassFixture<BroadcastChannelTests.Fixture>
     {

@@ -4,6 +4,11 @@ using Xunit.Abstractions;
 
 namespace UnitTests.General;
 
+/// <summary>
+/// Tests for the CounterAggregatorGroup, which is part of Orleans' instrumentation and metrics infrastructure.
+/// This component aggregates counter values from multiple sources and is used throughout Orleans for collecting
+/// performance metrics such as message counts, activation counts, and other operational statistics.
+/// </summary>
 public class CounterAggregatorGroupTests
 {
     private readonly ITestOutputHelper _output;
@@ -12,6 +17,10 @@ public class CounterAggregatorGroupTests
         this._output = output;
     }
 
+    /// <summary>
+    /// Verifies that the aggregator group caches aggregator instances to avoid creating duplicates
+    /// for the same metric name and tags combination.
+    /// </summary>
     [Fact, TestCategory("Functional"), TestCategory("Aggregators")]
     public void ValidateAggregatorCache()
     {
@@ -24,6 +33,9 @@ public class CounterAggregatorGroupTests
         Assert.Single(group.Aggregators);
     }
 
+    /// <summary>
+    /// Tests the collection mechanism that retrieves aggregated metric values from all counters in the group.
+    /// </summary>
     [Fact, TestCategory("Functional"), TestCategory("Aggregators")]
     public void Collect()
     {
@@ -43,6 +55,10 @@ public class CounterAggregatorGroupTests
         Assert.Equal(5, measurements.Single(m => m.Tags[0].Value is "bar2").Value);
     }
 
+    /// <summary>
+    /// Stress test to verify thread-safety of the counter aggregator under high concurrent load.
+    /// This ensures metrics collection remains accurate in Orleans' multi-threaded runtime environment.
+    /// </summary>
     [Fact, TestCategory("Functional"), TestCategory("Aggregators")]
     public void TestMultithreadedCorrectness()
     {

@@ -14,7 +14,7 @@ namespace Orleans.Streams
     /// <summary>
     /// Base class for StreamQueueBalancer
     /// </summary>
-    public abstract class QueueBalancerBase : IStreamQueueBalancer
+    public abstract partial class QueueBalancerBase : IStreamQueueBalancer
     {
         private readonly IAsyncEnumerable<ClusterMembershipSnapshot> clusterMembershipUpdates;
         private readonly List<IStreamQueueBalanceListener> queueBalanceListeners;
@@ -63,7 +63,7 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                Logger.LogError(exc, "Error signaling shutdown token.");
+                LogErrorSignalingShutdownToken(Logger, exc);
             }
 
             await _listenForClusterChangesTask.SuppressThrowing();
@@ -126,11 +126,23 @@ namespace Orleans.Streams
                 }
                 catch (Exception exception)
                 {
-                    Logger.LogError(exception, "Error processing cluster membership update.");
+                    LogErrorProcessingClusterMembershipUpdate(Logger, exception);
                 }
             }
         }
 
         protected abstract void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error signaling shutdown token."
+        )]
+        private static partial void LogErrorSignalingShutdownToken(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error processing cluster membership update."
+        )]
+        private static partial void LogErrorProcessingClusterMembershipUpdate(ILogger logger, Exception exception);
     }
 }

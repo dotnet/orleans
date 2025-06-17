@@ -4,6 +4,9 @@ using Xunit;
 
 namespace UnitTests.StorageTests.AdoNet
 {
+    /// <summary>
+    /// Tests for PostgreSQL relational storage functionality.
+    /// </summary>
     [TestCategory("Persistence"), TestCategory("PostgreSql")]
     public class PostgreSqlRelationalStoreTests : RelationalStoreTestsBase, IClassFixture<PostgreSqlRelationalStoreTests.Fixture>
     {

@@ -12,6 +12,9 @@ using Xunit.Abstractions;
 
 namespace UnitTests.MembershipTests
 {
+    /// <summary>
+    /// Base class for testing silo liveness detection and membership management during silo failures and restarts.
+    /// </summary>
     public abstract class LivenessTestsBase : TestClusterPerTest
     {
         private readonly ITestOutputHelper output;
@@ -173,6 +176,9 @@ namespace UnitTests.MembershipTests
         }
     }
 
+    /// <summary>
+    /// Tests silo liveness detection using membership grain with specific gateway preferences.
+    /// </summary>
     public class LivenessTests_MembershipGrain : LivenessTestsBase
     {
         public LivenessTests_MembershipGrain(ITestOutputHelper output) : base(output)

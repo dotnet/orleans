@@ -136,6 +136,7 @@ namespace Orleans.Core
             }
         }
 
+        /// <inheritdoc />
         public void OnDehydrate(IDehydrationContext dehydrationContext)
         {
             try
@@ -149,6 +150,7 @@ namespace Orleans.Core
             }
         }
 
+        /// <inheritdoc />
         public void OnRehydrate(IRehydrationContext rehydrationContext)
         {
             try
@@ -174,7 +176,7 @@ namespace Orleans.Core
 
             var grainId = _grainContext.GrainId;
             var providerName = _shared.Store.GetType().Name;
-            // cannot use LoggerMessage here because we need to pass the eventId as an argument
+            // TODO: pending on https://github.com/dotnet/runtime/issues/110570
             _shared.Logger.LogError((int)id, exception, "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}", providerName, _shared.Name, operation, grainId, errorString);
 
             // If error is not specialization of OrleansException, wrap it
