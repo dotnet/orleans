@@ -37,7 +37,7 @@ namespace UnitTests.StreamingTests
                 public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
-                         .AddMemoryGrainStorageAsDefault()
+                        .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("MemoryStore")
                         .AddPersistentStreams(StreamProviderName,
                             GeneratorAdapterFactory.Create,
@@ -47,6 +47,14 @@ namespace UnitTests.StreamingTests
                                 b.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = TotalQueueCount));
                                 b.UseDynamicClusterConfigDeploymentBalancer();
                             });
+
+                    hostBuilder.Configure<GrainCollectionOptions>(options =>
+                    {
+                        options.MemoryPressureGrainCollectionOptions = new()
+                        {
+                            MemoryUsageCollectionEnabled = false
+                        };
+                    });
                 }
             }
         }
