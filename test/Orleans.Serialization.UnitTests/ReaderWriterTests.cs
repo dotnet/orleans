@@ -16,6 +16,24 @@ using System.Runtime.InteropServices;
 
 namespace Orleans.Serialization.UnitTests
 {
+    /// <summary>
+    /// Tests for Orleans' low-level Reader and Writer implementations.
+    /// 
+    /// These tests verify the fundamental building blocks of Orleans serialization:
+    /// - Binary encoding/decoding of primitive types
+    /// - Variable-length integer encoding (VarInt) for space efficiency
+    /// - Buffer management and pooling strategies
+    /// - Stream-based and memory-based I/O operations
+    /// 
+    /// The Reader/Writer infrastructure provides:
+    /// - High-performance binary serialization primitives
+    /// - Zero-allocation patterns for common scenarios
+    /// - Support for various buffer types (streams, arrays, pipes)
+    /// - Efficient handling of large data through segmented buffers
+    /// 
+    /// These components are critical for Orleans' wire protocol efficiency
+    /// and directly impact the performance of grain communication.
+    /// </summary>
     [Trait("Category", "BVT")]
     public sealed class ReaderWriterPoolingStreamTest : ReaderWriterTestBase<Stream, PoolingStreamBufferWriter, ReaderInput>
     {

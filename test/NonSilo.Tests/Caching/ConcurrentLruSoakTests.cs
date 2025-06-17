@@ -8,6 +8,12 @@ using Xunit.Abstractions;
 
 namespace NonSilo.Tests.Caching;
 
+/// <summary>
+/// Stress tests for the ConcurrentLruCache to verify thread-safety and consistency under high concurrent load.
+/// These "soak tests" run intensive multi-threaded operations to detect race conditions, deadlocks, and data corruption
+/// that might not be caught by regular unit tests. The cache must maintain consistency of its multi-generation structure
+/// even under extreme concurrent access patterns.
+/// </summary>
 [TestCategory("BVT")]
 public sealed class ConcurrentLruCacheSoakTests
 {
@@ -25,6 +31,10 @@ public sealed class ConcurrentLruCacheSoakTests
         this.testOutputHelper = testOutputHelper;
     }
 
+    /// <summary>
+    /// Tests concurrent GetOrAdd operations to ensure the cache maintains consistency under heavy read/write load.
+    /// Verifies that the cache size remains within bounds and internal structures remain valid.
+    /// </summary>
     [Fact]
     public async Task WhenSoakConcurrentGetCacheEndsInConsistentState()
     {

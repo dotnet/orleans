@@ -11,6 +11,11 @@ using Xunit.Abstractions;
 
 namespace NonSilo.Tests.Membership
 {
+    /// <summary>
+    /// Tests for Orleans' cluster health monitoring system, which is responsible for detecting failed silos
+    /// and maintaining cluster membership consistency. The health monitor performs periodic probes of other silos
+    /// and uses voting mechanisms to declare silos as dead, preventing split-brain scenarios in the distributed system.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("Membership")]
     public class ClusterHealthMonitorTests
     {

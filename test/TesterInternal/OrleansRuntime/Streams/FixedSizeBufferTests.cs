@@ -3,6 +3,9 @@ using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
+    /// <summary>
+    /// Tests for fixed size buffer pooling and segment allocation.
+    /// </summary>
     public class FixedSizeBufferTests
     {
         private const int TestBlockSize = 100;

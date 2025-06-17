@@ -4,6 +4,9 @@ using Xunit;
 
 namespace UnitTests.StorageTests.AdoNet
 {
+    /// <summary>
+    /// Tests for SQL Server relational storage functionality.
+    /// </summary>
     [TestCategory("Persistence"), TestCategory("SqlServer")]
     public class SqlServerRelationalStoreTests : RelationalStoreTestsBase, IClassFixture<SqlServerRelationalStoreTests.Fixture>
     {

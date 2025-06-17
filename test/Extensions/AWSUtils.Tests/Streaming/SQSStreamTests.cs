@@ -10,6 +10,9 @@ using OrleansAWSUtils.Streams;
 
 namespace AWSUtils.Tests.Streaming
 {
+    /// <summary>
+    /// Tests SQS streaming provider with various producer/consumer configurations between grains and clients.
+    /// </summary>
     [TestCategory("AWS"), TestCategory("SQS")]
     public class SQSStreamTests : TestClusterPerTest
     {

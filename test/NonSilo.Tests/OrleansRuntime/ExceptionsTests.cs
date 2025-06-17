@@ -5,6 +5,9 @@ using Xunit;
 
 namespace UnitTests.OrleansRuntime
 {
+    /// <summary>
+    /// Tests for Orleans exception serialization and round-trip testing.
+    /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class ExceptionsTests
     {

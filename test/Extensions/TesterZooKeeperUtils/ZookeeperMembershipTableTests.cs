@@ -12,6 +12,16 @@ namespace UnitTests.MembershipTests
 {
     /// <summary>
     /// Tests for operation of Orleans SiloInstanceManager using ZookeeperStore - Requires access to external Zookeeper storage
+    /// 
+    /// Apache ZooKeeper provides a hierarchical namespace for distributed coordination.
+    /// Orleans uses ZooKeeper for:
+    /// - Distributed membership management using znodes (ZooKeeper nodes)
+    /// - Leader election and distributed consensus
+    /// - Ephemeral nodes for automatic cleanup on silo failure
+    /// - Watch notifications for membership changes
+    /// 
+    /// These tests verify the ZooKeeper-based membership provider handles all
+    /// membership operations correctly, including node failures and network partitions.
     /// </summary>
     [TestCategory("Membership"), TestCategory("ZooKeeper")]
     public class ZookeeperMembershipTableTests : MembershipTableTestsBase
@@ -28,6 +38,11 @@ namespace UnitTests.MembershipTests
             return filters;
         }
 
+        /// <summary>
+        /// Creates a ZooKeeper-based membership table for testing.
+        /// Configures the ZooKeeper connection and creates the membership
+        /// table that uses ZooKeeper's hierarchical namespace for storage.
+        /// </summary>
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
             var options = new ZooKeeperClusteringSiloOptions();
@@ -36,6 +51,11 @@ namespace UnitTests.MembershipTests
             return new ZooKeeperBasedMembershipTable(this.Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>(), Options.Create(options), this._clusterOptions);
         }
 
+        /// <summary>
+        /// Creates a ZooKeeper-based gateway list provider.
+        /// This provider uses ZooKeeper watches to maintain an up-to-date
+        /// list of available gateways for client connections.
+        /// </summary>
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
             var options = new ZooKeeperGatewayListProviderOptions();
@@ -67,6 +87,11 @@ namespace UnitTests.MembershipTests
             await MembershipTable_ReadAll_EmptyTable();
         }
 
+        /// <summary>
+        /// Tests inserting a silo entry as a ZooKeeper znode.
+        /// Verifies that the membership data is correctly serialized
+        /// and stored in ZooKeeper's hierarchical structure.
+        /// </summary>
         [SkippableFact]
         public async Task MembershipTable_ZooKeeper_InsertRow()
         {
@@ -91,12 +116,22 @@ namespace UnitTests.MembershipTests
             await MembershipTable_UpdateRow();
         }
 
+        /// <summary>
+        /// Tests concurrent updates using ZooKeeper's versioning.
+        /// Verifies that ZooKeeper's optimistic concurrency control
+        /// correctly handles simultaneous updates from multiple silos.
+        /// </summary>
         [SkippableFact]
         public async Task MembershipTable_ZooKeeper_UpdateRowInParallel()
         {
             await MembershipTable_UpdateRowInParallel();
         }
 
+        /// <summary>
+        /// Tests heartbeat updates using ZooKeeper.
+        /// Verifies that ephemeral nodes and session timeouts
+        /// work correctly for detecting failed silos.
+        /// </summary>
         [SkippableFact]
         public async Task MembershipTable_ZooKeeper_UpdateIAmAlive()
         {

@@ -14,6 +14,9 @@ using Microsoft.Extensions.Options;
 
 namespace Tester.Cosmos.Persistence;
 
+/// <summary>
+/// Tests for Orleans grain state persistence operations using Azure Cosmos DB as the storage provider.
+/// </summary>
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 [TestCategory("Persistence"), TestCategory("Cosmos")]
 public class PersistenceProviderTests_Cosmos

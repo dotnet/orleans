@@ -14,7 +14,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
         {
             var streamId = StreamId.Create(new StreamIdentity(GetPartitionGuid(partition), null));
             StreamSequenceToken token =
-            new EventHubSequenceTokenV2(queueMessage.Offset.ToString(), queueMessage.SequenceNumber, 0);
+            new EventHubSequenceTokenV2(queueMessage.OffsetString, queueMessage.SequenceNumber, 0);
 
             return new StreamPosition(streamId, token);
         }

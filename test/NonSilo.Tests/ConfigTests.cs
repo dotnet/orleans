@@ -8,6 +8,10 @@ using Xunit.Abstractions;
 
 namespace UnitTests
 {
+    /// <summary>
+    /// Tests for Orleans configuration utilities, particularly the security features for handling sensitive connection strings.
+    /// These tests verify that Orleans properly redacts sensitive information from configuration strings for logging and diagnostics.
+    /// </summary>
     public class ConfigTests
     {
         private readonly ITestOutputHelper output;
@@ -17,6 +21,10 @@ namespace UnitTests
             this.output = output;
         }
 
+        /// <summary>
+        /// Tests that Azure Storage connection strings have their account keys properly redacted.
+        /// This prevents sensitive authentication information from being exposed in logs.
+        /// </summary>
         [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void Config_AzureConnectionInfo()
         {
@@ -29,6 +37,10 @@ namespace UnitTests
                 "Removed account key info from Azure connection string " + azureConnectionString);
         }
 
+        /// <summary>
+        /// Tests that SQL Server connection strings have their passwords properly redacted.
+        /// This ensures database credentials are not exposed in logs or error messages.
+        /// </summary>
         [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void Config_AdoNetConnectionInfo()
         {

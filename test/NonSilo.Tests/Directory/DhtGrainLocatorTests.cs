@@ -11,6 +11,9 @@ using Xunit.Abstractions;
 
 namespace UnitTests.Directory
 {
+    /// <summary>
+    /// Tests for distributed hash table grain locator functionality including grain unregistration and batch operations.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("Directory")]
     public class DhtGrainLocatorTests
     {

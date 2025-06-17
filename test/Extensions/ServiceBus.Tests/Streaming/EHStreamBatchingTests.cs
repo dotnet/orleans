@@ -9,6 +9,9 @@ using Xunit.Abstractions;
 
 namespace ServiceBus.Tests.Streaming
 {
+    /// <summary>
+    /// Tests for EventHub stream batching functionality with implicit subscriptions.
+    /// </summary>
     [TestCategory("EventHub")]
     public class EHStreamBatchingTests : StreamBatchingTestRunner, IClassFixture<EHStreamBatchingTests.Fixture>
     {

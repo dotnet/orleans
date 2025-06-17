@@ -10,6 +10,9 @@ using Xunit;
 
 namespace DefaultCluster.Tests;
 
+/// <summary>
+/// Tests System.Text.Json serialization of Orleans types including GrainId with various collection types.
+/// </summary>
 [TestCategory("Serialization"), TestCategory("BVT")]
 public class JsonSerializerTests : HostedTestClusterEnsureDefaultStarted
 {

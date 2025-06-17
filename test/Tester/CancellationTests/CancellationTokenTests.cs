@@ -7,6 +7,9 @@ using Xunit;
 
 namespace UnitTests.CancellationTests;
 
+/// <summary>
+/// Tests for CancellationToken functionality with acknowledgement waiting enabled.
+/// </summary>
 public sealed class CancellationTokenTests_WaitForAcknowledgement(CancellationTokenTests_WaitForAcknowledgement.Fixture fixture) : CancellationTokenTests(fixture), IClassFixture<CancellationTokenTests_WaitForAcknowledgement.Fixture>
 {
     public sealed class Fixture : FixtureBase
@@ -16,6 +19,9 @@ public sealed class CancellationTokenTests_WaitForAcknowledgement(CancellationTo
     }
 }
 
+/// <summary>
+/// Tests for CancellationToken functionality with acknowledgement waiting disabled.
+/// </summary>
 public sealed class CancellationTokenTests_NoWaitForAcknowledgement(CancellationTokenTests_NoWaitForAcknowledgement.Fixture fixture) : CancellationTokenTests(fixture), IClassFixture<CancellationTokenTests_NoWaitForAcknowledgement.Fixture>
 {
     public sealed class Fixture : FixtureBase
@@ -25,6 +31,9 @@ public sealed class CancellationTokenTests_NoWaitForAcknowledgement(Cancellation
     }
 }
 
+/// <summary>
+/// Base class for testing CancellationToken propagation and handling across grain calls.
+/// </summary>
 public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase fixture)
 {
     public abstract class FixtureBase : BaseInProcessTestClusterFixture

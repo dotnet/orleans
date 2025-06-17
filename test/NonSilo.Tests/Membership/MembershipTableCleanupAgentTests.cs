@@ -12,6 +12,9 @@ using Xunit.Abstractions;
 
 namespace NonSilo.Tests.Membership
 {
+    /// <summary>
+    /// Tests for membership table cleanup agent functionality including enabled/disabled scenarios and defunct silo cleanup.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("Membership")]
     public class MembershipTableCleanupAgentTests
     {

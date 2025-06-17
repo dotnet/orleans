@@ -15,6 +15,12 @@ using Xunit;
 
 namespace Analyzers.Tests
 {
+    /// <summary>
+    /// Base class for testing Roslyn diagnostic analyzers in the Orleans project.
+    /// Provides common infrastructure for compiling test code and running analyzers to verify diagnostics.
+    /// This enables testing of Orleans-specific code analysis rules that help developers avoid common mistakes.
+    /// </summary>
+    /// <typeparam name="TDiagnosticAnalyzer">The type of diagnostic analyzer being tested.</typeparam>
     public abstract class DiagnosticAnalyzerTestBase<TDiagnosticAnalyzer>
         where TDiagnosticAnalyzer : DiagnosticAnalyzer, new()
     {
@@ -24,6 +30,10 @@ namespace Analyzers.Tests
             "Orleans"
         };
 
+        /// <summary>
+        /// Provides test data for all Orleans grain interface types.
+        /// Used by theory tests to ensure analyzers work correctly with all grain interface variations.
+        /// </summary>
         public static IEnumerable<object[]> GrainInterfaces =>
             new List<object[]>
             {
@@ -35,14 +45,31 @@ namespace Analyzers.Tests
                 new object[] { "Orleans.IGrainWithIntegerCompoundKey" }
             };
 
+        /// <summary>
+        /// Creates an instance of the diagnostic analyzer being tested.
+        /// Can be overridden in derived classes to customize analyzer creation.
+        /// </summary>
         protected virtual DiagnosticAnalyzer CreateDiagnosticAnalyzer() => new TDiagnosticAnalyzer();
 
+        /// <summary>
+        /// Asserts that the provided source code produces no diagnostics when analyzed.
+        /// Used to verify that valid code patterns don't trigger false positives.
+        /// </summary>
+        /// <param name="source">The C# source code to analyze.</param>
+        /// <param name="extraUsings">Additional using statements to include.</param>
         protected async Task AssertNoDiagnostics(string source, params string[] extraUsings)
         {
             var (diagnostics, _) = await this.GetDiagnosticsAsync(source, extraUsings);
             Assert.Empty(diagnostics);
         }
 
+        /// <summary>
+        /// Compiles the provided source code and runs the diagnostic analyzer on it.
+        /// Returns any diagnostics produced along with the formatted source code.
+        /// </summary>
+        /// <param name="source">The C# source code to analyze.</param>
+        /// <param name="extraUsings">Additional using statements to include.</param>
+        /// <returns>A tuple containing the diagnostics array and the formatted source code.</returns>
         protected virtual async Task<(Diagnostic[], string)> GetDiagnosticsAsync(string source, params string[] extraUsings)
         {
             var sb = new StringBuilder();

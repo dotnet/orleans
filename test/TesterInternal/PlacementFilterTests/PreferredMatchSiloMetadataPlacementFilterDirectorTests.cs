@@ -8,6 +8,9 @@ using Xunit;
 
 namespace UnitTests.PlacementFilterTests;
 
+/// <summary>
+/// Tests for preferred match silo metadata placement filter director behavior.
+/// </summary>
 [TestCategory("Placement"), TestCategory("Filters"), TestCategory("SiloMetadata")]
 public class PreferredMatchSiloMetadataPlacementFilterDirectorTests
 {

@@ -7,6 +7,9 @@ using Xunit;
 
 namespace UnitTests.CancellationTests
 {
+    /// <summary>
+    /// Tests for GrainCancellationToken functionality including task cancellation and token callbacks.
+    /// </summary>
     public class GrainCancellationTokenTests : OrleansTestingBase, IClassFixture<GrainCancellationTokenTests.Fixture>
     {
         private readonly Fixture fixture;

@@ -14,6 +14,9 @@ using Xunit.Abstractions;
 
 namespace ServiceBus.Tests.StreamingTests
 {
+    /// <summary>
+    /// Tests for EventHub streaming functionality with client producer/consumer scenarios and dropped client handling.
+    /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
     public class EHClientStreamTests : TestClusterPerTest
     {

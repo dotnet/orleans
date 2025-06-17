@@ -14,6 +14,9 @@ using System.Buffers;
 
 namespace Benchmarks.Comparison
 {
+    /// <summary>
+    /// Compares Orleans deserialization performance against other popular serializers for class types.
+    /// </summary>
     [Trait("Category", "Benchmark")]
     [Config(typeof(BenchmarkConfig))]
     //[DisassemblyDiagnoser(recursiveDepth: 2, printSource: true)]

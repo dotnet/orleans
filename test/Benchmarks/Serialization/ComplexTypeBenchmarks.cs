@@ -16,6 +16,9 @@ using Xunit;
 
 namespace Benchmarks
 {
+    /// <summary>
+    /// Benchmarks Orleans serialization performance for complex object graphs with circular references.
+    /// </summary>
     [Trait("Category", "Benchmark")]
     [Config(typeof(BenchmarkConfig))]
     [MemoryDiagnoser]

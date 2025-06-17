@@ -13,6 +13,9 @@ using Xunit.Abstractions;
 
 namespace NonSilo.Tests.Membership
 {
+    /// <summary>
+    /// Tests for membership agent functionality including lifecycle stages, IAmAlive updates, and connectivity validation.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("Membership")]
     public class MembershipAgentTests
     {

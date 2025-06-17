@@ -3,6 +3,9 @@ using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
+    /// <summary>
+    /// Tests for subscription marker functionality including implicit and explicit subscription marking.
+    /// </summary>
     public class SubscriptionMarkerTests
     {
         [Fact, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]

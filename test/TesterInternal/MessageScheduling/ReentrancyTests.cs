@@ -19,6 +19,9 @@ namespace UnitTests
         }
     }
 
+    /// <summary>
+    /// Tests for grain reentrancy, MayInterleave predicates, and fan-out scenarios.
+    /// </summary>
     public class ReentrancyTests : OrleansTestingBase, IClassFixture<ReentrancyTests.Fixture>
     {
         public class Fixture : BaseTestClusterFixture

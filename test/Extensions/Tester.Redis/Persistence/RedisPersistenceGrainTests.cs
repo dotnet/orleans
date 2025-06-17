@@ -13,6 +13,9 @@ using Xunit.Abstractions;
 
 namespace Tester.Redis.Persistence
 {
+    /// <summary>
+    /// Tests for grain persistence functionality using Redis as the storage provider, including Redis-specific scenarios.
+    /// </summary>
     [TestCategory("Redis"), TestCategory("Persistence")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class RedisPersistenceGrainTests : GrainPersistenceTestsRunner, IClassFixture<RedisPersistenceGrainTests.Fixture>

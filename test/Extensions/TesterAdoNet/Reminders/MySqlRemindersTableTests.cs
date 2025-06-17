@@ -10,7 +10,7 @@ using Xunit;
 namespace UnitTests.RemindersTest
 {
     /// <summary>
-    /// Tests for operation of Orleans Reminders Table using MySQL
+    /// Tests for Orleans reminders table operations using MySQL as the storage backend.
     /// </summary>
     [TestCategory("Functional"), TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("MySql")]
     public class MySqlRemindersTableTests : ReminderTableTestsBase

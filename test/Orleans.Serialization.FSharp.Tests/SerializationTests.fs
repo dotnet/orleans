@@ -7,11 +7,36 @@ open Xunit
 [<CollectionDefinition("DefaultCluster")>]
 type DefaultClusterTestCollection() = interface ICollectionFixture<DefaultClusterFixture>;
 
+/// <summary>
+/// Tests for Orleans' F# language support in serialization.
+/// 
+/// Orleans provides first-class support for F# types including:
+/// - Discriminated unions (both enum-style and data-carrying)
+/// - F# records with structural equality
+/// - Recursive discriminated unions
+/// - Generic discriminated unions
+/// - Option types and other F# core types
+/// - Unit type
+/// 
+/// The F# serialization support ensures:
+/// - Proper handling of F# type system features
+/// - Preservation of structural equality semantics
+/// - Efficient encoding of discriminated union cases
+/// - Support for F# collections (lists, sets, maps)
+/// 
+/// This enables F# developers to use Orleans with idiomatic F# code,
+/// leveraging functional programming patterns while maintaining
+/// full compatibility with Orleans' distributed computing model.
+/// </summary>
 type FSharpSerializationTests(fixture: DefaultClusterFixture) =
     inherit HostedTestClusterEnsureDefaultStarted(fixture)
 
     let cluster = fixture.HostedCluster
 
+    /// <summary>
+    /// Tests serialization of F# unit type, which represents "no value" and is commonly
+    /// used in F# for side-effect-only operations.
+    /// </summary>
     [<Fact; TestCategory("BVT"); TestCategory("Serialization")>]
     let Serialization_Roundtrip_FSharp_Unit () =
         let roundtripped = cluster.RoundTripSerializationForTesting ()
@@ -19,6 +44,10 @@ type FSharpSerializationTests(fixture: DefaultClusterFixture) =
         Assert.Equal((), roundtripped)
         Assert.Equal((), copy)
 
+    /// <summary>
+    /// Tests enum-style discriminated unions (DUs without data), which are similar
+    /// to C# enums but with F# type safety and pattern matching support.
+    /// </summary>
     [<Fact; TestCategory("BVT"); TestCategory("Serialization")>]
     let Serialization_Roundtrip_FSharp_EnumStyleDU () =
         let case1 = EnumStyleDU.Case1
@@ -47,6 +76,10 @@ type FSharpSerializationTests(fixture: DefaultClusterFixture) =
         Assert.Equal(case1, copyCase1)
         Assert.Equal(case2, copyCase2)
 
+    /// <summary>
+    /// Tests recursive discriminated unions, which can contain references to themselves,
+    /// commonly used for tree structures and recursive data types in F#.
+    /// </summary>
     [<Fact; TestCategory("BVT"); TestCategory("Serialization")>]
     let Serialization_Roundtrip_FSharp_RecursiveDU () =
         let case1 = RecursiveDU.Case1

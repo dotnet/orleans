@@ -13,6 +13,9 @@ using Xunit.Abstractions;
 
 namespace UnitTests.SchedulerTests
 {
+    /// <summary>
+    /// Second set of advanced tests for Orleans task scheduler.
+    /// </summary>
     public class OrleansTaskSchedulerAdvancedTests_Set2 : IDisposable
     {
         private static readonly object Lockable = new object();

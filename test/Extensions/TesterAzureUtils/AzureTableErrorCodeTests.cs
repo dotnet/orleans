@@ -4,6 +4,9 @@ using Xunit;
 
 namespace Tester.AzureUtils
 {
+    /// <summary>
+    /// Tests for Azure Storage error code handling and validation of table/container names.
+    /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Storage")]
     public class AzureTableErrorCodeTests
     {

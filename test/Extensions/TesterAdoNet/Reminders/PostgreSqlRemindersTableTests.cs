@@ -8,6 +8,9 @@ using UnitTests.General;
 
 namespace UnitTests.RemindersTest
 {
+    /// <summary>
+    /// Tests for Orleans reminders table operations using PostgreSQL as the storage backend.
+    /// </summary>
     [TestCategory("Functional"), TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("PostgreSql")]
     public class PostgreSqlRemindersTableTests : ReminderTableTestsBase
     {

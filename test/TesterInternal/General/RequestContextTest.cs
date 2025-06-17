@@ -10,6 +10,9 @@ using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
+    /// <summary>
+    /// Tests for request context propagation across grain calls and activities.
+    /// </summary>
     public class RequestContextTests_Silo : OrleansTestingBase, IClassFixture<RequestContextTests_Silo.Fixture>, IDisposable
     {
         private readonly ITestOutputHelper output;

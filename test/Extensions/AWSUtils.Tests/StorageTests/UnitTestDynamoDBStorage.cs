@@ -6,6 +6,9 @@ using Orleans.AWSUtils.Tests;
 
 namespace AWSUtils.Tests.StorageTests
 {
+    /// <summary>
+    /// Test data model for DynamoDB storage unit tests.
+    /// </summary>
     [Serializable]
     [Orleans.GenerateSerializer]
     internal class UnitTestDynamoDBTableData
@@ -87,6 +90,9 @@ namespace AWSUtils.Tests.StorageTests
         }
     }
 
+    /// <summary>
+    /// Test implementation of DynamoDB storage for unit testing DynamoDB operations.
+    /// </summary>
     internal class UnitTestDynamoDBStorage : DynamoDBStorage
     {
         public const string INSTANCE_TABLE_NAME = "UnitTestDDBTableData";

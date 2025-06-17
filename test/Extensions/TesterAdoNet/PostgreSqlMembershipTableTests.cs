@@ -11,6 +11,9 @@ using Xunit;
 
 namespace UnitTests.MembershipTests
 {
+    /// <summary>
+    /// Tests for Orleans membership table operations using PostgreSQL as the storage backend.
+    /// </summary>
     [TestCategory("Membership"), TestCategory("PostgreSql"), TestCategory("Functional")]
     public class PostgreSqlMembershipTableTests : MembershipTableTestsBase
     {

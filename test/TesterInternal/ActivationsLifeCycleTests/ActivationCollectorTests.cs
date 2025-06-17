@@ -14,6 +14,9 @@ using Xunit;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
+    /// <summary>
+    /// Tests for the activation collector that manages grain activation lifecycle and garbage collection.
+    /// </summary>
     public class ActivationCollectorTests : OrleansTestingBase, IAsyncLifetime
     {
         private static readonly TimeSpan DEFAULT_COLLECTION_QUANTUM = TimeSpan.FromSeconds(10);

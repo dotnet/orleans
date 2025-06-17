@@ -8,6 +8,17 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
+    /// <summary>
+    /// Tests basic grain communication patterns using Echo grains.
+    /// Echo grains are simple test grains that return or process the input they receive.
+    /// These tests verify fundamental Orleans features:
+    /// - Basic request/response communication
+    /// - Error propagation from grains to clients
+    /// - Timeout handling and recovery
+    /// - Cross-silo communication
+    /// - Async/await patterns in grain methods
+    /// - Nullable type handling across grain boundaries
+    /// </summary>
     public class EchoTaskGrainTests : HostedTestClusterEnsureDefaultStarted
     {
         private readonly TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(10) : TimeSpan.FromSeconds(10);
@@ -26,12 +37,25 @@ namespace DefaultCluster.Tests.General
             }
         }
 
+        /// <summary>
+        /// Tests basic grain reference creation.
+        /// Verifies that grain references can be obtained without activation.
+        /// Getting a grain reference is a local operation that doesn't communicate with the cluster.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public void EchoGrain_GetGrain()
         {
             _ = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
         }
 
+        /// <summary>
+        /// Tests basic grain method invocation with string echo.
+        /// Verifies that:
+        /// - Grain activation occurs on first call
+        /// - Method parameters are correctly marshaled to the grain
+        /// - Return values are correctly marshaled back to the client
+        /// This is the most fundamental test of grain communication.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_Echo()
         {
@@ -48,6 +72,14 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(expectedEcho, received);
         }
 
+        /// <summary>
+        /// Tests exception propagation from grain to client.
+        /// Verifies that exceptions thrown in grain methods are:
+        /// - Serialized and sent back to the client
+        /// - Wrapped in appropriate exception types
+        /// - Contain the original error message
+        /// This ensures proper error handling in distributed scenarios.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_EchoError()
         {
@@ -65,6 +97,14 @@ namespace DefaultCluster.Tests.General
             }).WaitAsync(timeout);
         }
 
+        /// <summary>
+        /// Tests timeout handling using ContinueWith pattern.
+        /// Verifies that:
+        /// - Long-running grain methods timeout according to configuration
+        /// - TimeoutException is properly thrown
+        /// - Timeout occurs within expected time bounds
+        /// This tests Orleans' ability to prevent hung calls from blocking indefinitely.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("Echo"), TestCategory("Timeout")]
         public async Task EchoGrain_Timeout_ContinueWith()
         {
@@ -90,6 +130,11 @@ namespace DefaultCluster.Tests.General
             Assert.True(TimeIsShorter(sw.Elapsed, delay60), $"Elapsed time out of range: {sw.Elapsed}");
         }
 
+        /// <summary>
+        /// Tests timeout handling using async/await pattern.
+        /// Similar to Timeout_ContinueWith but using modern async/await syntax.
+        /// Verifies proper timeout behavior with await-based error handling.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("Echo")]
         public async Task EchoGrain_Timeout_Await()
         {
@@ -114,6 +159,11 @@ namespace DefaultCluster.Tests.General
             Assert.True(TimeIsShorter(sw.Elapsed, delay25), $"Elapsed time out of range: {sw.Elapsed}");
         }
 
+        /// <summary>
+        /// Tests timeout handling when using Task.Result (blocking wait).
+        /// Verifies that timeouts work correctly even when using synchronous waiting patterns.
+        /// Note: This pattern is generally discouraged but needs to work for compatibility.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("Echo"), TestCategory("Timeout")]
         public async Task EchoGrain_Timeout_Result()
         {
@@ -145,6 +195,14 @@ namespace DefaultCluster.Tests.General
             Assert.True(TimeIsShorter(sw.Elapsed, delay25), $"Elapsed time out of range: {sw.Elapsed}");
         }
 
+        /// <summary>
+        /// Tests grain state persistence across multiple calls.
+        /// Verifies that:
+        /// - Grains can maintain state between calls
+        /// - State is updated correctly for both successful and error cases
+        /// - The last value (or error message) is retrievable
+        /// This demonstrates basic stateful grain behavior.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_LastEcho()
         {
@@ -185,6 +243,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(expectedEchoError, received); // LastEcho-Error
         }
 
+        /// <summary>
+        /// Tests basic grain liveness check (ping).
+        /// Verifies that grains can respond to simple parameterless calls.
+        /// Ping operations are useful for health checks and keeping grains activated.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_Ping()
         {
@@ -202,6 +265,11 @@ namespace DefaultCluster.Tests.General
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
         }
 
+        /// <summary>
+        /// Tests grain's ability to ping its local silo.
+        /// Verifies intra-silo communication where a grain communicates with its hosting silo.
+        /// This pattern is useful for silo-level health checks and diagnostics.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_PingSilo_Local()
         {
@@ -218,6 +286,11 @@ namespace DefaultCluster.Tests.General
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
         }
 
+        /// <summary>
+        /// Tests grain's ability to ping specific remote silos.
+        /// Verifies cross-silo communication where a grain can target specific silos.
+        /// This demonstrates Orleans' ability to route messages to specific cluster nodes.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_PingSilo_Remote()
         {
@@ -242,6 +315,11 @@ namespace DefaultCluster.Tests.General
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
         }
 
+        /// <summary>
+        /// Tests grain's ability to ping any other silo in the cluster.
+        /// Verifies that grains can discover and communicate with other silos dynamically.
+        /// This is useful for distributed health checks and cluster topology awareness.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_PingSilo_OtherSilo()
         {
@@ -258,6 +336,11 @@ namespace DefaultCluster.Tests.General
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
         }
 
+        /// <summary>
+        /// Tests grain's ability to interact with cluster membership.
+        /// Verifies that grains can query and use membership information to communicate
+        /// with other cluster members. This demonstrates Orleans' membership awareness.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_PingSilo_OtherSilo_Membership()
         {
@@ -274,6 +357,14 @@ namespace DefaultCluster.Tests.General
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
         }
 
+        /// <summary>
+        /// Tests various async/await patterns in non-reentrant grains.
+        /// Verifies that blocking grains correctly handle:
+        /// - Direct async method calls
+        /// - Chained async calls (grain calling grain)
+        /// - Different Task-based return patterns
+        /// Non-reentrant grains process one message at a time.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoTaskGrain_Await()
         {
@@ -289,6 +380,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(expectedEcho, received); // CallMethodTask_Await
         }
 
+        /// <summary>
+        /// Tests various async/await patterns in reentrant grains.
+        /// Similar to EchoTaskGrain_Await but with reentrant grains that can process
+        /// multiple messages concurrently. This verifies Orleans' reentrancy support.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoTaskGrain_Await_Reentrant()
         {
@@ -304,6 +400,13 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(expectedEcho, received); // CallMethodTask_Await
         }
 
+        /// <summary>
+        /// Tests nullable type handling across grain boundaries.
+        /// Verifies that:
+        /// - Nullable values are correctly serialized when non-null
+        /// - Null values are properly handled and returned as null
+        /// This ensures Orleans correctly handles .NET nullable value types.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_EchoNullable()
         {

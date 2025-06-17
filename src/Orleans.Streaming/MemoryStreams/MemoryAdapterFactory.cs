@@ -22,7 +22,7 @@ namespace Orleans.Providers
     /// This factory acts as the adapter and the adapter factory.  The events are stored in an in-memory grain that 
     /// behaves as an event queue, this provider adapter is primarily used for testing
     /// </summary>
-    public class MemoryAdapterFactory<TSerializer> : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
+    public partial class MemoryAdapterFactory<TSerializer> : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
         where TSerializer : class, IMemoryMessageBodySerializer
     {
         private readonly StreamCacheEvictionOptions cacheOptions;
@@ -163,7 +163,7 @@ namespace Orleans.Providers
             }
             catch (Exception exc)
             {
-                logger.LogError((int)ProviderErrorCode.MemoryStreamProviderBase_QueueMessageBatchAsync, exc, "Exception thrown in MemoryAdapterFactory.QueueMessageBatchAsync.");
+                LogErrorQueueMessageBatchAsync(exc);
                 throw;
             }
         }
@@ -219,5 +219,12 @@ namespace Orleans.Providers
             factory.Init();
             return factory;
         }
+
+        [LoggerMessage(
+            EventId = (int)ProviderErrorCode.MemoryStreamProviderBase_QueueMessageBatchAsync,
+            Level = LogLevel.Error,
+            Message = "Exception thrown in MemoryAdapterFactory.QueueMessageBatchAsync."
+        )]
+        private partial void LogErrorQueueMessageBatchAsync(Exception exception);
     }
 }

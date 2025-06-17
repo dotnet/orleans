@@ -15,6 +15,9 @@ using Xunit;
 
 namespace Benchmarks.Serialization.Comparison;
 
+/// <summary>
+/// Compares Orleans serialization performance against other popular serializers for array types.
+/// </summary>
 [GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
 [Config(typeof(BenchmarkConfig))]
 public class ArraySerializeBenchmark

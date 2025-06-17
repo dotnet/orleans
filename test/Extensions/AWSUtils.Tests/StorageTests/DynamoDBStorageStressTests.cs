@@ -8,6 +8,9 @@ using Xunit.Abstractions;
 
 namespace AWSUtils.Tests.StorageTests
 {
+    /// <summary>
+    /// Stress tests for DynamoDB storage to verify performance under high-volume read/write operations.
+    /// </summary>
     [TestCategory("Storage"), TestCategory("AWS"), TestCategory("DynamoDb"), TestCategory("Stress")]
     public class DynamoDBStorageStressTests : IClassFixture<DynamoDBStorageTestsFixture>
     {

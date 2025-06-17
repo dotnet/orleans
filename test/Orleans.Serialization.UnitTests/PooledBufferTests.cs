@@ -8,6 +8,24 @@ using Xunit;
 
 namespace Orleans.Serialization.UnitTests
 {
+    /// <summary>
+    /// Tests for Orleans' PooledBuffer implementation.
+    /// 
+    /// PooledBuffer is a high-performance buffer management system that:
+    /// - Uses ArrayPool to minimize allocations and GC pressure
+    /// - Supports efficient slicing operations without copying
+    /// - Handles large data through segmented storage
+    /// - Provides zero-copy access to buffer contents
+    /// 
+    /// Key features tested:
+    /// - Large buffer handling (multi-megabyte)
+    /// - Slicing operations at various offsets
+    /// - Memory safety and bounds checking
+    /// - Proper cleanup and return to pool
+    /// 
+    /// This infrastructure is critical for Orleans' serialization performance,
+    /// especially when handling large object graphs or streaming scenarios.
+    /// </summary>
     [Trait("Category", "BVT")]
     public class PooledBufferTests
     {

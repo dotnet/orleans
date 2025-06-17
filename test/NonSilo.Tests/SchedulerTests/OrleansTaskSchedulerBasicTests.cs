@@ -12,6 +12,9 @@ using Orleans;
 
 namespace UnitTests.SchedulerTests
 {
+    /// <summary>
+    /// Test implementation of IGrainContext for unit testing the Orleans task scheduler without requiring a full grain activation.
+    /// </summary>
     internal class UnitTestSchedulingContext : IGrainContext, IDisposable
     {
         public static UnitTestSchedulingContext Create(ILoggerFactory loggerFactory)
@@ -64,6 +67,11 @@ namespace UnitTests.SchedulerTests
         void IGrainContext.Migrate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) => throw new NotImplementedException();
     }
     
+    /// <summary>
+    /// Basic tests for the Orleans task scheduler, which is the core component responsible for scheduling grain work items.
+    /// The scheduler ensures single-threaded execution semantics for grains while efficiently utilizing thread pool resources.
+    /// These tests verify fundamental scheduling operations without requiring a full Orleans runtime.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("Scheduler")]
     public class OrleansTaskSchedulerBasicTests : IDisposable
     {
@@ -84,6 +92,10 @@ namespace UnitTests.SchedulerTests
             SynchronizationContext.SetSynchronizationContext(null);
         }
 
+        /// <summary>
+        /// Tests that tasks can be scheduled and executed on the Orleans activation task scheduler.
+        /// Verifies basic task execution flow in the grain's single-threaded execution context.
+        /// </summary>
         [Fact, TestCategory("AsynchronyPrimitives")]
         public async Task Async_Task_Start_ActivationTaskScheduler()
         {

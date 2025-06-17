@@ -13,6 +13,9 @@ using Xunit;
 
 namespace Tester.HeterogeneousSilosTests
 {
+    /// <summary>
+    /// Tests for heterogeneous silo configurations including grain type exclusion and type resolution merging.
+    /// </summary>
     [TestCategory("Functional")]
     public class HeterogeneousTests : OrleansTestingBase, IDisposable, IAsyncLifetime
     {

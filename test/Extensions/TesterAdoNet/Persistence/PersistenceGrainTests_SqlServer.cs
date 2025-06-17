@@ -10,6 +10,9 @@ using Xunit.Abstractions;
 
 namespace Tester.AdoNet.Persistence
 {
+    /// <summary>
+    /// Tests for Orleans grain state persistence functionality using SQL Server as the storage provider.
+    /// </summary>
     [TestCategory("Persistence"), TestCategory("SqlServer")]
     public class PersistenceGrainTests_SqlServer : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_SqlServer.Fixture>
     {

@@ -6,7 +6,11 @@ using Xunit;
 namespace DefaultCluster.Tests.General
 {
     /// <summary>
-    /// Summary description for SimpleGrain
+    /// Basic tests for simple grain functionality in Orleans.
+    /// These tests verify fundamental grain operations including activation,
+    /// method invocation, state management, and basic control flow.
+    /// SimpleGrain represents the most basic grain pattern with getter/setter
+    /// methods and demonstrates core Orleans programming model concepts.
     /// </summary>
     public class SimpleGrainTests : HostedTestClusterEnsureDefaultStarted
     {
@@ -19,6 +23,12 @@ namespace DefaultCluster.Tests.General
             return this.GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), SimpleGrain.SimpleGrainNamePrefix);
         }
 
+        /// <summary>
+        /// Tests basic grain activation and method invocation.
+        /// Verifies that a grain can be obtained from the factory and
+        /// that methods can be successfully called on it, demonstrating
+        /// the fundamental grain lifecycle and RPC mechanism.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task SimpleGrainGetGrain()
         {
@@ -26,6 +36,13 @@ namespace DefaultCluster.Tests.General
             _ = await grain.GetAxB();
         }
 
+        /// <summary>
+        /// Tests sequential grain method calls and state persistence.
+        /// Verifies that grain state is maintained between calls by
+        /// setting values through separate method calls and then
+        /// computing a result based on the persisted state.
+        /// Demonstrates grain activation persistence within a session.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task SimpleGrainControlFlow()
         {
@@ -41,6 +58,13 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(6, await intPromise);
         }
 
+        /// <summary>
+        /// Tests concurrent grain method calls and data consistency.
+        /// Verifies that multiple method calls can be issued concurrently
+        /// (using Task.WhenAll) and that the grain properly handles
+        /// concurrent operations while maintaining state consistency.
+        /// Demonstrates Orleans' turn-based concurrency model.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task SimpleGrainDataFlow()
         {
@@ -54,6 +78,13 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(12, x);
         }
 
+        /// <summary>
+        /// Tests grain activation with multiple constructors.
+        /// Would verify that grains with multiple constructors activate
+        /// using the default (parameterless) constructor.
+        /// NOTE: Currently skipped as grains with multiple constructors
+        /// require explicit registration in the current Orleans version.
+        /// </summary>
         [Fact(Skip = "Grains with multiple constructors are not supported without being explicitly registered.")]
         [TestCategory("BVT")]
         public async Task GettingGrainWithMultipleConstructorsActivesViaDefaultConstructor()

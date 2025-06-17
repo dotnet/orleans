@@ -100,16 +100,36 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         public static EventData ToEventData<T>(Serializer bodySerializer, StreamId streamId, IEnumerable<T> events, Dictionary<string, object> requestContext)
         {
+            var eventData = new EventData();
+
+            UpdateEventData(eventData, bodySerializer, streamId, events.Cast<object>().ToList(), requestContext);
+            return eventData;
+        }
+
+        /// <summary>
+        /// Updates the event data with the events list and its context.
+        /// </summary>
+        /// <param name="eventData">The <see cref="EventData"/> instance to update with a new body and context.</param>
+        /// <param name="bodySerializer">The serializer to use for creating the event body payload.</param>
+        /// <param name="streamId">The stream identifier to associate with the event context.</param>
+        /// <param name="events">The events list to use for the payload.</param>
+        /// <param name="requestContext">The request context to associate with the event.</param>
+        public static void UpdateEventData<T>(EventData eventData, Serializer bodySerializer, StreamId streamId, IEnumerable<T> events, Dictionary<string, object> requestContext)
+        {
+            eventData.EventBody = CreateEventDataBody(bodySerializer, events, requestContext);
+            eventData.SetStreamNamespaceProperty(streamId.GetNamespace());
+        }
+
+        private static BinaryData CreateEventDataBody<T>(Serializer bodySerializer, IEnumerable<T> events, Dictionary<string, object> requestContext)
+        {
             var payload = new Body
             {
                 Events = events.Cast<object>().ToList(),
                 RequestContext = requestContext
             };
-            var bytes = bodySerializer.SerializeToArray(payload);
-            var eventData = new EventData(bytes);
 
-            eventData.SetStreamNamespaceProperty(streamId.GetNamespace());
-            return eventData;
+            var bytes = bodySerializer.SerializeToArray(payload);
+            return new BinaryData(bytes);
         }
     }
 }

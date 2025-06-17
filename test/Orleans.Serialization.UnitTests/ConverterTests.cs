@@ -6,6 +6,19 @@ using Xunit.Abstractions;
 
 namespace Orleans.Serialization.UnitTests;
 
+/// <summary>
+/// Tests for the converter-based serialization mechanism in Orleans.
+/// 
+/// Converters allow Orleans to serialize types from external libraries that cannot be modified
+/// to add Orleans serialization attributes. This is achieved through surrogate types that:
+/// - Act as intermediaries for serialization
+/// - Convert between the foreign type and a serializable representation
+/// - Support both reference types and value types
+/// - Allow serialization of derived types from foreign libraries
+/// 
+/// This approach enables Orleans to maintain its high-performance serialization while
+/// integrating with third-party libraries and legacy code.
+/// </summary>
 public class ConverterCodecTests : FieldCodecTester<MyForeignLibraryType, IFieldCodec<MyForeignLibraryType>>
 {
     public ConverterCodecTests(ITestOutputHelper output) : base(output)

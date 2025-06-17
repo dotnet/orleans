@@ -11,6 +11,9 @@ using Orleans.Runtime.Placement;
 
 namespace Tester.Forwarding
 {
+    /// <summary>
+    /// Tests for silo shutdown scenarios including request forwarding, timer handling, and stuck activations.
+    /// </summary>
     public class ShutdownSiloTests : TestClusterPerTest
     {
         public const int NumberOfSilos = 2;

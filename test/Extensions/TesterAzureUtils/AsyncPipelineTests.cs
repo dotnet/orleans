@@ -6,6 +6,9 @@ using Xunit.Abstractions;
 
 namespace UnitTests.AsyncPrimitivesTests
 {
+    /// <summary>
+    /// Tests for AsyncPipeline functionality including throughput limits and concurrent task execution.
+    /// </summary>
     [TestCategory("AsynchronyPrimitives")]
     public class AsyncPipelineTests
     {

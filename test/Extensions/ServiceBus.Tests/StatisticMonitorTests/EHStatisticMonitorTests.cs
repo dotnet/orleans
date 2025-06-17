@@ -13,6 +13,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace ServiceBus.Tests.MonitorTests
 {
+    /// <summary>
+    /// Tests for EventHub statistics monitoring including receiver, cache, and object pool monitor counters.
+    /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming")]
     public class EHStatisticMonitorTests : OrleansTestingBase, IClassFixture<EHStatisticMonitorTests.Fixture>
     {

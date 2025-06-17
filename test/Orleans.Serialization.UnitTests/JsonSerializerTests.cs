@@ -12,6 +12,20 @@ using Xunit.Abstractions;
 
 namespace Orleans.Serialization.UnitTests
 {
+    /// <summary>
+    /// Tests for Orleans' JSON serialization support using System.Text.Json.
+    /// 
+    /// Orleans provides integration with System.Text.Json for scenarios where:
+    /// - JSON format is required for interoperability
+    /// - Human-readable serialization is needed for debugging
+    /// - Integration with external systems that expect JSON
+    /// 
+    /// The JSON codec in Orleans:
+    /// - Can be selectively applied to specific types using predicates
+    /// - Supports polymorphic serialization through Orleans' type system
+    /// - Provides both serialization and deep copy functionality
+    /// - Can be combined with Orleans' native serialization for optimal performance
+    /// </summary>
     [Trait("Category", "BVT")]
     public class JsonCodecTests : FieldCodecTester<MyJsonClass?, IFieldCodec<MyJsonClass?>>
     {

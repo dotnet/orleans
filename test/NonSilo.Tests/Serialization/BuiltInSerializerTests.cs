@@ -18,7 +18,9 @@ using Xunit.Abstractions;
 namespace UnitTests.Serialization
 {
     /// <summary>
-    /// Test the built-in serializers
+    /// Tests for Orleans' built-in serializers, which handle serialization of common .NET types and Orleans-specific types.
+    /// These serializers are crucial for grain communication, state persistence, and streaming. The tests verify that
+    /// Orleans can correctly serialize and deserialize various data structures used throughout the framework.
     /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection), TestCategory("Serialization")]
     public class BuiltInSerializerTests
@@ -32,6 +34,10 @@ namespace UnitTests.Serialization
             this.environment = fixture;
         }
 
+        /// <summary>
+        /// Verifies that Orleans internal types have appropriate serializers registered.
+        /// This is essential for proper functioning of Orleans' internal messaging and state management.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("CodeGen")]
         public void InternalSerializableTypesHaveSerializers()
         {

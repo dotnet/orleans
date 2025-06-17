@@ -6,6 +6,9 @@ using TestExtensions.Runners;
 
 namespace DefaultCluster.Tests
 {
+    /// <summary>
+    /// Tests for the in-memory lease provider implementation following the golden path test patterns.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("Lease")]
     public class GoldenPathInMemoryLeaseProviderTests : GoldenPathLeaseProviderTestRunner, IClassFixture<GoldenPathInMemoryLeaseProviderTests.Fixture>
     {

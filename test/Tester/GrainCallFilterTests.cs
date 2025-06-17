@@ -49,6 +49,23 @@ namespace UnitTests.General
         ValueTask<int> IMyOtherInterface.GetExtensionValue() => new(100 + _value);
     }
 
+    /// <summary>
+    /// Comprehensive tests for Orleans grain call filters (interceptors).
+    /// 
+    /// Grain call filters provide AOP-style interception of grain method calls, enabling:
+    /// - Cross-cutting concerns (logging, monitoring, security)
+    /// - Request/response manipulation
+    /// - Retry logic and error handling
+    /// - Method call metrics and tracing
+    /// 
+    /// Orleans supports both incoming filters (executed on the target grain/silo) and
+    /// outgoing filters (executed on the calling grain/client). Filters can be registered:
+    /// - System-wide (all grains)
+    /// - Per-grain-type
+    /// 
+    /// These tests verify filter execution order, context propagation, exception handling,
+    /// and integration with various Orleans features like streaming and observers.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("GrainCallFilter")]
     public class GrainCallFilterTests : OrleansTestingBase, IClassFixture<GrainCallFilterTests.Fixture>
     {
@@ -67,6 +84,7 @@ namespace UnitTests.General
                 {
                     hostBuilder
                         .AddGrainExtension<IMyGrainExtension, MyGrainExtension>()
+                        // System-wide incoming filter - executes for ALL grain calls on this silo
                         .AddIncomingGrainCallFilter(context =>
                         {
                             Assert.NotNull(context);
@@ -79,18 +97,24 @@ namespace UnitTests.General
                             Assert.False(context.TargetId.IsDefault);
                             Assert.False(context.InterfaceType.IsDefault);
 
+                            // Test 1: Verify RequestContext propagation through filters
+                            // Each filter adds a digit to build up "1234"
                             if (string.Equals(context.InterfaceMethod.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
                             {
                                 if (RequestContext.Get(GrainCallFilterTestConstants.Key) != null) throw new InvalidOperationException();
                                 RequestContext.Set(GrainCallFilterTestConstants.Key, "1");
                             }
 
+                            // Test 2: Verify behavior when filter doesn't call context.Invoke()
+                            // This should result in an InvalidOperationException for the caller
                             if (string.Equals(context.InterfaceMethod.Name, nameof(IGrainCallFilterTestGrain.SystemWideCallFilterMarker)))
                             {
                                 // explicitly do not continue calling Invoke
                                 return Task.CompletedTask;
                             }
 
+                            // Test 3: Demonstrate request manipulation - negate the value
+                            // This shows filters can modify method arguments before execution
                             if (string.Equals(context.InterfaceMethod.Name, nameof(IMyGrainExtension.SetExtensionValue)))
                             {
                                 context.Request.SetArgument(0, (int)context.Request.GetArgument(0) * -1);
@@ -99,8 +123,10 @@ namespace UnitTests.General
                             return context.Invoke();
                         })
                         .AddIncomingGrainCallFilter<GrainCallFilterWithDependencies>()
+                        // System-wide outgoing filter - executes when this silo calls other grains
                         .AddOutgoingGrainCallFilter(async ctx =>
                         {
+                            // Modify outgoing Echo calls by doubling the string argument
                             if (ctx.InterfaceMethod?.Name == "Echo")
                             {
                                 // Concatenate the input to itself.
@@ -182,6 +208,8 @@ namespace UnitTests.General
                         })
                         .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("SMSProvider");
 
+                    // Demonstrates retry logic in outgoing filters
+                    // This filter retries failed calls by modifying the argument
                     static async Task RetryCertainCalls(IOutgoingGrainCallContext ctx)
                     {
                         var attemptsRemaining = 2;
@@ -195,6 +223,7 @@ namespace UnitTests.General
                             }
                             catch (ArgumentOutOfRangeException) when (attemptsRemaining > 1 && ctx.Grain is IOutgoingMethodInterceptionGrain)
                             {
+                                // Retry by decrementing the problematic value
                                 if (string.Equals(ctx.InterfaceMethod?.Name, nameof(IOutgoingMethodInterceptionGrain.ThrowIfGreaterThanZero)) && ctx.Request.GetArgument(0) is int value)
                                 {
                                     ctx.Request.SetArgument(0, value - 1);
@@ -208,12 +237,18 @@ namespace UnitTests.General
             }
         }
 
+        /// <summary>
+        /// Demonstrates that grain call filters can use dependency injection.
+        /// This filter receives IGrainFactory through constructor injection,
+        /// showing that filters are full participants in the DI container.
+        /// </summary>
         [SuppressMessage("ReSharper", "NotAccessedField.Local")]
         public class GrainCallFilterWithDependencies(IGrainFactory grainFactory) : IIncomingGrainCallFilter
         {
             public Task Invoke(IIncomingGrainCallContext context)
             {
                 Assert.NotNull(grainFactory);
+                // Continue building the RequestContext value: "1" -> "12"
                 if (string.Equals(context.ImplementationMethod?.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
                 {
                     if (RequestContext.Get(GrainCallFilterTestConstants.Key) is string value)
@@ -234,9 +269,13 @@ namespace UnitTests.General
         }
         
         /// <summary>
-        /// Ensures that grain call filters are invoked around method calls in the correct order.
+        /// Tests the complete outgoing filter pipeline with request/response manipulation.
+        /// Verifies that:
+        /// 1. Client outgoing filter converts argument to uppercase: ab -> AB
+        /// 2. Grain1 outgoing filter doubles the string: AB -> ABAB
+        /// 3. Grain2 incoming filter reverses it: ABAB -> BABA
+        /// 4. Response is intercepted and modified on the way back
         /// </summary>
-        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         [Fact]
         public async Task GrainCallFilter_Outgoing_Test()
         {
@@ -256,7 +295,9 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// Ensures that grain call filters are invoked around method calls in the correct order.
+        /// Verifies the execution order of multiple incoming grain call filters.
+        /// The RequestContext should accumulate values in order: "1" -> "12" -> "123" -> "1234"
+        /// where each digit is added by a different filter in the pipeline.
         /// </summary>
         [Fact]
         public async Task GrainCallFilter_Incoming_Order_Test()
@@ -270,7 +311,9 @@ namespace UnitTests.General
         }
         
         /// <summary>
-        /// Ensures that the invocation interceptor is invoked for stream subscribers.
+        /// Tests that grain call filters are properly invoked for streaming scenarios.
+        /// When a grain receives stream events, the incoming filters should still execute,
+        /// allowing for stream event manipulation or monitoring.
         /// </summary>
         [Fact]
         public async Task GrainCallFilter_Incoming_Stream_Test()
@@ -295,7 +338,9 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// Tests that an incoming call filter can retry calls.
+        /// Demonstrates retry logic in incoming filters.
+        /// The filter modifies the failing argument value to make the call succeed.
+        /// Shows how filters can implement resilience patterns.
         /// </summary>
         [Fact]
         public async Task GrainCallFilter_Incoming_Retry_Test()
@@ -335,7 +380,12 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// Tests filters on just the grain level.
+        /// Tests grain-specific filters.
+        /// These filters only execute for specific grain types, not system-wide.
+        /// Demonstrates:
+        /// - Method interception with custom logic
+        /// - Selective filtering (some methods not intercepted)
+        /// - Access to implementation method info
         /// </summary>
         [Fact]
         public async Task GrainCallFilter_Incoming_GrainLevel_Test()
@@ -355,7 +405,9 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// Tests filters on generic grains.
+        /// Verifies that grain call filters work correctly with generic grain types.
+        /// Generic grains pose special challenges for reflection-based systems,
+        /// so this ensures filters can properly intercept calls to generic grain methods.
         /// </summary>
         [Fact]
         public async Task GrainCallFilter_Incoming_GenericGrain_Test()
@@ -392,7 +444,12 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// Tests that grain call filters can handle exceptions.
+        /// Demonstrates exception handling in grain call filters.
+        /// Filters can catch exceptions from grain methods and:
+        /// - Transform them into different responses
+        /// - Log and rethrow
+        /// - Convert to domain-specific exceptions
+        /// This test shows converting an exception into a success response.
         /// </summary>
         [Fact]
         public async Task GrainCallFilter_Incoming_ExceptionHandling_Test()
@@ -434,7 +491,10 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// Tests that grain call filters work as expected on grain extensions.
+        /// Tests that grain call filters properly intercept calls to grain extensions.
+        /// Grain extensions are a way to add additional interfaces to existing grains.
+        /// This verifies that filters work correctly even when methods are called
+        /// through extension interfaces rather than the primary grain interface.
         /// </summary>
         [Fact]
         public async Task GrainCallFilter_GrainExtension()
@@ -451,8 +511,12 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// Tests that <see cref="IIncomingGrainCallContext.ImplementationMethod"/> and <see cref="IGrainCallContext.InterfaceMethod"/> are non-null
-        /// for a call made to a grain and that they match the correct methods.
+        /// Verifies correct method resolution when grains implement generic interfaces.
+        /// Tests complex inheritance scenarios where:
+        /// - A grain implements multiple generic interfaces
+        /// - Methods have the same name across interfaces
+        /// - The filter must correctly identify which interface method was called
+        /// This is critical for filters that need to apply interface-specific logic.
         /// </summary>
         [Fact]
         public async Task GrainCallFilter_Incoming_GenericInterface_ConcreteGrain_Test()

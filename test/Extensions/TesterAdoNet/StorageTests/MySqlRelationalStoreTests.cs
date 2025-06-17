@@ -6,6 +6,9 @@ using Xunit;
 
 namespace UnitTests.StorageTests.AdoNet
 {
+    /// <summary>
+    /// Tests for MySQL relational storage functionality.
+    /// </summary>
     [TestCategory("Persistence"), TestCategory("MySql")]
     public class MySqlRelationalStoreTests : RelationalStoreTestsBase, IClassFixture<MySqlRelationalStoreTests.Fixture>
     {

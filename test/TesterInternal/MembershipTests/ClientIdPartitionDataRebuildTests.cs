@@ -10,6 +10,9 @@ using Xunit.Abstractions;
 
 namespace UnitTests.MembershipTests
 {
+    /// <summary>
+    /// Tests for client directory partition reconstruction after silo failures.
+    /// </summary>
     public class ClientIdPartitionDataRebuildTests : IDisposable
     {
         internal class Observer : ISimpleGrainObserver

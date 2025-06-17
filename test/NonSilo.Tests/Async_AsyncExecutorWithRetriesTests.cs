@@ -9,7 +9,9 @@ using Xunit.Abstractions;
 namespace NonSilo.Tests
 {
     /// <summary>
-    /// Summary description for UnitTest1
+    /// Tests for the AsyncExecutorWithRetries utility class, which provides resilient asynchronous execution with retry logic.
+    /// This class tests Orleans' internal retry mechanism for handling transient failures in asynchronous operations.
+    /// The AsyncExecutorWithRetries is used throughout Orleans for reliable execution of operations that may fail temporarily.
     /// </summary>
     public class Async_AsyncExecutorWithRetriesTests
     {
@@ -20,6 +22,10 @@ namespace NonSilo.Tests
             this.output = output;
         }
 
+        /// <summary>
+        /// Tests that AsyncExecutorWithRetries retries a failing function until it succeeds, 
+        /// and verifies that it fails when max retries are exceeded.
+        /// </summary>
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public async Task Async_AsyncExecutorWithRetriesTest_1()
         {
@@ -58,6 +64,10 @@ namespace NonSilo.Tests
             Assert.Fail("Should have thrown");
         }
 
+        /// <summary>
+        /// Tests the success filter functionality, where retries continue until a success condition is met.
+        /// Verifies that execution stops when the success filter returns true.
+        /// </summary>
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public async Task Async_AsyncExecutorWithRetriesTest_2()
         {
@@ -91,6 +101,10 @@ namespace NonSilo.Tests
             Assert.Equal(counter, value); // "Counter == Returned value"
         }
 
+        /// <summary>
+        /// Tests successful execution without any errors, verifying that the error filter is not invoked
+        /// when the function succeeds on the first attempt.
+        /// </summary>
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public async Task Async_AsyncExecutorWithRetriesTest_4()
         {
@@ -124,6 +138,10 @@ namespace NonSilo.Tests
             Assert.Equal(1, counter);
         }
 
+        /// <summary>
+        /// Tests error filter behavior when it returns true (retry), false (stop), or throws an exception.
+        /// Verifies that the executor respects the error filter's decision on whether to continue retrying.
+        /// </summary>
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public async Task Async_AsyncExecutorWithRetriesTest_5()
         {
