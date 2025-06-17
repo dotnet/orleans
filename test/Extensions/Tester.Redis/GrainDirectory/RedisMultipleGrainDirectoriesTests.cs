@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.GrainDirectory.Redis;
 using Orleans.TestingHost;
 using StackExchange.Redis;
@@ -31,6 +32,14 @@ namespace Tester.Redis.GrainDirectory
                             options.EntryExpiry = TimeSpan.FromMinutes(5);
                         })
                     .ConfigureLogging(builder => builder.AddFilter(typeof(RedisGrainDirectory).FullName, LogLevel.Debug));
+
+                siloBuilder.Configure<GrainCollectionOptions>(options =>
+                {
+                    options.MemoryPressureGrainCollectionOptions = new MemoryPressureGrainCollectionOptions
+                    {
+                        MemoryUsageCollectionEnabled = false
+                    };
+                });
             }
         }
 

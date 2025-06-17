@@ -23,6 +23,13 @@ namespace TestVersionGrains
                     options.DefaultCompatibilityStrategy = cfg["CompatibilityStrategy"];
                     options.DefaultVersionSelectorStrategy = cfg["VersionSelectorStrategy"];
                 });
+                siloBuilder.Configure<GrainCollectionOptions>(options =>
+                {
+                    options.MemoryPressureGrainCollectionOptions = new MemoryPressureGrainCollectionOptions
+                    {
+                        MemoryUsageCollectionEnabled = false,
+                    };
+                });
 
                 siloBuilder.ConfigureServices(ConfigureServices)
                     .AddMemoryGrainStorageAsDefault();
