@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Configuration;
-using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.TestingHost;
 
@@ -38,14 +37,6 @@ namespace Tester.StreamingTests
                             options.DataMinTimeInCache = DataMinTimeInCache;
                         }));
                     });
-
-                hostBuilder.Configure<GrainCollectionOptions>(options =>
-                {
-                    options.MemoryPressureGrainCollectionOptions = new()
-                    {
-                        MemoryUsageCollectionEnabled = false
-                    };
-                });
             }
         }
 
