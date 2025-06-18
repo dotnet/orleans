@@ -594,7 +594,7 @@ namespace Orleans.Runtime
             await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
             var cancellationToken = _shutdownCts.Token;
 
-            int lastGen2GcCount = -1;
+            int lastGen2GcCount = 0;
             int activationLimit = int.MaxValue;
             int newTargetActivationLimit = int.MaxValue;
 
@@ -603,6 +603,11 @@ namespace Orleans.Runtime
                 try
                 {
                     var currentGen2GcCount = GC.CollectionCount(2);
+                    if (currentGen2GcCount < 0)
+                    {
+                        // no gen2 GC happened yet - we don't expect high memory pressure until gen2 GC happens
+                        continue;
+                    }
 
                     // only when memory is overloaded and we know gen2 gc was not invoked recently (GC.CollectionCount(2) returns a higher revision than remembered)
                     if (currentGen2GcCount > lastGen2GcCount && IsMemoryOverloaded(out newTargetActivationLimit))
