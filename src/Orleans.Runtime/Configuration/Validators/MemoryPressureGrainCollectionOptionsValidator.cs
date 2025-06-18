@@ -10,16 +10,16 @@ namespace Orleans.Configuration;
 
 internal class MemoryPressureGrainCollectionOptionsValidator : IConfigurationValidator
 {
-    private readonly IOptions<GrainCollectionOptions> grainCollectionOptions;
+    private readonly IOptions<MemoryPressureGrainCollectionOptions> _memoryPressureGrainCollectionOptions;
 
-    public MemoryPressureGrainCollectionOptionsValidator(IOptions<GrainCollectionOptions> options)
+    public MemoryPressureGrainCollectionOptionsValidator(IOptions<MemoryPressureGrainCollectionOptions> options)
     {
-        this.grainCollectionOptions = options;
+        _memoryPressureGrainCollectionOptions = options;
     }
 
     public void ValidateConfiguration()
     {
-        var options = grainCollectionOptions.Value.MemoryPressureGrainCollectionOptions;
+        var options = _memoryPressureGrainCollectionOptions.Value;
         if (!options.MemoryUsageCollectionEnabled)
         {
             return;

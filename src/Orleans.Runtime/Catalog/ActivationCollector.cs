@@ -46,6 +46,7 @@ namespace Orleans.Runtime
         public ActivationCollector(
             TimeProvider timeProvider,
             IOptions<GrainCollectionOptions> options,
+            IOptions<MemoryPressureGrainCollectionOptions> memoryPressureGrainCollectionOptions,
             ILogger<ActivationCollector> logger,
             IEnvironmentStatisticsProvider environmentStatisticsProvider)
         {
@@ -57,8 +58,8 @@ namespace Orleans.Runtime
 
             _environmentStatisticsProvider = environmentStatisticsProvider;
 
-            _memoryPressureGrainCollectionOptions = options.Value.MemoryPressureGrainCollectionOptions;
-            if (_memoryPressureGrainCollectionOptions.IsMemoryUsageCollectionEnabled())
+            _memoryPressureGrainCollectionOptions = memoryPressureGrainCollectionOptions.Value;
+            if (_memoryPressureGrainCollectionOptions.MemoryUsageCollectionEnabled)
             {
                 _memBasedDeactivationTimer = new PeriodicTimer(_memoryPressureGrainCollectionOptions.MemoryUsagePollingPeriod);
             }
@@ -354,6 +355,16 @@ namespace Orleans.Runtime
                 targetActivationLimit = 0;
             }
 
+            LogCurrentMemoryStats(
+                maxAvailableMemoryMb: (double)stats.MaximumAvailableMemoryBytes / 1024 / 1024,
+                rawAvailableMemoryMb: (double)stats.RawAvailableMemoryBytes / 1024 / 1024,
+                usedMemoryMb: (double)usedMemory / 1024 / 1024,
+                activationCount: activationCount,
+                activationSize: activationSize,
+                threshold: threshold,
+                currentMemoryLoad: memoryLoadPercentage
+            );
+
             return true;
         }
 
@@ -523,7 +534,7 @@ namespace Orleans.Runtime
             using var _ = new ExecutionContextSuppressor();
             _collectionLoopTask = RunActivationCollectionLoop();
 
-            if (_memoryPressureGrainCollectionOptions.IsMemoryUsageCollectionEnabled())
+            if (_memoryPressureGrainCollectionOptions.MemoryUsageCollectionEnabled)
             {
                 _memBasedDeactivationLoopTask = RunMemoryBasedDeactivationLoop();
             }
@@ -725,9 +736,9 @@ namespace Orleans.Runtime
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = "High memory pressure: forced deactivations and waiting for GC2 (count={Gc2Count}) collection"
+            Message = "[Memory Stats] maxAvailableMemoryMb={maxAvailableMemoryMb}, rawAvailableMemoryMb={rawAvailableMemoryMb}, usedMemoryMb={usedMemoryMb}, activationCount={activationCount}, activationSize={activationSize}, thresholdMemoryLoad={threshold}, currentMemoryLoad={currentMemoryLoad}"
         )]
-        private partial void LogWaitingForGC2Run(int gc2Count);
+        private partial void LogCurrentMemoryStats(double maxAvailableMemoryMb, double rawAvailableMemoryMb, double usedMemoryMb, int activationCount, double activationSize, double threshold, double currentMemoryLoad);
 
         [LoggerMessage(
             Level = LogLevel.Error,

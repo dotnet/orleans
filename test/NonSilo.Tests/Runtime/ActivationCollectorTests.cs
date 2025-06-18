@@ -22,10 +22,11 @@ namespace UnitTests.Runtime
         public ActivationCollectorTests()
         {
             var grainCollectionOptions = Options.Create(new GrainCollectionOptions());
+            var memoryPressureGrainCollectionOptions = Options.Create(new MemoryPressureGrainCollectionOptions());
             var logger = NullLogger<ActivationCollector>.Instance;
 
             this.timeProvider = new FakeTimeProvider(DateTimeOffset.Parse("2025-01-01T00:00:00.000+00:00"));
-            this.collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, new EnvironmentStatisticsProvider());
+            this.collector = new ActivationCollector(timeProvider, grainCollectionOptions, memoryPressureGrainCollectionOptions, logger, new EnvironmentStatisticsProvider());
         }
 
         [Theory, TestCategory("Activation")]
@@ -79,14 +80,12 @@ namespace UnitTests.Runtime
             bool expectedOverloaded,
             int expectedActivationsTarget)
         {
-            var options = new GrainCollectionOptions
+            var grainCollectionOptions = Options.Create(new GrainCollectionOptions());
+            var memoryPressureGrainCollectionOptions = Options.Create(new MemoryPressureGrainCollectionOptions
             {
-                MemoryPressureGrainCollectionOptions = new MemoryPressureGrainCollectionOptions
-                {
-                    MemoryUsageLimitPercentage = memoryLoadThreshold,
-                    MemoryUsageTargetPercentage = targetMemoryLoad
-                }
-            };
+                MemoryUsageLimitPercentage = memoryLoadThreshold,
+                MemoryUsageTargetPercentage = targetMemoryLoad
+            });
 
             var statsProvider = Substitute.For<IEnvironmentStatisticsProvider>();
             statsProvider.GetEnvironmentStatistics().Returns(
@@ -106,7 +105,8 @@ namespace UnitTests.Runtime
 
             var collector = new ActivationCollector(
                 timeProvider,
-                Options.Create(options),
+                grainCollectionOptions,
+                memoryPressureGrainCollectionOptions,
                 logger,
                 statsProvider
             );
@@ -121,15 +121,14 @@ namespace UnitTests.Runtime
         [Fact]
         public async Task DeactivateInDueTimeOrder_OnlyOldestAndEligibleAreDeactivated()
         {
-            var options = Options.Create(new GrainCollectionOptions
-            {
-                MemoryPressureGrainCollectionOptions = new MemoryPressureGrainCollectionOptions()
-            });
+            var grainCollectionOptions = Options.Create(new GrainCollectionOptions());
+            var memoryPressureGrainCollectionOptions = Options.Create(new MemoryPressureGrainCollectionOptions());
+
             var logger = NullLogger<ActivationCollector>.Instance;
             var statsProvider = Substitute.For<IEnvironmentStatisticsProvider>();
             var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
 
-            var collector = new ActivationCollector(timeProvider, options, logger, statsProvider);
+            var collector = new ActivationCollector(timeProvider, grainCollectionOptions, memoryPressureGrainCollectionOptions, logger, statsProvider);
             var timer = Substitute.For<IAsyncTimer>();
             timer.NextTick().Returns(Task.FromResult(false));
             var timerFactory = Substitute.For<IAsyncTimerFactory>();
