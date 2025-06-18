@@ -355,7 +355,7 @@ namespace Orleans.Runtime
                 targetActivationLimit = 0;
             }
 
-            LogCurrentMemoryStats(
+            LogCurrentHighMemoryPressureStats(
                 maxAvailableMemoryMb: (double)stats.MaximumAvailableMemoryBytes / 1024 / 1024,
                 rawAvailableMemoryMb: (double)stats.RawAvailableMemoryBytes / 1024 / 1024,
                 usedMemoryMb: (double)usedMemory / 1024 / 1024,
@@ -736,9 +736,9 @@ namespace Orleans.Runtime
 
         [LoggerMessage(
             Level = LogLevel.Debug,
-            Message = "[Memory Stats] maxAvailableMemoryMb={maxAvailableMemoryMb}, rawAvailableMemoryMb={rawAvailableMemoryMb}, usedMemoryMb={usedMemoryMb}, activationCount={activationCount}, activationSize={activationSize}, thresholdMemoryLoad={threshold}, currentMemoryLoad={currentMemoryLoad}"
+            Message = "[High Memory Pressure Stats] maxAvailableMemoryMb={maxAvailableMemoryMb}, rawAvailableMemoryMb={rawAvailableMemoryMb}, usedMemoryMb={usedMemoryMb}, activationCount={activationCount}, activationSize={activationSize}, thresholdMemoryLoad={threshold}, currentMemoryLoad={currentMemoryLoad}"
         )]
-        private partial void LogCurrentMemoryStats(double maxAvailableMemoryMb, double rawAvailableMemoryMb, double usedMemoryMb, int activationCount, double activationSize, double threshold, double currentMemoryLoad);
+        private partial void LogCurrentHighMemoryPressureStats(double maxAvailableMemoryMb, double rawAvailableMemoryMb, double usedMemoryMb, int activationCount, double activationSize, double threshold, double currentMemoryLoad);
 
         [LoggerMessage(
             Level = LogLevel.Error,
