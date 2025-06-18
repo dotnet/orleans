@@ -53,13 +53,10 @@ namespace Tester.StreamingTests
             /// </summary>
             private class MySiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloBuilder hostBuilder) =>
-                    hostBuilder
-                        .AddMemoryGrainStorage("PubSubStore")
+                public void Configure(ISiloBuilder hostBuilder)=> hostBuilder.AddMemoryGrainStorage("PubSubStore")
                         .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>b
-                        .ConfigurePartitioning(partitionCount))
-                        .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5))
-                        .Configure<GrainCollectionOptions>(options => options.MemoryPressureGrainCollectionOptions = new() { MemoryUsageCollectionEnabled = false });
+                    .ConfigurePartitioning(partitionCount))
+                    .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
             }
         }
 

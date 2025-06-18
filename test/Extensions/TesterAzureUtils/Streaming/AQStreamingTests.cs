@@ -84,11 +84,7 @@ namespace Tester.AzureUtils.Streaming
                                 options.ConfigureTestDefaults();
                                 options.DeleteStateOnClear = true;
                             }))
-                        .AddMemoryGrainStorage("MemoryStore")
-                        .Configure<GrainCollectionOptions>(options =>
-                        {
-                            options.MemoryPressureGrainCollectionOptions = new() { MemoryUsageCollectionEnabled = false };
-                        });
+                        .AddMemoryGrainStorage("MemoryStore");
                 });
                 builder.ConfigureClient(clientBuilder =>
                 {
