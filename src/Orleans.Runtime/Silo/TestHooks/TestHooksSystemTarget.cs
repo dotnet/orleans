@@ -104,7 +104,7 @@ namespace Orleans.Runtime.TestHooks
             var previousStats = environmentStatistics.GetEnvironmentStatistics();
 
             environmentStatistics.SetHardwareStatistics(
-                new(cpuUsage, previousStats.MemoryUsageBytes, previousStats.AvailableMemoryBytes, previousStats.MaximumAvailableMemoryBytes));
+                new(cpuUsage, cpuUsage, previousStats.MemoryUsageBytes, previousStats.MemoryUsageBytes, previousStats.AvailableMemoryBytes, previousStats.AvailableMemoryBytes, previousStats.MaximumAvailableMemoryBytes));
 
             Task.Delay(latchPeriod).ContinueWith(t =>
                 {
@@ -114,7 +114,7 @@ namespace Orleans.Runtime.TestHooks
                     if (currentStats.CpuUsagePercentage == cpuUsage)
                     {
                         environmentStatistics.SetHardwareStatistics(
-                            new(previousStats.CpuUsagePercentage, currentStats.MemoryUsageBytes, currentStats.AvailableMemoryBytes, currentStats.MaximumAvailableMemoryBytes));
+                            new(previousStats.CpuUsagePercentage, previousStats.CpuUsagePercentage, currentStats.MemoryUsageBytes, currentStats.MemoryUsageBytes, currentStats.AvailableMemoryBytes, currentStats.AvailableMemoryBytes, currentStats.MaximumAvailableMemoryBytes));
                     }
                 }).Ignore();
         }

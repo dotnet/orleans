@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.Internal;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
@@ -23,10 +24,18 @@ namespace Orleans.Runtime
         private DateTime nextTicket;
         private static readonly List<ICollectibleGrainContext> nothing = new(0);
         private readonly ILogger logger;
+        private int collectionNumber;
+
+        // internal for testing
+        internal int _activationCount;
+
         private readonly PeriodicTimer _collectionTimer;
         private Task _collectionLoopTask;
-        private int collectionNumber;
-        private int _activationCount;
+
+        private readonly IEnvironmentStatisticsProvider _environmentStatisticsProvider;
+        private readonly MemoryPressureGrainCollectionOptions _memoryPressureGrainCollectionOptions;
+        private readonly PeriodicTimer _memBasedDeactivationTimer;
+        private Task _memBasedDeactivationLoopTask;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ActivationCollector"/> class.
@@ -37,13 +46,22 @@ namespace Orleans.Runtime
         public ActivationCollector(
             TimeProvider timeProvider,
             IOptions<GrainCollectionOptions> options,
-            ILogger<ActivationCollector> logger)
+            ILogger<ActivationCollector> logger,
+            IEnvironmentStatisticsProvider environmentStatisticsProvider)
         {
             quantum = options.Value.CollectionQuantum;
             shortestAgeLimit = new(options.Value.ClassSpecificCollectionAge.Values.Aggregate(options.Value.CollectionAge.Ticks, (a, v) => Math.Min(a, v.Ticks)));
             nextTicket = MakeTicketFromDateTime(timeProvider.GetUtcNow().UtcDateTime);
             this.logger = logger;
             _collectionTimer = new PeriodicTimer(quantum);
+
+            _environmentStatisticsProvider = environmentStatisticsProvider;
+
+            _memoryPressureGrainCollectionOptions = options.Value.MemoryPressureGrainCollectionOptions;
+            if (_memoryPressureGrainCollectionOptions.IsMemoryUsageCollectionEnabled())
+            {
+                _memBasedDeactivationTimer = new PeriodicTimer(_memoryPressureGrainCollectionOptions.MemoryUsagePollingPeriod);
+            }
         }
 
         // Return the number of activations that were used (touched) in the last recencyPeriod.
@@ -110,6 +128,7 @@ namespace Orleans.Runtime
         /// <returns><see langword="true"/> if collection was canceled, <see langword="false"/> otherwise.</returns>
         public bool TryCancelCollection(ICollectibleGrainContext item)
         {
+            if (item is null) return false;
             if (item.IsExemptFromCollection) return false;
 
             lock (item)
@@ -302,6 +321,101 @@ namespace Orleans.Runtime
             return condemned ?? nothing;
         }
 
+        /// <summary>
+        /// Checks if current memory usage is above the configured threshold for deactivation.
+        /// Also calculates the target number of activations to keep active if memory is overloaded to reach target memory usage.
+        /// </summary>
+        /// <remarks>internal for testing</remarks>
+        /// <param name="targetActivationLimit">number of activations to keep active to bring back memory consumption to target value</param>
+        internal bool IsMemoryOverloaded(out int targetActivationLimit)
+        {
+            targetActivationLimit = 0;
+            var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
+
+            // filtering harms here: we need raw and precise statistics to calculate memory usage correctly
+            var usedMemory = stats.MaximumAvailableMemoryBytes - stats.RawAvailableMemoryBytes;
+            var activationCount = _activationCount > 0 ? _activationCount : 1;
+            var activationSize = usedMemory / (double)activationCount;
+
+            var options = _memoryPressureGrainCollectionOptions;
+
+            var threshold = options.MemoryUsageLimitPercentage;
+            var targetThreshold = options.MemoryUsageTargetPercentage;
+            var memoryLoadPercentage = 100.0 * usedMemory / stats.MaximumAvailableMemoryBytes;
+            if (memoryLoadPercentage < threshold)
+            {
+                return false;
+            }
+
+            var targetUsedMemory = targetThreshold * stats.MaximumAvailableMemoryBytes / 100.0;
+            targetActivationLimit = (int)Math.Floor(targetUsedMemory / activationSize);
+            if (targetActivationLimit < 0)
+            {
+                targetActivationLimit = 0;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Deactivates <param name="count" /> activations in due time order
+        /// <remarks>internal for testing</remarks>
+        /// </summary>
+        internal async Task DeactivateInDueTimeOrder(int count, CancellationToken cancellationToken)
+        {
+            LogHighMemoryPressureDeactivationStarted(count);
+
+            var watch = ValueStopwatch.StartNew();
+            var number = Interlocked.Increment(ref collectionNumber);
+            long memBefore = GC.GetTotalMemory(false) / (1024 * 1024); // MB
+            LogBeforeCollection(number, memBefore, _activationCount, this);
+
+            var candidates = new List<ICollectibleGrainContext>(count);
+
+            foreach (var bucket in buckets.OrderBy(b => b.Key))
+            {
+                foreach (var item in bucket.Value.Items)
+                {
+                    if (candidates.Count >= count)
+                    {
+                        break;
+                    }
+
+                    var activation = item.Value;
+                    lock (activation)
+                    {
+                        if (!activation.IsValid || !activation.IsInactive)
+                        {
+                            continue;
+                        }
+                    }
+
+                    candidates.Add(activation);
+                }
+
+                if (candidates.Count >= count)
+                {
+                    break;
+                }
+            }
+
+            CatalogInstruments.ActivationCollections.Add(1);
+            if (candidates.Count > 0) 
+            {
+                LogCollectActivations(new(candidates));
+
+                var reason = new DeactivationReason(
+                    DeactivationReasonCode.HighMemoryPressure,
+                    $"Process memory utilization exceeded the configured limit of '{_memoryPressureGrainCollectionOptions.MemoryUsageLimitPercentage}'. Detected memory usage is {memBefore} MB.");
+
+                await DeactivateActivationsFromCollector(candidates, cancellationToken, reason);
+            }
+
+            long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
+            watch.Stop();
+            LogAfterCollection(number, memAfter, _activationCount, candidates.Count, this, watch.Elapsed);
+        }
+
         private static DeactivationReason GetDeactivationReason()
         {
             var reasonText = "This activation has become idle.";
@@ -400,16 +514,20 @@ namespace Orleans.Runtime
 
         void IActivationWorkingSetObserver.OnDeactivated(IActivationWorkingSetMember member)
         {
-            if (member is ICollectibleGrainContext activation && TryCancelCollection(activation))
-            {
-                Interlocked.Decrement(ref _activationCount);
-            }
+            Interlocked.Decrement(ref _activationCount);
+            _ = TryCancelCollection(member as ICollectibleGrainContext);
         }
 
         private Task Start(CancellationToken cancellationToken)
         {
             using var _ = new ExecutionContextSuppressor();
             _collectionLoopTask = RunActivationCollectionLoop();
+
+            if (_memoryPressureGrainCollectionOptions.IsMemoryUsageCollectionEnabled())
+            {
+                _memBasedDeactivationLoopTask = RunMemoryBasedDeactivationLoop();
+            }
+
             return Task.CompletedTask;
         }
 
@@ -417,10 +535,16 @@ namespace Orleans.Runtime
         {
             using var registration = cancellationToken.Register(() => _shutdownCts.Cancel());
             _collectionTimer.Dispose();
+            _memBasedDeactivationTimer?.Dispose();
 
             if (_collectionLoopTask is Task task)
             {
                 await task.WaitAsync(cancellationToken);
+            }
+
+            if (_memBasedDeactivationLoopTask is Task deactivationLoopTask)
+            {
+                await deactivationLoopTask.WaitAsync(cancellationToken);
             }
         }
 
@@ -442,6 +566,47 @@ namespace Orleans.Runtime
                 try
                 {
                     await this.CollectActivationsImpl(true, ageLimit: default, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // most probably shutdown
+                }
+                catch (Exception exception)
+                {
+                    LogErrorWhileCollectingActivations(exception);
+                }
+            }
+        }
+
+        private async Task RunMemoryBasedDeactivationLoop()
+        {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+            var cancellationToken = _shutdownCts.Token;
+
+            int lastGen2GcCount = -1;
+            int activationLimit = int.MaxValue;
+            int newTargetActivationLimit = int.MaxValue;
+
+            while (await _memBasedDeactivationTimer.WaitForNextTickAsync())
+            {
+                try
+                {
+                    var currentGen2GcCount = GC.CollectionCount(2);
+
+                    // only when memory is overloaded and we know gen2 gc was not invoked recently (GC.CollectionCount(2) returns a higher revision than remembered)
+                    if (currentGen2GcCount > lastGen2GcCount && IsMemoryOverloaded(out newTargetActivationLimit))
+                    {
+                        // recalculate the surplus activations based on the new target activation limit
+                        var surplusActivations = Math.Max(0, _activationCount - newTargetActivationLimit);
+
+                        activationLimit = newTargetActivationLimit;
+                        lastGen2GcCount = currentGen2GcCount;
+                        await DeactivateInDueTimeOrder(surplusActivations, cancellationToken);
+                    }
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // most probably shutdown
                 }
                 catch (Exception exception)
                 {
@@ -472,12 +637,12 @@ namespace Orleans.Runtime
             LogAfterCollection(number, memAfter, _activationCount, list?.Count ?? 0, this, watch.Elapsed);
         }
 
-        private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list, CancellationToken cancellationToken)
+        private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list, CancellationToken cancellationToken, DeactivationReason? deactivationReason = null)
         {
             LogDeactivateActivationsFromCollector(list.Count);
             CatalogInstruments.ActivationShutdownViaCollection();
 
-            var reason = GetDeactivationReason();
+            deactivationReason ??= GetDeactivationReason();
 
             var options = new ParallelOptions
             {
@@ -489,7 +654,7 @@ namespace Orleans.Runtime
             await Parallel.ForEachAsync(list, options, async (activationData, token) =>
             {
                 // Continue deactivation when ready.
-                activationData.Deactivate(reason, cancellationToken);
+                activationData.Deactivate(deactivationReason.Value, cancellationToken);
                 await activationData.Deactivated.ConfigureAwait(false);
             }).WaitAsync(cancellationToken);
         }
@@ -551,6 +716,18 @@ namespace Orleans.Runtime
                 return result ?? nothing;
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "High memory pressure detected. Starting {count} deactivations."
+        )]
+        private partial void LogHighMemoryPressureDeactivationStarted(int count);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "High memory pressure: forced deactivations and waiting for GC2 (count={Gc2Count}) collection"
+        )]
+        private partial void LogWaitingForGC2Run(int gc2Count);
 
         [LoggerMessage(
             Level = LogLevel.Error,
