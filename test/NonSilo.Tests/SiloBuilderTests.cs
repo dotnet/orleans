@@ -238,7 +238,18 @@ namespace NonSilo.Tests
 
         private class FakeEnvironmentStatisticsProvider : IEnvironmentStatisticsProvider
         {
-            public EnvironmentStatistics GetEnvironmentStatistics() => new();
+            private static EnvironmentStatisticsProvider _realStatisticsProvider = new();
+
+            public EnvironmentStatistics GetEnvironmentStatistics()
+            {
+                EnvironmentStatistics stats = new();
+                if (!stats.IsValid())
+                {
+                    stats = _realStatisticsProvider.GetEnvironmentStatistics();
+                }
+
+                return stats;
+            }
         }
 
         private class MyService
