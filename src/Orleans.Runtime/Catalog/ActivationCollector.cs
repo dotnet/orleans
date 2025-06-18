@@ -603,7 +603,7 @@ namespace Orleans.Runtime
                 try
                 {
                     var currentGen2GcCount = GC.CollectionCount(2);
-                    if (currentGen2GcCount < 0)
+                    if (currentGen2GcCount <= 0)
                     {
                         // no gen2 GC happened yet - we don't expect high memory pressure until gen2 GC happens
                         continue;
