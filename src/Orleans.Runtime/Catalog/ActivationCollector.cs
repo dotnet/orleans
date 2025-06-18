@@ -735,7 +735,7 @@ namespace Orleans.Runtime
         private partial void LogHighMemoryPressureDeactivationStarted(int count);
 
         [LoggerMessage(
-            Level = LogLevel.Debug,
+            Level = LogLevel.Information,
             Message = "[High Memory Pressure Stats] maxAvailableMemoryMb={maxAvailableMemoryMb}, rawAvailableMemoryMb={rawAvailableMemoryMb}, usedMemoryMb={usedMemoryMb}, activationCount={activationCount}, activationSize={activationSize}, thresholdMemoryLoad={threshold}, currentMemoryLoad={currentMemoryLoad}"
         )]
         private partial void LogCurrentHighMemoryPressureStats(double maxAvailableMemoryMb, double rawAvailableMemoryMb, double usedMemoryMb, int activationCount, double activationSize, double threshold, double currentMemoryLoad);
