@@ -1,6 +1,5 @@
 using MySql.Data.MySqlClient;
 using Npgsql;
-using Orleans.Configuration;
 using Orleans.TestingHost;
 using Orleans.Tests.SqlUtils;
 using Tester.Directories;
@@ -73,14 +72,6 @@ public abstract class AdoNetGrainDirectoryClusterTests : MultipleGrainDirectorie
     {
         public void Configure(ISiloBuilder siloBuilder)
         {
-            siloBuilder.Configure<GrainCollectionOptions>(options =>
-            {
-                options.MemoryPressureGrainCollectionOptions = new MemoryPressureGrainCollectionOptions
-                {
-                    MemoryUsageCollectionEnabled = false
-                };
-            });
-
             siloBuilder.AddAdoNetGrainDirectory(CustomDirectoryGrain.DIRECTORY, options =>
             {
                 options.Invariant = _invariant;
