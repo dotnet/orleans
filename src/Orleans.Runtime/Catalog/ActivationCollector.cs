@@ -56,8 +56,9 @@ namespace Orleans.Runtime
             _collectionTimer = new PeriodicTimer(quantum);
 
             _environmentStatisticsProvider = environmentStatisticsProvider;
+
             _memoryPressureGrainCollectionOptions = options.Value.MemoryPressureGrainCollectionOptions;
-            if (_memoryPressureGrainCollectionOptions.MemoryUsageCollectionEnabled)
+            if (_memoryPressureGrainCollectionOptions.IsMemoryUsageCollectionEnabled())
             {
                 _memBasedDeactivationTimer = new PeriodicTimer(_memoryPressureGrainCollectionOptions.MemoryUsagePollingPeriod);
             }
@@ -522,7 +523,7 @@ namespace Orleans.Runtime
             using var _ = new ExecutionContextSuppressor();
             _collectionLoopTask = RunActivationCollectionLoop();
 
-            if (_memoryPressureGrainCollectionOptions.MemoryUsageCollectionEnabled)
+            if (_memoryPressureGrainCollectionOptions.IsMemoryUsageCollectionEnabled())
             {
                 _memBasedDeactivationLoopTask = RunMemoryBasedDeactivationLoop();
             }
