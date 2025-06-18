@@ -22,11 +22,10 @@ namespace UnitTests.Runtime
         public ActivationCollectorTests()
         {
             var grainCollectionOptions = Options.Create(new GrainCollectionOptions());
-            var memoryPressureGrainCollectionOptions = Options.Create(new MemoryPressureGrainCollectionOptions());
             var logger = NullLogger<ActivationCollector>.Instance;
 
             this.timeProvider = new FakeTimeProvider(DateTimeOffset.Parse("2025-01-01T00:00:00.000+00:00"));
-            this.collector = new ActivationCollector(timeProvider, grainCollectionOptions, memoryPressureGrainCollectionOptions, logger, new EnvironmentStatisticsProvider());
+            this.collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, new EnvironmentStatisticsProvider());
         }
 
         [Theory, TestCategory("Activation")]
@@ -80,13 +79,12 @@ namespace UnitTests.Runtime
             bool expectedOverloaded,
             int expectedActivationsTarget)
         {
-            var grainCollectionOptions = Options.Create(new GrainCollectionOptions());
-            var memoryPressureGrainCollectionOptions = Options.Create(new MemoryPressureGrainCollectionOptions
+            var grainCollectionOptions = Options.Create(new GrainCollectionOptions
             {
                 MemoryUsageLimitPercentage = memoryLoadThreshold,
                 MemoryUsageTargetPercentage = targetMemoryLoad
             });
-
+            
             var statsProvider = Substitute.For<IEnvironmentStatisticsProvider>();
             statsProvider.GetEnvironmentStatistics().Returns(
                 new EnvironmentStatistics(
@@ -106,13 +104,12 @@ namespace UnitTests.Runtime
             var collector = new ActivationCollector(
                 timeProvider,
                 grainCollectionOptions,
-                memoryPressureGrainCollectionOptions,
                 logger,
                 statsProvider
             );
 
             collector._activationCount = activationCount;
-            var overloaded = collector.IsMemoryOverloaded(out var activationsTarget);
+            var overloaded = collector.IsMemoryOverloaded(GC.CollectionCount(2), out var activationsTarget);
 
             Assert.Equal(expectedOverloaded, overloaded);
             Assert.Equal(expectedActivationsTarget, activationsTarget);
@@ -122,13 +119,12 @@ namespace UnitTests.Runtime
         public async Task DeactivateInDueTimeOrder_OnlyOldestAndEligibleAreDeactivated()
         {
             var grainCollectionOptions = Options.Create(new GrainCollectionOptions());
-            var memoryPressureGrainCollectionOptions = Options.Create(new MemoryPressureGrainCollectionOptions());
 
             var logger = NullLogger<ActivationCollector>.Instance;
             var statsProvider = Substitute.For<IEnvironmentStatisticsProvider>();
             var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
 
-            var collector = new ActivationCollector(timeProvider, grainCollectionOptions, memoryPressureGrainCollectionOptions, logger, statsProvider);
+            var collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, statsProvider);
             var timer = Substitute.For<IAsyncTimer>();
             timer.NextTick().Returns(Task.FromResult(false));
             var timerFactory = Substitute.For<IAsyncTimerFactory>();

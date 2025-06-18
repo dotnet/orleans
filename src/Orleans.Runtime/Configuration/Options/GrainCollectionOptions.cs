@@ -48,13 +48,7 @@ namespace Orleans.Configuration
         /// The default value for <see cref="DeactivationTimeout"/>.
         /// </summary>
         public static readonly TimeSpan DEFAULT_DEACTIVATION_TIMEOUT = TimeSpan.FromSeconds(30);
-    }
 
-    /// <summary>
-    /// Options for grain collection based on memory pressure.
-    /// </summary>
-    public sealed class MemoryPressureGrainCollectionOptions
-    {
         /// <summary>
         /// Indicates if memory-based grain collection is enabled.
         /// Is enabled by default.
