@@ -332,13 +332,13 @@ namespace Orleans.Runtime
             var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
 
             // filtering harms here: we need raw and precise statistics to calculate memory usage correctly
-            var usedMemory = stats.MaximumAvailableMemoryBytes - stats.RawAvailableMemoryBytes;
+            var usedMemory = stats.RawMemoryUsageBytes;
             var activationCount = _activationCount > 0 ? _activationCount : 1;
             var activationSize = usedMemory / (double)activationCount;
 
             var threshold = _grainCollectionOptions.MemoryUsageLimitPercentage;
             var targetThreshold = _grainCollectionOptions.MemoryUsageTargetPercentage;
-            var memoryLoadPercentage = 100.0 * usedMemory / stats.MaximumAvailableMemoryBytes;
+            var memoryLoadPercentage = 100.0 * usedMemory / (usedMemory + stats.RawAvailableMemoryBytes);
             if (memoryLoadPercentage < threshold)
             {
                 return false;
@@ -351,17 +351,7 @@ namespace Orleans.Runtime
                 targetActivationLimit = 0;
             }
 
-            LogCurrentHighMemoryPressureStats(
-                currentGen2GcCount: currentGen2GcCount,
-                maxAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes,
-                rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
-                usedMemoryBytes: usedMemory,
-                activationCount: activationCount,
-                activationSize: activationSize,
-                threshold: threshold,
-                currentMemoryLoad: memoryLoadPercentage
-            );
-
+            LogCurrentHighMemoryPressureStats(currentGen2GcCount: currentGen2GcCount, stats);
             return true;
         }
 
@@ -734,9 +724,9 @@ namespace Orleans.Runtime
 
         [LoggerMessage(
             Level = LogLevel.Information,
-            Message = "[High Memory Pressure Stats] currentGen2GcCount={currentGen2GcCount}, maxAvailableMemoryBytes={maxAvailableMemoryBytes}, rawAvailableMemoryBytes={rawAvailableMemoryBytes}, usedMemoryBytes={usedMemoryBytes}, activationCount={activationCount}, activationSize={activationSize}, thresholdMemoryLoad={threshold}, currentMemoryLoad={currentMemoryLoad}"
+            Message = "[High Memory Pressure Stats] currentGen2GcCount: {currentGen2GcCount}; {statistics}"
         )]
-        private partial void LogCurrentHighMemoryPressureStats(int currentGen2GcCount, double maxAvailableMemoryBytes, double rawAvailableMemoryBytes, double usedMemoryBytes, int activationCount, double activationSize, double threshold, double currentMemoryLoad);
+        private partial void LogCurrentHighMemoryPressureStats(int currentGen2GcCount, EnvironmentStatistics statistics);
 
         [LoggerMessage(
             Level = LogLevel.Error,

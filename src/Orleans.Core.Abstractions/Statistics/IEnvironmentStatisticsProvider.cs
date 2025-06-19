@@ -113,4 +113,7 @@ public readonly struct EnvironmentStatistics
         RawAvailableMemoryBytes = rawAvailableMemoryBytes;
         MaximumAvailableMemoryBytes = maximumAvailableMemoryBytes;
     }
+
+    public override string ToString()
+        => $"CpuUsage%: {CpuUsagePercentage} (raw: {RawCpuUsagePercentage}); MemoryUsage: {MemoryUsageBytes} bytes (raw: {RawMemoryUsageBytes}); AvailableMemory: {AvailableMemoryBytes} bytes (raw: {RawAvailableMemoryBytes}); MaximumAvailableMemory: {MaximumAvailableMemoryBytes} bytes;";
 }
