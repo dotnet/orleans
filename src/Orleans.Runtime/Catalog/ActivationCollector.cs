@@ -333,18 +333,20 @@ namespace Orleans.Runtime
 
             // filtering harms here: we need raw and precise statistics to calculate memory usage correctly
             var usedMemory = stats.RawMemoryUsageBytes;
+            var memoryCapacity = usedMemory + stats.RawAvailableMemoryBytes;
+
             var activationCount = _activationCount > 0 ? _activationCount : 1;
             var activationSize = usedMemory / (double)activationCount;
 
             var threshold = _grainCollectionOptions.MemoryUsageLimitPercentage;
             var targetThreshold = _grainCollectionOptions.MemoryUsageTargetPercentage;
-            var memoryLoadPercentage = 100.0 * usedMemory / (usedMemory + stats.RawAvailableMemoryBytes);
+            var memoryLoadPercentage = 100.0 * usedMemory / memoryCapacity;
             if (memoryLoadPercentage < threshold)
             {
                 return false;
             }
 
-            var targetUsedMemory = targetThreshold * stats.MaximumAvailableMemoryBytes / 100.0;
+            var targetUsedMemory = targetThreshold * memoryCapacity / 100.0;
             targetActivationLimit = (int)Math.Floor(targetUsedMemory / activationSize);
             if (targetActivationLimit < 0)
             {
