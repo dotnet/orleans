@@ -115,7 +115,6 @@ namespace DefaultCluster.Tests
         /// This establishes baseline behavior for comparison with timeout scenarios.
         /// </summary>
         [Fact(Skip = "https://github.com/dotnet/orleans/issues/9558"), TestCategory("BVT"), TestCategory("ErrorHandling")]
-        // check that premature wait finishes on time with false.
         public async Task ErrorHandlingTimedMethod()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
