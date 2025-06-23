@@ -69,11 +69,7 @@ namespace Orleans.Runtime
                 LogTraceUnregisteredActivation(activation);
 
                 // this should be removed once we've refactored the deactivation code path. For now safe to keep.
-                if (activation is ICollectibleGrainContext collectibleActivation)
-                {
-                    activationCollector.TryCancelCollection(collectibleActivation);
-                }
-
+                activationCollector.TryCancelCollection(activation as ICollectibleGrainContext);
                 CatalogInstruments.ActivationsDestroyed.Add(1);
             }
         }

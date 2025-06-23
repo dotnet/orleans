@@ -29,7 +29,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private readonly ObjectPool<FixedSizeBuffer> bufferPool;
         private readonly TimeSpan timeOut = TimeSpan.FromSeconds(30);
         private readonly EventHubPartitionSettings ehSettings;
-        private NoOpEnvironmentStatisticsProvider _hostEnvironmentStatistics;
+        private IEnvironmentStatisticsProvider environmentStatisticsProvider;
         private ConcurrentBag<EventHubQueueCacheForTesting> cacheList;
         private List<EHEvictionStrategyForTesting> evictionStrategyList;
 
@@ -44,6 +44,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             };
 
             //set up cache pressure monitor and purge predicate
+            this.environmentStatisticsProvider = new EnvironmentStatisticsProvider();
             this.cachePressureInjectionMonitor = new CachePressureInjectionMonitor();
             this.purgePredicate = new PurgeDecisionInjectionPredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(30));
 
@@ -192,7 +193,6 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
         private void InitForTesting()
         {
-            _hostEnvironmentStatistics = new NoOpEnvironmentStatisticsProvider();
             this.cacheList = new ConcurrentBag<EventHubQueueCacheForTesting>();
             this.evictionStrategyList = new List<EHEvictionStrategyForTesting>();
             var monitorDimensions = new EventHubReceiverMonitorDimensions
@@ -202,9 +202,9 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             };
 
             this.receiver1 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
-                new DefaultEventHubReceiverMonitor(monitorDimensions), new LoadSheddingOptions(), _hostEnvironmentStatistics);
+                new DefaultEventHubReceiverMonitor(monitorDimensions), new LoadSheddingOptions(), environmentStatisticsProvider);
             this.receiver2 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
-                new DefaultEventHubReceiverMonitor(monitorDimensions), new LoadSheddingOptions(), _hostEnvironmentStatistics);
+                new DefaultEventHubReceiverMonitor(monitorDimensions), new LoadSheddingOptions(), environmentStatisticsProvider);
             this.receiver1.Initialize(this.timeOut);
             this.receiver2.Initialize(this.timeOut);
         }
@@ -258,11 +258,6 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             cache.AddCachePressureMonitor(this.cachePressureInjectionMonitor);
             this.cacheList.Add(cache);
             return cache;
-        }
-
-        private class NoOpEnvironmentStatisticsProvider : IEnvironmentStatisticsProvider
-        {
-            public EnvironmentStatistics GetEnvironmentStatistics() => new();
         }
     }
 }
