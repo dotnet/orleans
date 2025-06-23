@@ -65,11 +65,11 @@ namespace UnitTests.Runtime
         }
 
         [Theory, TestCategory("MemoryBasedDeactivations")]
-        [InlineData(80.0, 70.0, 1000, 150, 100, true, 100 - 18)] // Over threshold, need to deactivate
+        [InlineData(80.0, 70.0, 1000, 150, 100, true, 82)] // Over threshold, need to deactivate
         [InlineData(80.0, 70.0, 1000, 250, 100, false, 0)] // Below threshold, no deactivation
-        [InlineData(80.0, 70.0, 1000, 100, 200, true, 200 - 45)] // More activations, smaller per-activation size
+        [InlineData(80.0, 70.0, 1000, 100, 200, true, 155)] // More activations, smaller per-activation size
         [InlineData(80.0, 70.0, 1000, 800, 100, false, 0)] // Well below threshold
-        [InlineData(80.0, 70.0, 1000, 50,  10,  true,  10 - 3)] // Few activations, large per-activation size
+        [InlineData(80.0, 70.0, 1000, 50,  10,  true, 7)] // Few activations, large per-activation size
         public void IsMemoryOverloaded_WorksAsExpected(
             double memoryLoadThreshold,
             double targetMemoryLoad,
@@ -79,25 +79,27 @@ namespace UnitTests.Runtime
             bool expectedOverloaded,
             int expectedActivationsTarget)
         {
-            var options = new GrainCollectionOptions
+            var grainCollectionOptions = Options.Create(new GrainCollectionOptions
             {
-                MemoryPressureGrainCollectionOptions = new MemoryPressureGrainCollectionOptions
-                {
-                    MemoryUsageLimitPercentage = memoryLoadThreshold,
-                    MemoryUsageTargetPercentage = targetMemoryLoad
-                }
-            };
+                MemoryUsageLimitPercentage = memoryLoadThreshold,
+                MemoryUsageTargetPercentage = targetMemoryLoad
+            });
+
+            // Calculate usedMemory and set rawAvailableMemoryBytes as per new logic
+            long usedMemoryBytes = (maxMemoryMb - availableMemoryMb);
+            long rawAvailableMemoryBytes = availableMemoryMb;
+            long maxMemoryBytes = maxMemoryMb;
 
             var statsProvider = Substitute.For<IEnvironmentStatisticsProvider>();
             statsProvider.GetEnvironmentStatistics().Returns(
                 new EnvironmentStatistics(
                     cpuUsagePercentage: 0,
                     rawCpuUsagePercentage: 0,
-                    memoryUsageBytes: 0,
-                    rawMemoryUsageBytes: 0,
-                    availableMemoryBytes: availableMemoryMb * 1024 * 1024,
-                    rawAvailableMemoryBytes: availableMemoryMb * 1024 * 1024,
-                    maximumAvailableMemoryBytes: maxMemoryMb * 1024 * 1024
+                    memoryUsageBytes: usedMemoryBytes, // used memory
+                    rawMemoryUsageBytes: usedMemoryBytes, // used memory
+                    availableMemoryBytes: rawAvailableMemoryBytes, // for compatibility
+                    rawAvailableMemoryBytes: rawAvailableMemoryBytes, // for new logic
+                    maximumAvailableMemoryBytes: maxMemoryBytes
                 )
             );
 
@@ -106,13 +108,13 @@ namespace UnitTests.Runtime
 
             var collector = new ActivationCollector(
                 timeProvider,
-                Options.Create(options),
+                grainCollectionOptions,
                 logger,
                 statsProvider
             );
 
             collector._activationCount = activationCount;
-            var overloaded = collector.IsMemoryOverloaded(out var activationsTarget);
+            var overloaded = collector.IsMemoryOverloaded(GC.CollectionCount(2), out var activationsTarget);
 
             Assert.Equal(expectedOverloaded, overloaded);
             Assert.Equal(expectedActivationsTarget, activationsTarget);
@@ -121,15 +123,13 @@ namespace UnitTests.Runtime
         [Fact]
         public async Task DeactivateInDueTimeOrder_OnlyOldestAndEligibleAreDeactivated()
         {
-            var options = Options.Create(new GrainCollectionOptions
-            {
-                MemoryPressureGrainCollectionOptions = new MemoryPressureGrainCollectionOptions()
-            });
+            var grainCollectionOptions = Options.Create(new GrainCollectionOptions());
+
             var logger = NullLogger<ActivationCollector>.Instance;
             var statsProvider = Substitute.For<IEnvironmentStatisticsProvider>();
             var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
 
-            var collector = new ActivationCollector(timeProvider, options, logger, statsProvider);
+            var collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, statsProvider);
             var timer = Substitute.For<IAsyncTimer>();
             timer.NextTick().Returns(Task.FromResult(false));
             var timerFactory = Substitute.For<IAsyncTimerFactory>();

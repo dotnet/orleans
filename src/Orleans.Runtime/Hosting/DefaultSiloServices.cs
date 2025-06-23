@@ -357,8 +357,6 @@ namespace Orleans.Hosting
 
             // Validate all CollectionAgeLimit values for the right configuration.
             services.AddTransient<IConfigurationValidator, GrainCollectionOptionsValidator>();
-
-            services.AddTransient<IConfigurationValidator, MemoryPressureGrainCollectionOptionsValidator>();
             services.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
 
             services.TryAddSingleton<ITimerManager, TimerManagerImpl>();

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,7 +18,6 @@ namespace Orleans.Runtime
     /// </summary>
     internal partial class ActivationCollector : IActivationWorkingSetObserver, ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
-        private readonly TimeSpan quantum;
         private readonly TimeSpan shortestAgeLimit;
         private readonly ConcurrentDictionary<DateTime, Bucket> buckets = new();
         private readonly CancellationTokenSource _shutdownCts = new();
@@ -33,7 +33,7 @@ namespace Orleans.Runtime
         private Task _collectionLoopTask;
 
         private readonly IEnvironmentStatisticsProvider _environmentStatisticsProvider;
-        private readonly MemoryPressureGrainCollectionOptions _memoryPressureGrainCollectionOptions;
+        private readonly GrainCollectionOptions _grainCollectionOptions;
         private readonly PeriodicTimer _memBasedDeactivationTimer;
         private Task _memBasedDeactivationLoopTask;
 
@@ -49,18 +49,17 @@ namespace Orleans.Runtime
             ILogger<ActivationCollector> logger,
             IEnvironmentStatisticsProvider environmentStatisticsProvider)
         {
-            quantum = options.Value.CollectionQuantum;
-            shortestAgeLimit = new(options.Value.ClassSpecificCollectionAge.Values.Aggregate(options.Value.CollectionAge.Ticks, (a, v) => Math.Min(a, v.Ticks)));
+            _grainCollectionOptions = options.Value;
+
+            shortestAgeLimit = new(_grainCollectionOptions.ClassSpecificCollectionAge.Values.Aggregate(_grainCollectionOptions.CollectionAge.Ticks, (a, v) => Math.Min(a, v.Ticks)));
             nextTicket = MakeTicketFromDateTime(timeProvider.GetUtcNow().UtcDateTime);
             this.logger = logger;
-            _collectionTimer = new PeriodicTimer(quantum);
+            _collectionTimer = new PeriodicTimer(_grainCollectionOptions.CollectionQuantum);
 
             _environmentStatisticsProvider = environmentStatisticsProvider;
-
-            _memoryPressureGrainCollectionOptions = options.Value.MemoryPressureGrainCollectionOptions;
-            if (_memoryPressureGrainCollectionOptions.IsMemoryUsageCollectionEnabled())
+            if (_grainCollectionOptions.MemoryUsageCollectionEnabled)
             {
-                _memBasedDeactivationTimer = new PeriodicTimer(_memoryPressureGrainCollectionOptions.MemoryUsagePollingPeriod);
+                _memBasedDeactivationTimer = new PeriodicTimer(_grainCollectionOptions.MemoryUsagePollingPeriod);
             }
         }
 
@@ -199,7 +198,7 @@ namespace Orleans.Runtime
                 }
 
                 key = nextTicket;
-                nextTicket += quantum;
+                nextTicket += _grainCollectionOptions.CollectionQuantum;
             }
 
             Bucket bucket;
@@ -327,33 +326,38 @@ namespace Orleans.Runtime
         /// </summary>
         /// <remarks>internal for testing</remarks>
         /// <param name="targetActivationLimit">number of activations to keep active to bring back memory consumption to target value</param>
-        internal bool IsMemoryOverloaded(out int targetActivationLimit)
+        /// <param name="currentGen2GcCount">current gen2 gc count</param>
+        internal bool IsMemoryOverloaded(int currentGen2GcCount, out int targetActivationLimit)
         {
             targetActivationLimit = 0;
             var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
 
             // filtering harms here: we need raw and precise statistics to calculate memory usage correctly
-            var usedMemory = stats.MaximumAvailableMemoryBytes - stats.RawAvailableMemoryBytes;
+            var usedMemory = stats.RawMemoryUsageBytes;
+            var memoryCapacity = usedMemory + stats.RawAvailableMemoryBytes;
+
+            Debug.Assert(usedMemory >= 0, "Memory usage cannot be negative.");
+            Debug.Assert(memoryCapacity >= 0 && memoryCapacity >= usedMemory, "Memory capacity should be [0: used memory + available memory]");
+
             var activationCount = _activationCount > 0 ? _activationCount : 1;
             var activationSize = usedMemory / (double)activationCount;
 
-            var options = _memoryPressureGrainCollectionOptions;
-
-            var threshold = options.MemoryUsageLimitPercentage;
-            var targetThreshold = options.MemoryUsageTargetPercentage;
-            var memoryLoadPercentage = 100.0 * usedMemory / stats.MaximumAvailableMemoryBytes;
+            var threshold = _grainCollectionOptions.MemoryUsageLimitPercentage;
+            var targetThreshold = _grainCollectionOptions.MemoryUsageTargetPercentage;
+            var memoryLoadPercentage = 100.0 * usedMemory / memoryCapacity;
             if (memoryLoadPercentage < threshold)
             {
                 return false;
             }
 
-            var targetUsedMemory = targetThreshold * stats.MaximumAvailableMemoryBytes / 100.0;
+            var targetUsedMemory = targetThreshold * memoryCapacity / 100.0;
             targetActivationLimit = (int)Math.Floor(targetUsedMemory / activationSize);
             if (targetActivationLimit < 0)
             {
                 targetActivationLimit = 0;
             }
 
+            LogCurrentHighMemoryPressureStats(currentGen2GcCount: currentGen2GcCount, stats);
             return true;
         }
 
@@ -406,7 +410,7 @@ namespace Orleans.Runtime
 
                 var reason = new DeactivationReason(
                     DeactivationReasonCode.HighMemoryPressure,
-                    $"Process memory utilization exceeded the configured limit of '{_memoryPressureGrainCollectionOptions.MemoryUsageLimitPercentage}'. Detected memory usage is {memBefore} MB.");
+                    $"Process memory utilization exceeded the configured limit of '{_grainCollectionOptions.MemoryUsageLimitPercentage}'. Detected memory usage is {memBefore} MB.");
 
                 await DeactivateActivationsFromCollector(candidates, cancellationToken, reason);
             }
@@ -426,7 +430,7 @@ namespace Orleans.Runtime
         private void ThrowIfTicketIsInvalid(DateTime ticket)
         {
             if (ticket.Ticks == 0) throw new ArgumentException("Empty ticket is not allowed in this context.");
-            if (0 != ticket.Ticks % quantum.Ticks)
+            if (0 != ticket.Ticks % _grainCollectionOptions.CollectionQuantum.Ticks)
             {
                 throw new ArgumentException(string.Format("invalid ticket ({0})", ticket));
             }
@@ -439,9 +443,9 @@ namespace Orleans.Runtime
 
         public DateTime MakeTicketFromDateTime(DateTime timestamp)
         {
-            // Round the timestamp to the next quantum. e.g. if the quantum is 1 minute and the timestamp is 3:45:22, then the ticket will be 3:46.
+            // Round the timestamp to the next _grainCollectionOptions.CollectionQuantum. e.g. if the _grainCollectionOptions.CollectionQuantum is 1 minute and the timestamp is 3:45:22, then the ticket will be 3:46.
             // Note that TimeStamp.Ticks and DateTime.Ticks both return a long.
-            var ticketTicks = ((timestamp.Ticks - 1) / quantum.Ticks + 1) * quantum.Ticks;
+            var ticketTicks = ((timestamp.Ticks - 1) / _grainCollectionOptions.CollectionQuantum.Ticks + 1) * _grainCollectionOptions.CollectionQuantum.Ticks;
             if (ticketTicks > DateTime.MaxValue.Ticks)
             {
                 return DateTime.MaxValue;
@@ -450,7 +454,7 @@ namespace Orleans.Runtime
             var ticket = new DateTime(ticketTicks, DateTimeKind.Utc);
             if (ticket < nextTicket)
             {
-                throw new ArgumentException(string.Format("The earliest collection that can be scheduled from now is for {0}", new DateTime(nextTicket.Ticks - quantum.Ticks + 1, DateTimeKind.Utc)));
+                throw new ArgumentException(string.Format("The earliest collection that can be scheduled from now is for {0}", new DateTime(nextTicket.Ticks - _grainCollectionOptions.CollectionQuantum.Ticks + 1, DateTimeKind.Utc)));
             }
 
             return ticket;
@@ -458,9 +462,9 @@ namespace Orleans.Runtime
 
         private DateTime MakeTicketFromTimeSpan(TimeSpan timeout, DateTime now)
         {
-            if (timeout < quantum)
+            if (timeout < _grainCollectionOptions.CollectionQuantum)
             {
-                throw new ArgumentException(string.Format("timeout must be at least {0}, but it is {1}", quantum, timeout), nameof(timeout));
+                throw new ArgumentException(string.Format("timeout must be at least {0}, but it is {1}", _grainCollectionOptions.CollectionQuantum, timeout), nameof(timeout));
             }
 
             return MakeTicketFromDateTime(now + timeout);
@@ -523,7 +527,7 @@ namespace Orleans.Runtime
             using var _ = new ExecutionContextSuppressor();
             _collectionLoopTask = RunActivationCollectionLoop();
 
-            if (_memoryPressureGrainCollectionOptions.IsMemoryUsageCollectionEnabled())
+            if (_grainCollectionOptions.MemoryUsageCollectionEnabled)
             {
                 _memBasedDeactivationLoopTask = RunMemoryBasedDeactivationLoop();
             }
@@ -583,7 +587,7 @@ namespace Orleans.Runtime
             await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
             var cancellationToken = _shutdownCts.Token;
 
-            int lastGen2GcCount = -1;
+            int lastGen2GcCount = 0;
             int activationLimit = int.MaxValue;
             int newTargetActivationLimit = int.MaxValue;
 
@@ -593,8 +597,9 @@ namespace Orleans.Runtime
                 {
                     var currentGen2GcCount = GC.CollectionCount(2);
 
-                    // only when memory is overloaded and we know gen2 gc was not invoked recently (GC.CollectionCount(2) returns a higher revision than remembered)
-                    if (currentGen2GcCount > lastGen2GcCount && IsMemoryOverloaded(out newTargetActivationLimit))
+                    // note: GC.CollectionCount(2) will return 0 if no gen2 gc happened yet and we rely on this behavior:
+                    //       high memory pressure situation cannot occur until gen2 occurred at least once
+                    if (currentGen2GcCount > lastGen2GcCount && IsMemoryOverloaded(currentGen2GcCount, out newTargetActivationLimit))
                     {
                         // recalculate the surplus activations based on the new target activation limit
                         var surplusActivations = Math.Max(0, _activationCount - newTargetActivationLimit);
@@ -724,10 +729,10 @@ namespace Orleans.Runtime
         private partial void LogHighMemoryPressureDeactivationStarted(int count);
 
         [LoggerMessage(
-            Level = LogLevel.Debug,
-            Message = "High memory pressure: forced deactivations and waiting for GC2 (count={Gc2Count}) collection"
+            Level = LogLevel.Information,
+            Message = "High memory pressure: forced deactivations and waiting for GC2 (gen2 count: {CurrentGen2GcCount}) collection. {Statistics}"
         )]
-        private partial void LogWaitingForGC2Run(int gc2Count);
+        private partial void LogCurrentHighMemoryPressureStats(int currentGen2GcCount, EnvironmentStatistics statistics);
 
         [LoggerMessage(
             Level = LogLevel.Error,

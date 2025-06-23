@@ -10,7 +10,6 @@ on:
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
   DOTNET_NOLOGO: true
-  ORLEANS_MEMORY_PRESSURE_GRAIN_COLLECTION_ENABLED: "false"
 jobs:
   build:
     name: Build

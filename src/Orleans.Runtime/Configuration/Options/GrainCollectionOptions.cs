@@ -50,36 +50,10 @@ namespace Orleans.Configuration
         public static readonly TimeSpan DEFAULT_DEACTIVATION_TIMEOUT = TimeSpan.FromSeconds(30);
 
         /// <summary>
-        /// Controls behavior of grain collection based on available memory.
-        /// </summary>
-        public MemoryPressureGrainCollectionOptions MemoryPressureGrainCollectionOptions { get; set; } = new();
-    }
-
-    /// <summary>
-    /// Options for grain collection based on memory pressure.
-    /// </summary>
-    public class MemoryPressureGrainCollectionOptions
-    {
-        /// <summary>
-        /// The same control as <see cref="MemoryUsageCollectionEnabled"/> but via the environment variable.
-        /// </summary>
-        public const string MemoryUsageCollectionEnabledEnvironmentVariable = "ORLEANS_MEMORY_PRESSURE_GRAIN_COLLECTION_ENABLED";
-
-        /// <summary>
         /// Indicates if memory-based grain collection is enabled.
         /// Is enabled by default.
         /// </summary>
         public bool MemoryUsageCollectionEnabled { get; set; } = true;
-
-        internal bool IsMemoryUsageCollectionEnabled()
-        {
-            if (bool.TryParse(Environment.GetEnvironmentVariable(MemoryUsageCollectionEnabledEnvironmentVariable), out var enabled))
-            {
-                return enabled;
-            }
-
-            return MemoryUsageCollectionEnabled;
-        }
 
         /// <summary>
         /// The interval at which memory usage is polled.
