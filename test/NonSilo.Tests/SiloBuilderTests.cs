@@ -161,12 +161,6 @@ namespace NonSilo.Tests
                         {
                             options.LoadSheddingEnabled = true;
                             options.CpuThreshold = 101;
-                        })
-                        .ConfigureServices(svcCollection =>
-                        {
-                            svcCollection.AddSingleton<FakeEnvironmentStatisticsProvider>();
-                            svcCollection.AddFromExisting<IEnvironmentStatisticsProvider, FakeEnvironmentStatisticsProvider>();
-                            svcCollection.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
                         });
                 }).RunConsoleAsync();
             });
@@ -234,22 +228,6 @@ namespace NonSilo.Tests
                         siloBuilder.UseLocalhostClustering();
                     });
             });
-        }
-
-        private class FakeEnvironmentStatisticsProvider : IEnvironmentStatisticsProvider
-        {
-            private static EnvironmentStatisticsProvider _realStatisticsProvider = new();
-
-            public EnvironmentStatistics GetEnvironmentStatistics()
-            {
-                EnvironmentStatistics stats = new();
-                if (!stats.IsValid())
-                {
-                    stats = _realStatisticsProvider.GetEnvironmentStatistics();
-                }
-
-                return stats;
-            }
         }
 
         private class MyService
