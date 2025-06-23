@@ -9,5 +9,5 @@ namespace Orleans.Statistics;
 internal static class EnvironmentStatisticExtensions
 {
     public static bool IsValid(this EnvironmentStatistics statistics)
-        => statistics.RawAvailableMemoryBytes > 0 && statistics.MaximumAvailableMemoryBytes > 0;
+        => statistics.MaximumAvailableMemoryBytes > 0;
 }

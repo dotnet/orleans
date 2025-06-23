@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -240,7 +241,7 @@ namespace Orleans.Runtime
                         if (!activation.IsValid)
                         {
                             // This is not an error scenario because the activation may have become invalid between the time
-                            // we captured a snapshot in 'Dequeue_grainCollectionOptions.CollectionQuantum' and now. We are not be able to observe such changes.
+                            // we captured a snapshot in 'DequeueQuantum' and now. We are not be able to observe such changes.
                             // Do nothing: don't collect, don't reschedule.
                         }
                         else if (activation.KeepAliveUntil > now)
@@ -334,6 +335,9 @@ namespace Orleans.Runtime
             // filtering harms here: we need raw and precise statistics to calculate memory usage correctly
             var usedMemory = stats.RawMemoryUsageBytes;
             var memoryCapacity = usedMemory + stats.RawAvailableMemoryBytes;
+
+            Debug.Assert(usedMemory >= 0, "Memory usage cannot be negative.");
+            Debug.Assert(memoryCapacity >= 0 && memoryCapacity >= usedMemory, "Memory capacity should be [0: used memory + available memory]");
 
             var activationCount = _activationCount > 0 ? _activationCount : 1;
             var activationSize = usedMemory / (double)activationCount;
@@ -726,7 +730,7 @@ namespace Orleans.Runtime
 
         [LoggerMessage(
             Level = LogLevel.Information,
-            Message = "[High Memory Pressure Stats] currentGen2GcCount: {currentGen2GcCount}; {statistics}"
+            Message = "High memory pressure: forced deactivations and waiting for GC2 (gen2 count: {CurrentGen2GcCount}) collection. {Statistics}"
         )]
         private partial void LogCurrentHighMemoryPressureStats(int currentGen2GcCount, EnvironmentStatistics statistics);
 
