@@ -25,7 +25,6 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders\Orleans.Reminders.csproj" />
     <PackageReference Include="Azure.Core" />
     <PackageReference Include="Azure.Data.Tables" />
-    <PackageReference Include="System.Net.NameResolution" />
   </ItemGroup>
 
   <ItemGroup>
