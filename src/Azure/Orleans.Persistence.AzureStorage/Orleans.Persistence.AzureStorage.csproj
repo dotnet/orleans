@@ -26,7 +26,6 @@
     <PackageReference Include="Azure.Data.Tables" />
     <PackageReference Include="Azure.Core" />
     <PackageReference Include="Azure.Storage.Blobs" />
-    <PackageReference Include="System.Net.NameResolution" />
   </ItemGroup>
 
   <ItemGroup>
