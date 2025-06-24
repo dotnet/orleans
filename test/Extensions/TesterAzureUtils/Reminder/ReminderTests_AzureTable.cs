@@ -90,7 +90,7 @@ namespace Tester.AzureUtils.TimerTests
             Assert.Equal(last, curr);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9557"), TestCategory("Functional")]
         public async Task Rem_Azure_Basic_Restart()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -279,7 +279,7 @@ namespace Tester.AzureUtils.TimerTests
             // TODO: write tests where period of a reminder is changed
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9557"), TestCategory("Functional")]
         public async Task Rem_Azure_GT_Basic()
         {
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());

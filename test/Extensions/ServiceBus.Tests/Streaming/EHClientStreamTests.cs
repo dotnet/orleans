@@ -84,14 +84,14 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5657")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5657")]
         public async Task EHStreamProducerOnDroppedClientTest()
         {
             logger.LogInformation("************************ EHStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(StreamProviderName, StreamNamespace);
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5634")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5634")]
         public async Task EHStreamConsumerOnDroppedClientTest()
         {
             logger.LogInformation("************************ EHStreamConsumerOnDroppedClientTest *********************************");

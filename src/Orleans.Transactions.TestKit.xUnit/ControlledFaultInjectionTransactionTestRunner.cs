@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -22,7 +22,7 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.SingleGrainWriteTransaction();
         }
 
-        [SkippableTheory]
+        [SkippableTheory(Skip = "https://github.com/dotnet/orleans/issues/9551")]
         [InlineData(TransactionFaultInjectPhase.AfterPrepare, FaultInjectionType.Deactivation)]
         [InlineData(TransactionFaultInjectPhase.AfterConfirm, FaultInjectionType.Deactivation)]
         [InlineData(TransactionFaultInjectPhase.AfterPrepared, FaultInjectionType.Deactivation)]

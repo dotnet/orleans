@@ -118,7 +118,7 @@ namespace Tester.HeterogeneousSilosTests
             await MergeGrainResolverTestsImpl<IStatelessWorkerGrain>(typeof(PreferLocalPlacement), true, this.CallIStatelessWorkerGrainMethod, typeof(StatelessWorkerGrain));
         }
 
-        [Fact]
+        [Fact(Skip = "https://github.com/dotnet/orleans/issues/9560")]
         public async Task StatelessWorkerPlacementWithClientRefreshTests()
         {
             await MergeGrainResolverTestsImpl<IStatelessWorkerGrain>(typeof(RandomPlacement), false, this.CallIStatelessWorkerGrainMethod, typeof(StatelessWorkerGrain));

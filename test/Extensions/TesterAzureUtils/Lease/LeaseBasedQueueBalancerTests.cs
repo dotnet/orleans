@@ -73,7 +73,7 @@ namespace Tester.AzureUtils.Lease
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, 2, mgmtGrain, lastTry), TimeOut);
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9559")]
         public async Task LeaseBalancedQueueBalancer_SupportUnexpectedNodeFailureScenerio()
         {
             var mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);

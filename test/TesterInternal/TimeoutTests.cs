@@ -132,7 +132,7 @@ namespace UnitTests
         /// 
         /// Currently skipped due to issue #3995.
         /// </summary>
-        [SkippableFact(Skip= "https://github.com/dotnet/orleans/issues/3995"), TestCategory("SlowBVT")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/3995"), TestCategory("SlowBVT")]
         public async Task CallThatShouldHaveBeenDroppedNotExecutedTest()
         {
             var responseTimeout = TimeSpan.FromSeconds(2);

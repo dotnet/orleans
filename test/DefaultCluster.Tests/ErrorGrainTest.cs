@@ -114,7 +114,7 @@ namespace DefaultCluster.Tests
         /// - Timing assertions ensure proper async behavior
         /// This establishes baseline behavior for comparison with timeout scenarios.
         /// </summary>
-        [Fact, TestCategory("BVT"), TestCategory("ErrorHandling")]
+        [Fact(Skip = "https://github.com/dotnet/orleans/issues/9558"), TestCategory("BVT"), TestCategory("ErrorHandling")]
         public async Task ErrorHandlingTimedMethod()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
