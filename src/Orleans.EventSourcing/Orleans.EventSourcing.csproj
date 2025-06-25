@@ -13,7 +13,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
-    <PackageReference Include="Microsoft.CSharp" />
   </ItemGroup>
 
   <ItemGroup>

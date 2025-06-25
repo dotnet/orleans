@@ -57,7 +57,7 @@ namespace Orleans.Runtime
             _collectionTimer = new PeriodicTimer(_grainCollectionOptions.CollectionQuantum);
 
             _environmentStatisticsProvider = environmentStatisticsProvider;
-            if (_grainCollectionOptions.MemoryUsageCollectionEnabled)
+            if (_grainCollectionOptions.EnableMemoryUsageActivationShedding)
             {
                 _memBasedDeactivationTimer = new PeriodicTimer(_grainCollectionOptions.MemoryUsagePollingPeriod);
             }
@@ -321,54 +321,11 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Checks if current memory usage is above the configured threshold for deactivation.
-        /// Also calculates the target number of activations to keep active if memory is overloaded to reach target memory usage.
-        /// </summary>
-        /// <remarks>internal for testing</remarks>
-        /// <param name="targetActivationLimit">number of activations to keep active to bring back memory consumption to target value</param>
-        /// <param name="currentGen2GcCount">current gen2 gc count</param>
-        internal bool IsMemoryOverloaded(int currentGen2GcCount, out int targetActivationLimit)
-        {
-            targetActivationLimit = 0;
-            var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
-
-            // filtering harms here: we need raw and precise statistics to calculate memory usage correctly
-            var usedMemory = stats.RawMemoryUsageBytes;
-            var memoryCapacity = usedMemory + stats.RawAvailableMemoryBytes;
-
-            Debug.Assert(usedMemory >= 0, "Memory usage cannot be negative.");
-            Debug.Assert(memoryCapacity >= 0 && memoryCapacity >= usedMemory, "Memory capacity should be [0: used memory + available memory]");
-
-            var activationCount = _activationCount > 0 ? _activationCount : 1;
-            var activationSize = usedMemory / (double)activationCount;
-
-            var threshold = _grainCollectionOptions.MemoryUsageLimitPercentage;
-            var targetThreshold = _grainCollectionOptions.MemoryUsageTargetPercentage;
-            var memoryLoadPercentage = 100.0 * usedMemory / memoryCapacity;
-            if (memoryLoadPercentage < threshold)
-            {
-                return false;
-            }
-
-            var targetUsedMemory = targetThreshold * memoryCapacity / 100.0;
-            targetActivationLimit = (int)Math.Floor(targetUsedMemory / activationSize);
-            if (targetActivationLimit < 0)
-            {
-                targetActivationLimit = 0;
-            }
-
-            LogCurrentHighMemoryPressureStats(currentGen2GcCount: currentGen2GcCount, stats);
-            return true;
-        }
-
-        /// <summary>
         /// Deactivates <param name="count" /> activations in due time order
         /// <remarks>internal for testing</remarks>
         /// </summary>
         internal async Task DeactivateInDueTimeOrder(int count, CancellationToken cancellationToken)
         {
-            LogHighMemoryPressureDeactivationStarted(count);
-
             var watch = ValueStopwatch.StartNew();
             var number = Interlocked.Increment(ref collectionNumber);
             long memBefore = GC.GetTotalMemory(false) / (1024 * 1024); // MB
@@ -386,13 +343,6 @@ namespace Orleans.Runtime
                     }
 
                     var activation = item.Value;
-                    lock (activation)
-                    {
-                        if (!activation.IsValid || !activation.IsInactive)
-                        {
-                            continue;
-                        }
-                    }
 
                     candidates.Add(activation);
                 }
@@ -527,7 +477,7 @@ namespace Orleans.Runtime
             using var _ = new ExecutionContextSuppressor();
             _collectionLoopTask = RunActivationCollectionLoop();
 
-            if (_grainCollectionOptions.MemoryUsageCollectionEnabled)
+            if (_grainCollectionOptions.EnableMemoryUsageActivationShedding)
             {
                 _memBasedDeactivationLoopTask = RunMemoryBasedDeactivationLoop();
             }
@@ -588,8 +538,6 @@ namespace Orleans.Runtime
             var cancellationToken = _shutdownCts.Token;
 
             int lastGen2GcCount = 0;
-            int activationLimit = int.MaxValue;
-            int newTargetActivationLimit = int.MaxValue;
 
             while (await _memBasedDeactivationTimer.WaitForNextTickAsync())
             {
@@ -599,25 +547,59 @@ namespace Orleans.Runtime
 
                     // note: GC.CollectionCount(2) will return 0 if no gen2 gc happened yet and we rely on this behavior:
                     //       high memory pressure situation cannot occur until gen2 occurred at least once
-                    if (currentGen2GcCount > lastGen2GcCount && IsMemoryOverloaded(currentGen2GcCount, out newTargetActivationLimit))
+                    if (currentGen2GcCount <= lastGen2GcCount)
                     {
-                        // recalculate the surplus activations based on the new target activation limit
-                        var surplusActivations = Math.Max(0, _activationCount - newTargetActivationLimit);
-
-                        activationLimit = newTargetActivationLimit;
-                        lastGen2GcCount = currentGen2GcCount;
-                        await DeactivateInDueTimeOrder(surplusActivations, cancellationToken);
+                        // No Gen2 GC since last deactivation cycle.
+                        // Wait for Gen2 GC between cycles to be sure that 
+                        continue;
                     }
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    // most probably shutdown
+
+                    if (!IsMemoryOverloaded(out var surplusActivationCount))
+                    {
+                        continue;
+                    }
+
+                    lastGen2GcCount = currentGen2GcCount;
+                    await DeactivateInDueTimeOrder(surplusActivationCount, cancellationToken);
                 }
                 catch (Exception exception)
                 {
-                    LogErrorWhileCollectingActivations(exception);
+                    // Ignore cancellation exceptions during shutdown.
+                    if (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+                    {
+                        LogErrorWhileCollectingActivations(exception);
+                    }
                 }
             }
+        }
+
+        // Internal for testing. It's expected that when this returns true, activation shedding will occur.
+        internal bool IsMemoryOverloaded(out int surplusActivationCount)
+        {
+            var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
+            var limit = _grainCollectionOptions.MemoryUsageLimitPercentage / 100f;
+            var target = _grainCollectionOptions.MemoryUsageTargetPercentage / 100f;
+
+            var usage = stats.NormalizedMemoryUsage;
+            if (usage <= limit)
+            {
+                // High memory pressure is not detected, so we do not need to deactivate any activations.
+                surplusActivationCount = 0;
+                return false;
+            }
+
+            // Calculate the surplus activations based the memory usage target.
+            var activationCount = _activationCount;
+            surplusActivationCount = (int)Math.Max(0, activationCount - Math.Floor(activationCount * target / usage));
+            if (surplusActivationCount <= 0)
+            {
+                surplusActivationCount = 0;
+                return false;
+            }
+
+            var surplusActivationPercentage = 100 * (1 - target / usage);
+            LogCurrentHighMemoryPressureStats(stats.MemoryUsagePercentage, _grainCollectionOptions.MemoryUsageLimitPercentage, deactivationTarget: surplusActivationCount, activationCount, surplusActivationPercentage);
+            return true;
         }
 
         private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit, CancellationToken cancellationToken)
@@ -724,15 +706,9 @@ namespace Orleans.Runtime
 
         [LoggerMessage(
             Level = LogLevel.Information,
-            Message = "High memory pressure detected. Starting {count} deactivations."
+            Message = "High memory pressure detected ({MemoryUsagePercentage:F2}% > {MemoryUsageLimitPercentage:F2}%). Deactivating up to {DeactivationTarget:N0}/{ActivationCount:N0} ({SurplusActivationPercentage:F2}%) grains to free memory."
         )]
-        private partial void LogHighMemoryPressureDeactivationStarted(int count);
-
-        [LoggerMessage(
-            Level = LogLevel.Information,
-            Message = "High memory pressure: forced deactivations and waiting for GC2 (gen2 count: {CurrentGen2GcCount}) collection. {Statistics}"
-        )]
-        private partial void LogCurrentHighMemoryPressureStats(int currentGen2GcCount, EnvironmentStatistics statistics);
+        private partial void LogCurrentHighMemoryPressureStats(double memoryUsagePercentage, double memoryUsageLimitPercentage, int deactivationTarget, int activationCount, double surplusActivationPercentage);
 
         [LoggerMessage(
             Level = LogLevel.Error,

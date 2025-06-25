@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
 using System.Diagnostics.Tracing;
@@ -38,27 +39,27 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
     /// <inheritdoc />
     public EnvironmentStatistics GetEnvironmentStatistics()
     {
-        var memoryInfo = GC.GetGCMemoryInfo();
-
         var cpuUsage = _eventCounterListener.CpuUsage;
 
-        var memoryUsage = GC.GetTotalMemory(false) + memoryInfo.FragmentedBytes;
-        var maxAvailableMemory = memoryInfo.TotalAvailableMemoryBytes;
-        var availableMemory = maxAvailableMemory - memoryInfo.HeapSizeBytes;
-
+        var memoryInfo = GC.GetGCMemoryInfo();
+        var memoryUsage = Math.Min(memoryInfo.TotalAvailableMemoryBytes, memoryInfo.TotalCommittedBytes - memoryInfo.FragmentedBytes);
+        var availableMemory = Math.Max(0, memoryInfo.TotalAvailableMemoryBytes - memoryInfo.TotalCommittedBytes + memoryInfo.FragmentedBytes);
         var filteredCpuUsage = _cpuUsageFilter.Filter(cpuUsage);
         var filteredMemoryUsage = (long)_memoryUsageFilter.Filter(memoryUsage);
         var filteredAvailableMemory = (long)_availableMemoryFilter.Filter(availableMemory);
-        // no need to filter 'maxAvailableMemory' as it will almost always be a steady value.
 
-        _availableMemoryBytes = filteredAvailableMemory;
-        _maximumAvailableMemoryBytes = maxAvailableMemory;
+        var result = new EnvironmentStatistics(
+            cpuUsagePercentage: filteredCpuUsage,
+            rawCpuUsagePercentage: cpuUsage,
+            memoryUsageBytes: filteredMemoryUsage,
+            rawMemoryUsageBytes: memoryUsage,
+            availableMemoryBytes: filteredAvailableMemory,
+            rawAvailableMemoryBytes: availableMemory,
+            maximumAvailableMemoryBytes: memoryInfo.TotalAvailableMemoryBytes);
 
-        return new(
-            filteredCpuUsage, cpuUsage,
-            filteredMemoryUsage, memoryUsage,
-            filteredAvailableMemory, availableMemory,
-            maxAvailableMemory);
+        _maximumAvailableMemoryBytes = result.MaximumAvailableMemoryBytes;
+        _availableMemoryBytes = result.RawAvailableMemoryBytes;
+        return result;
     }
 
     public void Dispose() => _eventCounterListener.Dispose();
