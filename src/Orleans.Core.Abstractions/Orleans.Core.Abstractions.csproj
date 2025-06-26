@@ -9,6 +9,7 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <RootNamespace>Orleans</RootNamespace>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>

@@ -4,7 +4,6 @@ using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 using Orleans.GrainDirectory;
 
-#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>

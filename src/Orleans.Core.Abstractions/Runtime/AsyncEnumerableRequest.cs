@@ -1,7 +1,7 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using System.Runtime.Serialization;
 using System.Threading;
@@ -180,6 +180,7 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
     /// <param name="request">The request which this instanced proxies.</param>
     public AsyncEnumeratorProxy(AsyncEnumerableRequest<T> request, CancellationToken cancellationToken)
     {
+        Debug.Assert(request.TargetGrain is not null);
         _request = request;
         var requestCancellationToken = request.GetCancellationToken();
         if (requestCancellationToken == cancellationToken)

@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +19,7 @@ public abstract partial class Grain : IGrainBase, IAddressable
     // any interaction with it will result in non unit-testable code. Any behavior that can be accessed
     // from within client code (including subclasses of this class), should be exposed through IGrainRuntime.
     // The better solution is to refactor this interface and make it injectable through the constructor.
+    [AllowNull]
     public IGrainContext GrainContext { get; private set; }
 
     public GrainReference GrainReference { get { return GrainContext.GrainReference; } }
@@ -32,6 +34,7 @@ public abstract partial class Grain : IGrainBase, IAddressable
     /// <summary>
     /// Gets the IServiceProvider managed by the runtime. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
     /// </summary>
+    // ! The runtime ensures that this is not null and Unit testing frameworks must make sure that this is not null.
     protected internal IServiceProvider ServiceProvider => GrainContext?.ActivationServices ?? Runtime?.ServiceProvider!;
 
     internal GrainId GrainId => GrainContext.GrainId;
@@ -40,7 +43,8 @@ public abstract partial class Grain : IGrainBase, IAddressable
     /// This constructor should never be invoked. We expose it so that client code (subclasses of Grain) do not have to add a constructor.
     /// Client code should use the GrainFactory property to get a reference to a Grain.
     /// </summary>
-    protected Grain() : this(RuntimeContext.Current, grainRuntime: null)
+    // ! The runtime ensures that this is not null and Unit testing frameworks must make sure that this is not null.
+    protected Grain() : this(RuntimeContext.Current!, grainRuntime: null)
     {}
 
     /// <summary>
@@ -51,6 +55,8 @@ public abstract partial class Grain : IGrainBase, IAddressable
     protected Grain(IGrainContext grainContext, IGrainRuntime? grainRuntime = null)
     {
         GrainContext = grainContext;
+
+        // ! The runtime ensures that this is not null and Unit testing frameworks must make sure that this is not null.
         Runtime = grainRuntime ?? grainContext?.ActivationServices.GetService<IGrainRuntime>()!;
     }
 
@@ -98,7 +104,9 @@ public abstract partial class Grain : IGrainBase, IAddressable
         ArgumentNullException.ThrowIfNull(callback);
 
         EnsureRuntime();
-        return Runtime.TimerRegistry.RegisterTimer(GrainContext ?? RuntimeContext.Current, callback, state, dueTime, period);
+
+        // ! The runtime ensures that this is not null and Unit testing frameworks must make sure that this is not null.
+        return Runtime.TimerRegistry.RegisterTimer(GrainContext ?? RuntimeContext.Current!, callback, state, dueTime, period);
     }
 
     /// <summary>
@@ -109,7 +117,9 @@ public abstract partial class Grain : IGrainBase, IAddressable
     protected void DeactivateOnIdle()
     {
         EnsureRuntime();
-        Runtime.DeactivateOnIdle(GrainContext ?? RuntimeContext.Current);
+
+        // ! The runtime ensures that this is not null and Unit testing frameworks must make sure that this is not null.
+        Runtime.DeactivateOnIdle(GrainContext ?? RuntimeContext.Current!);
     }
 
     /// <summary>
@@ -133,7 +143,9 @@ public abstract partial class Grain : IGrainBase, IAddressable
     protected void DelayDeactivation(TimeSpan timeSpan)
     {
         EnsureRuntime();
-        Runtime.DelayDeactivation(GrainContext ?? RuntimeContext.Current, timeSpan);
+
+        // ! The runtime ensures that this is not null and Unit testing frameworks must make sure that this is not null.
+        Runtime.DelayDeactivation(GrainContext ?? RuntimeContext.Current!, timeSpan);
     }
 
     /// <summary>
@@ -169,7 +181,8 @@ public class Grain<TGrainState> : Grain
     /// <summary>
     /// The underlying state storage.
     /// </summary>
-    private IStorage<TGrainState>? _storage;
+    [AllowNull] // This is set by the runtime during activation, so it can be null in the constructor.
+    private IStorage<TGrainState> _storage;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Grain{TGrainState}"/> class.
@@ -181,7 +194,9 @@ public class Grain<TGrainState> : Grain
     protected Grain()
     {
         var observer = new LifecycleObserver(this);
-        var lifecycle = RuntimeContext.Current.ObservableLifecycle;
+
+        // ! The runtime ensures that this is not null and Unit testing frameworks must make sure that this is not null.
+        var lifecycle = RuntimeContext.Current!.ObservableLifecycle;
         lifecycle.AddMigrationParticipant(observer);
         lifecycle.Subscribe(RuntimeTypeNameFormatter.Format(GetType()), GrainLifecycleStage.SetupState, observer);
     }
@@ -207,8 +222,8 @@ public class Grain<TGrainState> : Grain
     /// </summary>
     protected TGrainState State
     {
-        get => _storage!.State;
-        set => _storage!.State = value;
+        get => _storage.State;
+        set => _storage.State = value;
     }
 
     /// <summary>
@@ -217,7 +232,7 @@ public class Grain<TGrainState> : Grain
     /// <returns>
     /// A <see cref="Task"/> representing the operation.
     /// </returns>
-    protected virtual Task ClearStateAsync() => _storage!.ClearStateAsync();
+    protected virtual Task ClearStateAsync() => _storage.ClearStateAsync();
 
     /// <summary>
     /// Write the current grain state data into the backing store.
@@ -225,7 +240,7 @@ public class Grain<TGrainState> : Grain
     /// <returns>
     /// A <see cref="Task"/> representing the operation.
     /// </returns>
-    protected virtual Task WriteStateAsync() => _storage!.WriteStateAsync();
+    protected virtual Task WriteStateAsync() => _storage.WriteStateAsync();
 
     /// <summary>
     /// Reads grain state from backing store, updating <see cref="State"/>.
@@ -236,7 +251,7 @@ public class Grain<TGrainState> : Grain
     /// <returns>
     /// A <see cref="Task"/> representing the operation.
     /// </returns>
-    protected virtual Task ReadStateAsync() => _storage!.ReadStateAsync();
+    protected virtual Task ReadStateAsync() => _storage.ReadStateAsync();
 
     private class LifecycleObserver : ILifecycleObserver, IGrainMigrationParticipant
     {

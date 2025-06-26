@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Buffers.Text;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
 using System.Text;
 
@@ -73,14 +74,14 @@ namespace Orleans.Runtime
                 : UniqueKey.NewKey(0, UniqueKey.Category.Grain, typeCode));
         }
 
-        internal static LegacyGrainId GetGrainId(long typeCode, long primaryKey, string keyExt = null)
+        internal static LegacyGrainId GetGrainId(long typeCode, long primaryKey, string? keyExt = null)
         {
             return FindOrCreateGrainId(UniqueKey.NewKey(primaryKey,
                 keyExt == null ? UniqueKey.Category.Grain : UniqueKey.Category.KeyExtGrain,
                 typeCode, keyExt));
         }
 
-        internal static LegacyGrainId GetGrainId(long typeCode, Guid primaryKey, string keyExt = null)
+        internal static LegacyGrainId GetGrainId(long typeCode, Guid primaryKey, string? keyExt = null)
         {
             return FindOrCreateGrainId(UniqueKey.NewKey(primaryKey,
                 keyExt == null ? UniqueKey.Category.Grain : UniqueKey.Category.KeyExtGrain,
@@ -129,7 +130,7 @@ namespace Orleans.Runtime
             get { return Key.IsLongKey; }
         }
 
-        public long GetPrimaryKeyLong(out string keyExt)
+        public long GetPrimaryKeyLong(out string? keyExt)
         {
             return Key.PrimaryKeyToLong(out keyExt);
         }
@@ -139,7 +140,7 @@ namespace Orleans.Runtime
             return Key.PrimaryKeyToLong();
         }
 
-        public Guid GetPrimaryKey(out string keyExt)
+        public Guid GetPrimaryKey(out string? keyExt)
         {
             return Key.PrimaryKeyToGuid(out keyExt);
         }
@@ -151,9 +152,8 @@ namespace Orleans.Runtime
 
         internal string GetPrimaryKeyString()
         {
-            string key;
-            _ = GetPrimaryKey(out key);
-            return key;
+            _ = GetPrimaryKey(out string? key);
+            return key ?? string.Empty;
         }
 
         public int TypeCode => Key.BaseTypeCode;
@@ -200,7 +200,7 @@ namespace Orleans.Runtime
             return new GrainId(GetGrainType(Key), this.GetGrainKey());
         }
 
-        public static bool TryConvertFromGrainId(GrainId id, out LegacyGrainId legacyId)
+        public static bool TryConvertFromGrainId(GrainId id, [NotNullWhen(true)] out LegacyGrainId? legacyId)
         {
             legacyId = FromGrainIdInternal(id);
             return legacyId is not null;
@@ -211,7 +211,7 @@ namespace Orleans.Runtime
             return FromGrainIdInternal(id) ?? ThrowNotLegacyGrainId(id);
         }
 
-        private static LegacyGrainId FromGrainIdInternal(GrainId id)
+        private static LegacyGrainId? FromGrainIdInternal(GrainId id)
         {
             var typeSpan = id.Type.AsSpan();
             if (typeSpan.Length != GrainTypePrefix.LegacyGrainPrefix.Length + 16)
@@ -223,7 +223,7 @@ namespace Orleans.Runtime
             if (!Utf8Parser.TryParse(typeSpan, out ulong typeCodeData, out var len, 'X') || len < 16)
                 return null;
 
-            string keyExt = null;
+            string? keyExt = null;
             var keySpan = id.Key.Value.Span;
             if (keySpan.Length < 32) return null;
 
@@ -252,12 +252,12 @@ namespace Orleans.Runtime
             return grainIdInternCache.FindOrCreate(key, k => new LegacyGrainId(k));
         }
 
-        public bool Equals(LegacyGrainId other)
+        public bool Equals(LegacyGrainId? other)
         {
             return other != null && Key.Equals(other.Key);
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             var o = obj as LegacyGrainId;
             return o != null && Key.Equals(o.Key);
@@ -389,8 +389,9 @@ namespace Orleans.Runtime
             return checked((uint)key);
         }
 
-        public int CompareTo(LegacyGrainId other)
+        public int CompareTo(LegacyGrainId? other)
         {
+            if (other is null) return 1; // null is less than any non-null instance
             return Key.CompareTo(other.Key);
         }
     }

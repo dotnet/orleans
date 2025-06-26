@@ -38,7 +38,7 @@ namespace Orleans.Runtime
         public bool Equals(MembershipVersion other) => this.Value == other.Value;
 
         /// <inheritdoc/>
-        public override bool Equals(object obj) => obj is MembershipVersion other && this.Equals(other);
+        public override bool Equals(object? obj) => obj is MembershipVersion other && this.Equals(other);
 
         /// <inheritdoc/>
         public override int GetHashCode() => this.Value.GetHashCode();

@@ -5,7 +5,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
-#nullable enable
 namespace Orleans
 {
     public static class StableHash

@@ -177,7 +177,10 @@ namespace Orleans.Runtime.Metadata
                 else
                 {
                     modified = true;
-                    builder[result.Key] = result.Value;
+                    if (result.Value is not null)
+                    {
+                        builder[result.Key] = result.Value;
+                    }
                 }
             }
 

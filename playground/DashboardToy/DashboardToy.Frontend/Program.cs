@@ -102,6 +102,10 @@ public class FanOutGrain : Grain, IFanOutGrain
     public FanOutGrain()
     {
         var id = this.GetPrimaryKeyLong(out var forest);
+        if (forest is null)
+        {
+            throw new InvalidOperationException("FanOutGrain must be created with a forest identifier (i.e, a grain key extension).");
+        }
 
         var level = id == 0 ? 0 : (int)Math.Log(id, FanOutFactor);
         var numChildren = level < MaxLevel ? FanOutFactor : 0;

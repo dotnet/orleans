@@ -6,9 +6,9 @@ namespace Orleans.Hosting;
 
 internal sealed class AdoNetGrainDirectoryProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.AddAdoNetGrainDirectory(name, optionsBuilder => optionsBuilder.Configure<IServiceProvider>((options, services) =>
+        builder.AddAdoNetGrainDirectory(name ?? "Default", optionsBuilder => optionsBuilder.Configure<IServiceProvider>((options, services) =>
         {
             var invariant = configurationSection["Invariant"];
             if (!IsNullOrWhiteSpace(invariant))

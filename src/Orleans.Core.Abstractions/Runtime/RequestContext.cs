@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Orleans.Core.Internal;
 
@@ -64,7 +65,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// The value currently associated with the provided key, otherwise <see langword="null"/> if no data is present for that key.
         /// </returns>
-        public static object Get(string key)
+        public static object? Get(string key)
         {
             var properties = CallContextData.Value;
             var values = properties.Values;
@@ -163,16 +164,16 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the collection of keys for the values currently in the request context.
         /// </summary>
-        public static IEnumerable<string> Keys => CallContextData.Value.Values.Keys;
+        public static IEnumerable<string> Keys => CallContextData.Value.Values?.Keys ?? Enumerable.Empty<string>();
 
         /// <summary>
         /// Gets the collection of entries currently in the request context.
         /// </summary>
-        public static IEnumerable<KeyValuePair<string, object>> Entries => CallContextData.Value.Values;
+        public static IEnumerable<KeyValuePair<string, object>> Entries => CallContextData.Value.Values ?? Enumerable.Empty<KeyValuePair<string, object>>();
 
         internal readonly struct ContextProperties
         {
-            public Dictionary<string, object> Values { get; init; }
+            public Dictionary<string, object>? Values { get; init; }
             public bool IsDefault => Values is null;
         }
 

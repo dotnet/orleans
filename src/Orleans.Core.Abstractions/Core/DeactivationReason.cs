@@ -35,7 +35,7 @@ namespace Orleans
         /// <param name="text">
         /// A descriptive reason for the deactivation.
         /// </param>
-        public DeactivationReason(DeactivationReasonCode code, Exception exception, string text)
+        public DeactivationReason(DeactivationReasonCode code, Exception? exception, string text)
         {
             ReasonCode = code;
             Description = text;
@@ -55,7 +55,7 @@ namespace Orleans
         /// <summary>
         /// Gets the exception which resulted in deactivation.
         /// </summary>
-        public Exception Exception { get; }
+        public Exception? Exception { get; }
 
         /// <inheritdoc/>
         public override string ToString()

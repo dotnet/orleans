@@ -86,7 +86,7 @@ internal class GrainRuntime : IGrainRuntime
         return new StateStorageBridge<TGrainState>("state", grainContext, grainStorage);
     }
 
-    public static void CheckRuntimeContext(IGrainContext context)
+    public static void CheckRuntimeContext(IGrainContext? context)
     {
         if (context is null)
         {
