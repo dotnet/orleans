@@ -94,6 +94,17 @@ and [<Immutable; GenerateSerializer>] DURecursive =
     | Case1 of DUMutually
     | Case2 of DURecursive * DUMutually
 
+[<Struct; GenerateSerializer>]
+type SingleCaseStructDU = Case of string
+
+[<Struct; GenerateSerializer>]
+type MulticaseStructDU =
+    | Case1 of value: string
+    | Case2 of value: string
+    | Case3 of valueInt: int
+    | Case4
+    | Case5 of int64
+
 [<Immutable; GenerateSerializer>]
 type Record = {  [<Id(1u)>] A: SingleCaseDU } with
     static member ofInt x = { A = SingleCaseDU.ofInt x }

@@ -305,3 +305,42 @@ type FSharpSerializationTests(fixture: DefaultClusterFixture) =
         Assert.Equal(mutually_case1, copy_mutually_case1)
         Assert.Equal(mutually_case2_case1, copy_mutually_case2_case1)
         Assert.Equal(mutually_case2_case2, copy_mutually_case2_case2)
+
+    [<Fact; TestCategory("BVT"); TestCategory("Serialization")>]
+    let Serialization_Roundtrip_FSharp_SingleCaseStructDiscriminatedUnion () =
+        let du = SingleCaseStructDU.Case "string"
+        let roundtripped = cluster.RoundTripSerializationForTesting du
+        let copy = cluster.DeepCopy du
+        Assert.Equal(du, roundtripped)
+        Assert.Equal(du, copy)
+
+    [<Fact>]
+    [<TestCategory("BVT"); TestCategory("Serialization")>]
+    let Serialization_Roundtrip_FSharp_MulticaseStructDiscriminatedUnion () =
+        let case1 = MulticaseStructDU.Case1 "case 1"
+        let case2 = MulticaseStructDU.Case2 "case 2"
+        let case3 = MulticaseStructDU.Case3 123
+        let case4 = MulticaseStructDU.Case4
+        let case5 = MulticaseStructDU.Case5 123L
+
+        let roundtrippedCase1 = cluster.RoundTripSerializationForTesting case1
+        let roundtrippedCase2 = cluster.RoundTripSerializationForTesting case2
+        let roundtrippedCase3 = cluster.RoundTripSerializationForTesting case3
+        let roundtrippedCase4 = cluster.RoundTripSerializationForTesting case4
+        let roundtrippedCase5 = cluster.RoundTripSerializationForTesting case5
+        let copyCase1 = cluster.DeepCopy case1
+        let copyCase2 = cluster.DeepCopy case2
+        let copyCase3 = cluster.DeepCopy case3
+        let copyCase4 = cluster.DeepCopy case4
+        let copyCase5 = cluster.DeepCopy case5
+
+        Assert.Equal(case1, roundtrippedCase1);
+        Assert.Equal(case2, roundtrippedCase2);
+        Assert.Equal(case3, roundtrippedCase3);
+        Assert.Equal(case4, roundtrippedCase4);
+        Assert.Equal(case5, roundtrippedCase5);
+        Assert.Equal(case1, copyCase1);
+        Assert.Equal(case2, copyCase2);
+        Assert.Equal(case3, copyCase3);
+        Assert.Equal(case4, copyCase4)
+        Assert.Equal(case5, copyCase5)
