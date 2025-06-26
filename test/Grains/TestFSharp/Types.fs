@@ -25,6 +25,22 @@ type GenericDU<'T> =
     | Case2
 
 [<Immutable; GenerateSerializer>]
+type PrivateConstructorDU =
+    private Constructor of string
+        static member SomeValue =
+            Constructor "some value"
+
+[<Immutable; GenerateSerializer>]
+type PrivateConstructorDoubleCaseDU =
+    private
+        | ConstructorOne of string
+        | ConstructorTwo of value: int
+    static member One =
+        ConstructorOne "some one"
+    static member Two =
+        ConstructorTwo 2
+
+[<Immutable; GenerateSerializer>]
 type SingleCaseDU =
     | Case1 of int
     static member ofInt i = Case1 i
@@ -32,7 +48,7 @@ type SingleCaseDU =
 [<Immutable; GenerateSerializer>]
 type DoubleCaseDU =
     | Case1 of string
-    | Case2 of int
+    | Case2 of number: int
 
 [<Immutable; GenerateSerializer>]
 type TripleCaseDU =
@@ -48,12 +64,35 @@ type QuadrupleCaseDU =
     | Case4 of byte
 
 [<Immutable; GenerateSerializer>]
+type NamedFieldsSingleCaseDU =
+    | Case1 of something: string
+
+[<Immutable; GenerateSerializer>]
+type NamedFieldsDoubleCaseDU =
+    | Case1 of something: string * int
+    | Case2 of other: string
+
+[<Immutable; GenerateSerializer>]
+type NamedFieldsTripleCaseDU =
+    | Case1 of something: string
+    | Case2 of other: string * byte
+    | Case3 of string * second: string * third: int
+
+[<Immutable; GenerateSerializer>]
 type QuintupleCaseDU =
     | Case1
-    | Case2 of int
+    | Case2 of number: int * string
     | Case3
-    | Case4 of byte
+    | Case4 of theByte: byte * theLong: int64
     | Case5 of string
+
+[<Immutable; GenerateSerializer>]
+type DUMutually =
+    | Case1 of int
+    | Case2 of DURecursive
+and [<Immutable; GenerateSerializer>] DURecursive =
+    | Case1 of DUMutually
+    | Case2 of DURecursive * DUMutually
 
 [<Immutable; GenerateSerializer>]
 type Record = {  [<Id(1u)>] A: SingleCaseDU } with
@@ -74,7 +113,7 @@ type GenericRecord<'T> = { [<Id(1u)>] Value: 'T } with
     static member ofT x = { Value = x }
 
 [<Immutable; GenerateSerializer>]
-type DiscriminatedUnion = 
+type DiscriminatedUnion =
     | ArrayFieldCase of int array
     | ListFieldCase of int list
     | MapFieldCase of Map<int,string>
