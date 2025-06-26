@@ -48,7 +48,7 @@ type SingleCaseDU =
 [<Immutable; GenerateSerializer>]
 type DoubleCaseDU =
     | Case1 of string
-    | Case2 of number: int
+    | Case2 of int
 
 [<Immutable; GenerateSerializer>]
 type TripleCaseDU =
