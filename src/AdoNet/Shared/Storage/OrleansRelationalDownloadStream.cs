@@ -26,7 +26,7 @@ namespace Orleans.Tests.SqlUtils
     /// This is a chunked read implementation for ADO.NET providers which do
     /// not otherwise implement <see cref="DbDataReader.GetStream(int)"/> natively.
     /// </summary>
-    public class OrleansRelationalDownloadStream : Stream
+    internal class OrleansRelationalDownloadStream : Stream
     {
         /// <summary>
         /// A cached task as if there are multiple rounds of reads, it is likely
