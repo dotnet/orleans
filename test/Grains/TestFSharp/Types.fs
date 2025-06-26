@@ -99,8 +99,8 @@ type SingleCaseStructDU = Case of string
 
 [<Struct; GenerateSerializer>]
 type MulticaseStructDU =
-    | Case1 of value: string
-    | Case2 of value: string
+    | Case1 of value1: string
+    | Case2 of value2: string
     | Case3 of valueInt: int
     | Case4
     | Case5 of int64
