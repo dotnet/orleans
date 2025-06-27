@@ -5,7 +5,7 @@ namespace Orleans.Hosting;
 /// <summary>
 /// <see cref="IServiceCollection"/> extensions.
 /// </summary>
-public static class AdoNetGrainDirectoryServiceCollectionExtensions
+internal static class AdoNetGrainDirectoryServiceCollectionExtensions
 {
     internal static IServiceCollection AddAdoNetGrainDirectory(
         this IServiceCollection services,
