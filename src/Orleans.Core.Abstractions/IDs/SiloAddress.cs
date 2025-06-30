@@ -12,7 +12,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -457,7 +456,7 @@ namespace Orleans.Runtime
     public sealed class SiloAddressConverter : JsonConverter<SiloAddress>
     {
         /// <inheritdoc />
-        public override SiloAddress Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => SiloAddress.FromParsableString(reader.GetString()!);
+        public override SiloAddress? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => reader.GetString() is { } str ? SiloAddress.FromParsableString(str) : null;
 
         /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, SiloAddress value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToUtf8String());

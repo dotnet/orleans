@@ -28,7 +28,7 @@ namespace Orleans
         /// The runtime used to manage grain cancellation tokens.
         /// </summary>
         [NonSerialized]
-        private IGrainCancellationTokenRuntime _cancellationTokenRuntime;
+        private IGrainCancellationTokenRuntime? _cancellationTokenRuntime;
 
         /// <summary>
         /// Initializes the <see cref="T:Orleans.GrainCancellationToken"/>.
@@ -55,7 +55,7 @@ namespace Orleans
         /// <param name="runtime">
         /// The runtime.
         /// </param>
-        internal GrainCancellationToken(Guid id, bool canceled, IGrainCancellationTokenRuntime runtime = null) : this(id)
+        internal GrainCancellationToken(Guid id, bool canceled, IGrainCancellationTokenRuntime? runtime = null) : this(id)
         {
             _cancellationTokenRuntime = runtime;
             if (canceled)

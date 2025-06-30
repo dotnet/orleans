@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -194,7 +194,10 @@ namespace Orleans.Runtime
             try
             {
                 if (exc is AggregateException { InnerExceptions.Count: 1 })
-                    exc = exc.InnerException!;
+                {
+                    Debug.Assert(exc.InnerException is not null, "AggregateException should have an inner exception.");
+                    exc = exc.InnerException;
+                }
 
                 LogWarningIgnoringException(logger, exc, new(exc), caller ?? string.Empty);
             }
@@ -232,7 +235,7 @@ namespace Orleans.Runtime
 
         private readonly struct ExceptionTypeLogValue(Exception exc)
         {
-            public override string ToString() => exc.GetType().FullName!;
+            public override string? ToString() => exc.GetType().FullName;
         }
 
         [LoggerMessage(

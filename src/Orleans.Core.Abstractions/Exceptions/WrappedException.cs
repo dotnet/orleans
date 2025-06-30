@@ -10,7 +10,7 @@ namespace Orleans.Runtime
     /// An exception class used by the Orleans runtime for reporting errors.
     /// </summary>
     /// <remarks>
-    /// This is also the base class for any more specific exceptions 
+    /// This is also the base class for any more specific exceptions
     /// raised by the Orleans runtime.
     /// </remarks>
     [Serializable]
@@ -50,7 +50,7 @@ namespace Orleans.Runtime
         /// Gets or sets the type of the original exception.
         /// </summary>
         [Id(0)]
-        public string OriginalExceptionType { get; set; }
+        public string? OriginalExceptionType { get; set; }
 
         /// <inheritdoc/>
         [Obsolete]
@@ -86,7 +86,11 @@ namespace Orleans.Runtime
                 OriginalExceptionType = originalExceptionType,
             };
 
-            ExceptionDispatchInfo.SetRemoteStackTrace(result, exception.StackTrace);
+            if (exception.StackTrace is { } stackTrace)
+            {
+                ExceptionDispatchInfo.SetRemoteStackTrace(result, exception.StackTrace);
+            }
+
             return result;
         }
 

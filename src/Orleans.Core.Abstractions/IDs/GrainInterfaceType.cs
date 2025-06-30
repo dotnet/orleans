@@ -1,6 +1,5 @@
 using System;
 
-#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -57,7 +56,7 @@ namespace Orleans.Runtime
         /// Returns a UTF8 interpretation of the current instance.
         /// </summary>
         /// <returns></returns>
-        public override string? ToString() => _value.ToString();
+        public override string ToString() => _value.ToString();
 
         string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString() ?? "";
 

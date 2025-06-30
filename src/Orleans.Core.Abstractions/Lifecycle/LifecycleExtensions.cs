@@ -16,9 +16,9 @@ namespace Orleans
         /// <param name="observerName">The name of the observer.</param>
         /// <param name="stage">The stage to participate in.</param>
         /// <param name="onStart">The delegate called when starting the specified lifecycle stage.</param>
-        /// <param name="onStop">Teh delegate to be called when stopping the specified lifecycle stage.</param>
+        /// <param name="onStop">The delegate to be called when stopping the specified lifecycle stage.</param>
         /// <returns>A <see cref="IDisposable"/> instance which can be disposed to unsubscribe the observer from the lifecycle.</returns>
-        public static IDisposable Subscribe(this ILifecycleObservable observable, string observerName, int stage, Func<CancellationToken, Task> onStart, Func<CancellationToken, Task> onStop)
+        public static IDisposable Subscribe(this ILifecycleObservable observable, string observerName, int stage, Func<CancellationToken, Task> onStart, Func<CancellationToken, Task>? onStop)
         {
             if (observable is null)
             {
@@ -63,7 +63,7 @@ namespace Orleans
         /// <returns>A <see cref="IDisposable"/> instance which can be disposed to unsubscribe the observer from the lifecycle.</returns>
         public static IDisposable Subscribe<TObserver>(this ILifecycleObservable observable, int stage, ILifecycleObserver observer)
         {
-            return observable.Subscribe(typeof(TObserver).FullName, stage, observer);
+            return observable.Subscribe(GetTypeName(typeof(TObserver)), stage, observer);
         }
 
         /// <summary>
@@ -79,7 +79,7 @@ namespace Orleans
         /// <returns>A <see cref="IDisposable"/> instance which can be disposed to unsubscribe the observer from the lifecycle.</returns>
         public static IDisposable Subscribe<TObserver>(this ILifecycleObservable observable, int stage, Func<CancellationToken, Task> onStart, Func<CancellationToken, Task> onStop)
         {
-            return observable.Subscribe(typeof(TObserver).FullName, stage, onStart, onStop);
+            return observable.Subscribe(GetTypeName(typeof(TObserver)), stage, onStart, onStop);
         }
 
         /// <summary>
@@ -94,7 +94,7 @@ namespace Orleans
         /// <returns>A <see cref="IDisposable"/> instance which can be disposed to unsubscribe the observer from the lifecycle.</returns>
         public static IDisposable Subscribe<TObserver>(this ILifecycleObservable observable, int stage, Func<CancellationToken, Task> onStart)
         {
-            return observable.Subscribe(typeof(TObserver).FullName, stage, onStart, null);
+            return observable.Subscribe(GetTypeName(typeof(TObserver)), stage, onStart, null);
         }
 
         /// <summary>
@@ -106,7 +106,7 @@ namespace Orleans
         /// <returns>A <see cref="IDisposable"/> instance which can be disposed to unsubscribe the observer from the lifecycle.</returns>
         public static IDisposable Subscribe(this ILifecycleObservable observable, int stage, ILifecycleObserver observer)
         {
-            return observable.Subscribe(observer.GetType().FullName, stage, observer);
+            return observable.Subscribe(GetTypeName(observer.GetType()), stage, observer);
         }
 
         private class Observer : ILifecycleObserver
@@ -150,5 +150,7 @@ namespace Orleans
 
             public Task OnStop(CancellationToken ct) => Task.CompletedTask;
         }
+
+        private static string GetTypeName(Type type) => type.FullName ?? type.Name;
     }
 }

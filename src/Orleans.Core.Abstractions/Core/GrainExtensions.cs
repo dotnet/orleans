@@ -166,7 +166,7 @@ namespace Orleans
         /// <param name="keyExt">The output parameter to return the extended key part of the grain primary key, if extended primary key was provided for that grain.</param>
         /// <returns>A <see langword="long"/> representing the primary key for this grain.</returns>
         /// <exception cref="InvalidOperationException">The provided grain does not have a <see cref="long"/>-based key.</exception>
-        public static long GetPrimaryKeyLong(this IAddressable grain, out string keyExt)
+        public static long GetPrimaryKeyLong(this IAddressable grain, out string? keyExt)
         {
             var grainId = GetGrainId(grain);
             if (grainId.TryGetIntegerKey(out var primaryKey, out keyExt))
@@ -211,7 +211,7 @@ namespace Orleans
         /// <param name="keyExt">The output parameter to return the extended key part of the grain primary key, if extended primary key was provided for that grain.</param>
         /// <returns>A <see cref="Guid"/> representing the primary key for this grain.</returns>
         /// <exception cref="InvalidOperationException">The provided grain does not have a <see cref="Guid"/>-based key.</exception>
-        public static Guid GetPrimaryKey(this IAddressable grain, out string keyExt)
+        public static Guid GetPrimaryKey(this IAddressable grain, out string? keyExt)
         {
             var grainId = GetGrainId(grain);
             if (grainId.TryGetGuidKey(out var guid, out keyExt))

@@ -109,12 +109,12 @@ namespace Orleans.Metadata
         public const string FullTypeName = "full-type-name";
 
         /// <summary>
-        /// The prefix for binding declarations 
+        /// The prefix for binding declarations
         /// </summary>
         public const string BindingPrefix = "binding";
 
         /// <summary>
-        /// The key for defining a binding type. 
+        /// The key for defining a binding type.
         /// </summary>
         public const string BindingTypeKey = "type";
 
@@ -129,22 +129,22 @@ namespace Orleans.Metadata
         public const string BroadcastChannelBindingTypeValue = "broadcast-channel";
 
         /// <summary>
-        /// The key to specify a stream binding pattern. 
+        /// The key to specify a stream binding pattern.
         /// </summary>
         public const string StreamBindingPatternKey = "pattern";
 
         /// <summary>
-        /// The key to specify a channel binding pattern. 
+        /// The key to specify a channel binding pattern.
         /// </summary>
         public const string BroadcastChannelBindingPatternKey = "channel-pattern";
 
         /// <summary>
-        /// The key to specify a stream id mapper 
+        /// The key to specify a stream id mapper
         /// </summary>
         public const string StreamIdMapperKey = "streamid-mapper";
 
         /// <summary>
-        /// The key to specify a channel id mapper 
+        /// The key to specify a channel id mapper
         /// </summary>
         public const string ChannelIdMapperKey = "channelid-mapper";
 
@@ -309,7 +309,7 @@ namespace Orleans.Metadata
                 {
                     foreach (var pair in binding)
                     {
-                        properties[BindingPrefix + bindingIndex.ToString(CultureInfo.InvariantCulture) + '.' + pair.Key] = pair.Value; 
+                        properties[BindingPrefix + bindingIndex.ToString(CultureInfo.InvariantCulture) + '.' + pair.Key] = pair.Value;
                     }
 
                     ++bindingIndex;

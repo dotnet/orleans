@@ -6,7 +6,6 @@ using System.Runtime.Serialization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -108,7 +107,7 @@ namespace Orleans.Runtime
     public sealed class ActivationIdConverter : JsonConverter<ActivationId>
     {
         /// <inheritdoc />
-        public override ActivationId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => ActivationId.FromParsableString(reader.GetString()!);
+        public override ActivationId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => reader.GetString() is { } str ? ActivationId.FromParsableString(str) : default;
 
         /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, ActivationId value, JsonSerializerOptions options)

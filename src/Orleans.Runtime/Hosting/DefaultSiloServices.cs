@@ -266,7 +266,7 @@ namespace Orleans.Hosting
             services.AddFromExisting<IActivationWorkingSetObserver, IncomingRequestMonitor>();
 
             // Scoped to a grain activation
-            services.AddScoped<IGrainContext>(sp => RuntimeContext.Current);
+            services.AddScoped<IGrainContext>(sp => RuntimeContext.Current ?? throw new InvalidOperationException("No current grain context available."));
 
             services.TryAddSingleton<IConsistentRingProvider>(
                 sp =>
