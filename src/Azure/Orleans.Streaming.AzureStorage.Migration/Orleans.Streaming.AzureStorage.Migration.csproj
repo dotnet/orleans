@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Streaming.AzureStorage.Migration</PackageId>
+    <Title>Microsoft Orleans Streaming Azure Storage Migration</Title>
+    <Description>Microsoft Orleans migration streaming provider for Azure Queue Storage</Description>
+    <PackageTags>$(PackageTags) Azure Table Blob Storage Migration</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Streaming.AzureStorage.Migration</AssemblyName>
+    <RootNamespace>Orleans.Streaming.AzureStorage.Migration</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);ORLEANS_STREAMING</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Core" Version="$(AzureCoreVersion)" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="$(AzureStorageBlobsVersion)" />
+    <PackageReference Include="Azure.Storage.Queues" Version="$(AzureStorageQueuesVersion)" />
+    <PackageReference Include="Azure.Data.Tables" Version="$(AzureDataTablesVersion)" />
+    <PackageReference Include="System.Net.NameResolution" Version="$(SystemNetNameResolutionVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Streaming.AzureStorage\Orleans.Streaming.AzureStorage.csproj" />
+  </ItemGroup>
+</Project>

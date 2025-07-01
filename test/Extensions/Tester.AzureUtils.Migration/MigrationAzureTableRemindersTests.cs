@@ -8,7 +8,7 @@ using Orleans.Persistence.AzureStorage.Migration;
 using TesterInternal.AzureInfra;
 using Xunit;
 
-namespace Tester.AzureUtils.Migration
+namespace Tester.AzureUtils .Migration
 {
     [TestCategory("Functional"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureTableStorage")]
     public class MigrationAzureTableRemindersTests : MigrationRemindersTests, IClassFixture<MigrationAzureTableRemindersTests.Fixture>
