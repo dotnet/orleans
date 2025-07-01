@@ -359,7 +359,7 @@ namespace Orleans.Transactions.DynamoDB
                 return tableDescription;
             }
 
-            if (string.IsNullOrEmpty(ttlAttributeName))
+            if (string.IsNullOrEmpty(ttlAttributeName) || describeTimeToLive.AttributeName == ttlAttributeName)
             {
                 return tableDescription;
             }
