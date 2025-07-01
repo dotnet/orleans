@@ -302,7 +302,12 @@ namespace Orleans
         /// <summary>
         /// The runtime requested to deactivate this activation.
         /// </summary>
-        RuntimeRequested
+        RuntimeRequested,
+
+        /// <summary>
+        /// Runtime detected that app is running on low memory, and forcefully decided to deactivate.
+        /// </summary>
+        HighMemoryPressure,
     }
 
     internal static class DeactivationReasonCodeExtensions

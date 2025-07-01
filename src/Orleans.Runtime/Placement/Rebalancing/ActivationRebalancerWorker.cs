@@ -321,8 +321,6 @@ internal sealed partial class ActivationRebalancerWorker(
         var addressPairs = FormSiloPairs(snapshot);
         var migrationTasks = new List<Task>();
 
-        Debug.Assert(addressPairs.Count % 2 == 0);
-
         for (var i = 0; i < addressPairs.Count; i++)
         {
             (var lowSilo, var highSilo) = addressPairs[i];

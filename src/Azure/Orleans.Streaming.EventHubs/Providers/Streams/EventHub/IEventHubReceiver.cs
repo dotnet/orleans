@@ -56,13 +56,8 @@ namespace Orleans.Streaming.EventHubs
                 // If we have a starting offset, read from offset
                 if (offset != EventHubConstants.StartOfStream)
                 {
-                    if (!long.TryParse(offset, out var longOffset))
-                    {
-                        throw new InvalidOperationException("Offset must be a number.");
-                    }
-
                     LogInfoStartingRead(logger, options.EventHubName, partitionSettings.Partition, offset);
-                    eventPosition = EventPosition.FromOffset(longOffset, true);
+                    eventPosition = EventPosition.FromOffset(offset, true);
                 }
                 // else, if configured to start from now, start reading from most recent data
                 else if (partitionSettings.ReceiverOptions.StartFromNow)

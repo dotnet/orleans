@@ -8,6 +8,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace ServiceBus.Tests
 {
+    /// <summary>
+    /// Tests for pluggable queue balancer functionality with EventHub streaming provider.
+    /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming")]
     public class PluggableQueueBalancerTestsWithEHStreamProvider : PluggableQueueBalancerTestBase, IClassFixture<PluggableQueueBalancerTestsWithEHStreamProvider.Fixture>
     {

@@ -1,4 +1,5 @@
 using Orleans.Internal;
+using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces.Directories;
@@ -6,6 +7,9 @@ using Xunit;
 
 namespace Tester.Directories
 {
+    /// <summary>
+    /// Base class for testing multiple grain directory implementations across cluster silos.
+    /// </summary>
     public abstract class MultipleGrainDirectoriesTests : TestClusterPerTest
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -42,6 +46,7 @@ namespace Tester.Directories
         {
             while (true)
             {
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, HostedCluster.Primary.SiloAddress);
                 var grain = this.GrainFactory.GetGrain<ICustomDirectoryGrain>(Guid.NewGuid());
                 var instanceId = await grain.GetRuntimeInstanceId();
                 if (instanceId.Contains(HostedCluster.Primary.SiloAddress.Endpoint.ToString()))
@@ -53,6 +58,7 @@ namespace Tester.Directories
         {
             while (true)
             {
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, HostedCluster.SecondarySilos[0].SiloAddress);
                 var grain = this.GrainFactory.GetGrain<ICustomDirectoryGrain>(Guid.NewGuid());
                 var instanceId = await grain.GetRuntimeInstanceId();
                 if (instanceId.Contains(HostedCluster.SecondarySilos[0].SiloAddress.Endpoint.ToString()))

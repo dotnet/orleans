@@ -9,6 +9,9 @@ using Xunit;
 
 namespace Tester.Redis.GrainDirectory
 {
+    /// <summary>
+    /// Tests for Orleans clusters using multiple grain directories with Redis as the directory storage backend.
+    /// </summary>
     [TestCategory("Redis"), TestCategory("Directory"), TestCategory("Functional")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class RedisMultipleGrainDirectoriesTests : MultipleGrainDirectoriesTests

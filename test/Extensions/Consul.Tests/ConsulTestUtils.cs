@@ -4,6 +4,9 @@ using Xunit;
 
 namespace Consul.Tests
 {
+    /// <summary>
+    /// Utility class for Consul test setup and connection verification.
+    /// </summary>
     public static class ConsulTestUtils
     {
         public static readonly string ConsulConnectionString = TestDefaultConfiguration.ConsulConnectionString;

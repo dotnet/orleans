@@ -9,6 +9,7 @@
     <AssemblyName>Orleans.Streaming.EventHubs</AssemblyName>
     <RootNamespace>Orleans.Streaming.EventHubs</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,8 +23,11 @@
   <ItemGroup>
     <PackageReference Include="Azure.Core" />
     <PackageReference Include="Azure.Data.Tables" />
-    <PackageReference Include="System.Net.NameResolution" />
     <PackageReference Include="Azure.Messaging.EventHubs" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>

@@ -9,6 +9,7 @@ using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("DefaultCluster.Tests")]
 [assembly: InternalsVisibleTo("NonSilo.Tests")]
+[assembly: InternalsVisibleTo("ServiceBus.Tests")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
 [assembly: InternalsVisibleTo("AWSUtils.Tests")]
 [assembly: InternalsVisibleTo("TesterInternal")]

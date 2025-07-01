@@ -3,9 +3,21 @@ using Xunit;
 
 namespace Orleans.Journaling.Tests;
 
+/// <summary>
+/// Tests for DurableQueue, a persistent FIFO queue implementation that uses Orleans' journaling
+/// infrastructure to maintain state across grain activations and system restarts.
+/// 
+/// DurableQueue provides standard queue operations (Enqueue, Dequeue, Peek) while ensuring
+/// all operations are journaled for durability. This is particularly useful for implementing
+/// reliable message processing patterns in Orleans grains.
+/// </summary>
 [TestCategory("BVT")]
 public class DurableQueueTests : StateMachineTestBase
 {
+    /// <summary>
+    /// Tests basic queue operations: Enqueue, Dequeue, Peek, and Count.
+    /// Verifies FIFO ordering and that operations are correctly persisted.
+    /// </summary>
     [Fact]
     public async Task DurableQueue_BasicOperations_Test()
     {
@@ -25,10 +37,10 @@ public class DurableQueueTests : StateMachineTestBase
         // Assert
         Assert.Equal(3, queue.Count);
         
-        // Act - Peek
+        // Act - Peek at the front of the queue
         var peeked = queue.Peek();
         
-        // Assert - Peek doesn't remove the item
+        // Assert - Peek returns the first item without removing it
         Assert.Equal("one", peeked);
         Assert.Equal(3, queue.Count);
         
@@ -57,6 +69,11 @@ public class DurableQueueTests : StateMachineTestBase
         Assert.Empty(queue);
     }
     
+    /// <summary>
+    /// Tests that queue state is correctly persisted and recovered.
+    /// Creates a queue, adds items, then recreates the queue from the same
+    /// storage to verify state recovery.
+    /// </summary>
     [Fact]
     public async Task DurableQueue_Persistence_Test()
     {
@@ -90,6 +107,11 @@ public class DurableQueueTests : StateMachineTestBase
         Assert.Equal(2, queue2.Count);
     }
     
+    /// <summary>
+    /// Tests that the queue correctly handles complex value types.
+    /// Verifies that custom objects are properly serialized and deserialized
+    /// when enqueued and dequeued.
+    /// </summary>
     [Fact]
     public async Task DurableQueue_ComplexValues_Test()
     {
@@ -123,6 +145,10 @@ public class DurableQueueTests : StateMachineTestBase
         Assert.Equal(30, dequeued.Age);
     }
     
+    /// <summary>
+    /// Tests the Clear operation which removes all items from the queue.
+    /// Verifies that the clear operation is properly journaled.
+    /// </summary>
     [Fact]
     public async Task DurableQueue_Clear_Test()
     {
@@ -148,6 +174,11 @@ public class DurableQueueTests : StateMachineTestBase
         Assert.Empty(queue);
     }
     
+    /// <summary>
+    /// Tests edge cases for operations on an empty queue.
+    /// Verifies that Peek and Dequeue throw appropriate exceptions
+    /// when the queue is empty.
+    /// </summary>
     [Fact]
     public async Task DurableQueue_EmptyQueueOperations_Test()
     {
@@ -167,6 +198,11 @@ public class DurableQueueTests : StateMachineTestBase
         Assert.Throws<InvalidOperationException>(() => queue.Dequeue());
     }
     
+    /// <summary>
+    /// Tests queue enumeration capabilities.
+    /// Verifies that the queue supports standard enumeration patterns
+    /// and returns items in FIFO order.
+    /// </summary>
     [Fact]
     public async Task DurableQueue_Enumeration_Test()
     {
@@ -194,6 +230,11 @@ public class DurableQueueTests : StateMachineTestBase
         Assert.Equal(expectedItems, actualItems);
     }
     
+    /// <summary>
+    /// Stress test for queue performance with large numbers of items.
+    /// Tests that the journaling system can handle thousands of queue operations
+    /// and correctly recover the entire queue state.
+    /// </summary>
     [Fact]
     public async Task DurableQueue_LargeNumberOfOperations_Test()
     {
@@ -236,6 +277,11 @@ public class DurableQueueTests : StateMachineTestBase
         Assert.Empty(queue2);
     }
     
+    /// <summary>
+    /// Tests complex queue operation patterns with interleaved enqueue/dequeue operations.
+    /// Simulates real-world usage where items are added and removed in batches,
+    /// verifying that the queue maintains correct ordering and state.
+    /// </summary>
     [Fact]
     public async Task DurableQueue_Concurrent_EnqueueDequeue_Test()
     {

@@ -10,6 +10,9 @@ using Xunit;
 
 namespace Tester.AzureUtils.Lease
 {
+    /// <summary>
+    /// Tests for lease-based queue balancer functionality in Azure Storage, including auto-scaling and node failure scenarios.
+    /// </summary>
     [TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Lease")]
     public class LeaseBasedQueueBalancerTests : TestClusterPerTest
     {
@@ -70,7 +73,7 @@ namespace Tester.AzureUtils.Lease
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, 2, mgmtGrain, lastTry), TimeOut);
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9559")]
         public async Task LeaseBalancedQueueBalancer_SupportUnexpectedNodeFailureScenerio()
         {
             var mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);

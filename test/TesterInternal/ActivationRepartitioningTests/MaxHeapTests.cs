@@ -3,6 +3,9 @@ using Xunit;
 
 namespace UnitTests.ActivationRepartitioningTests;
 
+/// <summary>
+/// Tests for the max heap data structure used in activation repartitioning algorithms.
+/// </summary>
 public sealed class MaxHeapTests
 {
     public class MyHeapElement(int value) : IHeapElement<MyHeapElement>

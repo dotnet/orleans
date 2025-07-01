@@ -5,12 +5,23 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
+    /// <summary>
+    /// Tests for Orleans grain key extensions functionality.
+    /// Key extensions allow grains to have compound keys by combining a primary key
+    /// (GUID, long, or string) with a string extension. This enables scenarios like
+    /// multi-tenancy where the same grain type can have different instances per tenant.
+    /// </summary>
     public class KeyExtensionTests : HostedTestClusterEnsureDefaultStarted
     {
         public KeyExtensionTests(DefaultClusterFixture fixture) : base(fixture)
         {
         }
 
+        /// <summary>
+        /// Verifies that grains with the same base primary key but different key extensions
+        /// are treated as distinct grain instances with separate activations.
+        /// This is fundamental for multi-tenancy and partitioning scenarios.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("PrimaryKeyExtension")]
         public async Task PrimaryKeyExtensionsShouldDifferentiateGrainsUsingTheSameBasePrimaryKey()
         {
@@ -31,6 +42,11 @@ namespace DefaultCluster.Tests.General
             Assert.NotEqual(activationId1, activationId2); // Mismatched key extensions should differentiate an identical base primary key.
         }
 
+        /// <summary>
+        /// Verifies that grains with different base primary keys are distinct
+        /// even when they share the same key extension value.
+        /// Ensures proper isolation between different grain instances.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("PrimaryKeyExtension")]
         public async Task PrimaryKeyExtensionsShouldDifferentiateGrainsUsingDifferentBaseKeys()
         {
@@ -51,6 +67,11 @@ namespace DefaultCluster.Tests.General
             Assert.NotEqual(activationId1, activationId2); // Mismatched base keys should differentiate between identical extended keys.
         }
 
+        /// <summary>
+        /// Verifies that empty string key extensions are not allowed.
+        /// This prevents accidental grain identity confusion and ensures
+        /// meaningful key extensions when used.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("PrimaryKeyExtension")]
         public void EmptyKeyExtensionsAreDisallowed()
         {
@@ -62,6 +83,11 @@ namespace DefaultCluster.Tests.General
             });
         }
 
+        /// <summary>
+        /// Verifies that whitespace-only key extensions are not allowed.
+        /// This ensures key extensions contain meaningful identifiers
+        /// and prevents subtle bugs from invisible characters.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("PrimaryKeyExtension")]
         public void WhiteSpaceKeyExtensionsAreDisallowed()
         {
@@ -73,6 +99,11 @@ namespace DefaultCluster.Tests.General
             });
         }
 
+        /// <summary>
+        /// Verifies that null key extensions are not allowed.
+        /// Enforces that key extensions must be explicitly provided
+        /// when using the extended grain factory methods.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("PrimaryKeyExtension")]
         public void NullKeyExtensionsAreDisallowed()
         {
@@ -84,6 +115,11 @@ namespace DefaultCluster.Tests.General
             });
         }
 
+        /// <summary>
+        /// Verifies that key extensions can exceed 127 bytes in length.
+        /// This ensures the system can handle long identifiers such as
+        /// file paths, URLs, or other extended identifiers without artificial limits.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("PrimaryKeyExtension")]
         public async Task PrimaryKeyExtensionsShouldPermitStringsLongerThan127BytesLong()
         {
@@ -97,6 +133,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(localGrainRef, remoteGrainRef); // Mismatched grain ID.
         }
 
+        /// <summary>
+        /// Tests retrieving the primary key string from a grain reference.
+        /// Verifies that string-keyed grains can have their keys extracted
+        /// from grain references for diagnostic or routing purposes.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("PrimaryKeyExtension")]
         public void GetPrimaryKeyStringOnGrainReference()
         {

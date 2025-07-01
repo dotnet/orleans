@@ -11,6 +11,9 @@ using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Streaming
 {
+    /// <summary>
+    /// Tests for programmatic subscription functionality with Azure Queue streaming providers.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("Streaming"), TestCategory("AQStreaming")]
     public class AQProgrammaticSubscribeTest : ProgrammaticSubscribeTestsRunner, IClassFixture<AQProgrammaticSubscribeTest.Fixture>
     {

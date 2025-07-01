@@ -14,6 +14,9 @@ using Xunit;
 
 namespace UnitTests.StreamingTests
 {
+    /// <summary>
+    /// Tests for stream generator provider functionality, validating automatic stream generation and event delivery.
+    /// </summary>
     public class StreamGeneratorProviderTests : OrleansTestingBase, IClassFixture<StreamGeneratorProviderTests.Fixture>
     {
         private const int TotalQueueCount = 4;

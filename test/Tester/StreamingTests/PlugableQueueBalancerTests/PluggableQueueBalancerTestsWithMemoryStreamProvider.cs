@@ -7,6 +7,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Tester.StreamingTests.PlugableQueueBalancerTests
 {
+    /// <summary>
+    /// Tests for pluggable queue balancer functionality using memory stream provider with lease-based queue balancing.
+    /// </summary>
     public class PluggableQueueBalancerTestsWithMemoryStreamProvider : PluggableQueueBalancerTestBase, IClassFixture<PluggableQueueBalancerTestsWithMemoryStreamProvider.Fixture>
     {
         private const string StreamProviderName = "MemoryStreamProvider";

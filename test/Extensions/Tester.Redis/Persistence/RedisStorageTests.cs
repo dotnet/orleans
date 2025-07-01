@@ -6,6 +6,9 @@ using Xunit.Abstractions;
 
 namespace Tester.Redis.Persistence
 {
+    /// <summary>
+    /// Tests for Redis grain storage provider with various data types and serialization scenarios.
+    /// </summary>
     [TestCategory("Redis"), TestCategory("Persistence"), TestCategory("Functional")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class RedisStorageTests

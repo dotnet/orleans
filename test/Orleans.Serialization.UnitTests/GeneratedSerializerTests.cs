@@ -21,6 +21,23 @@ using Orleans;
 
 namespace Orleans.Serialization.UnitTests;
 
+/// <summary>
+/// Tests for Orleans' code-generated serializers.
+/// 
+/// Orleans uses source generators to create high-performance serializers at compile time for types
+/// marked with [GenerateSerializer]. The generated serializers provide:
+/// - Zero-allocation serialization for common scenarios
+/// - Support for complex object graphs with circular references
+/// - Version tolerance through field-based serialization
+/// - Efficient handling of inheritance hierarchies
+/// - Support for records, classes, and structs
+/// - Integration with external types through assembly-level attributes
+/// 
+/// The generated code follows Orleans' serialization protocol which ensures:
+/// - Backward and forward compatibility
+/// - Minimal wire format overhead
+/// - Support for schema evolution
+/// </summary>
 [Trait("Category", "BVT")]
 public class GeneratedSerializerTests : IDisposable
 {
@@ -41,6 +58,10 @@ public class GeneratedSerializerTests : IDisposable
         _deepCopier = _serviceProvider.GetRequiredService<DeepCopier>();
     }
 
+    /// <summary>
+    /// Verifies that generated serializers correctly handle basic class serialization,
+    /// including fields, properties, and polymorphic object references.
+    /// </summary>
     [Fact]
     public void GeneratedSerializersRoundTripThroughCodec()
     {
@@ -53,6 +74,11 @@ public class GeneratedSerializerTests : IDisposable
         Assert.Equal(MyCustomEnum.Two, otherObj);
     }
 
+    /// <summary>
+    /// Verifies that C# records are properly serialized and deserialized,
+    /// maintaining both primary constructor parameters and additional properties.
+    /// Records are fully supported in Orleans serialization.
+    /// </summary>
     [Fact]
     public void GeneratedRecordSerializersRoundTripThroughCodec()
     {
@@ -92,6 +118,11 @@ public class GeneratedSerializerTests : IDisposable
         Assert.Equal(original, result);
     }
 
+    /// <summary>
+    /// Tests serialization of circular references and recursive data structures.
+    /// Orleans correctly handles object graphs with cycles, preserving reference equality
+    /// after deserialization to maintain object graph integrity.
+    /// </summary>
     [Fact]
     public void RecursiveTypeSerializersRoundTripThroughSerializer()
     {

@@ -4,6 +4,8 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
+#nullable disable
+
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
 #elif PERSISTENCE_ADONET
@@ -12,6 +14,8 @@ namespace Orleans.Persistence.AdoNet.Storage
 namespace Orleans.Reminders.AdoNet.Storage
 #elif STREAMING_ADONET
 namespace Orleans.Streaming.AdoNet.Storage
+#elif GRAINDIRECTORY_ADONET
+namespace Orleans.GrainDirectory.AdoNet.Storage
 #elif TESTER_SQLUTILS
 namespace Orleans.Tests.SqlUtils
 #else
@@ -22,7 +26,7 @@ namespace Orleans.Tests.SqlUtils
     /// This is a chunked read implementation for ADO.NET providers which do
     /// not otherwise implement <see cref="DbDataReader.GetStream(int)"/> natively.
     /// </summary>
-    public class OrleansRelationalDownloadStream : Stream
+    internal class OrleansRelationalDownloadStream : Stream
     {
         /// <summary>
         /// A cached task as if there are multiple rounds of reads, it is likely
@@ -211,3 +215,5 @@ namespace Orleans.Tests.SqlUtils
         }
     }
 }
+
+#nullable restore

@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.Streaming.SQS</PackageId>
     <Title>Microsoft Orleans AWS SQS Streaming Provider</Title>
     <Description>Microsoft Orleans streaming provider backed by AWS SQS</Description>
@@ -18,4 +19,8 @@
     <PackageReference Include="AWSSDK.SQS" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>

@@ -3,9 +3,21 @@ using Xunit;
 
 namespace Orleans.Journaling.Tests;
 
+/// <summary>
+/// Tests for DurableValue, a simple persistent value wrapper that uses Orleans' journaling
+/// infrastructure to maintain a single value across grain activations and system restarts.
+/// 
+/// DurableValue is the simplest durable data structure, providing a way to persist
+/// a single value of any type. It's useful for grain state properties that need
+/// durability without the complexity of collections.
+/// </summary>
 [TestCategory("BVT")]
 public class DurableValueTests : StateMachineTestBase
 {
+    /// <summary>
+    /// Tests basic value operations: setting and updating values.
+    /// Verifies that value changes are properly journaled and persisted.
+    /// </summary>
     [Fact]
     public async Task DurableValue_BasicOperations_Test()
     {
@@ -31,6 +43,11 @@ public class DurableValueTests : StateMachineTestBase
         Assert.Equal("Updated Value", durableValue.Value);
     }
 
+    /// <summary>
+    /// Tests that value state is correctly persisted and recovered.
+    /// Creates a DurableValue, sets a value, then recreates it from the same
+    /// storage to verify state recovery.
+    /// </summary>
     [Fact]
     public async Task DurableValue_Persistence_Test()
     {
@@ -53,6 +70,11 @@ public class DurableValueTests : StateMachineTestBase
         Assert.Equal(42, durableValue2.Value);
     }
 
+    /// <summary>
+    /// Tests handling of null values in DurableValue.
+    /// Verifies that null values are properly persisted and can be
+    /// distinguished from uninitialized state.
+    /// </summary>
     [Fact]
     public async Task DurableValue_NullValue_Test()
     {
@@ -85,6 +107,11 @@ public class DurableValueTests : StateMachineTestBase
         Assert.Null(durableValue.Value);
     }
 
+    /// <summary>
+    /// Tests that DurableValue correctly handles complex value types.
+    /// Verifies that custom objects are properly serialized and that
+    /// mutations to properties of the stored object are persisted.
+    /// </summary>
     [Fact]
     public async Task DurableValue_ComplexType_Test()
     {

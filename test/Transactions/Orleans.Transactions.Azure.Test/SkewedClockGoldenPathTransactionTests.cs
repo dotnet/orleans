@@ -4,6 +4,9 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
+    /// <summary>
+    /// Tests for transaction golden path scenarios with skewed clocks using Azure Storage.
+    /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("Functional")]
     public class SkewedClockGoldenPathTransactionTests : GoldenPathTransactionTestRunnerxUnit, IClassFixture<SkewedClockTestFixture>
     {

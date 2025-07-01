@@ -13,6 +13,7 @@ namespace Orleans.Runtime;
 /// <para>Silos which are overloaded by definition of the load shedding mechanism are not considered as candidates for new placements.</para>
 /// <para><i>This placement strategy is configured by adding the <see cref="Placement.ResourceOptimizedPlacementAttribute"/> attribute to a grain.</i></para>
 /// </remarks>
+[GenerateSerializer, Immutable, SuppressReferenceTracking]
 public sealed class ResourceOptimizedPlacement : PlacementStrategy
 {
     internal static readonly ResourceOptimizedPlacement Singleton = new();

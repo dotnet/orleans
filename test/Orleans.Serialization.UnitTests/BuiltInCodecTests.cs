@@ -42,6 +42,21 @@ namespace Orleans.Serialization.UnitTests
         Two
     }
 
+    /// <summary>
+    /// Tests for Orleans' built-in codecs for primitive and common .NET types.
+    /// Orleans provides optimized serialization codecs for commonly used types including:
+    /// - Primitive types (int, bool, etc.)
+    /// - Common .NET types (DateTime, Guid, Version, etc.)
+    /// - Collection types (List, Dictionary, arrays, etc.)
+    /// - Nullable types
+    /// - Enums
+    /// 
+    /// These codecs are designed for:
+    /// - High performance with minimal allocations
+    /// - Compact binary representation
+    /// - Version tolerance (forward/backward compatibility)
+    /// - Cross-language support where applicable
+    /// </summary>
     [Trait("Category", "BVT")]
     public class CodecTestTests
     {
@@ -135,6 +150,11 @@ namespace Orleans.Serialization.UnitTests
         }
     }
 
+    /// <summary>
+    /// Tests enum serialization and deserialization.
+    /// Enums in Orleans are serialized efficiently as their underlying type values,
+    /// ensuring compact representation and support for undefined enum values.
+    /// </summary>
     public class EnumTests(ITestOutputHelper output) : FieldCodecTester<MyEnum, IFieldCodec<MyEnum>>(output)
     {
         protected override IFieldCodec<MyEnum> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<MyEnum>();

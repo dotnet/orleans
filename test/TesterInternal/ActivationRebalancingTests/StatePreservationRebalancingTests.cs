@@ -13,6 +13,9 @@ using SPFixture = UnitTests.ActivationRebalancingTests.StatePreservationRebalanc
 
 namespace UnitTests.ActivationRebalancingTests;
 
+/// <summary>
+/// Tests for activation rebalancing with state preservation when the hosting silo dies.
+/// </summary>
 [TestCategory("Functional"), TestCategory("ActivationRebalancing")]
 public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHelper output)
     : RebalancingTestBase<SPFixture>(fixture, output), IClassFixture<SPFixture>
@@ -31,7 +34,7 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
         // the primary in this test setup.
         RequestContext.Set(IPlacementDirector.PlacementHintKey, Cluster.Silos[1].SiloAddress);
         await Cluster.Client.GetGrain<IActivationRebalancerWorker>(0).Cast<IGrainManagementExtension>().MigrateOnIdle();
-        RequestContext.Set(IPlacementDirector.PlacementHintKey, null);
+        RequestContext.Remove(IPlacementDirector.PlacementHintKey);
 
         AddTestActivations(tasks, Silo1, 300);
         AddTestActivations(tasks, Silo2, 30);

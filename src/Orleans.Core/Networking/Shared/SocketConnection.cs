@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Networking.Shared
 {
-    internal sealed class SocketConnection : TransportConnection
+    internal sealed partial class SocketConnection : TransportConnection
     {
         private static readonly int MinAllocBufferSize = SlabMemoryPool.BlockSize / 2;
         private static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
@@ -99,7 +99,7 @@ namespace Orleans.Networking.Shared
             }
             catch (Exception ex)
             {
-                _trace.LogError(0, ex, $"Unexpected exception in {nameof(SocketConnection)}.{nameof(StartAsync)}.");
+                LogErrorUnexpectedExceptionInStartAsync(_trace, ex);
             }
         }
 
@@ -355,7 +355,7 @@ namespace Orleans.Networking.Shared
             }
             catch (Exception ex)
             {
-                _trace.LogError(0, ex, $"Unexpected exception in {nameof(SocketConnection)}.{nameof(CancelConnectionClosedToken)}.");
+                LogErrorUnexpectedExceptionInCancelConnectionClosedToken(_trace, ex);
             }
         }
 
@@ -376,5 +376,17 @@ namespace Orleans.Networking.Shared
                    errorCode == SocketError.Interrupted ||
                    (errorCode == SocketError.InvalidArgument && !IsWindows);
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Unexpected exception in SocketConnection.StartAsync."
+        )]
+        private static partial void LogErrorUnexpectedExceptionInStartAsync(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Unexpected exception in SocketConnection.CancelConnectionClosedToken."
+        )]
+        private static partial void LogErrorUnexpectedExceptionInCancelConnectionClosedToken(ILogger logger, Exception exception);
     }
 }

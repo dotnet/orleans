@@ -1,10 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.Reminders.DynamoDB</PackageId>
     <Title>Microsoft Orleans AWS DynamoDB Reminders Provider</Title>
     <Description>Microsoft Orleans reminders provider backed by AWS DynamoDB</Description>
     <PackageTags>$(PackageTags) AWS DynamoDB</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -26,4 +28,8 @@
     <PackageReference Include="AWSSDK.DynamoDBv2" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>

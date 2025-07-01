@@ -6,6 +6,9 @@ using Xunit.Abstractions;
 
 namespace Consul.Tests
 {
+    /// <summary>
+    /// Tests Orleans cluster liveness functionality using Consul as the membership provider.
+    /// </summary>
     [TestCategory("Membership"), TestCategory("Consul")]
     public class LivenessTests_Consul : LivenessTestsBase
     {

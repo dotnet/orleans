@@ -10,6 +10,9 @@ using Xunit.Abstractions;
 
 namespace Tester.AdoNet.Persistence
 {
+    /// <summary>
+    /// Tests for Orleans grain state persistence functionality using PostgreSQL as the storage provider.
+    /// </summary>
     [TestCategory("Persistence"), TestCategory("PostgreSql")]
     public class PersistenceGrainTests_Postgres : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_Postgres.Fixture>
     {

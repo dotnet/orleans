@@ -19,7 +19,7 @@ namespace UnitTests.StreamingTests
             this.output = output;
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5649"), TestCategory("Functional"), TestCategory("Streaming")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5649"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SingleSendBatchConsume()
         {
             const int ExpectedConsumed = 30;

@@ -15,7 +15,7 @@ namespace Orleans.Runtime.Utilities;
 /// writes scale linearly with number of concurrent threads.
 /// </summary>
 /// <remarks>
-/// Note: this implementation was originally authored by Alex Peck and was copied from BitFaster.Caching: https://github.com/bitfaster/BitFaster.Caching/blob/275b9b072c0218e20f549b769cd183df1374e2ee/BitFaster.Caching/Buffers/StripedMpscBuffer.cs
+/// Derived from BitFaster.Caching by Alex Peck: https://github.com/bitfaster/BitFaster.Caching/blob/275b9b072c0218e20f549b769cd183df1374e2ee/BitFaster.Caching/Buffers/StripedMpscBuffer.cs
 /// </remarks>
 [DebuggerDisplay("Count = {Count}/{Capacity}")]
 internal sealed class StripedMpscBuffer<T> where T : class
@@ -417,7 +417,7 @@ internal struct PaddedHeadAndTail
     [FieldOffset(2 * Padding.CACHE_LINE_SIZE)] public int Tail;
 }
 
-internal class Padding
+internal static class Padding
 {
 #if TARGET_ARM64 || TARGET_LOONGARCH64
         internal const int CACHE_LINE_SIZE = 128;

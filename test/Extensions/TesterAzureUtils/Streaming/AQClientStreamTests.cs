@@ -13,6 +13,9 @@ using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Streaming
 {
+    /// <summary>
+    /// Tests for Azure Queue streaming client functionality, including producer and consumer behavior with dropped clients.
+    /// </summary>
     public class AQClientStreamTests : TestClusterPerTest
     {
         private const string AQStreamProviderName = "AzureQueueProvider";
@@ -84,7 +87,7 @@ namespace Tester.AzureUtils.Streaming
             }
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5639"), TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Streaming")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5639"), TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Streaming")]
         public async Task AQStreamProducerOnDroppedClientTest()
         {
             logger.LogInformation("************************ AQStreamProducerOnDroppedClientTest *********************************");

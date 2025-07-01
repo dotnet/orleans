@@ -4,6 +4,9 @@ using Xunit;
 
 namespace Orleans.Transactions.Tests
 {
+    /// <summary>
+    /// Tests for transaction golden path scenarios with in-memory storage.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("Transactions")]
     public class GoldenPathTransactionMemoryTests : GoldenPathTransactionTestRunnerxUnit, IClassFixture<MemoryTransactionsFixture>
     {

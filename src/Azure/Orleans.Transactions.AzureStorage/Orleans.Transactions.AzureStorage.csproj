@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.Transactions.AzureStorage</PackageId>
     <Title>Microsoft Orleans Azure Storage Transactions Provider</Title>
     <Description>Microsoft Orleans transactions storage provider backed by Azure Storage</Description>
@@ -8,6 +9,7 @@
     <AssemblyName>Orleans.Transactions.AzureStorage</AssemblyName>
     <RootNamespace>Orleans.Transactions.AzureStorage</RootNamespace>
     <DefineConstants>$(DefineConstants);ORLEANS_TRANSACTIONS</DefineConstants>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,7 +23,10 @@
   <ItemGroup>
     <PackageReference Include="Azure.Core" />
     <PackageReference Include="Azure.Data.Tables" />
-    <PackageReference Include="System.Net.NameResolution" />
     <ProjectReference Include="..\..\Orleans.Transactions\Orleans.Transactions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>

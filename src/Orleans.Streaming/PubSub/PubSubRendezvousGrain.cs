@@ -445,9 +445,7 @@ namespace Orleans.Streams
         {
             try
             {
-                var extension = GrainFactory
-                    .GetGrain(producer.Producer)
-                    .AsReference<IStreamProducerExtension>();
+                var extension = GrainFactory.GetGrain<IStreamProducerExtension>(producer.Producer);
                 await producerTask(extension);
             }
             catch (GrainExtensionNotInstalledException)

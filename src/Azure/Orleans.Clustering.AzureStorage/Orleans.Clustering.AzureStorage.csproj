@@ -9,6 +9,7 @@
     <RootNamespace>Orleans.Clustering.AzureStorage</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <DefineConstants>$(DefineConstants);ORLEANS_CLUSTERING</DefineConstants>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,6 +24,9 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
     <PackageReference Include="Azure.Core" />
     <PackageReference Include="Azure.Data.Tables" />
-    <PackageReference Include="System.Net.NameResolution" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>

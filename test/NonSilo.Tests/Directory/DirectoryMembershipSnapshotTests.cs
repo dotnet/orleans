@@ -6,6 +6,9 @@ using Orleans.Configuration;
 
 namespace NonSilo.Tests.Directory;
 
+/// <summary>
+/// Tests for directory membership snapshot functionality including range ownership and ring coverage validation.
+/// </summary>
 [TestCategory("BVT")]
 public sealed class DirectoryMembershipSnapshotTests
 {

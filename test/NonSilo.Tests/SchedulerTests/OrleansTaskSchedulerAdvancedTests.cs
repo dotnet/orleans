@@ -9,6 +9,9 @@ using System.Threading.Tasks;
 
 namespace UnitTests.SchedulerTests
 {
+    /// <summary>
+    /// Advanced tests for Orleans task scheduler functionality.
+    /// </summary>
     public class OrleansTaskSchedulerAdvancedTests : IDisposable
     {
         private readonly ITestOutputHelper output;

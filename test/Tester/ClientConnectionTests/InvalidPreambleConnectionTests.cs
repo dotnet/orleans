@@ -8,6 +8,9 @@ using Xunit;
 
 namespace Tester.ClientConnectionTests
 {
+    /// <summary>
+    /// Tests for handling invalid connection preambles sent to gateway endpoints.
+    /// </summary>
     public class InvalidPreambleConnectionTests : TestClusterPerTest
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)

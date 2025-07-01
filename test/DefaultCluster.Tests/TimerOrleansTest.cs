@@ -6,6 +6,14 @@ using Xunit.Abstractions;
 
 namespace DefaultCluster.Tests.TimerTests
 {
+    /// <summary>
+    /// Tests for Orleans Timer functionality.
+    /// Timers provide grain-local, non-durable periodic callbacks. Unlike reminders,
+    /// timers are active only while a grain is activated and don't persist across
+    /// deactivations. They're ideal for short-lived periodic tasks, polling,
+    /// timeouts, and other scenarios where persistence isn't required.
+    /// Timers are more efficient than reminders for high-frequency operations.
+    /// </summary>
     public class TimerOrleansTest : HostedTestClusterEnsureDefaultStarted
     {
         private readonly ITestOutputHelper output;
@@ -16,6 +24,12 @@ namespace DefaultCluster.Tests.TimerTests
             this.output = output;
         }
 
+        /// <summary>
+        /// Tests basic timer functionality including start and stop operations.
+        /// Verifies that timers tick at expected intervals, can be stopped,
+        /// and that stopping a timer prevents further ticks. This demonstrates
+        /// the fundamental timer lifecycle within a grain activation.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Basic()
         {
@@ -42,6 +56,12 @@ namespace DefaultCluster.Tests.TimerTests
             }
         }
 
+        /// <summary>
+        /// Tests multiple grains with timers running in parallel.
+        /// Verifies that each grain maintains its own independent timer
+        /// and that timers across different grain activations don't interfere
+        /// with each other, demonstrating timer isolation per grain.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Parallel()
         {
@@ -84,6 +104,12 @@ namespace DefaultCluster.Tests.TimerTests
             }
         }
 
+        /// <summary>
+        /// Tests timer behavior across grain deactivation and reactivation.
+        /// Verifies that timers don't persist across grain lifecycle - when a grain
+        /// is deactivated and reactivated, timers start fresh. This demonstrates
+        /// the non-durable nature of timers compared to reminders.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Migration()
         {
@@ -130,6 +156,12 @@ namespace DefaultCluster.Tests.TimerTests
                 ". Actual ticks = " + last);
         }
 
+        /// <summary>
+        /// Tests timers that make asynchronous grain calls in their callbacks.
+        /// Verifies that timer callbacks can perform grain-to-grain communication
+        /// and that exceptions in timer callbacks are captured and don't crash
+        /// the grain. Important for timer-based orchestration patterns.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task AsyncTimerTest_GrainCall()
         {
@@ -176,6 +208,12 @@ namespace DefaultCluster.Tests.TimerTests
             }
         }
 
+        /// <summary>
+        /// Tests all timer creation overloads and their behavior.
+        /// Verifies that different timer registration methods (with/without state,
+        /// different period specifications) work correctly and that all timer
+        /// variants execute their callbacks as expected.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Timers")]
         public async Task GrainTimer_TestAllOverloads()
         {
@@ -197,6 +235,12 @@ namespace DefaultCluster.Tests.TimerTests
             await grain.TestCompletedTimerResults();
         }
 
+        /// <summary>
+        /// Tests that timers can safely dispose themselves from their own callbacks.
+        /// Verifies that self-disposal doesn't cause deadlocks or exceptions,
+        /// which is important for one-shot timer patterns or timers that
+        /// need to cancel themselves based on conditions.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task GrainTimer_DisposeFromCallback()
         {
@@ -208,6 +252,13 @@ namespace DefaultCluster.Tests.TimerTests
             await pocoGrain.RunSelfDisposingTimer();
         }
 
+        /// <summary>
+        /// Tests timer behavior in non-reentrant grains.
+        /// Verifies that multiple timers in a non-reentrant grain respect
+        /// the grain's concurrency constraints - timer callbacks don't overlap
+        /// and are serialized with other grain methods, maintaining the
+        /// single-threaded execution model.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task NonReentrantGrainTimer_Test()
         {
@@ -243,6 +294,13 @@ namespace DefaultCluster.Tests.TimerTests
             await grain.StopTimer($"{testName}_2");
         }
 
+        /// <summary>
+        /// Tests changing timer periods and due times after creation.
+        /// Verifies that timer.Change() correctly updates timing parameters,
+        /// handles edge cases (infinite, zero, negative values), and that
+        /// timers can be safely modified from within their own callbacks.
+        /// Essential for adaptive timing scenarios.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task GrainTimer_Change()
         {
@@ -303,6 +361,12 @@ namespace DefaultCluster.Tests.TimerTests
             await grain.StopTimer(testName);
         }
 
+        /// <summary>
+        /// Tests basic timer functionality with POCO (Plain Old CLR Object) grains.
+        /// Verifies that timers work identically with POCO grains as with
+        /// traditional Grain-derived classes, demonstrating that the timer
+        /// infrastructure is independent of the grain implementation style.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Basic_Poco()
         {
@@ -329,6 +393,12 @@ namespace DefaultCluster.Tests.TimerTests
             }
         }
 
+        /// <summary>
+        /// Tests parallel timer execution across multiple POCO grain instances.
+        /// Verifies that POCO grains maintain timer isolation just like
+        /// traditional grains, with each instance having independent timers
+        /// that don't interfere with each other.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Parallel_Poco()
         {
@@ -371,6 +441,12 @@ namespace DefaultCluster.Tests.TimerTests
             }
         }
 
+        /// <summary>
+        /// Tests timer behavior across POCO grain deactivation/reactivation.
+        /// Verifies that POCO grains exhibit the same non-persistent timer
+        /// behavior as traditional grains - timers are lost on deactivation
+        /// and start fresh on reactivation.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Migration_Poco()
         {
@@ -417,6 +493,12 @@ namespace DefaultCluster.Tests.TimerTests
                 ". Actual ticks = " + last);
         }
 
+        /// <summary>
+        /// Tests asynchronous grain calls from POCO grain timer callbacks.
+        /// Verifies that POCO grain timers can perform async operations
+        /// including grain-to-grain calls, with proper exception handling
+        /// in the timer callback context.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task AsyncTimerTest_GrainCall_Poco()
         {
@@ -463,6 +545,12 @@ namespace DefaultCluster.Tests.TimerTests
             }
         }
 
+        /// <summary>
+        /// Tests all timer registration overloads with POCO grains.
+        /// Ensures that POCO grains support the full range of timer
+        /// registration methods, maintaining API compatibility with
+        /// traditional grain implementations.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Timers")]
         public async Task GrainTimer_TestAllOverloads_Poco()
         {
@@ -484,6 +572,12 @@ namespace DefaultCluster.Tests.TimerTests
             await grain.TestCompletedTimerResults();
         }
 
+        /// <summary>
+        /// Tests timer concurrency constraints in non-reentrant POCO grains.
+        /// Verifies that POCO grains respect reentrancy settings, ensuring
+        /// timer callbacks are properly serialized in non-reentrant grains
+        /// regardless of the grain implementation style.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task NonReentrantGrainTimer_Test_Poco()
         {
@@ -519,6 +613,12 @@ namespace DefaultCluster.Tests.TimerTests
             await grain.StopTimer($"{testName}_2");
         }
 
+        /// <summary>
+        /// Tests dynamic timer period changes in POCO grains.
+        /// Verifies that POCO grain timers support runtime modifications
+        /// of timing parameters through the Change method, including
+        /// edge cases and callback-initiated changes.
+        /// </summary>
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task GrainTimer_Change_Poco()
         {

@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -150,7 +151,7 @@ namespace UnitTests.General
         /// <summary>
         /// Do not place activation in case all silos are above 110 CPU utilization or have overloaded flag set.
         /// </summary>
-        [SkippableFact(Skip= "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
         public async Task ElasticityTest_AllSilosOverloaded()
         {
             var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
@@ -198,6 +199,7 @@ namespace UnitTests.General
         {
             while (true)
             {
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, silo);
                 IPlacementTestGrain grain = this.GrainFactory.GetGrain<IRandomPlacementTestGrain>(Guid.NewGuid());
                 SiloAddress address = await grain.GetLocation();
                 if (address.Equals(silo))

@@ -5,6 +5,9 @@ using Xunit;
 
 namespace UnitTests.PlacementFilterTests;
 
+/// <summary>
+/// Tests for required match silo metadata placement filter director behavior.
+/// </summary>
 [TestCategory("Placement"), TestCategory("Filters"), TestCategory("SiloMetadata")]
 public class RequiredMatchSiloMetadataPlacementFilterDirectorTests
 {

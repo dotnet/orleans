@@ -16,6 +16,24 @@ using Xunit.Abstractions;
 
 namespace Orleans.Serialization.UnitTests
 {
+    /// <summary>
+    /// Tests for Orleans' support of the .NET ISerializable interface.
+    /// 
+    /// Orleans provides compatibility with types that implement ISerializable for custom serialization,
+    /// which is important for:
+    /// - Integrating with legacy .NET types
+    /// - Supporting types that require custom serialization logic
+    /// - Maintaining compatibility with existing serialization patterns
+    /// 
+    /// The DotNetSerializableCodec handles ISerializable types by:
+    /// - Respecting serialization callbacks (OnSerializing, OnSerialized, etc.)
+    /// - Supporting streaming contexts
+    /// - Handling serialization constructors
+    /// - Providing fallback serialization for types without Orleans-specific serializers
+    /// 
+    /// Note: While supported for compatibility, Orleans' native serialization is preferred
+    /// for better performance and version tolerance.
+    /// </summary>
     [Trait("Category", "BVT"), Trait("Category", "ISerializable")]
     public class ISerializableTests
     {

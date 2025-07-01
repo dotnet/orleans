@@ -12,6 +12,9 @@ using Xunit;
 
 namespace UnitTests.StreamingTests
 {
+    /// <summary>
+    /// Tests for stream pub/sub reliability with error injection in storage providers.
+    /// </summary>
     public class StreamPubSubReliabilityTests : OrleansTestingBase, IClassFixture<StreamPubSubReliabilityTests.Fixture>, IAsyncLifetime
     {
         public class Fixture : BaseTestClusterFixture

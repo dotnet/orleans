@@ -13,6 +13,9 @@ using Microsoft.Extensions.Hosting;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
+    /// <summary>
+    /// Tests for grain deactivation on idle behavior and related stress scenarios.
+    /// </summary>
     [TestCategory("ActivationCollector")]
     public class DeactivateOnIdleTests : OrleansTestingBase, IDisposable
     {

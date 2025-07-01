@@ -6,6 +6,9 @@ using Xunit;
 
 namespace DefaultCluster.Tests.SchedulerTests
 {
+    /// <summary>
+    /// Tests Orleans scheduler behavior with long-running grain operations to ensure they don't cause timeouts or queue blocking.
+    /// </summary>
     [TestCategory("BVT")]
     public class STSchedulerLongTurnTest : HostedTestClusterEnsureDefaultStarted
     {

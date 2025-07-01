@@ -21,7 +21,7 @@ namespace Orleans.Runtime
             Grain = 3,
             Client = 4,
             KeyExtGrain = 6,
-            // 7 was GeoClient 
+            // 7 was GeoClient
             KeyExtSystemTarget = 8,
         }
 
@@ -32,7 +32,7 @@ namespace Orleans.Runtime
         [Id(2)]
         public ulong TypeCodeData { get; private set; }
         [Id(3)]
-        public string KeyExt { get; private set; }
+        public string? KeyExt { get; private set; }
 
         [NonSerialized]
         private uint uniformHashCache;
@@ -65,7 +65,7 @@ namespace Orleans.Runtime
                 var n0 = ulong.Parse(input[..16].ToString(), NumberStyles.AllowHexSpecifier);
                 var n1 = ulong.Parse(input.Slice(16, 16).ToString(), NumberStyles.AllowHexSpecifier);
                 var typeCodeData = ulong.Parse(input.Slice(32, 16).ToString(), NumberStyles.AllowHexSpecifier);
-                string keyExt = null;
+                string? keyExt = null;
                 if (input.Length > minimumValidKeyLength)
                 {
                     if (input[48] != '+') throw new InvalidDataException("UniqueKey hex string missing + separator.");
@@ -80,10 +80,10 @@ namespace Orleans.Runtime
             return NewKey(Guid.Parse(input.ToString()));
         }
 
-        internal static UniqueKey NewKey(ulong n0, ulong n1, Category category, long typeData, string keyExt)
+        internal static UniqueKey NewKey(ulong n0, ulong n1, Category category, long typeData, string? keyExt)
             => NewKey(n0, n1, GetTypeCodeData(category, typeData), keyExt);
 
-        internal static UniqueKey NewKey(long longKey, Category category = Category.None, long typeData = 0, string keyExt = null)
+        internal static UniqueKey NewKey(long longKey, Category category = Category.None, long typeData = 0, string? keyExt = null)
         {
             ThrowIfIsSystemTargetKey(category);
 
@@ -96,7 +96,7 @@ namespace Orleans.Runtime
 
         internal static UniqueKey NewKey(Guid guid) => new UniqueKey { Guid = guid };
 
-        internal static UniqueKey NewKey(Guid guid, Category category = Category.None, long typeData = 0, string keyExt = null)
+        internal static UniqueKey NewKey(Guid guid, Category category = Category.None, long typeData = 0, string? keyExt = null)
         {
             ThrowIfIsSystemTargetKey(category);
 
@@ -120,7 +120,7 @@ namespace Orleans.Runtime
         public static UniqueKey NewGrainServiceKey(string key, long typeData)
             => NewKey(GetTypeCodeData(Category.KeyExtSystemTarget, typeData), key);
 
-        internal static UniqueKey NewKey(ulong n0, ulong n1, ulong typeCodeData, string keyExt)
+        internal static UniqueKey NewKey(ulong n0, ulong n1, ulong typeCodeData, string? keyExt)
         {
             var key = NewKey(typeCodeData, keyExt);
             key.N0 = n0;
@@ -128,7 +128,7 @@ namespace Orleans.Runtime
             return key;
         }
 
-        private static UniqueKey NewKey(ulong typeCodeData, string keyExt)
+        private static UniqueKey NewKey(ulong typeCodeData, string? keyExt)
         {
             if (IsKeyExt(GetCategory(typeCodeData)))
             {
@@ -161,7 +161,7 @@ namespace Orleans.Runtime
                         methodName));
         }
 
-        public long PrimaryKeyToLong(out string extendedKey)
+        public long PrimaryKeyToLong(out string? extendedKey)
         {
             ThrowIfIsNotLong();
 
@@ -176,7 +176,7 @@ namespace Orleans.Runtime
             return (long)N1;
         }
 
-        public Guid PrimaryKeyToGuid(out string extendedKey)
+        public Guid PrimaryKeyToGuid(out string? extendedKey)
         {
             extendedKey = this.KeyExt;
             return Guid;
@@ -188,13 +188,14 @@ namespace Orleans.Runtime
             return Guid;
         }
 
-        public override bool Equals(object o) => o is UniqueKey key && Equals(key);
+        public override bool Equals(object? o) => o is UniqueKey key && Equals(key);
 
         // We really want Equals to be as fast as possible, as a minimum cost, as close to native as possible.
         // No function calls, no boxing, inline.
-        public bool Equals(UniqueKey other)
+        public bool Equals(UniqueKey? other)
         {
-            return N0 == other.N0
+            return other is not null
+                   && N0 == other.N0
                    && N1 == other.N1
                    && TypeCodeData == other.TypeCodeData
                    && (KeyExt is null || KeyExt == other.KeyExt);
@@ -202,8 +203,10 @@ namespace Orleans.Runtime
 
         // We really want CompareTo to be as fast as possible, as a minimum cost, as close to native as possible.
         // No function calls, no boxing, inline.
-        public int CompareTo(UniqueKey other)
+        public int CompareTo(UniqueKey? other)
         {
+            if (other is null) return 1;
+
             return TypeCodeData < other.TypeCodeData ? -1
                : TypeCodeData > other.TypeCodeData ? 1
                : N0 < other.N0 ? -1
@@ -321,9 +324,9 @@ namespace Orleans.Runtime
             string keyString;
             if (HasKeyExt)
             {
-                string extension;
+                string? extension;
                 keyString = IsLongKey ? PrimaryKeyToLong(out extension).ToString() : PrimaryKeyToGuid(out extension).ToString();
-                keyString = $"{keyString}+{extension}";
+                keyString = $"{keyString}+{extension ?? string.Empty}";
             }
             else
             {

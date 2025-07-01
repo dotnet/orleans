@@ -9,6 +9,9 @@ using Xunit;
 
 namespace UnitTests.StreamingTests
 {
+    /// <summary>
+    /// Tests for the controllable stream provider adapter, validating echo commands through adapter and factory interfaces.
+    /// </summary>
     public class ControllableStreamProviderTests : OrleansTestingBase, IClassFixture<ControllableStreamProviderTests.Fixture>
     {
         public class Fixture : BaseTestClusterFixture

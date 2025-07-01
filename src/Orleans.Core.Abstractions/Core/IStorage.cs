@@ -14,7 +14,7 @@ namespace Orleans.Core
         /// <remarks>
         /// An ETag, or entity tag, is a value used to prevent concurrent writes where one or more of those writes has not first observed the most recent operation.
         /// </remarks>
-        string Etag { get; }
+        string? Etag { get; }
 
         /// <summary>
         /// Gets a value indicating whether the record already exists.

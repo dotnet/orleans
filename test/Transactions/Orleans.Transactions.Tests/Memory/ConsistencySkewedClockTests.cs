@@ -4,6 +4,9 @@ using Xunit;
 
 namespace Orleans.Transactions.Tests
 {
+    /// <summary>
+    /// Tests for transaction consistency with skewed clock scenarios using in-memory storage.
+    /// </summary>
     [TestCategory("Transactions-dev")]
     public class ConsistencySkewedClockTests : ConsistencyTransactionTestRunnerxUnit, IClassFixture<SkewedClockMemoryTransactionsFixture>
     {

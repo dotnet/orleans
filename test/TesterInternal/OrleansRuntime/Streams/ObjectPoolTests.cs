@@ -3,6 +3,9 @@ using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
+    /// <summary>
+    /// Tests for object pool allocation, recycling, and resource management.
+    /// </summary>
     public class ObjectPoolTests
     {
         private class Accumulator

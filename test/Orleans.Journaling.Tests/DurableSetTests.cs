@@ -3,9 +3,21 @@ using Xunit;
 
 namespace Orleans.Journaling.Tests;
 
+/// <summary>
+/// Tests for DurableSet, a persistent set implementation that uses Orleans' journaling
+/// infrastructure to maintain unique collections across grain activations and system restarts.
+/// 
+/// DurableSet provides standard set operations (Add, Remove, Contains) while ensuring
+/// uniqueness of elements and durability through journaling. This is useful for maintaining
+/// collections of unique identifiers, tags, or other distinct values in Orleans grains.
+/// </summary>
 [TestCategory("BVT")]
 public class DurableSetTests : StateMachineTestBase
 {
+    /// <summary>
+    /// Tests basic set operations: Add, Remove, and uniqueness constraint.
+    /// Verifies that duplicates are not added and that operations are persisted.
+    /// </summary>
     [Fact]
     public async Task DurableSet_BasicOperations_Test()
     {
@@ -29,9 +41,7 @@ public class DurableSetTests : StateMachineTestBase
         Assert.True(added3);
         Assert.False(duplicateAdded); // Should not add duplicates
         Assert.Equal(3, set.Count);
-        Assert.Contains("one", set);
-        Assert.Contains("two", set);
-        Assert.Contains("three", set);
+        Assert.Equal(["one", "two", "three"], set);
         
         // Act - Remove item
         bool removed = set.Remove("two");
@@ -42,11 +52,14 @@ public class DurableSetTests : StateMachineTestBase
         Assert.True(removed);
         Assert.False(removedNonExisting);
         Assert.Equal(2, set.Count);
-        Assert.Contains("one", set);
-        Assert.DoesNotContain("two", set);
-        Assert.Contains("three", set);
+        Assert.Equal(["one", "three"], set);
     }
     
+    /// <summary>
+    /// Tests that set state is correctly persisted and recovered.
+    /// Creates a set, adds items, then recreates the set from the same
+    /// storage to verify state recovery.
+    /// </summary>
     [Fact]
     public async Task DurableSet_Persistence_Test()
     {
@@ -69,11 +82,14 @@ public class DurableSetTests : StateMachineTestBase
 
         // Assert - Set should be recovered
         Assert.Equal(3, set2.Count);
-        Assert.Contains("one", set2);
-        Assert.Contains("two", set2);
-        Assert.Contains("three", set2);
+        Assert.Equal(["one", "two", "three"], set2);
     }
     
+    /// <summary>
+    /// Tests that the set correctly handles complex value types.
+    /// Verifies that custom objects with proper equality implementations
+    /// maintain uniqueness in the set.
+    /// </summary>
     [Fact]
     public async Task DurableSet_ComplexValues_Test()
     {
@@ -95,11 +111,15 @@ public class DurableSetTests : StateMachineTestBase
         await manager.WriteStateAsync(CancellationToken.None);
         
         // Assert
+        Assert.False(duplicateAdded);
         Assert.Equal(2, set.Count);
-        Assert.Contains(person1, set);
-        Assert.Contains(person2, set);
+        Assert.Equal([person1, person2], set);
     }
     
+    /// <summary>
+    /// Tests the Clear operation which removes all items from the set.
+    /// Verifies that the clear operation is properly journaled.
+    /// </summary>
     [Fact]
     public async Task DurableSet_Clear_Test()
     {
@@ -122,9 +142,13 @@ public class DurableSetTests : StateMachineTestBase
         
         // Assert
         Assert.Empty(set);
-        Assert.Empty(set);
     }
     
+    /// <summary>
+    /// Tests set enumeration capabilities.
+    /// Verifies that the set supports standard enumeration patterns
+    /// and can be converted to other collection types.
+    /// </summary>
     [Fact]
     public async Task DurableSet_Enumeration_Test()
     {
@@ -152,6 +176,11 @@ public class DurableSetTests : StateMachineTestBase
         Assert.Equal(expectedItems, actualItems);
     }
     
+    /// <summary>
+    /// Stress test for set performance with large numbers of items.
+    /// Tests that the journaling system can handle thousands of unique items
+    /// and correctly enforce uniqueness constraints.
+    /// </summary>
     [Fact]
     public async Task DurableSet_LargeNumberOfItems_Test()
     {
@@ -189,10 +218,15 @@ public class DurableSetTests : StateMachineTestBase
         Assert.Equal(itemCount, set2.Count);
         for (int i = 0; i < itemCount; i++)
         {
-            Assert.Contains(i, set2);
+            Assert.Contains(i, (IReadOnlySet<int>)set2);
         }
     }
     
+    /// <summary>
+    /// Tests mathematical set operations using durable sets.
+    /// Demonstrates how to perform intersection, union, and difference
+    /// operations using the enumeration capabilities of durable sets.
+    /// </summary>
     [Fact]
     public async Task DurableSet_SetOperations_Test()
     {
@@ -238,6 +272,11 @@ public class DurableSetTests : StateMachineTestBase
         Assert.Equal(new HashSet<int> { 0, 2, 4 }, difference);
     }
     
+    /// <summary>
+    /// Tests selective removal of multiple items from a set.
+    /// Demonstrates how to remove a subset of items and verify
+    /// that the remaining items are correctly persisted.
+    /// </summary>
     [Fact]
     public async Task DurableSet_ExceptWith_Test()
     {
@@ -274,7 +313,7 @@ public class DurableSetTests : StateMachineTestBase
         Assert.Equal(5, set.Count);
         for (int i = 1; i < 10; i += 2)
         {
-            Assert.Contains(i, set);
+            Assert.Contains(i, (IReadOnlySet<int>)set);
         }
     }
 }

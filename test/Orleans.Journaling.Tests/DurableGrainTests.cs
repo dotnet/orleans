@@ -3,11 +3,29 @@ using Xunit;
 
 namespace Orleans.Journaling.Tests;
 
+/// <summary>
+/// Integration tests for DurableGrain functionality in Orleans.
+/// 
+/// DurableGrain is a base class that provides automatic state persistence using Orleans' journaling
+/// infrastructure. It ensures that grain state survives grain deactivations, node failures, and
+/// system restarts by journaling all state modifications to a durable log.
+/// 
+/// These tests verify:
+/// - State persistence across grain activations
+/// - Support for complex types and collections
+/// - Multiple durable collections in a single grain
+/// - Large state handling
+/// </summary>
 [TestCategory("BVT")]
 public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<IntegrationTestFixture>
 {
     private IGrainFactory Client => fixture.Client;
 
+    /// <summary>
+    /// Tests basic state persistence for a durable grain.
+    /// Verifies that simple state properties (string and int) are correctly
+    /// persisted and recovered after grain deactivation.
+    /// </summary>
     [Fact]
     public async Task DurableGrain_State_Persistence_Test()
     {
@@ -22,6 +40,7 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.Equal(42, await grain.GetCounter());
 
         // Force deactivation and get a new reference
+        // This simulates grain failure or node restart scenarios
         var idBefore = await grain.GetActivationId();
         await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
         Assert.NotEqual(idBefore, await grain.GetActivationId());
@@ -31,6 +50,11 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.Equal(42, await grain.GetCounter());
     }
 
+    /// <summary>
+    /// Tests that state updates are properly journaled and persisted.
+    /// Verifies that the latest state values are recovered after deactivation,
+    /// not the initial values.
+    /// </summary>
     [Fact]
     public async Task DurableGrain_Update_State_Test()
     {
@@ -55,6 +79,11 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.Equal(20, await grain.GetCounter());
     }
 
+    /// <summary>
+    /// Tests persistence of complex types including custom objects and collections.
+    /// Verifies that Orleans' serialization correctly handles nested objects
+    /// and collections in durable grain state.
+    /// </summary>
     [Fact]
     public async Task DurableGrain_Complex_Types_Test()
     {
@@ -74,6 +103,7 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.Equal(3, retrievedItems.Count);
 
         // Force deactivation and get a new reference
+        // This simulates grain failure or node restart scenarios
         var idBefore = await grain.GetActivationId();
         await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
         Assert.NotEqual(idBefore, await grain.GetActivationId());
@@ -93,6 +123,11 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.Equal("Item3", retrievedItems[2]);
     }
 
+    /// <summary>
+    /// Tests a grain that uses multiple durable collections simultaneously.
+    /// Verifies that DurableDictionary, DurableList, DurableQueue, and DurableSet
+    /// can coexist in a single grain and maintain their state independently.
+    /// </summary>
     [Fact]
     public async Task DurableGrain_Multiple_Collections_Test()
     {
@@ -116,6 +151,7 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.Equal(2, await grain.GetSetCount());
 
         // Force deactivation and get a new reference
+        // This simulates grain failure or node restart scenarios
         var idBefore = await grain.GetActivationId();
         await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
         Assert.NotEqual(idBefore, await grain.GetActivationId());
@@ -137,6 +173,11 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.True(await grain.ContainsSetItem("set2"));
     }
 
+    /// <summary>
+    /// Tests complex state modification scenarios including updates and removals.
+    /// Verifies that all modification operations (add, update, remove) are properly
+    /// journaled and the final state is correctly recovered.
+    /// </summary>
     [Fact]
     public async Task DurableGrain_State_Modifications_Test()
     {
@@ -164,6 +205,7 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.Equal(2, await grain.GetSetCount());
 
         // Force deactivation and get a new reference
+        // This simulates grain failure or node restart scenarios
         var idBefore = await grain.GetActivationId();
         await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
         Assert.NotEqual(idBefore, await grain.GetActivationId());
@@ -190,6 +232,11 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.Equal(1, await grain.GetSetCount());
     }
 
+    /// <summary>
+    /// Tests grain state persistence using a different grain interface.
+    /// This test provides an additional verification of the durability mechanism
+    /// using a simpler grain interface.
+    /// </summary>
     [Fact]
     public async Task Grain_State_Should_Persist_Between_Activations()
     {
@@ -213,6 +260,11 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.Equal(initialState.Counter, newState.Counter);
     }
 
+    /// <summary>
+    /// Comprehensive test for multiple collection operations and persistence.
+    /// Tests add, remove, and query operations on all collection types,
+    /// verifying state consistency across multiple deactivation cycles.
+    /// </summary>
     [Fact]
     public async Task Grain_Should_Handle_Multiple_Collections()
     {
@@ -281,6 +333,11 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.True(await grain.ContainsSetItem("set2"));
     }
 
+    /// <summary>
+    /// Stress test for large state handling in durable grains.
+    /// Verifies that the journaling system can handle grains with thousands
+    /// of state entries without performance degradation or data loss.
+    /// </summary>
     [Fact]
     public async Task Grain_Should_Handle_Large_State()
     {

@@ -6,6 +6,28 @@ using Xunit;
 
 namespace Orleans.Serialization.UnitTests;
 
+/// <summary>
+/// Tests for Orleans' support of C# record types.
+/// 
+/// Records are first-class citizens in Orleans serialization, with full support for:
+/// - Primary constructor parameters
+/// - Init-only properties
+/// - Record inheritance hierarchies
+/// - Abstract record base types
+/// - Complex record structures with multiple inheritance levels
+/// 
+/// Orleans handles records efficiently by:
+/// - Generating optimized serializers that understand record semantics
+/// - Preserving value equality semantics
+/// - Supporting both positional and nominal record syntax
+/// - Handling record structs (value type records)
+/// 
+/// This support is crucial for modern C# applications that leverage records for:
+/// - Immutable data models
+/// - Domain-driven design with value objects
+/// - Functional programming patterns
+/// - Clean API contracts
+/// </summary>
 public class RecordSerializationTests
 {
     private readonly ServiceProvider _services;

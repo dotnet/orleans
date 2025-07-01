@@ -13,6 +13,10 @@ using Xunit;
 
 namespace NonSilo.Tests
 {
+    /// <summary>
+    /// A no-op implementation of IMembershipTable used for testing silo configuration
+    /// without requiring actual membership table infrastructure.
+    /// </summary>
     public class NoOpMembershipTable : IMembershipTable
     {
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
@@ -57,12 +61,18 @@ namespace NonSilo.Tests
     }
 
     /// <summary>
-    /// Tests for <see cref="ISiloBuilder"/>.
+    /// Tests for the Orleans SiloBuilder, which is responsible for configuring and building Orleans silo instances.
+    /// These tests verify configuration validation, service registration, and proper initialization of silo components
+    /// without requiring a full Orleans cluster. Silos are the primary hosting units for grains in Orleans.
     /// </summary>
     [TestCategory("BVT")]
     [TestCategory("Hosting")]
     public class SiloBuilderTests
     {
+        /// <summary>
+        /// Tests basic silo builder configuration, verifying that a silo can be successfully built
+        /// with localhost clustering and required configuration options.
+        /// </summary>
         [Fact]
         public void SiloBuilderTest()
         {
@@ -151,17 +161,15 @@ namespace NonSilo.Tests
                         {
                             options.LoadSheddingEnabled = true;
                             options.CpuThreshold = 101;
-                        })
-                        .ConfigureServices(svcCollection =>
-                        {
-                            svcCollection.AddSingleton<FakeEnvironmentStatisticsProvider>();
-                            svcCollection.AddFromExisting<IEnvironmentStatisticsProvider, FakeEnvironmentStatisticsProvider>();
-                            svcCollection.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
                         });
                 }).RunConsoleAsync();
             });
         }
 
+        /// <summary>
+        /// Tests that a silo cannot start without any grain classes or interfaces registered.
+        /// This ensures silos have actual work to perform before they can be started.
+        /// </summary>
         [Fact]
         public async Task SiloBuilderThrowsDuringStartupIfNoGrainsAdded()
         {
@@ -180,6 +188,10 @@ namespace NonSilo.Tests
             await Assert.ThrowsAsync<OrleansConfigurationException>(() => host.StartAsync());
         }
 
+        /// <summary>
+        /// Tests that attempting to configure both a client and a silo in the same host throws an exception.
+        /// Orleans requires separate hosts for silos and clients.
+        /// </summary>
         [Fact]
         public void SiloBuilderThrowsDuringStartupIfClientBuildersAdded()
         {
@@ -197,6 +209,10 @@ namespace NonSilo.Tests
             });
         }
 
+        /// <summary>
+        /// Tests that attempting to configure both a client and a silo using the Host.CreateApplicationBuilder API throws an exception.
+        /// This verifies that the same restriction applies to the modern hosting API.
+        /// </summary>
         [Fact]
         public void SiloBuilderWithHotApplicationBuilderThrowsDuringStartupIfClientBuildersAdded()
         {
@@ -212,11 +228,6 @@ namespace NonSilo.Tests
                         siloBuilder.UseLocalhostClustering();
                     });
             });
-        }
-
-        private class FakeEnvironmentStatisticsProvider : IEnvironmentStatisticsProvider
-        {
-            public EnvironmentStatistics GetEnvironmentStatistics() => new();
         }
 
         private class MyService

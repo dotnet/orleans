@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Placement;
 using Orleans.Runtime.MembershipService.SiloMetadata;
 using Orleans.Runtime.Placement.Filtering;
 using Orleans.TestingHost;
@@ -232,7 +233,7 @@ public interface IUniqueRequiredMatchFilteredGrain : IGrainWithIntegerKey
 }
 
 #pragma warning disable ORLEANSEXP004
-[RequiredMatchSiloMetadataPlacementFilter(["unique"])]
+[RequiredMatchSiloMetadataPlacementFilter(["unique"]), RandomPlacement]
 #pragma warning restore ORLEANSEXP004
 public class UniqueRequiredMatchFilteredGrain(ILocalSiloDetails localSiloDetails) : Grain, IUniqueRequiredMatchFilteredGrain
 {
@@ -244,7 +245,7 @@ public interface IPreferredMatchFilteredGrain : IGrainWithIntegerKey
 }
 
 #pragma warning disable ORLEANSEXP004
-[PreferredMatchSiloMetadataPlacementFilter(["unique"], 1)]
+[PreferredMatchSiloMetadataPlacementFilter(["unique"], 1), RandomPlacement]
 #pragma warning restore ORLEANSEXP004
 public class PreferredMatchFilteredGrain(ILocalSiloDetails localSiloDetails) : Grain, IPreferredMatchFilteredGrain
 {
@@ -258,7 +259,7 @@ public interface IPreferredMatchMin2FilteredGrain : IGrainWithIntegerKey
 }
 
 #pragma warning disable ORLEANSEXP004
-[PreferredMatchSiloMetadataPlacementFilter(["unique"])]
+[PreferredMatchSiloMetadataPlacementFilter(["unique"]), RandomPlacement]
 #pragma warning restore ORLEANSEXP004
 public class PreferredMatchMinTwoFilteredGrain(ILocalSiloDetails localSiloDetails) : Grain, IPreferredMatchMin2FilteredGrain
 {
@@ -271,7 +272,7 @@ public interface IPreferredMatchMultipleFilteredGrain : IGrainWithIntegerKey
 }
 
 #pragma warning disable ORLEANSEXP004
-[PreferredMatchSiloMetadataPlacementFilter(["unique", "other"], 2)]
+[PreferredMatchSiloMetadataPlacementFilter(["unique", "other"], 2), RandomPlacement]
 #pragma warning restore ORLEANSEXP004
 public class PreferredMatchMultipleFilteredGrain(ILocalSiloDetails localSiloDetails) : Grain, IPreferredMatchMultipleFilteredGrain
 {
@@ -279,7 +280,7 @@ public class PreferredMatchMultipleFilteredGrain(ILocalSiloDetails localSiloDeta
 }
 
 #pragma warning disable ORLEANSEXP004
-[PreferredMatchSiloMetadataPlacementFilter(["not.there"])]
+[PreferredMatchSiloMetadataPlacementFilter(["not.there"]), RandomPlacement]
 #pragma warning restore ORLEANSEXP004
 public class PreferredMatchNoMetadataFilteredGrain(ILocalSiloDetails localSiloDetails) : Grain, IPreferredMatchNoMetadataFilteredGrain
 {

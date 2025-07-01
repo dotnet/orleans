@@ -9,10 +9,16 @@ using static System.String;
 
 namespace Tester.AdoNet.Streaming;
 
+/// <summary>
+/// Tests for SQL Server ADO.NET stream filtering functionality.
+/// </summary>
 public class SqlServerAdoNetStreamFilteringTests() : AdoNetStreamFilteringTests(new Fixture(AdoNetInvariants.InvariantNameSqlServer))
 {
 }
 
+/// <summary>
+/// Tests for MySQL ADO.NET stream filtering functionality.
+/// </summary>
 public class MySqlAdoNetStreamFilteringTests : AdoNetStreamFilteringTests
 {
     public MySqlAdoNetStreamFilteringTests() : base(new Fixture(AdoNetInvariants.InvariantNameMySql))
@@ -21,10 +27,16 @@ public class MySqlAdoNetStreamFilteringTests : AdoNetStreamFilteringTests
     }
 }
 
+/// <summary>
+/// Tests for PostgreSQL ADO.NET stream filtering functionality.
+/// </summary>
 public class PostgreSqlAdoNetStreamFilteringTests() : AdoNetStreamFilteringTests(new Fixture(AdoNetInvariants.InvariantNamePostgreSql))
 {
 }
 
+/// <summary>
+/// Base class for ADO.NET stream filtering tests.
+/// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
 public abstract class AdoNetStreamFilteringTests : StreamFilteringTestsBase, IAsyncLifetime
 {

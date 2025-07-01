@@ -16,6 +16,9 @@ using Xunit.Abstractions;
 
 namespace NonSilo.Tests.Directory
 {
+    /// <summary>
+    /// Tests for grain directory resolver functionality including custom directory resolution and directory listing.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("Directory")]
     public class GrainDirectoryResolverTests
     {

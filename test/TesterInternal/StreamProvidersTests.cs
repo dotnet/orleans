@@ -14,6 +14,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace UnitTests.Streaming
 {
+    /// <summary>
+    /// Tests for stream provider configuration and error injection scenarios.
+    /// </summary>
     public class StreamProvidersTests_ProviderConfigNotLoaded : IClassFixture<StreamProvidersTests_ProviderConfigNotLoaded.Fixture>
     {
         public class Fixture : BaseTestClusterFixture

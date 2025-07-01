@@ -4,9 +4,20 @@ using Xunit;
 
 namespace Analyzers.Tests
 {
+    /// <summary>
+    /// Tests for the analyzer that prevents ref, out, and in parameters in grain interface methods.
+    /// Orleans grain calls are distributed RPC calls that serialize parameters, so ref/out/in
+    /// parameters cannot work as they would in local method calls. This analyzer helps developers
+    /// avoid this common mistake and ensures grain interfaces follow the Orleans programming model.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("Analyzer")]
     public class NoRefParamsDiagnosticAnalyzerTest : DiagnosticAnalyzerTestBase<NoRefParamsDiagnosticAnalyzer>
     {
+        /// <summary>
+        /// Verifies that the analyzer detects ref parameters in grain interface methods.
+        /// Ref parameters cannot work across distributed calls because they require
+        /// shared memory access, which is impossible in a distributed system.
+        /// </summary>
         [Fact]
         public async Task NoRefParamsAllowedInGrainInterfaceMethods()
         {
@@ -26,6 +37,11 @@ namespace Analyzers.Tests
             Assert.Equal(NoRefParamsDiagnosticAnalyzer.MessageFormat, diagnostic.GetMessage());
         }
 
+        /// <summary>
+        /// Verifies that the analyzer detects out parameters in grain interface methods.
+        /// Out parameters cannot work across distributed calls because they require
+        /// the ability to write back to the caller's memory, which is impossible in RPC.
+        /// </summary>
         [Fact]
         public async Task NoOutParamsAllowedInGrainInterfaceMethods()
         {
@@ -45,6 +61,10 @@ namespace Analyzers.Tests
             Assert.Equal(NoRefParamsDiagnosticAnalyzer.MessageFormat, diagnostic.GetMessage());
         }
 
+        /// <summary>
+        /// Verifies that the analyzer detects multiple ref/out parameter violations
+        /// in grain interface methods, ensuring all problematic parameters are reported.
+        /// </summary>
         [Fact]
         public async Task NoRefParamsDiagnosticAnalyzerInClass()
         {
@@ -76,6 +96,11 @@ namespace Analyzers.Tests
             Assert.Equal(NoRefParamsDiagnosticAnalyzer.MessageFormat, diagnostic.GetMessage());
         }
 
+        /// <summary>
+        /// Verifies that the analyzer allows regular parameters in grain interface methods
+        /// and doesn't interfere with ref/out/in parameters in non-grain methods,
+        /// which are outside the scope of Orleans restrictions.
+        /// </summary>
         [Fact]
         public async Task NoRefParamsDiagnosticAnalyzerNoError()
         {
@@ -101,6 +126,11 @@ namespace Analyzers.Tests
             Assert.Empty(diagnostics);
         }
 
+        /// <summary>
+        /// Verifies that static interface methods can use ref/out parameters.
+        /// Static methods don't participate in grain calls and execute locally,
+        /// so they're not subject to the distributed calling restrictions.
+        /// </summary>
         [Fact]
         public async Task OutAndRefParamsAllowedInStaticGrainInterfaceMethods()
         {

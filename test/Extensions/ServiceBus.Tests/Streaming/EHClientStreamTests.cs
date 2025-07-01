@@ -14,6 +14,9 @@ using Xunit.Abstractions;
 
 namespace ServiceBus.Tests.StreamingTests
 {
+    /// <summary>
+    /// Tests for EventHub streaming functionality with client producer/consumer scenarios and dropped client handling.
+    /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
     public class EHClientStreamTests : TestClusterPerTest
     {
@@ -81,14 +84,14 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5657")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5657")]
         public async Task EHStreamProducerOnDroppedClientTest()
         {
             logger.LogInformation("************************ EHStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(StreamProviderName, StreamNamespace);
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5634")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5634")]
         public async Task EHStreamConsumerOnDroppedClientTest()
         {
             logger.LogInformation("************************ EHStreamConsumerOnDroppedClientTest *********************************");

@@ -12,12 +12,12 @@ namespace Orleans.Runtime
         /// The thread-local context.
         /// </summary>
         [ThreadStatic]
-        private static IGrainContext _threadLocalContext;
+        private static IGrainContext? _threadLocalContext;
 
         /// <summary>
         /// Gets the current grain context.
         /// </summary>
-        public static IGrainContext Current => _threadLocalContext;
+        public static IGrainContext? Current => _threadLocalContext;
 
         /// <summary>
         /// Sets the current grain context.
@@ -25,7 +25,7 @@ namespace Orleans.Runtime
         /// <param name="newContext">The new context.</param>
         /// <param name="currentContext">The current context at the time of the call.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void SetExecutionContext(IGrainContext newContext, out IGrainContext currentContext)
+        internal static void SetExecutionContext(IGrainContext newContext, out IGrainContext? currentContext)
         {
             currentContext = _threadLocalContext;
             _threadLocalContext = newContext;
@@ -36,7 +36,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="originalContext">The original context.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void ResetExecutionContext(IGrainContext originalContext)
+        internal static void ResetExecutionContext(IGrainContext? originalContext)
         {
             _threadLocalContext = originalContext;
         }

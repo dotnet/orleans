@@ -1,5 +1,10 @@
 ﻿namespace DefaultCluster.Tests
 {
+    /// <summary>
+    /// Test grain implementation used for error handling tests.
+    /// This grain simulates various error conditions to test exception propagation and timeout scenarios.
+    /// Not a real Orleans grain - used as a local mock for testing error cases.
+    /// </summary>
     internal class LocalErrorGrain
     {
         private int m_a = 0;

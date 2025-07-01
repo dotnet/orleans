@@ -9,7 +9,7 @@ namespace Orleans.Statistics;
 public interface IEnvironmentStatisticsProvider
 {
     /// <summary>
-    /// Gets the current environment statistics.
+    /// Gets the current environment statistics. May apply filtering or processing based on the runtime configuration.
     /// </summary>
     EnvironmentStatistics GetEnvironmentStatistics();
 }
@@ -28,6 +28,10 @@ public readonly struct EnvironmentStatistics
 {
     /// <summary>
     /// The system CPU usage.
+    /// <br/>
+    /// Applies Kalman filtering to smooth out short-term fluctuations.
+    /// See <see href="https://en.wikipedia.org/wiki/Kalman_filter"/>;
+    /// <see href="https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/"/>
     /// </summary>
     /// <remarks>Ranges from 0.0-100.0.</remarks>
     [Id(0)]
@@ -35,13 +39,23 @@ public readonly struct EnvironmentStatistics
 
     /// <summary>
     /// The amount of managed memory currently consumed by the process.
+    /// <br/>
+    /// Applies Kalman filtering to smooth out short-term fluctuations.
+    /// See <see href="https://en.wikipedia.org/wiki/Kalman_filter"/>;
+    /// <see href="https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/"/>
     /// </summary>
-    /// <remarks>Includes fragmented memory, which is the unused memory between objects on the managed heaps.</remarks>
+    /// <remarks>
+    /// Includes fragmented memory, which is the unused memory between objects on the managed heaps.
+    /// </remarks>
     [Id(1)]
     public readonly long MemoryUsageBytes;
 
     /// <summary>
     /// The amount of memory currently available for allocations to the process.
+    /// <br/>
+    /// Applies Kalman filtering to smooth out short-term fluctuations.
+    /// See <see href="https://en.wikipedia.org/wiki/Kalman_filter"/>;
+    /// <see href="https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/"/>
     /// </summary>
     /// <remarks>
     /// Includes the currently available memory of the process and the system.
@@ -63,11 +77,43 @@ public readonly struct EnvironmentStatistics
     [Id(3)]
     public readonly long MaximumAvailableMemoryBytes;
 
-    internal EnvironmentStatistics(float cpuUsagePercentage, long memoryUsageBytes, long availableMemoryBytes, long maximumAvailableMemoryBytes)
+    /// <summary>
+    /// The system CPU usage.
+    /// </summary>
+    /// <remarks>Ranges from 0.0-100.0.</remarks>
+    [Id(4)]
+    public readonly float RawCpuUsagePercentage;
+
+    /// <summary>
+    /// The amount of managed memory currently consumed by the process.
+    /// </summary>
+    [Id(5)]
+    public readonly long RawMemoryUsageBytes;
+
+    /// <summary>
+    /// The amount of memory currently available for allocations to the process.
+    /// </summary>
+    [Id(6)]
+    public readonly long RawAvailableMemoryBytes;
+
+    internal EnvironmentStatistics(
+        float cpuUsagePercentage,
+        float rawCpuUsagePercentage,
+        long memoryUsageBytes,
+        long rawMemoryUsageBytes,
+        long availableMemoryBytes,
+        long rawAvailableMemoryBytes,
+        long maximumAvailableMemoryBytes)
     {
         CpuUsagePercentage = cpuUsagePercentage;
+        RawCpuUsagePercentage = rawCpuUsagePercentage;
         MemoryUsageBytes = memoryUsageBytes;
+        RawMemoryUsageBytes = rawMemoryUsageBytes;
         AvailableMemoryBytes = availableMemoryBytes;
+        RawAvailableMemoryBytes = rawAvailableMemoryBytes;
         MaximumAvailableMemoryBytes = maximumAvailableMemoryBytes;
     }
+
+    public override string ToString()
+        => $"CpuUsage%: {CpuUsagePercentage} (raw: {RawCpuUsagePercentage}); MemoryUsage: {MemoryUsageBytes} bytes (raw: {RawMemoryUsageBytes}); AvailableMemory: {AvailableMemoryBytes} bytes (raw: {RawAvailableMemoryBytes}); MaximumAvailableMemory: {MaximumAvailableMemoryBytes} bytes;";
 }

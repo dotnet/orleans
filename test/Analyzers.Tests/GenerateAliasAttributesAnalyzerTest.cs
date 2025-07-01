@@ -4,6 +4,11 @@ using Xunit;
 
 namespace Analyzers.Tests;
 
+/// <summary>
+/// Tests for the GenerateAliasAttributesAnalyzer which suggests adding [Alias] attributes to types and methods
+/// that need them. Orleans uses aliases for stable type identification across versions and deployments.
+/// This analyzer helps developers remember to add aliases to grain interfaces, serializable types, and RPC methods.
+/// </summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]
 public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<GenerateAliasAttributesAnalyzer>
 {
@@ -28,6 +33,10 @@ public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<Ge
 
     #region Interfaces & Methods
 
+    /// <summary>
+    /// Verifies that the analyzer suggests adding [Alias] attributes to grain interfaces and their methods
+    /// when they don't have them. Each interface and non-static method should have an alias for proper RPC routing.
+    /// </summary>
     [Theory]
     [MemberData(nameof(GrainInterfaces))]
     public Task GrainInterfaceWithoutAliasAttribute_ShouldTriggerDiagnostic(string grainInterface)
@@ -45,6 +54,9 @@ public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<Ge
         return VerifyHasDiagnostic(code, 3);  // 3 diagnostics, because 1 for interface, and 2 for the non-static methods
     }
 
+    /// <summary>
+    /// Verifies that the analyzer does not trigger when grain interfaces and their methods already have [Alias] attributes.
+    /// </summary>
     [Theory]
     [MemberData(nameof(GrainInterfaces))]
     public Task GrainInterfaceWithAliasAttribute_ShouldNotTriggerDiagnostic(string grainInterface)
@@ -63,6 +75,10 @@ public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<Ge
         return VerifyHasNoDiagnostic(code);
     }
 
+    /// <summary>
+    /// Verifies that the analyzer does not suggest aliases for non-grain interfaces,
+    /// as aliases are only needed for grain interfaces in the Orleans RPC system.
+    /// </summary>
     [Fact]
     public Task NonGrainInterfaceWithoutAliasAttribute_ShouldNotTriggerDiagnostic()
     {
@@ -83,22 +99,38 @@ public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<Ge
 
     #region Classes, Structs, Records
 
+    /// <summary>
+    /// Verifies that the analyzer suggests adding [Alias] to classes marked with [GenerateSerializer].
+    /// Serializable types need aliases for version-tolerant serialization.
+    /// </summary>
     [Fact]
     public Task ClassWithoutAliasAttribute_AndWithGenerateSerializerAttribute_ShouldTriggerDiagnostic()
         => VerifyHasDiagnostic("[GenerateSerializer] public class C {}");
 
+    /// <summary>
+    /// Verifies that the analyzer suggests adding [Alias] to structs marked with [GenerateSerializer].
+    /// </summary>
     [Fact]
     public Task StructWithoutAliasAttribute_AndWithGenerateSerializerAttribute_ShouldTriggerDiagnostic()
        => VerifyHasDiagnostic("[GenerateSerializer] public struct S {}");
 
+    /// <summary>
+    /// Verifies that the analyzer suggests adding [Alias] to record classes marked with [GenerateSerializer].
+    /// </summary>
     [Fact]
     public Task RecordClassWithoutAliasAttribute_AndWithGenerateSerializerAttribute_ShouldTriggerDiagnostic()
        => VerifyHasDiagnostic("[GenerateSerializer] public record R {}");
 
+    /// <summary>
+    /// Verifies that the analyzer suggests adding [Alias] to record structs marked with [GenerateSerializer].
+    /// </summary>
     [Fact]
     public Task RecordStructWithoutAliasAttribute_AndWithGenerateSerializerAttribute_ShouldTriggerDiagnostic()
        => VerifyHasDiagnostic("[GenerateSerializer] public record struct RS {}");
 
+    /// <summary>
+    /// Verifies that the analyzer does not trigger when a class with [GenerateSerializer] already has an [Alias].
+    /// </summary>
     [Fact]
     public Task ClassWithAliasAttribute_AndWithGenerateSerializerAttribute_ShouldNotTriggerDiagnostic()
         => VerifyHasNoDiagnostic("[GenerateSerializer, Alias(\"C\")] public class C {}");
@@ -115,6 +147,10 @@ public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<Ge
     public Task RecordStructWithAliasAttribute_AndWithGenerateSerializerAttribute_ShouldNotTriggerDiagnostic()
        => VerifyHasNoDiagnostic("[GenerateSerializer, Alias(\"RS\")] public record struct RS {}");
 
+    /// <summary>
+    /// Verifies that the analyzer does not suggest aliases for classes without [GenerateSerializer],
+    /// as only serializable types need aliases.
+    /// </summary>
     [Fact]
     public Task ClassWithoutAliasAttribute_AndWithoutGenerateSerializerAttribute_ShouldNotTriggerDiagnostic()
         => VerifyHasNoDiagnostic("public class C {}");

@@ -8,6 +8,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Benchmarks
 {
+    /// <summary>
+    /// Benchmarks Orleans wire protocol field header encoding and writing performance.
+    /// </summary>
     [Config(typeof(BenchmarkConfig))]
     public class FieldHeaderBenchmarks
     {

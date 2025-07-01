@@ -3,6 +3,9 @@ using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
+    /// <summary>
+    /// Tests for best-fit balancer algorithm including resource distribution across buckets and ordering invariance.
+    /// </summary>
     public class BestFitBalancerTests
     {
         [Fact, TestCategory("Functional")]

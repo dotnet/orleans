@@ -99,6 +99,8 @@ namespace Orleans.CodeGenerator
             {
                 foreach (var symbol in asm.GetDeclaredTypes())
                 {
+                    var containingAssemblyAttributes = symbol.ContainingAssembly.GetAttributes();
+
                     if (GetWellKnownTypeId(symbol) is uint wellKnownTypeId)
                     {
                         MetadataModel.WellKnownTypeIds.Add((symbol.ToOpenTypeSyntax(), wellKnownTypeId));
@@ -126,6 +128,29 @@ namespace Orleans.CodeGenerator
                     }
                     else if (ShouldGenerateSerializer(symbol))
                     {
+                        // https://learn.microsoft.com/dotnet/api/system.runtime.compilerservices.referenceassemblyattribute
+                        if (containingAssemblyAttributes.Any(attributeData => attributeData.AttributeClass is
+                            {
+                                Name: "ReferenceAssemblyAttribute",
+                                ContainingNamespace:
+                                {
+                                    Name: "CompilerServices",
+                                    ContainingNamespace:
+                                    {
+                                        Name: "Runtime",
+                                        ContainingNamespace:
+                                        {
+                                            Name: "System",
+                                            ContainingNamespace.IsGlobalNamespace: true
+                                        }
+                                    }
+                                }
+                            }))
+                        {
+                            // not ALWAYS will be properly processed, therefore emit a warning
+                            throw new OrleansGeneratorDiagnosticAnalysisException(ReferenceAssemblyWithGenerateSerializerDiagnostic.CreateDiagnostic(symbol));
+                        }
+
                         if (!Compilation.IsSymbolAccessibleWithin(symbol, Compilation.Assembly))
                         {
                             throw new OrleansGeneratorDiagnosticAnalysisException(InaccessibleSerializableTypeDiagnostic.CreateDiagnostic(symbol));

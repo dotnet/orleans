@@ -11,7 +11,7 @@ namespace Orleans.Hosting;
 
 internal sealed class AzureBlobStorageGrainJournalingProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.AddAzureAppendBlobStateMachineStorage();
         var optionsBuilder = builder.Services.AddOptions<AzureAppendBlobStateMachineStorageOptions>();
