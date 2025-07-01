@@ -13,7 +13,9 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use azure queue persistent migration streams.
         /// </summary>
-        public static ISiloBuilder AddAzureQueueMigrationStreams(this ISiloBuilder builder, string name,
+        public static ISiloBuilder AddAzureQueueMigrationStreams(
+            this ISiloBuilder builder,
+            string name,
             Action<SiloAzureQueueMigrationStreamConfigurator> configure)
         {
             var configurator = new SiloAzureQueueMigrationStreamConfigurator(name,

@@ -4,7 +4,7 @@
     <Title>Microsoft Orleans Streaming Azure Storage Migration</Title>
     <Description>Microsoft Orleans migration streaming provider for Azure Queue Storage</Description>
     <PackageTags>$(PackageTags) Azure Table Blob Storage Migration</PackageTags>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>net6.0</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Orleans.Persistence.Migration\Orleans.Persistence.Migration.csproj" />
     <ProjectReference Include="..\Orleans.Streaming.AzureStorage\Orleans.Streaming.AzureStorage.csproj" />
   </ItemGroup>
 </Project>

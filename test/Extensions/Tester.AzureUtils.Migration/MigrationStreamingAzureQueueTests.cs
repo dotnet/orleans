@@ -7,6 +7,7 @@ using Tester.AzureUtils.Migration.Abstractions;
 using Orleans.Persistence.AzureStorage.Migration;
 using TesterInternal.AzureInfra;
 using Xunit;
+using Orleans.Streaming.Migration.Configuration;
 
 namespace Tester.AzureUtils.Migration;
 
@@ -43,6 +44,8 @@ public class MigrationStreamingAzureQueueSetup : MigrationStreamingAzureQueueTes
                     // TODO replace with configuration connection string
                     options.ConfigureQueueServiceClient("UseDevelopmentStorage=true");
                     options.QueueNames = new List<string> { QueueName };
+                    
+                    options.SerializationMode = SerializationMode.PrioritizeJson;
                 }));
             });
 

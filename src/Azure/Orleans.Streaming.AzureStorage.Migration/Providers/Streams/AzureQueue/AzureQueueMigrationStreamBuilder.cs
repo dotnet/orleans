@@ -4,11 +4,10 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.ApplicationParts;
 using Orleans.Providers.Streams.AzureQueue;
-using Orleans.Providers.Streams.Common;
 using Orleans.Configuration;
 using Orleans.Streams;
-using Orleans.Hosting;
-using Orleans.Streaming.AzureStorage.Migration.Providers.Streams.AzureQueue;
+using Orleans.Streaming.Migration.Configuration;
+using Orleans.Providers.Streams.AzureQueue.Migration;
 
 
 namespace Orleans.Hosting
@@ -32,7 +31,16 @@ namespace Orleans.Hosting
                             this.Name);
                 }
             }));
+
             this.ConfigureDelegate(services => services.TryAddSingleton<IQueueDataAdapter<string, IBatchContainer>, AzureQueueDataAdapterMigrationV1>());
+        }
+    }
+
+    public static class SiloAzureQueueMigrationStreamConfiguratorExtensions
+    {
+        public static void ConfigureAzureQueue(this SiloAzureQueueMigrationStreamConfigurator configurator, Action<OptionsBuilder<AzureQueueMigrationOptions>> configureOptions)
+        {
+            configurator.Configure(configureOptions);
         }
     }
 }
