@@ -8,6 +8,8 @@ namespace Orleans.Reminders.Cosmos;
 namespace Orleans.Streaming.Cosmos;
 #elif ORLEANS_DIRECTORY
 namespace Orleans.GrainDirectory.Cosmos;
+#elif ORLEANS_JOURNALING
+namespace Orleans.Journaling.Cosmos;
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
@@ -33,7 +35,7 @@ public class CosmosOptionsValidator<TOptions> : IConfigurationValidator where TO
     }
 
     /// <inheritdoc/>
-    public void ValidateConfiguration()
+    public virtual void ValidateConfiguration()
     {
         if (string.IsNullOrWhiteSpace(_options.DatabaseName))
             throw new OrleansConfigurationException(
