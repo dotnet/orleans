@@ -20,7 +20,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public ValueTask<GrainAddress?> Lookup(GrainId grainId) => GetGrainLocator(grainId.Type).Lookup(grainId);
 
-        public Task<GrainAddress> Register(GrainAddress address, GrainAddress? previousRegistration) => GetGrainLocator(address.GrainId.Type).Register(address, previousRegistration);
+        public Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousRegistration) => GetGrainLocator(address.GrainId.Type).Register(address, previousRegistration);
 
         public Task Unregister(GrainAddress address, UnregistrationCause cause) => GetGrainLocator(address.GrainId.Type).Unregister(address, cause);
 

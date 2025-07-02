@@ -97,6 +97,12 @@ namespace Orleans.Runtime.GrainDirectory
 
             var result = await GetGrainDirectory(grainType).Register(address, previousAddress);
 
+            if (result is null)
+            {
+                // If the registration failed, we return a null address
+                return null;
+            }
+
             // Check if the entry point to a dead silo
             if (IsKnownDeadSilo(result))
             {
@@ -109,6 +115,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.cache.AddOrUpdate(result, (int)result.MembershipVersion.Value);
 
             return result;
+
         }
 
         public async Task Unregister(GrainAddress address, UnregistrationCause cause)
