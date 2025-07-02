@@ -37,6 +37,7 @@ public class MigrationStreamingAzureQueueSetup : MigrationStreamingAzureQueueTes
         {
             siloBuilder.AddMigrationTools();
 
+            // Migration registration
             siloBuilder.AddAzureQueueMigrationStreams("AzureQueueProvider", configurator =>
             {
                 configurator.ConfigureAzureQueue(ob => ob.Configure(options =>
@@ -44,10 +45,21 @@ public class MigrationStreamingAzureQueueSetup : MigrationStreamingAzureQueueTes
                     // TODO replace with configuration connection string
                     options.ConfigureQueueServiceClient("UseDevelopmentStorage=true");
                     options.QueueNames = new List<string> { QueueName };
-                    
+
                     options.SerializationMode = SerializationMode.PrioritizeJson;
                 }));
             });
+
+            // NON MIGRATION
+            //siloBuilder.AddAzureQueueStreams("AzureQueueProvider", configurator =>
+            //{
+            //    configurator.ConfigureAzureQueue(ob => ob.Configure(options =>
+            //    {
+            //        // TODO replace with configuration connection string
+            //        options.ConfigureQueueServiceClient("UseDevelopmentStorage=true");
+            //        options.QueueNames = new List<string> { QueueName };
+            //    }));
+            //});
 
 
         }

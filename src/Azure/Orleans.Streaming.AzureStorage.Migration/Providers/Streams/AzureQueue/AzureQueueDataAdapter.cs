@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Persistence.Migration.Serialization;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
 using Orleans.Streaming.Migration.Configuration;
 using Orleans.Streams;
-using Orleans.Persistence.Migration.Serialization;
 
 namespace Orleans.Providers.Streams.AzureQueue.Migration;
 
@@ -16,24 +18,30 @@ namespace Orleans.Providers.Streams.AzureQueue.Migration;
 public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatchContainer>, IOnDeserialized
 {
     private SerializationManager serializationManager;
-    private readonly AzureQueueMigrationOptions options;
     private readonly OrleansMigrationJsonSerializer orleansMigrationJsonSerializer;
+
+    private readonly AzureQueueMigrationOptions options;
+    private readonly ILogger logger;
 
     private SerializationMode SerializationMode => options.SerializationMode;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AzureQueueDataAdapterMigrationV1"/> class.
     /// </summary>
+    /// <param name="logger"></param>
     /// <param name="serializationManager"></param>
     /// <param name="orleansMigrationJsonSerializer"></param>
     /// <param name="options"></param>
     public AzureQueueDataAdapterMigrationV1(
+        ILogger<AzureQueueDataAdapterMigrationV1> logger,
         SerializationManager serializationManager,
         OrleansMigrationJsonSerializer orleansMigrationJsonSerializer,
         AzureQueueMigrationOptions options)
     {
         this.serializationManager = serializationManager;
         this.orleansMigrationJsonSerializer = orleansMigrationJsonSerializer;
+
+        this.logger = logger;
         this.options = options;
     }
 
@@ -51,9 +59,9 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
                 {
                     return orleansMigrationJsonSerializer.Serialize(azureQueueBatchMessage, typeof(AzureQueueBatchContainerV2));
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // log?
+                    this.logger.LogDebug(ex, "Failed to serialize AzureQueueBatchContainerV2 to JSON");
                     goto default;
                 }
 
@@ -79,9 +87,9 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
                 {
                     azureQueueBatch = (AzureQueueBatchContainerV2)orleansMigrationJsonSerializer.Deserialize(typeof(AzureQueueBatchContainerV2), cloudMsg);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // log?
+                    this.logger.LogDebug(ex, "Failed to Deserialize AzureQueueBatchContainerV2 from JSON");
                     goto default;
                 }
                 break;

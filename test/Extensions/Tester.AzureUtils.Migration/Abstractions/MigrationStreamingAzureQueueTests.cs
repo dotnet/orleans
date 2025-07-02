@@ -10,150 +10,48 @@ using Orleans.Reminders.AzureStorage.Storage.Reminders;
 using Orleans.Runtime.ReminderService;
 using Orleans.Persistence.Migration;
 using Orleans.Persistence.AzureStorage.Migration.Reminders.Storage;
+using Orleans.Streams;
+using Orleans.Providers.Streams.AzureQueue;
 
 namespace Tester.AzureUtils.Migration.Abstractions
 {
     public abstract class MigrationStreamingAzureQueueTests : MigrationBaseTests
     {
-        const int baseId = 300;
+        const int baseId = 800;
 
-        private IReminderTableEntryBuilder? migrationEntryBuilder;
-        protected IReminderTableEntryBuilder MigrationEntryBuilder
-        {
-            get
-            {
-                if (this.migrationEntryBuilder == null)
-                {
-                    this.migrationEntryBuilder = new MigratedReminderTableEntryBuilder(ServiceProvider.GetRequiredService<IGrainReferenceExtractor>());
-                }
-                return this.migrationEntryBuilder;
-            }
-        }
-
-        protected MigrationRemindersTests(BaseAzureTestClusterFixture fixture)
+        protected MigrationStreamingAzureQueueTests(BaseAzureTestClusterFixture fixture)
             : base(fixture)
         {
         }
 
         [SkippableFact]
-        public async Task UpsertRow_WritesIntoTwoTables()
+        public async Task Streaming_PushesDataIntoPredeterminedAzureQueue()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 1);
-            var grainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
-            var stateName = typeof(SimplePersistentGrain).FullName;
-            var grainReference = (GrainReference)grain;
+            var streamId = Guid.NewGuid();
+            var streamNamespace = $"test-{baseId}-123";
 
-            var defaultEntryBuilder = SourceReminderTableEntryBuilder;
-            var reminderName = GenerateReminderName();
-            var migrationEntryRowKey = MigrationEntryBuilder.ConstructRowKey(grainReference, reminderName);
-            var oldEntryRowKey = defaultEntryBuilder.ConstructRowKey(grainReference, reminderName);
+            var streamProvider = ServiceProvider.GetRequiredServiceByName<IStreamProvider>("AzureQueueProvider");
+            var stream = streamProvider.GetStream<StreamDataType>(streamId, streamNamespace);
+            var data = GenerateStreamData();
 
-            var reminderEntry = new ReminderEntry
-            {
-                GrainRef = grainReference,
-                ReminderName = reminderName,
-                StartAt = DateTime.UtcNow,
-                Period = TimeSpan.FromMinutes(1)
-            };
-
-            var reminderTable = await GetAndInitReminderTableAsync();
-            var res = await reminderTable.UpsertRow(reminderEntry);
-
-            var entryStorage = await reminderTable.ReadRow(grainReference, reminderName);
-            Assert.NotNull(entryStorage);
-            Assert.Equal(entryStorage.GrainRef.ToKeyString(), grainReference.ToKeyString());
-            Assert.Equal(entryStorage.GrainRef.GrainIdentity.ToString(), grainReference.GrainIdentity.ToString());
-
-            var migratedTableClient = GetMigratedTableClient();
-            var migratedFetchedEntry = migratedTableClient.Query<ReminderTableEntry>(x => x.RowKey == migrationEntryRowKey).FirstOrDefault();
-            Assert.NotNull(migratedFetchedEntry);
-            Assert.Equal(MigrationEntryBuilder.ConstructPartitionKey(ClusterOptions.ServiceId, grainReference), migratedFetchedEntry!.PartitionKey);
-            Assert.Equal(MigrationEntryBuilder.GetGrainReference(grainReference), migratedFetchedEntry!.GrainReference);
-
-            var oldTableClient = GetOldTableClient();
-            var oldFetchedEntry = oldTableClient.Query<ReminderTableEntry>(x => x.RowKey == oldEntryRowKey).FirstOrDefault();
-            Assert.NotNull(oldFetchedEntry);
-            Assert.Equal(defaultEntryBuilder.ConstructPartitionKey(ClusterOptions.ServiceId, grainReference), oldFetchedEntry!.PartitionKey);
-            Assert.Equal(defaultEntryBuilder.GetGrainReference(grainReference), oldFetchedEntry!.GrainReference);
+            await stream.OnNextAsync(data);
         }
 
-        [SkippableFact]
-        public async Task Read_ReturnsOriginalGrainReferenceAndReminder()
+        private static StreamDataType GenerateStreamData()
         {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 2);
-            var grainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
-            var stateName = typeof(SimplePersistentGrain).FullName;
-            var grainReference = (GrainReference)grain;
-
-            var defaultEntryBuilder = SourceReminderTableEntryBuilder;
-            var reminderName = GenerateReminderName();
-            var migrationEntryRowKey = MigrationEntryBuilder.ConstructRowKey(grainReference, reminderName);
-            var oldEntryRowKey = defaultEntryBuilder.ConstructRowKey(grainReference, reminderName);
-
-            var reminderEntry = new ReminderEntry
+            return new StreamDataType
             {
-                GrainRef = grainReference,
-                ReminderName = reminderName,
-                StartAt = DateTime.UtcNow,
-                Period = TimeSpan.FromMinutes(1)
+                Id = Guid.NewGuid().ToString(),
+                Name = "TestStreamData",
+                Version = 1
             };
-
-            var reminderTable = await GetAndInitReminderTableAsync();
-            var res = await reminderTable.UpsertRow(reminderEntry);
-            var readEntry = await reminderTable.ReadRow(grainReference, reminderName);
-            Assert.NotNull(readEntry);
-            Assert.Equal(grainReference.GrainIdentity.PrimaryKey, readEntry.GrainRef.GrainIdentity.PrimaryKey);
-            Assert.Equal(reminderName, readEntry.ReminderName);
         }
+    }
 
-        [SkippableFact]
-        public async Task DataMigrator_ProperlyMigratesData()
-        {
-            var grain = this.fixture.Client.GetGrain<ISimplePersistentGrain>(baseId + 3);
-            var grainState = new GrainState<SimplePersistentGrain_State>(new() { A = 33, B = 806 });
-            var stateName = typeof(SimplePersistentGrain).FullName;
-            var grainReference = (GrainReference)grain;
-
-            var defaultEntryBuilder = SourceReminderTableEntryBuilder;
-            var reminderName = GenerateReminderName();
-            var migrationEntryRowKey = MigrationEntryBuilder.ConstructRowKey(grainReference, reminderName);
-            var oldEntryRowKey = defaultEntryBuilder.ConstructRowKey(grainReference, reminderName);
-
-            var reminderEntry = new ReminderEntry
-            {
-                GrainRef = grainReference,
-                ReminderName = reminderName,
-                StartAt = DateTime.UtcNow,
-                Period = TimeSpan.FromMinutes(1)
-            };
-
-            var reminderTable = await GetAndInitReminderTableAsync();
-            var res = await reminderTable.UpsertRow(reminderEntry);
-
-            var stats = await DataMigrator.MigrateRemindersAsync(
-                CancellationToken.None,
-                startingGrainRefHashCode: grainReference.GrainIdentity.GetUniformHashCode() - 1);
-
-            Assert.NotNull(stats);
-            Assert.True(stats.MigratedEntries > 0);
-            Assert.Equal((uint)0, stats.FailedEntries);
-            Assert.Equal((uint)0, stats.SkippedEntries);
-        }
-
-        private static string GenerateReminderName() => "Reminder" + Guid.NewGuid().ToString().Replace("-", "");
-
-        private TableClient GetOldTableClient() => GetTable(MigrationAzureTableRemindersTests.OldTableName);
-        private TableClient GetMigratedTableClient() => GetTable(MigrationAzureTableRemindersTests.DestinationTableName);
-        private TableClient GetTable(string tableName)
-        {
-            if (TestDefaultConfiguration.UseAadAuthentication)
-            {
-                return new Azure.Data.Tables.TableClient(TestDefaultConfiguration.TableEndpoint, tableName, TestDefaultConfiguration.TokenCredential);
-            }
-            else
-            {
-                return new Azure.Data.Tables.TableClient(TestDefaultConfiguration.DataConnectionString, tableName);
-            }
-        } 
+    public class StreamDataType
+    {
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+        public int Version { get; set; }
     }
 }

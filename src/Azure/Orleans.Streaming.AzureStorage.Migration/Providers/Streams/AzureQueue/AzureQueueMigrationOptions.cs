@@ -7,7 +7,7 @@ namespace Orleans.Streaming.Migration.Configuration;
 
 public class AzureQueueMigrationOptions : AzureQueueOptions
 {
-    public SerializationMode SerializationMode { get; set; } = SerializationMode.Default;
+    public SerializationMode SerializationMode { get; set; }
 }
 
 public enum SerializationMode
