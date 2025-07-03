@@ -64,7 +64,7 @@ public struct BufferSliceReaderInput
                 else
                 {
                     // Start is in this segment
-                    segmentOffset = Offset;
+                    segmentOffset = Offset - _position;
                 }
             }
             else
