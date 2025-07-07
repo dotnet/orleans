@@ -127,9 +127,32 @@ type FSharpSerializationTests(fixture: DefaultClusterFixture) =
         Assert.Equal(du, copy)
 
     [<Fact; TestCategory("BVT"); TestCategory("Serialization")>]
+    let Serialization_Roundtrip_FSharp_NamedFieldsSingleCaseDiscriminatedUnion () =
+        let du = NamedFieldsSingleCaseDU.Case1 "str"
+        let roundtripped = cluster.RoundTripSerializationForTesting du
+        let copy = cluster.DeepCopy du
+        Assert.Equal(du, roundtripped)
+        Assert.Equal(du, copy)
+
+    [<Fact; TestCategory("BVT"); TestCategory("Serialization")>]
     let Serialization_Roundtrip_FSharp_DoubleCaseDiscriminatedUnion () =
         let case1 = DoubleCaseDU.Case1 "case 1"
         let case2 = DoubleCaseDU.Case2 2
+
+        let roundtrippedCase1 = cluster.RoundTripSerializationForTesting case1
+        let roundtrippedCase2 = cluster.RoundTripSerializationForTesting case2
+        let copyCase1 = cluster.DeepCopy case1
+        let copyCase2 = cluster.DeepCopy case2
+
+        Assert.Equal(case1, roundtrippedCase1)
+        Assert.Equal(case2, roundtrippedCase2)
+        Assert.Equal(case1, copyCase1)
+        Assert.Equal(case2, copyCase2)
+
+    [<Fact; TestCategory("BVT"); TestCategory("Serialization")>]
+    let Serialization_Roundtrip_FSharp_NamedFieldsDoubleCaseDiscriminatedUnion () =
+        let case1 = NamedFieldsDoubleCaseDU.Case1 ("case 1", 123)
+        let case2 = NamedFieldsDoubleCaseDU.Case2 "case 2"
 
         let roundtrippedCase1 = cluster.RoundTripSerializationForTesting case1
         let roundtrippedCase2 = cluster.RoundTripSerializationForTesting case2
@@ -146,6 +169,26 @@ type FSharpSerializationTests(fixture: DefaultClusterFixture) =
         let case1 = TripleCaseDU.Case1 "case 1"
         let case2 = TripleCaseDU.Case2 2
         let case3 = TripleCaseDU.Case3 'a'
+
+        let roundtrippedCase1 = cluster.RoundTripSerializationForTesting case1
+        let roundtrippedCase2 = cluster.RoundTripSerializationForTesting case2
+        let roundtrippedCase3 = cluster.RoundTripSerializationForTesting case3
+        let copyCase1 = cluster.DeepCopy case1
+        let copyCase2 = cluster.DeepCopy case2
+        let copyCase3 = cluster.DeepCopy case3
+
+        Assert.Equal(case1, roundtrippedCase1)
+        Assert.Equal(case2, roundtrippedCase2)
+        Assert.Equal(case3, roundtrippedCase3)
+        Assert.Equal(case1, copyCase1)
+        Assert.Equal(case2, copyCase2)
+        Assert.Equal(case3, copyCase3)
+
+    [<Fact; TestCategory("BVT"); TestCategory("Serialization")>]
+    let Serialization_Roundtrip_FSharp_NamedFieldsTripleCaseDiscriminatedUnion () =
+        let case1 = NamedFieldsTripleCaseDU.Case1 "case 1"
+        let case2 = NamedFieldsTripleCaseDU.Case2 ("case 2", 123uy)
+        let case3 = NamedFieldsTripleCaseDU.Case3 ("one", "two", 3)
 
         let roundtrippedCase1 = cluster.RoundTripSerializationForTesting case1
         let roundtrippedCase2 = cluster.RoundTripSerializationForTesting case2
@@ -191,10 +234,94 @@ type FSharpSerializationTests(fixture: DefaultClusterFixture) =
     [<TestCategory("BVT"); TestCategory("Serialization")>]
     let Serialization_Roundtrip_FSharp_QuintupleCaseDiscriminatedUnion () =
         let case1 = QuintupleCaseDU.Case1
-        let case2 = QuintupleCaseDU.Case2 2
+        let case2 = QuintupleCaseDU.Case2 (2, "some string")
         let case3 = QuintupleCaseDU.Case3
-        let case4 = QuintupleCaseDU.Case4 1uy
+        let case4 = QuintupleCaseDU.Case4 (1uy, 2L)
         let case5 = QuintupleCaseDU.Case5 "case 5"
+
+        let roundtrippedCase1 = cluster.RoundTripSerializationForTesting case1
+        let roundtrippedCase2 = cluster.RoundTripSerializationForTesting case2
+        let roundtrippedCase3 = cluster.RoundTripSerializationForTesting case3
+        let roundtrippedCase4 = cluster.RoundTripSerializationForTesting case4
+        let roundtrippedCase5 = cluster.RoundTripSerializationForTesting case5
+        let copyCase1 = cluster.DeepCopy case1
+        let copyCase2 = cluster.DeepCopy case2
+        let copyCase3 = cluster.DeepCopy case3
+        let copyCase4 = cluster.DeepCopy case4
+        let copyCase5 = cluster.DeepCopy case5
+
+        Assert.Equal(case1, roundtrippedCase1);
+        Assert.Equal(case2, roundtrippedCase2);
+        Assert.Equal(case3, roundtrippedCase3);
+        Assert.Equal(case4, roundtrippedCase4);
+        Assert.Equal(case5, roundtrippedCase5);
+        Assert.Equal(case1, copyCase1);
+        Assert.Equal(case2, copyCase2);
+        Assert.Equal(case3, copyCase3);
+        Assert.Equal(case4, copyCase4)
+        Assert.Equal(case5, copyCase5)
+
+    [<Fact; TestCategory("BVT"); TestCategory("Serialization")>]
+    let Serialization_Roundtrip_FSharp_PrivateConstructorDiscriminatedUnion () =
+        let du = PrivateConstructorDU.SomeValue
+        let roundtripped = cluster.RoundTripSerializationForTesting du
+        let copy = cluster.DeepCopy du
+        Assert.Equal(du, roundtripped)
+        Assert.Equal(du, copy)
+
+    [<Fact; TestCategory("BVT"); TestCategory("Serialization")>]
+    let Serialization_Roundtrip_FSharp_PrivateConstructorDoubleCaseDiscriminatedUnion () =
+        let case1 = PrivateConstructorDoubleCaseDU.One
+        let case2 = PrivateConstructorDoubleCaseDU.Two
+
+        let roundtrippedCase1 = cluster.RoundTripSerializationForTesting case1
+        let roundtrippedCase2 = cluster.RoundTripSerializationForTesting case2
+        let copyCase1 = cluster.DeepCopy case1
+        let copyCase2 = cluster.DeepCopy case2
+
+        Assert.Equal(case1, roundtrippedCase1)
+        Assert.Equal(case2, roundtrippedCase2)
+        Assert.Equal(case1, copyCase1)
+        Assert.Equal(case2, copyCase2)
+
+    [<Fact>]
+    [<TestCategory("BVT"); TestCategory("Serialization")>]
+    let Serialization_Roundtrip_FSharp_Mutually_Recursive_DU () =
+        let mutually_case1 = DUMutually.Case1 1
+        let mutually_case2_case1 = DUMutually.Case2 (DURecursive.Case1 (DUMutually.Case1 2))
+        let mutually_case2_case2 =
+            DUMutually.Case2 (DURecursive.Case2 (DURecursive.Case1 (DUMutually.Case1 3), DUMutually.Case2 (DURecursive.Case1 (DUMutually.Case1 1337))))
+
+        let roundtripped_mutually_case1 = cluster.RoundTripSerializationForTesting mutually_case1
+        let roundtripped_mutually_case2_case1 = cluster.RoundTripSerializationForTesting mutually_case2_case1
+        let roundtripped_mutually_case2_case2 = cluster.RoundTripSerializationForTesting mutually_case2_case2
+        let copy_mutually_case1 = cluster.DeepCopy mutually_case1
+        let copy_mutually_case2_case1 = cluster.DeepCopy mutually_case2_case1
+        let copy_mutually_case2_case2 = cluster.DeepCopy mutually_case2_case2
+
+        Assert.Equal(mutually_case1, roundtripped_mutually_case1)
+        Assert.Equal(mutually_case2_case1, roundtripped_mutually_case2_case1)
+        Assert.Equal(mutually_case2_case2, roundtripped_mutually_case2_case2)
+        Assert.Equal(mutually_case1, copy_mutually_case1)
+        Assert.Equal(mutually_case2_case1, copy_mutually_case2_case1)
+        Assert.Equal(mutually_case2_case2, copy_mutually_case2_case2)
+
+    [<Fact; TestCategory("BVT"); TestCategory("Serialization")>]
+    let Serialization_Roundtrip_FSharp_SingleCaseStructDiscriminatedUnion () =
+        let du = SingleCaseStructDU.Case "string"
+        let roundtripped = cluster.RoundTripSerializationForTesting du
+        let copy = cluster.DeepCopy du
+        Assert.Equal(du, roundtripped)
+        Assert.Equal(du, copy)
+
+    [<Fact>]
+    [<TestCategory("BVT"); TestCategory("Serialization")>]
+    let Serialization_Roundtrip_FSharp_MulticaseStructDiscriminatedUnion () =
+        let case1 = MulticaseStructDU.Case1 "case 1"
+        let case2 = MulticaseStructDU.Case2 "case 2"
+        let case3 = MulticaseStructDU.Case3 123
+        let case4 = MulticaseStructDU.Case4
+        let case5 = MulticaseStructDU.Case5 123L
 
         let roundtrippedCase1 = cluster.RoundTripSerializationForTesting case1
         let roundtrippedCase2 = cluster.RoundTripSerializationForTesting case2
