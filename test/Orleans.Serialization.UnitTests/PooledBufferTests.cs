@@ -268,5 +268,103 @@ namespace Orleans.Serialization.UnitTests
                 return new(id, values);
             }
         }
+
+        /// <summary>
+        /// Ensures that BufferSlice's SpanEnumerator and MemoryEnumerator correctly handle non-zero offsets that cross segment boundaries.
+        /// This test exercises the offset math for enumerators when the slice starts partway through a segment and spans multiple segments.
+        /// </summary>
+        [Fact]
+        public void PooledBuffer_SliceEnumerators_OffsetCrossSegment_Correctness()
+        {
+            // Arrange: Write enough data to ensure multiple segments
+            var random = new Random(42);
+            var buffer = new PooledBuffer();
+            int totalLength = 16 * 1024; // 16KB, should span multiple segments (4KB min segment size)
+            var data = new byte[totalLength];
+            random.NextBytes(data);
+            buffer.Write(data);
+
+            // Pick an offset and length that will cross segment boundaries
+            int offset = 3500; // Not aligned to segment boundary
+            int length = 7000; // Crosses at least one segment boundary
+            var expected = data.AsSpan(offset, length).ToArray();
+
+            // Act & Assert: SpanEnumerator
+            var slice = buffer.Slice(offset, length);
+            var spanConcat = new byte[length];
+            int spanPos = 0;
+            foreach (var span in slice)
+            {
+                span.CopyTo(spanConcat.AsSpan(spanPos));
+                spanPos += span.Length;
+            }
+            Assert.Equal(length, spanPos);
+            Assert.Equal(expected, spanConcat);
+
+            // Act & Assert: MemoryEnumerator
+            var memConcat = new byte[length];
+            int memPos = 0;
+            foreach (var mem in slice.MemorySegments)
+            {
+                var span = mem.Span;
+                span.CopyTo(memConcat.AsSpan(memPos));
+                memPos += span.Length;
+            }
+            Assert.Equal(length, memPos);
+            Assert.Equal(expected, memConcat);
+
+            buffer.Dispose();
+        }
+
+        /// <summary>
+        /// Ensures that BufferSlice's SpanEnumerator and MemoryEnumerator exercise the code path where the enumerator's position is greater than zero.
+        /// This is achieved by using a slice offset that skips at least one full segment, so the enumerator must skip segments before yielding data.
+        /// The test validates that the enumerators return the correct data for such non-zero offsets.
+        /// </summary>
+        [Fact]
+        public void PooledBuffer_SliceEnumerators_OffsetAfterFirstSegment_CoversPositionGreaterThanZero()
+        {
+            // This test ensures that the BufferSlice enumerators exercise the branch where _position > 0
+            // by using a slice offset that skips at least one full segment. The correctness of the output
+            // validates that the offset math is correct for non-zero _position.
+            var random = new Random(123);
+            var buffer = new PooledBuffer();
+            int segmentSize = 4 * 1024; // MinimumBlockSize
+            int totalLength = segmentSize * 3; // 3 segments
+            var data = new byte[totalLength];
+            random.NextBytes(data);
+            buffer.Write(data);
+
+            // Pick an offset that is after the first segment
+            int offset = segmentSize + 123; // Offset into the second segment
+            int length = 1000; // Arbitrary length within the second segment
+            var expected = data.AsSpan(offset, length).ToArray();
+
+            // Act & Assert: SpanEnumerator
+            var slice = buffer.Slice(offset, length);
+            var spanConcat = new byte[length];
+            int spanPos = 0;
+            foreach (var span in slice)
+            {
+                span.CopyTo(spanConcat.AsSpan(spanPos));
+                spanPos += span.Length;
+            }
+            Assert.Equal(length, spanPos);
+            Assert.Equal(expected, spanConcat);
+
+            // Act & Assert: MemoryEnumerator
+            var memConcat = new byte[length];
+            int memPos = 0;
+            foreach (var mem in slice.MemorySegments)
+            {
+                var span = mem.Span;
+                span.CopyTo(memConcat.AsSpan(memPos));
+                memPos += span.Length;
+            }
+            Assert.Equal(length, memPos);
+            Assert.Equal(expected, memConcat);
+
+            buffer.Dispose();
+        }
     }
 }
