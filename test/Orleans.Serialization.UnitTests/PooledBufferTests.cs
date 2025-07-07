@@ -117,6 +117,11 @@ namespace Orleans.Serialization.UnitTests
             var result4 = reader4.ReadBytes((uint)slice4.Length);
             Assert.True(randomData.AsSpan(3000, 1500).SequenceEqual(result4));
 
+            var slice5 = writer.Output.Slice(4500, 125);
+            var reader5 = Reader.Create(slice5, null);
+            var result5 = reader5.ReadBytes((uint)slice5.Length);
+            Assert.True(randomData.AsSpan(4500, 125).SequenceEqual(result5));
+
             var ros = writer.Output.AsReadOnlySequence();
             var rosReader = Reader.Create(ros, null);
             var rosArray = rosReader.ReadBytes((uint)randomData.Length);
