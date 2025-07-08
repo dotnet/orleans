@@ -76,7 +76,7 @@ namespace Tester.AzureUtils.Migration.Abstractions
 
             // Create a proper Orleans message using the SAME streamId and streamNamespace as the subscription; but written in previous format
             var azureQueueDataAdapter = new AzureQueueDataAdapterV2(ServiceProvider.GetRequiredService<Orleans.Serialization.SerializationManager>());
-            var orleansBatchMessage = azureQueueDataAdapter.ToQueueMessage(streamId, streamNamespace, [ data ], null, new Dictionary<string, object>());
+            var orleansBatchMessage = azureQueueDataAdapter.ToQueueMessage(streamId, streamNamespace, new[] { data }, null, new Dictionary<string, object>());
 
             var queueServiceClient = new Azure.Storage.Queues.QueueServiceClient(TestDefaultConfiguration.DataQueueUri, TestDefaultConfiguration.TokenCredential);
             var queueClient = queueServiceClient.GetQueueClient(MigrationStreamingAzureQueueSetup.QueueName);
