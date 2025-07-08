@@ -37,7 +37,7 @@ namespace Orleans.Providers.Streams.Common
         private readonly IRuntimeClient runtimeClient;
         private readonly ProviderStateManager stateManager = new ProviderStateManager();
         private IQueueAdapterFactory    adapterFactory;
-        private IQueueAdapter           queueAdapter;
+        internal IQueueAdapter queueAdapter; // for testing
         private IPersistentStreamPullingManager pullingAgentManager;
         private IStreamSubscriptionManager streamSubscriptionManager;
         private readonly StreamPubSubOptions pubsubOptions;

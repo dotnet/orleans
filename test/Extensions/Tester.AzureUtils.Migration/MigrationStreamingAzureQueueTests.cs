@@ -1,11 +1,7 @@
-using Microsoft.Extensions.Options;
 using Orleans.Hosting;
-using Orleans.Persistence.AzureStorage.Migration.Reminders;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
 using Tester.AzureUtils.Migration.Abstractions;
-using Orleans.Persistence.AzureStorage.Migration;
-using TesterInternal.AzureInfra;
 using Xunit;
 using Orleans.Streaming.Migration.Configuration;
 
@@ -21,6 +17,7 @@ public class MigrationStreamingAzureQueueSetup : MigrationStreamingAzureQueueTes
         fixture.EnsurePreconditionsMet();
     }
 
+    public static string StreamProviderName = "AzureQueueProvider";
     public static string QueueName => $"migration-queue-{Guid}";
 
     public class Fixture : BaseAzureTestClusterFixture
@@ -37,8 +34,11 @@ public class MigrationStreamingAzureQueueSetup : MigrationStreamingAzureQueueTes
         {
             siloBuilder.AddMigrationTools();
 
+            // required for Orleans streaming
+            siloBuilder.AddMemoryGrainStorage("PubSubStore");
+
             // Migration registration
-            siloBuilder.AddAzureQueueMigrationStreams("AzureQueueProvider", configurator =>
+            siloBuilder.AddAzureQueueMigrationStreams(StreamProviderName, configurator =>
             {
                 configurator.ConfigureAzureQueue(ob => ob.Configure(options =>
                 {
@@ -51,7 +51,7 @@ public class MigrationStreamingAzureQueueSetup : MigrationStreamingAzureQueueTes
             });
 
             // NON MIGRATION
-            //siloBuilder.AddAzureQueueStreams("AzureQueueProvider", configurator =>
+            //siloBuilder.AddAzureQueueStreams(StreamProviderName, configurator =>
             //{
             //    configurator.ConfigureAzureQueue(ob => ob.Configure(options =>
             //    {

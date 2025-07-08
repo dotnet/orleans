@@ -1,17 +1,8 @@
-using Orleans;
-using Orleans.Runtime;
-using UnitTests.GrainInterfaces;
-using UnitTests.Grains;
-using Xunit;
-using Azure.Data.Tables;
-using TestExtensions;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Reminders.AzureStorage.Storage.Reminders;
-using Orleans.Runtime.ReminderService;
-using Orleans.Persistence.Migration;
-using Orleans.Persistence.AzureStorage.Migration.Reminders.Storage;
-using Orleans.Streams;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
+using Orleans.Streams;
+using Xunit;
 
 namespace Tester.AzureUtils.Migration.Abstractions
 {
@@ -25,16 +16,40 @@ namespace Tester.AzureUtils.Migration.Abstractions
         }
 
         [SkippableFact]
-        public async Task Streaming_PushesDataIntoPredeterminedAzureQueue()
+        public async Task Streaming_PushesDataIntoPredeterminedAzureQueue_AndReceivesViaExplicitSubscription()
         {
+            var providerName = MigrationStreamingAzureQueueSetup.StreamProviderName;
             var streamId = Guid.NewGuid();
             var streamNamespace = $"test-{baseId}-123";
-
-            var streamProvider = ServiceProvider.GetRequiredServiceByName<IStreamProvider>("AzureQueueProvider");
-            var stream = streamProvider.GetStream<StreamDataType>(streamId, streamNamespace);
             var data = GenerateStreamData();
 
-            await stream.OnNextAsync(data);
+            var streamProvider = ServiceProvider.GetRequiredServiceByName<IStreamProvider>(providerName);
+            var stream = streamProvider.GetStream<StreamDataType>(streamId, streamNamespace);
+
+            // subscribe to receive the message.
+            // there is no way to explicitly get the message, because scheduler will pick it up by itself.
+            var receivedMessages = new List<StreamDataType>();
+            var subscriptionHandle = await stream.SubscribeAsync((message, token) =>
+            {
+                receivedMessages.Add(message);
+                return Task.CompletedTask;
+            });
+
+            var persistentStreamProvider = (PersistentStreamProvider)streamProvider;
+            var adapter = (AzureQueueAdapter)persistentStreamProvider.queueAdapter;
+            await adapter.QueueMessageAsync(streamId, streamNamespace, data, token: null, requestContext: new Dictionary<string, object>());
+
+            // wait until background worker reads the message
+            await Task.Delay(TimeSpan.FromSeconds(5));
+
+            // verify the message was received
+            Assert.Single(receivedMessages);
+            var receivedMessage = receivedMessages[0];
+            Assert.Equal(data.Id, receivedMessage.Id);
+            Assert.Equal(data.Name, receivedMessage.Name);
+            Assert.Equal(data.Version, receivedMessage.Version);
+
+            await subscriptionHandle.UnsubscribeAsync();
         }
 
         private static StreamDataType GenerateStreamData()
