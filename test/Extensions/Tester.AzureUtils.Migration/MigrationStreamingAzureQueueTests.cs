@@ -4,6 +4,7 @@ using Orleans.TestingHost;
 using Tester.AzureUtils.Migration.Abstractions;
 using Xunit;
 using Orleans.Streaming.Migration.Configuration;
+using TesterInternal.AzureInfra;
 
 namespace Tester.AzureUtils.Migration;
 
@@ -42,26 +43,12 @@ public class MigrationStreamingAzureQueueSetup : MigrationStreamingAzureQueueTes
             {
                 configurator.ConfigureAzureQueue(ob => ob.Configure(options =>
                 {
-                    // TODO replace with configuration connection string
-                    options.ConfigureQueueServiceClient("UseDevelopmentStorage=true");
+                    options.ConfigureTestDefaults();
                     options.QueueNames = new List<string> { QueueName };
 
                     options.SerializationMode = SerializationMode.PrioritizeJson;
                 }));
             });
-
-            // NON MIGRATION
-            //siloBuilder.AddAzureQueueStreams(StreamProviderName, configurator =>
-            //{
-            //    configurator.ConfigureAzureQueue(ob => ob.Configure(options =>
-            //    {
-            //        // TODO replace with configuration connection string
-            //        options.ConfigureQueueServiceClient("UseDevelopmentStorage=true");
-            //        options.QueueNames = new List<string> { QueueName };
-            //    }));
-            //});
-
-
         }
     }
 }

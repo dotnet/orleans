@@ -90,6 +90,10 @@ namespace TesterInternal.AzureInfra
 
         public static Orleans.Configuration.AzureQueueOptions ConfigureTestDefaults(this Orleans.Configuration.AzureQueueOptions options)
         {
+#if DEBUG
+            options.ConfigureQueueServiceClient(TestDefaultConfiguration.DataQueueUri, TestDefaultConfiguration.TokenCredential);
+            return options;
+#else
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
                 options.ConfigureQueueServiceClient(TestDefaultConfiguration.DataQueueUri, TestDefaultConfiguration.TokenCredential);
@@ -100,6 +104,7 @@ namespace TesterInternal.AzureInfra
             }
 
             return options;
+#endif
         }
 
         public static Orleans.Configuration.AzureBlobLeaseProviderOptions ConfigureTestDefaults(this Orleans.Configuration.AzureBlobLeaseProviderOptions options)
