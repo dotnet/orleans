@@ -401,7 +401,6 @@ namespace Orleans.Serialization.UnitTests
             }
         }
 
-
         [GenerateSerializer]
         public class ObjectWithoutNewField
         {
