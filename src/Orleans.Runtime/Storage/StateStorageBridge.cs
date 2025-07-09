@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
@@ -24,9 +23,6 @@ namespace Orleans.Core
     {
         private readonly IGrainContext _grainContext;
         private readonly StateStorageBridgeShared<TState> _shared;
-        private readonly string _storeTypeName;
-        private readonly string _stateTypeName;
-        private readonly System.Diagnostics.TagList _metricTags;
         private GrainState<TState>? _grainState;
 
         /// <inheritdoc/>
@@ -78,13 +74,6 @@ namespace Orleans.Core
             _grainContext = grainContext;
             var sharedInstances = ActivatorUtilities.GetServiceOrCreateInstance<StateStorageBridgeSharedMap>(grainContext.ActivationServices);
             _shared = sharedInstances.Get<TState>(name, store);
-            _storeTypeName = store.GetType().Name;
-            _stateTypeName = typeof(TState).Name;
-            _metricTags = new System.Diagnostics.TagList([
-                new KeyValuePair<string, object?>("provider_name", _storeTypeName),
-                new KeyValuePair<string, object?>("state_name", name),
-                new KeyValuePair<string, object?>("state_type", _stateTypeName)
-            ]);
         }
 
         /// <inheritdoc />
@@ -97,11 +86,11 @@ namespace Orleans.Core
                 var sw = ValueStopwatch.StartNew();
                 await _shared.Store.ReadStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
                 IsStateInitialized = true;
-                StorageInstruments.OnStorageRead(sw.Elapsed, _metricTags);
+                StorageInstruments.OnStorageRead(sw.Elapsed, _shared.ProviderName, _shared.Name, _shared.StateTypeName);
             }
             catch (Exception exc)
             {
-                StorageInstruments.OnStorageReadError(_metricTags);
+                StorageInstruments.OnStorageReadError(_shared.ProviderName, _shared.Name, _shared.StateTypeName);
                 OnError(exc, ErrorCode.StorageProvider_ReadFailed, nameof(ReadStateAsync));
             }
         }
@@ -115,11 +104,11 @@ namespace Orleans.Core
 
                 var sw = ValueStopwatch.StartNew();
                 await _shared.Store.WriteStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
-                StorageInstruments.OnStorageWrite(sw.Elapsed, _metricTags);
+                StorageInstruments.OnStorageWrite(sw.Elapsed, _shared.ProviderName, _shared.Name, _shared.StateTypeName);
             }
             catch (Exception exc)
             {
-                StorageInstruments.OnStorageWriteError(_metricTags);
+                StorageInstruments.OnStorageWriteError(_shared.ProviderName, _shared.Name, _shared.StateTypeName);
                 OnError(exc, ErrorCode.StorageProvider_WriteFailed, nameof(WriteStateAsync));
             }
         }
@@ -138,11 +127,11 @@ namespace Orleans.Core
                 sw.Stop();
 
                 // Update counters
-                StorageInstruments.OnStorageDelete(sw.Elapsed, _metricTags);
+                StorageInstruments.OnStorageDelete(sw.Elapsed, _shared.ProviderName, _shared.Name, _shared.StateTypeName);
             }
             catch (Exception exc)
             {
-                StorageInstruments.OnStorageDeleteError(_metricTags);
+                StorageInstruments.OnStorageDeleteError(_shared.ProviderName, _shared.Name, _shared.StateTypeName);
                 OnError(exc, ErrorCode.StorageProvider_DeleteFailed, nameof(ClearStateAsync));
             }
         }
@@ -186,14 +175,13 @@ namespace Orleans.Core
             var errorString = errorCode is { Length: > 0 } ? $" Error: {errorCode}" : null;
 
             var grainId = _grainContext.GrainId;
-            var providerName = _storeTypeName;
             // TODO: pending on https://github.com/dotnet/runtime/issues/110570
-            _shared.Logger.LogError((int)id, exception, "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}", providerName, _shared.Name, operation, grainId, errorString);
+            _shared.Logger.LogError((int)id, exception, "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}", _shared.ProviderName, _shared.Name, operation, grainId, errorString);
 
             // If error is not specialization of OrleansException, wrap it
             if (exception is not OrleansException)
             {
-                var errMsg = $"Error from storage provider {providerName}.{_shared.Name} during {operation} for grain {grainId}{errorString}{Environment.NewLine} {LogFormatter.PrintException(exception)}";
+                var errMsg = $"Error from storage provider {_shared.ProviderName}.{_shared.Name} during {operation} for grain {grainId}{errorString}{Environment.NewLine} {LogFormatter.PrintException(exception)}";
                 throw new OrleansException(errMsg, exception);
             }
 
@@ -235,6 +223,8 @@ namespace Orleans.Core
         private string? _migrationContextKey;
 
         public readonly string Name = name;
+        public readonly string ProviderName = store.GetType().Name;
+        public readonly string StateTypeName = typeof(TState).Name;
         public readonly IGrainStorage Store = store;
         public readonly ILogger Logger = logger;
         public readonly IActivator<TState> Activator = activator;
