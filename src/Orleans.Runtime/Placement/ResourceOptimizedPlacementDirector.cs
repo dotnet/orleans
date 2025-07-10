@@ -183,20 +183,6 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         }
     }
 
-    private record NormalizedWeights(float CpuUsageWeight, float MemoryUsageWeight, float AvailableMemoryWeight, float MaxAvailableMemoryWeight, float ActivationCountWeight);
-    private readonly record struct ResourceStatistics(bool IsOverloaded, float CpuUsage, float NormalizedMemoryUsage, float NormalizedAvailableMemory, float MaxAvailableMemory, int ActivationCount)
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ResourceStatistics FromRuntime(SiloRuntimeStatistics statistics)
-            => new(
-                IsOverloaded: statistics.IsOverloaded,
-                CpuUsage: statistics.EnvironmentStatistics.CpuUsagePercentage,
-                NormalizedMemoryUsage: statistics.EnvironmentStatistics.NormalizedMemoryUsage,
-                NormalizedAvailableMemory: statistics.EnvironmentStatistics.NormalizedAvailableMemory,
-                MaxAvailableMemory: statistics.EnvironmentStatistics.MaximumAvailableMemoryBytes,
-                ActivationCount: statistics.ActivationCount);
-    }
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private float CalculateScore(ref readonly ResourceStatistics stats, float maxMaxAvailableMemory, int maxActivationCount)
     {
@@ -236,4 +222,18 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             factoryArgument: statistics,
             addValueFactory: static (_, statistics) => ResourceStatistics.FromRuntime(statistics),
             updateValueFactory: static (_, _, statistics) => ResourceStatistics.FromRuntime(statistics));
+
+    private record NormalizedWeights(float CpuUsageWeight, float MemoryUsageWeight, float AvailableMemoryWeight, float MaxAvailableMemoryWeight, float ActivationCountWeight);
+    private readonly record struct ResourceStatistics(bool IsOverloaded, float CpuUsage, float NormalizedMemoryUsage, float NormalizedAvailableMemory, float MaxAvailableMemory, int ActivationCount)
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ResourceStatistics FromRuntime(SiloRuntimeStatistics statistics)
+            => new(
+                IsOverloaded: statistics.IsOverloaded,
+                CpuUsage: statistics.EnvironmentStatistics.CpuUsagePercentage,
+                NormalizedMemoryUsage: statistics.EnvironmentStatistics.NormalizedMemoryUsage,
+                NormalizedAvailableMemory: statistics.EnvironmentStatistics.NormalizedAvailableMemory,
+                MaxAvailableMemory: statistics.EnvironmentStatistics.MaximumAvailableMemoryBytes,
+                ActivationCount: statistics.ActivationCount);
+    }
 }

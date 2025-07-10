@@ -57,7 +57,7 @@ namespace Orleans.Runtime
             _collectionTimer = new PeriodicTimer(_grainCollectionOptions.CollectionQuantum);
 
             _environmentStatisticsProvider = environmentStatisticsProvider;
-            if (_grainCollectionOptions.EnableMemoryUsageActivationShedding)
+            if (_grainCollectionOptions.EnableActivationSheddingOnMemoryPressure)
             {
                 _memBasedDeactivationTimer = new PeriodicTimer(_grainCollectionOptions.MemoryUsagePollingPeriod);
             }
@@ -325,7 +325,6 @@ namespace Orleans.Runtime
         {
             var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
             var limit = _grainCollectionOptions.MemoryUsageLimitPercentage / 100f;
-            var target = _grainCollectionOptions.MemoryUsageTargetPercentage / 100f;
 
             var usage = stats.NormalizedMemoryUsage;
             if (usage <= limit)
@@ -337,6 +336,7 @@ namespace Orleans.Runtime
 
             // Calculate the surplus activations based the memory usage target.
             var activationCount = _activationCount;
+            var target = _grainCollectionOptions.MemoryUsageTargetPercentage / 100f;
             surplusActivationCount = (int)Math.Max(0, activationCount - Math.Floor(activationCount * target / usage));
             if (surplusActivationCount <= 0)
             {
@@ -506,7 +506,7 @@ namespace Orleans.Runtime
             using var _ = new ExecutionContextSuppressor();
             _collectionLoopTask = RunActivationCollectionLoop();
 
-            if (_grainCollectionOptions.EnableMemoryUsageActivationShedding)
+            if (_grainCollectionOptions.EnableActivationSheddingOnMemoryPressure)
             {
                 _memBasedDeactivationLoopTask = RunMemoryBasedDeactivationLoop();
             }
@@ -568,36 +568,52 @@ namespace Orleans.Runtime
 
             int lastGen2GcCount = 0;
 
-            while (await _memBasedDeactivationTimer.WaitForNextTickAsync())
+            try
             {
-                try
+                while (await _memBasedDeactivationTimer.WaitForNextTickAsync(cancellationToken))
                 {
-                    var currentGen2GcCount = GC.CollectionCount(2);
-
-                    // note: GC.CollectionCount(2) will return 0 if no gen2 gc happened yet and we rely on this behavior:
-                    //       high memory pressure situation cannot occur until gen2 occurred at least once
-                    if (currentGen2GcCount <= lastGen2GcCount)
+                    try
                     {
-                        // No Gen2 GC since last deactivation cycle.
-                        // Wait for Gen2 GC between cycles to be sure that 
-                        continue;
+                        var currentGen2GcCount = GC.CollectionCount(2);
+
+                        // note: GC.CollectionCount(2) will return 0 if no gen2 gc happened yet and we rely on this behavior:
+                        //       high memory pressure situation cannot occur until gen2 occurred at least once
+                        if (currentGen2GcCount <= lastGen2GcCount)
+                        {
+                            // No Gen2 GC since last deactivation cycle.
+                            // Wait for Gen2 GC between cycles to be sure that 
+                            continue;
+                        }
+
+                        if (!IsMemoryOverloaded(out var surplusActivationCount))
+                        {
+                            continue;
+                        }
+
+                        lastGen2GcCount = currentGen2GcCount;
+                        await DeactivateInDueTimeOrder(surplusActivationCount, cancellationToken);
                     }
-
-                    if (!IsMemoryOverloaded(out var surplusActivationCount))
+                    catch (Exception exception)
                     {
-                        continue;
-                    }
+                        // Ignore cancellation exceptions during shutdown.
+                        if (exception is OperationCanceledException && cancellationToken.IsCancellationRequested)
+                        {
+                            break;
+                        }
 
-                    lastGen2GcCount = currentGen2GcCount;
-                    await DeactivateInDueTimeOrder(surplusActivationCount, cancellationToken);
-                }
-                catch (Exception exception)
-                {
-                    // Ignore cancellation exceptions during shutdown.
-                    if (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
-                    {
                         LogErrorWhileCollectingActivations(exception);
                     }
+                }
+            }
+            catch (Exception exception)
+            {
+                if (exception is OperationCanceledException && cancellationToken.IsCancellationRequested)
+                {
+                    // Ignore cancellation exceptions during shutdown.
+                }
+                else
+                {
+                    throw;
                 }
             }
         }
@@ -650,6 +666,7 @@ namespace Orleans.Runtime
         {
             _collectionTimer.Dispose();
             _shutdownCts.Dispose();
+            _memBasedDeactivationTimer?.Dispose();
         }
 
         private class Bucket

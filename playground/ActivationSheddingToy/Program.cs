@@ -14,7 +14,7 @@ builder.UseOrleans(orleans =>
 
 builder.Services.Configure<GrainCollectionOptions>(options =>
 {
-    options.EnableMemoryUsageActivationShedding = true;
+    options.EnableActivationSheddingOnMemoryPressure = true;
     options.MemoryUsageLimitPercentage = 80;
     options.MemoryUsageTargetPercentage = 50;
 });
