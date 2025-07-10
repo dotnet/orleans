@@ -192,25 +192,21 @@ public readonly struct EnvironmentStatistics
         RawAvailableMemoryBytes = rawAvailableMemoryBytes;
         MaximumAvailableMemoryBytes = maximumAvailableMemoryBytes;
 
-        Debug.Assert(maximumAvailableMemoryBytes >= 0, "MaximumAvailableMemoryBytes must be non-negative.");
-        Debug.Assert(memoryUsageBytes >= 0, "MemoryUsageBytes must be non-negative.");
-        Debug.Assert(availableMemoryBytes >= 0, "AvailableMemoryBytes must be non-negative.");
-        Debug.Assert(rawMemoryUsageBytes >= 0, "RawMemoryUsageBytes must be non-negative.");
-        Debug.Assert(rawAvailableMemoryBytes >= 0, "RawAvailableMemoryBytes must be non-negative.");
-        if (rawMemoryUsageBytes + rawAvailableMemoryBytes > maximumAvailableMemoryBytes)
-        {
-            Debugger.Launch();
-        }
+        Debug.Assert(maximumAvailableMemoryBytes >= 0, $"MaximumAvailableMemoryBytes must be non-negative. Value: {maximumAvailableMemoryBytes}");
+        Debug.Assert(memoryUsageBytes >= 0, $"MemoryUsageBytes must be non-negative. Value: {memoryUsageBytes}");
+        Debug.Assert(availableMemoryBytes >= 0, $"AvailableMemoryBytes must be non-negative. Value: {availableMemoryBytes}");
+        Debug.Assert(rawMemoryUsageBytes >= 0, $"RawMemoryUsageBytes must be non-negative. Value: {rawMemoryUsageBytes}");
+        Debug.Assert(rawAvailableMemoryBytes >= 0, $"RawAvailableMemoryBytes must be non-negative. Value: {rawAvailableMemoryBytes}");
         Debug.Assert(rawMemoryUsageBytes + rawAvailableMemoryBytes <= maximumAvailableMemoryBytes,
-            "Sum of RawMemoryUsageBytes and RawAvailableMemoryBytes must not exceed MaximumAvailableMemoryBytes.");
-        Debug.Assert(cpuUsagePercentage is >= 0.0f and <= 100.0f, "CpuUsagePercentage must be between 0.0 and 100.0.");
-        Debug.Assert(rawCpuUsagePercentage is >= 0.0f and <= 100.0f, "RawCpuUsagePercentage must be between 0.0 and 100.0.");
+            $"Sum of RawMemoryUsageBytes and RawAvailableMemoryBytes must not exceed MaximumAvailableMemoryBytes. RawMemoryUsageBytes: {rawMemoryUsageBytes}, RawAvailableMemoryBytes: {rawAvailableMemoryBytes}, MaximumAvailableMemoryBytes: {maximumAvailableMemoryBytes}");
+        Debug.Assert(cpuUsagePercentage is >= 0.0f and <= 100.0f, $"CpuUsagePercentage must be between 0.0 and 100.0. Value: {cpuUsagePercentage}");
+        Debug.Assert(rawCpuUsagePercentage is >= 0.0f and <= 100.0f, $"RawCpuUsagePercentage must be between 0.0 and 100.0. Value: {rawCpuUsagePercentage}");
 
         float memoryUsagePercentage = maximumAvailableMemoryBytes > 0 ? (float)Math.Clamp((double)memoryUsageBytes / maximumAvailableMemoryBytes * 100.0, 0.0, 100.0) : 0f;
         float availableMemoryPercentage = maximumAvailableMemoryBytes > 0 ? (float)Math.Clamp((double)availableMemoryBytes / maximumAvailableMemoryBytes * 100.0, 0.0, 100.0) : 0f;
-        Debug.Assert(memoryUsagePercentage is >= 0.0f and <= 100.0f, "MemoryUsagePercentage must be between 0.0 and 100.0.");
-        Debug.Assert(availableMemoryPercentage is >= 0.0f and <= 100.0f, "AvailableMemoryPercentage must be between 0.0 and 100.0.");
-        Debug.Assert(memoryUsagePercentage / 100f is >= 0.0f and <= 1.0f, "NormalizedMemoryUsage must be between 0.0 and 1.0.");
-        Debug.Assert(availableMemoryPercentage / 100f is >= 0.0f and <= 1.0f, "NormalizedAvailableMemory must be between 0.0 and 1.0.");
+        Debug.Assert(memoryUsagePercentage is >= 0.0f and <= 100.0f, $"MemoryUsagePercentage must be between 0.0 and 100.0. Value: {memoryUsagePercentage}");
+        Debug.Assert(availableMemoryPercentage is >= 0.0f and <= 100.0f, $"AvailableMemoryPercentage must be between 0.0 and 100.0. Value: {availableMemoryPercentage}");
+        Debug.Assert(memoryUsagePercentage / 100f is >= 0.0f and <= 1.0f, $"NormalizedMemoryUsage must be between 0.0 and 1.0. Value: {memoryUsagePercentage / 100f}");
+        Debug.Assert(availableMemoryPercentage / 100f is >= 0.0f and <= 1.0f, $"NormalizedAvailableMemory must be between 0.0 and 1.0. Value: {availableMemoryPercentage / 100f}");
     }
 }
