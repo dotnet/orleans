@@ -89,7 +89,7 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
                         && eventPayload.TryGetValue("Mean", out var mean)
                         && mean is double value)
                     {
-                        CpuUsage = (float)value;
+                        CpuUsage = Math.Clamp((float)value, 0f, 100f);
                         break;
                     }
                 }
