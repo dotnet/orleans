@@ -320,6 +320,35 @@ namespace Orleans.Runtime
             return condemned ?? nothing;
         }
 
+        // Internal for testing. It's expected that when this returns true, activation shedding will occur.
+        internal bool IsMemoryOverloaded(out int surplusActivationCount)
+        {
+            var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
+            var limit = _grainCollectionOptions.MemoryUsageLimitPercentage / 100f;
+            var target = _grainCollectionOptions.MemoryUsageTargetPercentage / 100f;
+
+            var usage = stats.NormalizedMemoryUsage;
+            if (usage <= limit)
+            {
+                // High memory pressure is not detected, so we do not need to deactivate any activations.
+                surplusActivationCount = 0;
+                return false;
+            }
+
+            // Calculate the surplus activations based the memory usage target.
+            var activationCount = _activationCount;
+            surplusActivationCount = (int)Math.Max(0, activationCount - Math.Floor(activationCount * target / usage));
+            if (surplusActivationCount <= 0)
+            {
+                surplusActivationCount = 0;
+                return false;
+            }
+
+            var surplusActivationPercentage = 100 * (1 - target / usage);
+            LogCurrentHighMemoryPressureStats(stats.MemoryUsagePercentage, _grainCollectionOptions.MemoryUsageLimitPercentage, deactivationTarget: surplusActivationCount, activationCount, surplusActivationPercentage);
+            return true;
+        }
+
         /// <summary>
         /// Deactivates <param name="count" /> activations in due time order
         /// <remarks>internal for testing</remarks>
@@ -571,35 +600,6 @@ namespace Orleans.Runtime
                     }
                 }
             }
-        }
-
-        // Internal for testing. It's expected that when this returns true, activation shedding will occur.
-        internal bool IsMemoryOverloaded(out int surplusActivationCount)
-        {
-            var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
-            var limit = _grainCollectionOptions.MemoryUsageLimitPercentage / 100f;
-            var target = _grainCollectionOptions.MemoryUsageTargetPercentage / 100f;
-
-            var usage = stats.NormalizedMemoryUsage;
-            if (usage <= limit)
-            {
-                // High memory pressure is not detected, so we do not need to deactivate any activations.
-                surplusActivationCount = 0;
-                return false;
-            }
-
-            // Calculate the surplus activations based the memory usage target.
-            var activationCount = _activationCount;
-            surplusActivationCount = (int)Math.Max(0, activationCount - Math.Floor(activationCount * target / usage));
-            if (surplusActivationCount <= 0)
-            {
-                surplusActivationCount = 0;
-                return false;
-            }
-
-            var surplusActivationPercentage = 100 * (1 - target / usage);
-            LogCurrentHighMemoryPressureStats(stats.MemoryUsagePercentage, _grainCollectionOptions.MemoryUsageLimitPercentage, deactivationTarget: surplusActivationCount, activationCount, surplusActivationPercentage);
-            return true;
         }
 
         private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit, CancellationToken cancellationToken)
