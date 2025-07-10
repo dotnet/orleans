@@ -729,7 +729,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                         else
                         {
                             // Start is in this segment
-                            segmentOffset = Offset;
+                            segmentOffset = Offset - _position;
                         }
                     }
                     else
@@ -843,7 +843,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                         else
                         {
                             // Start is in this segment
-                            segmentOffset = Offset;
+                            segmentOffset = Offset - _position;
                         }
                     }
                     else
