@@ -42,8 +42,9 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
         var cpuUsage = _eventCounterListener.CpuUsage;
 
         var memoryInfo = GC.GetGCMemoryInfo();
-        var memoryUsage = Math.Clamp(memoryInfo.TotalCommittedBytes - memoryInfo.FragmentedBytes, 0, memoryInfo.TotalAvailableMemoryBytes);
-        var availableMemory = Math.Clamp(memoryInfo.TotalAvailableMemoryBytes - memoryUsage, 0, memoryInfo.TotalAvailableMemoryBytes);
+        var maximumAvailableMemoryBytes = memoryInfo.TotalAvailableMemoryBytes;
+        var memoryUsage = Math.Clamp(memoryInfo.TotalCommittedBytes - memoryInfo.FragmentedBytes, 0, maximumAvailableMemoryBytes);
+        var availableMemory = maximumAvailableMemoryBytes - memoryUsage;
         var filteredCpuUsage = _cpuUsageFilter.Filter(cpuUsage);
         var filteredMemoryUsage = (long)_memoryUsageFilter.Filter(memoryUsage);
         var filteredAvailableMemory = (long)_availableMemoryFilter.Filter(availableMemory);
@@ -55,7 +56,7 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
             rawMemoryUsageBytes: memoryUsage,
             availableMemoryBytes: filteredAvailableMemory,
             rawAvailableMemoryBytes: availableMemory,
-            maximumAvailableMemoryBytes: memoryInfo.TotalAvailableMemoryBytes);
+            maximumAvailableMemoryBytes: maximumAvailableMemoryBytes);
 
         _maximumAvailableMemoryBytes = result.MaximumAvailableMemoryBytes;
         _availableMemoryBytes = result.RawAvailableMemoryBytes;
@@ -66,7 +67,7 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
 
     private sealed class EventCounterListener : EventListener
     {
-        public float CpuUsage { get; private set; } = 0f;
+        public float CpuUsage { get; private set; }
 
         protected override void OnEventSourceCreated(EventSource source)
         {
