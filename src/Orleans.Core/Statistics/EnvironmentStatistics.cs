@@ -42,8 +42,8 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
         var cpuUsage = _eventCounterListener.CpuUsage;
 
         var memoryInfo = GC.GetGCMemoryInfo();
-        var memoryUsage = Math.Min(memoryInfo.TotalAvailableMemoryBytes, memoryInfo.TotalCommittedBytes - memoryInfo.FragmentedBytes);
-        var availableMemory = Math.Max(0, memoryInfo.TotalAvailableMemoryBytes - memoryUsage);
+        var memoryUsage = Math.Clamp(memoryInfo.TotalCommittedBytes - memoryInfo.FragmentedBytes, 0, memoryInfo.TotalAvailableMemoryBytes);
+        var availableMemory = Math.Clamp(memoryInfo.TotalAvailableMemoryBytes - memoryUsage, 0, memoryInfo.TotalAvailableMemoryBytes);
         var filteredCpuUsage = _cpuUsageFilter.Filter(cpuUsage);
         var filteredMemoryUsage = (long)_memoryUsageFilter.Filter(memoryUsage);
         var filteredAvailableMemory = (long)_availableMemoryFilter.Filter(availableMemory);
