@@ -11,12 +11,8 @@ internal static class OverloadDetectionLogic
     /// <remarks><see cref="LoadSheddingOptions.LoadSheddingEnabled"/> is ignored here.</remarks>
     public static bool IsOverloaded(ref readonly EnvironmentStatistics statistics, LoadSheddingOptions options)
     {
-        var maxProcessMemoryBytes = statistics.MaximumAvailableMemoryBytes;
-        var minFreeMemoryFraction = (100 - options.MemoryThreshold) / 100d;
-        var minFreeMemoryBytes = (long)(maxProcessMemoryBytes * minFreeMemoryFraction); // represents the minimum amount of memory that should remain available
-
-        bool isMemoryOverloaded = statistics.AvailableMemoryBytes < minFreeMemoryBytes;
-        bool isCpuOverloaded = statistics.CpuUsagePercentage > options.CpuThreshold;
+        bool isMemoryOverloaded = statistics.MemoryUsagePercentage > options.MemoryThreshold;
+        bool isCpuOverloaded = statistics.FilteredCpuUsagePercentage > options.CpuThreshold;
 
         return isMemoryOverloaded || isCpuOverloaded;
     }

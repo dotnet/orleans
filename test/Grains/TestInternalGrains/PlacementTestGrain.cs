@@ -102,28 +102,56 @@ namespace UnitTests.Grains
         public Task LatchOverloaded()
         {
             var stats = environmentStatistics.GetEnvironmentStatistics();
-            environmentStatistics.SetHardwareStatistics(new(loadSheddingOptions.CpuThreshold + 1, loadSheddingOptions.CpuThreshold + 1, stats.MemoryUsageBytes, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
+            environmentStatistics.SetHardwareStatistics(new EnvironmentStatistics(
+                cpuUsagePercentage: loadSheddingOptions.CpuThreshold + 1,
+                rawCpuUsagePercentage: loadSheddingOptions.CpuThreshold + 1,
+                memoryUsageBytes: stats.FilteredMemoryUsageBytes,
+                rawMemoryUsageBytes: stats.RawMemoryUsageBytes,
+                availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
+                rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
+                maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
             return PropagateStatisticsToCluster(GrainFactory);
         }
 
         public Task UnlatchOverloaded()
         {
             var stats = environmentStatistics.GetEnvironmentStatistics();
-            environmentStatistics.SetHardwareStatistics(new(0, 0, stats.MemoryUsageBytes, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
+            environmentStatistics.SetHardwareStatistics(new(
+                cpuUsagePercentage: 0,
+                rawCpuUsagePercentage: 0,
+                memoryUsageBytes: stats.FilteredMemoryUsageBytes,
+                rawMemoryUsageBytes: stats.RawMemoryUsageBytes,
+                availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
+                rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
+                maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
             return PropagateStatisticsToCluster(GrainFactory);
         }
 
         public Task LatchCpuUsage(float value)
         {
             var stats = environmentStatistics.GetEnvironmentStatistics();
-            environmentStatistics.SetHardwareStatistics(new(value, value, stats.MemoryUsageBytes, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
+            environmentStatistics.SetHardwareStatistics(new(
+                cpuUsagePercentage: value,
+                rawCpuUsagePercentage: value,
+                memoryUsageBytes: stats.FilteredMemoryUsageBytes,
+                rawMemoryUsageBytes: stats.RawMemoryUsageBytes,
+                availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
+                rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
+                maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
             return PropagateStatisticsToCluster(GrainFactory);
         }
 
         public Task UnlatchCpuUsage()
         {
             var stats = environmentStatistics.GetEnvironmentStatistics();
-            environmentStatistics.SetHardwareStatistics(new(0, 0, stats.MemoryUsageBytes, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
+            environmentStatistics.SetHardwareStatistics(new(
+                cpuUsagePercentage: 0,
+                rawCpuUsagePercentage: 0,
+                memoryUsageBytes: stats.FilteredMemoryUsageBytes,
+                rawMemoryUsageBytes: stats.RawMemoryUsageBytes,
+                availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
+                rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
+                maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
             return PropagateStatisticsToCluster(GrainFactory);
         }
 

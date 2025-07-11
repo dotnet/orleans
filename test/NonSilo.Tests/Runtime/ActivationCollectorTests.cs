@@ -86,7 +86,7 @@ namespace UnitTests.Runtime
             });
 
             // Calculate usedMemory and set rawAvailableMemoryBytes as per new logic
-            long usedMemoryBytes = (maxMemoryMb - availableMemoryMb);
+            long usedMemoryBytes = maxMemoryMb - availableMemoryMb;
             long rawAvailableMemoryBytes = availableMemoryMb;
             long maxMemoryBytes = maxMemoryMb;
 
@@ -95,10 +95,10 @@ namespace UnitTests.Runtime
                 new EnvironmentStatistics(
                     cpuUsagePercentage: 0,
                     rawCpuUsagePercentage: 0,
-                    memoryUsageBytes: usedMemoryBytes, // used memory
-                    rawMemoryUsageBytes: usedMemoryBytes, // used memory
-                    availableMemoryBytes: rawAvailableMemoryBytes, // for compatibility
-                    rawAvailableMemoryBytes: rawAvailableMemoryBytes, // for new logic
+                    memoryUsageBytes: usedMemoryBytes,
+                    rawMemoryUsageBytes: usedMemoryBytes,
+                    availableMemoryBytes: rawAvailableMemoryBytes,
+                    rawAvailableMemoryBytes: rawAvailableMemoryBytes,
                     maximumAvailableMemoryBytes: maxMemoryBytes
                 )
             );
@@ -114,10 +114,13 @@ namespace UnitTests.Runtime
             );
 
             collector._activationCount = activationCount;
-            var overloaded = collector.IsMemoryOverloaded(GC.CollectionCount(2), out var activationsTarget);
+            var overloaded = collector.IsMemoryOverloaded(out var surplusActivations);
 
             Assert.Equal(expectedOverloaded, overloaded);
-            Assert.Equal(expectedActivationsTarget, activationsTarget);
+            if (overloaded)
+            {
+                Assert.Equal(expectedActivationsTarget, activationCount - surplusActivations);
+            }
         }
 
         [Fact]

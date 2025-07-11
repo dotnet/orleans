@@ -45,7 +45,7 @@ namespace Orleans.Configuration
 
         private void ValidateHighMemoryPressureSettings()
         {
-            if (!options.MemoryUsageCollectionEnabled)
+            if (!options.EnableActivationSheddingOnMemoryPressure)
             {
                 return;
             }

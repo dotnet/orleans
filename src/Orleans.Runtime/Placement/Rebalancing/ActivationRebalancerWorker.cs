@@ -155,7 +155,7 @@ internal sealed partial class ActivationRebalancerWorker(
     void ISiloStatisticsChangeListener.SiloStatisticsChangeNotification(SiloAddress address, SiloRuntimeStatistics statistics)
     {
         GrainContext.Scheduler.QueueAction(()
-            => _siloStatistics[address] = new(statistics.EnvironmentStatistics.MemoryUsageBytes, statistics.ActivationCount));
+            => _siloStatistics[address] = new(statistics.EnvironmentStatistics.FilteredMemoryUsageBytes, statistics.ActivationCount));
     }
 
     public ValueTask<RebalancingReport> GetReport() => new(BuildReport());

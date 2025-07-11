@@ -13,7 +13,6 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
-    <PackageReference Include="Microsoft.CSharp" />
   </ItemGroup>
 
 

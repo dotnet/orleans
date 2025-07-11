@@ -130,7 +130,7 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// Do not place activation in case all silos are above 110 CPU utilization.
+        /// Do not place activation in case all silos are at 100 CPU utilization.
         /// </summary>
         [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
         public async Task ElasticityTest_AllSilosCPUTooHigh()
@@ -141,15 +141,15 @@ namespace UnitTests.General
             await taintedGrainPrimary.EnableOverloadDetection(false);
             await taintedGrainSecondary.EnableOverloadDetection(false);
 
-            await taintedGrainPrimary.LatchCpuUsage(110.0f);
-            await taintedGrainSecondary.LatchCpuUsage(110.0f);
+            await taintedGrainPrimary.LatchCpuUsage(100.0f);
+            await taintedGrainSecondary.LatchCpuUsage(100.0f);
 
             await Assert.ThrowsAsync<OrleansException>(() =>
                 this.AddTestGrains(1));
         }
 
         /// <summary>
-        /// Do not place activation in case all silos are above 110 CPU utilization or have overloaded flag set.
+        /// Do not place activation in case all silos are at 100 CPU utilization or have overloaded flag set.
         /// </summary>
         [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
         public async Task ElasticityTest_AllSilosOverloaded()
@@ -157,7 +157,7 @@ namespace UnitTests.General
             var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
             var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.SecondarySilos.First().SiloAddress);
 
-            await taintedGrainPrimary.LatchCpuUsage(110.0f);
+            await taintedGrainPrimary.LatchCpuUsage(100.0f);
             await taintedGrainSecondary.LatchOverloaded();
 
             // OrleansException or GateWayTooBusyException
@@ -183,11 +183,10 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional")]
         public async Task LoadAwareGrainShouldNotAttemptToCreateActivationsOnBusySilos()
         {
-            // a CPU usage of 110% will disqualify a silo from getting new grains.
-            const float undesirability = (float)110.0;
+            // a CPU usage of 100% will disqualify a silo from getting new grains.
             await ElasticityGrainPlacementTest(
                 g =>
-                    g.LatchCpuUsage(undesirability),
+                    g.LatchCpuUsage(100.0f),
                 g =>
                     g.UnlatchCpuUsage(),
                 "LoadAwareGrainShouldNotAttemptToCreateActivationsOnBusySilos",
