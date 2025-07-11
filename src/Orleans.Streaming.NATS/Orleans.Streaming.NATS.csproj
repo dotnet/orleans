@@ -10,6 +10,8 @@
     <RootNamespace>Orleans.Streaming.NATS</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <Nullable>enable</Nullable>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,8 +20,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>NATS.Tests</_Parameter1>
-    </AssemblyAttribute>
+    <InternalsVisibleTo Include="NATS.Tests" />
   </ItemGroup>
 </Project>
