@@ -230,7 +230,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         public static ResourceStatistics FromRuntime(SiloRuntimeStatistics statistics)
             => new(
                 IsOverloaded: statistics.IsOverloaded,
-                CpuUsage: statistics.EnvironmentStatistics.CpuUsagePercentage,
+                CpuUsage: statistics.EnvironmentStatistics.FilteredCpuUsagePercentage,
                 NormalizedMemoryUsage: statistics.EnvironmentStatistics.NormalizedMemoryUsage,
                 NormalizedAvailableMemory: statistics.EnvironmentStatistics.NormalizedAvailableMemory,
                 MaxAvailableMemory: statistics.EnvironmentStatistics.MaximumAvailableMemoryBytes,

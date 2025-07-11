@@ -105,10 +105,10 @@ namespace UnitTests.Grains
             environmentStatistics.SetHardwareStatistics(new EnvironmentStatistics(
                 cpuUsagePercentage: loadSheddingOptions.CpuThreshold + 1,
                 rawCpuUsagePercentage: loadSheddingOptions.CpuThreshold + 1,
-                memoryUsageBytes: stats.MemoryUsageBytes,
-                rawMemoryUsageBytes: stats.MemoryUsageBytes,
-                availableMemoryBytes: stats.AvailableMemoryBytes,
-                rawAvailableMemoryBytes: stats.AvailableMemoryBytes,
+                memoryUsageBytes: stats.FilteredMemoryUsageBytes,
+                rawMemoryUsageBytes: stats.RawMemoryUsageBytes,
+                availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
+                rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
                 maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
             return PropagateStatisticsToCluster(GrainFactory);
         }
@@ -119,10 +119,10 @@ namespace UnitTests.Grains
             environmentStatistics.SetHardwareStatistics(new(
                 cpuUsagePercentage: 0,
                 rawCpuUsagePercentage: 0,
-                memoryUsageBytes: stats.MemoryUsageBytes,
-                rawMemoryUsageBytes: stats.MemoryUsageBytes,
-                availableMemoryBytes: stats.AvailableMemoryBytes,
-                rawAvailableMemoryBytes: stats.AvailableMemoryBytes,
+                memoryUsageBytes: stats.FilteredMemoryUsageBytes,
+                rawMemoryUsageBytes: stats.RawMemoryUsageBytes,
+                availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
+                rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
                 maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
             return PropagateStatisticsToCluster(GrainFactory);
         }
@@ -133,10 +133,10 @@ namespace UnitTests.Grains
             environmentStatistics.SetHardwareStatistics(new(
                 cpuUsagePercentage: value,
                 rawCpuUsagePercentage: value,
-                memoryUsageBytes: stats.MemoryUsageBytes,
-                rawMemoryUsageBytes: stats.MemoryUsageBytes,
-                availableMemoryBytes: stats.AvailableMemoryBytes,
-                rawAvailableMemoryBytes: stats.AvailableMemoryBytes,
+                memoryUsageBytes: stats.FilteredMemoryUsageBytes,
+                rawMemoryUsageBytes: stats.RawMemoryUsageBytes,
+                availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
+                rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
                 maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
             return PropagateStatisticsToCluster(GrainFactory);
         }
@@ -147,10 +147,10 @@ namespace UnitTests.Grains
             environmentStatistics.SetHardwareStatistics(new(
                 cpuUsagePercentage: 0,
                 rawCpuUsagePercentage: 0,
-                memoryUsageBytes: stats.MemoryUsageBytes,
-                rawMemoryUsageBytes: stats.MemoryUsageBytes,
-                availableMemoryBytes: stats.AvailableMemoryBytes,
-                rawAvailableMemoryBytes: stats.AvailableMemoryBytes,
+                memoryUsageBytes: stats.FilteredMemoryUsageBytes,
+                rawMemoryUsageBytes: stats.RawMemoryUsageBytes,
+                availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
+                rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
                 maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
             return PropagateStatisticsToCluster(GrainFactory);
         }

@@ -38,7 +38,7 @@ public readonly struct EnvironmentStatistics
     /// </summary>
     /// <remarks>Ranges from 0.0-100.0.</remarks>
     [Id(0)]
-    public readonly float CpuUsagePercentage;
+    public readonly float FilteredCpuUsagePercentage;
 
     /// <summary>
     /// The amount of managed memory currently consumed by the process.
@@ -51,7 +51,7 @@ public readonly struct EnvironmentStatistics
     /// Includes fragmented memory, which is the unused memory between objects on the managed heaps.
     /// </remarks>
     [Id(1)]
-    public readonly long MemoryUsageBytes;
+    public readonly long FilteredMemoryUsageBytes;
 
     /// <summary>
     /// The amount of memory currently available for allocations to the process.
@@ -64,7 +64,7 @@ public readonly struct EnvironmentStatistics
     /// Includes the currently available memory of the process and the system.
     /// </remarks>
     [Id(2)]
-    public readonly long AvailableMemoryBytes;
+    public readonly long FilteredAvailableMemoryBytes;
 
     /// <summary>
     /// The maximum amount of memory available to the process.
@@ -142,7 +142,7 @@ public readonly struct EnvironmentStatistics
         }
     }
 
-    /// <summary>
+    /// <summary>SheddingBasic
     /// Gets the normalized available memory (0.0 to 1.0).
     /// </summary>
     public float NormalizedAvailableMemory
@@ -170,9 +170,9 @@ public readonly struct EnvironmentStatistics
     }
 
     public override string ToString()
-        => $"CpuUsage: {CpuUsagePercentage:F2}% (raw: {RawCpuUsagePercentage:F2}%) | " +
-           $"MemoryUsage: {FormatBytes(MemoryUsageBytes)} (raw: {FormatBytes(RawMemoryUsageBytes)}) [{MemoryUsagePercentage:F2}%] | " +
-           $"AvailableMemory: {FormatBytes(AvailableMemoryBytes)} (raw: {FormatBytes(RawAvailableMemoryBytes)}) [{AvailableMemoryPercentage:F2}%] | " +
+        => $"CpuUsage: {FilteredCpuUsagePercentage:F2}% (raw: {RawCpuUsagePercentage:F2}%) | " +
+           $"MemoryUsage: {FormatBytes(FilteredMemoryUsageBytes)} (raw: {FormatBytes(RawMemoryUsageBytes)}) [{MemoryUsagePercentage:F2}%] | " +
+           $"AvailableMemory: {FormatBytes(FilteredAvailableMemoryBytes)} (raw: {FormatBytes(RawAvailableMemoryBytes)}) [{AvailableMemoryPercentage:F2}%] | " +
            $"MaximumAvailableMemory: {FormatBytes(MaximumAvailableMemoryBytes)}";
 
     internal EnvironmentStatistics(
@@ -184,31 +184,31 @@ public readonly struct EnvironmentStatistics
         long rawAvailableMemoryBytes,
         long maximumAvailableMemoryBytes)
     {
-        CpuUsagePercentage = cpuUsagePercentage;
-        RawCpuUsagePercentage = rawCpuUsagePercentage;
-        MemoryUsageBytes = memoryUsageBytes;
+        FilteredCpuUsagePercentage = Math.Clamp(cpuUsagePercentage, 0f, 100f);
+        RawCpuUsagePercentage = Math.Clamp(rawCpuUsagePercentage, 0f, 100f);
+        FilteredMemoryUsageBytes = memoryUsageBytes;
         RawMemoryUsageBytes = rawMemoryUsageBytes;
-        AvailableMemoryBytes = availableMemoryBytes;
+        FilteredAvailableMemoryBytes = availableMemoryBytes;
         RawAvailableMemoryBytes = rawAvailableMemoryBytes;
         MaximumAvailableMemoryBytes = maximumAvailableMemoryBytes;
 
 #if DEBUG
-        Debug.Assert(maximumAvailableMemoryBytes >= 0, $"MaximumAvailableMemoryBytes must be non-negative. {this}");
-        Debug.Assert(memoryUsageBytes >= 0, $"MemoryUsageBytes must be non-negative. {this}");
-        Debug.Assert(availableMemoryBytes >= 0, $"AvailableMemoryBytes must be non-negative. {this}");
-        Debug.Assert(rawMemoryUsageBytes >= 0, $"RawMemoryUsageBytes must be non-negative. {this}");
-        Debug.Assert(rawAvailableMemoryBytes >= 0, $"RawAvailableMemoryBytes must be non-negative. {this}");
-        Debug.Assert(rawMemoryUsageBytes + rawAvailableMemoryBytes <= maximumAvailableMemoryBytes,
-            $"Sum of RawMemoryUsageBytes and RawAvailableMemoryBytes must not exceed MaximumAvailableMemoryBytes. {this}");
-        Debug.Assert(cpuUsagePercentage is >= 0.0f and <= 100.0f, $"CpuUsagePercentage must be between 0.0 and 100.0. {this}");
-        Debug.Assert(rawCpuUsagePercentage is >= 0.0f and <= 100.0f, $"RawCpuUsagePercentage must be between 0.0 and 100.0. {this}");
+        Debug.Assert(MaximumAvailableMemoryBytes >= 0, $"{nameof(MaximumAvailableMemoryBytes)} must be non-negative. {this}");
+        Debug.Assert(RawMemoryUsageBytes >= 0, $"{nameof(RawMemoryUsageBytes)} must be non-negative. {this}");
+        Debug.Assert(RawAvailableMemoryBytes >= 0, $"{nameof(RawAvailableMemoryBytes)} must be non-negative. {this}");
+        Debug.Assert(RawMemoryUsageBytes + RawAvailableMemoryBytes <= MaximumAvailableMemoryBytes,
+            $"Sum of {nameof(RawMemoryUsageBytes)} and {nameof(RawAvailableMemoryBytes)} must not exceed {nameof(MaximumAvailableMemoryBytes)}. {this}");
 
-        float memoryUsagePercentage = maximumAvailableMemoryBytes > 0 ? (float)Math.Clamp((double)memoryUsageBytes / maximumAvailableMemoryBytes * 100.0, 0.0, 100.0) : 0f;
-        float availableMemoryPercentage = maximumAvailableMemoryBytes > 0 ? (float)Math.Clamp((double)availableMemoryBytes / maximumAvailableMemoryBytes * 100.0, 0.0, 100.0) : 0f;
-        Debug.Assert(memoryUsagePercentage is >= 0.0f and <= 100.0f, $"MemoryUsagePercentage must be between 0.0 and 100.0. {this}");
-        Debug.Assert(availableMemoryPercentage is >= 0.0f and <= 100.0f, $"AvailableMemoryPercentage must be between 0.0 and 100.0. {this}");
-        Debug.Assert(memoryUsagePercentage / 100f is >= 0.0f and <= 1.0f, $"NormalizedMemoryUsage must be between 0.0 and 1.0. {this}");
-        Debug.Assert(availableMemoryPercentage / 100f is >= 0.0f and <= 1.0f, $"NormalizedAvailableMemory must be between 0.0 and 1.0. {this}");
+        Debug.Assert(FilteredMemoryUsageBytes >= 0, $"{nameof(FilteredMemoryUsageBytes)} must be non-negative. {this}");
+        Debug.Assert(FilteredAvailableMemoryBytes >= 0, $"{nameof(FilteredAvailableMemoryBytes)} must be non-negative. {this}");
+
+        Debug.Assert(RawCpuUsagePercentage is >= 0.0f and <= 100.0f, $"{nameof(RawCpuUsagePercentage)} must be between 0.0 and 100.0. {this}");
+        Debug.Assert(FilteredCpuUsagePercentage is >= 0.0f and <= 100.0f, $"{nameof(FilteredCpuUsagePercentage)} must be between 0.0 and 100.0. {this}");
+
+        Debug.Assert(MemoryUsagePercentage is >= 0.0f and <= 100.0f, $"{nameof(MemoryUsagePercentage)} must be between 0.0 and 100.0. {this}");
+        Debug.Assert(AvailableMemoryPercentage is >= 0.0f and <= 100.0f, $"{nameof(AvailableMemoryPercentage)} must be between 0.0 and 100.0. {this}");
+        Debug.Assert(NormalizedMemoryUsage is >= 0.0f and <= 1.0f, $"{nameof(NormalizedMemoryUsage)} must be between 0.0 and 1.0. {this}");
+        Debug.Assert(NormalizedAvailableMemory is >= 0.0f and <= 1.0f, $"{nameof(NormalizedAvailableMemory)} must be between 0.0 and 1.0. {this}");
 #endif
     }
 }

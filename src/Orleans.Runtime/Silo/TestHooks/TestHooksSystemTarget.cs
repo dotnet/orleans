@@ -118,10 +118,10 @@ namespace Orleans.Runtime.TestHooks
             environmentStatistics.SetHardwareStatistics(new(
                 cpuUsagePercentage: cpuUsage,
                 rawCpuUsagePercentage: cpuUsage,
-                memoryUsageBytes: previousStats.MemoryUsageBytes,
-                rawMemoryUsageBytes: previousStats.MemoryUsageBytes,
-                availableMemoryBytes: previousStats.AvailableMemoryBytes,
-                rawAvailableMemoryBytes: previousStats.AvailableMemoryBytes,
+                memoryUsageBytes: previousStats.FilteredMemoryUsageBytes,
+                rawMemoryUsageBytes: previousStats.RawMemoryUsageBytes,
+                availableMemoryBytes: previousStats.FilteredAvailableMemoryBytes,
+                rawAvailableMemoryBytes: previousStats.RawAvailableMemoryBytes,
                 maximumAvailableMemoryBytes: previousStats.MaximumAvailableMemoryBytes));
 
             Task.Delay(latchPeriod).ContinueWith(t =>
@@ -129,15 +129,15 @@ namespace Orleans.Runtime.TestHooks
                     var currentStats = environmentStatistics.GetEnvironmentStatistics();
 
                     // ReSharper disable once CompareOfFloatsByEqualityOperator
-                    if (currentStats.CpuUsagePercentage == cpuUsage)
+                    if (currentStats.FilteredCpuUsagePercentage == cpuUsage)
                     {
                         environmentStatistics.SetHardwareStatistics(new(
-                                cpuUsagePercentage: previousStats.CpuUsagePercentage,
-                                rawCpuUsagePercentage: previousStats.CpuUsagePercentage,
-                                memoryUsageBytes: currentStats.MemoryUsageBytes,
-                                rawMemoryUsageBytes: currentStats.MemoryUsageBytes,
-                                availableMemoryBytes: currentStats.AvailableMemoryBytes,
-                                rawAvailableMemoryBytes: currentStats.AvailableMemoryBytes,
+                                cpuUsagePercentage: previousStats.FilteredCpuUsagePercentage,
+                                rawCpuUsagePercentage: previousStats.RawCpuUsagePercentage,
+                                memoryUsageBytes: currentStats.FilteredMemoryUsageBytes,
+                                rawMemoryUsageBytes: currentStats.RawMemoryUsageBytes,
+                                availableMemoryBytes: currentStats.FilteredAvailableMemoryBytes,
+                                rawAvailableMemoryBytes: currentStats.RawAvailableMemoryBytes,
                                 maximumAvailableMemoryBytes: currentStats.MaximumAvailableMemoryBytes));
                     }
                 }).Ignore();

@@ -12,7 +12,7 @@ internal static class OverloadDetectionLogic
     public static bool IsOverloaded(ref readonly EnvironmentStatistics statistics, LoadSheddingOptions options)
     {
         bool isMemoryOverloaded = statistics.MemoryUsagePercentage > options.MemoryThreshold;
-        bool isCpuOverloaded = statistics.CpuUsagePercentage > options.CpuThreshold;
+        bool isCpuOverloaded = statistics.FilteredCpuUsagePercentage > options.CpuThreshold;
 
         return isMemoryOverloaded || isCpuOverloaded;
     }
