@@ -22,7 +22,7 @@ public class GenerateSerializationAttributesAnalyzerTest : DiagnosticAnalyzerTes
 
         var diagnostic = diagnostics.First();
         Assert.Equal(GenerateSerializationAttributesAnalyzer.RuleId, diagnostic.Id);
-        Assert.Equal(DiagnosticSeverity.Info, diagnostic.Severity);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
     }
 
     /// <summary>
@@ -48,6 +48,14 @@ public class GenerateSerializationAttributesAnalyzerTest : DiagnosticAnalyzerTes
     [Fact]
     public Task SerializableRecord()
         => VerifyGeneratedDiagnostic(@"[GenerateSerializer] public record D { public int f; }");
+
+    /// <summary>
+    /// Verifies that the analyzer detects when a record class with [GenerateSerializer]
+    /// has fields without [Id] attributes, which are required for proper Orleans serialization.
+    /// </summary>
+    [Fact]
+    public Task SerializableRecordClass()
+        => VerifyGeneratedDiagnostic(@"[GenerateSerializer] public record class D { public int f; }");
 
     /// <summary>
     /// Verifies that the analyzer detects when a record struct with [GenerateSerializer]

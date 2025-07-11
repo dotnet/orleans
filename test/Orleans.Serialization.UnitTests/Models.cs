@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Runtime.Serialization;
 using System.Text.Json;
@@ -222,6 +223,7 @@ public sealed class MyCustomForeignExceptionSurrogateConverter : IConverter<MyCu
 }
 
 [GenerateSerializer]
+[SuppressMessage("Usage", "ORLEANS0004:Add missing serialization attributes", Justification = "Intentional for tests")]
 public class SomeClassWithSerializers
 {
     [Id(0)]
@@ -722,6 +724,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [SuppressMessage("Usage", "ORLEANS0004:Add missing serialization attributes", Justification = "Intentional for tests")]
     public class ImmutableClass
     {
         public ImmutableClass(int intProperty, int intField, int unmarkedField, int unmarkedProperty)
@@ -799,6 +802,7 @@ namespace Orleans.Serialization.UnitTests
     [GenerateSerializer]
     public class ClassWithManualSerializableProperty
     {
+        [NonSerialized]
         private string _stringPropertyValue;
 
         [Id(0)]
