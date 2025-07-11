@@ -86,11 +86,11 @@ namespace Orleans.Core
                 var sw = ValueStopwatch.StartNew();
                 await _shared.Store.ReadStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
                 IsStateInitialized = true;
-                StorageInstruments.OnStorageRead(sw.Elapsed);
+                StorageInstruments.OnStorageRead(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
             }
             catch (Exception exc)
             {
-                StorageInstruments.OnStorageReadError();
+                StorageInstruments.OnStorageReadError(_shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
                 OnError(exc, ErrorCode.StorageProvider_ReadFailed, nameof(ReadStateAsync));
             }
         }
@@ -104,11 +104,11 @@ namespace Orleans.Core
 
                 var sw = ValueStopwatch.StartNew();
                 await _shared.Store.WriteStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
-                StorageInstruments.OnStorageWrite(sw.Elapsed);
+                StorageInstruments.OnStorageWrite(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
             }
             catch (Exception exc)
             {
-                StorageInstruments.OnStorageWriteError();
+                StorageInstruments.OnStorageWriteError(_shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
                 OnError(exc, ErrorCode.StorageProvider_WriteFailed, nameof(WriteStateAsync));
             }
         }
@@ -127,11 +127,11 @@ namespace Orleans.Core
                 sw.Stop();
 
                 // Update counters
-                StorageInstruments.OnStorageDelete(sw.Elapsed);
+                StorageInstruments.OnStorageDelete(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
             }
             catch (Exception exc)
             {
-                StorageInstruments.OnStorageDeleteError();
+                StorageInstruments.OnStorageDeleteError(_shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
                 OnError(exc, ErrorCode.StorageProvider_DeleteFailed, nameof(ClearStateAsync));
             }
         }
@@ -175,14 +175,13 @@ namespace Orleans.Core
             var errorString = errorCode is { Length: > 0 } ? $" Error: {errorCode}" : null;
 
             var grainId = _grainContext.GrainId;
-            var providerName = _shared.Store.GetType().Name;
             // TODO: pending on https://github.com/dotnet/runtime/issues/110570
-            _shared.Logger.LogError((int)id, exception, "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}", providerName, _shared.Name, operation, grainId, errorString);
+            _shared.Logger.LogError((int)id, exception, "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}", _shared.ProviderTypeName, _shared.Name, operation, grainId, errorString);
 
             // If error is not specialization of OrleansException, wrap it
             if (exception is not OrleansException)
             {
-                var errMsg = $"Error from storage provider {providerName}.{_shared.Name} during {operation} for grain {grainId}{errorString}{Environment.NewLine} {LogFormatter.PrintException(exception)}";
+                var errMsg = $"Error from storage provider {_shared.ProviderTypeName}.{_shared.Name} during {operation} for grain {grainId}{errorString}{Environment.NewLine} {LogFormatter.PrintException(exception)}";
                 throw new OrleansException(errMsg, exception);
             }
 
@@ -224,6 +223,8 @@ namespace Orleans.Core
         private string? _migrationContextKey;
 
         public readonly string Name = name;
+        public readonly string ProviderTypeName = store.GetType().Name;
+        public readonly string StateTypeName = typeof(TState).Name;
         public readonly IGrainStorage Store = store;
         public readonly ILogger Logger = logger;
         public readonly IActivator<TState> Activator = activator;

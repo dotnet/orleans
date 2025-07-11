@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 
 namespace Orleans.Runtime;
@@ -12,28 +13,83 @@ internal static class StorageInstruments
     private static readonly Counter<int> StorageWriteErrorsCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.STORAGE_WRITE_ERRORS);
     private static readonly Counter<int> StorageClearErrorsCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.STORAGE_CLEAR_ERRORS);
 
-    internal static void OnStorageRead(TimeSpan latency)
+    internal static void OnStorageRead(TimeSpan latency, string providerTypeName, string stateName, string stateTypeName)
     {
-        StorageReadHistogram.Record(latency.TotalMilliseconds);
+        if (StorageReadHistogram.Enabled)
+        {
+            StorageReadHistogram.Record(
+                latency.TotalMilliseconds,
+                [
+                    new KeyValuePair<string, object>("provider_name", providerTypeName),
+                    new KeyValuePair<string, object>("state_name", stateName),
+                    new KeyValuePair<string, object>("state_type", stateTypeName)
+                ]);
+        }
     }
-    internal static void OnStorageWrite(TimeSpan latency)
+
+    internal static void OnStorageWrite(TimeSpan latency, string providerTypeName, string stateName, string stateTypeName)
     {
-        StorageWriteHistogram.Record(latency.TotalMilliseconds);
+        if (StorageWriteHistogram.Enabled)
+        {
+            StorageWriteHistogram.Record(
+                latency.TotalMilliseconds,
+                [
+                    new KeyValuePair<string, object>("provider_name", providerTypeName),
+                    new KeyValuePair<string, object>("state_name", stateName),
+                    new KeyValuePair<string, object>("state_type", stateTypeName)
+                ]);
+        }
     }
-    internal static void OnStorageReadError()
+
+    internal static void OnStorageReadError(string providerTypeName, string stateName, string stateTypeName)
     {
-        StorageReadErrorsCounter.Add(1);
+        if (StorageReadErrorsCounter.Enabled)
+        {
+            StorageReadErrorsCounter.Add(1,
+                [
+                    new KeyValuePair<string, object>("provider_name", providerTypeName),
+                    new KeyValuePair<string, object>("state_name", stateName),
+                    new KeyValuePair<string, object>("state_type", stateTypeName)
+                ]);
+        }
     }
-    internal static void OnStorageWriteError()
+
+    internal static void OnStorageWriteError(string providerTypeName, string stateName, string stateTypeName)
     {
-        StorageWriteErrorsCounter.Add(1);
+        if (StorageWriteErrorsCounter.Enabled)
+        {
+            StorageWriteErrorsCounter.Add(1,
+                [
+                    new KeyValuePair<string, object>("provider_name", providerTypeName),
+                    new KeyValuePair<string, object>("state_name", stateName),
+                    new KeyValuePair<string, object>("state_type", stateTypeName)
+                ]);
+        }
     }
-    internal static void OnStorageDelete(TimeSpan latency)
+
+    internal static void OnStorageDelete(TimeSpan latency, string providerTypeName, string stateName, string stateTypeName)
     {
-        StorageClearHistogram.Record(latency.TotalMilliseconds);
+        if (StorageClearHistogram.Enabled)
+        {
+            StorageClearHistogram.Record(latency.TotalMilliseconds,
+                [
+                    new KeyValuePair<string, object>("provider_name", providerTypeName),
+                    new KeyValuePair<string, object>("state_name", stateName),
+                    new KeyValuePair<string, object>("state_type", stateTypeName)
+                ]);
+        }
     }
-    internal static void OnStorageDeleteError()
+
+    internal static void OnStorageDeleteError(string providerTypeName, string stateName, string stateTypeName)
     {
-        StorageClearErrorsCounter.Add(1);
+        if (StorageClearErrorsCounter.Enabled)
+        {
+            StorageClearErrorsCounter.Add(1,
+                [
+                    new KeyValuePair<string, object>("provider_name", providerTypeName),
+                    new KeyValuePair<string, object>("state_name", stateName),
+                    new KeyValuePair<string, object>("state_type", stateTypeName)
+                ]);
+        }
     }
 }
