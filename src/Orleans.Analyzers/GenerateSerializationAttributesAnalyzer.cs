@@ -36,10 +36,46 @@ namespace Orleans.Analyzers
                     var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
                     if (analysis.UnannotatedMembers.Count > 0)
                     {
-                        context.ReportDiagnostic(Diagnostic.Create(Rule, attribute.GetLocation()));
+                        // Check if GenerateFieldIds is set to PublicProperties
+                        var generateFieldIds = GetGenerateFieldIdsValue(attribute);
+                        if (generateFieldIds != GenerateFieldIds.PublicProperties)
+                        {
+                            context.ReportDiagnostic(Diagnostic.Create(Rule, attribute.GetLocation()));
+                        }
                     }
                 }
             }
+        }
+
+        private static GenerateFieldIds GetGenerateFieldIdsValue(AttributeSyntax attribute)
+        {
+            if (attribute.ArgumentList == null)
+            {
+                return GenerateFieldIds.None;
+            }
+
+            foreach (var argument in attribute.ArgumentList.Arguments)
+            {
+                if (argument.NameEquals?.Name.Identifier.Text == "GenerateFieldIds")
+                {
+                    if (argument.Expression is MemberAccessExpressionSyntax memberAccess)
+                    {
+                        var memberName = memberAccess.Name.Identifier.Text;
+                        if (memberName == "PublicProperties")
+                        {
+                            return GenerateFieldIds.PublicProperties;
+                        }
+                    }
+                }
+            }
+
+            return GenerateFieldIds.None;
+        }
+
+        private enum GenerateFieldIds
+        {
+            None,
+            PublicProperties
         }
     }
 }
