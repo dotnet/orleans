@@ -52,8 +52,10 @@ namespace AWSUtils.Tests.StorageTests
         public static string DynamoDbSecretKey { get; set; } = TestDefaultConfiguration.DynamoDbSecretKey;
         public static string DynamoDbService { get; set; } = TestDefaultConfiguration.DynamoDbService;
         public static string SqsConnectionString { get; set; } = TestDefaultConfiguration.SqsConnectionString;
+        public static string KinesisConnectionString { get; set; } = TestDefaultConfiguration.KinesisConnectionString;
 
         public static bool IsDynamoDbAvailable => _isDynamoDbAvailable.Value;
         public static bool IsSqsAvailable => !string.IsNullOrWhiteSpace(SqsConnectionString);
+        public static bool IsKinesisAvailable => !string.IsNullOrWhiteSpace(KinesisConnectionString);
     }
 }

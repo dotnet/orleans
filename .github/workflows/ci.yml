@@ -469,6 +469,74 @@ jobs:
         path: |
           **/TestResults/*
           **/logs/*
+  test-kinesis:
+    name: AWS Kinesis provider tests
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      matrix:
+        provider: ["Kinesis"]
+        framework: [net8.0]
+    services:
+      localstack:
+        image: localstack/localstack:latest
+        ports:
+        - 4566:4566
+        env:
+          SERVICES: kinesis,dynamodb
+          DEBUG: 1
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+          AWS_ACCESS_KEY_ID: test
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_REGION: us-east-1
+          DATA_DIR: /tmp/localstack/data
+        options: >-
+          --health-cmd "curl -f http://localhost:4566/_localstack/health || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        global-json-file: global.json
+    - name: Create Kinesis Streams
+      run: |
+        sleep 10
+        aws --endpoint-url=http://localhost:4566 kinesis create-stream --stream-name OrleansTestStream --shard-count 4 --region us-east-1
+        aws --endpoint-url=http://localhost:4566 kinesis wait stream-exists --stream-name OrleansTestStream --region us-east-1
+      env:
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+        AWS_ACCESS_KEY_ID: test
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+        AWS_SECRET_ACCESS_KEY: test
+        AWS_REGION: us-east-1
+    - name: Test
+      run: dotnet test
+        --framework ${{ matrix.framework }}
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --blame-hang-timeout 10m
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
+        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
+        -- -parallel none -noshadow
+      env:
+        ORLEANSKINESISCONNECTIONSTRING: "http://localhost:4566;test;test;us-east-1"
+        ORLEANSDYNAMODBSERVICE: "http://localhost:4566"
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+        ORLEANSDYNAMODBACCESSKEY: "test"
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+        ORLEANSDYNAMODBSECRETKEY: "test"
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
+        retention-days: 1
+        path: |
+          **/TestResults/*
+          **/logs/*
   test:
     name: Test
     runs-on: ${{ matrix.os }}

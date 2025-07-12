@@ -137,8 +137,8 @@ namespace Orleans.Streaming.Kinesis
 
         internal AmazonKinesisClient CreateClient()
         {
-            if (_options.Service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                _options.Service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            if (_options.Service != null && (_options.Service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                _options.Service.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
             {
                 // Local Kinesis instance (for testing)
                 var credentials = !string.IsNullOrEmpty(_options.AccessKey) && !string.IsNullOrEmpty(_options.SecretKey) ?
@@ -151,12 +151,14 @@ namespace Orleans.Streaming.Kinesis
             {
                 // AWS Kinesis instance (auth via explicit credentials)
                 var credentials = new BasicAWSCredentials(_options.AccessKey, _options.SecretKey);
-                return new AmazonKinesisClient(credentials, new AmazonKinesisConfig { RegionEndpoint = RegionEndpoint.GetBySystemName(_options.Service) });
+                var regionName = !string.IsNullOrEmpty(_options.Region) ? _options.Region : "us-east-1";
+                return new AmazonKinesisClient(credentials, new AmazonKinesisConfig { RegionEndpoint = RegionEndpoint.GetBySystemName(regionName) });
             }
             else
             {
                 // AWS Kinesis instance (implicit auth - EC2 IAM Roles etc)
-                return new AmazonKinesisClient(new AmazonKinesisConfig { RegionEndpoint = RegionEndpoint.GetBySystemName(_options.Service) });
+                var regionName = !string.IsNullOrEmpty(_options.Region) ? _options.Region : "us-east-1";
+                return new AmazonKinesisClient(new AmazonKinesisConfig { RegionEndpoint = RegionEndpoint.GetBySystemName(regionName) });
             }
         }
 

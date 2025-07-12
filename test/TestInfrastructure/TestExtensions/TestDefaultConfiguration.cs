@@ -52,6 +52,7 @@ namespace TestExtensions
         public static string DynamoDbAccessKey => defaultConfiguration[nameof(DynamoDbAccessKey)];
         public static string DynamoDbSecretKey => defaultConfiguration[nameof(DynamoDbSecretKey)];
         public static string SqsConnectionString => defaultConfiguration[nameof(SqsConnectionString)];
+        public static string KinesisConnectionString => defaultConfiguration[nameof(KinesisConnectionString)];
         public static TokenCredential TokenCredential
         {
             get
