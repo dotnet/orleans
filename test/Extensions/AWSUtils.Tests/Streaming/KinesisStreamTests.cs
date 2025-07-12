@@ -7,6 +7,7 @@ using Xunit;
 using TestExtensions;
 using UnitTests.Streaming;
 using Orleans.Streaming.Kinesis;
+using UnitTests.GrainInterfaces;
 
 namespace AWSUtils.Tests.Streaming
 {
@@ -162,108 +163,42 @@ namespace AWSUtils.Tests.Streaming
             await runner.StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains();
         }
 
-        //------------------------- MANY to One ----------------------//
+        //------------------------ MANY to Many producer consumer same grain ----------------------//
 
         [SkippableFact]
-        public async Task Kinesis_13_ManyToOne_ManyProducerGrainsOneConsumerGrain()
+        public async Task Kinesis_13_SameGrain_ConsumerFirstProducerLater()
         {
-            await runner.StreamTest_13_ManyToOne_ManyProducerGrainsOneConsumerGrain();
+            await runner.StreamTest_13_SameGrain_ConsumerFirstProducerLater(false);
         }
 
         [SkippableFact]
-        public async Task Kinesis_14_ManyToOne_ManyProducerGrainsOneConsumerClient()
+        public async Task Kinesis_14_SameGrain_ProducerFirstConsumerLater()
         {
-            await runner.StreamTest_14_ManyToOne_ManyProducerGrainsOneConsumerClient();
+            await runner.StreamTest_14_SameGrain_ProducerFirstConsumerLater(false);
+        }
+
+        //----------------------------------------------//
+
+        [SkippableFact]
+        public async Task Kinesis_15_ConsumeAtProducersRequest()
+        {
+            await runner.StreamTest_15_ConsumeAtProducersRequest();
         }
 
         [SkippableFact]
-        public async Task Kinesis_15_ManyToOne_ManyProducerClientsOneConsumerGrain()
+        public async Task Kinesis_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
-            await runner.StreamTest_15_ManyToOne_ManyProducerClientsOneConsumerGrain();
+            var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, KINESIS_STREAM_PROVIDER_NAME, 16, false);
+            await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
         }
 
         [SkippableFact]
-        public async Task Kinesis_16_ManyToOne_ManyProducerClientsOneConsumerClient()
+        public async Task Kinesis_17_MultipleStreams_1J_ManyProducerGrainsManyConsumerGrains()
         {
-            await runner.StreamTest_16_ManyToOne_ManyProducerClientsOneConsumerClient();
+            var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, KINESIS_STREAM_PROVIDER_NAME, 17, false);
+            await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(TestEnum.One);
         }
 
-        //------------------------- One to MANY ----------------------//
 
-        [SkippableFact]
-        public async Task Kinesis_17_OneToMany_OneProducerGrainManyConsumerGrains()
-        {
-            await runner.StreamTest_17_OneToMany_OneProducerGrainManyConsumerGrains();
-        }
-
-        [SkippableFact]
-        public async Task Kinesis_18_OneToMany_OneProducerGrainManyConsumerClients()
-        {
-            await runner.StreamTest_18_OneToMany_OneProducerGrainManyConsumerClients();
-        }
-
-        [SkippableFact]
-        public async Task Kinesis_19_OneToMany_OneProducerClientManyConsumerGrains()
-        {
-            await runner.StreamTest_19_OneToMany_OneProducerClientManyConsumerGrains();
-        }
-
-        [SkippableFact]
-        public async Task Kinesis_20_OneToMany_OneProducerClientManyConsumerClients()
-        {
-            await runner.StreamTest_20_OneToMany_OneProducerClientManyConsumerClients();
-        }
-
-        //------------------------- Broadcast ----------------------//
-
-        [SkippableFact]
-        public async Task Kinesis_21_Broadcast_ProducerGrainAllConsumerGrains()
-        {
-            await runner.StreamTest_21_Broadcast_ProducerGrainAllConsumerGrains();
-        }
-
-        [SkippableFact]
-        public async Task Kinesis_22_Broadcast_ProducerGrainAllConsumerClients()
-        {
-            await runner.StreamTest_22_Broadcast_ProducerGrainAllConsumerClients();
-        }
-
-        [SkippableFact]
-        public async Task Kinesis_23_Broadcast_ProducerClientAllConsumerGrains()
-        {
-            await runner.StreamTest_23_Broadcast_ProducerClientAllConsumerGrains();
-        }
-
-        [SkippableFact]
-        public async Task Kinesis_24_Broadcast_ProducerClientAllConsumerClients()
-        {
-            await runner.StreamTest_24_Broadcast_ProducerClientAllConsumerClients();
-        }
-
-        //------------------------- Broadcast into MANY ----------------------//
-
-        [SkippableFact]
-        public async Task Kinesis_25_Broadcast_ManyProducerGrainsAllConsumerGrains()
-        {
-            await runner.StreamTest_25_Broadcast_ManyProducerGrainsAllConsumerGrains();
-        }
-
-        [SkippableFact]
-        public async Task Kinesis_26_Broadcast_ManyProducerGrainsAllConsumerClients()
-        {
-            await runner.StreamTest_26_Broadcast_ManyProducerGrainsAllConsumerClients();
-        }
-
-        [SkippableFact]
-        public async Task Kinesis_27_Broadcast_ManyProducerClientsAllConsumerGrains()
-        {
-            await runner.StreamTest_27_Broadcast_ManyProducerClientsAllConsumerGrains();
-        }
-
-        [SkippableFact]
-        public async Task Kinesis_28_Broadcast_ManyProducerClientsAllConsumerClients()
-        {
-            await runner.StreamTest_28_Broadcast_ManyProducerClientsAllConsumerClients();
-        }
     }
 }
