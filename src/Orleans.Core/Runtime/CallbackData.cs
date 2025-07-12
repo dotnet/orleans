@@ -46,7 +46,7 @@ namespace Orleans.Runtime
             }, this);
         }
 
-        private void SignalCancellation() => shared.CancellationManager.SignalCancellation(Message.TargetSilo, Message.TargetGrain, Message.SendingGrain, Message.Id);
+        private void SignalCancellation() => shared.CancellationManager?.SignalCancellation(Message.TargetSilo, Message.TargetGrain, Message.SendingGrain, Message.Id);
 
         public void OnStatusUpdate(StatusResponse status)
         {
