@@ -202,7 +202,6 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
             || type == typeof(JsonDocument)
             || type == typeof(JsonArray)
             || type == typeof(JsonObject)
-            || type == typeof(JsonNode)
             || type == typeof(JsonValue)
             || typeof(JsonNode).IsAssignableFrom(type);
     }
