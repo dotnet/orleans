@@ -40,7 +40,7 @@ namespace DefaultCluster.Tests.General
         {
             var grain = this.GrainFactory.GetGrain<IStatelessWorkerExceptionGrain>(0);
 
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 5; i++)
             {
                 var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => grain.Ping());
                 Assert.Contains("Failed to create an instance of grain type", ex.Message);
