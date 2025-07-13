@@ -1,7 +1,6 @@
 using System;
 using System.Runtime.Serialization;
 
-#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -99,6 +98,7 @@ namespace Orleans.Runtime
 
         private GuidId(SerializationInfo info, StreamingContext context)
         {
+            // ! This is an older pattern which is not compatible with nullable reference types.
             Guid = (Guid)info.GetValue("Guid", typeof(Guid))!;
         }
     }

@@ -13,6 +13,9 @@ using TestExtensions.Runners;
 
 namespace AWSUtils.Tests.StorageTests
 {
+    /// <summary>
+    /// Tests DynamoDB storage provider for grain persistence including serialization of grain references.
+    /// </summary>
     [TestCategory("Persistence"), TestCategory("AWS"), TestCategory("DynamoDb")]
     public class PersistenceGrainTests_AWSDynamoDBStore : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_AWSDynamoDBStore.Fixture>
     {

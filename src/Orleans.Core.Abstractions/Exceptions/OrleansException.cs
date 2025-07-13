@@ -7,7 +7,7 @@ namespace Orleans.Runtime
     /// An exception class used by the Orleans runtime for reporting errors.
     /// </summary>
     /// <remarks>
-    /// This is also the base class for any more specific exceptions 
+    /// This is also the base class for any more specific exceptions
     /// raised by the Orleans runtime.
     /// </remarks>
     [Serializable]

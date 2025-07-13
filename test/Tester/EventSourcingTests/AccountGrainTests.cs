@@ -4,6 +4,9 @@ using Assert = Xunit.Assert;
 
 namespace Tester.EventSourcingTests
 {
+    /// <summary>
+    /// Tests for event-sourced account grain functionality including balance operations and transaction logging.
+    /// </summary>
     public class AccountGrainTests : IClassFixture<EventSourcingClusterFixture>
     {
         private readonly EventSourcingClusterFixture fixture;
@@ -52,7 +55,7 @@ namespace Tester.EventSourcingTests
             }
         }
 
-        [Fact(Skip = "Flaky test. See https://github.com/dotnet/orleans/issues/5605"), TestCategory("EventSourcing"), TestCategory("Functional")]
+        [Fact(Skip = "https://github.com/dotnet/orleans/issues/5605"), TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task AccountWithLog()
         {
             var account = this.fixture.GrainFactory.GetGrain<IAccountGrain>($"Account-{Guid.NewGuid()}", "TestGrains.AccountGrain");

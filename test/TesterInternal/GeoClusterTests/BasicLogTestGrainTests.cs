@@ -11,6 +11,9 @@ using Azure.Identity;
 
 namespace Tests.GeoClusterTests
 {
+    /// <summary>
+    /// Tests for log-based consistency providers with different storage configurations.
+    /// </summary>
     [TestCategory("GeoCluster"), TestCategory("Functional")]
     public class BasicLogTestGrainTests : IClassFixture<BasicLogTestGrainTests.Fixture>
     {

@@ -4,6 +4,9 @@ using Xunit;
 
 namespace UnitTests.General;
 
+/// <summary>
+/// Tests for resource optimized placement configuration options validation.
+/// </summary>
 public sealed class ResourceOptimizedPlacementOptionsTests
 {
     [Fact, TestCategory("PlacementOptions"), TestCategory("BVT")]

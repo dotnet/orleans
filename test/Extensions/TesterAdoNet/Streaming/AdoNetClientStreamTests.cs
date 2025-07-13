@@ -11,10 +11,16 @@ using static System.String;
 
 namespace Tester.AdoNet.Streaming;
 
+/// <summary>
+/// Tests for SQL Server ADO.NET client stream functionality.
+/// </summary>
 public class SqlServerAdoNetClientStreamTests(ITestOutputHelper output) : AdoNetClientStreamTests(AdoNetInvariants.InvariantNameSqlServer, output)
 {
 }
 
+/// <summary>
+/// Tests for MySQL ADO.NET client stream functionality.
+/// </summary>
 public class MySqlAdoNetClientStreamTests : AdoNetClientStreamTests
 {
     public MySqlAdoNetClientStreamTests(ITestOutputHelper output) : base(AdoNetInvariants.InvariantNameMySql, output)
@@ -23,10 +29,16 @@ public class MySqlAdoNetClientStreamTests : AdoNetClientStreamTests
     }
 }
 
+/// <summary>
+/// Tests for PostgreSQL ADO.NET client stream functionality.
+/// </summary>
 public class PostgreSqlAdoNetClientStreamTests(ITestOutputHelper output) : AdoNetClientStreamTests(AdoNetInvariants.InvariantNamePostgreSql, output)
 {
 }
 
+/// <summary>
+/// Base class for ADO.NET client stream tests.
+/// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
 public abstract class AdoNetClientStreamTests : TestClusterPerTest
 {

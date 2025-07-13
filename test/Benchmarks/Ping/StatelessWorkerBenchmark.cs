@@ -5,6 +5,9 @@ using Orleans.Concurrency;
 
 namespace Benchmarks.Ping;
 
+/// <summary>
+/// Benchmarks stateless worker grain performance and adaptive worker pool management.
+/// </summary>
 public class StatelessWorkerBenchmark : IDisposable
 {
     private readonly IHost _host;

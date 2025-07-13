@@ -8,8 +8,11 @@ using Xunit;
 
 namespace Tester.AzureUtils
 {
+    /// <summary>
+    /// Tests for Azure Queue Storage data manager operations including queue message handling and visibility timeouts.
+    /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("AzureQueue")]
-    public class AzureQueueDataManagerTests : IClassFixture<AzureStorageBasicTests>, IAsyncLifetime
+    public class AzureQueueDataManagerTests : IAsyncLifetime
     {
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
@@ -18,6 +21,8 @@ namespace Tester.AzureUtils
 
         public AzureQueueDataManagerTests()
         {
+            TestUtils.CheckForAzureStorage();
+
             var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName("Client", DateTime.Now.ToString("yyyyMMdd_hhmmss")));
             logger = loggerFactory.CreateLogger<AzureQueueDataManagerTests>();
             this.loggerFactory = loggerFactory;
@@ -122,7 +127,7 @@ namespace Tester.AzureUtils
             await Task.WhenAll(promises);
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9552"), TestCategory("Functional")]
         public async Task AQ_Standalone_4()
         {
             TimeSpan visibilityTimeout = TimeSpan.FromSeconds(2);

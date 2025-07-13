@@ -6,6 +6,9 @@ using Xunit.Abstractions;
 
 namespace UnitTests.OrleansRuntime
 {
+    /// <summary>
+    /// Tests for async serial executor functionality including sequential task execution and concurrency validation.
+    /// </summary>
     public class AsyncSerialExecutorTests
     {
         public ITestOutputHelper output;

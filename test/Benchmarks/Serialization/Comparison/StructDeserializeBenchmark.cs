@@ -14,6 +14,9 @@ using ZeroFormatter;
 
 namespace Benchmarks.Comparison
 {
+    /// <summary>
+    /// Compares Orleans deserialization performance against other popular serializers for struct types.
+    /// </summary>
     [Trait("Category", "Benchmark")]
     [Config(typeof(BenchmarkConfig))]
     //[DisassemblyDiagnoser(recursiveDepth: 4)]

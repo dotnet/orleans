@@ -15,7 +15,7 @@ namespace OrleansAWSUtils.Storage
     /// <summary>
     /// Wrapper/Helper class around AWS SQS queue service
     /// </summary>
-    internal class SQSStorage
+    internal partial class SQSStorage
     {
         /// <summary>
         /// Maximum number of messages allowed by SQS to peak per request
@@ -134,7 +134,7 @@ namespace OrleansAWSUtils.Storage
             }
             catch (Exception exc)
             {
-                ReportErrorAndRethrow(exc, "InitQueueAsync", ErrorCode.StreamProviderManagerBase);
+                ReportErrorAndRethrow(exc, "InitQueueAsync");
             }
         }
 
@@ -152,7 +152,7 @@ namespace OrleansAWSUtils.Storage
             }
             catch (Exception exc)
             {
-                ReportErrorAndRethrow(exc, "DeleteQueue", ErrorCode.StreamProviderManagerBase);
+                ReportErrorAndRethrow(exc, "DeleteQueue");
             }
         }
 
@@ -173,7 +173,7 @@ namespace OrleansAWSUtils.Storage
             }
             catch (Exception exc)
             {
-                ReportErrorAndRethrow(exc, "AddMessage", ErrorCode.StreamProviderManagerBase);
+                ReportErrorAndRethrow(exc, "AddMessage");
             }
         }
 
@@ -198,7 +198,7 @@ namespace OrleansAWSUtils.Storage
             }
             catch (Exception exc)
             {
-                ReportErrorAndRethrow(exc, "GetMessages", ErrorCode.StreamProviderManagerBase);
+                ReportErrorAndRethrow(exc, "GetMessages");
             }
             return null;
         }
@@ -226,14 +226,21 @@ namespace OrleansAWSUtils.Storage
             }
             catch (Exception exc)
             {
-                ReportErrorAndRethrow(exc, "DeleteMessage", ErrorCode.StreamProviderManagerBase);
+                ReportErrorAndRethrow(exc, "DeleteMessage");
             }
         }
 
-        private void ReportErrorAndRethrow(Exception exc, string operation, ErrorCode errorCode)
+        private void ReportErrorAndRethrow(Exception exc, string operation)
         {
-            Logger.LogError((int)errorCode, exc, "Error doing {Operation} for SQS queue {QueueName}", operation, QueueName);
+            LogErrorSQSOperation(exc, operation, QueueName);
             throw new AggregateException($"Error doing {operation} for SQS queue {QueueName}", exc);
         }
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.StreamProviderManagerBase,
+            Level = LogLevel.Error,
+            Message = "Error doing {Operation} for SQS queue {QueueName}"
+        )]
+        private partial void LogErrorSQSOperation(Exception exception, string operation, string queueName);
     }
 }

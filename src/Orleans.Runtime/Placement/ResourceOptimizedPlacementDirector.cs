@@ -187,24 +187,28 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     private float CalculateScore(ref readonly ResourceStatistics stats, float maxMaxAvailableMemory, int maxActivationCount)
     {
         float normalizedCpuUsage = stats.CpuUsage / 100f;
+        Debug.Assert(normalizedCpuUsage >= 0f && normalizedCpuUsage <= 1.01f, "CPU usage should be normalized to [0, 1] range");
         float score = _weights.CpuUsageWeight * normalizedCpuUsage;
 
         if (stats.MaxAvailableMemory > 0)
         {
-            float maxAvailableMemory = stats.MaxAvailableMemory; // cache locally
-
-            float normalizedMemoryUsage = stats.MemoryUsage / maxAvailableMemory;
-            float normalizedAvailableMemory = 1 - stats.AvailableMemory / maxAvailableMemory;
-            float normalizedMaxAvailableMemory = maxAvailableMemory / maxMaxAvailableMemory;
+            float normalizedMemoryUsage = stats.NormalizedMemoryUsage;
+            Debug.Assert(normalizedMemoryUsage >= 0f && normalizedMemoryUsage <= 1.01f, "Memory usage should be normalized to [0, 1] range");
+            float normalizedAvailableMemory = stats.NormalizedAvailableMemory;
+            Debug.Assert(normalizedAvailableMemory >= 0f && normalizedAvailableMemory <= 1.01f, "Available memory should be normalized to [0, 1] range");
+            float normalizedMaxAvailableMemory = stats.MaxAvailableMemory / maxMaxAvailableMemory;
+            Debug.Assert(normalizedMaxAvailableMemory >= 0f && normalizedMaxAvailableMemory <= 1.01f, "Max available memory should be normalized to [0, 1] range");
 
             score += _weights.MemoryUsageWeight * normalizedMemoryUsage +
                      _weights.AvailableMemoryWeight * normalizedAvailableMemory +
                      _weights.MaxAvailableMemoryWeight * normalizedMaxAvailableMemory;
         }
 
-        score += _weights.ActivationCountWeight * stats.ActivationCount / maxActivationCount;
+        var normalizedActivationCount = stats.ActivationCount / maxActivationCount;
+        Debug.Assert(normalizedActivationCount >= 0f && normalizedActivationCount <= 1.01f, "Activation count should be normalized to [0, 1] range");
+        score += _weights.ActivationCountWeight * normalizedActivationCount;
 
-        Debug.Assert(score >= 0f && score <= 1.01f);
+        Debug.Assert(score >= 0f && score <= 1.01f, "Score should be normalized to [0, 1] range");
 
         return score;
     }
@@ -220,15 +224,15 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             updateValueFactory: static (_, _, statistics) => ResourceStatistics.FromRuntime(statistics));
 
     private record NormalizedWeights(float CpuUsageWeight, float MemoryUsageWeight, float AvailableMemoryWeight, float MaxAvailableMemoryWeight, float ActivationCountWeight);
-    private readonly record struct ResourceStatistics(bool IsOverloaded, float CpuUsage, float MemoryUsage, float AvailableMemory, float MaxAvailableMemory, int ActivationCount)
+    private readonly record struct ResourceStatistics(bool IsOverloaded, float CpuUsage, float NormalizedMemoryUsage, float NormalizedAvailableMemory, float MaxAvailableMemory, int ActivationCount)
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ResourceStatistics FromRuntime(SiloRuntimeStatistics statistics)
             => new(
                 IsOverloaded: statistics.IsOverloaded,
-                CpuUsage: statistics.EnvironmentStatistics.CpuUsagePercentage,
-                MemoryUsage: statistics.EnvironmentStatistics.MemoryUsageBytes,
-                AvailableMemory: statistics.EnvironmentStatistics.AvailableMemoryBytes,
+                CpuUsage: statistics.EnvironmentStatistics.FilteredCpuUsagePercentage,
+                NormalizedMemoryUsage: statistics.EnvironmentStatistics.NormalizedMemoryUsage,
+                NormalizedAvailableMemory: statistics.EnvironmentStatistics.NormalizedAvailableMemory,
                 MaxAvailableMemory: statistics.EnvironmentStatistics.MaximumAvailableMemoryBytes,
                 ActivationCount: statistics.ActivationCount);
     }

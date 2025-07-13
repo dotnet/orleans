@@ -4,7 +4,7 @@ using System.Runtime.Serialization;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Signifies that a grain is in an overloaded state where some runtime limit setting is currently being exceeded, 
+    /// Signifies that a grain is in an overloaded state where some runtime limit setting is currently being exceeded,
     /// and so that grain is unable to currently accept the message being sent.
     /// </summary>
     /// <remarks>

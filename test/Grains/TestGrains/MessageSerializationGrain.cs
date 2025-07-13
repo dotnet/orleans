@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime.Placement;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -57,8 +59,11 @@ namespace UnitTests.Grains
             IMessageSerializationGrain otherGrain;
             var id = this.GetPrimaryKeyLong();
             var currentSiloIdentity = await this.GetSiloIdentity();
+            var silos = ServiceProvider.GetRequiredService<IClusterMembershipService>().CurrentSnapshot.Members.Where(kv => kv.Value.Status == SiloStatus.Active).Select(kv => kv.Key).ToHashSet();
+            silos.Remove(ServiceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress);
             while (true)
             {
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, silos.First());
                 otherGrain = this.GrainFactory.GetGrain<IMessageSerializationGrain>(++id);
                 var otherIdentity = await otherGrain.GetSiloIdentity();
                 if (!string.Equals(otherIdentity, currentSiloIdentity))

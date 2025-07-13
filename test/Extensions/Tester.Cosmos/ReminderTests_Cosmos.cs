@@ -8,6 +8,9 @@ using UnitTests.GrainInterfaces;
 
 namespace Tester.Cosmos.Reminders;
 
+/// <summary>
+/// Tests for Orleans reminders functionality using Azure Cosmos DB as the reminder service backing store.
+/// </summary>
 [TestCategory("Reminders"), TestCategory("Cosmos")]
 public class ReminderTests_Cosmos : ReminderTests_Base, IClassFixture<ReminderTests_Cosmos.Fixture>
 {

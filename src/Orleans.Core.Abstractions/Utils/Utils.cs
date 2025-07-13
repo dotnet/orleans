@@ -1,17 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
     /// The Utils class contains a variety of utility methods for use in application and grain code.
     /// </summary>
-    public static class Utils
+    public static partial class Utils
     {
         /// <summary>
         /// Returns a human-readable text string that describes an IEnumerable collection of objects.
@@ -194,14 +194,12 @@ namespace Orleans.Runtime
             try
             {
                 if (exc is AggregateException { InnerExceptions.Count: 1 })
-                    exc = exc.InnerException!;
+                {
+                    Debug.Assert(exc.InnerException is not null, "AggregateException should have an inner exception.");
+                    exc = exc.InnerException;
+                }
 
-                logger.LogWarning(
-                    (int)ErrorCode.Runtime_Error_100325,
-                    exc,
-                    "Ignoring {ExceptionType} exception thrown from an action called by {Caller}.",
-                    exc.GetType().FullName,
-                    caller ?? string.Empty);
+                LogWarningIgnoringException(logger, exc, new(exc), caller ?? string.Empty);
             }
             catch
             {
@@ -234,5 +232,17 @@ namespace Orleans.Runtime
             skipFrames += 1; //skip this method from the stack trace
             return new System.Diagnostics.StackTrace(skipFrames).ToString();
         }
+
+        private readonly struct ExceptionTypeLogValue(Exception exc)
+        {
+            public override string? ToString() => exc.GetType().FullName;
+        }
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Runtime_Error_100325,
+            Level = LogLevel.Warning,
+            Message = "Ignoring {ExceptionType} exception thrown from an action called by {Caller}."
+        )]
+        private static partial void LogWarningIgnoringException(ILogger logger, Exception exception, ExceptionTypeLogValue exceptionType, string caller);
     }
 }

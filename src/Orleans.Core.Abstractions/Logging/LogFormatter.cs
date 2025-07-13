@@ -92,10 +92,13 @@ namespace Orleans.Runtime
                 }
                 else
                 {
-                    foreach (Exception inner in loaderExceptions)
+                    foreach (Exception? inner in loaderExceptions)
                     {
-                        // call recursively on all loader exceptions. Same level for all.
-                        PrintException_Helper(sb, inner, level + 1);
+                        if (inner is not null)
+                        {
+                            // call recursively on all loader exceptions. Same level for all.
+                            PrintException_Helper(sb, inner, level + 1);
+                        }
                     }
                 }
             }

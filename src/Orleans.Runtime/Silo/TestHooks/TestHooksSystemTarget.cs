@@ -16,9 +16,21 @@ namespace Orleans.Runtime.TestHooks
     /// </summary>
     internal class TestHooksEnvironmentStatisticsProvider : IEnvironmentStatisticsProvider
     {
+        private static EnvironmentStatisticsProvider _realStatisticsProvider = new();
+
         private EnvironmentStatistics? _currentStats = null;
 
-        public EnvironmentStatistics GetEnvironmentStatistics() => _currentStats ?? new();
+        public EnvironmentStatistics GetEnvironmentStatistics()
+        {
+            var stats = _currentStats ?? new();
+            if (!stats.IsValid())
+            {
+                stats = _realStatisticsProvider.GetEnvironmentStatistics();
+            }
+
+            return stats;
+        }
+
         public void SetHardwareStatistics(EnvironmentStatistics stats) => _currentStats = stats;
     }
 
@@ -103,18 +115,30 @@ namespace Orleans.Runtime.TestHooks
         {
             var previousStats = environmentStatistics.GetEnvironmentStatistics();
 
-            environmentStatistics.SetHardwareStatistics(
-                new(cpuUsage, previousStats.MemoryUsageBytes, previousStats.AvailableMemoryBytes, previousStats.MaximumAvailableMemoryBytes));
+            environmentStatistics.SetHardwareStatistics(new(
+                cpuUsagePercentage: cpuUsage,
+                rawCpuUsagePercentage: cpuUsage,
+                memoryUsageBytes: previousStats.FilteredMemoryUsageBytes,
+                rawMemoryUsageBytes: previousStats.RawMemoryUsageBytes,
+                availableMemoryBytes: previousStats.FilteredAvailableMemoryBytes,
+                rawAvailableMemoryBytes: previousStats.RawAvailableMemoryBytes,
+                maximumAvailableMemoryBytes: previousStats.MaximumAvailableMemoryBytes));
 
             Task.Delay(latchPeriod).ContinueWith(t =>
                 {
                     var currentStats = environmentStatistics.GetEnvironmentStatistics();
 
                     // ReSharper disable once CompareOfFloatsByEqualityOperator
-                    if (currentStats.CpuUsagePercentage == cpuUsage)
+                    if (currentStats.FilteredCpuUsagePercentage == cpuUsage)
                     {
-                        environmentStatistics.SetHardwareStatistics(
-                            new(previousStats.CpuUsagePercentage, currentStats.MemoryUsageBytes, currentStats.AvailableMemoryBytes, currentStats.MaximumAvailableMemoryBytes));
+                        environmentStatistics.SetHardwareStatistics(new(
+                                cpuUsagePercentage: previousStats.FilteredCpuUsagePercentage,
+                                rawCpuUsagePercentage: previousStats.RawCpuUsagePercentage,
+                                memoryUsageBytes: currentStats.FilteredMemoryUsageBytes,
+                                rawMemoryUsageBytes: currentStats.RawMemoryUsageBytes,
+                                availableMemoryBytes: currentStats.FilteredAvailableMemoryBytes,
+                                rawAvailableMemoryBytes: currentStats.RawAvailableMemoryBytes,
+                                maximumAvailableMemoryBytes: currentStats.MaximumAvailableMemoryBytes));
                     }
                 }).Ignore();
         }

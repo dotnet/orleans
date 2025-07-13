@@ -11,6 +11,9 @@ using Xunit.Abstractions;
 
 namespace Tester.Cassandra.Clustering;
 
+/// <summary>
+/// Tests for Orleans membership table operations using Apache Cassandra as the backing store.
+/// </summary>
 [TestCategory("Cassandra"), TestCategory("Clustering")]
 [Collection("Cassandra")]
 public sealed class CassandraClusteringTableTests : IClassFixture<CassandraContainer>

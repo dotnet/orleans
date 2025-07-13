@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace Orleans.Configuration
 {
     /// <summary>
-    /// Silo options for grain garbage collection.
+    /// Silo options for idle grain collection.
     /// </summary>
     public class GrainCollectionOptions
     {
@@ -48,5 +48,31 @@ namespace Orleans.Configuration
         /// The default value for <see cref="DeactivationTimeout"/>.
         /// </summary>
         public static readonly TimeSpan DEFAULT_DEACTIVATION_TIMEOUT = TimeSpan.FromSeconds(30);
+
+        /// <summary>
+        /// Indicates if memory pressure should trigger grain activation shedding.
+        /// </summary>
+        /// <remarks>
+        /// If set to true, the silo will shed grain activations when memory usage exceeds the specified limits.
+        /// See <see cref="MemoryUsageLimitPercentage"/>, <see cref="MemoryUsageTargetPercentage"/>, and <see cref="MemoryUsagePollingPeriod"/> for configuration.
+        /// </remarks>
+        public bool EnableActivationSheddingOnMemoryPressure { get; set; }
+
+        /// <summary>
+        /// The interval at which memory usage is polled.
+        /// </summary>
+        public TimeSpan MemoryUsagePollingPeriod { get; set; } = TimeSpan.FromSeconds(5);
+
+        /// <summary>
+        /// The memory usage percentage (0–100) at which grain collection is triggered.
+        /// Must be greater than 0 and less than or equal to 100.
+        /// </summary>
+        public double MemoryUsageLimitPercentage { get; set; } = 80;
+
+        /// <summary>
+        /// The target memory usage percentage (0–100) to reach after grain collection.
+        /// Must be greater than 0, less than or equal to 100, and less than <see cref="MemoryUsageLimitPercentage"/>.
+        /// </summary>
+        public double MemoryUsageTargetPercentage { get; set; } = 75;
     }
 }

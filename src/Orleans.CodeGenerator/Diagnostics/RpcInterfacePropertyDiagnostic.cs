@@ -5,7 +5,7 @@ namespace Orleans.CodeGenerator.Diagnostics;
 
 public static class RpcInterfacePropertyDiagnostic
 {
-    public const string DiagnosticId = "ORLEANS0105";
+    public const string DiagnosticId = DiagnosticRuleId.RpcInterfaceProperty;
     public const string Title = "RPC interfaces must not contain properties";
     public const string MessageFormat = "The interface {0} contains a property {1}. RPC interfaces must not contain properties.";
     public const string Category = "Usage";

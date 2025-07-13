@@ -6,6 +6,18 @@ using Xunit;
 
 namespace UnitTests.StreamingTests
 {
+    /// <summary>
+    /// Sample streaming tests demonstrating basic producer-consumer patterns in Orleans Streaming.
+    /// 
+    /// These tests showcase fundamental streaming scenarios:
+    /// - Producer and consumer grain communication via streams
+    /// - Different subscription ordering (consumer-first vs producer-first)
+    /// - Inline vs async consumer processing
+    /// - Message delivery guarantees and counting
+    /// 
+    /// These patterns form the foundation for more complex streaming applications
+    /// like real-time analytics, event processing, and pub-sub systems.
+    /// </summary>
     public class SampleStreamingTests
     {
         private const string StreamNamespace = "SampleStreamNamespace";
@@ -22,6 +34,13 @@ namespace UnitTests.StreamingTests
             this.cluster = cluster;
         }
 
+        /// <summary>
+        /// Tests the scenario where a consumer subscribes before the producer starts.
+        /// This verifies that:
+        /// - Consumers can subscribe to streams that don't yet have producers
+        /// - Messages are delivered once the producer starts
+        /// - No messages are lost in the handoff
+        /// </summary>
         public async Task StreamingTests_Consumer_Producer(Guid streamId)
         {
             // consumer joins first, producer later
@@ -42,6 +61,13 @@ namespace UnitTests.StreamingTests
             await consumer.StopConsuming();
         }
 
+        /// <summary>
+        /// Tests the scenario where a producer starts before any consumers subscribe.
+        /// This verifies that:
+        /// - Producers can send to streams without active consumers
+        /// - Late-joining consumers receive messages (depending on provider)
+        /// - The system handles dynamic subscription scenarios
+        /// </summary>
         public async Task StreamingTests_Producer_Consumer(Guid streamId)
         {
             // producer joins first, consumer later
@@ -63,6 +89,13 @@ namespace UnitTests.StreamingTests
             await consumer.StopConsuming();
         }
 
+        /// <summary>
+        /// Tests streaming with an inline consumer that processes messages synchronously.
+        /// Inline consumers:
+        /// - Process messages in the same task context as delivery
+        /// - Can provide lower latency but may impact throughput
+        /// - Are useful for simple, fast message processing
+        /// </summary>
         public async Task StreamingTests_Producer_InlineConsumer(Guid streamId)
         {
             // producer joins first, consumer later
@@ -84,6 +117,13 @@ namespace UnitTests.StreamingTests
             await consumer.StopConsuming();
         }
 
+        /// <summary>
+        /// Verifies that all produced messages were consumed.
+        /// This is a key validation for streaming tests to ensure:
+        /// - No messages were lost
+        /// - No duplicate deliveries occurred
+        /// - Producer and consumer are properly synchronized
+        /// </summary>
         private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, ISampleStreaming_ConsumerGrain consumer, bool assertIsTrue)
         {
             var numProduced = await producer.GetNumberProduced();

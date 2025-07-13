@@ -6,7 +6,9 @@ using Xunit.Abstractions;
 namespace NonSilo.Tests
 {
     /// <summary>
-    /// Tests for <see cref="RuntimeTypeNameFormatter"/>.
+    /// Tests for the Orleans RuntimeTypeNameFormatter, which is responsible for formatting and parsing .NET type names
+    /// in a way that is recoverable and consistent across different environments. This is crucial for Orleans' serialization
+    /// system and type resolution when communicating between silos and clients.
     /// </summary>
     [TestCategory("BVT")]
     public class RuntimeTypeNameFormatterTests
@@ -86,6 +88,10 @@ namespace NonSilo.Tests
             }
         }
 
+        /// <summary>
+        /// Tests that parsing invalid type names produces descriptive error messages with position indicators.
+        /// This helps developers debug type resolution issues in Orleans serialization.
+        /// </summary>
         [Fact]
         public void InvalidNamesThrowDescriptiveErrorMessage()
         {

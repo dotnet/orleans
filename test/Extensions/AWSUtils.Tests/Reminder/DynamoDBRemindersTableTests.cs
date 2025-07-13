@@ -10,6 +10,9 @@ using Xunit;
 
 namespace AWSUtils.Tests.RemindersTest
 {
+    /// <summary>
+    /// Tests DynamoDB implementation of the Orleans reminders table for storing and retrieving grain reminders.
+    /// </summary>
     [TestCategory("Reminders"), TestCategory("AWS"), TestCategory("DynamoDb")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class DynamoDBRemindersTableTests : ReminderTableTestsBase, IClassFixture<DynamoDBStorageTestsFixture>

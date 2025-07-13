@@ -11,9 +11,13 @@ using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Orleans.Statistics;
+using System.Globalization;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {
+    /// <summary>
+    /// Tests for EventHub cache purge logic and eviction strategy behavior under pressure conditions.
+    /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming")]
     public class EHPurgeLogicTests
     {
@@ -25,7 +29,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private readonly ObjectPool<FixedSizeBuffer> bufferPool;
         private readonly TimeSpan timeOut = TimeSpan.FromSeconds(30);
         private readonly EventHubPartitionSettings ehSettings;
-        private NoOpEnvironmentStatisticsProvider _hostEnvironmentStatistics;
+        private IEnvironmentStatisticsProvider environmentStatisticsProvider;
         private ConcurrentBag<EventHubQueueCacheForTesting> cacheList;
         private List<EHEvictionStrategyForTesting> evictionStrategyList;
 
@@ -40,6 +44,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             };
 
             //set up cache pressure monitor and purge predicate
+            this.environmentStatisticsProvider = new EnvironmentStatisticsProvider();
             this.cachePressureInjectionMonitor = new CachePressureInjectionMonitor();
             this.purgePredicate = new PurgeDecisionInjectionPredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(30));
 
@@ -55,7 +60,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         }
 
         [Fact, TestCategory("BVT")]
-        public async Task EventhubQueueCache_WontPurge_WhenUnderPressure()
+        public async Task EventHubQueueCache_WontPurge_WhenUnderPressure()
         {
             InitForTesting();
             var tasks = new List<Task>();
@@ -78,7 +83,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         }
 
         [Fact, TestCategory("BVT")]
-        public async Task EventhubQueueCache_WontPurge_WhenTimePurgePredicateSaysDontPurge()
+        public async Task EventHubQueueCache_WontPurge_WhenTimePurgePredicateSaysDontPurge()
         {
             InitForTesting();
             var tasks = new List<Task>();
@@ -103,7 +108,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         }
 
         [Fact, TestCategory("BVT")]
-        public async Task EventhubQueueCache_WillPurge_WhenTimePurgePredicateSaysPurge_And_NotUnderPressure()
+        public async Task EventHubQueueCache_WillPurge_WhenTimePurgePredicateSaysPurge_And_NotUnderPressure()
         {
             InitForTesting();
             var tasks = new List<Task>();
@@ -129,7 +134,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         }
 
         [Fact, TestCategory("BVT")]
-        public async Task EventhubQueueCache_EvictionStrategy_Behavior()
+        public async Task EventHubQueueCache_EvictionStrategy_Behavior()
         {
             InitForTesting();
             var tasks = new List<Task>();
@@ -188,7 +193,6 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
         private void InitForTesting()
         {
-            _hostEnvironmentStatistics = new NoOpEnvironmentStatisticsProvider();
             this.cacheList = new ConcurrentBag<EventHubQueueCacheForTesting>();
             this.evictionStrategyList = new List<EHEvictionStrategyForTesting>();
             var monitorDimensions = new EventHubReceiverMonitorDimensions
@@ -197,10 +201,10 @@ namespace ServiceBus.Tests.EvictionStrategyTests
                 EventHubPath = this.ehSettings.Hub.EventHubName,
             };
 
-            this.receiver1 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance, 
-                new DefaultEventHubReceiverMonitor(monitorDimensions), new LoadSheddingOptions(), _hostEnvironmentStatistics);
+            this.receiver1 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
+                new DefaultEventHubReceiverMonitor(monitorDimensions), new LoadSheddingOptions(), environmentStatisticsProvider);
             this.receiver2 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
-                new DefaultEventHubReceiverMonitor(monitorDimensions), new LoadSheddingOptions(), _hostEnvironmentStatistics);
+                new DefaultEventHubReceiverMonitor(monitorDimensions), new LoadSheddingOptions(), environmentStatisticsProvider);
             this.receiver1.Initialize(this.timeOut);
             this.receiver2.Initialize(this.timeOut);
         }
@@ -226,20 +230,13 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
         private static EventData MakeEventData(long sequenceNumber)
         {
-            byte[] ignore = { 12, 23 };
             var now = DateTime.UtcNow;
-            var eventData = new TestEventData(ignore,
-                offset: now.Ticks,
+            var eventData = EventHubsModelFactory.EventData(
+                eventBody: new BinaryData([12, 23]),
+                offsetString: now.Ticks.ToString(CultureInfo.InvariantCulture),
                 sequenceNumber: sequenceNumber,
                 enqueuedTime: now);
             return eventData;
-        }
-
-        private class TestEventData : EventData
-        {
-            public TestEventData(ReadOnlyMemory<byte> eventBody, IDictionary<string, object> properties = null, IReadOnlyDictionary<string, object> systemProperties = null, long sequenceNumber = long.MinValue, long offset = long.MinValue, DateTimeOffset enqueuedTime = default, string partitionKey = null) : base(eventBody, properties, systemProperties, sequenceNumber, offset, enqueuedTime, partitionKey)
-            {
-            }
         }
 
         private Task<IStreamQueueCheckpointer<string>> CheckPointerFactory(string partition)
@@ -261,11 +258,6 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             cache.AddCachePressureMonitor(this.cachePressureInjectionMonitor);
             this.cacheList.Add(cache);
             return cache;
-        }
-
-        private class NoOpEnvironmentStatisticsProvider : IEnvironmentStatisticsProvider
-        {
-            public EnvironmentStatistics GetEnvironmentStatistics() => new();
         }
     }
 }

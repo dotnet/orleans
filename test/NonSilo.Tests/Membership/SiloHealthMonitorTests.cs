@@ -13,6 +13,9 @@ using static Orleans.Runtime.MembershipService.SiloHealthMonitor;
 
 namespace NonSilo.Tests.Membership
 {
+    /// <summary>
+    /// Tests for silo health monitoring including direct/indirect probing, failure detection, and stale silo handling.
+    /// </summary>
     [TestCategory("BVT"), TestCategory("Membership")]
     public class SiloHealthMonitorTests
     {

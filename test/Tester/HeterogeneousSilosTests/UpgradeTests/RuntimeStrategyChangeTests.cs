@@ -7,6 +7,9 @@ using Xunit;
 
 namespace Tester.HeterogeneousSilosTests.UpgradeTests
 {
+    /// <summary>
+    /// Tests for runtime changes to versioning strategies including compatibility and selector strategy modifications.
+    /// </summary>
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT")]
     public class RuntimeStrategyChangeTests : UpgradeTestsBase
     {

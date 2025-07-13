@@ -44,7 +44,18 @@ namespace Orleans.Serialization.Buffers.Adaptors
         /// <summary>
         /// Return an object to the pool.
         /// </summary>
-        public static void Return(PooledBufferStream stream) => StreamPool.Return(stream);
+        public static void Return(PooledBufferStream stream)
+        {
+#if NET5_0_OR_GREATER
+            ArgumentNullException.ThrowIfNull(stream);
+#else
+            if (stream is null)
+            {
+                throw new ArgumentNullException(nameof(stream));
+            }
+#endif
+            StreamPool.Return(stream);
+        }
 
         /// <summary>Gets the total length which has been written.</summary>
         public override long Length => _length;
@@ -106,7 +117,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
             if (_segments.Count == 1)
             {
                 var buffer = _segments[0];
-                return new ReadOnlySequence<byte>(buffer, 0, buffer.Length);
+                return new ReadOnlySequence<byte>(buffer, 0, (int)Math.Min(buffer.Length, _length));
             }
 
             var runningIndex = 0L;
@@ -178,6 +189,14 @@ namespace Orleans.Serialization.Buffers.Adaptors
 
         public override int Read(byte[] buffer, int offset, int count)
         {
+#if NET5_0_OR_GREATER
+            ArgumentNullException.ThrowIfNull(buffer);
+#else
+            if (buffer is null)
+            {
+                throw new ArgumentNullException(nameof(buffer));
+            }
+#endif
             var destination = buffer.AsSpan(offset, count);
             FindCurrentSegment(out var segmentIndex, out var indexIntoSegment);
             if (segmentIndex < 0)
@@ -190,9 +209,9 @@ namespace Orleans.Serialization.Buffers.Adaptors
 
             while (remaining > 0 && segmentIndex < _segments.Count)
             {
-                var readLength = Math.Min(remaining, destination.Length);
-                var segment = _segments[segmentIndex].AsSpan(indexIntoSegment, readLength);
-                segment.CopyTo(destination);
+                var segment = _segments[segmentIndex];
+                var readLength = Math.Min(remaining, Math.Min(segment.Length - indexIntoSegment, destination.Length));
+                segment.AsSpan(indexIntoSegment, readLength).CopyTo(destination);
 
                 destination = destination[readLength..];
                 remaining -= readLength;
@@ -213,7 +232,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
                 // Do nothing
                 return;
             }
-            else if (Length == 0)
+            else if (value == 0)
             {
                 Reset();
             }
@@ -226,13 +245,19 @@ namespace Orleans.Serialization.Buffers.Adaptors
                     while (excess > 0)
                     {
                         var lastSegment = _segments[^1];
-                        if (excess > lastSegment.Length)
+                        if (excess >= lastSegment.Length)
                         {
                             // Remove the entire segment.
                             excess -= lastSegment.Length;
                             _segments.RemoveAt(_segments.Count - 1);
                             _capacity -= lastSegment.Length;
                             Pool.Return(lastSegment);
+                        }
+                        else
+                        {
+                            // Partially truncate the last segment - we don't need to do anything 
+                            // since we're just reducing the logical length, not the physical buffer
+                            break;
                         }
                     }
                 }
@@ -263,6 +288,14 @@ namespace Orleans.Serialization.Buffers.Adaptors
 
         public override void Write(byte[] buffer, int offset, int count)
         {
+#if NET5_0_OR_GREATER
+            ArgumentNullException.ThrowIfNull(buffer);
+#else
+            if (buffer is null)
+            {
+                throw new ArgumentNullException(nameof(buffer));
+            }
+#endif
             var data = new ReadOnlyMemory<byte>(buffer, offset, count);
 
             if (Position < Length)
@@ -345,7 +378,8 @@ namespace Orleans.Serialization.Buffers.Adaptors
             }
         }
 
-        private sealed class BufferSegment : ReadOnlySequenceSegment<byte>
+        // Internal for testing purposes only.
+        internal sealed class BufferSegment : ReadOnlySequenceSegment<byte>
         {
             public static readonly ObjectPool<BufferSegment> Pool = ObjectPool.Create(new SegmentPoolPolicy());
 

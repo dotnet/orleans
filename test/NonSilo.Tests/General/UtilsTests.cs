@@ -5,6 +5,9 @@ using Xunit.Abstractions;
 
 namespace UnitTests.UtilsTests
 {
+    /// <summary>
+    /// Tests for utility functions including gateway URI conversion for IPv4 and IPv6 addresses.
+    /// </summary>
     [TestCategory("Utils")]
     public class UtilsTests
     {

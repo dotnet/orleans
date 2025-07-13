@@ -7,6 +7,17 @@ using Xunit;
 
 namespace Orleans.Serialization.UnitTests;
 
+/// <summary>
+/// Tests for the ArcBufferWriter class, which provides a high-performance buffer writer implementation
+/// for Orleans' serialization system. ArcBufferWriter is a specialized buffer writer that manages
+/// memory in pages and supports atomic reference counting (ARC) for efficient memory management.
+/// 
+/// Orleans' serialization approach emphasizes:
+/// - Zero-copy operations where possible through buffer slicing
+/// - Efficient memory pooling to reduce GC pressure
+/// - Reference counting for safe concurrent access
+/// - Support for streaming scenarios with incremental writes and reads
+/// </summary>
 [Trait("Category", "BVT")]
 public class ArcBufferWriterTests
 {

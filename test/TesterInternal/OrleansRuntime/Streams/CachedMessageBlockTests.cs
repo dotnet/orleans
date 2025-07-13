@@ -5,6 +5,9 @@ using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
+    /// <summary>
+    /// Tests for cached message block functionality in streaming infrastructure.
+    /// </summary>
     public class CachedMessageBlockTests
     {
         private const int TestBlockSize = 100;

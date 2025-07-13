@@ -12,6 +12,9 @@ using Orleans.Configuration;
 
 namespace AWSUtils.Tests.Streaming
 {
+    /// <summary>
+    /// Tests SQS streaming functionality from Orleans client perspective including producer dropout scenarios.
+    /// </summary>
     public class SQSClientStreamTests : TestClusterPerTest
     {
         private const string SQSStreamProviderName = "SQSProvider";

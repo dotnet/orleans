@@ -4,7 +4,7 @@ using System.Runtime.Serialization;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Signifies that a gateway silo is currently in overloaded / load shedding state 
+    /// Signifies that a gateway silo is currently in overloaded / load shedding state
     /// and is unable to currently accept this message being sent.
     /// </summary>
     /// <remarks>

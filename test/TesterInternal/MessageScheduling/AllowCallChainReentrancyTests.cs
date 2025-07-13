@@ -4,6 +4,9 @@ using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
+    /// <summary>
+    /// Tests for allowed call chain reentrancy scenarios on non-reentrant grains.
+    /// </summary>
     public class AllowCallChainReentrancyTests : OrleansTestingBase, IClassFixture<AllowCallChainReentrancyTests.Fixture>
     {
         private const int NumIterations = 30;

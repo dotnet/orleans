@@ -9,6 +9,9 @@ using Orleans.Configuration;
 
 namespace Benchmarks.Ping
 {
+    /// <summary>
+    /// Benchmarks grain-to-grain communication latency and throughput using simple ping operations.
+    /// </summary>
     [MemoryDiagnoser]
     public class PingBenchmark : IDisposable
     {

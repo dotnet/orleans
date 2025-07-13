@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Placement;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -262,11 +263,14 @@ namespace UnitTests.Grains
 
             async Task<IOneWayGrain> GetGrainOnOtherSilo()
             {
+                var silos = ServiceProvider.GetRequiredService<IClusterMembershipService>().CurrentSnapshot.Members.Where(kv => kv.Value.Status == SiloStatus.Active).Select(kv => kv.Key).ToHashSet();
+                var thisSilo = await this.GetSiloAddress();
+                silos.Remove(thisSilo);
                 while (true)
                 {
+                    RequestContext.Set(IPlacementDirector.PlacementHintKey, silos.First());
                     var candidate = this.GrainFactory.GetGrain<IOneWayGrain>(Guid.NewGuid());
                     var directorySilo = await candidate.GetPrimaryForGrain();
-                    var thisSilo = await this.GetSiloAddress();
                     var candidateSilo = await candidate.GetSiloAddress();
                     if (!directorySilo.Equals(candidateSilo)
                         && !directorySilo.Equals(thisSilo)

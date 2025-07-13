@@ -81,9 +81,10 @@ namespace Orleans.Runtime
             var period = Max(TimeSpan.FromMilliseconds(1), Min(this.messagingOptions.ResponseTimeout, TimeSpan.FromSeconds(1)));
             this.callbackTimer = new PeriodicTimer(period, timeProvider);
 
+            var callbackDataLogger = loggerFactory.CreateLogger<CallbackData>();
             this.sharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
-                this.loggerFactory.CreateLogger<CallbackData>(),
+                callbackDataLogger,
                 this.messagingOptions.ResponseTimeout,
                 this.messagingOptions.CancelRequestOnTimeout,
                 this.messagingOptions.WaitForCancellationAcknowledgement,
@@ -91,10 +92,10 @@ namespace Orleans.Runtime
 
             this.systemSharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
-                this.loggerFactory.CreateLogger<CallbackData>(),
+                callbackDataLogger,
                 this.messagingOptions.SystemResponseTimeout,
-                this.messagingOptions.CancelRequestOnTimeout,
-                this.messagingOptions.WaitForCancellationAcknowledgement,
+                cancelOnTimeout: false,
+                waitForCancellationAcknowledgement: false,
                 cancellationManager: null);
         }
 
@@ -523,7 +524,6 @@ namespace Orleans.Runtime
         {
             _cancellationManager = this.ServiceProvider.GetRequiredService<IGrainCallCancellationManager>();
             sharedCallbackData.CancellationManager = _cancellationManager;
-            systemSharedCallbackData.CancellationManager = _cancellationManager;
             lifecycle.Subscribe<InsideRuntimeClient>(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
         }
 

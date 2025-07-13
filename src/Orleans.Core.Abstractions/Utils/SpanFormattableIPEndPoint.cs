@@ -2,7 +2,6 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 
-#nullable enable
 namespace Orleans;
 
 internal readonly struct SpanFormattableIPEndPoint : ISpanFormattable

@@ -6,8 +6,14 @@ using Xunit;
 
 namespace Tester.AzureUtils;
 
+/// <summary>
+/// Tests for Azure Queue Stream Provider configuration builder, validating various configuration scenarios.
+/// </summary>
 public class AzureQueueStreamProviderBuilderTests
 {
+	/// <summary>
+	/// Verifies that missing connection string results in null QueueServiceClient.
+	/// </summary>
 	[Fact]
 	public void Missing_ConnectionString()
 	{
@@ -31,6 +37,9 @@ public class AzureQueueStreamProviderBuilderTests
 		Assert.Null(queueOptions.QueueServiceClient);
 	}
 
+	/// <summary>
+	/// Verifies that minimal required configuration creates valid QueueServiceClient with default settings.
+	/// </summary>
 	[Fact]
 	public void Minimal_Configuration()
 	{
@@ -58,6 +67,9 @@ public class AzureQueueStreamProviderBuilderTests
 		Assert.Null(queueOptions.MessageVisibilityTimeout);
 	}
 
+	/// <summary>
+	/// Verifies that all configuration options are properly parsed and applied.
+	/// </summary>
 	[Fact]
 	public void Full_Configuration()
 	{

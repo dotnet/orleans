@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Orleans.Internal;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -20,6 +19,9 @@ namespace UnitTests
         }
     }
 
+    /// <summary>
+    /// Tests for grain reentrancy, MayInterleave predicates, and fan-out scenarios.
+    /// </summary>
     public class ReentrancyTests : OrleansTestingBase, IClassFixture<ReentrancyTests.Fixture>
     {
         public class Fixture : BaseTestClusterFixture
@@ -67,6 +69,35 @@ namespace UnitTests
             // Should reenter since predicate should return true.
             await grain.TwoReentrant().WaitAsync(TimeSpan.FromSeconds(5));
             this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsTrue Test finished OK.");
+        }
+
+        [Theory, TestCategory("Functional"), TestCategory("Reentrancy")]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task MayInterleavePredicate_AllowsInterleaving(bool mayInterleaveFirst)
+        {
+            // Create a unique grain per run
+            var grainKey = $"grain-{mayInterleaveFirst}";
+            var grain = this.fixture.GrainFactory.GetGrain<ICallOrderingGrain>(grainKey);
+
+            Task first = mayInterleaveFirst ? grain.MethodA() : grain.MethodB();
+            await Task.Delay(250); // Stagger second call
+            Task second = mayInterleaveFirst ? grain.MethodB() : grain.MethodA();
+
+            await Task.Delay(500); // Let both methods reach entry point
+
+            await grain.Unblock();
+            await Task.WhenAll(first, second);
+
+            var log = await grain.GetLog();
+
+            Assert.Contains("enter:A", log);
+            Assert.Contains("enter:B", log);
+            Assert.Contains("exit:A", log);
+            Assert.Contains("exit:B", log);
+
+            var firstExit = log.FindIndex(x => x.StartsWith("exit"));
+            Assert.True(firstExit >= 2, $"Expected both methods to enter before exiting. Log: {string.Join(", ", log)}");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]

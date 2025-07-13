@@ -4,6 +4,13 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
+    /// <summary>
+    /// Tests for multifaceted grain functionality in Orleans.
+    /// Multifaceted grains can implement multiple interfaces and be accessed
+    /// through different interface references using AsReference<T>().
+    /// This enables grains to expose different APIs to different consumers
+    /// while maintaining a single grain instance.
+    /// </summary>
     //using ValueUpdateEventArgs = MultifacetGrainClient.ValueUpdateEventArgs;
     public class MultifacetGrainTest : HostedTestClusterEnsureDefaultStarted
     {
@@ -18,6 +25,12 @@ namespace DefaultCluster.Tests.General
         {
         }
 
+        /// <summary>
+        /// Tests accessing a grain through different interface facets.
+        /// Verifies that a grain implementing multiple interfaces (writer and reader)
+        /// can be accessed through either interface using AsReference<T>(),
+        /// and that both references operate on the same underlying grain state.
+        /// </summary>
         [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public async Task RWReferences()
         {
@@ -30,6 +43,12 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(x, y);
         }
 
+        /// <summary>
+        /// Verifies that invalid interface casts throw appropriate exceptions.
+        /// Tests that attempting to cast a grain reference to an interface
+        /// it doesn't implement results in an InvalidCastException,
+        /// ensuring type safety in the multifacet pattern.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public void RWReferencesInvalidCastException()
         {
@@ -40,6 +59,12 @@ namespace DefaultCluster.Tests.General
             });
         }
 
+        /// <summary>
+        /// Tests factory methods that return different facets of a grain.
+        /// Verifies that factory grains can create and return references
+        /// to different interfaces of the same grain, enabling patterns
+        /// where grain creation logic returns appropriate interfaces to callers.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task MultifacetFactory()
         {
@@ -53,6 +78,12 @@ namespace DefaultCluster.Tests.General
 
         }
 
+        /// <summary>
+        /// Tests passing grain interface references as method arguments.
+        /// Verifies that different interface facets of a grain can be passed
+        /// to and stored by other grains, and that these references remain
+        /// valid and operate on the same underlying grain instance.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task Multifacet_InterfacesAsArguments()
         {

@@ -8,6 +8,9 @@ using Xunit;
 
 namespace ServiceBus.Tests.StreamingTests
 {
+    /// <summary>
+    /// Tests for EventHub subscription multiplicity scenarios including parallel, linear, and resubscription behaviors.
+    /// </summary>
     [TestCategory("Functional")]
     public class EHSubscriptionMultiplicityTests : OrleansTestingBase, IClassFixture<EHSubscriptionMultiplicityTests.Fixture>
     {

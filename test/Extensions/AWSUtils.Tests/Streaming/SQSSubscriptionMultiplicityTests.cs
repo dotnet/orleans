@@ -10,6 +10,9 @@ using UnitTests.StreamingTests;
 
 namespace AWSUtils.Tests.Streaming
 {
+    /// <summary>
+    /// Tests multiple subscription scenarios for SQS streams including parallel, linear, and resubscription patterns.
+    /// </summary>
     public class SQSSubscriptionMultiplicityTests : TestClusterPerTest
     {
         private const string SQSStreamProviderName = "SQSProvider";

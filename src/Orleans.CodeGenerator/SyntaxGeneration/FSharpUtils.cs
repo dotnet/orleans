@@ -11,6 +11,7 @@ namespace Orleans.CodeGenerator
     internal static class FSharpUtilities
     {
         private const int SourceConstructFlagsSumTypeValue = 1;
+        private const int SourceConstructFlagsKindMaskValue = 31;
         private const int SourceConstructFlagsRecordTypeValue = 2;
 
         public static bool IsUnionCase(LibraryTypes libraryTypes, INamedTypeSymbol symbol, out INamedTypeSymbol sumType)
@@ -56,7 +57,7 @@ namespace Orleans.CodeGenerator
                 return false;
             }
 
-            if ((int)sourceConstructFlagsArgument.Value != SourceConstructFlagsSumTypeValue)
+            if (sourceConstructFlagsArgument.Value != null && ((int)sourceConstructFlagsArgument.Value & SourceConstructFlagsKindMaskValue) != SourceConstructFlagsSumTypeValue)
             {
                 return false;
             }
@@ -116,10 +117,7 @@ namespace Orleans.CodeGenerator
                 List<IFieldSymbol> dataMembers = new();
                 foreach (var field in symbol.GetDeclaredInstanceMembers<IFieldSymbol>())
                 {
-                    if (field.Name.StartsWith("item", System.StringComparison.Ordinal) || field.Name.Equals("_tag", System.StringComparison.Ordinal))
-                    {
-                        dataMembers.Add(field);
-                    }
+                    dataMembers.Add(field);
                 }
 
                 dataMembers.Sort(FSharpUnionCasePropertyNameComparer.Default);

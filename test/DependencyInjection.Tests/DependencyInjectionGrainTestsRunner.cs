@@ -7,12 +7,34 @@ using Xunit;
 
 namespace DependencyInjection.Tests
 {
+    /// <summary>
+    /// Test runner for Orleans dependency injection integration tests.
+    /// 
+    /// Orleans integrates with Microsoft.Extensions.DependencyInjection to support:
+    /// - Constructor injection in grains
+    /// - Scoped services (one instance per grain activation)
+    /// - Singleton services (shared across all grains)
+    /// - Integration with third-party DI containers
+    /// 
+    /// Key concepts tested:
+    /// - Grain constructors can have dependencies injected
+    /// - Each grain activation gets its own scope
+    /// - IGrainFactory and IGrainActivationContext are automatically available
+    /// - Generic grains can have dependencies based on their type parameters
+    /// - Explicit grain registrations in DI are NOT supported by design
+    /// 
+    /// This abstract base class contains the core test logic, while concrete
+    /// implementations test different DI container integrations.
+    /// </summary>
     public abstract class DependencyInjectionGrainTestRunner : OrleansTestingBase
     {
         private readonly BaseTestClusterFixture fixture;
 
-        //contains IServiceCollection configuration for the following tests, so should be part of the test runner.
-        //while different ServiceProviderFactory set up should be in the more concrete test files
+        /// <summary>
+        /// Configures services for dependency injection tests.
+        /// This is in the base test runner because all DI tests need these services,
+        /// while different ServiceProviderFactory setups are in concrete test classes.
+        /// </summary>
         protected class TestSiloBuilderConfigurator : ISiloConfigurator
         {
             public void Configure(ISiloBuilder hostBuilder)
@@ -24,8 +46,10 @@ namespace DependencyInjection.Tests
                     services.AddSingleton<IInjectedService, InjectedService>();
                     services.AddScoped<IInjectedScopedService, InjectedScopedService>();
 
-                    // explicitly register a grain class to assert that it will NOT use the registration, 
-                    // as by design this is not supported.
+                    // Explicitly register a grain class to test that it will NOT use this registration.
+                    // Orleans creates grains through its own activation system, not DI container.
+                    // This registration is here to verify that Orleans ignores it and fails
+                    // when trying to create the grain (missing constructor parameters).
                     services.AddTransient(
                         sp => new ExplicitlyRegisteredSimpleDIGrain(
                             sp.GetRequiredService<IInjectedService>(),
@@ -40,6 +64,10 @@ namespace DependencyInjection.Tests
             this.fixture = fixture;
         }
 
+        /// <summary>
+        /// Basic test that grains can be activated with constructor dependencies.
+        /// This verifies the fundamental DI integration is working.
+        /// </summary>
         [Fact]
         public async Task CanGetGrainWithInjectedDependencies()
         {
@@ -47,6 +75,11 @@ namespace DependencyInjection.Tests
             var _ = await grain.GetLongValue();
         }
 
+        /// <summary>
+        /// Tests that IGrainFactory is automatically available for injection.
+        /// IGrainFactory is a framework service that allows grains to create other grains.
+        /// Note: Don't register your own IGrainFactory - Orleans provides this automatically.
+        /// </summary>
         [Fact]
         public async Task CanGetGrainWithInjectedGrainFactory()
         {
@@ -56,6 +89,10 @@ namespace DependencyInjection.Tests
             _ = await grain.GetGrainFactoryId();
         }
 
+        /// <summary>
+        /// Verifies that singleton services are shared across all grain activations.
+        /// The same instance should be injected into different grains.
+        /// </summary>
         [Fact]
         public async Task CanResolveSingletonDependencies()
         {
@@ -71,6 +108,11 @@ namespace DependencyInjection.Tests
             await grain2.DoDeactivate();
         }
 
+        /// <summary>
+        /// Verifies that scoped services create unique instances per grain activation.
+        /// Each grain should get its own instance of scoped services.
+        /// This is crucial for services that maintain per-grain state.
+        /// </summary>
         [Fact]
         public async Task CanResolveScopedDependencies()
         {
@@ -86,6 +128,11 @@ namespace DependencyInjection.Tests
             await grain2.DoDeactivate();
         }
 
+        /// <summary>
+        /// Tests that IGrainActivationContext is available as a scoped service.
+        /// Each grain activation has its own context with grain-specific information
+        /// like GrainId, which should be accessible through DI.
+        /// </summary>
         [Fact]
         public async Task CanResolveScopedGrainActivationContext()
         {
@@ -102,6 +149,11 @@ namespace DependencyInjection.Tests
             await grain2.DoDeactivate();
         }
 
+        /// <summary>
+        /// Verifies that scoped services are thread-safe within a grain activation.
+        /// Multiple concurrent calls to the same grain should use the same
+        /// scoped service instances, as grains process requests sequentially.
+        /// </summary>
         [Fact]
         public async Task ScopedDependenciesAreThreadSafe()
         {
@@ -123,6 +175,11 @@ namespace DependencyInjection.Tests
             await grain1.DoDeactivate();
         }
 
+        /// <summary>
+        /// Tests that grains can access the DI container through IServiceProvider.
+        /// Services resolved directly from the provider should match those
+        /// injected through the constructor for the same grain activation.
+        /// </summary>
         [Fact]
         public async Task CanResolveSameDependenciesViaServiceProvider()
         {
@@ -136,6 +193,10 @@ namespace DependencyInjection.Tests
             await grain2.DoDeactivate();
         }
 
+        /// <summary>
+        /// Verifies that IGrainFactory is registered as a singleton.
+        /// All grains in the silo should receive the same IGrainFactory instance.
+        /// </summary>
         [Fact]
         public async Task CanResolveSingletonGrainFactory()
         {
@@ -148,6 +209,12 @@ namespace DependencyInjection.Tests
                 await grain2.GetGrainFactoryId());
         }
 
+        /// <summary>
+        /// Tests that explicitly registered grain classes in DI are ignored.
+        /// Orleans must create grains through its activation system, not DI,
+        /// to ensure proper lifecycle management and distributed behavior.
+        /// This test verifies that the explicit registration is not used.
+        /// </summary>
         [Fact]
         public async Task CannotGetExplictlyRegisteredGrain()
         {
@@ -157,6 +224,11 @@ namespace DependencyInjection.Tests
             Assert.Contains("Unable to resolve service for type 'System.String' while attempting to activate 'UnitTests.Grains.ExplicitlyRegisteredSimpleDIGrain'", innerException.Message);
         }
 
+        /// <summary>
+        /// Tests that generic grains can have dependencies injected based on their type parameters.
+        /// For example, IReducer<TState, TAction> can be resolved differently for different
+        /// TState/TAction combinations, allowing type-safe dependency injection.
+        /// </summary>
         [Fact]
         public async Task CanUseGenericArgumentsInConstructor()
         {

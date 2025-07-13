@@ -27,6 +27,8 @@ namespace Orleans.GrainDirectory.Redis
         private IConnectionMultiplexer _redis = null!;
         private IDatabase _database = null!;
 
+        private bool _disposed;
+
         public RedisGrainDirectory(
             RedisGrainDirectoryOptions directoryOptions,
             IOptions<ClusterOptions> clusterOptions,
@@ -43,7 +45,7 @@ namespace Orleans.GrainDirectory.Redis
         {
             try
             {
-                var result = (string?)await _database.StringGetAsync(GetKey(grainId));
+                var result = _disposed ? null : (string?)await _database.StringGetAsync(GetKey(grainId));
 
                 LogDebugLookup(grainId, string.IsNullOrWhiteSpace(result) ? "null" : result);
 
@@ -92,6 +94,8 @@ namespace Orleans.GrainDirectory.Redis
             var value = JsonSerializer.Serialize(address);
             try
             {
+                ObjectDisposedException.ThrowIf(_disposed, _database);
+
                 var previousActivationId = previousAddress is { } ? previousAddress.ActivationId.ToString() : "";
                 var key = GetKey(address.GrainId);
                 var entryString = (string?)await _database.ScriptEvaluateAsync(
@@ -141,8 +145,10 @@ namespace Orleans.GrainDirectory.Redis
 
             try
             {
+                ObjectDisposedException.ThrowIf(_disposed, _database);
+
                 var value = JsonSerializer.Serialize(address);
-                var result = (int) await _database.ScriptEvaluateAsync(
+                var result = (int)await _database.ScriptEvaluateAsync(
                     DeleteScript,
                     keys: new RedisKey[] { GetKey(address.GrainId) },
                     values: new RedisValue[] { address.ActivationId.ToString() });
@@ -187,6 +193,8 @@ namespace Orleans.GrainDirectory.Redis
         {
             if (_redis != null && _redis.IsConnected)
             {
+                _disposed = true;
+
                 await _redis.CloseAsync();
                 _redis.Dispose();
                 _redis = null!;

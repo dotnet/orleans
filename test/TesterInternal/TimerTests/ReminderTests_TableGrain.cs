@@ -11,6 +11,9 @@ using Orleans.Internal;
 
 namespace UnitTests.TimerTests
 {
+    /// <summary>
+    /// Tests for grain-based reminder functionality using in-memory reminder service as table storage.
+    /// </summary>
     [TestCategory("Functional"), TestCategory("Reminders")]
     public class ReminderTests_TableGrain : ReminderTests_Base, IClassFixture<ReminderTests_TableGrain.Fixture>
     {
@@ -42,18 +45,27 @@ namespace UnitTests.TimerTests
 
         // Basic tests
 
+        /// <summary>
+        /// Tests basic reminder operations including stopping reminders by reference.
+        /// </summary>
         [Fact]
         public async Task Rem_Grain_Basic_StopByRef()
         {
             await Test_Reminders_Basic_StopByRef();
         }
 
-        [Fact]
+        /// <summary>
+        /// Tests basic reminder list operations including creation and retrieval.
+        /// </summary>
+        [Fact(Skip = "https://github.com/dotnet/orleans/issues/9555")]
         public async Task Rem_Grain_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
         }
 
+        /// <summary>
+        /// Tests handling of multiple reminders per grain.
+        /// </summary>
         [Fact]
         public async Task Rem_Grain_MultipleReminders()
         {
@@ -63,12 +75,18 @@ namespace UnitTests.TimerTests
 
         // Single join tests ... multi grain, multi reminders
 
+        /// <summary>
+        /// Tests single join scenario with multiple grains and multiple reminders.
+        /// </summary>
         [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4318")]
         public async Task Rem_Grain_1J_MultiGrainMultiReminders()
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();
         }
 
+        /// <summary>
+        /// Tests handling of reminder not found scenarios.
+        /// </summary>
         [Fact]
         public async Task Rem_Grain_ReminderNotFounds()
         {

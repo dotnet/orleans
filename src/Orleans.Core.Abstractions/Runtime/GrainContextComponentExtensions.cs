@@ -1,3 +1,4 @@
+using System;
 using Orleans.Runtime;
 
 namespace Orleans
@@ -23,6 +24,11 @@ namespace Orleans
             where TComponent : class, IGrainExtension
         {
             var binder = context.GetComponent<IGrainExtensionBinder>();
+            if (binder is null)
+            {
+                throw new InvalidOperationException($"No {nameof(IGrainExtensionBinder)} is available on the current grain context.");
+            }
+
             return binder.GetExtension<TComponent>();
         }
     }

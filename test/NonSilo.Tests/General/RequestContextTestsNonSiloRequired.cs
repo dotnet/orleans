@@ -7,6 +7,9 @@ using Tester;
 
 namespace UnitTests.General
 {
+    /// <summary>
+    /// Tests for request context functionality including multi-threading, activity ID propagation, and import/export operations.
+    /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class RequestContextTests_Local : IDisposable
     {

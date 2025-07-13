@@ -6,6 +6,9 @@ using Xunit;
 
 namespace Tester;
 
+/// <summary>
+/// Tests for client connection events including cluster disconnection and gateway count changes.
+/// </summary>
 public class ClientConnectionEventTests
 {
     [Fact, TestCategory("SlowBVT")]

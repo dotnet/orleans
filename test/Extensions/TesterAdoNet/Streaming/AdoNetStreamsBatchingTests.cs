@@ -14,10 +14,16 @@ using static System.String;
 
 namespace Tester.AdoNet.Streaming;
 
+/// <summary>
+/// Tests for SQL Server ADO.NET stream batching functionality.
+/// </summary>
 public class SqlServerAdoNetStreamsBatchingTests(ITestOutputHelper output) : AdoNetStreamsBatchingTests(new Fixture(AdoNetInvariants.InvariantNameSqlServer), output)
 {
 }
 
+/// <summary>
+/// Tests for MySQL ADO.NET stream batching functionality.
+/// </summary>
 public class MySqlAdoNetStreamsBatchingTests : AdoNetStreamsBatchingTests
 {
     public MySqlAdoNetStreamsBatchingTests(ITestOutputHelper output) : base(new Fixture(AdoNetInvariants.InvariantNameMySql), output)
@@ -26,10 +32,16 @@ public class MySqlAdoNetStreamsBatchingTests : AdoNetStreamsBatchingTests
     }
 }
 
+/// <summary>
+/// Tests for PostgreSQL ADO.NET stream batching functionality.
+/// </summary>
 public class PostgreSqlAdoNetStreamsBatchingTests(ITestOutputHelper output) : AdoNetStreamsBatchingTests(new Fixture(AdoNetInvariants.InvariantNamePostgreSql), output)
 {
 }
 
+/// <summary>
+/// Base class for ADO.NET stream batching tests.
+/// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
 public abstract class AdoNetStreamsBatchingTests : StreamBatchingTestRunner, IAsyncLifetime
 {

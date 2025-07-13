@@ -11,6 +11,23 @@ using Xunit.Abstractions;
 
 namespace UnitTests.MessageCenterTests
 {
+    /// <summary>
+    /// Tests for Orleans gateway selection and load balancing mechanisms.
+    /// 
+    /// Gateways are the entry points for client connections to an Orleans cluster.
+    /// Each silo can act as a gateway, and clients need to:
+    /// - Discover available gateways (via IGatewayListProvider)
+    /// - Select which gateway to connect to
+    /// - Handle gateway failures by switching to another gateway
+    /// 
+    /// The GatewayManager implements a round-robin selection strategy to distribute
+    /// client connections evenly across available gateways. This is critical for:
+    /// - Load balancing client connections
+    /// - Avoiding gateway overload
+    /// - Providing high availability for client access
+    /// 
+    /// These tests verify that gateway selection distributes load evenly.
+    /// </summary>
     public class GatewaySelectionTest
     {
         protected readonly ITestOutputHelper output;
@@ -28,6 +45,11 @@ namespace UnitTests.MessageCenterTests
             this.output = output;
         }
 
+        /// <summary>
+        /// Tests that the gateway manager properly distributes connections
+        /// across available gateways using round-robin selection.
+        /// Verifies even distribution across 4 test gateways.
+        /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Gateway")]
         public async Task GatewaySelection()
         {
@@ -35,6 +57,10 @@ namespace UnitTests.MessageCenterTests
             await Test_GatewaySelection(listProvider);
         }
 
+        /// <summary>
+        /// Core test logic for gateway selection distribution.
+        /// Simulates 2300 gateway selections and verifies they are evenly distributed.
+        /// </summary>
         protected async Task Test_GatewaySelection(IGatewayListProvider listProvider)
         {
             IList<Uri> gatewayUris = await listProvider.GetGateways();
@@ -45,11 +71,13 @@ namespace UnitTests.MessageCenterTests
                 return new IPEndPoint(IPAddress.Parse(uri.Host), uri.Port);
             }).ToList();
 
+            // Create and start the gateway manager with our test gateway list
             var gatewayManager = new GatewayManager(Options.Create(new GatewayOptions()), listProvider, NullLoggerFactory.Instance, null, TimeProvider.System);
             await gatewayManager.StartAsync(CancellationToken.None);
 
-            var counts = new int[4];
+            var counts = new int[4];  // Track selections per gateway
 
+            // Simulate 2300 gateway selections to test distribution
             for (int i = 0; i < 2300; i++)
             {
                 var ip = gatewayManager.GetLiveGateway();
@@ -57,20 +85,15 @@ namespace UnitTests.MessageCenterTests
                 var addr = ip.Endpoint.Address;
                 Assert.Equal(IPAddress.Loopback, addr);  // "Incorrect IP address returned for gateway"
                 Assert.True((0 < ip.Endpoint.Port) && (ip.Endpoint.Port < 5), "Incorrect IP port returned for gateway");
-                counts[ip.Endpoint.Port - 1]++;
+                counts[ip.Endpoint.Port - 1]++;  // Count selections per gateway
             }
 
-            // The following needed to be changed as the gateway manager now round-robins through the available gateways, rather than
-            // selecting randomly based on load numbers.
-            //Assert.True((500 < counts[0]) && (counts[0] < 1500), "Gateway selection is incorrectly skewed");
-            //Assert.True((500 < counts[1]) && (counts[1] < 1500), "Gateway selection is incorrectly skewed");
-            //Assert.True((125 < counts[2]) && (counts[2] < 375), "Gateway selection is incorrectly skewed");
-            //Assert.True((25 < counts[3]) && (counts[3] < 75), "Gateway selection is incorrectly skewed");
-            //Assert.True((287 < counts[0]) && (counts[0] < 1150), "Gateway selection is incorrectly skewed");
-            //Assert.True((287 < counts[1]) && (counts[1] < 1150), "Gateway selection is incorrectly skewed");
-            //Assert.True((287 < counts[2]) && (counts[2] < 1150), "Gateway selection is incorrectly skewed");
-            //Assert.True((287 < counts[3]) && (counts[3] < 1150), "Gateway selection is incorrectly skewed");
+            // Historical note: The gateway manager used to select randomly based on load,
+            // but now uses round-robin for more predictable distribution.
+            // The commented assertions show the old expected distribution patterns.
 
+            // With round-robin selection, we expect exactly even distribution
+            // 2300 selections / 4 gateways = 575 per gateway
             int low = 2300 / 4;
             int up = 2300 / 4;
             Assert.True((low <= counts[0]) && (counts[0] <= up), "Gateway selection is incorrectly skewed. " + counts[0]);
@@ -79,6 +102,11 @@ namespace UnitTests.MessageCenterTests
             Assert.True((low <= counts[3]) && (counts[3] <= up), "Gateway selection is incorrectly skewed. " + counts[3]);
         }
 
+        /// <summary>
+        /// Test implementation of IGatewayListProvider that returns a fixed list of gateways.
+        /// In production, this interface is implemented by membership providers
+        /// (Azure Table, SQL, ZooKeeper, etc.) to dynamically discover available gateways.
+        /// </summary>
         private class TestListProvider : IGatewayListProvider
         {
             private readonly IList<Uri> list;

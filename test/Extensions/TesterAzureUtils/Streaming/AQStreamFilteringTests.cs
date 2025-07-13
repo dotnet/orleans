@@ -11,6 +11,9 @@ using Xunit;
 
 namespace Tester.AzureUtils.Streaming
 {
+    /// <summary>
+    /// Tests for stream filtering functionality with Azure Queue streaming providers.
+    /// </summary>
     public class AQStreamFilteringTests : StreamFilteringTestsBase, IClassFixture<AQStreamFilteringTests.Fixture>, IAsyncLifetime
     {
         private const int queueCount = 1;

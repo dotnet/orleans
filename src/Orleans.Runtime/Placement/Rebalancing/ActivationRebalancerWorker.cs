@@ -155,7 +155,7 @@ internal sealed partial class ActivationRebalancerWorker(
     void ISiloStatisticsChangeListener.SiloStatisticsChangeNotification(SiloAddress address, SiloRuntimeStatistics statistics)
     {
         GrainContext.Scheduler.QueueAction(()
-            => _siloStatistics[address] = new(statistics.EnvironmentStatistics.MemoryUsageBytes, statistics.ActivationCount));
+            => _siloStatistics[address] = new(statistics.EnvironmentStatistics.FilteredMemoryUsageBytes, statistics.ActivationCount));
     }
 
     public ValueTask<RebalancingReport> GetReport() => new(BuildReport());
@@ -320,8 +320,6 @@ internal sealed partial class ActivationRebalancerWorker(
         var scalingFactor = ComputeAdaptiveScaling(siloCount, _rebalancingCycle);
         var addressPairs = FormSiloPairs(snapshot);
         var migrationTasks = new List<Task>();
-
-        Debug.Assert(addressPairs.Count % 2 == 0);
 
         for (var i = 0; i < addressPairs.Count; i++)
         {

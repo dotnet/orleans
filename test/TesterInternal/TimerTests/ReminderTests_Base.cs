@@ -15,6 +15,9 @@ using Xunit;
 
 namespace UnitTests.TimerTests
 {
+    /// <summary>
+    /// Base class for reminder tests providing common test operations and utilities.
+    /// </summary>
     public class ReminderTests_Base : OrleansTestingBase, IDisposable
     {
         protected TestCluster HostedCluster { get; private set; }

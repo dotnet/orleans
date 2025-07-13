@@ -9,7 +9,12 @@ using Xunit;
 namespace DefaultCluster.Tests.General
 {
     /// <summary>
-    /// Summary description for ObserverTests
+    /// Tests for the Orleans Observer pattern implementation.
+    /// Observers enable grains to send notifications to clients or other grains
+    /// through callback interfaces. This is Orleans' mechanism for push-based
+    /// communication, allowing grains to notify interested parties of state changes
+    /// or events without polling. Observers are weakly referenced to prevent
+    /// memory leaks and support automatic cleanup.
     /// </summary>
     public class ObserverTests : HostedTestClusterEnsureDefaultStarted
     {
@@ -41,6 +46,12 @@ namespace DefaultCluster.Tests.General
             return this.GrainFactory.GetGrain<ISimpleObserverableGrain>(GetRandomGrainId());
         }
 
+        /// <summary>
+        /// Tests basic observer notification functionality.
+        /// Verifies that a grain can notify registered observers of state changes,
+        /// that multiple notifications are delivered correctly, and that the
+        /// observer callback context is properly maintained.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task ObserverTest_SimpleNotification()
         {
@@ -59,6 +70,11 @@ namespace DefaultCluster.Tests.General
             this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
 
+        /// <summary>
+        /// Tests observer notifications using generated factory methods.
+        /// Similar to SimpleNotification test but uses the generated factory pattern
+        /// to create observer references, verifying both approaches work identically.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task ObserverTest_SimpleNotification_GeneratedFactory()
         {
@@ -105,6 +121,11 @@ namespace DefaultCluster.Tests.General
             }
         }
 
+        /// <summary>
+        /// Tests that subscribing the same observer reference twice is prevented.
+        /// Verifies that Orleans detects and rejects duplicate subscriptions
+        /// to prevent duplicate notifications and maintain subscription integrity.
+        /// </summary>
         [Fact, TestCategory("SlowBVT")]
         public async Task ObserverTest_DoubleSubscriptionSameReference()
         {
@@ -153,6 +174,12 @@ namespace DefaultCluster.Tests.General
             }
         }
 
+        /// <summary>
+        /// Tests the subscribe/unsubscribe lifecycle for observers.
+        /// Verifies that observers receive notifications after subscribing,
+        /// stop receiving them after unsubscribing, and that the unsubscribe
+        /// operation properly cleans up the subscription.
+        /// </summary>
         [Fact, TestCategory("SlowBVT")]
         public async Task ObserverTest_SubscribeUnsubscribe()
         {
@@ -187,6 +214,11 @@ namespace DefaultCluster.Tests.General
         }
 
 
+        /// <summary>
+        /// Tests unsubscribing an observer that was never subscribed.
+        /// Verifies that attempting to unsubscribe a non-existent subscription
+        /// is handled gracefully without causing system errors.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task ObserverTest_Unsubscribe()
         {
@@ -212,6 +244,11 @@ namespace DefaultCluster.Tests.General
             }
         }
 
+        /// <summary>
+        /// Tests multiple different observers subscribing to the same grain.
+        /// Verifies that a grain can maintain multiple observer subscriptions
+        /// and correctly notify all registered observers of state changes.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task ObserverTest_DoubleSubscriptionDifferentReferences()
         {
@@ -246,6 +283,12 @@ namespace DefaultCluster.Tests.General
                 result.Done = true;
         }
 
+        /// <summary>
+        /// Tests that deleting an observer reference stops notifications.
+        /// Verifies that when an observer reference is deleted using
+        /// DeleteObjectReference, the grain can no longer send notifications
+        /// to that observer, demonstrating automatic cleanup behavior.
+        /// </summary>
         [Fact, TestCategory("SlowBVT")]
         public async Task ObserverTest_DeleteObject()
         {
@@ -276,6 +319,12 @@ namespace DefaultCluster.Tests.General
             result.Continue = true;
         }
 
+        /// <summary>
+        /// Verifies that only grain references can be used as observers.
+        /// Tests that attempting to subscribe a regular object (not created via
+        /// CreateObjectReference) throws an appropriate exception, enforcing
+        /// the requirement that observers must be grain references.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task ObserverTest_SubscriberMustBeGrainReference()
         {
@@ -293,6 +342,12 @@ namespace DefaultCluster.Tests.General
             });
         }
 
+        /// <summary>
+        /// Tests that CreateObjectReference validates its arguments correctly.
+        /// Verifies that attempting to create object references from invalid types
+        /// (like Grain classes or existing grain references) throws appropriate
+        /// exceptions, ensuring type safety in the observer pattern.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public void ObserverTest_CreateObjectReference_ThrowsForInvalidArgumentTypes()
         {

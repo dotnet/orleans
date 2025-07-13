@@ -6,6 +6,9 @@ using Tester.StorageFacet.Implementations;
 
 namespace Tester
 {
+    /// <summary>
+    /// Tests storage facet infrastructure with multiple storage implementations (Blob and Table) demonstrating extensible storage patterns.
+    /// </summary>
     public class StorageFacetTests : IClassFixture<StorageFacetTests.Fixture>
     {
         private readonly Fixture fixture;

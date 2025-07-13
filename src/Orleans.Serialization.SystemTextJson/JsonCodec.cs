@@ -73,7 +73,7 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
         var bufferWriter = new BufferWriterBox<PooledBuffer>(new PooledBuffer());
         try
         {
-            var jsonWriter = new Utf8JsonWriter(bufferWriter);
+            var jsonWriter = new Utf8JsonWriter(bufferWriter, _options.WriterOptions);
             JsonSerializer.Serialize(jsonWriter, value, _options.SerializerOptions);
             jsonWriter.Flush();
 
@@ -135,7 +135,14 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
                         reader.ReadBytes(ref tempBuffer, (int)length);
                         var sequence = tempBuffer.AsReadOnlySequence();
                         var jsonReader = new Utf8JsonReader(sequence, _options.ReaderOptions);
-                        result = JsonSerializer.Deserialize(ref jsonReader, type, _options.SerializerOptions);
+                        if (typeof(JsonNode).IsAssignableFrom(type))
+                        {
+                            result = JsonNode.Parse(ref jsonReader);
+                        }
+                        else
+                        {
+                            result = JsonSerializer.Deserialize(ref jsonReader, type, _options.SerializerOptions);
+                        }
                     }
                     finally
                     {
@@ -191,25 +198,33 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
     {
         // Add types natively supported by System.Text.Json
         // From https://github.com/dotnet/runtime/blob/2c4d0df3b146f8322f676b83a53ca21a065bdfc7/src/libraries/System.Text.Json/gen/JsonSourceGenerator.Parser.cs#L1792-L1797
-        return type == typeof(JsonArray)
-            || type == typeof(JsonElement)
-            || type == typeof(JsonObject)
+        return type == typeof(JsonElement)
             || type == typeof(JsonDocument)
-            || typeof(JsonNode).IsAssignableFrom(type)
-            || typeof(JsonValue).IsAssignableFrom(type);
+            || type == typeof(JsonArray)
+            || type == typeof(JsonObject)
+            || type == typeof(JsonValue)
+            || typeof(JsonNode).IsAssignableFrom(type);
     }
 
     /// <inheritdoc/>
     object IDeepCopier.DeepCopy(object input, CopyContext context)
     {
         if (context.TryGetCopy(input, out object result))
+        {
             return result;
+        }
 
+        if (input is JsonNode jsonNode)
+        {
+            var copy = jsonNode.DeepClone();
+            context.RecordCopy(input, copy);
+            return copy;
+        }
 
         var bufferWriter = new BufferWriterBox<PooledBuffer>(new PooledBuffer());
         try
         {
-            var jsonWriter = new Utf8JsonWriter(bufferWriter);
+            var jsonWriter = new Utf8JsonWriter(bufferWriter, _options.WriterOptions);
             JsonSerializer.Serialize(jsonWriter, input, _options.SerializerOptions);
             jsonWriter.Flush();
 

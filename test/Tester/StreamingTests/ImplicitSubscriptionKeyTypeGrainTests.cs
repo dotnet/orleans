@@ -9,6 +9,9 @@ using Xunit;
 
 namespace UnitTests.StreamingTests
 {
+    /// <summary>
+    /// Tests implicit stream subscriptions with different grain key types, specifically testing long key type grain subscriptions.
+    /// </summary>
     public sealed class ImplicitSubscriptionKeyTypeGrainTests : OrleansTestingBase, IClassFixture<ImplicitSubscriptionKeyTypeGrainTests.Fixture>
     {
         private readonly Fixture fixture;

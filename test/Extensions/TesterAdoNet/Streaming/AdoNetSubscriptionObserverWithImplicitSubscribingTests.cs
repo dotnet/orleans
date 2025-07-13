@@ -12,10 +12,16 @@ using static System.String;
 
 namespace Tester.AdoNet.Streaming;
 
+/// <summary>
+/// Tests for SQL Server ADO.NET subscription observer with implicit subscribing.
+/// </summary>
 public class SqlServerAdoNetSubscriptionObserverWithImplicitSubscribingTests() : AdoNetSubscriptionObserverWithImplicitSubscribingTests(new Fixture(AdoNetInvariants.InvariantNameSqlServer))
 {
 }
 
+/// <summary>
+/// Tests for MySQL ADO.NET subscription observer with implicit subscribing.
+/// </summary>
 public class MySqlAdoNetSubscriptionObserverWithImplicitSubscribingTests : AdoNetSubscriptionObserverWithImplicitSubscribingTests
 {
     public MySqlAdoNetSubscriptionObserverWithImplicitSubscribingTests() : base(new Fixture(AdoNetInvariants.InvariantNameMySql))
@@ -24,10 +30,16 @@ public class MySqlAdoNetSubscriptionObserverWithImplicitSubscribingTests : AdoNe
     }
 }
 
+/// <summary>
+/// Tests for PostgreSQL ADO.NET subscription observer with implicit subscribing.
+/// </summary>
 public class PostgreSqlAdoNetSubscriptionObserverWithImplicitSubscribingTests() : AdoNetSubscriptionObserverWithImplicitSubscribingTests(new Fixture(AdoNetInvariants.InvariantNamePostgreSql))
 {
 }
 
+/// <summary>
+/// Base class for ADO.NET subscription observer with implicit subscribing tests.
+/// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming"), TestCategory("Functional")]
 public abstract class AdoNetSubscriptionObserverWithImplicitSubscribingTests(AdoNetSubscriptionObserverWithImplicitSubscribingTests.Fixture fixture) : SubscriptionObserverWithImplicitSubscribingTestRunner(fixture), IAsyncLifetime
 {

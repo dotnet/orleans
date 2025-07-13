@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.Internal;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
@@ -16,36 +18,49 @@ namespace Orleans.Runtime
     /// </summary>
     internal partial class ActivationCollector : IActivationWorkingSetObserver, ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
-        private readonly TimeSpan quantum;
         private readonly TimeSpan shortestAgeLimit;
         private readonly ConcurrentDictionary<DateTime, Bucket> buckets = new();
         private readonly CancellationTokenSource _shutdownCts = new();
         private DateTime nextTicket;
         private static readonly List<ICollectibleGrainContext> nothing = new(0);
         private readonly ILogger logger;
+        private int collectionNumber;
+
+        // internal for testing
+        internal int _activationCount;
+
         private readonly PeriodicTimer _collectionTimer;
         private Task _collectionLoopTask;
-        private int collectionNumber;
-        private int _activationCount;
-        private readonly IOptions<GrainCollectionOptions> _options;
+
+        private readonly IEnvironmentStatisticsProvider _environmentStatisticsProvider;
+        private readonly GrainCollectionOptions _grainCollectionOptions;
+        private readonly PeriodicTimer _memBasedDeactivationTimer;
+        private Task _memBasedDeactivationLoopTask;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ActivationCollector"/> class.
         /// </summary>
-        /// <param name="timerFactory">The timer factory.</param>
+        /// <param name="timeProvider">The time provider.</param>
         /// <param name="options">The options.</param>
         /// <param name="logger">The logger.</param>
         public ActivationCollector(
-            IAsyncTimerFactory timerFactory,
+            TimeProvider timeProvider,
             IOptions<GrainCollectionOptions> options,
-            ILogger<ActivationCollector> logger)
+            ILogger<ActivationCollector> logger,
+            IEnvironmentStatisticsProvider environmentStatisticsProvider)
         {
-            _options = options;
-            quantum = options.Value.CollectionQuantum;
-            shortestAgeLimit = new(options.Value.ClassSpecificCollectionAge.Values.Aggregate(options.Value.CollectionAge.Ticks, (a, v) => Math.Min(a, v.Ticks)));
-            nextTicket = MakeTicketFromDateTime(DateTime.UtcNow);
+            _grainCollectionOptions = options.Value;
+
+            shortestAgeLimit = new(_grainCollectionOptions.ClassSpecificCollectionAge.Values.Aggregate(_grainCollectionOptions.CollectionAge.Ticks, (a, v) => Math.Min(a, v.Ticks)));
+            nextTicket = MakeTicketFromDateTime(timeProvider.GetUtcNow().UtcDateTime);
             this.logger = logger;
-            _collectionTimer = new PeriodicTimer(quantum);
+            _collectionTimer = new PeriodicTimer(_grainCollectionOptions.CollectionQuantum);
+
+            _environmentStatisticsProvider = environmentStatisticsProvider;
+            if (_grainCollectionOptions.EnableActivationSheddingOnMemoryPressure)
+            {
+                _memBasedDeactivationTimer = new PeriodicTimer(_grainCollectionOptions.MemoryUsagePollingPeriod);
+            }
         }
 
         // Return the number of activations that were used (touched) in the last recencyPeriod.
@@ -112,6 +127,7 @@ namespace Orleans.Runtime
         /// <returns><see langword="true"/> if collection was canceled, <see langword="false"/> otherwise.</returns>
         public bool TryCancelCollection(ICollectibleGrainContext item)
         {
+            if (item is null) return false;
             if (item.IsExemptFromCollection) return false;
 
             lock (item)
@@ -182,7 +198,7 @@ namespace Orleans.Runtime
                 }
 
                 key = nextTicket;
-                nextTicket += quantum;
+                nextTicket += _grainCollectionOptions.CollectionQuantum;
             }
 
             Bucket bucket;
@@ -304,6 +320,85 @@ namespace Orleans.Runtime
             return condemned ?? nothing;
         }
 
+        // Internal for testing. It's expected that when this returns true, activation shedding will occur.
+        internal bool IsMemoryOverloaded(out int surplusActivationCount)
+        {
+            var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
+            var limit = _grainCollectionOptions.MemoryUsageLimitPercentage / 100f;
+
+            var usage = stats.NormalizedMemoryUsage;
+            if (usage <= limit)
+            {
+                // High memory pressure is not detected, so we do not need to deactivate any activations.
+                surplusActivationCount = 0;
+                return false;
+            }
+
+            // Calculate the surplus activations based the memory usage target.
+            var activationCount = _activationCount;
+            var target = _grainCollectionOptions.MemoryUsageTargetPercentage / 100f;
+            surplusActivationCount = (int)Math.Max(0, activationCount - Math.Floor(activationCount * target / usage));
+            if (surplusActivationCount <= 0)
+            {
+                surplusActivationCount = 0;
+                return false;
+            }
+
+            var surplusActivationPercentage = 100 * (1 - target / usage);
+            LogCurrentHighMemoryPressureStats(stats.MemoryUsagePercentage, _grainCollectionOptions.MemoryUsageLimitPercentage, deactivationTarget: surplusActivationCount, activationCount, surplusActivationPercentage);
+            return true;
+        }
+
+        /// <summary>
+        /// Deactivates <param name="count" /> activations in due time order
+        /// <remarks>internal for testing</remarks>
+        /// </summary>
+        internal async Task DeactivateInDueTimeOrder(int count, CancellationToken cancellationToken)
+        {
+            var watch = ValueStopwatch.StartNew();
+            var number = Interlocked.Increment(ref collectionNumber);
+            long memBefore = GC.GetTotalMemory(false) / (1024 * 1024); // MB
+            LogBeforeCollection(number, memBefore, _activationCount, this);
+
+            var candidates = new List<ICollectibleGrainContext>(count);
+
+            foreach (var bucket in buckets.OrderBy(b => b.Key))
+            {
+                foreach (var item in bucket.Value.Items)
+                {
+                    if (candidates.Count >= count)
+                    {
+                        break;
+                    }
+
+                    var activation = item.Value;
+
+                    candidates.Add(activation);
+                }
+
+                if (candidates.Count >= count)
+                {
+                    break;
+                }
+            }
+
+            CatalogInstruments.ActivationCollections.Add(1);
+            if (candidates.Count > 0) 
+            {
+                LogCollectActivations(new(candidates));
+
+                var reason = new DeactivationReason(
+                    DeactivationReasonCode.HighMemoryPressure,
+                    $"Process memory utilization exceeded the configured limit of '{_grainCollectionOptions.MemoryUsageLimitPercentage}'. Detected memory usage is {memBefore} MB.");
+
+                await DeactivateActivationsFromCollector(candidates, cancellationToken, reason);
+            }
+
+            long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
+            watch.Stop();
+            LogAfterCollection(number, memAfter, _activationCount, candidates.Count, this, watch.Elapsed);
+        }
+
         private static DeactivationReason GetDeactivationReason()
         {
             var reasonText = "This activation has become idle.";
@@ -314,7 +409,7 @@ namespace Orleans.Runtime
         private void ThrowIfTicketIsInvalid(DateTime ticket)
         {
             if (ticket.Ticks == 0) throw new ArgumentException("Empty ticket is not allowed in this context.");
-            if (0 != ticket.Ticks % quantum.Ticks)
+            if (0 != ticket.Ticks % _grainCollectionOptions.CollectionQuantum.Ticks)
             {
                 throw new ArgumentException(string.Format("invalid ticket ({0})", ticket));
             }
@@ -325,14 +420,20 @@ namespace Orleans.Runtime
             return ticket < nextTicket;
         }
 
-        private DateTime MakeTicketFromDateTime(DateTime timestamp)
+        public DateTime MakeTicketFromDateTime(DateTime timestamp)
         {
-            // Round the timestamp to the next quantum. e.g. if the quantum is 1 minute and the timestamp is 3:45:22, then the ticket will be 3:46.
+            // Round the timestamp to the next _grainCollectionOptions.CollectionQuantum. e.g. if the _grainCollectionOptions.CollectionQuantum is 1 minute and the timestamp is 3:45:22, then the ticket will be 3:46.
             // Note that TimeStamp.Ticks and DateTime.Ticks both return a long.
-            var ticket = new DateTime(((timestamp.Ticks - 1) / quantum.Ticks + 1) * quantum.Ticks, DateTimeKind.Utc);
+            var ticketTicks = ((timestamp.Ticks - 1) / _grainCollectionOptions.CollectionQuantum.Ticks + 1) * _grainCollectionOptions.CollectionQuantum.Ticks;
+            if (ticketTicks > DateTime.MaxValue.Ticks)
+            {
+                return DateTime.MaxValue;
+            }
+
+            var ticket = new DateTime(ticketTicks, DateTimeKind.Utc);
             if (ticket < nextTicket)
             {
-                throw new ArgumentException(string.Format("The earliest collection that can be scheduled from now is for {0}", new DateTime(nextTicket.Ticks - quantum.Ticks + 1, DateTimeKind.Utc)));
+                throw new ArgumentException(string.Format("The earliest collection that can be scheduled from now is for {0}", new DateTime(nextTicket.Ticks - _grainCollectionOptions.CollectionQuantum.Ticks + 1, DateTimeKind.Utc)));
             }
 
             return ticket;
@@ -340,9 +441,9 @@ namespace Orleans.Runtime
 
         private DateTime MakeTicketFromTimeSpan(TimeSpan timeout, DateTime now)
         {
-            if (timeout < quantum)
+            if (timeout < _grainCollectionOptions.CollectionQuantum)
             {
-                throw new ArgumentException(string.Format("timeout must be at least {0}, but it is {1}", quantum, timeout), nameof(timeout));
+                throw new ArgumentException(string.Format("timeout must be at least {0}, but it is {1}", _grainCollectionOptions.CollectionQuantum, timeout), nameof(timeout));
             }
 
             return MakeTicketFromDateTime(now + timeout);
@@ -396,16 +497,20 @@ namespace Orleans.Runtime
 
         void IActivationWorkingSetObserver.OnDeactivated(IActivationWorkingSetMember member)
         {
-            if (member is ICollectibleGrainContext activation && TryCancelCollection(activation))
-            {
-                Interlocked.Decrement(ref _activationCount);
-            }
+            Interlocked.Decrement(ref _activationCount);
+            _ = TryCancelCollection(member as ICollectibleGrainContext);
         }
 
         private Task Start(CancellationToken cancellationToken)
         {
             using var _ = new ExecutionContextSuppressor();
             _collectionLoopTask = RunActivationCollectionLoop();
+
+            if (_grainCollectionOptions.EnableActivationSheddingOnMemoryPressure)
+            {
+                _memBasedDeactivationLoopTask = RunMemoryBasedDeactivationLoop();
+            }
+
             return Task.CompletedTask;
         }
 
@@ -413,10 +518,16 @@ namespace Orleans.Runtime
         {
             using var registration = cancellationToken.Register(() => _shutdownCts.Cancel());
             _collectionTimer.Dispose();
+            _memBasedDeactivationTimer?.Dispose();
 
             if (_collectionLoopTask is Task task)
             {
                 await task.WaitAsync(cancellationToken);
+            }
+
+            if (_memBasedDeactivationLoopTask is Task deactivationLoopTask)
+            {
+                await deactivationLoopTask.WaitAsync(cancellationToken);
             }
         }
 
@@ -439,9 +550,70 @@ namespace Orleans.Runtime
                 {
                     await this.CollectActivationsImpl(true, ageLimit: default, cancellationToken);
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // most probably shutdown
+                }
                 catch (Exception exception)
                 {
                     LogErrorWhileCollectingActivations(exception);
+                }
+            }
+        }
+
+        private async Task RunMemoryBasedDeactivationLoop()
+        {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+            var cancellationToken = _shutdownCts.Token;
+
+            int lastGen2GcCount = 0;
+
+            try
+            {
+                while (await _memBasedDeactivationTimer.WaitForNextTickAsync(cancellationToken))
+                {
+                    try
+                    {
+                        var currentGen2GcCount = GC.CollectionCount(2);
+
+                        // note: GC.CollectionCount(2) will return 0 if no gen2 gc happened yet and we rely on this behavior:
+                        //       high memory pressure situation cannot occur until gen2 occurred at least once
+                        if (currentGen2GcCount <= lastGen2GcCount)
+                        {
+                            // No Gen2 GC since last deactivation cycle.
+                            // Wait for Gen2 GC between cycles to be sure that 
+                            continue;
+                        }
+
+                        if (!IsMemoryOverloaded(out var surplusActivationCount))
+                        {
+                            continue;
+                        }
+
+                        lastGen2GcCount = currentGen2GcCount;
+                        await DeactivateInDueTimeOrder(surplusActivationCount, cancellationToken);
+                    }
+                    catch (Exception exception)
+                    {
+                        // Ignore cancellation exceptions during shutdown.
+                        if (exception is OperationCanceledException && cancellationToken.IsCancellationRequested)
+                        {
+                            break;
+                        }
+
+                        LogErrorWhileCollectingActivations(exception);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                if (exception is OperationCanceledException && cancellationToken.IsCancellationRequested)
+                {
+                    // Ignore cancellation exceptions during shutdown.
+                }
+                else
+                {
+                    throw;
                 }
             }
         }
@@ -468,12 +640,12 @@ namespace Orleans.Runtime
             LogAfterCollection(number, memAfter, _activationCount, list?.Count ?? 0, this, watch.Elapsed);
         }
 
-        private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list, CancellationToken cancellationToken)
+        private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list, CancellationToken cancellationToken, DeactivationReason? deactivationReason = null)
         {
             LogDeactivateActivationsFromCollector(list.Count);
             CatalogInstruments.ActivationShutdownViaCollection();
 
-            var reason = GetDeactivationReason();
+            deactivationReason ??= GetDeactivationReason();
 
             var options = new ParallelOptions
             {
@@ -485,7 +657,7 @@ namespace Orleans.Runtime
             await Parallel.ForEachAsync(list, options, async (activationData, token) =>
             {
                 // Continue deactivation when ready.
-                activationData.Deactivate(reason, cancellationToken);
+                activationData.Deactivate(deactivationReason.Value, cancellationToken);
                 await activationData.Deactivated.ConfigureAwait(false);
             }).WaitAsync(cancellationToken);
         }
@@ -494,6 +666,7 @@ namespace Orleans.Runtime
         {
             _collectionTimer.Dispose();
             _shutdownCts.Dispose();
+            _memBasedDeactivationTimer?.Dispose();
         }
 
         private class Bucket
@@ -547,6 +720,12 @@ namespace Orleans.Runtime
                 return result ?? nothing;
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "High memory pressure detected ({MemoryUsagePercentage:F2}% > {MemoryUsageLimitPercentage:F2}%). Deactivating up to {DeactivationTarget:N0}/{ActivationCount:N0} ({SurplusActivationPercentage:F2}%) grains to free memory."
+        )]
+        private partial void LogCurrentHighMemoryPressureStats(double memoryUsagePercentage, double memoryUsageLimitPercentage, int deactivationTarget, int activationCount, double surplusActivationPercentage);
 
         [LoggerMessage(
             Level = LogLevel.Error,

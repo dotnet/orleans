@@ -13,7 +13,7 @@ namespace Orleans.Runtime.ConsistentRing
     /// Note: MembershipOracle uses 'forward/counter-clockwise' definition to assign responsibilities. 
     /// E.g. in a ring of nodes {5, 10, 15}, the responsible of key 7 is node 5 (the node is responsible for its succeeding range).
     /// </summary>
-    internal sealed class ConsistentRingProvider :
+    internal sealed partial class ConsistentRingProvider :
         IConsistentRingProvider, ISiloStatusListener, IDisposable
     {
         // internal, so that unit tests can access them
@@ -81,7 +81,6 @@ namespace Orleans.Runtime.ConsistentRing
                 if (!(membershipRingList.Count == 0 || myOldIndex != -1))
                     throw new OrleansException(string.Format("{0}: Couldn't find my position in the ring {1}.", MyAddress, Utils.EnumerableToString(membershipRingList)));
 
-
                 // insert new silo in the sorted order
                 int hash = silo.GetConsistentHashCode();
 
@@ -100,10 +99,7 @@ namespace Orleans.Runtime.ConsistentRing
                     NotifyLocalRangeSubscribers(oldRange, myRange, false);
                 }
 
-                if (log.IsEnabled(LogLevel.Debug))
-                {
-                    log.LogDebug("Added Server {SiloAddress}. Current view: {CurrentView}", silo.ToStringWithHashCode(), this.ToString());
-                }
+                LogDebugAddedServer(log, new(silo), this);
             }
         }
 
@@ -140,12 +136,12 @@ namespace Orleans.Runtime.ConsistentRing
                 int myNewIndex = membershipRingList.IndexOf(MyAddress);
 
                 if (myNewIndex == -1)
-                    throw new OrleansException($"{MyAddress}: Couldn't find my position in the ring {this.ToString()}.");
+                    throw new OrleansException($"{MyAddress}: Couldn't find my position in the ring {this}.");
 
                 bool wasMyPred = ((myNewIndex == indexOfFailedSilo) || (myNewIndex == 0 && indexOfFailedSilo == membershipRingList.Count)); // no need for '- 1'
                 if (wasMyPred) // failed node was our predecessor
                 {
-                    if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Failed server was my predecessor? {WasPredecessor}, updated view {CurrentView}", wasMyPred, this.ToString());
+                    LogDebugFailedServerWasMyPredecessor(log, wasMyPred, this);
 
                     IRingRange oldRange = myRange;
                     if (membershipRingList.Count == 1) // i'm the only one left
@@ -163,14 +159,7 @@ namespace Orleans.Runtime.ConsistentRing
                     }
                 }
 
-                if (log.IsEnabled(LogLevel.Debug))
-                {
-                    log.LogDebug(
-                        "Removed Server {SiloAddress} hash {Hash}. Current view {CurrentView}",
-                        silo,
-                        silo.GetConsistentHashCode(),
-                        this.ToString());
-                }
+                LogDebugRemovedServer(log, silo, new(silo), this);
             }
         }
 
@@ -199,10 +188,7 @@ namespace Orleans.Runtime.ConsistentRing
 
         private void NotifyLocalRangeSubscribers(IRingRange old, IRingRange now, bool increased)
         {
-            if (log.IsEnabled(LogLevel.Debug))
-            {
-                log.LogDebug("NotifyLocalRangeSubscribers about old {OldRange} new {NewRange} increased? {IsIncreased}", old, now, increased);
-            }
+            LogDebugNotifyLocalRangeSubscribers(log, old, now, increased);
 
             IRingRangeListener[] copy;
             lock (statusListeners)
@@ -219,14 +205,7 @@ namespace Orleans.Runtime.ConsistentRing
                 }
                 catch (Exception exc)
                 {
-                    log.LogWarning(
-                        (int)ErrorCode.CRP_Local_Subscriber_Exception,
-                        exc,
-                        "Error notifying listener '{ListenerType}' of ring range {AdjustmentKind} from '{OldRange}' to '{NewRange}'.",
-                        listener.GetType().FullName,
-                        increased ? "expansion" : "contraction",
-                        old,
-                        now);
+                    LogWarningErrorNotifyingListener(log, exc, listener.GetType().FullName, increased ? "expansion" : "contraction", old, now);
                 }
             }
         }
@@ -305,7 +284,7 @@ namespace Orleans.Runtime.ConsistentRing
                 }
             }
 
-            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Silo {SiloAddress} calculated ring partition owner silo {OwnerAddress} for key {Key}: {Key} --> {OwnerHash}", MyAddress, siloAddress, hash, hash, siloAddress?.GetConsistentHashCode());
+            LogTraceCalculatedRingPartitionOwner(log, MyAddress, siloAddress, hash, new(siloAddress));
             return siloAddress;
         }
 
@@ -318,5 +297,52 @@ namespace Orleans.Runtime.ConsistentRing
         {
             _siloStatusOracle.UnSubscribeFromSiloStatusEvents(this);
         }
+
+        private readonly struct SiloAddressWithHashLogRecord(SiloAddress siloAddress)
+        {
+            public override string ToString() => siloAddress.ToStringWithHashCode();
+        }
+
+        private readonly struct ConsistentHashCodeLogRecord(SiloAddress siloAddress)
+        {
+            public override string ToString() => siloAddress?.GetConsistentHashCode().ToString();
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Added Server {SiloAddress}. Current view: {CurrentView}"
+        )]
+        private static partial void LogDebugAddedServer(ILogger logger, SiloAddressWithHashLogRecord siloAddress, ConsistentRingProvider currentView);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Failed server was my predecessor? {WasPredecessor}, updated view {CurrentView}"
+        )]
+        private static partial void LogDebugFailedServerWasMyPredecessor(ILogger logger, bool wasPredecessor, ConsistentRingProvider currentView);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Removed Server {SiloAddress} hash {Hash}. Current view {CurrentView}"
+        )]
+        private static partial void LogDebugRemovedServer(ILogger logger, SiloAddress siloAddress, SiloAddressWithHashLogRecord hash, ConsistentRingProvider currentView);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "NotifyLocalRangeSubscribers about old {OldRange} new {NewRange} increased? {IsIncreased}"
+        )]
+        private static partial void LogDebugNotifyLocalRangeSubscribers(ILogger logger, IRingRange oldRange, IRingRange newRange, bool isIncreased);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.CRP_Local_Subscriber_Exception,
+            Level = LogLevel.Warning,
+            Message = "Error notifying listener '{ListenerType}' of ring range {AdjustmentKind} from '{OldRange}' to '{NewRange}'."
+        )]
+        private static partial void LogWarningErrorNotifyingListener(ILogger logger, Exception exception, string listenerType, string adjustmentKind, IRingRange oldRange, IRingRange newRange);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Silo {SiloAddress} calculated ring partition owner silo {OwnerAddress} for key {Key}: {Key} --> {OwnerHash}"
+        )]
+        private static partial void LogTraceCalculatedRingPartitionOwner(ILogger logger, SiloAddress siloAddress, SiloAddress ownerAddress, uint key, ConsistentHashCodeLogRecord ownerHash);
     }
 }

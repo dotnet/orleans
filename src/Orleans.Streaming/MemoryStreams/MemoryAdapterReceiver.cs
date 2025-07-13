@@ -9,7 +9,7 @@ using Orleans.Streams;
 
 namespace Orleans.Providers
 {
-    internal class MemoryAdapterReceiver<TSerializer> : IQueueAdapterReceiver
+    internal partial class MemoryAdapterReceiver<TSerializer> : IQueueAdapterReceiver
         where TSerializer : class, IMemoryMessageBodySerializer
     {
         private readonly IMemoryStreamQueueGrain queueGrain;
@@ -55,7 +55,7 @@ namespace Orleans.Providers
             }
             catch (Exception exc)
             {
-                logger.LogError((int)ProviderErrorCode.MemoryStreamProviderBase_GetQueueMessagesAsync, exc, "Exception thrown in MemoryAdapterFactory.GetQueueMessagesAsync.");
+                LogErrorGetQueueMessagesAsync(exc);
                 watch.Stop();
                 this.receiverMonitor?.TrackRead(true, watch.Elapsed, exc);
                 throw;
@@ -90,5 +90,12 @@ namespace Orleans.Providers
                 this.receiverMonitor?.TrackShutdown(false, watch.Elapsed, ex);
             }
         }
+
+        [LoggerMessage(
+            EventId = (int)ProviderErrorCode.MemoryStreamProviderBase_GetQueueMessagesAsync,
+            Level = LogLevel.Error,
+            Message = "Exception thrown in MemoryAdapterFactory.GetQueueMessagesAsync."
+        )]
+        private partial void LogErrorGetQueueMessagesAsync(Exception exception);
     }
 }

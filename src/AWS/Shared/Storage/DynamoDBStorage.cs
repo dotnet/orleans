@@ -352,13 +352,14 @@ namespace Orleans.Transactions.DynamoDB
             // This is because updating the TTL attribute requires (1) disabling the table TTL and (2) re-enabling it with the new TTL attribute.
             // As per the below details page for this API: "It can take up to one hour for the change to fully process. Any additional UpdateTimeToLive calls for the same table during this one hour duration result in a ValidationException."
             // https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_UpdateTimeToLive.html
-            if (describeTimeToLive.TimeToLiveStatus != TimeToLiveStatus.DISABLED)
+            // However if the TTL is already set on the correct attribute, the attribute value is updated every time a record is written, thus the configuration is already correct and warning doesn't need to be logged.
+            if (describeTimeToLive.TimeToLiveStatus != TimeToLiveStatus.DISABLED && describeTimeToLive.AttributeName != ttlAttributeName)
             {
-                LogErrorTtlNotDisabled(_logger, tableDescription.TableName);
+                LogWarningTtlNotDisabled(_logger, tableDescription.TableName);
                 return tableDescription;
             }
 
-            if (string.IsNullOrEmpty(ttlAttributeName))
+            if (string.IsNullOrEmpty(ttlAttributeName) || describeTimeToLive.AttributeName == ttlAttributeName)
             {
                 return tableDescription;
             }
@@ -989,10 +990,10 @@ namespace Orleans.Transactions.DynamoDB
         private static partial void LogErrorCouldNotUpdateTable(ILogger logger, Exception exception, string tableName);
 
         [LoggerMessage(
-            Level = LogLevel.Error,
+            Level = LogLevel.Warning,
             Message = "TTL is not DISABLED. Cannot update table TTL for table {TableName}. Please update manually."
         )]
-        private static partial void LogErrorTtlNotDisabled(ILogger logger, string tableName);
+        private static partial void LogWarningTtlNotDisabled(ILogger logger, string tableName);
 
         [LoggerMessage(
             Level = LogLevel.Error,

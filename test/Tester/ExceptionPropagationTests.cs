@@ -8,7 +8,21 @@ using Xunit.Abstractions;
 namespace UnitTests.General
 {
     /// <summary>
-    /// Tests that exceptions are correctly propagated.
+    /// Comprehensive tests for exception propagation across Orleans' distributed system boundaries.
+    /// 
+    /// Orleans must correctly propagate exceptions from grains back to callers, preserving:
+    /// - Original exception types and messages
+    /// - Stack traces from the remote grain (critical for debugging distributed systems)
+    /// - AggregateException structure (not unwrapped)
+    /// - Task cancellation semantics
+    /// 
+    /// These tests also verify exception propagation during serialization/deserialization failures,
+    /// which can occur at multiple points:
+    /// - Client -> Grain (request/response)
+    /// - Grain -> Client (callbacks)
+    /// - Grain -> Grain (cross-silo calls)
+    /// 
+    /// Proper exception handling is crucial for debugging and maintaining distributed applications.
     /// </summary>
     public class ExceptionPropagationTests : OrleansTestingBase, IClassFixture<ExceptionPropagationTests.Fixture>
     {
@@ -33,6 +47,10 @@ namespace UnitTests.General
         {
         }
 
+        /// <summary>
+        /// Verifies that different exception types thrown by grains are correctly
+        /// propagated to the calling client with their original type and message intact.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task ExceptionsPropagatedFromGrainToClient()
         {
@@ -45,6 +63,10 @@ namespace UnitTests.General
             Assert.Equal("null null null", nullReferenceException.Message);
         }
 
+        /// <summary>
+        /// Basic test ensuring that exceptions thrown in grain methods
+        /// are propagated back to the caller as the same exception type.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task BasicExceptionPropagation()
         {
@@ -56,6 +78,12 @@ namespace UnitTests.General
             Assert.Equal("Test exception", exception.Message);
         }
 
+        /// <summary>
+        /// Critical test verifying that remote stack traces are preserved in propagated exceptions.
+        /// When debugging distributed systems, it's essential to see where the exception originated
+        /// in the remote grain, not just where it was received in the client.
+        /// Uses .Wait() to get the raw AggregateException without any async state machine modifications.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task ExceptionContainsOriginalStackTrace()
         {
@@ -84,6 +112,11 @@ namespace UnitTests.General
             Assert.Contains("ThrowsInvalidOperationException", exception.StackTrace);
         }
 
+        /// <summary>
+        /// Verifies that even when using async/await (which rethrows exceptions),
+        /// the original remote stack trace is still preserved in the exception.
+        /// This is important for maintaining debuggability in async code.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task ExceptionContainsOriginalStackTraceWhenRethrowingLocally()
         {
@@ -103,6 +136,11 @@ namespace UnitTests.General
             }
         }
 
+        /// <summary>
+        /// Ensures that AggregateExceptions thrown by grains are NOT unwrapped during propagation.
+        /// This preserves the original exception structure, which may be important for error handling
+        /// logic that expects specific exception hierarchies.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task ExceptionPropagationDoesNotUnwrapAggregateExceptions()
         {
@@ -114,6 +152,11 @@ namespace UnitTests.General
             Assert.Equal("Test exception", nestedEx.Message);
         }
 
+        /// <summary>
+        /// Tests that nested AggregateExceptions maintain their structure during propagation.
+        /// Orleans does not flatten the exception hierarchy, preserving the original nesting
+        /// that may have semantic meaning in the application.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task ExceptionPropagationDoesNoFlattenAggregateExceptions()
         {
@@ -126,6 +169,10 @@ namespace UnitTests.General
             Assert.Equal("Test exception", doubleNestedEx.Message);
         }
 
+        /// <summary>
+        /// Verifies that task cancellation is properly propagated as TaskCanceledException.
+        /// This is important for cooperative cancellation patterns in distributed systems.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task TaskCancelationPropagation()
         {
@@ -134,6 +181,11 @@ namespace UnitTests.General
                 () => grain.Canceled());
         }
 
+        /// <summary>
+        /// Tests exception propagation through grain-to-grain calls.
+        /// When grain A calls grain B, and grain B throws an exception,
+        /// the exception should propagate back through grain A to the original caller.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task GrainForwardingExceptionPropagation()
         {
@@ -157,6 +209,11 @@ namespace UnitTests.General
             Assert.Equal("Test exception", nestedEx.Message);
         }
 
+        /// <summary>
+        /// Ensures that exceptions thrown synchronously in grain methods (before any await)
+        /// still result in a faulted Task rather than throwing synchronously to the caller.
+        /// This maintains consistent async behavior regardless of where exceptions occur.
+        /// </summary>
         [Fact, TestCategory("BVT")]
         public async Task SynchronousExceptionThrownShouldResultInFaultedTask()
         {
@@ -174,6 +231,11 @@ namespace UnitTests.General
             Assert.Equal("Test exception", exception2.Message);
         }
 
+        /// <summary>
+        /// Tests that when a Task is faulted with multiple exceptions, all exceptions
+        /// are propagated in the AggregateException, not just the first one.
+        /// This is currently skipped pending implementation of issue #1378.
+        /// </summary>
         [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT")]
         public async Task ExceptionPropagationForwardsEntireAggregateException()
         {
@@ -230,7 +292,10 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// Tests that when a client cannot deserialize a request from a grain, an exception is promptly propagated back to the original caller.
+        /// Tests exception propagation when a client cannot deserialize a request from a grain.
+        /// This scenario occurs when a grain makes a callback to a client observer, but the
+        /// request contains types that cannot be deserialized on the client side.
+        /// The serialization failure should be detected and propagated back to the grain.
         /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Messaging"), TestCategory("Serialization")]
         public async Task ExceptionPropagation_GrainCallsClient_Request_Deserialization_Failure()
@@ -282,7 +347,10 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// Tests that when a grain cannot deserialize a request from another grain, an exception is promptly propagated back to the original caller.
+        /// Tests exception propagation for grain-to-grain calls when deserialization fails.
+        /// This can happen in cross-silo scenarios where grains have incompatible type versions
+        /// or when using custom serializers that fail. The exception should propagate back
+        /// through the call chain to the original caller.
         /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Messaging"), TestCategory("Serialization")]
         public async Task ExceptionPropagation_GrainCallsGrain_Request_Deserialization_Failure()
@@ -334,7 +402,10 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// Tests that when a grain cannot deserialize a request from a client, an exception is promptly propagated back to the original caller.
+        /// Tests the most common serialization failure scenario: client sends a request
+        /// that the grain cannot deserialize. This validates that Orleans properly detects
+        /// the failure and sends an appropriate exception back to the client rather than
+        /// silently failing or hanging.
         /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Messaging"), TestCategory("Serialization")]
         public async Task ExceptionPropagation_ClientCallsGrain_Request_Deserialization_Failure()

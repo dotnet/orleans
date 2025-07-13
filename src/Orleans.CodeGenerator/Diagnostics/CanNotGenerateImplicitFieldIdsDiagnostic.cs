@@ -5,7 +5,7 @@ namespace Orleans.CodeGenerator.Diagnostics;
 
 public static class CanNotGenerateImplicitFieldIdsDiagnostic
 {
-    public const string DiagnosticId = "ORLEANS0106";
+    public const string DiagnosticId = DiagnosticRuleId.CanNotGenerateImplicitFieldIds;
     public const string Title = "Implicit field identifiers could not be generated";
     public const string MessageFormat = "Could not generate implicit field identifiers for the type {0}: {reason}";
     public const string Category = "Usage";

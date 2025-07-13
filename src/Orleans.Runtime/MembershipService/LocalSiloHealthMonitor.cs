@@ -3,7 +3,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -50,14 +49,14 @@ namespace Orleans.Runtime.MembershipService
     ///   <item><description>Check that local async timers have been firing on-time (within 3 seconds of their due time).</description></item>
     /// </list>
     /// </remarks>
-    internal class LocalSiloHealthMonitor : ILifecycleParticipant<ISiloLifecycle>, ILifecycleObserver, ILocalSiloHealthMonitor
+    internal partial class LocalSiloHealthMonitor : ILifecycleParticipant<ISiloLifecycle>, ILifecycleObserver, ILocalSiloHealthMonitor
     {
         private const int MaxScore = 8;
         private readonly List<IHealthCheckParticipant> _healthCheckParticipants;
         private readonly MembershipTableManager _membershipTableManager;
         private readonly ClusterHealthMonitor _clusterHealthMonitor;
         private readonly ILocalSiloDetails _localSiloDetails;
-        private readonly ILogger<LocalSiloHealthMonitor> _log;
+        private readonly ILogger<LocalSiloHealthMonitor> _lo;
         private readonly ClusterMembershipOptions _clusterMembershipOptions;
         private readonly IAsyncTimer _degradationCheckTimer;
         private readonly ThreadPoolMonitor _threadPoolMonitor;
@@ -83,7 +82,7 @@ namespace Orleans.Runtime.MembershipService
             _membershipTableManager = membershipTableManager;
             _clusterHealthMonitor = clusterHealthMonitor;
             _localSiloDetails = localSiloDetails;
-            _log = log;
+            _lo = log;
             _probeRequestMonitor = probeRequestMonitor;
             _clusterMembershipOptions = clusterMembershipOptions.Value;
             _degradationCheckTimer = timerFactory.Create(
@@ -145,10 +144,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 // Log as an error if the delay is massive.
                 var logLevel = (int)threadPoolDelaySeconds >= 10 ? LogLevel.Error : LogLevel.Warning;
-                _log.Log(
-                    logLevel,
-                    ".NET Thread Pool is exhibiting delays of {ThreadPoolQueueDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.",
-                    threadPoolDelaySeconds);
+                LogThreadPoolDelay(logLevel, threadPoolDelaySeconds);
 
                 complaints?.Add(
                     $".NET Thread Pool is exhibiting delays of {threadPoolDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.");
@@ -166,7 +162,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 if (membershipEntry.Status != SiloStatus.Active)
                 {
-                    _log.LogWarning("This silo is not active (Status: {Status}) and is therefore not healthy.", membershipEntry.Status);
+                    LogSiloNotActive(membershipEntry.Status);
                     complaints?.Add($"This silo is not active (Status: {membershipEntry.Status}) and is therefore not healthy.");
 
                     score = MaxScore;
@@ -179,7 +175,7 @@ namespace Orleans.Runtime.MembershipService
                 {
                     if (membershipSnapshot.GetSiloStatus(vote.Item1) == SiloStatus.Active)
                     {
-                        _log.LogWarning("Silo {Silo} recently suspected this silo is dead at {SuspectingTime}.", vote.Item1, vote.Item2);
+                        LogSiloSuspected(vote.Item1, vote.Item2);
                         complaints?.Add($"Silo {vote.Item1} recently suspected this silo is dead at {vote.Item2}.");
 
                         ++score;
@@ -188,8 +184,7 @@ namespace Orleans.Runtime.MembershipService
             }
             else
             {
-                // If our entry is not found, this node is not healthy.
-                _log.LogError("Could not find a membership entry for this silo");
+                LogMembershipEntryNotFound();
                 complaints?.Add("Could not find a membership entry for this silo");
 
                 score = MaxScore;
@@ -212,7 +207,7 @@ namespace Orleans.Runtime.MembershipService
                 var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
                 if (!sinceLastProbeRequest.HasValue)
                 {
-                    _log.LogWarning("This silo has not received any probe requests");
+                    LogNoProbeRequests();
                     complaints?.Add("This silo has not received any probe requests");
                     ++score;
                 }
@@ -220,7 +215,7 @@ namespace Orleans.Runtime.MembershipService
                 {
                     // This node has not received a successful ping response since the window began.
                     var lastRequestTime = now - sinceLastProbeRequest.Value;
-                    _log.LogWarning("This silo has not received a probe request since {LastProbeRequest}", lastRequestTime);
+                    LogNoRecentProbeRequest(lastRequestTime);
                     complaints?.Add($"This silo has not received a probe request since {lastRequestTime}");
                     ++score;
                 }
@@ -251,14 +246,14 @@ namespace Orleans.Runtime.MembershipService
                 var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
                 if (!elapsedSinceLastResponse.HasValue)
                 {
-                    _log.LogWarning("This silo has not received any successful probe responses");
+                    LogNoProbeResponses();
                     complaints?.Add("This silo has not received any successful probe responses");
                     ++score;
                 }
                 else if (elapsedSinceLastResponse.Value > recencyWindow)
                 {
                     // This node has not received a successful ping response since the window began.
-                    _log.LogWarning("This silo has not received a successful probe response since {LastSuccessfulResponse}", elapsedSinceLastResponse.Value);
+                    LogNoRecentProbeResponse(elapsedSinceLastResponse.Value);
                     complaints?.Add($"This silo has not received a successful probe response since {elapsedSinceLastResponse.Value}");
                     ++score;
                 }
@@ -277,16 +272,16 @@ namespace Orleans.Runtime.MembershipService
                 {
                     if (!participant.CheckHealth(_lastHealthCheckTime, out var reason))
                     {
-                        _log.LogWarning("Health check participant {Participant} is reporting that it is unhealthy with complaint: {Reason}", participant.GetType().ToString(), reason);
-                        complaints?.Add($"Health check participant {participant.GetType().ToString()} is reporting that it is unhealthy with complaint: {reason}");
+                        LogHealthCheckParticipantUnhealthy(participant.GetType(), reason);
+                        complaints?.Add($"Health check participant {participant.GetType()} is reporting that it is unhealthy with complaint: {reason}");
 
                         ++score;
                     }
                 }
                 catch (Exception exception)
                 {
-                    _log.LogError(exception, "Error checking health for {Participant}", participant.GetType().ToString());
-                    complaints?.Add($"Error checking health for participant {participant.GetType().ToString()}: {LogFormatter.PrintException(exception)}");
+                    LogHealthCheckParticipantError(exception, participant.GetType());
+                    complaints?.Add($"Error checking health for participant {participant.GetType()}: {LogFormatter.PrintException(exception)}");
 
                     ++score;
                 }
@@ -308,14 +303,14 @@ namespace Orleans.Runtime.MembershipService
                     if (score > 0)
                     {
                         var complaintsString = string.Join("\n", complaints);
-                        _log.LogWarning("Self-monitoring determined that local health is degraded. Degradation score is {Score}/{MaxScore} (lower is better). Complaints: {Complaints}", score, MaxScore, complaintsString);
+                        LogSelfMonitoringDegraded(score, MaxScore, complaintsString);
                     }
 
                     this.Complaints = ImmutableArray.CreateRange(complaints);
                 }
                 catch (Exception exception)
                 {
-                    _log.LogError(exception, "Error while monitoring local silo health");
+                    LogErrorMonitoringLocalSiloHealth(exception);
                 }
             }
         }
@@ -406,5 +401,76 @@ namespace Orleans.Runtime.MembershipService
                 }
             }
         }
+
+        [LoggerMessage(
+            Message = ".NET Thread Pool is exhibiting delays of {ThreadPoolQueueDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses."
+        )]
+        private partial void LogThreadPoolDelay(LogLevel logLevel, double threadPoolQueueDelaySeconds);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "This silo is not active (Status: {Status}) and is therefore not healthy."
+        )]
+        private partial void LogSiloNotActive(SiloStatus status);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Silo {Silo} recently suspected this silo is dead at {SuspectingTime}."
+        )]
+        private partial void LogSiloSuspected(SiloAddress silo, DateTime suspectingTime);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Could not find a membership entry for this silo"
+        )]
+        private partial void LogMembershipEntryNotFound();
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "This silo has not received any probe requests"
+        )]
+        private partial void LogNoProbeRequests();
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "This silo has not received a probe request since {LastProbeRequest}"
+        )]
+        private partial void LogNoRecentProbeRequest(DateTime lastProbeRequest);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "This silo has not received any successful probe responses"
+        )]
+        private partial void LogNoProbeResponses();
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "This silo has not received a successful probe response since {LastSuccessfulResponse}"
+        )]
+        private partial void LogNoRecentProbeResponse(TimeSpan lastSuccessfulResponse);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Health check participant {Participant} is reporting that it is unhealthy with complaint: {Reason}"
+        )]
+        private partial void LogHealthCheckParticipantUnhealthy(Type participant, string reason);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error checking health for {Participant}"
+        )]
+        private partial void LogHealthCheckParticipantError(Exception exception, Type participant);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Self-monitoring determined that local health is degraded. Degradation score is {Score}/{MaxScore} (lower is better). Complaints: {Complaints}"
+        )]
+        private partial void LogSelfMonitoringDegraded(int score, int maxScore, string complaints);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error while monitoring local silo health"
+        )]
+        private partial void LogErrorMonitoringLocalSiloHealth(Exception exception);
     }
 }

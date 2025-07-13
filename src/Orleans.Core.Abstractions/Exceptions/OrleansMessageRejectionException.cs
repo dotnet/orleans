@@ -36,7 +36,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="OrleansMessageRejectionException"/> class. 
+        /// Initializes a new instance of the <see cref="OrleansMessageRejectionException"/> class.
         /// </summary>
         /// <param name="info">
         /// The serialization info.

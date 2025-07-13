@@ -19,6 +19,9 @@ namespace UnitTests.StorageTests
         AdoNet
     }
     
+    /// <summary>
+    /// Tests for local data store operations including read, write, and delete functionality.
+    /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class LocalStoreTests
     {

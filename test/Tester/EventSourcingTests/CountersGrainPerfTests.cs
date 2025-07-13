@@ -5,6 +5,9 @@ using Xunit.Sdk;
 
 namespace Tester.EventSourcingTests
 {
+    /// <summary>
+    /// Performance tests for event-sourced counters grain comparing different synchronization and reentrancy strategies.
+    /// </summary>
     [TestCaseOrderer("Tester.EventSourcingTests.SimplePriorityOrderer", "Tester")]
     public partial class CountersGrainTests
     {

@@ -12,7 +12,7 @@ using Orleans.Internal;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal abstract class ConnectionListener
+    internal abstract partial class ConnectionListener
     {
         private readonly IConnectionListenerFactory listenerFactory;
         private readonly ConnectionManager connectionManager;
@@ -100,7 +100,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exception)
             {
-                this.NetworkingTrace.LogCritical(exception, "Exception in AcceptAsync");
+                LogCriticalExceptionInAcceptAsync(this.NetworkingTrace, exception);
             }
         }
 
@@ -131,7 +131,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exception)
             {
-                this.NetworkingTrace.LogWarning(exception, "Exception during shutdown");
+                LogWarningExceptionDuringShutdown(this.NetworkingTrace, exception);
             }
         }
 
@@ -153,11 +153,11 @@ namespace Orleans.Runtime.Messaging
                 try
                 {
                     await connection.Run();
-                    this.NetworkingTrace.LogInformation("Connection {Connection} terminated", connection);
+                    LogInformationConnectionTerminated(this.NetworkingTrace, connection);
                 }
                 catch (Exception exception)
                 {
-                    this.NetworkingTrace.LogInformation(exception, "Connection {Connection} terminated with an exception", connection);
+                    LogInformationConnectionTerminatedWithException(this.NetworkingTrace, exception, connection);
                 }
                 finally
                 {
@@ -175,5 +175,29 @@ namespace Orleans.Runtime.Messaging
 
             return null;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Critical,
+            Message = "Exception in AcceptAsync"
+        )]
+        private static partial void LogCriticalExceptionInAcceptAsync(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Exception during shutdown"
+        )]
+        private static partial void LogWarningExceptionDuringShutdown(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Connection {Connection} terminated"
+        )]
+        private static partial void LogInformationConnectionTerminated(ILogger logger, Connection connection);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Connection {Connection} terminated with an exception"
+        )]
+        private static partial void LogInformationConnectionTerminatedWithException(ILogger logger, Exception exception, Connection connection);
     }
 }

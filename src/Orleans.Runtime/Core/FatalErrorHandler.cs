@@ -7,7 +7,7 @@ using System.Threading;
 
 namespace Orleans.Runtime
 {
-    internal class FatalErrorHandler : IFatalErrorHandler
+    internal partial class FatalErrorHandler : IFatalErrorHandler
     {
         private readonly ILogger<FatalErrorHandler> log;
         private readonly ClusterMembershipOptions clusterMembershipOptions;
@@ -27,12 +27,7 @@ namespace Orleans.Runtime
 
         public void OnFatalException(object sender, string context, Exception exception)
         {
-            this.log.LogError(
-                (int)ErrorCode.Logger_ProcessCrashing,
-                exception,
-                "Fatal error from {Sender}. Context: {Context}",
-                sender,
-                context);
+            LogFatalError(this.log, exception, sender, context);
 
             var msg = @$"FATAL EXCEPTION from {sender?.ToString() ?? "null"}. Context: {context ?? "null"
                 }. Exception: {(exception != null ? LogFormatter.PrintException(exception) : "null")}.\nCurrent stack: {Environment.StackTrace}";
@@ -45,5 +40,12 @@ namespace Orleans.Runtime
 
             Environment.FailFast(msg, exception);
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)ErrorCode.Logger_ProcessCrashing,
+            Message = "Fatal error from {Sender}. Context: {Context}"
+        )]
+        private static partial void LogFatalError(ILogger logger, Exception exception, object sender, string context);
     }
 }

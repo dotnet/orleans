@@ -5,6 +5,9 @@ using Xunit;
 
 namespace Tester.HeterogeneousSilosTests.UpgradeTests
 {
+    /// <summary>
+    /// Tests grain placement behavior during version upgrades when using AllCompatibleVersions selector and AllVersionsCompatible compatibility strategy.
+    /// </summary>
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT")]
     public class VersionPlacementTests : UpgradeTestsBase
     {

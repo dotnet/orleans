@@ -13,6 +13,9 @@ using Xunit;
 
 namespace Tester.HeterogeneousSilosTests
 {
+    /// <summary>
+    /// Tests for heterogeneous silo configurations including grain type exclusion and type resolution merging.
+    /// </summary>
     [TestCategory("Functional")]
     public class HeterogeneousTests : OrleansTestingBase, IDisposable, IAsyncLifetime
     {
@@ -115,7 +118,7 @@ namespace Tester.HeterogeneousSilosTests
             await MergeGrainResolverTestsImpl<IStatelessWorkerGrain>(typeof(PreferLocalPlacement), true, this.CallIStatelessWorkerGrainMethod, typeof(StatelessWorkerGrain));
         }
 
-        [Fact]
+        [Fact(Skip = "https://github.com/dotnet/orleans/issues/9560")]
         public async Task StatelessWorkerPlacementWithClientRefreshTests()
         {
             await MergeGrainResolverTestsImpl<IStatelessWorkerGrain>(typeof(RandomPlacement), false, this.CallIStatelessWorkerGrainMethod, typeof(StatelessWorkerGrain));

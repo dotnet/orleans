@@ -26,6 +26,27 @@ namespace Orleans.Serialization.UnitTests
         public int CustomInt;
     }
 
+    /// <summary>
+    /// Tests for Orleans' polymorphic serialization capabilities.
+    /// 
+    /// Orleans fully supports polymorphic types, allowing:
+    /// - Serialization of base class references containing derived types
+    /// - Proper type preservation across serialization boundaries
+    /// - Interface and abstract class serialization
+    /// - Custom exception types with inheritance
+    /// 
+    /// Key features tested:
+    /// - Type manifests for efficient type encoding
+    /// - Well-known type IDs for common types
+    /// - Inheritance hierarchy preservation
+    /// - Cross-version compatibility with type evolution
+    /// 
+    /// This is essential for:
+    /// - Object-oriented designs with inheritance
+    /// - Plugin architectures with dynamic type loading
+    /// - Exception propagation across grain boundaries
+    /// - Flexible API designs with interface parameters
+    /// </summary>
     public class PolymorphismTests
     {
         private readonly ServiceProvider _serviceProvider;

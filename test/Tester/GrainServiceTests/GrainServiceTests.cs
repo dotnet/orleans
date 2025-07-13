@@ -5,6 +5,9 @@ using UnitTests.GrainInterfaces;
 
 namespace Tester
 {
+    /// <summary>
+    /// Tests for grain service functionality including service invocation, lifecycle, and extensions.
+    /// </summary>
     public class GrainServiceTests : OrleansTestingBase, IClassFixture<GrainServiceTests.Fixture>
     {
         public class Fixture : BaseTestClusterFixture

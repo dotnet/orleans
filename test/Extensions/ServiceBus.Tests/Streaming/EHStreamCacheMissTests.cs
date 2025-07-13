@@ -9,6 +9,9 @@ using Tester.StreamingTests;
 
 namespace ServiceBus.Tests.StreamingTests
 {
+    /// <summary>
+    /// Tests for EventHub streaming cache miss scenarios with custom stream filters and cache eviction.
+    /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional"), TestCategory("StreamingCacheMiss")]
     public class EHStreamCacheMissTests : StreamingCacheMissTests
     {

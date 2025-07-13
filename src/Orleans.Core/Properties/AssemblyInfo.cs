@@ -12,6 +12,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("GoogleUtils.Tests")]
 [assembly: InternalsVisibleTo("LoadTestGrains")]
 [assembly: InternalsVisibleTo("NonSilo.Tests")]
+[assembly: InternalsVisibleTo("ServiceBus.Tests")]
 [assembly: InternalsVisibleTo("Benchmarks")]
 [assembly: InternalsVisibleTo("Tester")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]

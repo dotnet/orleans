@@ -2,7 +2,6 @@ using System;
 using System.Runtime.Serialization;
 using System.Text;
 
-#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -148,7 +147,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// A string representation fo this instance.
         /// </returns>
-        public override string? ToString() => _value is null ? null : Encoding.UTF8.GetString(_value);
+        public override string ToString() => _value is null ? "" : Encoding.UTF8.GetString(_value);
 
         public bool TryFormat(Span<char> destination, out int charsWritten)
         {
@@ -169,7 +168,7 @@ namespace Orleans.Runtime
             return true;
         }
 
-        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString() ?? "";
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider) => TryFormat(destination, out charsWritten);
 

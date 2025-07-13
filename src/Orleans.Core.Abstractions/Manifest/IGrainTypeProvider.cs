@@ -24,7 +24,7 @@ namespace Orleans.Metadata
         private readonly IServiceProvider _serviceProvider;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="AttributeGrainTypeProvider"/> class. 
+        /// Initializes a new instance of the <see cref="AttributeGrainTypeProvider"/> class.
         /// </summary>
         /// <param name="serviceProvider">
         /// The service provider.
@@ -84,7 +84,7 @@ namespace Orleans
         private readonly GrainType _grainType;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="GrainTypeAttribute"/> class. 
+        /// Initializes a new instance of the <see cref="GrainTypeAttribute"/> class.
         /// </summary>
         /// <param name="grainType">
         /// The grain type name.
