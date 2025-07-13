@@ -8,6 +8,7 @@ using Orleans.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Storage;
 using Orleans.Statistics;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.Runtime.TestHooks
 {
@@ -43,24 +44,24 @@ namespace Orleans.Runtime.TestHooks
         private readonly ISiloStatusOracle siloStatusOracle;
 
         private readonly TestHooksEnvironmentStatisticsProvider environmentStatistics;
-
+        private readonly OverloadDetector _overloadDetector;
         private readonly LoadSheddingOptions loadSheddingOptions;
 
         private readonly IConsistentRingProvider consistentRingProvider;
 
         public TestHooksSystemTarget(
             IServiceProvider serviceProvider,
-            ILocalSiloDetails siloDetails,
-            ILoggerFactory loggerFactory,
             ISiloStatusOracle siloStatusOracle,
             TestHooksEnvironmentStatisticsProvider environmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
+            OverloadDetector overloadDetector,
             SystemTargetShared shared)
             : base(Constants.TestHooksSystemTargetType, shared)
         {
             this.serviceProvider = serviceProvider;
             this.siloStatusOracle = siloStatusOracle;
             this.environmentStatistics = environmentStatistics;
+            _overloadDetector = overloadDetector;
             this.loadSheddingOptions = loadSheddingOptions.Value;
             this.consistentRingProvider = this.serviceProvider.GetRequiredService<IConsistentRingProvider>();
             shared.ActivationDirectory.RecordNewTarget(this);
@@ -123,6 +124,7 @@ namespace Orleans.Runtime.TestHooks
                 availableMemoryBytes: previousStats.FilteredAvailableMemoryBytes,
                 rawAvailableMemoryBytes: previousStats.RawAvailableMemoryBytes,
                 maximumAvailableMemoryBytes: previousStats.MaximumAvailableMemoryBytes));
+            _overloadDetector.ForceRefresh();
 
             Task.Delay(latchPeriod).ContinueWith(t =>
                 {
@@ -140,6 +142,8 @@ namespace Orleans.Runtime.TestHooks
                                 rawAvailableMemoryBytes: currentStats.RawAvailableMemoryBytes,
                                 maximumAvailableMemoryBytes: currentStats.MaximumAvailableMemoryBytes));
                     }
+
+                    _overloadDetector.ForceRefresh();
                 }).Ignore();
         }
     }

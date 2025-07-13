@@ -55,7 +55,7 @@ namespace UnitTests.General
             // Do not accept message in overloaded state
             await Assert.ThrowsAsync<GatewayTooBusyException>(() =>
                 grain.SetA(5));
-            await Task.Delay(latchPeriod.Multiply(1.1)); // wait for latch to reset
+            await this.HostedCluster.Client.GetTestHooks(this.HostedCluster.Primary).LatchIsOverloaded(false, latchPeriod);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("LoadShedding")]
@@ -84,7 +84,6 @@ namespace UnitTests.General
             // Simple request after overload is cleared should succeed
             await grain.SetA(4);
             this.fixture.Logger.LogInformation("Third set succeeded");
-            await Task.Delay(latchPeriod.Multiply(1.1)); // wait for latch to reset
         }
     }
 }
