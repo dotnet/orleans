@@ -32,7 +32,8 @@ namespace Orleans.Runtime.TestHooks
             return stats;
         }
 
-        public void SetHardwareStatistics(EnvironmentStatistics stats) => _currentStats = stats;
+        public void LatchHardwareStatistics(EnvironmentStatistics stats) => _currentStats = stats;
+        public void UnlatchHardwareStatistics() => _currentStats = null;
     }
 
     /// <summary>
@@ -43,26 +44,16 @@ namespace Orleans.Runtime.TestHooks
         private readonly IServiceProvider serviceProvider;
         private readonly ISiloStatusOracle siloStatusOracle;
 
-        private readonly TestHooksEnvironmentStatisticsProvider environmentStatistics;
-        private readonly OverloadDetector _overloadDetector;
-        private readonly LoadSheddingOptions loadSheddingOptions;
-
         private readonly IConsistentRingProvider consistentRingProvider;
 
         public TestHooksSystemTarget(
             IServiceProvider serviceProvider,
             ISiloStatusOracle siloStatusOracle,
-            TestHooksEnvironmentStatisticsProvider environmentStatistics,
-            IOptions<LoadSheddingOptions> loadSheddingOptions,
-            OverloadDetector overloadDetector,
             SystemTargetShared shared)
             : base(Constants.TestHooksSystemTargetType, shared)
         {
             this.serviceProvider = serviceProvider;
             this.siloStatusOracle = siloStatusOracle;
-            this.environmentStatistics = environmentStatistics;
-            _overloadDetector = overloadDetector;
-            this.loadSheddingOptions = loadSheddingOptions.Value;
             this.consistentRingProvider = this.serviceProvider.GetRequiredService<IConsistentRingProvider>();
             shared.ActivationDirectory.RecordNewTarget(this);
         }
@@ -95,56 +86,7 @@ namespace Orleans.Runtime.TestHooks
         }
 
         public Task<int> UnregisterGrainForTesting(GrainId grain) => Task.FromResult(this.serviceProvider.GetRequiredService<Catalog>().UnregisterGrainForTesting(grain));
-        
-        public Task LatchIsOverloaded(bool overloaded, TimeSpan latchPeriod)
-        {
-            if (overloaded)
-            {
-                this.LatchCpuUsage(this.loadSheddingOptions.CpuThreshold + 1, latchPeriod);
-            }
-            else
-            {
-                this.LatchCpuUsage(this.loadSheddingOptions.CpuThreshold - 1, latchPeriod);
-            }
-
-            return Task.CompletedTask;
-        }
 
         public Task<Dictionary<SiloAddress, SiloStatus>> GetApproximateSiloStatuses() => Task.FromResult(this.siloStatusOracle.GetApproximateSiloStatuses());
-
-        private void LatchCpuUsage(float cpuUsage, TimeSpan latchPeriod)
-        {
-            var previousStats = environmentStatistics.GetEnvironmentStatistics();
-
-            environmentStatistics.SetHardwareStatistics(new(
-                cpuUsagePercentage: cpuUsage,
-                rawCpuUsagePercentage: cpuUsage,
-                memoryUsageBytes: previousStats.FilteredMemoryUsageBytes,
-                rawMemoryUsageBytes: previousStats.RawMemoryUsageBytes,
-                availableMemoryBytes: previousStats.FilteredAvailableMemoryBytes,
-                rawAvailableMemoryBytes: previousStats.RawAvailableMemoryBytes,
-                maximumAvailableMemoryBytes: previousStats.MaximumAvailableMemoryBytes));
-            _overloadDetector.ForceRefresh();
-
-            Task.Delay(latchPeriod).ContinueWith(t =>
-                {
-                    var currentStats = environmentStatistics.GetEnvironmentStatistics();
-
-                    // ReSharper disable once CompareOfFloatsByEqualityOperator
-                    if (currentStats.FilteredCpuUsagePercentage == cpuUsage)
-                    {
-                        environmentStatistics.SetHardwareStatistics(new(
-                                cpuUsagePercentage: previousStats.FilteredCpuUsagePercentage,
-                                rawCpuUsagePercentage: previousStats.RawCpuUsagePercentage,
-                                memoryUsageBytes: currentStats.FilteredMemoryUsageBytes,
-                                rawMemoryUsageBytes: currentStats.RawMemoryUsageBytes,
-                                availableMemoryBytes: currentStats.FilteredAvailableMemoryBytes,
-                                rawAvailableMemoryBytes: currentStats.RawAvailableMemoryBytes,
-                                maximumAvailableMemoryBytes: currentStats.MaximumAvailableMemoryBytes));
-                    }
-
-                    _overloadDetector.ForceRefresh();
-                }).Ignore();
-        }
     }
 }
