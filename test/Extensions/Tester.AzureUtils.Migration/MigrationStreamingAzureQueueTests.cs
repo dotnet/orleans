@@ -11,7 +11,7 @@ namespace Tester.AzureUtils.Migration;
 [TestCategory("Functional"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureQueueStorage")]
 public class MigrationStreamingAzureQueueSetup : MigrationStreamingAzureQueueTests, IClassFixture<MigrationStreamingAzureQueueSetup.Fixture>
 {
-    public static Guid Guid = Guid.NewGuid();
+    public readonly static Guid Guid = Guid.NewGuid();
 
     public MigrationStreamingAzureQueueSetup(Fixture fixture) : base(fixture)
     {
