@@ -54,7 +54,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        // Exposed only for testing purposes (accessed by TestHooksSystemTarget).
+        // Exposed only for testing purposes
         internal void ForceRefresh()
         {
             _isOverloaded = null;
