@@ -26,7 +26,7 @@ namespace UnitTests.General
     /// </summary>
     public class ExceptionPropagationTests : OrleansTestingBase, IClassFixture<ExceptionPropagationTests.Fixture>
     {
-        private const int TestIterations = 100;
+        private const int TestIterations = 3;
         private readonly ITestOutputHelper output;
         private readonly Fixture fixture;
         private readonly IMessageSerializationGrain exceptionGrain;

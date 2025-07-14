@@ -59,7 +59,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// The default value for <see cref="ClientGatewayShutdownNotificationTimeout"/>.
         /// </summary>
-        public static readonly TimeSpan DEFAULT_CLIENT_GW_NOTIFICATION_TIMEOUT = TimeSpan.FromSeconds(5);
+        public static readonly TimeSpan DEFAULT_CLIENT_GW_NOTIFICATION_TIMEOUT = TimeSpan.Zero;
 
         /// <summary>
         /// Gets or sets the per grain threshold for pending requests.  Generated warning when exceeded.
@@ -122,12 +122,14 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the period of time the silo will wait to reroute queued messages before it continues shutting down. 
         /// </summary>
+        [Obsolete("Unused, will be removed in a future version.")]
         public TimeSpan ShutdownRerouteTimeout { get; set; } = DEFAULT_SHUTDOWN_REROUTE_TIMEOUT;
 
         /// <summary>
         /// The default value for <see cref="ShutdownRerouteTimeout"/>.
         /// </summary>
-        public static readonly TimeSpan DEFAULT_SHUTDOWN_REROUTE_TIMEOUT = TimeSpan.FromSeconds(10);
+        [Obsolete("Unused, will be removed in a future version.")]
+        public static readonly TimeSpan DEFAULT_SHUTDOWN_REROUTE_TIMEOUT = TimeSpan.Zero;
 
         /// <summary>
         /// Gets or sets the default timeout before an internal system request is assumed to have failed.
@@ -169,6 +171,6 @@ namespace Orleans.Configuration
         /// <summary>
         /// The default value for <see cref="WaitForMessageToBeQueuedForOutboundTime"/>.
         /// </summary>
-        public static readonly TimeSpan DEFAULT_WAIT_FOR_MESSAGE_TO_BE_QUEUED_FOR_OUTBOUND_TIME = TimeSpan.FromSeconds(2);
+        public static readonly TimeSpan DEFAULT_WAIT_FOR_MESSAGE_TO_BE_QUEUED_FOR_OUTBOUND_TIME = TimeSpan.Zero;
     }
 }

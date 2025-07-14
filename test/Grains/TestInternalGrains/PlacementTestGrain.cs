@@ -102,7 +102,7 @@ namespace UnitTests.Grains
         public Task LatchOverloaded()
         {
             var stats = environmentStatistics.GetEnvironmentStatistics();
-            environmentStatistics.SetHardwareStatistics(new EnvironmentStatistics(
+            environmentStatistics.LatchHardwareStatistics(new EnvironmentStatistics(
                 cpuUsagePercentage: loadSheddingOptions.CpuThreshold + 1,
                 rawCpuUsagePercentage: loadSheddingOptions.CpuThreshold + 1,
                 memoryUsageBytes: stats.FilteredMemoryUsageBytes,
@@ -116,7 +116,7 @@ namespace UnitTests.Grains
         public Task UnlatchOverloaded()
         {
             var stats = environmentStatistics.GetEnvironmentStatistics();
-            environmentStatistics.SetHardwareStatistics(new(
+            environmentStatistics.LatchHardwareStatistics(new(
                 cpuUsagePercentage: 0,
                 rawCpuUsagePercentage: 0,
                 memoryUsageBytes: stats.FilteredMemoryUsageBytes,
@@ -130,7 +130,7 @@ namespace UnitTests.Grains
         public Task LatchCpuUsage(float value)
         {
             var stats = environmentStatistics.GetEnvironmentStatistics();
-            environmentStatistics.SetHardwareStatistics(new(
+            environmentStatistics.LatchHardwareStatistics(new(
                 cpuUsagePercentage: value,
                 rawCpuUsagePercentage: value,
                 memoryUsageBytes: stats.FilteredMemoryUsageBytes,
@@ -144,7 +144,7 @@ namespace UnitTests.Grains
         public Task UnlatchCpuUsage()
         {
             var stats = environmentStatistics.GetEnvironmentStatistics();
-            environmentStatistics.SetHardwareStatistics(new(
+            environmentStatistics.LatchHardwareStatistics(new(
                 cpuUsagePercentage: 0,
                 rawCpuUsagePercentage: 0,
                 memoryUsageBytes: stats.FilteredMemoryUsageBytes,

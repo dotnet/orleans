@@ -1,6 +1,9 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
+using Orleans.Runtime.TestHooks;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -16,75 +19,102 @@ namespace UnitTests.General
     public class LoadSheddingTest : OrleansTestingBase, IClassFixture<LoadSheddingTest.Fixture>
     {
         private readonly Fixture fixture;
+        private readonly TestHooksEnvironmentStatisticsProvider _environmentStatistics;
+        private readonly OverloadDetector _overloadDetector;
+        private const int CpuThreshold = 98;
 
-        public class Fixture : BaseTestClusterFixture
+        public class Fixture : BaseInProcessTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 1;
-                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-            }
-        }
-
-        internal class SiloConfigurator : ISiloConfigurator
-        {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
+                builder.ConfigureSilo((options, hostBuilder) =>
                 hostBuilder.AddMemoryGrainStorage("MemoryStore")
                     .AddMemoryGrainStorageAsDefault()
-                    .Configure<LoadSheddingOptions>(options => options.LoadSheddingEnabled = true);
+                    .Configure<LoadSheddingOptions>(options =>
+                    {
+                        options.LoadSheddingEnabled = true;
+                        options.CpuThreshold = CpuThreshold;
+                    }));
             }
         }
 
         public LoadSheddingTest(Fixture fixture)
         {
             this.fixture = fixture;
-            HostedCluster = fixture.HostedCluster;
+            _environmentStatistics = fixture.HostedCluster.Silos[0].ServiceProvider.GetRequiredService<TestHooksEnvironmentStatisticsProvider>();
+            _overloadDetector = fixture.HostedCluster.Silos[0].ServiceProvider.GetRequiredService<OverloadDetector>();
         }
-
-        public TestCluster HostedCluster { get; }
 
         [Fact, TestCategory("Functional"), TestCategory("LoadShedding")]
         public async Task LoadSheddingBasic()
         {
-            ISimpleGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), SimpleGrain.SimpleGrainNamePrefix);
+            try
+            {
+                ISimpleGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), SimpleGrain.SimpleGrainNamePrefix);
+                LatchIsOverloaded(true);
 
-            var latchPeriod = TimeSpan.FromSeconds(1);
-            await this.HostedCluster.Client.GetTestHooks(this.HostedCluster.Primary).LatchIsOverloaded(true, latchPeriod);
-
-            // Do not accept message in overloaded state
-            await Assert.ThrowsAsync<GatewayTooBusyException>(() =>
-                grain.SetA(5));
-            await Task.Delay(latchPeriod.Multiply(1.1)); // wait for latch to reset
+                // Do not accept message in overloaded state
+                await Assert.ThrowsAsync<GatewayTooBusyException>(() => grain.SetA(5));
+            }
+            finally
+            {
+                UnlatchIsOverloaded();
+            }
         }
 
         [Fact, TestCategory("Functional"), TestCategory("LoadShedding")]
         public async Task LoadSheddingComplex()
         {
-            ISimpleGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), SimpleGrain.SimpleGrainNamePrefix);
+            try
+            {
+                ISimpleGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), SimpleGrain.SimpleGrainNamePrefix);
 
-            this.fixture.Logger.LogInformation("Acquired grain reference");
+                this.fixture.Logger.LogInformation("Acquired grain reference");
 
-            await grain.SetA(1);
-            this.fixture.Logger.LogInformation("First set succeeded");
+                LatchIsOverloaded(false);
 
-            var latchPeriod = TimeSpan.FromSeconds(1);
-            await this.HostedCluster.Client.GetTestHooks(this.HostedCluster.Primary).LatchIsOverloaded(true, latchPeriod);
+                await grain.SetA(1);
+                this.fixture.Logger.LogInformation("First set succeeded");
 
-            // Do not accept message in overloaded state
-            await Assert.ThrowsAsync<GatewayTooBusyException>(() =>
-                grain.SetA(2));
+                LatchIsOverloaded(true);
 
-            await Task.Delay(latchPeriod.Multiply(1.1)); // wait for latch to reset
+                // Do not accept message in overloaded state
+                await Assert.ThrowsAsync<GatewayTooBusyException>(() => grain.SetA(2));
 
-            this.fixture.Logger.LogInformation("Second set was shed");
+                this.fixture.Logger.LogInformation("Second set was shed");
 
-            await this.HostedCluster.Client.GetTestHooks(this.HostedCluster.Primary).LatchIsOverloaded(false, latchPeriod);
+                LatchIsOverloaded(false);
 
-            // Simple request after overload is cleared should succeed
-            await grain.SetA(4);
-            this.fixture.Logger.LogInformation("Third set succeeded");
-            await Task.Delay(latchPeriod.Multiply(1.1)); // wait for latch to reset
+                // Simple request after overload is cleared should succeed
+                await grain.SetA(4);
+                this.fixture.Logger.LogInformation("Third set succeeded");
+            }
+            finally
+            {
+                UnlatchIsOverloaded();
+            }
+        }
+
+        private void LatchIsOverloaded(bool isOverloaded)
+        {
+            var cpuUsage = isOverloaded ? CpuThreshold + 1 : CpuThreshold - 1;
+            var previousStats = _environmentStatistics.GetEnvironmentStatistics();
+            _environmentStatistics.LatchHardwareStatistics(new(
+                cpuUsagePercentage: cpuUsage,
+                rawCpuUsagePercentage: cpuUsage,
+                memoryUsageBytes: previousStats.FilteredMemoryUsageBytes,
+                rawMemoryUsageBytes: previousStats.RawMemoryUsageBytes,
+                availableMemoryBytes: previousStats.FilteredAvailableMemoryBytes,
+                rawAvailableMemoryBytes: previousStats.RawAvailableMemoryBytes,
+                maximumAvailableMemoryBytes: previousStats.MaximumAvailableMemoryBytes));
+            _overloadDetector.ForceRefresh();
+        }
+
+        private void UnlatchIsOverloaded()
+        {
+            _environmentStatistics.UnlatchHardwareStatistics();
+            _overloadDetector.ForceRefresh();
         }
     }
 }

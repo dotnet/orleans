@@ -14,12 +14,12 @@ public class ClientConnectionEventTests
     [Fact, TestCategory("SlowBVT")]
     public async Task EventSendWhenDisconnectedFromCluster()
     {
-        var semaphore = new SemaphoreSlim(0, 1);
+        var tcs = new TaskCompletionSource();
         var builder = new InProcessTestClusterBuilder();
         builder.ConfigureClient(c =>
         {
             c.Configure<GatewayOptions>(o => o.GatewayListRefreshPeriod = TimeSpan.FromSeconds(0.5));
-            c.AddClusterConnectionLostHandler((sender, args) => semaphore.Release());
+            c.AddClusterConnectionLostHandler((sender, args) => tcs.TrySetResult());
         });
         await using var cluster = builder.Build();
         await cluster.DeployAsync();
@@ -32,15 +32,14 @@ public class ClientConnectionEventTests
         }
 
         await cluster.StopAllSilosAsync();
-
-        Assert.True(await semaphore.WaitAsync(TimeSpan.FromSeconds(10)));
+        await tcs.Task.WaitAsync(TimeSpan.FromSeconds(10));
     }
 
     [Fact, TestCategory("SlowBVT")]
     public async Task GatewayChangedEventSentOnDisconnectAndReconnect()
     {
-        var regainedGatewaySemaphore = new SemaphoreSlim(0, 1);
-        var lostGatewaySemaphore = new SemaphoreSlim(0, 1);
+        var regainedGatewayTcs = new TaskCompletionSource();
+        var lostGatewayTcs = new TaskCompletionSource();
         var builder = new InProcessTestClusterBuilder();
         builder.ConfigureClient(c =>
         {
@@ -49,11 +48,11 @@ public class ClientConnectionEventTests
             {
                 if (args.NumberOfConnectedGateways == 1)
                 {
-                    lostGatewaySemaphore.Release();
+                    lostGatewayTcs.TrySetResult();
                 }
                 if (args.NumberOfConnectedGateways == 2)
                 {
-                    regainedGatewaySemaphore.Release();
+                    regainedGatewayTcs.TrySetResult();
                 }
             });
         });
@@ -63,7 +62,7 @@ public class ClientConnectionEventTests
         var silo = cluster.Silos[0];
         await silo.StopSiloAsync(true);
 
-        Assert.True(await lostGatewaySemaphore.WaitAsync(TimeSpan.FromSeconds(20)));
+        await lostGatewayTcs.Task.WaitAsync(TimeSpan.FromSeconds(20));
 
         await cluster.RestartStoppedSecondarySiloAsync(silo.Name);
 
@@ -73,7 +72,8 @@ public class ClientConnectionEventTests
         do
         {
             cluster.Client.GetGrain<ITestGrain>(Guid.NewGuid().GetHashCode()).SetLabel("test").Ignore();
-            reconnected = await regainedGatewaySemaphore.WaitAsync(TimeSpan.FromSeconds(1));
+            await regainedGatewayTcs.Task.WaitAsync(TimeSpan.FromSeconds(1)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+            reconnected = regainedGatewayTcs.Task.IsCompleted;
         } while (!reconnected && --remainingAttempts > 0);
 
         Assert.True(reconnected, "Failed to reconnect to restarted gateway.");
