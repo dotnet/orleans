@@ -10,8 +10,11 @@ namespace Orleans.Runtime.Messaging
     /// </summary>
     internal class OverloadDetector
     {
+        private const int RefreshIntervalMilliseconds = 1_000;
         private readonly IEnvironmentStatisticsProvider _environmentStatisticsProvider;
         private readonly LoadSheddingOptions _options;
+        private CoarseStopwatch _refreshStopwatch;
+        private bool? _isOverloaded;
 
         public OverloadDetector(IEnvironmentStatisticsProvider environmentStatisticsProvider, IOptions<LoadSheddingOptions> loadSheddingOptions)
         {
@@ -19,6 +22,8 @@ namespace Orleans.Runtime.Messaging
             _options = loadSheddingOptions.Value;
 
             Enabled = _options.LoadSheddingEnabled;
+
+            _refreshStopwatch = CoarseStopwatch.StartNew();
         }
 
         /// <summary>
@@ -34,11 +39,25 @@ namespace Orleans.Runtime.Messaging
             get
             {
                 if (!Enabled)
+                {
                     return false;
-            
-                var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
-                return OverloadDetectionLogic.IsOverloaded(ref stats, _options);
+                }
+
+                if (!_isOverloaded.HasValue || _refreshStopwatch.ElapsedMilliseconds >= RefreshIntervalMilliseconds)
+                {
+                    var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
+                    _isOverloaded = OverloadDetectionLogic.IsOverloaded(ref stats, _options);
+                    _refreshStopwatch.Restart();
+                }
+
+                return _isOverloaded.Value;
             }
+        }
+
+        // Exposed only for testing purposes
+        internal void ForceRefresh()
+        {
+            _isOverloaded = null;
         }
     }
 }
