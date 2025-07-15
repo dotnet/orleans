@@ -19,6 +19,7 @@
     <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Persistence.DynamoDB\Orleans.Persistence.DynamoDB.csproj" />
     <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Reminders.DynamoDB\Orleans.Reminders.DynamoDB.csproj" />
     <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Streaming.SQS\Orleans.Streaming.SQS.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Streaming.Kinesis\Orleans.Streaming.Kinesis.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
   </ItemGroup>
 </Project>

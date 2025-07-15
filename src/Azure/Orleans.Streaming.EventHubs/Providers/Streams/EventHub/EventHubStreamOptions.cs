@@ -190,23 +190,6 @@ namespace Orleans.Configuration
         }
     }
 
-    public class StreamCheckpointerConfigurationValidator : IConfigurationValidator
-    {
-        private readonly IServiceProvider services;
-        private readonly string name;
-        public StreamCheckpointerConfigurationValidator(IServiceProvider services, string name)
-        {
-            this.services = services;
-            this.name = name;
-        }
-        public void ValidateConfiguration()
-        {
-            var checkpointerFactory = services.GetKeyedService<IStreamQueueCheckpointerFactory>(this.name);
-            if (checkpointerFactory == null)
-                throw new OrleansConfigurationException($"No IStreamQueueCheckpointer is configured with PersistentStreamProvider {this.name}. Please configure one.");
-        }
-    }
-
     public class EventHubReceiverOptions
     {
         /// <summary>
