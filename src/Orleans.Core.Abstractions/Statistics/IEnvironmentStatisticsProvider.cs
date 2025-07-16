@@ -142,7 +142,20 @@ public readonly struct EnvironmentStatistics
         }
     }
 
-    /// <summary>SheddingBasic
+    /// <summary>
+    /// Gets the normalized filtered memory usage (0.0 to 1.0).
+    /// </summary>
+    public float NormalizedFilteredMemoryUsage
+    {
+        get
+        {
+            if (MaximumAvailableMemoryBytes <= 0) return 0f;
+            var fraction = (double)FilteredMemoryUsageBytes / MaximumAvailableMemoryBytes;
+            return (float)Math.Clamp(fraction, 0.0, 1.0);
+        }
+    }
+
+    /// <summary>
     /// Gets the normalized available memory (0.0 to 1.0).
     /// </summary>
     public float NormalizedAvailableMemory
@@ -151,6 +164,19 @@ public readonly struct EnvironmentStatistics
         {
             if (MaximumAvailableMemoryBytes <= 0) return 0f;
             var fraction = (double)RawAvailableMemoryBytes / MaximumAvailableMemoryBytes;
+            return (float)Math.Clamp(fraction, 0.0, 1.0);
+        }
+    }
+
+    /// <summary>
+    /// Gets the normalized filtered available memory (0.0 to 1.0).
+    /// </summary>
+    public float NormalizedFilteredAvailableMemory
+    {
+        get
+        {
+            if (MaximumAvailableMemoryBytes <= 0) return 0f;
+            var fraction = (double)FilteredAvailableMemoryBytes / MaximumAvailableMemoryBytes;
             return (float)Math.Clamp(fraction, 0.0, 1.0);
         }
     }
@@ -209,6 +235,8 @@ public readonly struct EnvironmentStatistics
         Debug.Assert(AvailableMemoryPercentage is >= 0.0f and <= 100.0f, $"{nameof(AvailableMemoryPercentage)} must be between 0.0 and 100.0. {this}");
         Debug.Assert(NormalizedMemoryUsage is >= 0.0f and <= 1.0f, $"{nameof(NormalizedMemoryUsage)} must be between 0.0 and 1.0. {this}");
         Debug.Assert(NormalizedAvailableMemory is >= 0.0f and <= 1.0f, $"{nameof(NormalizedAvailableMemory)} must be between 0.0 and 1.0. {this}");
+        Debug.Assert(NormalizedFilteredMemoryUsage is >= 0.0f and <= 1.0f, $"{nameof(NormalizedFilteredMemoryUsage)} must be between 0.0 and 1.0. {this}");
+        Debug.Assert(NormalizedFilteredAvailableMemory is >= 0.0f and <= 1.0f, $"{nameof(NormalizedFilteredAvailableMemory)} must be between 0.0 and 1.0. {this}");
 #endif
     }
 }

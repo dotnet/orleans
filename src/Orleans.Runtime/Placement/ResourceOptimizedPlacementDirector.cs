@@ -200,11 +200,11 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             Debug.Assert(normalizedMaxAvailableMemory >= 0f && normalizedMaxAvailableMemory <= 1.01f, "Max available memory should be normalized to [0, 1] range");
 
             score += _weights.MemoryUsageWeight * normalizedMemoryUsage +
-                     _weights.AvailableMemoryWeight * normalizedAvailableMemory +
-                     _weights.MaxAvailableMemoryWeight * normalizedMaxAvailableMemory;
+                     _weights.AvailableMemoryWeight * (1 - normalizedAvailableMemory) +
+                     _weights.MaxAvailableMemoryWeight * (1 - normalizedMaxAvailableMemory);
         }
 
-        var normalizedActivationCount = stats.ActivationCount / maxActivationCount;
+        var normalizedActivationCount = stats.ActivationCount / (float)maxActivationCount;
         Debug.Assert(normalizedActivationCount >= 0f && normalizedActivationCount <= 1.01f, "Activation count should be normalized to [0, 1] range");
         score += _weights.ActivationCountWeight * normalizedActivationCount;
 
@@ -231,8 +231,8 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             => new(
                 IsOverloaded: statistics.IsOverloaded,
                 CpuUsage: statistics.EnvironmentStatistics.FilteredCpuUsagePercentage,
-                NormalizedMemoryUsage: statistics.EnvironmentStatistics.NormalizedMemoryUsage,
-                NormalizedAvailableMemory: statistics.EnvironmentStatistics.NormalizedAvailableMemory,
+                NormalizedMemoryUsage: statistics.EnvironmentStatistics.NormalizedFilteredMemoryUsage,
+                NormalizedAvailableMemory: statistics.EnvironmentStatistics.NormalizedFilteredAvailableMemory,
                 MaxAvailableMemory: statistics.EnvironmentStatistics.MaximumAvailableMemoryBytes,
                 ActivationCount: statistics.ActivationCount);
     }
