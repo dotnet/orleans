@@ -2,7 +2,8 @@ using Orleans.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.UseOrleansClient(clientBuilder => clientBuilder.UseLocalhostClustering());
+builder.AddKeyedRedisClient("orleans-redis");
+builder.UseOrleansClient();
 builder.Services.AddControllers();
 
 var app = builder.Build();
