@@ -19,7 +19,7 @@ internal sealed class NatsStreamConsumer(
     string stream,
     uint partition,
     int batchSize,
-    NatsJsonContextSerializer<NatsStreamMessage> serializer)
+    INatsDeserialize<NatsStreamMessage> serializer)
 {
     private readonly ILogger _logger = loggerFactory.CreateLogger<NatsStreamConsumer>();
 
@@ -27,7 +27,7 @@ internal sealed class NatsStreamConsumer(
     {
         FilterSubject = $"{provider}.{partition}.>",
         MaxBatch = batchSize,
-        DeliverPolicy = ConsumerConfigDeliverPolicy.LastPerSubject,
+        DeliverPolicy = ConsumerConfigDeliverPolicy.All,
         MaxAckPending = batchSize
     };
 

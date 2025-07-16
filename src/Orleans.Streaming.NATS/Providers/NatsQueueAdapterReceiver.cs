@@ -130,18 +130,16 @@ internal sealed class NatsQueueAdapterReceiver : IQueueAdapterReceiver
 
         if (messages.Count == 0) return;
 
-        var natsMessages = messages
-            .Cast<NatsBatchContainer>().Select(b => b.ReplyTo).ToArray();
-
         var tasks = new List<Task>();
 
-        foreach (var message in natsMessages)
+        foreach (var message in messages)
         {
-            if (message is null) continue;
-
-            tasks.Add(this._nats.AcknowledgeMessages(message));
+            if (message is NatsBatchContainer natsMessage && !string.IsNullOrWhiteSpace(natsMessage.ReplyTo))
+            {
+                tasks.Add(this._nats.AcknowledgeMessages(natsMessage.ReplyTo));
+            }
         }
 
-        await  Task.WhenAll(tasks);
+        await Task.WhenAll(tasks);
     }
 }

@@ -77,7 +77,7 @@
     <PackageVersion Include="StackExchange.Redis" Version="2.8.16" />
     <PackageVersion Include="KubernetesClient" Version="15.0.1" />
     <PackageVersion Include="CassandraCSharpDriver" Version="3.20.1" />
-    <PackageVersion Include="NATS.Net" Version="2.5.9" />
+    <PackageVersion Include="NATS.Net" Version="2.6.4" />
     <!-- Test related packages -->
     <PackageVersion Include="coverlet.collector" Version="6.0.2" />
     <PackageVersion Include="coverlet.msbuild" Version="6.0.0" />

@@ -476,7 +476,7 @@ jobs:
     strategy:
       matrix:
         provider: ["NATS"]
-        framework: [net8.0]
+        framework: [net9.0]
 #    services:
 #      nats:
 #        image: nats:latest
@@ -495,7 +495,7 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
-          8.0.x
+          9.0.x
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}

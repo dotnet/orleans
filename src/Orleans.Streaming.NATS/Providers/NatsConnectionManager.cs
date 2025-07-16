@@ -6,16 +6,16 @@ using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
+using NATS.Client.Serializers.Json;
 
 namespace Orleans.Streaming.NATS;
 
 /// <summary>
-/// Wrapper around a NATS and JetStream APIs
+/// Wrapper around NATS and JetStream APIs
 /// </summary>
 internal sealed class NatsConnectionManager
 {
-    private const string AckPayload = "+ACK";
-    private static readonly NatsJsonContextSerializer<NatsStreamMessage> Serializer;
+    private static readonly byte[] AckPayload = "+ACK"u8.ToArray();
     private readonly string _providerName;
     private readonly NatsOpts _natsClientOptions;
     private readonly NatsConnection _natsConnection;
@@ -25,11 +25,6 @@ internal sealed class NatsConnectionManager
     private readonly NatsJSContext[] _producerNatsContexts;
     private readonly NatsJSContext _natsContext;
 
-    static NatsConnectionManager()
-    {
-        Serializer = new NatsJsonContextSerializer<NatsStreamMessage>(NatsSerializerContext.Default);
-    }
-
     [GeneratedActivatorConstructor]
     public NatsConnectionManager(string providerName, ILoggerFactory loggerFactory, NatsOptions options)
     {
@@ -37,8 +32,28 @@ internal sealed class NatsConnectionManager
         this._loggerFactory = loggerFactory;
         this._logger = this._loggerFactory.CreateLogger<NatsConnectionManager>();
         this._options = options;
-        this._natsClientOptions =
-            this._options.NatsClientOptions ?? NatsOpts.Default with { Name = $"Orleans-{this._providerName}" };
+        this._options.JsonSerializerOptions.TypeInfoResolverChain.Add(NatsSerializerContext.Default);
+        if (this._options.NatsClientOptions is null)
+        {
+            this._options.NatsClientOptions = NatsOpts.Default with
+            {
+                Name = $"Orleans-{this._providerName}",
+                SerializerRegistry =
+                new NatsJsonContextOptionsSerializerRegistry(this._options.JsonSerializerOptions)
+            };
+        }
+        else
+        {
+            this._options.NatsClientOptions = this._options.NatsClientOptions with
+            {
+                Name = string.IsNullOrWhiteSpace(this._options.NatsClientOptions.Name)
+                    ? $"Orleans-{this._providerName}"
+                    : this._options.NatsClientOptions.Name,
+                SerializerRegistry = new NatsJsonContextOptionsSerializerRegistry(this._options.JsonSerializerOptions)
+            };
+        }
+
+        this._natsClientOptions = this._options.NatsClientOptions;
         this._natsConnection = new NatsConnection(this._natsClientOptions);
         this._natsContext = new NatsJSContext(this._natsConnection);
 
@@ -93,6 +108,7 @@ internal sealed class NatsConnectionManager
             {
                 var streamConfig = new StreamConfig(this._options.StreamName, [$"{this._providerName}.>"])
                 {
+                    Retention = StreamConfigRetention.Workqueue,
                     SubjectTransform = new SubjectTransform
                     {
                         Src = $"{this._providerName}.*.*",
@@ -140,7 +156,10 @@ internal sealed class NatsConnectionManager
 
         var context = this._producerNatsContexts[Math.Abs(id.GetHashCode()) % this._producerNatsContexts.Length];
 
-        var ack = await context.TryPublishAsync(subject, message, Serializer,
+        var ack = await context.TryPublishAsync(
+            subject,
+            message,
+            this._natsClientOptions.SerializerRegistry.GetSerializer<NatsStreamMessage>(),
             cancellationToken: cancellationToken);
 
         if (ack.Success)
@@ -165,7 +184,7 @@ internal sealed class NatsConnectionManager
             this._options.StreamName,
             partition,
             this._options.BatchSize,
-            Serializer);
+            this._natsClientOptions.SerializerRegistry.GetDeserializer<NatsStreamMessage>());
 
     /// <summary>
     /// Acknowledge messages on a subject in a NATS JetStream stream
@@ -173,6 +192,7 @@ internal sealed class NatsConnectionManager
     /// <param name="subject">The ReplyTo subject</param>
     public async Task AcknowledgeMessages(string subject)
     {
-        await this._natsConnection.PublishAsync(subject, AckPayload);
+        await this._natsConnection
+            .PublishAsync(subject, AckPayload, serializer: NatsRawSerializer<byte[]>.Default);
     }
 }

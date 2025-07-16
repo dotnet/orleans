@@ -1,4 +1,5 @@
-﻿using NATS.Client.Core;
+﻿using System.Text.Json;
+using NATS.Client.Core;
 
 namespace Orleans.Streaming.NATS;
 
@@ -44,4 +45,9 @@ public class NatsOptions
     /// The number of connections used to send stream messages to NATS JetStream.
     /// </summary>
     public int ProducerCount { get; set; } = 8;
+
+    /// <summary>
+    /// System.Text.Json serializer options to be used by the NATS provider.
+    /// </summary>
+    public JsonSerializerOptions JsonSerializerOptions { get; set; } = default!;
 }

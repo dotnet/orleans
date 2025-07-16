@@ -42,7 +42,6 @@ internal class NatsAdapterFactory : IQueueAdapterFactory
         adapterCache = new SimpleQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
     }
 
-
     /// <summary> Init the factory.</summary>
     public virtual void Init()
     {
