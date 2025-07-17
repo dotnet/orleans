@@ -21,7 +21,6 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
     private readonly string name;
     private readonly DynamoDBTransactionalStorageOptions options;
     private readonly ClusterOptions clusterOptions;
-    private readonly JsonSerializerSettings jsonSettings;
     private readonly ILoggerFactory loggerFactory;
 
     private DynamoDBStorage storage;
@@ -36,7 +35,6 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
         this.name = name;
         this.options = options;
         this.clusterOptions = clusterOptions.Value;
-        this.jsonSettings = TransactionalStateFactory.GetJsonSerializerSettings(services);
         this.loggerFactory = loggerFactory;
     }
 
@@ -54,7 +52,7 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
         }
 
         var partitionKey = this.MakePartitionKey(context, stateName);
-        return ActivatorUtilities.CreateInstance<DynamoDBTransactionalStateStorage<TState>>(context.ActivationServices, this.storage, partitionKey, this.jsonSettings);
+        return ActivatorUtilities.CreateInstance<DynamoDBTransactionalStateStorage<TState>>(context.ActivationServices, this.storage, this.options.TableName, partitionKey, this.options.GrainStorageSerializer);
     }
 
     public void Participate(ISiloLifecycle lifecycle)
@@ -89,13 +87,13 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
             await storage.InitializeTable(this.options.TableName,
                 new List<KeySchemaElement>
                 {
-                    new KeySchemaElement { AttributeName = DynamoDBTransactionalStateConstants.GRAIN_REFERENCE_PROPERTY_NAME, KeyType = KeyType.HASH },
-                    new KeySchemaElement { AttributeName = DynamoDBTransactionalStateConstants.GRAIN_TYPE_PROPERTY_NAME, KeyType = KeyType.RANGE }
+                    new KeySchemaElement { AttributeName = DynamoDBTransactionalStateConstants.PARTITION_KEY_PROPERTY_NAME, KeyType = KeyType.HASH },
+                    new KeySchemaElement { AttributeName = DynamoDBTransactionalStateConstants.ROW_KEY_PROPERTY_NAME, KeyType = KeyType.RANGE }
                 },
                 new List<AttributeDefinition>
                 {
-                    new AttributeDefinition { AttributeName = DynamoDBTransactionalStateConstants.GRAIN_REFERENCE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
-                    new AttributeDefinition { AttributeName = DynamoDBTransactionalStateConstants.GRAIN_TYPE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
+                    new AttributeDefinition { AttributeName = DynamoDBTransactionalStateConstants.PARTITION_KEY_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
+                    new AttributeDefinition { AttributeName = DynamoDBTransactionalStateConstants.ROW_KEY_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
                 },
                 secondaryIndexes: null,
                 null);
