@@ -114,9 +114,187 @@ internal partial class DynamoDBTransactionalStateStorage<TState> : ITransactiona
         }
     }
 
-    public Task<string> Store(string expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo,
-        long? abortAfter) =>
-        throw new NotImplementedException();
+    public async Task<string> Store(string expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
+    {
+        var transactItems = new List<(TransactWriteItem Item, string PartitionKey, string RowKey)>();
+
+        try
+        {
+            var keyETag = key.ETag.ToString();
+            if ((!string.IsNullOrWhiteSpace(keyETag) || !string.IsNullOrWhiteSpace(expectedETag)) &&
+                keyETag != expectedETag)
+            {
+                throw new ArgumentException(nameof(expectedETag), "Etag does not match");
+            }
+
+            // assemble all storage operations into a single batch
+            // these operations must commit in sequence, but not necessarily atomically
+            // so we can split this up if needed
+
+            // first, clean up aborted records
+            if (abortAfter.HasValue && states.Count != 0)
+            {
+                while (states.Count > 0 && states[states.Count - 1].Key > abortAfter)
+                {
+                    var entity = states[states.Count - 1].Value;
+                    var delete = new Amazon.DynamoDBv2.Model.Delete
+                    {
+                        TableName = this.tableName,
+                        Key = this.MakeKeyAttributes(entity.PartitionKey, entity.RowKey),
+                        ConditionExpression = $"{DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME} = :etag",
+                        ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                        {
+                            [":etag"] = new AttributeValue { S = entity.ETag.ToString() }
+                        }
+                    };
+
+                    transactItems.Add((new TransactWriteItem { Delete = delete }, entity.PartitionKey, entity.RowKey));
+
+                    states.RemoveAt(states.Count - 1);
+                    LogTraceDeleteTransaction(entity.PartitionKey, entity.RowKey, entity.TransactionId);
+                }
+            }
+
+            // second, persist non-obsolete prepare records
+            var obsoleteBefore = commitUpTo ?? key.CommittedSequenceId;
+            if (statesToPrepare != null)
+                foreach (var s in statesToPrepare)
+                {
+                    if (s.SequenceId >= obsoleteBefore)
+                    {
+                        if (FindState(s.SequenceId, out var pos))
+                        {
+                            // overwrite with new pending state
+                            StateEntity existing = states[pos].Value;
+                            var currentETag = existing.ETag.ToString();
+                            existing.TransactionId = s.TransactionId;
+                            existing.TransactionTimestamp = s.TimeStamp;
+                            existing.TransactionManager = this.ConvertToStorageFormat(s.TransactionManager);
+                            existing.SetState(s.State, this.serializer);
+                            existing.ETag = existing.ETag + 1;
+
+                            transactItems.Add((new TransactWriteItem
+                            {
+                                Put = new Put
+                                {
+                                    TableName = this.tableName,
+                                    Item = existing.ToStorageFormat(),
+                                    ConditionExpression =
+                                        $"{DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME} = :etag",
+                                    ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                                    {
+                                        [":etag"] = new AttributeValue { S = currentETag }
+                                    }
+                                }
+                            }, existing.PartitionKey, existing.RowKey));
+
+                            LogTraceUpdateTransaction(partitionKey, existing.RowKey, existing.TransactionId);
+                        }
+                        else
+                        {
+                            var entity = StateEntity.Create(this.serializer, this.partitionKey, s);
+                            transactItems.Add((new TransactWriteItem
+                            {
+                                Put = new Put { TableName = this.tableName, Item = entity.ToStorageFormat(), }
+                            }, entity.PartitionKey, entity.RowKey));
+
+                            states.Insert(pos, new KeyValuePair<long, StateEntity>(s.SequenceId, entity));
+                            LogTraceInsertTransaction(partitionKey, entity.RowKey, entity.TransactionId);
+                        }
+                    }
+                }
+
+            // third, persist metadata and commit position
+            key.Metadata = this.ConvertToStorageFormat(metadata);
+            key.Timestamp = DateTimeOffset.UtcNow;
+            if (commitUpTo.HasValue && commitUpTo.Value > key.CommittedSequenceId)
+            {
+                key.CommittedSequenceId = commitUpTo.Value;
+            }
+
+            var createNewKey = true;
+            var existingETag = key.ETag.ToString();
+
+            // Zero value means this is a new key record, we need to create it.
+            // ETag must start from 1
+            if (this.key.ETag == 0)
+            {
+                this.key.ETag = 1;
+                LogTraceInsertWithCount(partitionKey, KeyEntity.RK, this.key.CommittedSequenceId,
+                    metadata.CommitRecords.Count);
+            }
+            else
+            {
+                this.key.ETag = this.key.ETag + 1;
+                createNewKey = false;
+                LogTraceUpdateWithCount(partitionKey, KeyEntity.RK, this.key.CommittedSequenceId,
+                    metadata.CommitRecords.Count);
+            }
+
+            var keyPutRequest = new Put
+            {
+                TableName = this.tableName,
+                Item = key.ToStorageFormat(),
+                ConditionExpression = createNewKey ? string.Empty : "ETag = :etag",
+                ExpressionAttributeValues = createNewKey
+                    ? null
+                    : new Dictionary<string, AttributeValue> { [":etag"] = new AttributeValue { S = existingETag } }
+            };
+            transactItems.Add((new TransactWriteItem { Put = keyPutRequest }, this.partitionKey, KeyEntity.RK));
+
+            // fourth, remove obsolete records
+            if (states.Count > 0 && states[0].Key < obsoleteBefore)
+            {
+                FindState(obsoleteBefore, out var pos);
+                for (int i = 0; i < pos; i++)
+                {
+                    var stateToDelete = states[pos];
+                    var delRequest = new Delete
+                    {
+                        TableName = this.tableName,
+                        Key = this.MakeKeyAttributes(stateToDelete.Value.PartitionKey, stateToDelete.Value.RowKey),
+                        ConditionExpression = "ETag = :etag",
+                        ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                        {
+                            [":etag"] = new AttributeValue { N = stateToDelete.Value.ETag.ToString() }
+                        }
+                    };
+                    transactItems.Add((new TransactWriteItem { Delete = delRequest }, stateToDelete.Value.PartitionKey, stateToDelete.Value.RowKey));
+
+                    LogTraceDeleteTransaction(this.partitionKey, states[i].Value.RowKey, states[i].Value.TransactionId);
+                }
+
+                states.RemoveRange(0, pos);
+            }
+
+            await this.storage.WriteTxAsync(transactItems.Select(item => item.Item).ToList());
+            LogDebugStoredETag(this.partitionKey, this.key.CommittedSequenceId, this.key.ETag);
+
+            return key.ETag.ToString();
+        }
+        catch (Exception ex)
+        {
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+                for (int i = 0; i < transactItems.Count; i++)
+                {
+                    LogTraceBatchOpFailed(logger, transactItems[i].PartitionKey, transactItems[i].RowKey, i);
+                }
+            }
+
+            LogErrorTransactionalStateStoreFailed(logger, ex);
+            throw;
+        }
+    }
+
+    private Dictionary<string, AttributeValue> MakeKeyAttributes(string partition, string rowKey)
+    {
+        return new Dictionary<string, AttributeValue>
+        {
+            [DynamoDBTransactionalStateConstants.PARTITION_KEY_PROPERTY_NAME] = new AttributeValue { S = partition },
+            [DynamoDBTransactionalStateConstants.ROW_KEY_PROPERTY_NAME] = new AttributeValue { S = rowKey }
+        };
+    }
 
     /// <summary>
     /// Loads the KeyEntity from DynamoDB.
@@ -168,7 +346,7 @@ internal partial class DynamoDBTransactionalStateStorage<TState> : ITransactiona
         }
     }
 
-    internal T ConvertFromStorageFormat<T>(StateEntity entity)
+    private T ConvertFromStorageFormat<T>(StateEntity entity)
     {
         T dataValue = default;
         try
@@ -194,7 +372,7 @@ internal partial class DynamoDBTransactionalStateStorage<TState> : ITransactiona
         return dataValue;
     }
 
-    internal T ConvertFromStorageFormat<T>(byte[] value)
+    private T ConvertFromStorageFormat<T>(byte[] value)
     {
         T dataValue = default;
 
@@ -212,6 +390,8 @@ internal partial class DynamoDBTransactionalStateStorage<TState> : ITransactiona
 
         return dataValue;
     }
+
+    private byte[] ConvertToStorageFormat<T>(T value) => this.serializer.Serialize(value).ToArray();
 
     private bool FindState(long sequenceId, out int pos)
     {
@@ -249,4 +429,58 @@ internal partial class DynamoDBTransactionalStateStorage<TState> : ITransactiona
         Message = "{Message}"
     )]
     private static partial void LogError(ILogger logger, string message);
+
+     [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{PartitionKey}.{RowKey} Delete {TransactionId}"
+        )]
+        private partial void LogTraceDeleteTransaction(string partitionKey, string rowKey, string transactionId);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{PartitionKey}.{RowKey} Update {TransactionId}"
+        )]
+        private partial void LogTraceUpdateTransaction(string partitionKey, string rowKey, string transactionId);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{PartitionKey}.{RowKey} Insert {TransactionId}"
+        )]
+        private partial void LogTraceInsertTransaction(string partitionKey, string rowKey, string transactionId);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{PartitionKey}.{RowKey} Insert. v{CommittedSequenceId}, {CommitRecordsCount}c"
+        )]
+        private partial void LogTraceInsertWithCount(string partitionKey, string rowKey, long committedSequenceId, int commitRecordsCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{PartitionKey}.{RowKey} Update. v{CommittedSequenceId}, {CommitRecordsCount}c"
+        )]
+        private partial void LogTraceUpdateWithCount(string partitionKey, string rowKey, long committedSequenceId, int commitRecordsCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "{PartitionKey} Stored v{CommittedSequenceId} eTag={ETag}"
+        )]
+        private partial void LogDebugStoredETag(string partitionKey, long committedSequenceId, long eTag);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{PartitionKey}.{RowKey} batch-op ok {BatchCount}"
+        )]
+        private static partial void LogTraceBatchOpOk(ILogger logger, string partitionKey, string rowKey, int batchCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{PartitionKey}.{RowKey} batch-op failed {BatchCount}"
+        )]
+        private static partial void LogTraceBatchOpFailed(ILogger logger, string partitionKey, string rowKey, int batchCount);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Transactional state store failed."
+        )]
+        private static partial void LogErrorTransactionalStateStoreFailed(ILogger logger, Exception ex);
 }

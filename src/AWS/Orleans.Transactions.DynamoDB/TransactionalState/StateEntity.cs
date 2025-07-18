@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using Amazon.DynamoDBv2.Model;
+using Orleans.Storage;
+using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.DynamoDB.TransactionalState;
 
@@ -14,6 +17,10 @@ internal class StateEntity
     public const string TRANSCATION_ID_PROPERTY_NAME = nameof(TransactionId);
     public const string TRANSACTION_TIMESTAMP_PROPERTY_NAME = nameof(TransactionTimestamp);
     public const string TRANSACTION_MANAGER_PROPERTY_NAME = nameof(TransactionManager);
+
+    internal StateEntity()
+    {
+    }
 
     internal StateEntity(Dictionary<string, AttributeValue> fields)
     {
@@ -44,6 +51,22 @@ internal class StateEntity
         return $"{ROW_KEY_PREFIX}{sequenceId.ToString("x16")}";
     }
 
+    public static StateEntity Create<TState>(IGrainStorageSerializer serializer, string partitionKey, PendingTransactionState<TState> pendingState) where TState : class, new()
+    {
+        var result = new StateEntity
+        {
+            PartitionKey = partitionKey,
+            RowKey = MakeRowKey(pendingState.SequenceId),
+            TransactionId = pendingState.TransactionId,
+            TransactionTimestamp = pendingState.TimeStamp,
+            TransactionManager = serializer.Serialize(pendingState.TransactionManager).ToArray(),
+            ETag = 0,
+        };
+
+        result.SetState(pendingState.State, serializer);
+        return result;
+    }
+
     public string PartitionKey { get; set; }
 
     public string RowKey { get; set; }
@@ -58,6 +81,34 @@ internal class StateEntity
 
     public byte[] State { get; set; }
 
-    public int? ETag { get; set; }
+    public long ETag { get; set; }
 
+    public void SetState<TState>(TState state, IGrainStorageSerializer serializer) where TState : class, new()
+    {
+        this.State = state == null ? null : serializer.Serialize(state).ToArray();
+    }
+
+    public Dictionary<string, AttributeValue> ToStorageFormat()
+    {
+        var item = new Dictionary<string, AttributeValue>
+        {
+            { DynamoDBTransactionalStateConstants.PARTITION_KEY_PROPERTY_NAME, new AttributeValue { S = this.PartitionKey } },
+            { DynamoDBTransactionalStateConstants.ROW_KEY_PROPERTY_NAME, new AttributeValue { S = this.RowKey } },
+            { DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME, new AttributeValue { N = this.ETag.ToString() } }
+        };
+
+        if (this.State != null)
+            item[DynamoDBTransactionalStateConstants.BINARY_STATE_PROPERTY_NAME] = new AttributeValue { B = new MemoryStream(this.State) };
+
+        if (!string.IsNullOrEmpty(this.TransactionId))
+            item[TRANSCATION_ID_PROPERTY_NAME] = new AttributeValue { S = this.TransactionId };
+
+        if (this.TransactionTimestamp != default)
+            item[TRANSACTION_TIMESTAMP_PROPERTY_NAME] = new AttributeValue { S = this.TransactionTimestamp.ToString("o") };
+
+        if (this.TransactionId != null)
+            item[TRANSACTION_MANAGER_PROPERTY_NAME] = new AttributeValue { B = new MemoryStream(this.TransactionManager) };
+
+        return item;
+    }
 }
