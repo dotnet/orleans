@@ -20,7 +20,7 @@ internal static class StorageInstruments
             StorageReadHistogram.Record(
                 latency.TotalMilliseconds,
                 [
-                    new KeyValuePair<string, object>("provider_name", providerTypeName),
+                    new KeyValuePair<string, object>("provider_type_name", providerTypeName),
                     new KeyValuePair<string, object>("state_name", stateName),
                     new KeyValuePair<string, object>("state_type", stateTypeName)
                 ]);
@@ -34,7 +34,7 @@ internal static class StorageInstruments
             StorageWriteHistogram.Record(
                 latency.TotalMilliseconds,
                 [
-                    new KeyValuePair<string, object>("provider_name", providerTypeName),
+                    new KeyValuePair<string, object>("provider_type_name", providerTypeName),
                     new KeyValuePair<string, object>("state_name", stateName),
                     new KeyValuePair<string, object>("state_type", stateTypeName)
                 ]);
@@ -47,7 +47,7 @@ internal static class StorageInstruments
         {
             StorageReadErrorsCounter.Add(1,
                 [
-                    new KeyValuePair<string, object>("provider_name", providerTypeName),
+                    new KeyValuePair<string, object>("provider_type_name", providerTypeName),
                     new KeyValuePair<string, object>("state_name", stateName),
                     new KeyValuePair<string, object>("state_type", stateTypeName)
                 ]);
@@ -60,7 +60,7 @@ internal static class StorageInstruments
         {
             StorageWriteErrorsCounter.Add(1,
                 [
-                    new KeyValuePair<string, object>("provider_name", providerTypeName),
+                    new KeyValuePair<string, object>("provider_type_name", providerTypeName),
                     new KeyValuePair<string, object>("state_name", stateName),
                     new KeyValuePair<string, object>("state_type", stateTypeName)
                 ]);
@@ -73,7 +73,7 @@ internal static class StorageInstruments
         {
             StorageClearHistogram.Record(latency.TotalMilliseconds,
                 [
-                    new KeyValuePair<string, object>("provider_name", providerTypeName),
+                    new KeyValuePair<string, object>("provider_type_name", providerTypeName),
                     new KeyValuePair<string, object>("state_name", stateName),
                     new KeyValuePair<string, object>("state_type", stateTypeName)
                 ]);
@@ -86,7 +86,7 @@ internal static class StorageInstruments
         {
             StorageClearErrorsCounter.Add(1,
                 [
-                    new KeyValuePair<string, object>("provider_name", providerTypeName),
+                    new KeyValuePair<string, object>("provider_type_name", providerTypeName),
                     new KeyValuePair<string, object>("state_name", stateName),
                     new KeyValuePair<string, object>("state_type", stateTypeName)
                 ]);
