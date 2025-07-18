@@ -34,7 +34,7 @@ internal class StateEntity
             this.TransactionId = transactionId.S;
 
         if (fields.TryGetValue(TRANSACTION_TIMESTAMP_PROPERTY_NAME, out var timestamp))
-            this.TransactionTimestamp = DateTimeOffset.FromUnixTimeSeconds(long.Parse(timestamp.N)).UtcDateTime;
+            this.TransactionTimestamp = DateTime.Parse(timestamp.S);
 
         if (fields.TryGetValue(TRANSACTION_MANAGER_PROPERTY_NAME, out var transactionManager))
             this.TransactionManager = transactionManager.B.ToArray();
@@ -81,7 +81,7 @@ internal class StateEntity
 
     public byte[] State { get; set; }
 
-    public long ETag { get; set; }
+    public long? ETag { get; set; }
 
     public void SetState<TState>(TState state, IGrainStorageSerializer serializer) where TState : class, new()
     {
@@ -94,7 +94,6 @@ internal class StateEntity
         {
             { DynamoDBTransactionalStateConstants.PARTITION_KEY_PROPERTY_NAME, new AttributeValue { S = this.PartitionKey } },
             { DynamoDBTransactionalStateConstants.ROW_KEY_PROPERTY_NAME, new AttributeValue { S = this.RowKey } },
-            { DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME, new AttributeValue { N = this.ETag.ToString() } }
         };
 
         if (this.State != null)
@@ -106,8 +105,11 @@ internal class StateEntity
         if (this.TransactionTimestamp != default)
             item[TRANSACTION_TIMESTAMP_PROPERTY_NAME] = new AttributeValue { S = this.TransactionTimestamp.ToString("o") };
 
-        if (this.TransactionId != null)
+        if (this.TransactionManager.Length > 0)
             item[TRANSACTION_MANAGER_PROPERTY_NAME] = new AttributeValue { B = new MemoryStream(this.TransactionManager) };
+
+        if (this.ETag.HasValue)
+            item[DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME] = new AttributeValue { N = this.ETag.Value.ToString() };
 
         return item;
     }

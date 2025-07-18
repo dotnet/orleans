@@ -13,7 +13,7 @@ using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.DynamoDB.TransactionalState;
 
-internal partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalStateStorage<TState> where TState : class, new()
+public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalStateStorage<TState> where TState : class, new()
 {
     private readonly DynamoDBStorage storage;
     private readonly string tableName;
@@ -25,7 +25,7 @@ internal partial class DynamoDBTransactionalStateStorage<TState> : ITransactiona
     private KeyEntity key;
     private List<KeyValuePair<long, StateEntity>> states;
 
-    internal DynamoDBTransactionalStateStorage(DynamoDBStorage storage, string tableName, string partitionKey, IGrainStorageSerializer serializer, ILogger<DynamoDBTransactionalStateStorage<TState>> logger)
+    public DynamoDBTransactionalStateStorage(DynamoDBStorage storage, string tableName, string partitionKey, IGrainStorageSerializer serializer, ILogger<DynamoDBTransactionalStateStorage<TState>> logger)
     {
         this.storage = storage;
         this.tableName = tableName;
@@ -44,7 +44,7 @@ internal partial class DynamoDBTransactionalStateStorage<TState> : ITransactiona
             key = await keyEntityTask.ConfigureAwait(false);
             states = await stateEntitiesTask.ConfigureAwait(false);
 
-            if (key?.ETag == null)
+            if (string.IsNullOrEmpty(key.ETag.ToString()))
             {
                 LogDebugLoadedV0Fresh(this.partitionKey);
 
@@ -144,7 +144,7 @@ internal partial class DynamoDBTransactionalStateStorage<TState> : ITransactiona
                         ConditionExpression = $"{DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME} = :etag",
                         ExpressionAttributeValues = new Dictionary<string, AttributeValue>
                         {
-                            [":etag"] = new AttributeValue { S = entity.ETag.ToString() }
+                            [":etag"] = new AttributeValue { N = entity.ETag.ToString() }
                         }
                     };
 
@@ -183,7 +183,7 @@ internal partial class DynamoDBTransactionalStateStorage<TState> : ITransactiona
                                         $"{DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME} = :etag",
                                     ExpressionAttributeValues = new Dictionary<string, AttributeValue>
                                     {
-                                        [":etag"] = new AttributeValue { S = currentETag }
+                                        [":etag"] = new AttributeValue { N = currentETag }
                                     }
                                 }
                             }, existing.PartitionKey, existing.RowKey));
@@ -212,35 +212,33 @@ internal partial class DynamoDBTransactionalStateStorage<TState> : ITransactiona
                 key.CommittedSequenceId = commitUpTo.Value;
             }
 
-            var createNewKey = true;
             var existingETag = key.ETag.ToString();
-
-            // Zero value means this is a new key record, we need to create it.
-            // ETag must start from 1
-            if (this.key.ETag == 0)
+            if (string.IsNullOrWhiteSpace(existingETag))
             {
-                this.key.ETag = 1;
+                this.key.ETag = 0;
+                var keyPutRequest = new Put
+                {
+                    TableName = this.tableName,
+                    Item = key.ToStorageFormat(),
+                };
+                transactItems.Add((new TransactWriteItem { Put = keyPutRequest }, this.partitionKey, KeyEntity.RK));
                 LogTraceInsertWithCount(partitionKey, KeyEntity.RK, this.key.CommittedSequenceId,
                     metadata.CommitRecords.Count);
             }
             else
             {
                 this.key.ETag = this.key.ETag + 1;
-                createNewKey = false;
+                var keyPutRequest = new Put
+                {
+                    TableName = this.tableName,
+                    Item = key.ToStorageFormat(),
+                    ConditionExpression = "ETag = :etag",
+                    ExpressionAttributeValues = new Dictionary<string, AttributeValue> { [":etag"] = new AttributeValue { N = existingETag } }
+                };
+                transactItems.Add((new TransactWriteItem { Put = keyPutRequest }, this.partitionKey, KeyEntity.RK));
                 LogTraceUpdateWithCount(partitionKey, KeyEntity.RK, this.key.CommittedSequenceId,
                     metadata.CommitRecords.Count);
             }
-
-            var keyPutRequest = new Put
-            {
-                TableName = this.tableName,
-                Item = key.ToStorageFormat(),
-                ConditionExpression = createNewKey ? string.Empty : "ETag = :etag",
-                ExpressionAttributeValues = createNewKey
-                    ? null
-                    : new Dictionary<string, AttributeValue> { [":etag"] = new AttributeValue { S = existingETag } }
-            };
-            transactItems.Add((new TransactWriteItem { Put = keyPutRequest }, this.partitionKey, KeyEntity.RK));
 
             // fourth, remove obsolete records
             if (states.Count > 0 && states[0].Key < obsoleteBefore)
@@ -248,7 +246,7 @@ internal partial class DynamoDBTransactionalStateStorage<TState> : ITransactiona
                 FindState(obsoleteBefore, out var pos);
                 for (int i = 0; i < pos; i++)
                 {
-                    var stateToDelete = states[pos];
+                    var stateToDelete = states[i];
                     var delRequest = new Delete
                     {
                         TableName = this.tableName,
@@ -266,6 +264,8 @@ internal partial class DynamoDBTransactionalStateStorage<TState> : ITransactiona
 
                 states.RemoveRange(0, pos);
             }
+
+            this.logger.LogInformation("Storing {Count} items in DynamoDB for partition {PartitionKey}", transactItems.Count, this.partitionKey);
 
             await this.storage.WriteTxAsync(transactItems.Select(item => item.Item).ToList());
             LogDebugStoredETag(this.partitionKey, this.key.CommittedSequenceId, this.key.ETag);
@@ -464,7 +464,7 @@ internal partial class DynamoDBTransactionalStateStorage<TState> : ITransactiona
             Level = LogLevel.Debug,
             Message = "{PartitionKey} Stored v{CommittedSequenceId} eTag={ETag}"
         )]
-        private partial void LogDebugStoredETag(string partitionKey, long committedSequenceId, long eTag);
+        private partial void LogDebugStoredETag(string partitionKey, long committedSequenceId, long? eTag);
 
         [LoggerMessage(
             Level = LogLevel.Trace,

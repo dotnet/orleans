@@ -12,6 +12,7 @@ using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Persistence.DynamoDB;
 using Orleans.Runtime;
+using Orleans.Storage;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.DynamoDB.TransactionalState;
@@ -20,6 +21,7 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
 {
     private readonly string name;
     private readonly DynamoDBTransactionalStorageOptions options;
+    private readonly IGrainStorageSerializer grainStorageSerializer;
     private readonly ClusterOptions clusterOptions;
     private readonly ILoggerFactory loggerFactory;
 
@@ -28,12 +30,14 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
     public DynamoDBTransactionalStateStorageFactory(
         string name,
         DynamoDBTransactionalStorageOptions options,
+        IGrainStorageSerializer grainStorageSerializer,
         IOptions<ClusterOptions> clusterOptions,
         IServiceProvider services,
         ILoggerFactory loggerFactory)
     {
         this.name = name;
         this.options = options;
+        this.grainStorageSerializer = grainStorageSerializer;
         this.clusterOptions = clusterOptions.Value;
         this.loggerFactory = loggerFactory;
     }
@@ -52,7 +56,8 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
         }
 
         var partitionKey = this.MakePartitionKey(context, stateName);
-        return ActivatorUtilities.CreateInstance<DynamoDBTransactionalStateStorage<TState>>(context.ActivationServices, this.storage, this.options.TableName, partitionKey, this.options.GrainStorageSerializer);
+        var logger = this.loggerFactory.CreateLogger<DynamoDBTransactionalStateStorage<TState>>();
+        return ActivatorUtilities.CreateInstance<DynamoDBTransactionalStateStorage<TState>>(context.ActivationServices, this.storage, this.options.TableName, partitionKey, this.grainStorageSerializer, logger);
     }
 
     public void Participate(ISiloLifecycle lifecycle)
