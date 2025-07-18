@@ -33,6 +33,7 @@ internal class KeyEntity
     public KeyEntity(string partitionKey)
     {
         this.PartitionKey = partitionKey;
+        this.RowKey = RK;
     }
 
     public const string RK = "key";
@@ -47,7 +48,7 @@ internal class KeyEntity
 
     public DateTimeOffset Timestamp { get; set; }
 
-    public long ETag { get; set; }
+    public long? ETag { get; set; }
 
     public Dictionary<string, AttributeValue> ToStorageFormat()
     {
@@ -56,10 +57,22 @@ internal class KeyEntity
             { DynamoDBTransactionalStateConstants.PARTITION_KEY_PROPERTY_NAME, new AttributeValue { S = this.PartitionKey } },
             { DynamoDBTransactionalStateConstants.ROW_KEY_PROPERTY_NAME, new AttributeValue { S = this.RowKey } },
             { COMITTED_SEQUENCE_ID_PROPERTY_NAME, new AttributeValue { N = this.CommittedSequenceId.ToString() } },
-            { METADATA_PROPERTY_NAME, new AttributeValue { B = new MemoryStream(this.Metadata) } },
-            { DynamoDBTransactionalStateConstants.TIMESTAMP_PROPERTY_NAME, new AttributeValue { N = this.Timestamp.ToUnixTimeSeconds().ToString() } },
-            { DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME, new AttributeValue { N = this.ETag.ToString() } }
         };
+
+        if (this.Metadata.Length > 0)
+        {
+            item[METADATA_PROPERTY_NAME] = new AttributeValue { B = new MemoryStream(this.Metadata) };
+        }
+
+        if (this.Timestamp != default)
+        {
+            item[DynamoDBTransactionalStateConstants.TIMESTAMP_PROPERTY_NAME] = new AttributeValue { N = this.Timestamp.ToUnixTimeSeconds().ToString() };
+        }
+
+        if (this.ETag.HasValue)
+        {
+            item[DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME] = new AttributeValue { N = this.ETag.Value.ToString() };
+        }
 
         return item;
     }
