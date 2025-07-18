@@ -954,6 +954,29 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
+        /// <summary>
+        /// Transactionally performs write requests
+        /// </summary>
+        /// <param name="transactItems">Transact write items to be performed</param>
+        /// <returns></returns>
+        public Task WriteTxAsync(List<TransactWriteItem> transactItems)
+        {
+            try
+            {
+                var request = new TransactWriteItemsRequest
+                {
+                    TransactItems = transactItems
+                };
+
+                return _ddbClient.TransactWriteItemsAsync(request);
+            }
+            catch (Exception exc)
+            {
+                LogDebugUnableToWrite(_logger, exc);
+                throw;
+            }
+        }
+
         private readonly struct DictionaryLogRecord(Dictionary<string, AttributeValue> dictionary)
         {
             public override string ToString() => Utils.DictionaryToString(dictionary);

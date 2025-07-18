@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Amazon.DynamoDBv2.Model;
 
 namespace Orleans.Transactions.DynamoDB.TransactionalState;
@@ -44,7 +45,22 @@ internal class KeyEntity
 
     public byte[] Metadata { get; set; }
 
-    public DateTimeOffset? Timestamp { get; set; }
+    public DateTimeOffset Timestamp { get; set; }
 
-    public int? ETag { get; set; }
+    public long ETag { get; set; }
+
+    public Dictionary<string, AttributeValue> ToStorageFormat()
+    {
+        var item = new Dictionary<string, AttributeValue>
+        {
+            { DynamoDBTransactionalStateConstants.PARTITION_KEY_PROPERTY_NAME, new AttributeValue { S = this.PartitionKey } },
+            { DynamoDBTransactionalStateConstants.ROW_KEY_PROPERTY_NAME, new AttributeValue { S = this.RowKey } },
+            { COMITTED_SEQUENCE_ID_PROPERTY_NAME, new AttributeValue { N = this.CommittedSequenceId.ToString() } },
+            { METADATA_PROPERTY_NAME, new AttributeValue { B = new MemoryStream(this.Metadata) } },
+            { DynamoDBTransactionalStateConstants.TIMESTAMP_PROPERTY_NAME, new AttributeValue { N = this.Timestamp.ToUnixTimeSeconds().ToString() } },
+            { DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME, new AttributeValue { N = this.ETag.ToString() } }
+        };
+
+        return item;
+    }
 }
