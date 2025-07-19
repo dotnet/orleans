@@ -54,12 +54,6 @@ namespace Orleans.Configuration
         public string TableName { get; set; } = "OrleansGrainState";
 
         /// <summary>
-        /// Maximum data bytes in a single state
-        /// defaults to 100KB.
-        /// </summary>
-        public int MaxDataBytesInState { get; set; } = 100 * 1024;
-
-        /// <summary>
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
         /// </summary>
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
