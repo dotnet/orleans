@@ -1,6 +1,17 @@
-using Orleans.Persistence.DynamoDB;
 using Orleans.Runtime;
 using Orleans.Storage;
+#if CLUSTERING_DYNAMODB
+using Orleans.Clustering.DynamoDB;
+#elif PERSISTENCE_DYNAMODB
+using Orleans.Persistence.DynamoDB;
+#elif REMINDERS_DYNAMODB
+using Orleans.Reminders.DynamoDB;
+#elif AWSUTILS_TESTS
+using Orleans.AWSUtils.Tests;
+#elif TRANSACTIONS_DYNAMODB
+using Orleans.Transactions.DynamoDB;
+#else
+#endif
 
 namespace Orleans.Configuration
 {

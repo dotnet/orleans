@@ -12,7 +12,7 @@
   <PropertyGroup>
     <AssemblyName>Orleans.Transactions.DynamoDB</AssemblyName>
     <RootNamespace>Orleans.Transactions.DynamoDB</RootNamespace>
-    <DefineConstants>$(DefineConstants);PERSISTENCE_DYNAMODB</DefineConstants>
+    <DefineConstants>$(DefineConstants);TRANSACTIONS_DYNAMODB</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

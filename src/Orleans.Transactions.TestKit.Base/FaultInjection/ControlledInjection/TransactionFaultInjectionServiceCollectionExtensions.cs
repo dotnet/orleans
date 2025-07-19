@@ -7,6 +7,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.TestKit;
+using Orleans.Transactions.TestKit.Base.FaultInjection.ControlledInjection;
 
 namespace Orleans.Hosting
 {
@@ -33,6 +34,18 @@ namespace Orleans.Hosting
 
             services.TryAddSingleton<ITransactionalStateStorageFactory>(sp => sp.GetKeyedService<ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
             services.AddKeyedSingleton<ITransactionalStateStorageFactory>(name, (sp, key) => FaultInjectionAzureTableTransactionStateStorageFactory.Create(sp, key as string));
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(s => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredKeyedService<ITransactionalStateStorageFactory>(name));
+
+            return services;
+        }
+
+        internal static IServiceCollection AddFaultInjectionDynamoDBTransactionalStateStorage(this IServiceCollection services, string name,
+            Action<OptionsBuilder<DynamoDBTransactionalStorageOptions>> configureOptions = null)
+        {
+            configureOptions?.Invoke(services.AddOptions<DynamoDBTransactionalStorageOptions>(name));
+
+            services.TryAddSingleton<ITransactionalStateStorageFactory>(sp => sp.GetKeyedService<ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+            services.AddKeyedSingleton<ITransactionalStateStorageFactory>(name, (sp, key) => FaultInjectionDynamoDBTransactionStateStorageFactory.Create(sp, key as string));
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(s => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredKeyedService<ITransactionalStateStorageFactory>(name));
 
             return services;
