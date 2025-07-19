@@ -67,7 +67,7 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
 
         var partitionKey = this.MakePartitionKey(context, stateName);
         var logger = this.loggerFactory.CreateLogger<DynamoDBTransactionalStateStorage<TState>>();
-        return ActivatorUtilities.CreateInstance<DynamoDBTransactionalStateStorage<TState>>(context.ActivationServices, this.storage, this.options.TableName, partitionKey, this.grainStorageSerializer, logger);
+        return ActivatorUtilities.CreateInstance<DynamoDBTransactionalStateStorage<TState>>(context.ActivationServices, this.storage, this.options, partitionKey, this.grainStorageSerializer, logger);
     }
 
     public void Participate(ISiloLifecycle lifecycle)
