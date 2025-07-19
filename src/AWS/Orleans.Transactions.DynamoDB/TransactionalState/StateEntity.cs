@@ -34,7 +34,7 @@ internal class StateEntity
             this.TransactionId = transactionId.S;
 
         if (fields.TryGetValue(TRANSACTION_TIMESTAMP_PROPERTY_NAME, out var timestamp))
-            this.TransactionTimestamp = DateTime.Parse(timestamp.S);
+            this.TransactionTimestamp = DateTime.Parse(timestamp.S, null,DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal);
 
         if (fields.TryGetValue(TRANSACTION_MANAGER_PROPERTY_NAME, out var transactionManager))
             this.TransactionManager = transactionManager.B.ToArray();
@@ -103,7 +103,7 @@ internal class StateEntity
             item[TRANSCATION_ID_PROPERTY_NAME] = new AttributeValue { S = this.TransactionId };
 
         if (this.TransactionTimestamp != default)
-            item[TRANSACTION_TIMESTAMP_PROPERTY_NAME] = new AttributeValue { S = this.TransactionTimestamp.ToString("o") };
+            item[TRANSACTION_TIMESTAMP_PROPERTY_NAME] = new AttributeValue { S = this.TransactionTimestamp.ToUniversalTime().ToString("o") };
 
         if (this.TransactionManager.Length > 0)
             item[TRANSACTION_MANAGER_PROPERTY_NAME] = new AttributeValue { B = new MemoryStream(this.TransactionManager) };

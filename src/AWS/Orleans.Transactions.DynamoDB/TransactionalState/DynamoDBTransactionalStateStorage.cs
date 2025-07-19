@@ -3,14 +3,22 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Transactions;
 using Amazon.DynamoDBv2.Model;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using Orleans.Persistence.DynamoDB;
 using Orleans.Storage;
 using Orleans.Transactions.Abstractions;
-
+#if CLUSTERING_DYNAMODB
+using Orleans.Clustering.DynamoDB;
+#elif PERSISTENCE_DYNAMODB
+using Orleans.Persistence.DynamoDB;
+#elif REMINDERS_DYNAMODB
+using Orleans.Reminders.DynamoDB;
+#elif AWSUTILS_TESTS
+using Orleans.AWSUtils.Tests;
+#elif TRANSACTIONS_DYNAMODB
+using Orleans.Transactions.DynamoDB;
+#else
+#endif
 namespace Orleans.Transactions.DynamoDB.TransactionalState;
 
 public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalStateStorage<TState> where TState : class, new()
@@ -267,9 +275,16 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
 
             this.logger.LogInformation("Storing {Count} items in DynamoDB for partition {PartitionKey}", transactItems.Count, this.partitionKey);
 
-            await this.storage.WriteTxAsync(transactItems.Select(item => item.Item).ToList());
-            LogDebugStoredETag(this.partitionKey, this.key.CommittedSequenceId, this.key.ETag);
+            const int txChunkSize = 20;
+            var txItems = transactItems.Select(item => item.Item).ToList();
+            for (int i = 0; i < txItems.Count; i += txChunkSize)
+            {
+                var batch = txItems.Skip(i).Take(txChunkSize).ToList();
+                await this.storage.WriteTxAsync(batch).ConfigureAwait(false);
+                LogTraceBatchOpOk(logger, transactItems[i].PartitionKey, transactItems[i].RowKey, batch.Count);
+            }
 
+            LogDebugStoredETag(this.partitionKey, this.key.CommittedSequenceId, this.key.ETag);
             return key.ETag.ToString();
         }
         catch (Exception ex)
