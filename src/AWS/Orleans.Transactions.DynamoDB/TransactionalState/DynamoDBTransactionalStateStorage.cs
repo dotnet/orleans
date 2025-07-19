@@ -181,7 +181,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                             existing.TransactionId = s.TransactionId;
                             existing.TransactionTimestamp = s.TimeStamp;
                             existing.TransactionManager = this.ConvertToStorageFormat(s.TransactionManager);
-                            existing.SetState(s.State, this.serializer, this.options);
+                            existing.SetState(s.State, this.serializer);
                             existing.ETag = existing.ETag + 1;
 
                             transactItems.Add((new TransactWriteItem
@@ -203,7 +203,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                         }
                         else
                         {
-                            var entity = StateEntity.Create(this.serializer, this.partitionKey, s, this.options);
+                            var entity = StateEntity.Create(this.serializer, this.partitionKey, s);
                             transactItems.Add((new TransactWriteItem
                             {
                                 Put = new Put { TableName = this.tableName, Item = entity.ToStorageFormat(), }
@@ -278,7 +278,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
 
             this.logger.LogInformation("Storing {Count} items in DynamoDB for partition {PartitionKey}", transactItems.Count, this.partitionKey);
 
-            const int txChunkSize = 20;
+            const int txChunkSize = 100;
             var txItems = transactItems.Select(item => item.Item).ToList();
             for (int i = 0; i < txItems.Count; i += txChunkSize)
             {
