@@ -4,11 +4,17 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.StackExchange.Redis" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Orleans.Server\Orleans.Server.csproj" />
     <ProjectReference Include="..\ActivationRebalancing.Cluster\ActivationRebalancing.Cluster.csproj" />
+    <ProjectReference Include="..\..\..\src\Redis\Orleans.Clustering.Redis\Orleans.Clustering.Redis.csproj" />
   </ItemGroup>
 
 </Project>

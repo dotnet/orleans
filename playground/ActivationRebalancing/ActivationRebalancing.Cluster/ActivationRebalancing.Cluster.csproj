@@ -8,7 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.StackExchange.Redis" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\..\src\Orleans.Server\Orleans.Server.csproj" />
+    <ProjectReference Include="..\..\..\src\Redis\Orleans.Clustering.Redis\Orleans.Clustering.Redis.csproj" />
   </ItemGroup>
 
 </Project>

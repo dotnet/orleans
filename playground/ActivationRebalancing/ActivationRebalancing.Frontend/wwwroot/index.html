@@ -3,58 +3,344 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Orleans Activation Rebalancing</title>
+  <title>Orleans Activation Load Balancing</title>
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <style>
-    .bar {
-      fill-opacity: 0.7;
+    :root {
+      --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      --card-bg: rgba(255, 255, 255, 0.95);
+      --card-dark-bg: rgba(44, 62, 80, 0.95);
+      --text-primary: #2c3e50;
+      --text-secondary: #7f8c8d;
+      --text-light: #ecf0f1;
+      --border-radius: 16px;
+      --shadow-soft: 0 10px 40px rgba(0, 0, 0, 0.1);
+      --shadow-strong: 0 20px 60px rgba(0, 0, 0, 0.15);
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .axis-label {
-      font-size: 12px;
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--primary-gradient);
+      height: 100vh;
+      color: var(--text-primary);
+      padding: 12px;
+      line-height: 1.6;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .container {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 16px;
+      flex-shrink: 0;
+    }
+
+    h1 {
+      color: white;
+      font-size: clamp(1.5rem, 3vw, 2.5rem);
+      font-weight: 700;
+      margin-bottom: 6px;
+      text-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+      font-weight: 400;
+      margin-bottom: 12px;
+    }
+
+    .dashboard-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .unified-chart-section {
+      background: var(--card-dark-bg);
+      border-radius: 12px;
+      padding: 20px;
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .charts-container {
+      display: grid;
+      grid-template-columns: 4fr 1fr;
+      gap: 20px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .line-chart-area {
+      grid-column: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .bar-chart-area {
+      grid-column: 2;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .chart-subtitle {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: rgba(236, 240, 241, 0.8);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .bar {
+      fill-opacity: 0.9;
+      transition: var(--transition);
+      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
+    }
+
+    .bar:hover {
+      fill-opacity: 1;
+      transform: scaleY(1.02);
+    }
+
+    .bar-label {
+      text-anchor: middle;
+      font-size: 13px;
+      fill: var(--text-light);
+      font-weight: 600;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    .max-scale-label {
+      font-weight: 500;
+      fill: #bdc3c7;
+      font-size: 11px;
     }
 
     .bar-chart {
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
-      height: 700px;
-      margin-left: 20px;
-    }
-
-    .bar-label {
-      text-anchor: middle;
-      font-size: 12px;
-      fill: #000;
+      flex: 1;
+      gap: 8px;
+      min-height: 0;
     }
 
     .line-chart {
-      margin-top: 50px;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .line {
+      filter: drop-shadow(0 3px 6px rgba(0,0,0,0.15));
+      stroke-width: 3;
+      transition: var(--transition);
+    }
+
+    .line:hover {
+      stroke-width: 4;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.25));
+    }
+
+    .legend {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      font-size: 0.8rem;
+      color: var(--text-light);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+    }
+
+    .legend-color {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .legend-color-1 { background-color: #ff6b6b; }
+    .legend-color-2 { background-color: #4ecdc4; }
+    .legend-color-3 { background-color: #45b7d1; }
+    .legend-color-4 { background-color: #f9ca24; }
+    .legend-color-5 { background-color: #dda0dd; }
+    /* Grid styling for the density matrix */
+    rect {
+      transition: var(--transition);
+      stroke: rgba(255, 255, 255, 0.1);
+      stroke-width: 0.5;
+    }
+
+    rect:hover {
+      stroke-width: 2;
+      stroke: rgba(255, 255, 255, 0.6);
+      filter: brightness(1.1);
+    }
+
+    /* Axis styling */
+    .axis text {
+      font-size: 12px;
+      fill: var(--text-light);
+      font-family: 'Inter', sans-serif;
+    }
+
+    .axis path,
+    .axis line {
+      fill: none;
+      stroke: rgba(236, 240, 241, 0.3);
+      shape-rendering: crispEdges;
+      stroke-width: 1;
+    }
+
+    .axis-title {
+      font-size: 14px;
+      font-weight: 500;
+      fill: var(--text-light);
+    }
+
+    /* Modern scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+      transition: var(--transition);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    /* Loading animation */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.1); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .loading {
+      animation: pulse 2s infinite;
     }
   </style>
 </head>
 <body>
-  <h1>Orleans Activation Rebalancing</h1>
-  <div id="chart" style="display: flex; align-items: flex-start;">
-    <div id="box"></div>
-    <div id="bar-charts" class="bar-chart"></div>
+  <div class="container">
+    <div class="header">
+      <h1>Orleans Activation Load Balancing</h1>
+      <p class="subtitle">Real-time monitoring and visualization of grain activation distribution across silos</p>
+    </div>
+
+    <div class="dashboard-grid">
+      <div class="unified-chart-section">
+        <div class="charts-container">
+          <div class="line-chart-area">
+            <div class="chart-subtitle">Timeline</div>
+            <div id="line-chart" class="line-chart"></div>
+          </div>
+
+          <div class="bar-chart-area">
+            <div class="chart-subtitle">Current Distribution</div>
+            <div id="bar-charts" class="bar-chart"></div>
+          </div>
+        </div>
+
+        <div class="legend">
+          <div class="legend-item">
+            <div class="legend-color legend-color-1"></div>
+            <span>Silo 1</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color legend-color-2"></div>
+            <span>Silo 2</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color legend-color-3"></div>
+            <span>Silo 3</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color legend-color-4"></div>
+            <span>Silo 4</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color legend-color-5"></div>
+            <span>Silo 5</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
-  <div id="line-chart" class="line-chart"></div>
 
   <script>
-    const width = 700;
-    const height = 700;
-    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff'];
+    // Calculate dimensions based on available space
+    const headerHeight = document.querySelector('.header').offsetHeight;
+    const availableHeight = window.innerHeight - headerHeight - 60; // Account for padding and margins
+    const availableWidth = window.innerWidth - 60; // Account for padding
+
+    // For the line chart (takes up 80% of width)
+    const lineChartWidth = availableWidth * 0.75; // Accounting for grid gap
+    const lineChartHeight = availableHeight * 0.85;
+
+    // For the bar charts (20% of width)
+    const barChartWidth = 50;
+    const barChartContainerHeight = availableHeight * 0.85;
+
+    const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#dda0dd'];
     const numColors = colors.length;
     const maxDataPoints = 100;
-
-    const svgBox = d3.select("#box")
-      .append("svg")
-      .attr("width", width)
-      .attr("height", height);
-
-    const barChartWidth = 60;
-    const barChartHeight = 700;
 
     const svgBarCharts = d3.select("#bar-charts")
       .selectAll("svg")
@@ -62,70 +348,114 @@
       .enter()
       .append("svg")
       .attr("width", barChartWidth)
-      .attr("height", barChartHeight)
+      .attr("height", barChartContainerHeight)
       .append("g")
       .attr("transform", `translate(${barChartWidth / 2}, 0)`);
 
     svgBarCharts.append("line")
       .attr("x1", 0)
-      .attr("y1", barChartHeight)
+      .attr("y1", barChartContainerHeight)
       .attr("x2", 0)
       .attr("y2", 0)
-      .attr("stroke", "#000");
+      .attr("stroke", "#ecf0f1")
+      .attr("stroke-width", 1);
 
     svgBarCharts.append("line")
       .attr("x1", -barChartWidth / 2)
-      .attr("y1", barChartHeight)
+      .attr("y1", barChartContainerHeight)
       .attr("x2", barChartWidth / 2)
-      .attr("y2", barChartHeight)
-      .attr("stroke", "#000");
+      .attr("y2", barChartContainerHeight)
+      .attr("stroke", "#ecf0f1")
+      .attr("stroke-width", 1);
 
     svgBarCharts.append("text")
       .attr("class", "bar-label")
       .attr("x", 0)
-      .attr("y", barChartHeight + 20)
+      .attr("y", barChartContainerHeight + 20)
       .text(d => "0");
 
-    const lineChartWidth = 1400;
-    const lineChartHeight = 1000;
+    // Add max scale label at the top
+    svgBarCharts.append("text")
+      .attr("class", "max-scale-label")
+      .attr("x", 0)
+      .attr("y", -5)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "10px")
+      .attr("fill", "#666")
+      .text("0");
 
     const svgLineChart = d3.select("#line-chart")
       .append("svg")
       .attr("width", lineChartWidth)
       .attr("height", lineChartHeight)
-      .style("border", "1px solid black");
+      .style("border-radius", "8px");
 
     const xScale = d3.scaleLinear()
       .domain([0, maxDataPoints - 1])
-      .range([0, lineChartWidth]);
+      .range([0, lineChartWidth - 50]);
 
-    const yScale = d3.scaleLinear()
+    let yScale = d3.scaleLinear()
       .domain([0, 750])
       .range([lineChartHeight, 0]);
 
     const xAxis = d3.axisBottom(xScale).ticks(5);
-    const yAxis = d3.axisLeft(yScale).ticks(5);
+    let yAxis = d3.axisLeft(yScale).ticks(5);
 
     svgLineChart.append("g")
+      .attr("class", "x-axis axis")
       .attr("transform", `translate(50, ${lineChartHeight - 30})`)
       .call(xAxis);
 
     svgLineChart.append("g")
+      .attr("class", "y-axis axis")
       .attr("transform", `translate(50, 0)`)
       .call(yAxis);
+
+    // Add axis labels
+    svgLineChart.append("text")
+      .attr("class", "axis-title")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 15)
+      .attr("x", -lineChartHeight / 2)
+      .style("text-anchor", "middle")
+      .text("Activation Count");
+
+    svgLineChart.append("text")
+      .attr("class", "axis-title")
+      .attr("x", lineChartWidth / 2 + 25)
+      .attr("y", lineChartHeight - 5)
+      .style("text-anchor", "middle")
+      .text("Time (Data Points)");
+
+    // Create a clipping path to constrain the line chart area
+    svgLineChart.append("defs")
+      .append("clipPath")
+      .attr("id", "chart-clip")
+      .append("rect")
+      .attr("width", lineChartWidth - 50)
+      .attr("height", lineChartHeight)
+      .attr("x", 0)
+      .attr("y", 0);
+
+    // Create a container group for the lines that will be clipped
+    const linesContainer = svgLineChart.append("g")
+      .attr("transform", "translate(50, 0)")
+      .attr("clip-path", "url(#chart-clip)");
 
     const lineGenerators = colors.map(() => d3.line()
       .x((d, i) => xScale(i))
       .y(d => yScale(d)));
 
-    const linePaths = svgLineChart.selectAll(".line")
+    const linePaths = linesContainer.selectAll(".line")
       .data(colors)
       .enter()
       .append("path")
       .attr("class", "line")
       .attr("stroke", (d, i) => colors[i])
       .attr("fill", "none")
-      .attr("stroke-width", 2);
+      .attr("stroke-width", 3)
+      .attr("stroke-linecap", "round")
+      .attr("stroke-linejoin", "round");
 
     const activationsHistory = colors.map(() => []);
 
@@ -142,20 +472,11 @@
           return;
         }
 
-        const cells = svgBox.selectAll("rect")
-          .data(densityMatrix.flat());
-
-        cells.enter()
-          .append("rect")
-          .merge(cells)
-          .attr("x", (d, i) => (i % 20) * (width / 20))
-          .attr("y", (d, i) => Math.floor(i / 20) * (height / 20))
-          .attr("width", width / 20)
-          .attr("height", height / 20)
-          .attr("fill", d => d)
-          .attr("stroke", "#ccc");
-
-        cells.exit().remove();
+        // Calculate the maximum activation count across all silos for scaling
+        const maxActivations = Math.max(...data.map(silo => silo.activations));
+        const barScale = d3.scaleLinear()
+          .domain([0, maxActivations])
+          .range([0, barChartContainerHeight - 30]); // Leave some space for labels
 
         svgBarCharts.each(function (d, i) {
           const barChart = d3.select(this);
@@ -167,36 +488,72 @@
             .append("rect")
             .attr("class", "bar")
             .merge(bars)
-            .attr("x", -barChartWidth / 2)
-            .attr("y", d => barChartHeight - d)
-            .attr("width", barChartWidth - 10)
-            .attr("height", d => d)
-            .attr("fill", colors[i]);
+            .attr("x", -barChartWidth / 2 + 5)
+            .attr("y", d => barChartContainerHeight - barScale(d))
+            .attr("width", barChartWidth - 20)
+            .attr("height", d => barScale(d))
+            .attr("fill", colors[i])
+            .attr("rx", 4) // Rounded corners
+            .attr("ry", 4);
 
           bars.exit().remove();
 
           barChart.select(".bar-label")
             .text(data[i].activations);
+
+          // Update the max scale label
+          barChart.select(".max-scale-label")
+            .text(maxActivations);
         });
 
         data.forEach((silo, i) => {
           activationsHistory[i].push(silo.activations);
+
+          // Keep only the most recent maxDataPoints for smooth scrolling
           if (activationsHistory[i].length > maxDataPoints) {
             activationsHistory[i].shift();
           }
         });
 
+        // Update line chart scale based on current maximum across all visible history
+        const allHistoryValues = activationsHistory.flat();
+        const maxHistoryValue = allHistoryValues.length > 0 ? Math.max(...allHistoryValues) : 750;
+        const rawMaxValue = Math.max(maxHistoryValue, maxActivations);
+
+        // Add 20% buffer above the maximum value for comfortable spacing
+        const newMaxValue = rawMaxValue * 1.2;
+
+        // Update Y scale domain if needed
+        yScale.domain([0, newMaxValue]);
+        yAxis = d3.axisLeft(yScale).ticks(5);
+
+        // Update Y axis
+        svgLineChart.select(".y-axis")
+          .transition()
+          .duration(300)
+          .call(yAxis);
+
+        // Update line generators with new scale
+        const updatedLineGenerators = colors.map(() => d3.line()
+          .x((d, i) => xScale(i))
+          .y(d => yScale(d)));
+
         linePaths.each(function (d, i) {
           d3.select(this)
             .datum(activationsHistory[i])
-            .attr("d", lineGenerators[i]);
+            .attr("d", updatedLineGenerators[i]);
         });
       };
     }
 
     function fetchData() {
-      fetch('http://localhost:5000/api/stats/silos')
-        .then(response => response.json())
+      fetch('/api/stats/silos')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
         .then(newData => {
           console.log('Fetched Data:', newData);
           updateChart(newData);
@@ -206,8 +563,28 @@
         });
     }
 
-    setInterval(fetchData, 2500);
+    setInterval(fetchData, 500);
     fetchData();
+
+    // Handle window resize for responsiveness
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        // Reload on any significant resize since we're using viewport-based dimensions
+        location.reload();
+      }, 250);
+    });
+
+    // Add keyboard shortcuts for better UX
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'r' || e.key === 'R') {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          fetchData();
+        }
+      }
+    });
   </script>
 </body>
 </html>

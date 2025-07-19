@@ -8,18 +8,18 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsAspireHost>true</IsAspireHost>
-    <UserSecretsId>6a521b87-2bf9-4af8-b7c7-4947536e1d50</UserSecretsId>
+    <UserSecretsId>6e52d7b6-4f1f-4e1c-abef-df2fe839e7f2</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.AppHost" />
     <PackageReference Include="Aspire.Hosting.Orleans" />
     <PackageReference Include="Aspire.Hosting.Redis" />
-    <PackageReference Include="Aspire.StackExchange.Redis" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DashboardToy.Frontend\DashboardToy.Frontend.csproj" />
+    <ProjectReference Include="..\ActivationRebalancing.Cluster\ActivationRebalancing.Cluster.csproj" />
+    <ProjectReference Include="..\ActivationRebalancing.Frontend\ActivationRebalancing.Frontend.csproj" />
   </ItemGroup>
 
 </Project>
