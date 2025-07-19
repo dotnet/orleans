@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.AWSUtils.Tests;
+using Orleans.Configuration;
 using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Transactions.Abstractions;
@@ -43,9 +44,14 @@ namespace Orleans.Transactions.DynamoDB.Tests
             var orleansJsonSerializer = new OrleansJsonSerializer(
                 new OptionsWrapper<OrleansJsonSerializerOptions>(new OrleansJsonSerializerOptions()));
 
+            var options = new DynamoDBTransactionalStorageOptions
+            {
+                TableName = tableName,
+            };
+
             var stateStorage = new DynamoDBTransactionalStateStorage<TestState>(
                 storage,
-                tableName,
+                options,
                 $"{partition}{DateTime.UtcNow.Ticks}",
                 new JsonGrainStorageSerializer(orleansJsonSerializer),
                 NullLoggerFactory.Instance.CreateLogger<DynamoDBTransactionalStateStorage<TestState>>());

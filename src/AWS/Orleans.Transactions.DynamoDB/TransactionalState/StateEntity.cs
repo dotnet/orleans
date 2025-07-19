@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using Amazon.DynamoDBv2.Model;
+using Orleans.Configuration;
 using Orleans.Storage;
 using Orleans.Transactions.Abstractions;
 
@@ -51,7 +52,11 @@ internal class StateEntity
         return $"{ROW_KEY_PREFIX}{sequenceId.ToString("x16")}";
     }
 
-    public static StateEntity Create<TState>(IGrainStorageSerializer serializer, string partitionKey, PendingTransactionState<TState> pendingState) where TState : class, new()
+    public static StateEntity Create<TState>(
+        IGrainStorageSerializer serializer,
+        string partitionKey,
+        PendingTransactionState<TState> pendingState,
+        DynamoDBTransactionalStorageOptions options) where TState : class, new()
     {
         var result = new StateEntity
         {
@@ -63,7 +68,7 @@ internal class StateEntity
             ETag = 0,
         };
 
-        result.SetState(pendingState.State, serializer);
+        result.SetState(pendingState.State, serializer, options);
         return result;
     }
 
@@ -83,9 +88,13 @@ internal class StateEntity
 
     public long? ETag { get; set; }
 
-    public void SetState<TState>(TState state, IGrainStorageSerializer serializer) where TState : class, new()
+    public void SetState<TState>(TState state, IGrainStorageSerializer serializer, DynamoDBTransactionalStorageOptions options) where TState : class, new()
     {
         this.State = state == null ? null : serializer.Serialize(state).ToArray();
+        if (this.State != null && this.State.Length > options.MaxDataBytesInState)
+        {
+            throw new ArgumentException($"DynamoDB Transactional State size exceeds maximum allowed size of {options.MaxDataBytesInState} bytes.");
+        }
     }
 
     public Dictionary<string, AttributeValue> ToStorageFormat()

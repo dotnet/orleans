@@ -13,6 +13,8 @@ namespace Orleans.Transactions.DynamoDB.Tests
 {
     public class TestFixture : BaseTestClusterFixture
     {
+        public const string TableName = "TransactionStore";
+
         protected override void CheckPreconditionsOrThrow()
         {
             base.CheckPreconditionsOrThrow();
@@ -36,6 +38,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
                         var orleansJsonSerializer = new OrleansJsonSerializer(
                             new OptionsWrapper<OrleansJsonSerializerOptions>(new OrleansJsonSerializerOptions()));
                         options.GrainStorageSerializer = new JsonGrainStorageSerializer(orleansJsonSerializer);
+                        options.TableName = TableName;
                         options.Service = AWSTestConstants.DynamoDbService;
                         options.SecretKey = AWSTestConstants.DynamoDbSecretKey;
                         options.AccessKey = AWSTestConstants.DynamoDbAccessKey;
@@ -56,6 +59,8 @@ namespace Orleans.Transactions.DynamoDB.Tests
 
     public class ControlledFaultInjectionTestFixture : BaseTestClusterFixture
     {
+        public const string TableName = "TransactionStore";
+
         protected override void CheckPreconditionsOrThrow()
         {
             base.CheckPreconditionsOrThrow();
@@ -77,6 +82,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
                         var orleansJsonSerializer = new OrleansJsonSerializer(
                             new OptionsWrapper<OrleansJsonSerializerOptions>(new OrleansJsonSerializerOptions()));
                         options.GrainStorageSerializer = new JsonGrainStorageSerializer(orleansJsonSerializer);
+                        options.TableName = TableName;
                         options.Service = AWSTestConstants.DynamoDbService;
                         options.SecretKey = AWSTestConstants.DynamoDbSecretKey;
                         options.AccessKey = AWSTestConstants.DynamoDbAccessKey;
@@ -121,6 +127,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
                         var orleansJsonSerializer = new OrleansJsonSerializer(
                             new OptionsWrapper<OrleansJsonSerializerOptions>(new OrleansJsonSerializerOptions()));
                         options.GrainStorageSerializer = new JsonGrainStorageSerializer(orleansJsonSerializer);
+                        options.TableName = TableName;
                         options.Service = AWSTestConstants.DynamoDbService;
                         options.SecretKey = AWSTestConstants.DynamoDbSecretKey;
                         options.AccessKey = AWSTestConstants.DynamoDbAccessKey;
