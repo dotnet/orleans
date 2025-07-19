@@ -34,7 +34,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
         protected override void CheckPreconditionsOrThrow()
         {
             base.CheckPreconditionsOrThrow();
-            TestUtils.CheckForAzureStorage();
+            TestUtils.CheckForDynamoDB();
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
