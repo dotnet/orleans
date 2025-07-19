@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Amazon.DynamoDBv2.Model;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Storage;
 using Orleans.Transactions.Abstractions;
 #if CLUSTERING_DYNAMODB
@@ -24,6 +25,7 @@ namespace Orleans.Transactions.DynamoDB.TransactionalState;
 public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalStateStorage<TState> where TState : class, new()
 {
     private readonly DynamoDBStorage storage;
+    private readonly DynamoDBTransactionalStorageOptions options;
     private readonly string tableName;
     private readonly string partitionKey;
     private readonly IGrainStorageSerializer serializer;
@@ -33,10 +35,11 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
     private KeyEntity key;
     private List<KeyValuePair<long, StateEntity>> states;
 
-    public DynamoDBTransactionalStateStorage(DynamoDBStorage storage, string tableName, string partitionKey, IGrainStorageSerializer serializer, ILogger<DynamoDBTransactionalStateStorage<TState>> logger)
+    public DynamoDBTransactionalStateStorage(DynamoDBStorage storage, DynamoDBTransactionalStorageOptions options, string partitionKey, IGrainStorageSerializer serializer, ILogger<DynamoDBTransactionalStateStorage<TState>> logger)
     {
         this.storage = storage;
-        this.tableName = tableName;
+        this.options = options;
+        this.tableName = options.TableName;
         this.partitionKey = partitionKey;
         this.serializer = serializer;
         this.logger = logger;
@@ -178,7 +181,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                             existing.TransactionId = s.TransactionId;
                             existing.TransactionTimestamp = s.TimeStamp;
                             existing.TransactionManager = this.ConvertToStorageFormat(s.TransactionManager);
-                            existing.SetState(s.State, this.serializer);
+                            existing.SetState(s.State, this.serializer, this.options);
                             existing.ETag = existing.ETag + 1;
 
                             transactItems.Add((new TransactWriteItem
@@ -200,7 +203,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                         }
                         else
                         {
-                            var entity = StateEntity.Create(this.serializer, this.partitionKey, s);
+                            var entity = StateEntity.Create(this.serializer, this.partitionKey, s, this.options);
                             transactItems.Add((new TransactWriteItem
                             {
                                 Put = new Put { TableName = this.tableName, Item = entity.ToStorageFormat(), }
