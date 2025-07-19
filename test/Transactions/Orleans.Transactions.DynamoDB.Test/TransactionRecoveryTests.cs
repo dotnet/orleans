@@ -41,8 +41,8 @@ namespace Orleans.Transactions.DynamoDB.Tests
         {
             builder.Options.InitialSilosCount = 4;
             builder.AddSiloBuilderConfigurator<TestFixture.SiloBuilderConfigurator>();
-            builder.AddSiloBuilderConfigurator<SiloBuilderConfiguratorUsingAzureClustering>();
-            builder.AddClientBuilderConfigurator<ClientBuilderConfiguratorUsingAzureClustering>();
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfiguratorUsingDynamoDBClustering>();
+            builder.AddClientBuilderConfigurator<ClientBuilderConfiguratorUsingDynamoDBClustering>();
         }
 
         [SkippableTheory]
@@ -61,7 +61,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
             return this.testRunner.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(transactionTestGrainClassName, concurrent);
         }
 
-        private class SiloBuilderConfiguratorUsingAzureClustering : ISiloConfigurator
+        private class SiloBuilderConfiguratorUsingDynamoDBClustering : ISiloConfigurator
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
@@ -74,7 +74,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
             }
         }
 
-        private class ClientBuilderConfiguratorUsingAzureClustering : IClientBuilderConfigurator
+        private class ClientBuilderConfiguratorUsingDynamoDBClustering : IClientBuilderConfigurator
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
