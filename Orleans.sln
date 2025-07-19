@@ -274,6 +274,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActivationSheddingToy", "pl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActivationRebalancing.AppHost", "playground\ActivationRebalancing\ActivationRebalancing.AppHost\ActivationRebalancing.AppHost.csproj", "{7D8A2688-7117-492B-8357-0DFC0EDCF012}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Transactions.DynamoDB.Test", "test\Transactions\Orleans.Transactions.DynamoDB.Test\Orleans.Transactions.DynamoDB.Test.csproj", "{064F0A5E-FA7D-4FD4-B77C-C6B176022509}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -720,6 +722,10 @@ Global
 		{7D8A2688-7117-492B-8357-0DFC0EDCF012}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7D8A2688-7117-492B-8357-0DFC0EDCF012}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7D8A2688-7117-492B-8357-0DFC0EDCF012}.Release|Any CPU.Build.0 = Release|Any CPU
+		{064F0A5E-FA7D-4FD4-B77C-C6B176022509}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{064F0A5E-FA7D-4FD4-B77C-C6B176022509}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{064F0A5E-FA7D-4FD4-B77C-C6B176022509}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{064F0A5E-FA7D-4FD4-B77C-C6B176022509}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -852,6 +858,7 @@ Global
 		{67697CD2-ABA6-4DC8-BCDA-CE31632CA31E} = {A41DE3D1-F8AA-4234-BE6F-3C9646A1507A}
 		{349A7839-4936-4B22-998B-325535DFD658} = {DA8E126B-BCDB-4E8F-BFB9-2DBFD41F8F70}
 		{7D8A2688-7117-492B-8357-0DFC0EDCF012} = {B0DC8B8D-29CD-4CA3-A874-471F75595829}
+		{064F0A5E-FA7D-4FD4-B77C-C6B176022509} = {E4550469-BCFB-4F3E-B778-3769DE18F45A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}
