@@ -2,8 +2,6 @@ namespace Orleans.Transactions.DynamoDB.TransactionalState;
 
 public class DynamoDBTransactionalStateConstants
 {
-    public const int MAX_DATA_SIZE = 400 * 1024;
-
     public const string PARTITION_KEY_PROPERTY_NAME = "PartitionKey";
 
     public const string ROW_KEY_PROPERTY_NAME = "RowKey";
