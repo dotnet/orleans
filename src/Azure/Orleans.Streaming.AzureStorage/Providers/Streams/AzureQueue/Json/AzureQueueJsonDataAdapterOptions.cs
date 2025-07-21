@@ -10,7 +10,7 @@ namespace Orleans.Streaming.AzureStorage.Providers.Streams.AzureQueue.Json;
 /// <summary>
 /// Configuration options for the Azure Queue JSON data adapter.
 /// </summary>
-[Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/todo")]
+[Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
 public class AzureQueueJsonDataAdapterOptions
 {
     /// <summary>

@@ -104,8 +104,9 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="configurator">The configurator.</param>
         /// <param name="cacheSize">The cache size.</param>
-        [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/todo")]
+#pragma warning disable StreamingJsonSerializationExperimental // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         public static void ConfigureCacheSize(this ISiloAzureQueueJsonStreamConfigurator configurator, int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
+#pragma warning restore StreamingJsonSerializationExperimental // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         {
             configurator.Configure<SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
         }
@@ -115,8 +116,9 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="configurator">The configurator.</param>
         /// <param name="configureJsonOptions">Action to configure JSON serializer options.</param>
-        [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/todo")]
+#pragma warning disable StreamingJsonSerializationExperimental // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         public static void ConfigureJsonSerialization(this ISiloAzureQueueJsonStreamConfigurator configurator, Action<OrleansJsonSerializerOptions> configureJsonOptions)
+#pragma warning restore StreamingJsonSerializationExperimental // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         {
             configurator.ConfigureDelegate(services => services.Configure(configurator.Name, configureJsonOptions));
         }
@@ -126,8 +128,9 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="configurator">The configurator.</param>
         /// <param name="configureAdapterOptions">Action to configure JSON data adapter options.</param>
-        [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/todo")]
+#pragma warning disable StreamingJsonSerializationExperimental // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         public static void ConfigureJsonAdapter(this ISiloAzureQueueJsonStreamConfigurator configurator, Action<AzureQueueJsonDataAdapterOptions> configureAdapterOptions)
+#pragma warning restore StreamingJsonSerializationExperimental // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         {
             configurator.ConfigureDelegate(services => services.Configure(configurator.Name, configureAdapterOptions));
         }
@@ -137,7 +140,7 @@ namespace Orleans.Hosting
     /// Silo configurator for Azure Queue streams with JSON serialization support.
     /// This configurator automatically sets up the JSON data adapter and required dependencies.
     /// </summary>
-    [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/todo")]
+    [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
     public class SiloAzureQueueJsonStreamConfigurator : SiloPersistentStreamConfigurator, ISiloAzureQueueJsonStreamConfigurator
     {
         public SiloAzureQueueJsonStreamConfigurator(string name, Action<Action<IServiceCollection>> configureServicesDelegate)
@@ -171,7 +174,7 @@ namespace Orleans.Hosting
     /// Cluster client configurator interface for Azure Queue streams with JSON serialization.
     /// This feature is experimental and subject to change in future updates.
     /// </summary>
-    [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/todo")]
+    [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
     public interface IClusterClientAzureQueueJsonStreamConfigurator : IAzureQueueStreamConfigurator, IClusterClientPersistentStreamConfigurator { }
 
     /// <summary>
@@ -184,8 +187,9 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="configurator">The configurator.</param>
         /// <param name="configureJsonOptions">Action to configure JSON serializer options.</param>
-        [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/todo")]
+#pragma warning disable StreamingJsonSerializationExperimental // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         public static void ConfigureJsonSerialization(this IClusterClientAzureQueueJsonStreamConfigurator configurator, Action<OrleansJsonSerializerOptions> configureJsonOptions)
+#pragma warning restore StreamingJsonSerializationExperimental // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         {
             configurator.ConfigureDelegate(services => services.Configure(configurator.Name, configureJsonOptions));
         }
@@ -195,8 +199,9 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="configurator">The configurator.</param>
         /// <param name="configureAdapterOptions">Action to configure JSON data adapter options.</param>
-        [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/todo")]
+#pragma warning disable StreamingJsonSerializationExperimental // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         public static void ConfigureJsonAdapter(this IClusterClientAzureQueueJsonStreamConfigurator configurator, Action<AzureQueueJsonDataAdapterOptions> configureAdapterOptions)
+#pragma warning restore StreamingJsonSerializationExperimental // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         {
             configurator.ConfigureDelegate(services => services.Configure(configurator.Name, configureAdapterOptions));
         }
@@ -206,7 +211,7 @@ namespace Orleans.Hosting
     /// Cluster client configurator for Azure Queue streams with JSON serialization support.
     /// This configurator automatically sets up the JSON data adapter and required dependencies.
     /// </summary>
-    [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/todo")]
+    [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
     public class ClusterClientAzureQueueJsonStreamConfigurator : ClusterClientPersistentStreamConfigurator, IClusterClientAzureQueueJsonStreamConfigurator
     {
         public ClusterClientAzureQueueJsonStreamConfigurator(string name, IClientBuilder builder)

@@ -103,7 +103,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     /// Data adapter that uses OrleansJsonSerializer for serializing stream event data with fallback support.
     /// This adapter is experimental and subject to change in future updates.
     /// </summary>
-    [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/todo")]
+    [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
     [SerializationCallbacks(typeof(OnDeserializedCallbacks))]
     public class AzureQueueJsonDataAdapter : IQueueDataAdapter<string, IBatchContainer>, IOnDeserialized
     {

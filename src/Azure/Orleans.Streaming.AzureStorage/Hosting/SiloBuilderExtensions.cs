@@ -38,7 +38,7 @@ namespace Orleans.Hosting
         /// <param name="name">The stream provider name.</param>
         /// <param name="configure">Configuration delegate for the JSON-enabled Azure Queue stream provider.</param>
         /// <returns>The silo builder for method chaining.</returns>
-        [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/todo")]
+        [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
         public static ISiloBuilder AddAzureQueueJsonStreams(this ISiloBuilder builder, string name,
             Action<SiloAzureQueueJsonStreamConfigurator> configure)
         {
@@ -55,7 +55,7 @@ namespace Orleans.Hosting
         /// <param name="name">The stream provider name.</param>
         /// <param name="configureOptions">Configuration delegate for Azure Queue options.</param>
         /// <returns>The silo builder for method chaining.</returns>
-        [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/todo")]
+        [Experimental("StreamingJsonSerializationExperimental", UrlFormat = "https://github.com/dotnet/orleans/pull/9618")]
         public static ISiloBuilder AddAzureQueueJsonStreams(this ISiloBuilder builder, string name, Action<OptionsBuilder<AzureQueueOptions>> configureOptions)
         {
             builder.AddAzureQueueJsonStreams(name, b =>b.ConfigureAzureQueue(configureOptions));
