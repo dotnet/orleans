@@ -112,8 +112,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                 entity.State = []; // clear the state to free memory
             }
 
-            // TODO:
-            // LogDebugLoadedPartitionKeyRows(partition, this.key.CommittedSequenceId, new(states));
+            LogDebugLoadedPartitionKeyRows(this.partitionKey, this.key.CommittedSequenceId, new(states));
 
             TransactionalStateMetaData metadata = this.ConvertFromStorageFormat<TransactionalStateMetaData>(this.key.Metadata);
             return new TransactionalStorageLoadResponse<TState>(this.key.ETag.ToString(), committedState, this.key.CommittedSequenceId, metadata, PrepareRecordsToRecover);
@@ -152,10 +151,10 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                     {
                         TableName = this.tableName,
                         Key = this.MakeKeyAttributes(entity.PartitionKey, entity.RowKey),
-                        ConditionExpression = $"{DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME} = :etag",
+                        ConditionExpression = $"{DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME} = {DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS}",
                         ExpressionAttributeValues = new Dictionary<string, AttributeValue>
                         {
-                            [":etag"] = new AttributeValue { N = entity.ETag.ToString() }
+                            [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = entity.ETag.ToString() }
                         }
                     };
 
@@ -191,10 +190,10 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                                     TableName = this.tableName,
                                     Item = existing.ToStorageFormat(),
                                     ConditionExpression =
-                                        $"{DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME} = :etag",
+                                        $"{DynamoDBTransactionalStateConstants.ETAG_PROPERTY_NAME} = {DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS}",
                                     ExpressionAttributeValues = new Dictionary<string, AttributeValue>
                                     {
-                                        [":etag"] = new AttributeValue { N = currentETag }
+                                        [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = currentETag }
                                     }
                                 }
                             }, existing.PartitionKey, existing.RowKey));
@@ -243,8 +242,8 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                 {
                     TableName = this.tableName,
                     Item = key.ToStorageFormat(),
-                    ConditionExpression = "ETag = :etag",
-                    ExpressionAttributeValues = new Dictionary<string, AttributeValue> { [":etag"] = new AttributeValue { N = existingETag } }
+                    ConditionExpression = $"ETag = {DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS}",
+                    ExpressionAttributeValues = new Dictionary<string, AttributeValue> { [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = existingETag } }
                 };
                 transactItems.Add((new TransactWriteItem { Put = keyPutRequest }, this.partitionKey, KeyEntity.RK));
                 LogTraceUpdateWithCount(partitionKey, KeyEntity.RK, this.key.CommittedSequenceId,
@@ -262,10 +261,10 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                     {
                         TableName = this.tableName,
                         Key = this.MakeKeyAttributes(stateToDelete.Value.PartitionKey, stateToDelete.Value.RowKey),
-                        ConditionExpression = "ETag = :etag",
+                        ConditionExpression = $"ETag = {DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS}",
                         ExpressionAttributeValues = new Dictionary<string, AttributeValue>
                         {
-                            [":etag"] = new AttributeValue { N = stateToDelete.Value.ETag.ToString() }
+                            [DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS] = new AttributeValue { N = stateToDelete.Value.ETag.ToString() }
                         }
                     };
                     transactItems.Add((new TransactWriteItem { Delete = delRequest }, stateToDelete.Value.PartitionKey, stateToDelete.Value.RowKey));
@@ -448,57 +447,68 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
     )]
     private static partial void LogError(ILogger logger, string message);
 
-     [LoggerMessage(
-            Level = LogLevel.Trace,
-            Message = "{PartitionKey}.{RowKey} Delete {TransactionId}"
-        )]
-        private partial void LogTraceDeleteTransaction(string partitionKey, string rowKey, string transactionId);
+    private readonly struct StatesLogRecord(List<KeyValuePair<long, StateEntity>> states)
+    {
+        public override string ToString() => string.Join(",", states.Select(s => s.Key.ToString("x16")));
+    }
 
-        [LoggerMessage(
-            Level = LogLevel.Trace,
-            Message = "{PartitionKey}.{RowKey} Update {TransactionId}"
-        )]
-        private partial void LogTraceUpdateTransaction(string partitionKey, string rowKey, string transactionId);
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "{PartitionKey} Loaded v{CommittedSequenceId} rows={Data}"
+    )]
+    private partial void LogDebugLoadedPartitionKeyRows(string partitionKey, long committedSequenceId, StatesLogRecord data);
 
-        [LoggerMessage(
-            Level = LogLevel.Trace,
-            Message = "{PartitionKey}.{RowKey} Insert {TransactionId}"
-        )]
-        private partial void LogTraceInsertTransaction(string partitionKey, string rowKey, string transactionId);
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "{PartitionKey}.{RowKey} Delete {TransactionId}"
+    )]
+    private partial void LogTraceDeleteTransaction(string partitionKey, string rowKey, string transactionId);
 
-        [LoggerMessage(
-            Level = LogLevel.Trace,
-            Message = "{PartitionKey}.{RowKey} Insert. v{CommittedSequenceId}, {CommitRecordsCount}c"
-        )]
-        private partial void LogTraceInsertWithCount(string partitionKey, string rowKey, long committedSequenceId, int commitRecordsCount);
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "{PartitionKey}.{RowKey} Update {TransactionId}"
+    )]
+    private partial void LogTraceUpdateTransaction(string partitionKey, string rowKey, string transactionId);
 
-        [LoggerMessage(
-            Level = LogLevel.Trace,
-            Message = "{PartitionKey}.{RowKey} Update. v{CommittedSequenceId}, {CommitRecordsCount}c"
-        )]
-        private partial void LogTraceUpdateWithCount(string partitionKey, string rowKey, long committedSequenceId, int commitRecordsCount);
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "{PartitionKey}.{RowKey} Insert {TransactionId}"
+    )]
+    private partial void LogTraceInsertTransaction(string partitionKey, string rowKey, string transactionId);
 
-        [LoggerMessage(
-            Level = LogLevel.Debug,
-            Message = "{PartitionKey} Stored v{CommittedSequenceId} eTag={ETag}"
-        )]
-        private partial void LogDebugStoredETag(string partitionKey, long committedSequenceId, long? eTag);
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "{PartitionKey}.{RowKey} Insert. v{CommittedSequenceId}, {CommitRecordsCount}c"
+    )]
+    private partial void LogTraceInsertWithCount(string partitionKey, string rowKey, long committedSequenceId, int commitRecordsCount);
 
-        [LoggerMessage(
-            Level = LogLevel.Trace,
-            Message = "{PartitionKey}.{RowKey} batch-op ok {BatchCount}"
-        )]
-        private static partial void LogTraceBatchOpOk(ILogger logger, string partitionKey, string rowKey, int batchCount);
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "{PartitionKey}.{RowKey} Update. v{CommittedSequenceId}, {CommitRecordsCount}c"
+    )]
+    private partial void LogTraceUpdateWithCount(string partitionKey, string rowKey, long committedSequenceId, int commitRecordsCount);
 
-        [LoggerMessage(
-            Level = LogLevel.Trace,
-            Message = "{PartitionKey}.{RowKey} batch-op failed {BatchCount}"
-        )]
-        private static partial void LogTraceBatchOpFailed(ILogger logger, string partitionKey, string rowKey, int batchCount);
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "{PartitionKey} Stored v{CommittedSequenceId} eTag={ETag}"
+    )]
+    private partial void LogDebugStoredETag(string partitionKey, long committedSequenceId, long? eTag);
 
-        [LoggerMessage(
-            Level = LogLevel.Error,
-            Message = "Transactional state store failed."
-        )]
-        private static partial void LogErrorTransactionalStateStoreFailed(ILogger logger, Exception ex);
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "{PartitionKey}.{RowKey} batch-op ok {BatchCount}"
+    )]
+    private static partial void LogTraceBatchOpOk(ILogger logger, string partitionKey, string rowKey, int batchCount);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "{PartitionKey}.{RowKey} batch-op failed {BatchCount}"
+    )]
+    private static partial void LogTraceBatchOpFailed(ILogger logger, string partitionKey, string rowKey, int batchCount);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Transactional state store failed."
+    )]
+    private static partial void LogErrorTransactionalStateStoreFailed(ILogger logger, Exception ex);
 }
