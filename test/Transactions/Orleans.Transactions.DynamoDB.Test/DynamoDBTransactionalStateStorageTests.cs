@@ -47,13 +47,13 @@ namespace Orleans.Transactions.DynamoDB.Tests
             var options = new DynamoDBTransactionalStorageOptions
             {
                 TableName = tableName,
+                GrainStorageSerializer = new JsonGrainStorageSerializer(orleansJsonSerializer)
             };
 
             var stateStorage = new DynamoDBTransactionalStateStorage<TestState>(
                 storage,
                 options,
                 $"{partition}{DateTime.UtcNow.Ticks}",
-                new JsonGrainStorageSerializer(orleansJsonSerializer),
                 NullLoggerFactory.Instance.CreateLogger<DynamoDBTransactionalStateStorage<TestState>>());
             return stateStorage;
         }
