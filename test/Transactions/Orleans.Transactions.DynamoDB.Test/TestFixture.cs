@@ -35,9 +35,6 @@ namespace Orleans.Transactions.DynamoDB.Tests
                     .ConfigureServices(services => services.AddKeyedSingleton<IRemoteCommitService, RemoteCommitService>(TransactionTestConstants.RemoteCommitService))
                     .AddDynamoDBTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
                     {
-                        var orleansJsonSerializer = new OrleansJsonSerializer(
-                            new OptionsWrapper<OrleansJsonSerializerOptions>(new OrleansJsonSerializerOptions()));
-                        options.GrainStorageSerializer = new JsonGrainStorageSerializer(orleansJsonSerializer);
                         options.TableName = TableName;
                         options.Service = AWSTestConstants.DynamoDbService;
                         options.SecretKey = AWSTestConstants.DynamoDbSecretKey;
@@ -79,9 +76,6 @@ namespace Orleans.Transactions.DynamoDB.Tests
                 hostBuilder
                     .AddFaultInjectionDynamoDBTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
                     {
-                        var orleansJsonSerializer = new OrleansJsonSerializer(
-                            new OptionsWrapper<OrleansJsonSerializerOptions>(new OrleansJsonSerializerOptions()));
-                        options.GrainStorageSerializer = new JsonGrainStorageSerializer(orleansJsonSerializer);
                         options.TableName = TableName;
                         options.Service = AWSTestConstants.DynamoDbService;
                         options.SecretKey = AWSTestConstants.DynamoDbSecretKey;
@@ -124,9 +118,6 @@ namespace Orleans.Transactions.DynamoDB.Tests
                 hostBuilder
                     .AddFaultInjectionDynamoDBTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
                     {
-                        var orleansJsonSerializer = new OrleansJsonSerializer(
-                            new OptionsWrapper<OrleansJsonSerializerOptions>(new OrleansJsonSerializerOptions()));
-                        options.GrainStorageSerializer = new JsonGrainStorageSerializer(orleansJsonSerializer);
                         options.TableName = TableName;
                         options.Service = AWSTestConstants.DynamoDbService;
                         options.SecretKey = AWSTestConstants.DynamoDbSecretKey;
