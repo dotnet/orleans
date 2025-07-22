@@ -10,7 +10,7 @@ namespace Tester.AzureUtils.Migration
     [TestCategory("Functional"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureBlobStorage")]
     public class MigrationAzureBlobTests : MigrationAzureBlobToBlobTests, IClassFixture<MigrationAzureBlobTests.Fixture>
     {
-        public static Guid Guid = Guid.NewGuid();
+        public readonly static Guid Guid = Guid.NewGuid();
 
         public MigrationAzureBlobTests(Fixture fixture) : base(fixture)
         {

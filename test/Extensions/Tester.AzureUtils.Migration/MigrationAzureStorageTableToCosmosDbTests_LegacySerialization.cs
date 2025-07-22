@@ -16,10 +16,10 @@ namespace Tester.AzureUtils.Migration
     [TestCategory("Functional"), TestCategory("Migration"), TestCategory("Azure"), TestCategory("AzureTableStorage")]
     public class MigrationAzureStorageTableToCosmosDbLegacySerializationTests : MigrationTableStorageToCosmosLegacySerializationTests, IClassFixture<MigrationAzureStorageTableToCosmosDbLegacySerializationTests.Fixture>
     {
-        public static string OrleansDatabase = Resources.MigrationDatabase;
-        public static string OrleansContainer = Resources.MigrationLegacyContainer; // container has different partition key '/pk'
+        public readonly static string OrleansDatabase = Resources.MigrationDatabase;
+        public readonly static string OrleansContainer = Resources.MigrationLegacyContainer; // container has different partition key '/pk'
 
-        public static string RandomIdentifier = Guid.NewGuid().ToString("N");
+        public readonly static string RandomIdentifier = Guid.NewGuid().ToString("N");
 
         public MigrationAzureStorageTableToCosmosDbLegacySerializationTests(Fixture fixture) : base(fixture)
         {
