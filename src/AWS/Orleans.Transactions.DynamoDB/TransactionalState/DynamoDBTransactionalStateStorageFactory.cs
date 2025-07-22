@@ -31,7 +31,6 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
 {
     private readonly string name;
     private readonly DynamoDBTransactionalStorageOptions options;
-    private readonly IGrainStorageSerializer grainStorageSerializer;
     private readonly ClusterOptions clusterOptions;
     private readonly ILoggerFactory loggerFactory;
 
@@ -40,14 +39,12 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
     public DynamoDBTransactionalStateStorageFactory(
         string name,
         DynamoDBTransactionalStorageOptions options,
-        IGrainStorageSerializer grainStorageSerializer,
         IOptions<ClusterOptions> clusterOptions,
         IServiceProvider services,
         ILoggerFactory loggerFactory)
     {
         this.name = name;
         this.options = options;
-        this.grainStorageSerializer = grainStorageSerializer;
         this.clusterOptions = clusterOptions.Value;
         this.loggerFactory = loggerFactory;
     }
@@ -67,7 +64,7 @@ public partial class DynamoDBTransactionalStateStorageFactory : ITransactionalSt
 
         var partitionKey = this.MakePartitionKey(context, stateName);
         var logger = this.loggerFactory.CreateLogger<DynamoDBTransactionalStateStorage<TState>>();
-        return ActivatorUtilities.CreateInstance<DynamoDBTransactionalStateStorage<TState>>(context.ActivationServices, this.storage, this.options, partitionKey, this.grainStorageSerializer, logger);
+        return ActivatorUtilities.CreateInstance<DynamoDBTransactionalStateStorage<TState>>(context.ActivationServices, this.storage, this.options, partitionKey, logger);
     }
 
     public void Participate(ISiloLifecycle lifecycle)
