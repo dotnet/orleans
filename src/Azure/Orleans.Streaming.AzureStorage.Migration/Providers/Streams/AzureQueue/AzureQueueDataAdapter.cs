@@ -24,6 +24,7 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
     private readonly ILogger logger;
 
     private SerializationMode SerializationMode => options.SerializationMode;
+    private DeserializationMode DeserializationMode => options.DeserializationMode;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AzureQueueDataAdapterMigrationV1"/> class.
@@ -54,23 +55,30 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
 
         switch (SerializationMode)
         {
-            case SerializationMode.PrioritizeJson:
+            case SerializationMode.JsonWithFallback:
+            {
                 try
                 {
                     return orleansMigrationJsonSerializer.Serialize(azureQueueBatchMessage, typeof(AzureQueueBatchContainerV2));
                 }
                 catch (Exception ex)
                 {
-                    this.logger.LogDebug(ex, "Failed to serialize AzureQueueBatchContainerV2 to JSON");
+                    this.logger.LogDebug(ex, "Failed to serialize AzureQueueBatchContainerV2 to JSON, falling back to binary serialization");
                     goto default;
                 }
+            }
 
             case SerializationMode.Json:
+            {
                 return orleansMigrationJsonSerializer.Serialize(azureQueueBatchMessage, typeof(AzureQueueBatchContainerV2));
+            }
 
+            case SerializationMode.Binary:
             default:
+            {
                 var rawBytes = this.serializationManager.SerializeToByteArray(azureQueueBatchMessage);
                 return Convert.ToBase64String(rawBytes);
+            }
         }
     }
 
@@ -80,9 +88,9 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
     public IBatchContainer FromQueueMessage(string cloudMsg, long sequenceId)
     {
         AzureQueueBatchContainerV2 azureQueueBatch;
-        switch (SerializationMode)
+        switch (DeserializationMode)
         {
-            case SerializationMode.PrioritizeJson:
+            case DeserializationMode.PreferJson:
                 try
                 {
                     azureQueueBatch = (AzureQueueBatchContainerV2)orleansMigrationJsonSerializer.Deserialize(typeof(AzureQueueBatchContainerV2), cloudMsg);
@@ -90,16 +98,22 @@ public class AzureQueueDataAdapterMigrationV1 : IQueueDataAdapter<string, IBatch
                 catch (Exception ex)
                 {
                     this.logger.LogDebug(ex, "Failed to Deserialize AzureQueueBatchContainerV2 from JSON");
-                    goto default;
+                    azureQueueBatch = this.serializationManager.DeserializeFromByteArray<AzureQueueBatchContainerV2>(Convert.FromBase64String(cloudMsg));
                 }
                 break;
 
-            case SerializationMode.Json:
-                azureQueueBatch = (AzureQueueBatchContainerV2)orleansMigrationJsonSerializer.Deserialize(typeof(AzureQueueBatchContainerV2), cloudMsg);
-                break;
 
+            case DeserializationMode.PreferBinary:
             default:
-                azureQueueBatch = this.serializationManager.DeserializeFromByteArray<AzureQueueBatchContainerV2>(Convert.FromBase64String(cloudMsg));
+                try
+                {
+                    azureQueueBatch = this.serializationManager.DeserializeFromByteArray<AzureQueueBatchContainerV2>(Convert.FromBase64String(cloudMsg));
+                }
+                catch (Exception ex)
+                {
+                    this.logger.LogDebug(ex, "Failed to Deserialize AzureQueueBatchContainerV2 via binary format");
+                    azureQueueBatch = (AzureQueueBatchContainerV2)orleansMigrationJsonSerializer.Deserialize(typeof(AzureQueueBatchContainerV2), cloudMsg);
+                }
                 break;
         }
 

@@ -7,7 +7,9 @@ namespace Orleans.Streaming.Migration.Configuration;
 /// </summary>
 public class AzureQueueMigrationOptions : AzureQueueOptions
 {
-    public SerializationMode SerializationMode { get; set; }
+    public SerializationMode SerializationMode { get; set; } = SerializationMode.Binary;
+
+    public DeserializationMode DeserializationMode { get; set; } = DeserializationMode.PreferBinary;
 }
 
 /// <summary>
@@ -18,7 +20,7 @@ public enum SerializationMode
     /// <summary>
     /// Uses the 3.x payload serialization format by default.
     /// </summary>
-    Default = 0,
+    Binary = 0,
 
     /// <summary>
     /// Uses the JSON format for payload serialization.
@@ -26,7 +28,24 @@ public enum SerializationMode
     Json = 1,
 
     /// <summary>
-    /// Uses the JSON format for payload serialization, and if fails on read/writes it will try to read/write the payload in the 3.x format.
+    /// Uses the JSON format for payload serialization, and if fails on read/writes it will try to read/write the payload in the binary format.
     /// </summary>
-    PrioritizeJson = 2
+    JsonWithFallback = 2
+}
+
+/// <summary>
+/// Deserialization mode used in the Migration Azure Queue stream provider.
+/// It will also have a fallback to other format than preferred.
+/// </summary>
+public enum DeserializationMode
+{
+    /// <summary>
+    /// Firstly deserialization happens via binary format and fallbacks to the JSON format if fails.
+    /// </summary>
+    PreferBinary = 0,
+
+    /// <summary>
+    /// Firstly deserialization happens via JSON format and fallbacks to the binary format if fails.
+    /// </summary>
+    PreferJson = 1
 }

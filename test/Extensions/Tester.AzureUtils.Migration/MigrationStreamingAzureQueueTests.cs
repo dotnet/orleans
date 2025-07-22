@@ -46,7 +46,7 @@ public class MigrationStreamingAzureQueueSetup : MigrationStreamingAzureQueueTes
                     options.ConfigureTestDefaults();
                     options.QueueNames = new List<string> { QueueName };
 
-                    options.SerializationMode = SerializationMode.PrioritizeJson;
+                    options.SerializationMode = SerializationMode.JsonWithFallback;
                 }));
             });
         }
