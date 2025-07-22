@@ -25,7 +25,6 @@ namespace Orleans.Transactions.DynamoDB.TransactionalState;
 public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalStateStorage<TState> where TState : class, new()
 {
     private readonly DynamoDBStorage storage;
-    private readonly DynamoDBTransactionalStorageOptions options;
     private readonly string tableName;
     private readonly string partitionKey;
     private readonly IGrainStorageSerializer serializer;
@@ -35,13 +34,12 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
     private KeyEntity key;
     private List<KeyValuePair<long, StateEntity>> states;
 
-    public DynamoDBTransactionalStateStorage(DynamoDBStorage storage, DynamoDBTransactionalStorageOptions options, string partitionKey, IGrainStorageSerializer serializer, ILogger<DynamoDBTransactionalStateStorage<TState>> logger)
+    public DynamoDBTransactionalStateStorage(DynamoDBStorage storage, DynamoDBTransactionalStorageOptions options, string partitionKey, ILogger<DynamoDBTransactionalStateStorage<TState>> logger)
     {
         this.storage = storage;
-        this.options = options;
         this.tableName = options.TableName;
         this.partitionKey = partitionKey;
-        this.serializer = serializer;
+        this.serializer = options.GrainStorageSerializer;
         this.logger = logger;
     }
 
