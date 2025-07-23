@@ -28,10 +28,10 @@ dotnet build -c Release
 
 ### Run crank scenario
 
-Run this from the root of the repository (next to Orleans.sln):
+Run this from the root of the repository (next to Orleans.slnx):
 
 ```sh
-crank --config .\distributed-tests.yml --scenario ping --profile local 
+crank --config .\distributed-tests.yml --scenario ping --profile local
 ```
 
 Note: scenarios can be found in `distributed-tests.yml`.
