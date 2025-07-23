@@ -105,7 +105,7 @@ namespace Orleans.Transactions.TestKit.xUnit
     {
         public ControlledFaultInjectionTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }
 
-        [SkippableTheory(new[] { })]
+        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9551")]
         [Xunit.InlineData(new[] { TransactionFaultInjectPhase.AfterPrepare, FaultInjectionType.Deactivation })]
         [Xunit.InlineData(new[] { TransactionFaultInjectPhase.AfterConfirm, FaultInjectionType.Deactivation })]
         [Xunit.InlineData(new[] { TransactionFaultInjectPhase.AfterPrepared, FaultInjectionType.Deactivation })]
@@ -142,49 +142,49 @@ namespace Orleans.Transactions.TestKit.xUnit
     {
         protected GoldenPathTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }
 
-        [SkippableTheory(new[] { })]
+        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9553")]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 8 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 4 })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain", 1 })]
         public override System.Threading.Tasks.Task MultiGrainReadWriteTransaction(string grainStates, int grainCount) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9553")]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 8 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 4 })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain", 1 })]
         public override System.Threading.Tasks.Task MultiGrainWriteTransaction(string grainStates, int grainCount) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9553")]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task MultiWriteToSingleGrainTransaction(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9553")]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 8 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 4 })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain", 1 })]
         public override System.Threading.Tasks.Task RepeatGrainReadWriteTransaction(string grainStates, int grainCount) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9553")]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 8 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 4 })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain", 1 })]
         public override System.Threading.Tasks.Task RWRWTest(string grainStates, int grainCount) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9553")]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task SingleGrainReadTransaction(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9553")]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task SingleGrainWriteTransaction(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9553")]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 8 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 4 })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain", 1 })]
@@ -212,6 +212,12 @@ namespace Orleans.Transactions.TestKit.xUnit
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task AbortTransactionOnOrphanCalls(string grainStates) { throw null; }
+
+        [SkippableTheory(new[] { })]
+        [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
+        [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
+        [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
+        public override System.Threading.Tasks.Task AbortTransactionOnReadOnlyViolatedException(string grainStates) { throw null; }
 
         [SkippableTheory(new[] { })]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
@@ -259,7 +265,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain", 1 })]
         public override System.Threading.Tasks.Task MultiGrainWriteTransactionWithCommitException(string grainStates, int grainCount) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9556")]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 8 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 4 })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain", 1 })]
@@ -270,7 +276,7 @@ namespace Orleans.Transactions.TestKit.xUnit
     {
         protected TocGoldenPathTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }
 
-        [SkippableTheory(new[] { })]
+        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9556")]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 8 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 4 })]
         public override System.Threading.Tasks.Task MultiGrainWriteTransaction(string grainStates, int grainCount) { throw null; }
@@ -338,19 +344,19 @@ namespace Orleans.Transactions.TestKit.xUnit
     {
         protected TransactionConcurrencyTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }
 
-        [SkippableTheory(new[] { })]
+        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9554")]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task SingleSharedGrainTest(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9554")]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]
         public override System.Threading.Tasks.Task TransactionChainTest(string grainStates) { throw null; }
 
-        [SkippableTheory(new[] { })]
+        [SkippableTheory(new[] { }, Skip = "https://github.com/dotnet/orleans/issues/9554")]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain" })]
         [Xunit.InlineData(new[] { "MaxStateTransactionalGrain" })]

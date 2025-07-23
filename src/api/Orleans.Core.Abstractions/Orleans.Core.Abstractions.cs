@@ -12,13 +12,13 @@ namespace Orleans
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
-        public DeactivationReason(DeactivationReasonCode code, System.Exception exception, string text) { }
+        public DeactivationReason(DeactivationReasonCode code, System.Exception? exception, string text) { }
 
         public DeactivationReason(DeactivationReasonCode code, string text) { }
 
         public string Description { get { throw null; } }
 
-        public System.Exception Exception { get { throw null; } }
+        public System.Exception? Exception { get { throw null; } }
 
         public DeactivationReasonCode ReasonCode { get { throw null; } }
 
@@ -39,7 +39,8 @@ namespace Orleans
         ApplicationError = 8,
         ApplicationRequested = 9,
         Migrating = 10,
-        RuntimeRequested = 11
+        RuntimeRequested = 11,
+        HighMemoryPressure = 12
     }
 
     public enum ErrorCode
@@ -1147,11 +1148,11 @@ namespace Orleans
 
         public static Runtime.GrainId GetGrainId(this Runtime.IAddressable grain) { throw null; }
 
-        public static System.Guid GetPrimaryKey(this Runtime.IAddressable grain, out string keyExt) { throw null; }
+        public static System.Guid GetPrimaryKey(this Runtime.IAddressable grain, out string? keyExt) { throw null; }
 
         public static System.Guid GetPrimaryKey(this Runtime.IAddressable grain) { throw null; }
 
-        public static long GetPrimaryKeyLong(this Runtime.IAddressable grain, out string keyExt) { throw null; }
+        public static long GetPrimaryKeyLong(this Runtime.IAddressable grain, out string? keyExt) { throw null; }
 
         public static long GetPrimaryKeyLong(this Runtime.IAddressable grain) { throw null; }
 
@@ -1240,15 +1241,15 @@ namespace Orleans
         IGrain GetGrain(System.Type grainInterfaceType, string grainPrimaryKey);
         TGrainInterface GetGrain<TGrainInterface>(Runtime.GrainId grainId)
             where TGrainInterface : Runtime.IAddressable;
-        TGrainInterface GetGrain<TGrainInterface>(System.Guid primaryKey, string keyExtension, string grainClassNamePrefix = null)
+        TGrainInterface GetGrain<TGrainInterface>(System.Guid primaryKey, string keyExtension, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithGuidCompoundKey;
-        TGrainInterface GetGrain<TGrainInterface>(System.Guid primaryKey, string grainClassNamePrefix = null)
+        TGrainInterface GetGrain<TGrainInterface>(System.Guid primaryKey, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithGuidKey;
-        TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null)
+        TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithIntegerCompoundKey;
-        TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string grainClassNamePrefix = null)
+        TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithIntegerKey;
-        TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string grainClassNamePrefix = null)
+        TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string? grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithStringKey;
     }
 
@@ -1336,7 +1337,7 @@ namespace Orleans
     {
         public static System.IDisposable Subscribe(this ILifecycleObservable observable, int stage, ILifecycleObserver observer) { throw null; }
 
-        public static System.IDisposable Subscribe(this ILifecycleObservable observable, string observerName, int stage, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> onStart, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> onStop) { throw null; }
+        public static System.IDisposable Subscribe(this ILifecycleObservable observable, string observerName, int stage, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> onStart, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task>? onStop) { throw null; }
 
         public static System.IDisposable Subscribe(this ILifecycleObservable observable, string observerName, int stage, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> onStart) { throw null; }
 
@@ -1455,7 +1456,7 @@ namespace Orleans.Core
 {
     public partial interface IStorage
     {
-        string Etag { get; }
+        string? Etag { get; }
 
         bool RecordExists { get; }
 
@@ -1653,7 +1654,7 @@ namespace Orleans.Metadata
 
         public readonly bool Equals(MajorMinorVersion other) { throw null; }
 
-        public override readonly bool Equals(object obj) { throw null; }
+        public override readonly bool Equals(object? obj) { throw null; }
 
         public override readonly int GetHashCode() { throw null; }
 
@@ -1806,7 +1807,7 @@ namespace Orleans.Providers
 {
     public partial interface IProviderBuilder<TBuilder>
     {
-        void Configure(TBuilder builder, string name, Microsoft.Extensions.Configuration.IConfigurationSection configurationSection);
+        void Configure(TBuilder builder, string? name, Microsoft.Extensions.Configuration.IConfigurationSection configurationSection);
     }
 
     [System.AttributeUsage(System.AttributeTargets.Class)]
@@ -2087,7 +2088,11 @@ namespace Orleans.Runtime
     {
         public override GrainId Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
 
+        public override GrainId ReadAsPropertyName(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
         public override void Write(System.Text.Json.Utf8JsonWriter writer, GrainId value, System.Text.Json.JsonSerializerOptions options) { }
+
+        public override void WriteAsPropertyName(System.Text.Json.Utf8JsonWriter writer, GrainId value, System.Text.Json.JsonSerializerOptions options) { }
     }
 
     public static partial class GrainIdKeyExtensions
@@ -2145,7 +2150,7 @@ namespace Orleans.Runtime
 
         readonly bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
 
-        public override readonly string? ToString() { throw null; }
+        public override readonly string ToString() { throw null; }
     }
 
     [System.AttributeUsage(System.AttributeTargets.Interface, AllowMultiple = false)]
@@ -2190,9 +2195,9 @@ namespace Orleans.Runtime
         public virtual TGrainInterface Cast<TGrainInterface>()
             where TGrainInterface : IAddressable { throw null; }
 
-        public bool Equals(GrainReference other) { throw null; }
+        public bool Equals(GrainReference? other) { throw null; }
 
-        public override bool Equals(object obj) { throw null; }
+        public override bool Equals(object? obj) { throw null; }
 
         public override int GetHashCode() { throw null; }
 
@@ -2206,13 +2211,13 @@ namespace Orleans.Runtime
 
         protected System.Threading.Tasks.ValueTask<T> InvokeAsync<T>(IRequest methodDescription) { throw null; }
 
-        public static bool operator ==(GrainReference reference1, GrainReference reference2) { throw null; }
+        public static bool operator ==(GrainReference? reference1, GrainReference? reference2) { throw null; }
 
-        public static bool operator !=(GrainReference reference1, GrainReference reference2) { throw null; }
+        public static bool operator !=(GrainReference? reference1, GrainReference? reference2) { throw null; }
 
-        string System.IFormattable.ToString(string format, System.IFormatProvider formatProvider) { throw null; }
+        string System.IFormattable.ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
 
-        bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider provider) { throw null; }
+        bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
 
         public sealed override string ToString() { throw null; }
     }
@@ -2434,7 +2439,7 @@ namespace Orleans.Runtime
 
         readonly bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
 
-        public override readonly string? ToString() { throw null; }
+        public override readonly string ToString() { throw null; }
 
         public readonly bool TryFormat(System.Span<char> destination, out int charsWritten) { throw null; }
 
@@ -2608,15 +2613,15 @@ namespace Orleans.Runtime
 
         public int TypeCode { get { throw null; } }
 
-        public int CompareTo(LegacyGrainId other) { throw null; }
+        public int CompareTo(LegacyGrainId? other) { throw null; }
 
         public static GrainType CreateGrainTypeForGrain(int typeCode) { throw null; }
 
         public static GrainType CreateGrainTypeForSystemTarget(int typeCode) { throw null; }
 
-        public bool Equals(LegacyGrainId other) { throw null; }
+        public bool Equals(LegacyGrainId? other) { throw null; }
 
-        public override bool Equals(object obj) { throw null; }
+        public override bool Equals(object? obj) { throw null; }
 
         public static LegacyGrainId FromGrainId(GrainId id) { throw null; }
 
@@ -2624,9 +2629,9 @@ namespace Orleans.Runtime
 
         public uint GetHashCode_Modulo(uint umod) { throw null; }
 
-        public System.Guid GetPrimaryKey(out string keyExt) { throw null; }
+        public System.Guid GetPrimaryKey(out string? keyExt) { throw null; }
 
-        public long GetPrimaryKeyLong(out string keyExt) { throw null; }
+        public long GetPrimaryKeyLong(out string? keyExt) { throw null; }
 
         public uint GetUniformHashCode() { throw null; }
 
@@ -2644,7 +2649,7 @@ namespace Orleans.Runtime
 
         public override string ToString() { throw null; }
 
-        public static bool TryConvertFromGrainId(GrainId id, out LegacyGrainId legacyId) { throw null; }
+        public static bool TryConvertFromGrainId(GrainId id, out LegacyGrainId? legacyId) { throw null; }
     }
 
     [GenerateSerializer]
@@ -2690,7 +2695,7 @@ namespace Orleans.Runtime
 
         public readonly bool Equals(MembershipVersion other) { throw null; }
 
-        public override readonly bool Equals(object obj) { throw null; }
+        public override readonly bool Equals(object? obj) { throw null; }
 
         public override readonly int GetHashCode() { throw null; }
 
@@ -2826,7 +2831,7 @@ namespace Orleans.Runtime
 
         public static void Clear() { }
 
-        public static object Get(string key) { throw null; }
+        public static object? Get(string key) { throw null; }
 
         public static bool Remove(string key) { throw null; }
 
@@ -2851,6 +2856,9 @@ namespace Orleans.Runtime
         protected abstract System.Threading.Tasks.ValueTask<TResult> InvokeInner();
     }
 
+    [GenerateSerializer]
+    [Immutable]
+    [SuppressReferenceTracking]
     public sealed partial class ResourceOptimizedPlacement : PlacementStrategy
     {
     }
@@ -2912,11 +2920,14 @@ namespace Orleans.Runtime
 
     public sealed partial class SiloAddressConverter : System.Text.Json.Serialization.JsonConverter<SiloAddress>
     {
-        public override SiloAddress Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+        public override SiloAddress? Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
 
         public override void Write(System.Text.Json.Utf8JsonWriter writer, SiloAddress value, System.Text.Json.JsonSerializerOptions options) { }
     }
 
+    [GenerateSerializer]
+    [Immutable]
+    [SuppressReferenceTracking]
     public partial class SiloRoleBasedPlacement : PlacementStrategy
     {
     }
@@ -3021,7 +3032,7 @@ namespace Orleans.Runtime
         public bool IsSystemTargetKey { get { throw null; } }
 
         [Id(3)]
-        public string KeyExt { get { throw null; } }
+        public string? KeyExt { get { throw null; } }
 
         [Id(0)]
         public ulong N0 { get { throw null; } }
@@ -3032,11 +3043,11 @@ namespace Orleans.Runtime
         [Id(2)]
         public ulong TypeCodeData { get { throw null; } }
 
-        public int CompareTo(UniqueKey other) { throw null; }
+        public int CompareTo(UniqueKey? other) { throw null; }
 
-        public bool Equals(UniqueKey other) { throw null; }
+        public bool Equals(UniqueKey? other) { throw null; }
 
-        public override bool Equals(object o) { throw null; }
+        public override bool Equals(object? o) { throw null; }
 
         public override int GetHashCode() { throw null; }
 
@@ -3052,11 +3063,11 @@ namespace Orleans.Runtime
 
         public System.Guid PrimaryKeyToGuid() { throw null; }
 
-        public System.Guid PrimaryKeyToGuid(out string extendedKey) { throw null; }
+        public System.Guid PrimaryKeyToGuid(out string? extendedKey) { throw null; }
 
         public long PrimaryKeyToLong() { throw null; }
 
-        public long PrimaryKeyToLong(out string extendedKey) { throw null; }
+        public long PrimaryKeyToLong(out string? extendedKey) { throw null; }
 
         public override string ToString() { throw null; }
 
@@ -3120,7 +3131,7 @@ namespace Orleans.Runtime
         public WrappedException(string message) { }
 
         [Id(0)]
-        public string OriginalExceptionType { get { throw null; } set { } }
+        public string? OriginalExceptionType { get { throw null; } set { } }
 
         [System.Diagnostics.CodeAnalysis.DoesNotReturn]
         public static void CreateAndRethrow(System.Exception exception) { }
@@ -3175,16 +3186,36 @@ namespace Orleans.Statistics
     [Immutable]
     [GenerateSerializer]
     [Alias("Orleans.Statistics.EnvironmentStatistics")]
+    [System.Diagnostics.DebuggerDisplay("{ToString(),nq}")]
     public readonly partial struct EnvironmentStatistics
     {
         [Id(2)]
-        public readonly long AvailableMemoryBytes;
+        public readonly long FilteredAvailableMemoryBytes;
         [Id(0)]
-        public readonly float CpuUsagePercentage;
+        public readonly float FilteredCpuUsagePercentage;
+        [Id(1)]
+        public readonly long FilteredMemoryUsageBytes;
         [Id(3)]
         public readonly long MaximumAvailableMemoryBytes;
-        [Id(1)]
-        public readonly long MemoryUsageBytes;
+        [Id(6)]
+        public readonly long RawAvailableMemoryBytes;
+        [Id(4)]
+        public readonly float RawCpuUsagePercentage;
+        [Id(5)]
+        public readonly long RawMemoryUsageBytes;
+        public float AvailableMemoryPercentage { get { throw null; } }
+
+        public float MemoryUsagePercentage { get { throw null; } }
+
+        public float NormalizedAvailableMemory { get { throw null; } }
+
+        public float NormalizedFilteredAvailableMemory { get { throw null; } }
+
+        public float NormalizedFilteredMemoryUsage { get { throw null; } }
+
+        public float NormalizedMemoryUsage { get { throw null; } }
+
+        public override readonly string ToString() { throw null; }
     }
 
     [System.Obsolete("This functionality will be removed, use IEnvironmentStatisticsProvider.GetEnvironmentStatistics instead.")]
@@ -4048,6 +4079,38 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_ResourceOptimizedPlacement : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.ResourceOptimizedPlacement>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Runtime.ResourceOptimizedPlacement instance) { }
+
+        public global::Orleans.Runtime.ResourceOptimizedPlacement ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Runtime.ResourceOptimizedPlacement instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Runtime.ResourceOptimizedPlacement value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_SiloRoleBasedPlacement : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.SiloRoleBasedPlacement>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Runtime.SiloRoleBasedPlacement>, global::Orleans.Serialization.Serializers.IBaseCodec
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Runtime.SiloRoleBasedPlacement instance) { }
+
+        public global::Orleans.Runtime.SiloRoleBasedPlacement ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Runtime.SiloRoleBasedPlacement instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Runtime.SiloRoleBasedPlacement value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_SiloUnavailableException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.SiloUnavailableException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_SiloUnavailableException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -4225,6 +4288,16 @@ namespace OrleansCodeGen.Orleans.Runtime
     public sealed partial class Copier_OrleansMessageRejectionException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Runtime.OrleansMessageRejectionException, global::Orleans.Runtime.OrleansException>
     {
         public Copier_OrleansMessageRejectionException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_SiloRoleBasedPlacement : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Runtime.SiloRoleBasedPlacement>, global::Orleans.Serialization.Cloning.IDeepCopier, global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.Runtime.SiloRoleBasedPlacement>, global::Orleans.Serialization.Cloning.IBaseCopier
+    {
+        public void DeepCopy(global::Orleans.Runtime.SiloRoleBasedPlacement input, global::Orleans.Runtime.SiloRoleBasedPlacement output, global::Orleans.Serialization.Cloning.CopyContext context) { }
+
+        public global::Orleans.Runtime.SiloRoleBasedPlacement DeepCopy(global::Orleans.Runtime.SiloRoleBasedPlacement original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]

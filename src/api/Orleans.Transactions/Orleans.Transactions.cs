@@ -26,6 +26,7 @@ namespace Orleans
 
         public TransactionAttribute(TransactionOptionAlias alias) { }
 
+        [System.Obsolete("Use [ReadOnly] attribute instead.")]
         public bool ReadOnly { get { throw null; } set { } }
 
         public TransactionOption Requirement { get { throw null; } }
