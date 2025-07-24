@@ -153,26 +153,40 @@ namespace Orleans.Configuration
         public System.TimeSpan CollectionQuantum { get { throw null; } set { } }
 
         public System.TimeSpan DeactivationTimeout { get { throw null; } set { } }
+
+        public bool EnableActivationSheddingOnMemoryPressure { get { throw null; } set { } }
+
+        public double MemoryUsageLimitPercentage { get { throw null; } set { } }
+
+        public System.TimeSpan MemoryUsagePollingPeriod { get { throw null; } set { } }
+
+        public double MemoryUsageTargetPercentage { get { throw null; } set { } }
     }
 
     public partial class GrainDirectoryOptions
     {
         public const int DEFAULT_CACHE_SIZE = 1000000;
-        public const CachingStrategyType DEFAULT_CACHING_STRATEGY = 2;
+        public const CachingStrategyType DEFAULT_CACHING_STRATEGY = 1;
+        [System.Obsolete("DEFAULT_INITIAL_CACHE_TTL is deprecated and will be removed in a future version.")]
         public static readonly System.TimeSpan DEFAULT_INITIAL_CACHE_TTL;
+        [System.Obsolete("DEFAULT_MAXIMUM_CACHE_TTL is deprecated and will be removed in a future version.")]
         public static readonly System.TimeSpan DEFAULT_MAXIMUM_CACHE_TTL;
+        [System.Obsolete("DEFAULT_TTL_EXTENSION_FACTOR is deprecated and will be removed in a future version.")]
         public const double DEFAULT_TTL_EXTENSION_FACTOR = 2D;
         public static readonly System.TimeSpan DEFAULT_UNREGISTER_RACE_DELAY;
         public int CacheSize { get { throw null; } set { } }
 
+        [System.Obsolete("CacheTTLExtensionFactor is deprecated and will be removed in a future version.")]
         public double CacheTTLExtensionFactor { get { throw null; } set { } }
 
         public CachingStrategyType CachingStrategy { get { throw null; } set { } }
 
+        [System.Obsolete("InitialCacheTTL is deprecated and will be removed in a future version.")]
         public System.TimeSpan InitialCacheTTL { get { throw null; } set { } }
 
         public System.TimeSpan LazyDeregistrationDelay { get { throw null; } set { } }
 
+        [System.Obsolete("MaximumCacheTTL is deprecated and will be removed in a future version.")]
         public System.TimeSpan MaximumCacheTTL { get { throw null; } set { } }
 
         public enum CachingStrategyType
@@ -253,6 +267,7 @@ namespace Orleans.Configuration
         public const int DEFAULT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER_HARD_LIMIT = 0;
         public const int DEFAULT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER_SOFT_LIMIT = 0;
         public static readonly System.TimeSpan DEFAULT_MAX_REQUEST_PROCESSING_TIME;
+        [System.Obsolete("Unused, will be removed in a future version.")]
         public static readonly System.TimeSpan DEFAULT_SHUTDOWN_REROUTE_TIMEOUT;
         public static readonly System.TimeSpan DEFAULT_WAIT_FOR_MESSAGE_TO_BE_QUEUED_FOR_OUTBOUND_TIME;
         public bool AssumeHomogenousSilosForTesting { get { throw null; } set { } }
@@ -283,6 +298,7 @@ namespace Orleans.Configuration
 
         public System.TimeSpan RequestQueueDelayWarningTime { get { throw null; } set { } }
 
+        [System.Obsolete("Unused, will be removed in a future version.")]
         public System.TimeSpan ShutdownRerouteTimeout { get { throw null; } set { } }
 
         public int SiloSenderQueues { get { throw null; } set { } }
@@ -572,6 +588,7 @@ namespace Orleans.Runtime
     public abstract partial class GrainService : SystemTarget, Orleans.Services.IGrainService, ISystemTarget, IAddressable
     {
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        [System.Obsolete("Do not call the empty constructor.")]
         protected GrainService() { }
 
         protected GrainService(GrainId grainId, Silo silo, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
