@@ -303,9 +303,12 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
             }
         }
 
-        foreach (var stateMachine in _stateMachines.Values)
+        lock (_lock)
         {
-            stateMachine.OnRecoveryCompleted();
+            foreach (var stateMachine in _stateMachines.Values)
+            {
+                stateMachine.OnRecoveryCompleted();
+            }
         }
     }
 
