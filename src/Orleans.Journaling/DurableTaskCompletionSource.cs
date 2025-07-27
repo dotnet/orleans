@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
@@ -141,7 +141,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
             throw new NotSupportedException($"This instance of {nameof(DurableTaskCompletionSource<T>)} supports version {(uint)SupportedVersion} and not version {(uint)version}.");
         }
 
-        _status = (DurableTaskCompletionSourceStatus)reader.ReadVarUInt32();
+        _status = (DurableTaskCompletionSourceStatus)reader.ReadByte();
         switch (_status)
         {
             case DurableTaskCompletionSourceStatus.Completed:
