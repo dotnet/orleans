@@ -186,9 +186,11 @@ public class GrainCtorInjectionTests(TestFixture fixture) : IClassFixture<TestFi
     public class TestFixture : IAsyncLifetime
     {
         public readonly InProcessTestCluster Cluster;
+
         public TestFixture()
         {
             var builder = new InProcessTestClusterBuilder(1);
+
             builder.ConfigureSilo((options, siloBuilder) =>
             {
                 siloBuilder.AddMemoryGrainStorageAsDefault();
@@ -201,8 +203,10 @@ public class GrainCtorInjectionTests(TestFixture fixture) : IClassFixture<TestFi
                 siloBuilder.Services.AddScoped<ScopedService>();
                 siloBuilder.Services.AddTransient<TransientService>();
             });
+
             Cluster = builder.Build();
         }
+
         public virtual async Task InitializeAsync() => await Cluster.DeployAsync();
         public virtual async Task DisposeAsync() => await Cluster.DisposeAsync();
     }
