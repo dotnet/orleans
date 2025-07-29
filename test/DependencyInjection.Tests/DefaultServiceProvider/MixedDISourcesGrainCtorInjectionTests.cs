@@ -2,47 +2,48 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core.Internal;
 using Orleans.TestingHost;
 using Xunit;
-using static UnitTests.General.GrainCtorInjectionTests;
 
-namespace UnitTests.General;
+namespace DependencyInjection.Tests.DefaultServiceProvider;
 
-public class GrainCtorInjectionTests(TestFixture fixture) : IClassFixture<TestFixture>
+[TestCategory("DI"), TestCategory("Functional")]
+public class MixedDISourcesGrainCtorInjectionTests(MixedDISourcesGrainCtorInjectionTests.TestFixture fixture)
+    : IClassFixture<MixedDISourcesGrainCtorInjectionTests.TestFixture>
 {
-    [Fact, TestCategory("Functional")]
+    [Fact]
     public async Task CanActivateGrainWithComplexMixedDISources()
     {
         var grain = fixture.Cluster.Client.GetGrain<IComplexCtorInjectGrain>(Guid.NewGuid());
 
         var result1 = await grain.GetActivationResult();
-        AssertResults(result1);
+        AssertResult(result1);
 
         await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
 
         var result2 = await grain.GetActivationResult();
-        AssertResults(result2);
+        AssertResult(result2);
 
         Assert.NotEqual(result1.ScopedServiceId, result2.ScopedServiceId);
         Assert.NotEqual(result1.TransientServiceId1, result2.TransientServiceId2);
     }
 
-    [Fact, TestCategory("Functional")]
+    [Fact]
     public async Task CanActivateGrainWithComplexMixedDISources_ReversedOrderInjection()
     {
         var grain = fixture.Cluster.Client.GetGrain<IComplexReversedCtorInjectGrain>(Guid.NewGuid());
 
         var result1 = await grain.GetActivationResult();
-        AssertResults(result1);
+        AssertResult(result1);
 
         await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
 
         var result2 = await grain.GetActivationResult();
-        AssertResults(result2);
+        AssertResult(result2);
 
         Assert.NotEqual(result1.ScopedServiceId, result2.ScopedServiceId);
         Assert.NotEqual(result1.TransientServiceId1, result2.TransientServiceId2);
     }
 
-    private void AssertResults(ActivationResult result)
+    private void AssertResult(ActivationResult result)
     {
         Assert.True(result.IsServiceInjected);
         Assert.True(result.IsKeyedServiceInjected);
