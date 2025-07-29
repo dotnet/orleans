@@ -37,14 +37,11 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
     string IStorage.Etag => $"{_version}";
     bool IStorage.RecordExists => _version > 0;
 
-    private void OnValuePersisted()
+    void IDurableStateMachine.OnWriteCompleted()
     {
-        ++_version;
+        _version++;
         OnPersisted?.Invoke();
     }
-
-    void IDurableStateMachine.OnRecoveryCompleted() => OnValuePersisted();
-    void IDurableStateMachine.OnWriteCompleted() => OnValuePersisted();
 
     void IDurableStateMachine.Reset(IStateMachineLogWriter storage) => _value = default;
 
