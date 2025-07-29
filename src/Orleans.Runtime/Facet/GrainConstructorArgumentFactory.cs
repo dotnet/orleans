@@ -62,20 +62,29 @@ public class GrainConstructorArgumentFactory
             }
             else
             {
-                // This is a standard DI parameter. So we create a factory that resolves it directly.
-                _argumentFactories.Add(context =>
-                {
-                    var activationServices = context.ActivationServices;
+                Factory<IGrainContext, object> factory;
+                var parameterType = parameter.ParameterType;
 
-                    if (parameter.GetCustomAttribute<FromKeyedServicesAttribute>() is { } keyedAttribute)
+                if (parameter.GetCustomAttribute<FromKeyedServicesAttribute>(inherit: true) is { } keyedAttribute)
+                {
+                    var key = keyedAttribute.Key;
+                    factory = context =>
                     {
-                        return activationServices.GetRequiredKeyedService(parameter.ParameterType, keyedAttribute.Key);
-                    }
-                    else
+                        var activationServices = context.ActivationServices;
+                        return activationServices.GetRequiredKeyedService(parameterType, key);
+                    };
+                }
+                else
+                {
+                    factory = context =>
                     {
-                        return activationServices.GetRequiredService(parameter.ParameterType);
-                    }
-                });
+                        var activationServices = context.ActivationServices;
+                        return activationServices.GetRequiredService(parameterType);
+                    };
+                }
+
+                _argumentFactories.Add(factory);
+
             }
         }
 
