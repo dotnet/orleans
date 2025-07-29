@@ -221,7 +221,7 @@ namespace DependencyInjection.Tests
             ISimpleDIGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => grain.GetLongValue());
             var innerException = Assert.IsType<InvalidOperationException>(exception.InnerException);
-            Assert.Contains("Unable to resolve service for type 'System.String' while attempting to activate 'UnitTests.Grains.ExplicitlyRegisteredSimpleDIGrain'", innerException.Message);
+            Assert.Contains("No service for type 'System.String' has been registered.", innerException.Message);
         }
 
         /// <summary>
