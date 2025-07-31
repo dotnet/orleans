@@ -50,6 +50,7 @@ namespace TestExtensions
 
         public virtual async Task InitializeAsync()
         {
+            EnsurePreconditionsMet();
             var builder = new TestClusterBuilder();
             TestDefaultConfiguration.ConfigureTestCluster(builder);
             this.ConfigureTestCluster(builder);

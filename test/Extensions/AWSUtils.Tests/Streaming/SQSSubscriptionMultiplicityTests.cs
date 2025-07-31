@@ -115,10 +115,10 @@ namespace AWSUtils.Tests.Streaming
         }
 
         [SkippableFact, TestCategory("AWS")]
-        public async Task SQSTwoIntermitentStreamTest()
+        public async Task SQSTwoIntermittentStreamTest()
         {
-            logger.LogInformation("************************ SQSTwoIntermitentStreamTest *********************************");
-            await runner.TwoIntermitentStreamTest(Guid.NewGuid());
+            logger.LogInformation("************************ SQSTwoIntermittentStreamTest *********************************");
+            await runner.TwoIntermittentStreamTest(Guid.NewGuid());
         }
 
         [SkippableFact, TestCategory("AWS")]
