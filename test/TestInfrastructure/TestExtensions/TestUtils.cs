@@ -56,6 +56,17 @@ namespace Tester
             ForceTlsVersion();
         }
 
+        public static void CheckForDynamoDB()
+        {
+            if (string.IsNullOrWhiteSpace(DynamoDbAccessKey) ||
+                string.IsNullOrWhiteSpace(DynamoDbSecretKey) ||
+                string.IsNullOrWhiteSpace(DynamoDbService))
+            {
+                throw new SkipException($"No DynamoDB credentials found. Skaaipping");
+            }
+            ForceTlsVersion();
+        }
+
         private static void ForceTlsVersion()
         {
             // Force TLS 1.2
