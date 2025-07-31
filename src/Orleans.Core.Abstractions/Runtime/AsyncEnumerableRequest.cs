@@ -169,7 +169,7 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
 {
     private readonly AsyncEnumerableRequest<T> _request;
     private readonly CancellationToken _cancellationToken;
-    private CancellationTokenSource? _cancellationTokenSource;
+    private readonly CancellationTokenSource? _cancellationTokenSource;
     private readonly IAsyncEnumerableGrainExtension _target;
     private readonly Guid _requestId;
     private (EnumerationResult State, object Value) _current;

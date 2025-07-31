@@ -98,7 +98,7 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
         await enumerationStartedTask;
 
         // Wait for the grain to record the cancellation
-        do
+        while (true)
         {
             var canceledCalls = await grain.GetCanceledCalls();
             if (canceledCalls.Contains(callId))
@@ -111,7 +111,7 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
             {
                 Assert.Fail("Test timed out waiting for cancellation to be recorded.");
             }
-        } while (true);
+        }
     }
 
     /// <summary>
