@@ -34,7 +34,7 @@ public class ArraySerializeBenchmark
     {
         _value = Enumerable.Repeat(new MyVector3 { X = 10.3f, Y = 40.5f, Z = 13411.3f }, 1000).ToArray();
         var serviceProvider = new ServiceCollection()
-            .AddSerializer(builder => builder.AddAssembly(typeof(ArraySerializeBenchmark).Assembly))
+            .AddSerializer()
             .BuildServiceProvider();
         _orleansSerializer = serviceProvider.GetRequiredService<Serializer<MyVector3[]>>();
         _session = serviceProvider.GetRequiredService<SerializerSessionPool>().GetSession();
