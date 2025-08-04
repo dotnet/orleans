@@ -172,11 +172,20 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
                                 if (_workers.Count == 0)
                                 {
-                                    // When the last worker is destroyed, we can consider the stateless worker grain
-                                    // activation to be destroyed as well
+                                    // When the last worker is destroyed, we can consider the stateless worker grain activation to be destroyed as well
                                     _shared.InternalRuntime.Catalog.UnregisterMessageTarget(this);
+
                                     var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                                     EnqueueWorkItem(WorkItemType.DisposeAsync, new DisposeAsyncWorkItemState(completion));
+
+                                    // DO NOT await this as it would deadlock the work loop!
+                                    _ = completion.Task.ContinueWith(t =>
+                                    {
+                                        if (t.Exception is { } ex)
+                                        {
+                                            LogErrorInMessageLoop(_shared.Logger, ex);
+                                        }
+                                    }, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Current);
                                 }
                                 break;
                             }
@@ -345,16 +354,12 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     private async Task DisposeAsyncInternal(TaskCompletionSource completion)
     {
-        try
+        if (_inspectionTimer != null)
         {
-            if (_inspectionTimer != null)
-            {
-                await _inspectionTimer.DisposeAsync();
-                _inspectionTimer = null;
-            }
-        }
-        catch
-        {
+            await _inspectionTimer.DisposeAsync().AsTask()
+                .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+            _inspectionTimer = null;
         }
 
         try
