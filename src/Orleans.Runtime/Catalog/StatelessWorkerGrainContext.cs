@@ -175,6 +175,8 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
                                     // When the last worker is destroyed, we can consider the stateless worker grain
                                     // activation to be destroyed as well
                                     _shared.InternalRuntime.Catalog.UnregisterMessageTarget(this);
+                                    var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                                    EnqueueWorkItem(WorkItemType.DisposeAsync, new DisposeAsyncWorkItemState(completion));
                                 }
                                 break;
                             }
