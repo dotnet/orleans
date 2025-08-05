@@ -12,15 +12,15 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 {
     /// <summary>
     /// Multiplexes messages to multiple different producers in the same grain over one grain-extension interface.
-    /// 
-    /// On the silo, we have one extension per activation and this extension multiplexes all streams on this activation 
+    ///
+    /// On the silo, we have one extension per activation and this extension multiplexes all streams on this activation
     ///     (different stream ids and different stream providers).
     /// On the client, we have one extension per stream (we bind an extension for every StreamProducer, therefore every stream has its own extension).
     /// </summary>
     [Serializable]
     internal class SimpleMessageStreamProducerExtension : IStreamProducerExtension
     {
-        private readonly Dictionary<StreamId, StreamConsumerExtensionCollection> remoteConsumers;
+        private readonly ConcurrentDictionary<StreamId, StreamConsumerExtensionCollection> remoteConsumers;
         private readonly IStreamProviderRuntime     providerRuntime;
         private readonly IStreamPubSub              streamPubSub;
         private readonly bool                       fireAndForgetDelivery;
@@ -33,7 +33,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             streamPubSub = pubsub;
             fireAndForgetDelivery = fireAndForget;
             optimizeForImmutableData = optimizeForImmutable;
-            remoteConsumers = new Dictionary<StreamId, StreamConsumerExtensionCollection>();
+            remoteConsumers = new ConcurrentDictionary<StreamId, StreamConsumerExtensionCollection>();
             this.logger = logger;
         }
 
@@ -45,19 +45,19 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             if (remoteConsumers.TryGetValue(streamId, out obs)) return;
 
             obs = new StreamConsumerExtensionCollection(streamPubSub, this.logger);
-            remoteConsumers.Add(streamId, obs);
+            remoteConsumers.TryAdd(streamId, obs);
         }
 
         internal void RemoveStream(StreamId streamId)
         {
-            remoteConsumers.Remove(streamId);
+            remoteConsumers.TryRemove(streamId, out _);
         }
 
         internal void AddSubscribers(StreamId streamId, ICollection<PubSubSubscriptionState> newSubscribers)
         {
             if (logger.IsEnabled(LogLevel.Debug))
                 logger.Debug("{0} AddSubscribers {1} for stream {2}", providerRuntime.ExecutingEntityIdentity(), Utils.EnumerableToString(newSubscribers), streamId);
-            
+
             StreamConsumerExtensionCollection consumers;
             if (remoteConsumers.TryGetValue(streamId, out consumers))
             {
@@ -78,9 +78,9 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             StreamConsumerExtensionCollection consumers;
             if (remoteConsumers.TryGetValue(streamId, out consumers))
             {
-                // Note: This is the main hot code path, 
-                // and the caller immediately does await on the Task 
-                // returned from this method, so we can just direct return here 
+                // Note: This is the main hot code path,
+                // and the caller immediately does await on the Task
+                // returned from this method, so we can just direct return here
                 // without incurring overhead of additional await.
                 return consumers.DeliverItem(streamId, item, fireAndForgetDelivery, optimizeForImmutableData);
             }
@@ -152,7 +152,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                     subscriptionId);
             }
 
-            foreach (StreamConsumerExtensionCollection consumers in remoteConsumers.Values)
+            foreach (StreamConsumerExtensionCollection consumers in new List<StreamConsumerExtensionCollection>(remoteConsumers.Values))
             {
                 consumers.RemoveRemoteSubscriber(subscriptionId);
             }

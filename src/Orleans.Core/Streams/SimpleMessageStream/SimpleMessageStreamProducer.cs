@@ -83,6 +83,9 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             // the caller should check _connectedToRendezvous before calling this method.
             using (await initLock.LockAsync())
             {
+                if (isDisposed)
+                    throw new ObjectDisposedException(string.Format("{0}-{1}", GetType(), "ConnectToRendezvous"));
+
                 if (!connectedToRendezvous) // need to re-check again.
                 {
                     var remoteSubscribers = await RegisterProducer();
@@ -96,7 +99,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             if (token != null && !IsRewindable)
                 throw new ArgumentNullException("token", "Passing a non-null token to a non-rewindable IAsyncBatchObserver.");
-            
+
 
             if (isDisposed) throw new ObjectDisposedException(string.Format("{0}-{1}", GetType(), "OnNextAsync"));
 
@@ -118,7 +121,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token)
         {
             if (token != null && !IsRewindable) throw new ArgumentNullException("token", "Passing a non-null token to a non-rewindable IAsyncBatchObserver.");
-            
+
             throw new NotImplementedException("We still don't support OnNextBatchAsync()");
         }
 
@@ -146,30 +149,33 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         public async Task Cleanup()
         {
-            if(logger.IsEnabled(LogLevel.Debug)) logger.Debug("Cleanup() called");
-
-            myExtension.RemoveStream(stream.StreamId);
-
-            if (isDisposed) return;
-
-            if (connectedToRendezvous)
+            using (await initLock.LockAsync())
             {
-                try
-                {
-                    await pubSub.UnregisterProducer(stream.StreamId, streamProviderName, myGrainReference);
-                    connectedToRendezvous = false;
-                }
-                catch (Exception exc)
-                {
-                    logger.Warn((int) ErrorCode.StreamProvider_ProducerFailedToUnregister,
-                        "Ignoring unhandled exception during PubSub.UnregisterProducer", exc);
-                }
-            }
-            isDisposed = true;
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Cleanup() called");
 
-            Action onDisposeTestHook = OnDisposeTestHook; // capture
-            if (onDisposeTestHook != null)
-                onDisposeTestHook();
+                myExtension.RemoveStream(stream.StreamId);
+
+                if (isDisposed) return;
+
+                if (connectedToRendezvous)
+                {
+                    try
+                    {
+                        await pubSub.UnregisterProducer(stream.StreamId, streamProviderName, myGrainReference);
+                        connectedToRendezvous = false;
+                    }
+                    catch (Exception exc)
+                    {
+                        logger.Warn((int) ErrorCode.StreamProvider_ProducerFailedToUnregister,
+                            "Ignoring unhandled exception during PubSub.UnregisterProducer", exc);
+                    }
+                }
+                isDisposed = true;
+
+                Action onDisposeTestHook = OnDisposeTestHook; // capture
+                if (onDisposeTestHook != null)
+                    onDisposeTestHook();
+            }
         }
     }
 }
