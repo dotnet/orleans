@@ -39,6 +39,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
     private double _integralTerm = 0d;
     private int _detectedIdleCyclesCount = 0;
     private readonly int _minIdleCyclesBeforeRemoval;
+    private readonly bool _isIdleWorkerRemovalStrategy;
 
     public StatelessWorkerGrainContext(
         GrainAddress address,
@@ -52,7 +53,8 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
         var strategy = (StatelessWorkerPlacement)_shared.PlacementStrategy;
         var options = _shared.StatelessWorkerOptions;
 
-        if (strategy.RemoveIdleWorkers && options.RemoveIdleWorkers)
+        _isIdleWorkerRemovalStrategy = strategy.RemoveIdleWorkers && options.RemoveIdleWorkers;
+        if (_isIdleWorkerRemovalStrategy)
         {
             _minIdleCyclesBeforeRemoval = options.MinIdleCyclesBeforeRemoval > 0 ? options.MinIdleCyclesBeforeRemoval : 1;
             _inspectionTimer = new Timer(
@@ -175,17 +177,20 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
                                     // When the last worker is destroyed, we can consider the stateless worker grain activation to be destroyed as well
                                     _shared.InternalRuntime.Catalog.UnregisterMessageTarget(this);
 
-                                    var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                                    EnqueueWorkItem(WorkItemType.DisposeAsync, new DisposeAsyncWorkItemState(completion));
-
-                                    // DO NOT await this as it would deadlock the work loop!
-                                    _ = completion.Task.ContinueWith(t =>
+                                    if (_isIdleWorkerRemovalStrategy)
                                     {
-                                        if (t.Exception is { } ex)
+                                        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                                        EnqueueWorkItem(WorkItemType.DisposeAsync, new DisposeAsyncWorkItemState(completion));
+
+                                        // DO NOT await this as it would deadlock the work loop!
+                                        _ = completion.Task.ContinueWith(t =>
                                         {
-                                            LogErrorInMessageLoop(_shared.Logger, ex);
-                                        }
-                                    }, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Current);
+                                            if (t.Exception is { } ex)
+                                            {
+                                                LogErrorInMessageLoop(_shared.Logger, ex);
+                                            }
+                                        }, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Current);
+                                    }
                                 }
                                 break;
                             }
