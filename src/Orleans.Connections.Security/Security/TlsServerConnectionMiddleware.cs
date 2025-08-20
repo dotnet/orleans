@@ -52,7 +52,7 @@ namespace Orleans.Connections.Security
 
         public Task OnConnectionAsync(ConnectionContext context)
         {
-            return Task.Run(() => InnerOnConnectionAsync(context));
+            return InnerOnConnectionAsync(context);
         }
 
         private async Task InnerOnConnectionAsync(ConnectionContext context)
