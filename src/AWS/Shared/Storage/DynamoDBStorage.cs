@@ -262,7 +262,7 @@ namespace Orleans.Transactions.DynamoDB
                 BillingMode = this._useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
                 ProvisionedThroughput = _provisionedThroughput,
                 GlobalSecondaryIndexUpdates = this._useProvisionedThroughput
-                    ? tableDescription.GlobalSecondaryIndexes.Select(gsi => new GlobalSecondaryIndexUpdate
+                    ? tableDescription.GlobalSecondaryIndexes?.Select(gsi => new GlobalSecondaryIndexUpdate
                     {
                         Update = new UpdateGlobalSecondaryIndexAction
                         {
@@ -289,17 +289,20 @@ namespace Orleans.Transactions.DynamoDB
                 // We can only have one GSI in CREATING state at one time.
                 // We also wait for all indexes to finish UPDATING as the table is not ready to receive queries from Orleans until all indexes are created.
                 List<GlobalSecondaryIndexDescription> globalSecondaryIndexes = tableDescription.GlobalSecondaryIndexes;
-                foreach (var globalSecondaryIndex in globalSecondaryIndexes)
+                if (globalSecondaryIndexes != null)
                 {
-                    if (globalSecondaryIndex.IndexStatus == IndexStatus.CREATING
-                        || globalSecondaryIndex.IndexStatus == IndexStatus.UPDATING)
+                    foreach (var globalSecondaryIndex in globalSecondaryIndexes)
                     {
-                        tableDescription = await TableIndexWaitOnStatusAsync(tableDescription.TableName, globalSecondaryIndex.IndexName, globalSecondaryIndex.IndexStatus, IndexStatus.ACTIVE);
+                        if (globalSecondaryIndex.IndexStatus == IndexStatus.CREATING
+                            || globalSecondaryIndex.IndexStatus == IndexStatus.UPDATING)
+                        {
+                            tableDescription = await TableIndexWaitOnStatusAsync(tableDescription.TableName, globalSecondaryIndex.IndexName, globalSecondaryIndex.IndexStatus, IndexStatus.ACTIVE);
+                        }
                     }
                 }
 
-                var existingGlobalSecondaryIndexes = tableDescription.GlobalSecondaryIndexes.Select(globalSecondaryIndex => globalSecondaryIndex.IndexName).ToArray();
-                var secondaryIndexesToCreate = (secondaryIndexes ?? Enumerable.Empty<GlobalSecondaryIndex>()).Where(secondaryIndex => !existingGlobalSecondaryIndexes.Contains(secondaryIndex.IndexName));
+                var existingGlobalSecondaryIndexes = tableDescription.GlobalSecondaryIndexes?.Select(globalSecondaryIndex => globalSecondaryIndex.IndexName).ToArray();
+                var secondaryIndexesToCreate = (secondaryIndexes ?? Enumerable.Empty<GlobalSecondaryIndex>()).Where(secondaryIndex => existingGlobalSecondaryIndexes == null || !existingGlobalSecondaryIndexes.Contains(secondaryIndex.IndexName));
 
                 foreach (var secondaryIndex in secondaryIndexesToCreate)
                 {
@@ -419,7 +422,7 @@ namespace Orleans.Transactions.DynamoDB
                 }
 
                 ret = await GetTableDescription(tableName);
-                index = ret.GlobalSecondaryIndexes.Find(index => index.IndexName == indexName);
+                index = ret.GlobalSecondaryIndexes?.Find(index => index.IndexName == indexName);
             } while (index.IndexStatus == whileStatus);
 
             if (desiredStatus != null && index.IndexStatus != desiredStatus)
@@ -765,7 +768,7 @@ namespace Orleans.Transactions.DynamoDB
                 {
                     resultList.AddRange(results);
                 }
-            } while (lastEvaluatedKey.Count != 0);
+            } while (lastEvaluatedKey != null && lastEvaluatedKey.Count != 0);
 
             return resultList;
         }
@@ -807,12 +810,15 @@ namespace Orleans.Transactions.DynamoDB
 
                     var response = await _ddbClient.ScanAsync(request);
 
-                    foreach (var item in response.Items)
+                    if (response.Items != null)
                     {
-                        resultList.Add(resolver(item));
+                        foreach (var item in response.Items)
+                        {
+                            resultList.Add(resolver(item));
+                        }
                     }
 
-                    if (response.LastEvaluatedKey.Count == 0)
+                    if (response.LastEvaluatedKey == null || response.LastEvaluatedKey.Count == 0)
                     {
                         break;
                     }
