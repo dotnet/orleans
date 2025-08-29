@@ -8,8 +8,27 @@ namespace UnitTests.Grains
     {
         private readonly List<(string InterfaceName, string MethodName)> _localCalls = new();
         private readonly Channel<string> _updates = Channel.CreateUnbounded<string>();
+        private readonly Dictionary<Guid, TaskCompletionSource> _receivedCalls = [];
+        private readonly HashSet<Guid> _canceledCalls = [];
 
         public IAsyncEnumerable<string> GetValues(CancellationToken cancellationToken) => _updates.Reader.ReadAllAsync(cancellationToken);
+        public ValueTask<HashSet<Guid>> GetCanceledCalls() => new(_canceledCalls);
+        public ValueTask WaitForCall(Guid id)
+        {
+            var tcs = GetReceivedCallTcs(id);
+
+            return new(tcs.Task);
+        }
+
+        private TaskCompletionSource GetReceivedCallTcs(Guid id)
+        {
+            if (!_receivedCalls.TryGetValue(id, out var tcs))
+            {
+                tcs = _receivedCalls[id] = new();
+            }
+
+            return tcs;
+        }
 
         public async IAsyncEnumerable<int> GetValuesWithError(int errorIndex, bool waitAfterYield, string errorMessage, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
@@ -58,6 +77,23 @@ namespace UnitTests.Grains
         {
             _localCalls.Add((context.InterfaceName, context.MethodName));
             return context.Invoke();
+        }
+
+        public async IAsyncEnumerable<int> SleepyEnumerable(Guid id, TimeSpan delay, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                GetReceivedCallTcs(id).TrySetResult();
+                await Task.Delay(delay, cancellationToken);
+                yield return 1;
+            }
+            finally
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    _canceledCalls.Add(id);
+                }
+            }
         }
     }
 }
