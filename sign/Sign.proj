@@ -22,6 +22,7 @@
     <PropertyGroup>
       <_DryRun>false</_DryRun>
       <_TestSign>false</_TestSign>
+      <_TestSign Condition="'$(DotNetSignType)' == 'test' >true</_TestSign>
       <_DesktopMSBuildRequired>false</_DesktopMSBuildRequired>
       <_DesktopMSBuildRequired>true</_DesktopMSBuildRequired>
       <DoStrongNameCheck>false</DoStrongNameCheck>
