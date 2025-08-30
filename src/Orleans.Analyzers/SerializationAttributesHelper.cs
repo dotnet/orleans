@@ -9,16 +9,6 @@ namespace Orleans.Analyzers
 {
     internal static class SerializationAttributesHelper
     {
-        public static bool ShouldGenerateSerializer(TypeDeclarationSyntax declaration)
-        {
-            if (!declaration.Modifiers.Any(m => m.IsKind(SyntaxKind.StaticKeyword)) && declaration.HasAttribute(Constants.GenerateSerializerAttributeName))
-            {
-                return true;
-            }
-
-            return false;
-        }
-
         public static bool ShouldGenerateSerializer(INamedTypeSymbol symbol, INamedTypeSymbol generateSerializerAttributeSymbol)
         {
             if (!symbol.IsStatic && symbol.HasAttribute(generateSerializerAttributeSymbol))
