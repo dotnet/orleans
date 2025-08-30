@@ -12,7 +12,7 @@ namespace Orleans.Analyzers
 
     internal static class SyntaxHelpers
     {
-        public static bool TryGetTypeName(this AttributeSyntax attributeSyntax, out string typeName)
+        private static bool TryGetTypeName(this AttributeSyntax attributeSyntax, out string typeName)
         {
             typeName = attributeSyntax.Name switch
             {
@@ -67,7 +67,7 @@ namespace Orleans.Analyzers
 
         public static bool IsAbstract(this MemberDeclarationSyntax member) => member.HasModifier(SyntaxKind.AbstractKeyword);
 
-        public static bool HasModifier(this MemberDeclarationSyntax member, SyntaxKind modifierKind)
+        private static bool HasModifier(this MemberDeclarationSyntax member, SyntaxKind modifierKind)
         {
             foreach (var modifier in member.Modifiers)
             {
