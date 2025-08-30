@@ -61,22 +61,15 @@ namespace Orleans.CodeGenerator
 
         public CompilationUnitSyntax GenerateCode(CancellationToken cancellationToken)
         {
-            var referencedAssemblies = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
             var assembliesToExamine = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
             var compilationAsm = LibraryTypes.Compilation.Assembly;
             ComputeAssembliesToExamine(compilationAsm, assembliesToExamine);
 
             // Expand the set of referenced assemblies
-            referencedAssemblies.Add(compilationAsm);
             MetadataModel.ApplicationParts.Add(compilationAsm.MetadataName);
             foreach (var reference in LibraryTypes.Compilation.References)
             {
                 if (LibraryTypes.Compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol asm)
-                {
-                    continue;
-                }
-
-                if (!referencedAssemblies.Add(asm))
                 {
                     continue;
                 }
