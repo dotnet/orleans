@@ -65,23 +65,7 @@ namespace Orleans.Analyzers
             return false;
         }
 
-        public static string GetMemberNameOrDefault(this MemberDeclarationSyntax member)
-        {
-            if (member is PropertyDeclarationSyntax property)
-            {
-                return property.ChildTokens().FirstOrDefault(token => token.IsKind(SyntaxKind.IdentifierToken)).ValueText;
-            }
-            else if (member is FieldDeclarationSyntax field)
-            {
-                return field.ChildNodes().OfType<VariableDeclarationSyntax>().FirstOrDefault()?.ChildNodes().OfType<VariableDeclaratorSyntax>().FirstOrDefault()?.Identifier.ValueText;
-            }
-
-            return null;
-        }
-
         public static bool IsAbstract(this MemberDeclarationSyntax member) => member.HasModifier(SyntaxKind.AbstractKeyword);
-
-        public static bool IsStatic(this MemberDeclarationSyntax member) => member.HasModifier(SyntaxKind.StaticKeyword);
 
         public static bool HasModifier(this MemberDeclarationSyntax member, SyntaxKind modifierKind)
         {
@@ -145,17 +129,6 @@ namespace Orleans.Analyzers
             }
 
             return isFieldOrAutoProperty;
-        }
-
-        public static bool ExtendsGrainInterface(this InterfaceDeclarationSyntax interfaceDeclaration, SemanticModel semanticModel)
-        {
-            if (interfaceDeclaration is null)
-            {
-                return false;
-            }
-
-            var symbol = semanticModel.GetDeclaredSymbol(interfaceDeclaration);
-            return symbol.ExtendsGrainInterface();
         }
 
         public static bool ExtendsGrainInterface(this INamedTypeSymbol symbol)
@@ -228,24 +201,5 @@ namespace Orleans.Analyzers
             attributeLists
                 .SelectMany(attributeList => attributeList.Attributes)
                 .Where(attribute => attribute.IsAttribute(attributeName));
-
-        public static string GetArgumentValue(this AttributeSyntax attribute, SemanticModel semanticModel)
-        {
-            if (attribute?.ArgumentList == null || attribute.ArgumentList.Arguments.Count == 0)
-            {
-                return null;
-            }
-
-            var symbolInfo = semanticModel.GetSymbolInfo(attribute);
-            if (symbolInfo.Symbol == null && symbolInfo.CandidateSymbols.Length == 0)
-            {
-                return null;
-            }
-
-            var argumentExpression = attribute.ArgumentList.Arguments[0].Expression;
-            var constant = semanticModel.GetConstantValue(argumentExpression);
-
-            return constant.HasValue ? constant.Value?.ToString() : null;
-        }
     }
 }

@@ -16,5 +16,21 @@ namespace Orleans.Analyzers
 
             return false;
         }
+
+        public static bool DerivesFrom(this ITypeSymbol symbol, ITypeSymbol candidateBaseType)
+        {
+            var baseType = symbol.BaseType;
+            while (baseType is not null)
+            {
+                if (baseType.Equals(candidateBaseType, SymbolEqualityComparer.Default))
+                {
+                    return true;
+                }
+
+                baseType = baseType.BaseType;
+            }
+
+            return false;
+        }
     }
 }
