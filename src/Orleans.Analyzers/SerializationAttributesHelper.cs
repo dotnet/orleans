@@ -19,6 +19,16 @@ namespace Orleans.Analyzers
             return false;
         }
 
+        public static bool ShouldGenerateSerializer(INamedTypeSymbol symbol, INamedTypeSymbol generateSerializerAttributeSymbol)
+        {
+            if (!symbol.IsStatic && symbol.HasAttribute(generateSerializerAttributeSymbol))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
         public readonly record struct TypeAnalysis
         {
             public List<MemberDeclarationSyntax> UnannotatedMembers { get; init; }
