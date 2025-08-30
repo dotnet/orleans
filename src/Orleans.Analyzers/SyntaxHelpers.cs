@@ -155,6 +155,11 @@ namespace Orleans.Analyzers
             }
 
             var symbol = semanticModel.GetDeclaredSymbol(interfaceDeclaration);
+            return symbol.ExtendsGrainInterface();
+        }
+
+        public static bool ExtendsGrainInterface(this INamedTypeSymbol symbol)
+        {
             if (symbol is null || symbol.TypeKind != TypeKind.Interface)
             {
                 return false;
