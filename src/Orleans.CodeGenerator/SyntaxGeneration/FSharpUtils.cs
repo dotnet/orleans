@@ -166,7 +166,7 @@ namespace Orleans.CodeGenerator
 
                 public uint FieldId { get; }
 
-                public bool IsShallowCopyable => _libraryTypes.IsShallowCopyable(Type) || _field.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
+                public bool IsShallowCopyable => _libraryTypes.IsShallowCopyable(Type) || _field.HasAttribute(_libraryTypes.ImmutableAttribute);
 
                 public bool IsValueType => Type.IsValueType;
 
@@ -274,7 +274,7 @@ namespace Orleans.CodeGenerator
 
                 public uint FieldId { get; }
 
-                public bool IsShallowCopyable => _libraryTypes.IsShallowCopyable(Type) || _property.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
+                public bool IsShallowCopyable => _libraryTypes.IsShallowCopyable(Type) || _property.HasAttribute(_libraryTypes.ImmutableAttribute);
 
                 public bool IsValueType => Type.IsValueType;
 
