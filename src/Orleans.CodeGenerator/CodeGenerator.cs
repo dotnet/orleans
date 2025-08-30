@@ -97,10 +97,10 @@ namespace Orleans.CodeGenerator
 
             foreach (var asm in assembliesToExamine)
             {
+                var containingAssemblyAttributes = asm.GetAttributes();
+
                 foreach (var symbol in asm.GetDeclaredTypes())
                 {
-                    var containingAssemblyAttributes = symbol.ContainingAssembly.GetAttributes();
-
                     if (GetWellKnownTypeId(symbol) is uint wellKnownTypeId)
                     {
                         MetadataModel.WellKnownTypeIds.Add((symbol.ToOpenTypeSyntax(), wellKnownTypeId));
