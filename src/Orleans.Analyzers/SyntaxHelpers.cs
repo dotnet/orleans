@@ -148,28 +148,5 @@ namespace Orleans.Analyzers
 
             return false;
         }
-
-        public static AttributeArgumentBag<T> GetArgumentBag<T>(this AttributeSyntax attribute, SemanticModel semanticModel)
-        {
-            if (attribute is null)
-            {
-                return default;
-            }
-
-            var argument = attribute.ArgumentList?.Arguments.FirstOrDefault();
-            if (argument is null || argument.Expression is not { } expression)
-            {
-                return default;
-            }
-
-            var constantValue = semanticModel.GetConstantValue(expression);
-            return constantValue.HasValue && constantValue.Value is T value ?
-                new(value, attribute.GetLocation()) : default;
-        }
-
-        public static IEnumerable<AttributeSyntax> GetAttributeSyntaxes(this SyntaxList<AttributeListSyntax> attributeLists, string attributeName) =>
-            attributeLists
-                .SelectMany(attributeList => attributeList.Attributes)
-                .Where(attribute => attribute.IsAttribute(attributeName));
     }
 }
