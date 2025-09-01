@@ -15,6 +15,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Linq;
 using System.Net;
+using System.Numerics;
 using Xunit;
 using Microsoft.FSharp.Collections;
 using Xunit.Abstractions;
@@ -50,7 +51,7 @@ namespace Orleans.Serialization.UnitTests
     /// - Collection types (List, Dictionary, arrays, etc.)
     /// - Nullable types
     /// - Enums
-    /// 
+    ///
     /// These codecs are designed for:
     /// - High performance with minimal allocations
     /// - Compact binary representation
@@ -1338,6 +1339,111 @@ namespace Orleans.Serialization.UnitTests
         ];
 
         protected override Action<Action<UInt128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.V0, value.V1)));
+    }
+
+    public class BigIntegerCodecTests(ITestOutputHelper output) : FieldCodecTester<BigInteger, BigIntegerCodec>(output)
+    {
+        // New behavior in .NET 9: https://learn.microsoft.com/en-us/dotnet/core/compatibility/core-libraries/9.0/biginteger-limit#new-behavior
+        protected override int[] MaxSegmentSizes => [(2^31)-1];
+
+        protected override BigInteger CreateValue()
+        {
+            var bytes = new byte[Random.Next(1, 100)];
+            Random.NextBytes(bytes);
+            return new BigInteger(bytes);
+        }
+
+        protected override BigInteger[] TestValues =>
+        [
+            BigInteger.Zero,
+            BigInteger.One,
+            BigInteger.MinusOne,
+            new BigInteger(byte.MaxValue),
+            new BigInteger(byte.MaxValue) + 1,
+            new BigInteger(ushort.MaxValue),
+            new BigInteger(ushort.MaxValue) + 1,
+            new BigInteger(uint.MaxValue),
+            new BigInteger(uint.MaxValue) + 1,
+            new BigInteger(ulong.MaxValue),
+            new BigInteger(ulong.MaxValue) + 1,
+            (BigInteger)Int128.MaxValue,
+            (BigInteger)Int128.MaxValue + 1,
+            (BigInteger)UInt128.MaxValue,
+            (BigInteger)UInt128.MaxValue + 1,
+            -new BigInteger(byte.MaxValue),
+            -new BigInteger(ushort.MaxValue),
+            -new BigInteger(uint.MaxValue),
+            -new BigInteger(ulong.MaxValue),
+            -(BigInteger)Int128.MaxValue,
+            -(BigInteger)UInt128.MaxValue,
+            BigInteger.Parse("123456789012345678901234567890123456789012345678901234567890"),
+            BigInteger.Parse("-123456789012345678901234567890123456789012345678901234567890"),
+        ];
+
+        protected override Action<Action<BigInteger>> ValueProvider => assert =>
+        {
+            Gen.Byte.Array.Sample(bytes =>
+            {
+                if (bytes.Length > 0)
+                {
+                    assert(new BigInteger(bytes));
+                }
+            });
+        };
+    }
+
+    public class BigIntegerCopierTests(ITestOutputHelper output) : CopierTester<BigInteger, ShallowCopier<BigInteger>>(output)
+    {
+        protected override bool IsImmutable => true;
+
+        protected override BigInteger CreateValue()
+        {
+            var bytes = new byte[Random.Next(1, 100)];
+            Random.NextBytes(bytes);
+            return new BigInteger(bytes);
+        }
+
+        protected override BigInteger[] TestValues =>
+        [
+            BigInteger.Zero,
+            BigInteger.One,
+            BigInteger.MinusOne,
+            new BigInteger(byte.MaxValue),
+            new BigInteger(byte.MaxValue) + 1,
+            new BigInteger(ushort.MaxValue),
+            new BigInteger(ushort.MaxValue) + 1,
+            new BigInteger(uint.MaxValue),
+            new BigInteger(uint.MaxValue) + 1,
+            new BigInteger(ulong.MaxValue),
+            new BigInteger(ulong.MaxValue) + 1,
+#if NET7_0_OR_GREATER
+            (BigInteger)Int128.MaxValue,
+            (BigInteger)Int128.MaxValue + 1,
+            (BigInteger)UInt128.MaxValue,
+            (BigInteger)UInt128.MaxValue + 1,
+#endif
+            -new BigInteger(byte.MaxValue),
+            -new BigInteger(ushort.MaxValue),
+            -new BigInteger(uint.MaxValue),
+            -new BigInteger(ulong.MaxValue),
+#if NET7_0_OR_GREATER
+            -(BigInteger)Int128.MaxValue,
+            -(BigInteger)UInt128.MaxValue,
+#endif
+            BigInteger.Parse("123456789012345678901234567890123456789012345678901234567890"),
+            BigInteger.Parse("-123456789012345678901234567890123456789012345678901234567890"),
+        ];
+
+        protected override Action<Action<BigInteger>> ValueProvider => assert =>
+        {
+            Gen.Byte.Array.Sample(bytes =>
+            {
+                if (bytes.Length > 0)
+                {
+                    assert(new BigInteger(bytes));
+                }
+            });
+        };
     }
 #endif
 
