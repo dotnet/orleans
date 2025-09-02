@@ -28,7 +28,7 @@ namespace Orleans.Hosting.Kubernetes
             rules:
             - apiGroups: [ "" ]
               resources: ["pods"]
-              verbs: ["get", "watch", "list", "patch"]
+              verbs: ["get", "watch", "list", "delete", "patch"]
             ---
             kind: RoleBinding
             apiVersion: rbac.authorization.k8s.io/v1
