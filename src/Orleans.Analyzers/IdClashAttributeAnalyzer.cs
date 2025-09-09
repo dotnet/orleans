@@ -29,32 +29,41 @@ public class IdClashAttributeAnalyzer : DiagnosticAnalyzer
     public override void Initialize(AnalysisContext context)
     {
         context.EnableConcurrentExecution();
-        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze | GeneratedCodeAnalysisFlags.ReportDiagnostics);
-        context.RegisterSyntaxNodeAction(CheckSyntaxNode,
-            SyntaxKind.ClassDeclaration,
-            SyntaxKind.StructDeclaration,
-            SyntaxKind.RecordDeclaration,
-            SyntaxKind.RecordStructDeclaration);
+        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+        context.RegisterCompilationStartAction(context =>
+        {
+            var generateSerializerAttribute = context.Compilation.GetTypeByMetadataName("Orleans.GenerateSerializerAttribute");
+            var idAttribute = context.Compilation.GetTypeByMetadataName("Orleans.IdAttribute");
+            if (generateSerializerAttribute is not null && idAttribute is not null)
+            {
+                context.RegisterSymbolAction(context => AnalyzeNamedType(context, generateSerializerAttribute, idAttribute), SymbolKind.NamedType);
+            }
+        });
     }
 
-    private void CheckSyntaxNode(SyntaxNodeAnalysisContext context)
+    private static void AnalyzeNamedType(SymbolAnalysisContext context, INamedTypeSymbol generateSerializerAttribute, INamedTypeSymbol idAttribute)
     {
-        var typeDeclaration = context.Node as TypeDeclarationSyntax;
-        if (!typeDeclaration.HasAttribute(Constants.GenerateSerializerAttributeName))
+        var typeSymbol = (INamedTypeSymbol)context.Symbol;
+        if (!typeSymbol.HasAttribute(generateSerializerAttribute))
         {
             return;
         }
 
-        List<AttributeArgumentBag<int>> bags = [];
-        foreach (var memberDeclaration in typeDeclaration.Members.OfType<MemberDeclarationSyntax>())
+        List<AttributeArgumentBag<uint>> bags = [];
+        foreach (var member in typeSymbol.GetMembers())
         {
-            var attributes = memberDeclaration.AttributeLists.GetAttributeSyntaxes(Constants.IdAttributeName);
-            foreach (var attribute in attributes)
+            foreach (var attribute in member.GetAttributes())
             {
-                var bag = attribute.GetArgumentBag<int>(context.SemanticModel);
-                if (bag != default)
+                if (!idAttribute.Equals(attribute.AttributeClass, SymbolEqualityComparer.Default))
                 {
-                    bags.Add(bag);
+                    continue;
+                }
+
+                if (attribute.ConstructorArguments.Length == 1 &&
+                    attribute.ConstructorArguments[0].Value is uint idValue)
+                {
+                    var attributeSyntax = (AttributeSyntax)attribute.ApplicationSyntaxReference.GetSyntax();
+                    bags.Add(new AttributeArgumentBag<uint>(idValue, attributeSyntax.GetLocation()));
                 }
             }
         }
