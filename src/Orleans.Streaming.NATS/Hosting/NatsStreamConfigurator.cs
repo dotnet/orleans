@@ -13,9 +13,11 @@ public class SiloNatsStreamConfigurator : SiloPersistentStreamConfigurator
     {
         this.ConfigureDelegate(services =>
         {
-            services.ConfigureNamedOptionForLogging<NatsOptions>(name)
+            services
+                .ConfigureNamedOptionForLogging<NatsOptions>(name)
                 .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
-                .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
+                .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name)
+                .AddTransient<IConfigurationValidator>(sp => new NatsStreamOptionsValidator(sp.GetRequiredService<IOptionsMonitor<NatsOptions>>().Get(name), name));
         });
     }
 
@@ -48,8 +50,10 @@ public class ClusterClientNatsStreamConfigurator : ClusterClientPersistentStream
         builder
             .ConfigureServices(services =>
             {
-                services.ConfigureNamedOptionForLogging<NatsOptions>(name)
-                    .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
+                services
+                    .ConfigureNamedOptionForLogging<NatsOptions>(name)
+                    .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name)
+                    .AddTransient<IConfigurationValidator>(sp => new NatsStreamOptionsValidator(sp.GetRequiredService<IOptionsMonitor<NatsOptions>>().Get(name), name));
             });
     }
 

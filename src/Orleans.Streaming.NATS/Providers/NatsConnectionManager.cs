@@ -32,7 +32,9 @@ internal sealed class NatsConnectionManager
         this._loggerFactory = loggerFactory;
         this._logger = this._loggerFactory.CreateLogger<NatsConnectionManager>();
         this._options = options;
+        this._options.JsonSerializerOptions ??= new();
         this._options.JsonSerializerOptions.TypeInfoResolverChain.Add(NatsSerializerContext.Default);
+
         if (this._options.NatsClientOptions is null)
         {
             this._options.NatsClientOptions = NatsOpts.Default with
