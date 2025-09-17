@@ -135,7 +135,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
                                     // If we did not do this, the log would begin with some writes which would be followed by a snapshot which also included those writes.
                                     _currentLogSegment?.Reset();
 
-                                    if (_hasStateMachineToRetire) // We use this flag because the majooority of times, there wont be any state machine to retire.
+                                    if (_hasStateMachineToRetire) // We use this flag because the majority of times, there won't be any state machine to retire.
                                     {
                                         // Since this is a snapshot, we use the opportunity to purge retired state machines.
                                         foreach (var (id, machine) in _stateMachinesMap)
