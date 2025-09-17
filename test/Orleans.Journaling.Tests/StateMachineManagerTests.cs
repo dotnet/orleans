@@ -256,4 +256,65 @@ public class StateMachineManagerTests : StateMachineTestBase
             Assert.Equal($"Value {i}", recoveredDict[i]);
         }
     }
+
+    /// <summary>
+    /// Tests that a "retired" state machine (one that is no longer registered)
+    /// has its data (and itself) purged when the storage triggers a compaction.
+    /// </summary>
+    [Fact]
+    public async Task StateMachineManager_RetiredStateMachine_IsPurgedOnCompaction()
+    {
+        const string DictToKeepKey = "dictToKeep";
+        const string DictToRetireKey = "dictToRetire";
+
+        var sut1 = CreateTestSystem();
+
+        // We beging with 2 dictionaries, one of which we will retire by means of not registering it in the manger.
+        // This would be in the real-world developers removing it from the grain's ctor as a dependecy. 
+        var dictToKeep = new DurableDictionary<string, int>(DictToKeepKey, sut1.Manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+        var dictToRetire = new DurableDictionary<string, int>(DictToRetireKey, sut1.Manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+
+        await sut1.Lifecycle.OnStart();
+
+        dictToKeep.Add("a", 1);
+        dictToRetire.Add("b", 2);
+
+        await sut1.Manager.WriteStateAsync(CancellationToken.None);
+
+        var sut2 = CreateTestSystem(sut1.Storage);
+
+        // This time, we only register the dictionary we want to keep, this marks dictToRetire as retired.
+        var recoveredDictToKeep = new DurableDictionary<string, int>(DictToKeepKey, sut2.Manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+
+        await sut2.Lifecycle.OnStart();
+
+        // The manager should have recovered the state for dictToKeep, and created a DurableNothing placeholder for dictToRetire.
+        Assert.Equal(1, recoveredDictToKeep["a"]);
+
+        // Now, we trigger the compaction logic in VolatileStateMachineStorage by writing more than 10 times.
+        for (var i = 0; i < 11; i++)
+        {
+            recoveredDictToKeep["a"] = i;
+            await sut2.Manager.WriteStateAsync(CancellationToken.None);
+        }
+
+        // At this point, the manager has performed a snapshot, so it should have purged the dictToRetire data.
+        var sut3 = CreateTestSystem(sut2.Storage);
+
+        // So by registering both dictionaries again, we should see what state remains after the snapshot.
+        var finalDictToKeep = new DurableDictionary<string, int>(DictToKeepKey, sut3.Manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+        var finalDictToRetire = new DurableDictionary<string, int>(DictToRetireKey, sut3.Manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+
+        await sut3.Lifecycle.OnStart();
+
+        // The dictionary we kept should have the last value written to it.
+        Assert.Equal(10, finalDictToKeep["a"]); // The last value from the i=0..10 loop.
+
+        // The retired dictionary should now be empty because its state was purged during the compaction.
+        // Note that this is a new version of dictToRetire, since that is removed as a state machine, idea here
+        // is that if we can register a new dictToRetire with the same key, it means that the machine itself has been removed
+        // but also the data, otherwise previous machine would have had at least one entry i.e. ["b", 2]. The removal of the machine
+        // itself has also the nice benefit of being able to reuse old machine names.
+        Assert.Empty(finalDictToRetire);
+    }
 }

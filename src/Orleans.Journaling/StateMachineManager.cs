@@ -25,6 +25,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     private readonly Task _workLoop;
     private ManagerState _state;
     private Task? _pendingWrite;
+    private bool _hasStateMachineToRetire;
     private ulong _nextStateMachineId = MinApplicationStateMachineId;
     private LogExtentBuilder? _currentLogSegment;
 
@@ -125,21 +126,38 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
                             //       If the current log length is greater than the snapshot size, then take a snapshot instead of appending more log entries.
                             var isSnapshot = workItem.Type is WorkItemType.WriteSnapshot;
                             LogExtentBuilder? logSegment;
+
                             lock (_lock)
                             {
-                                if (isSnapshot && _currentLogSegment is { } existingSegment)
+                                if (isSnapshot)
                                 {
                                     // If there are pending writes, reset them since they will be captured by the snapshot instead.
                                     // If we did not do this, the log would begin with some writes which would be followed by a snapshot which also included those writes.
-                                    existingSegment.Reset();
+                                    _currentLogSegment?.Reset();
+
+                                    if (_hasStateMachineToRetire) // We use this flag because the majooority of times, there wont be any state machine to retire.
+                                    {
+                                        // Since this is a snapshot, we use the opportunity to purge retired state machines.
+                                        foreach (var (id, machine) in _stateMachinesMap)
+                                        {
+                                            if (machine is DurableNothing retired)
+                                            {
+                                                var name = retired.StateMachineKey;
+
+                                                LogPurgingRetiredStateMachine(_logger, name, id);
+
+                                                _stateMachinesMap.Remove(id);
+                                                _stateMachineIds.Remove(name); // This will take effect when the snapshot is persisted below.
+                                            }
+                                        }
+                                    }
                                 }
-                                else
-                                {
-                                    _currentLogSegment ??= new();
-                                }
+
+                                _currentLogSegment ??= new();
 
                                 // The map of state machine ids is itself stored as a durable state machine with the id 0.
                                 // This must be stored first, since it includes the identities of all other state machines, which are needed when replaying the log.
+                                // If we removed retired machines, this snapshot will persist that change.
                                 AppendUpdatesOrSnapshotStateMachine(_currentLogSegment, isSnapshot, 0, _stateMachineIds);
 
                                 foreach (var (id, stateMachine) in _stateMachinesMap)
@@ -366,7 +384,15 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
             }
             else
             {
-                throw new InvalidOperationException($"State machine \"{name}\" (id: {id}) has not been registered on this state machine manager.");
+                // When a state machine is not found, we substitute it with a DurableNothing.
+                // It will be purged on the next snapshot.
+
+                LogRetiredStateMachineDetected(_logger, name, id);
+
+                _stateMachinesMap[id] = new DurableNothing(name, this);
+                _hasStateMachineToRetire = true;
+
+                // No need to call Reset, as DurableNothing does nothing.
             }
         }
     }
@@ -452,4 +478,14 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
         Level = LogLevel.Error,
         Message = "Error processing work items.")]
     private static partial void LogErrorProcessingWorkItems(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "State machine \"{Name}\" (id: {Id}) not found. Substituting a placeholder for graceful retirement.")]
+    private static partial void LogRetiredStateMachineDetected(ILogger logger, string name, ulong id);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Purging retired state machine \"{Name}\" (id: {Id}).")]
+    private static partial void LogPurgingRetiredStateMachine(ILogger logger, string name, ulong id);
 }

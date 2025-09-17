@@ -1,4 +1,5 @@
-﻿using System.Buffers;
+using System.Buffers;
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Journaling;
@@ -6,19 +7,16 @@ namespace Orleans.Journaling;
 /// <summary>
 /// A durable object which does nothing, used for retiring other durable types.
 /// </summary>
-public interface IDurableNothing
+[DebuggerDisplay("DurableNothing")]
+internal sealed class DurableNothing : IDurableStateMachine
 {
-}
+    public string StateMachineKey { get; }
 
-/// <summary>
-/// A durable object which does nothing, used for retiring other durable types.
-/// </summary>
-internal sealed class DurableNothing : IDurableNothing, IDurableStateMachine
-{
     public DurableNothing([ServiceKey] string key, IStateMachineManager manager)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterStateMachine(key, this);
+        StateMachineKey = key;
     }
 
     void IDurableStateMachine.Reset(IStateMachineLogWriter storage) { }
