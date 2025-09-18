@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Runtime.Internal;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
@@ -18,6 +19,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     private readonly Dictionary<ulong, IDurableStateMachine> _stateMachinesMap = [];
     private readonly IStateMachineStorage _storage;
     private readonly ILogger<StateMachineManager> _logger;
+    private readonly TimeProvider _timeProvider;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Queue<WorkItem> _workQueue = new();
     private readonly CancellationTokenSource _shutdownCancellation = new();
@@ -26,16 +28,21 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     private ManagerState _state;
     private Task? _pendingWrite;
     private bool _hasStateMachineToRetire;
+    private TimeSpan _retirementGracePeriod;
     private ulong _nextStateMachineId = MinApplicationStateMachineId;
     private LogExtentBuilder? _currentLogSegment;
 
     public StateMachineManager(
         IStateMachineStorage storage,
         ILogger<StateMachineManager> logger,
-        SerializerSessionPool serializerSessionPool)
+        IOptions<StateMachineManagerOptions> options,
+        SerializerSessionPool serializerSessionPool,
+        TimeProvider timeProvider)
     {
         _storage = storage;
         _logger = logger;
+        _timeProvider = timeProvider;
+        _retirementGracePeriod = options.Value.RetirementGracePeriod;
 
         // The list of known state machines is itself stored as a durable state machine with the implicit id 0.
         // This allows us to recover the list of state machines ids without having to store it separately.
@@ -392,10 +399,8 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
 
                 LogRetiredStateMachineDetected(_logger, name, id);
 
-                _stateMachinesMap[id] = new DurableNothing(name, this);
+                _stateMachinesMap[id] = new DurableNothing(name, _timeProvider.GetUtcNow().UtcDateTime, this);
                 _hasStateMachineToRetire = true;
-
-                // No need to call Reset, as DurableNothing does nothing.
             }
         }
     }
