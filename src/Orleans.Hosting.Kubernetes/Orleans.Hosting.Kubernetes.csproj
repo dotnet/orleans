@@ -14,14 +14,8 @@
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="$(MicrosoftBclAsyncInterfacesVersion)" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' ">
-    <PackageReference Include="KubernetesClient" Version="$(Netstandard20KubernetesClientVersion)" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="$(MicrosoftExtensionsHttpVersion)" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="$(MicrosoftExtensionsOptionsVersion)" />
-  </ItemGroup>
-
-  <ItemGroup Condition=" '$(TargetFramework)' != 'netstandard2.0' ">
-    <PackageReference Include="KubernetesClient" Version="$(KubernetesClientVersion)" />
+  <ItemGroup>
+    <PackageReference Include="KubernetesClient.Classic" Version="$(KubernetesClientClassicVersion)" />
     <PackageReference Include="System.Security.Cryptography.Cng" Version="$(SystemSecurityCryptographyCngVersion)" />
   </ItemGroup>
 
