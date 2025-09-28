@@ -84,7 +84,7 @@
     <Project Path="src/Cassandra/Orleans.Clustering.Cassandra/Orleans.Clustering.Cassandra.csproj" />
   </Folder>
   <Folder Name="/src/Extensions/NATS/">
-    <Project Path="src\Orleans.Streaming.NATS\Orleans.Streaming.NATS.csproj" Type="Classic C#" />
+    <Project Path="src\Orleans.Streaming.NATS\Orleans.Streaming.NATS.csproj" />
   </Folder>
   <Folder Name="/src/Extensions/Redis/">
     <Project Path="src/Redis/Orleans.Clustering.Redis/Orleans.Clustering.Redis.csproj" />
@@ -133,7 +133,7 @@
     <Project Path="test/Extensions/TesterAdoNet/Tester.AdoNet.csproj" />
     <Project Path="test/Extensions/TesterAzureUtils/Tester.AzureUtils.csproj" />
     <Project Path="test/Extensions/TesterZooKeeperUtils/Tester.ZooKeeperUtils.csproj" />
-    <Project Path="test\Extensions\NATS.Tests\NATS.Tests.csproj" Type="Classic C#" />
+    <Project Path="test\Extensions\NATS.Tests\NATS.Tests.csproj" />
   </Folder>
   <Folder Name="/test/Grains/">
     <Project Path="test/Grains/TestFSharp/TestFSharp.fsproj" />

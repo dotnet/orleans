@@ -1,43 +1,33 @@
 using System.Buffers;
-using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Journaling;
 
 /// <summary>
-/// A durable object which does nothing but preserves the raw state of a retired durable type.
+/// A durable object which does nothing, used for retiring other durable types.
 /// </summary>
-[DebuggerDisplay("DurableNothing")]
-internal sealed class DurableNothing : IDurableStateMachine
+public interface IDurableNothing
 {
-    private readonly List<byte[]> _bufferedData = [];
+}
 
-    public string StateMachineKey { get; }
-    public DateTime RetirementTimestamp { get; }
-
-    public DurableNothing([ServiceKey] string key, DateTime retirementTimestamp, IStateMachineManager manager)
+/// <summary>
+/// A durable object which does nothing, used for retiring other durable types.
+/// </summary>
+internal sealed class DurableNothing : IDurableNothing, IDurableStateMachine
+{
+    public DurableNothing([ServiceKey] string key, IStateMachineManager manager)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-
         manager.RegisterStateMachine(key, this);
-
-        StateMachineKey = key;
-        RetirementTimestamp = retirementTimestamp;
     }
 
-    void IDurableStateMachine.Reset(IStateMachineLogWriter storage) => _bufferedData.Clear();
-    void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry) => _bufferedData.Add(logEntry.ToArray());
+    void IDurableStateMachine.Reset(IStateMachineLogWriter storage) { }
+
+    void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry) { }
 
     void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter) { }
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter)
-    {
-        // When a snapshot is created, we write the preserved raw data back out.
-        foreach (var data in _bufferedData)
-        {
-            snapshotWriter.AppendEntry(data);
-        }
-    }
+    void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter) { }
 
     public IDurableStateMachine DeepCopy() => this;
 }
