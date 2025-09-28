@@ -51,7 +51,9 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
         // This allows us to recover the list of state machines ids without having to store it separately.
         _stateMachineIds = new StateMachineManagerState(this, StringCodec, UInt64Codec, serializerSessionPool);
         _stateMachinesMap[0] = _stateMachineIds;
+
         _retirementTracker = new StateMachinesRetirementTracker(this, StringCodec, DateTimeCodec, serializerSessionPool);
+
         _workLoop = Start();
     }
 
@@ -145,7 +147,11 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
                                     // If there are pending writes, reset them since they will be captured by the snapshot instead.
                                     // If we did not do this, the log would begin with some writes which would be followed by a snapshot which also included those writes.
                                     _currentLogSegment?.Reset();
-                                    RetiredOrResurectStateMachines();
+
+                                    if (_retirementTracker.Count > 0)
+                                    {
+                                        RetiredOrResurectStateMachines();
+                                    }
                                 }
 
                                 _currentLogSegment ??= new();
@@ -270,35 +276,32 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
 
     private void RetiredOrResurectStateMachines()
     {
-        lock (_lock)
+        foreach (var (name, timestamp) in _retirementTracker)
         {
-            foreach (var (name, timestamp) in _retirementTracker)
+            var isDuetime = _timeProvider.GetUtcNow().UtcDateTime - timestamp >= _retirementGracePeriod;
+            if (isDuetime && _stateMachineIds.TryGetValue(name, out var id))
             {
-                var isDuetime = _timeProvider.GetUtcNow().UtcDateTime - timestamp >= _retirementGracePeriod;
-                if (isDuetime && _stateMachineIds.TryGetValue(name, out var id))
+                var stateMachine = _stateMachines[name];
+
+                Debug.Assert(stateMachine is not null);
+
+                if (stateMachine is RetiredStateMachineVessel)
                 {
-                    var stateMachine = _stateMachines[name];
+                    LogRemovingRetiredStateMachine(_logger, name);
 
-                    Debug.Assert(stateMachine is not null);
+                    // Since we are permanently removing this state machine, we will clean it up by reseting it.
+                    stateMachine.Reset(new StateMachineLogWriter(this, new(id)));
 
-                    if (stateMachine is RetiredMachineVessel)
-                    {
-                        LogRemovingRetiredStateMachine(_logger, name);
-
-                        // Since we are permanently removing this state machine, we will clean it up by reseting it.
-                        stateMachine.Reset(new StateMachineLogWriter(this, new(id)));
-
-                        _stateMachinesMap.Remove(id);
-                        // We remove these from memory only, since the snapshot will persist these changes.
-                        _stateMachineIds.ApplyRemove(name);
-                        _retirementTracker.ApplyRemove(name);
-                    }
-                    else
-                    {
-                        LogRetiredStateMachineComebackDetected(_logger, name);
-                        // We remove the tracker from memory only, since the snapshot will persist the change.
-                        _retirementTracker.ApplyRemove(name);
-                    }
+                    _stateMachinesMap.Remove(id);
+                    // We remove these from memory only, since the snapshot will persist these changes.
+                    _stateMachineIds.ApplyRemove(name);
+                    _retirementTracker.ApplyRemove(name);
+                }
+                else
+                {
+                    LogRetiredStateMachineComebackDetected(_logger, name);
+                    // We remove the tracker from memory only, since the snapshot will persist the change.
+                    _retirementTracker.ApplyRemove(name);
                 }
             }
         }
@@ -338,7 +341,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
             _stateMachineIds.ResetVolatileState();
         }
 
-        await foreach (var segment in _storage.ReadAsync(cancellationToken))
+        await foreach (var segment in _storage.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -361,8 +364,9 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
             {
                 stateMachine.OnRecoveryCompleted();
 
-                if (stateMachine is RetiredMachineVessel)
+                if (stateMachine is RetiredStateMachineVessel)
                 {
+                    // We can use TryAdd since recovery has finished.
                     if (_retirementTracker.TryAdd(name, _timeProvider.GetUtcNow().UtcDateTime))
                     {
                         LogRetiredStateMachineDetected(_logger, name);
@@ -426,7 +430,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
             }
             else
             {
-                var vessel = new RetiredMachineVessel();
+                var vessel = new RetiredStateMachineVessel();
 
                 // We must not make the vessel self-register with the manager, since it will
                 // result in a late-registration after the manger is 'ready'. Instead we add it inline here.
@@ -498,7 +502,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     private enum ManagerState
     {
         Unknown,
-        Ready,
+        Ready
     }
 
     private sealed class StateMachineManagerState(
@@ -534,7 +538,8 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     /// Used to keep retired machines into a purgatory state until time-based purging or if a comeback ocurrs.
     /// This keeps buffering entries and dumps them back into the log upon compaction.
     /// </summary>
-    private sealed class RetiredMachineVessel : IDurableStateMachine
+    [DebuggerDisplay(nameof(RetiredStateMachineVessel))]
+    private sealed class RetiredStateMachineVessel : IDurableStateMachine
     {
         private readonly List<byte[]> _bufferedData = [];
 
