@@ -9,6 +9,7 @@
     <NetCoreAppTargetFrameworks>netcoreapp3.1;net6.0</NetCoreAppTargetFrameworks>
     <StandardTargetFrameworks>netstandard2.0</StandardTargetFrameworks>
     <MultiTargetFrameworks>$(StandardTargetFrameworks);$(NetCoreAppTargetFrameworks)</MultiTargetFrameworks>
+    <HostingKubernetesMultiTargetFrameworks>$(MultiTargetFrameworks);net8.0</HostingKubernetesMultiTargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
