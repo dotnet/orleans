@@ -80,7 +80,7 @@
     <MicrosoftBuildVersion>16.11.6</MicrosoftBuildVersion>
     <MicrosoftCodeAnalysisVersion>4.5.0</MicrosoftCodeAnalysisVersion>
     <MicrosoftWin32RegistryVersion>5.0.0</MicrosoftWin32RegistryVersion>
-    <MicrosoftBclAsyncInterfacesVersion>7.0.0</MicrosoftBclAsyncInterfacesVersion>
+    <MicrosoftBclAsyncInterfacesVersion>9.0.4</MicrosoftBclAsyncInterfacesVersion>
     <MicrosoftNETFrameworkReferenceAssembliesVersion>1.0.2</MicrosoftNETFrameworkReferenceAssembliesVersion>
     <MicrosoftCSharpVersion>4.7.0</MicrosoftCSharpVersion>
 
@@ -131,7 +131,7 @@
     <NSubstituteAnalyzersCSharpVersion>1.0.14</NSubstituteAnalyzersCSharpVersion>
     <ZooKeeperNetExVersion>3.4.12.4</ZooKeeperNetExVersion>
     <StackExchangeRedis>2.2.88</StackExchangeRedis>
-    <KubernetesClientClassicVersion>10.0.16</KubernetesClientClassicVersion>
+    <KubernetesClientClassicVersion>17.0.14</KubernetesClientClassicVersion>
 
     <!-- Test related packages -->
     <FluentAssertionsVersion>6.2.0</FluentAssertionsVersion>
