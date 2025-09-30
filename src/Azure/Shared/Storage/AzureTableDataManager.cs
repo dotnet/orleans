@@ -81,10 +81,10 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 TableServiceClient tableCreationClient = await GetCloudTableCreationClientAsync();
                 var table = tableCreationClient.GetTableClient(TableName);
-                var tableItem = await table.CreateIfNotExistsAsync();
-                var didCreate = tableItem is not null;
+                var response = await table.CreateIfNotExistsAsync();
+                var alreadyExisted = response.GetRawResponse().Status == (int)HttpStatusCode.Conflict;
 
-                LogInfoTableCreation(Logger, didCreate ? "Created" : "Attached to", TableName);
+                LogInfoTableCreation(Logger, alreadyExisted ? "Attached to" : "Created", TableName);
                 Table = table;
             }
             catch (TimeoutException te)
