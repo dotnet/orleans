@@ -390,8 +390,8 @@ jobs:
         provider: ["ZooKeeper"]
         framework: [net8.0]
     services:
-      consul:
-        image: bitnami/zookeeper
+      zookeeper:
+        image: bitnami/zookeeper:3.9
         ports:
           - 2181:2181
         env:
