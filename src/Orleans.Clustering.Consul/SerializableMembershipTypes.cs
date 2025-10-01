@@ -108,7 +108,11 @@ namespace Orleans.Runtime.Host
 
         internal static string FormatDeploymentSiloKey(string deploymentId, string rootKvFolder, SiloAddress siloAddress)
         {
-            return $"{FormatDeploymentKVPrefix(deploymentId, rootKvFolder)}{KeySeparator}{Uri.EscapeDataString(siloAddress.ToParsableString())}";
+            // Consul keys must match ^[a-zA-Z0-9,_./\\-?&=]+$ regex, so we need to encode : and @ characters
+            var siloAddressString = siloAddress.ToParsableString()
+                .Replace(":", "_c_")  // Replace colon with _c_
+                .Replace("@", "_a_"); // Replace at-sign with _a_
+            return $"{FormatDeploymentKVPrefix(deploymentId, rootKvFolder)}{KeySeparator}{siloAddressString}";
         }
 
         internal static string FormatSiloIAmAliveKey(string siloKey)
@@ -126,7 +130,11 @@ namespace Orleans.Runtime.Host
             var ret = JsonConvert.DeserializeObject<ConsulSiloRegistration>(Encoding.UTF8.GetString(siloKV.Value));
 
             var keyParts = siloKV.Key.Split(KeySeparator);
-            ret.Address = SiloAddress.FromParsableString(Uri.UnescapeDataString(keyParts[^1]));
+            // Decode the silo address by reversing the encoding done in FormatDeploymentSiloKey
+            var encodedAddress = keyParts[^1]
+                .Replace("_a_", "@")  // Restore at-sign
+                .Replace("_c_", ":"); // Restore colon
+            ret.Address = SiloAddress.FromParsableString(encodedAddress);
             ret.DeploymentId = deploymentId;
             ret.LastIndex = siloKV.ModifyIndex;
 
