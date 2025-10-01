@@ -109,8 +109,10 @@ namespace Orleans.Runtime.Host
         internal static string FormatDeploymentSiloKey(string deploymentId, string rootKvFolder, SiloAddress siloAddress)
         {
             // Consul keys must match ^[a-zA-Z0-9,_./\\-?&=]+$ regex, so we need to encode : and @ characters
+            // SiloAddress format is {IP}:{Port}@{Generation} where IP can be IPv4 or IPv6 (with colons)
+            // We replace all colons and @ with allowed characters, and use the same LastIndexOf logic during decode
             var siloAddressString = siloAddress.ToParsableString()
-                .Replace(":", "_c_")  // Replace colon with _c_
+                .Replace(":", "_c_")  // Replace all colons with _c_
                 .Replace("@", "_a_"); // Replace at-sign with _a_
             return $"{FormatDeploymentKVPrefix(deploymentId, rootKvFolder)}{KeySeparator}{siloAddressString}";
         }
@@ -131,9 +133,10 @@ namespace Orleans.Runtime.Host
 
             var keyParts = siloKV.Key.Split(KeySeparator);
             // Decode the silo address by reversing the encoding done in FormatDeploymentSiloKey
+            // Simply restore all _c_ to : and _a_ to @ in the correct order
             var encodedAddress = keyParts[^1]
                 .Replace("_a_", "@")  // Restore at-sign
-                .Replace("_c_", ":"); // Restore colon
+                .Replace("_c_", ":"); // Restore all colons
             ret.Address = SiloAddress.FromParsableString(encodedAddress);
             ret.DeploymentId = deploymentId;
             ret.LastIndex = siloKV.ModifyIndex;
