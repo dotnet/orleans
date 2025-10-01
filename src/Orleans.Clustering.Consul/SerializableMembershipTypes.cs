@@ -108,7 +108,7 @@ namespace Orleans.Runtime.Host
 
         internal static string FormatDeploymentSiloKey(string deploymentId, string rootKvFolder, SiloAddress siloAddress)
         {
-            return $"{FormatDeploymentKVPrefix(deploymentId, rootKvFolder)}{KeySeparator}{siloAddress.ToParsableString()}";
+            return $"{FormatDeploymentKVPrefix(deploymentId, rootKvFolder)}{KeySeparator}{Uri.EscapeDataString(siloAddress.ToParsableString())}";
         }
 
         internal static string FormatSiloIAmAliveKey(string siloKey)
@@ -126,7 +126,7 @@ namespace Orleans.Runtime.Host
             var ret = JsonConvert.DeserializeObject<ConsulSiloRegistration>(Encoding.UTF8.GetString(siloKV.Value));
 
             var keyParts = siloKV.Key.Split(KeySeparator);
-            ret.Address = SiloAddress.FromParsableString(keyParts[^1]);
+            ret.Address = SiloAddress.FromParsableString(Uri.UnescapeDataString(keyParts[^1]));
             ret.DeploymentId = deploymentId;
             ret.LastIndex = siloKV.ModifyIndex;
 
