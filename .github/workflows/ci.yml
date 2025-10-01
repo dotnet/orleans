@@ -391,11 +391,9 @@ jobs:
         framework: [net8.0]
     services:
       zookeeper:
-        image: bitnami/zookeeper:3.9
+        image: zookeeper:3.9
         ports:
           - 2181:2181
-        env:
-          ALLOW_ANONYMOUS_LOGIN: "yes"
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
