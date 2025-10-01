@@ -48,7 +48,9 @@ namespace Orleans.Analyzers
             static void AddIfNotNull(ImmutableHashSet<ITypeSymbol>.Builder builder, INamedTypeSymbol symbol)
             {
                 if (symbol is not null)
+                {
                     builder.Add(symbol);
+                }
             }
         }
 
