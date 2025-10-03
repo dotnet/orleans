@@ -49,10 +49,6 @@ namespace Orleans.Runtime
             try
             {
                 await context.Invoke();
-                if (activity is not null && activity.IsAllDataRequested)
-                {
-                    activity.SetStatus(ActivityStatusCode.Ok);
-                }
             }
             catch (Exception e)
             {
