@@ -58,12 +58,32 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     public void RegisterStateMachine(string name, IDurableStateMachine stateMachine)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(name);
-
         _shutdownCancellation.Token.ThrowIfCancellationRequested();
 
         lock (_lock)
         {
-            _stateMachines.Add(name, stateMachine);
+            if (_stateMachines.TryGetValue(name, out var machine))
+            {
+               
+                if (machine is RetiredStateMachineVessel)
+                {
+                    // If the existing machine is a vessel for a retired one, it means the machine was loaded from a previous
+                    // log during recovery but has not been re-registered. We effectively are "staging" the resurrection of the machine.
+                    // The actual reseting and removal from the tracker is handled within the serialized loop.
+                    // This is to prevent logical race conditions with the recovery process.
+                    _stateMachines[name] = stateMachine;
+                }
+                else
+                {
+                    // A real state machine is already registered with this name, this must be a developer error.
+                    throw new ArgumentException($"A state machine with the key '{name}' has already been registered.");
+                }
+            }
+            else
+            {
+                _stateMachines.Add(name, stateMachine);
+            }
+
             _workQueue.Enqueue(new WorkItem(WorkItemType.RegisterStateMachine, completion: null)
             {
                 Context = name
@@ -148,7 +168,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
 
                                     if (_retirementTracker.Count > 0)
                                     {
-                                        RetiredOrResurectStateMachines();
+                                        RetireOrResurectStateMachines();
                                     }
                                 }
 
@@ -272,7 +292,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
         }
     }
 
-    private void RetiredOrResurectStateMachines()
+    private void RetireOrResurectStateMachines()
     {
         foreach (var (name, timestamp) in _retirementTracker)
         {
