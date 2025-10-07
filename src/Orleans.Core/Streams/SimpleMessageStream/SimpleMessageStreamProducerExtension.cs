@@ -152,9 +152,9 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                     subscriptionId);
             }
 
-            foreach (StreamConsumerExtensionCollection consumers in new List<StreamConsumerExtensionCollection>(remoteConsumers.Values))
+            foreach (KeyValuePair<StreamId, StreamConsumerExtensionCollection> consumers in remoteConsumers.ToArray())
             {
-                consumers.RemoveRemoteSubscriber(subscriptionId);
+                consumers.Value.RemoveRemoteSubscriber(subscriptionId);
             }
             return Task.CompletedTask;
         }
