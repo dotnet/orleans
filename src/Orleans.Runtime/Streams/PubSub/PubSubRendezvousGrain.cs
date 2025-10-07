@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers;
@@ -162,14 +163,14 @@ namespace Orleans.Streams
                     tasks.Add(ExecuteProducerTask(producerState, producerState.Producer.AddSubscriber(subscriptionId, streamId, streamConsumer, filter)));
                 }
 
-                Exception exception = null;
+                ExceptionDispatchInfo exception = null;
                 try
                 {
                     await Task.WhenAll(tasks);
                 }
                 catch (Exception exc)
                 {
-                    exception = exc;
+                    exception = ExceptionDispatchInfo.Capture(exc);
                 }
 
                 // if the number of producers has been changed, resave state.
@@ -181,7 +182,7 @@ namespace Orleans.Streams
 
                 if (exception != null)
                 {
-                    throw exception;
+                    exception.Throw();
                 }
             }
             catch (Exception exc)
