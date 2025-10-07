@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
@@ -64,13 +65,17 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
         {
             if (_stateMachines.TryGetValue(name, out var machine))
             {
-               
-                if (machine is RetiredStateMachineVessel)
+                if (machine is RetiredStateMachineVessel vessel)
                 {
                     // If the existing machine is a vessel for a retired one, it means the machine was loaded from a previous
                     // log during recovery but has not been re-registered. We effectively are "staging" the resurrection of the machine.
-                    // The actual reseting and removal from the tracker is handled within the serialized loop.
-                    // This is to prevent logical race conditions with the recovery process.
+                    // The removal from the tracker is handled within the serialized loop. This is to prevent logical race conditions with the recovery process.
+                    // We also make sure to apply any buffered data that could have occured while the vessel took this machine's place.
+                    stateMachine.Reset(new StateMachineLogWriter(this, new(_stateMachineIds[name])));          
+                    foreach (var entry in vessel.BufferedData)
+                    {
+                        stateMachine.Apply(new ReadOnlySequence<byte>(entry));
+                    }
                     _stateMachines[name] = stateMachine;
                 }
                 else
@@ -560,6 +565,8 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     private sealed class RetiredStateMachineVessel : IDurableStateMachine
     {
         private readonly List<byte[]> _bufferedData = [];
+
+        public ReadOnlyCollection<byte[]> BufferedData => _bufferedData.AsReadOnly();
 
         void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter)
         {
