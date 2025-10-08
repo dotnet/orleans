@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
 
@@ -70,7 +71,7 @@ namespace Orleans.Transactions
 
         public TransactionInfo Fork()
         {
-            PendingCalls++;
+            Interlocked.Increment(ref PendingCalls);
             return new TransactionInfo(this);
         }
 
