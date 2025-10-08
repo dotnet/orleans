@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Internal;
-using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
@@ -864,10 +863,9 @@ namespace Orleans.Streams
                     {
                         exceptionOccured = exc;
                         consumerData.SafeDisposeCursor(logger);
-                        // start from the entry at the low token, which is the first entry we know is still in the cache.
-                        var tokenParsed = long.TryParse(exc.Low, out var lowTokenLong);
-                        var lowToken = tokenParsed ? new EventSequenceTokenV2(lowTokenLong) : null;
-                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, lowToken);
+                        var lowToken = exc.LowToken
+                            ?? throw new InvalidOperationException("Queue cache miss did not include the earliest available sequence token.", exc);
+                        consumerData.Cursor = queueCache!.GetCacheCursor(consumerData.StreamId, lowToken);
                     }
                     catch (Exception exc)
                     {
