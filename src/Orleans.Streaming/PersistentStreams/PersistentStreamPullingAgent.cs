@@ -547,7 +547,6 @@ namespace Orleans.Streams
                         consumerData.SafeDisposeCursor(logger);
                         // start from the entry at the low token, which is the first entry we know is still in the cache.
                         var match = SequenceNumberEventIndexRegex().Match(exc.Low);
-                        var tokenParsed = long.TryParse(exc.Low, out var lowTokenLong);
                         var lowToken = match.Success ? new EventSequenceToken(long.Parse(match.Groups[1].Value), int.Parse(match.Groups[2].Value)) : null;
                         consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, lowToken);
                     }
