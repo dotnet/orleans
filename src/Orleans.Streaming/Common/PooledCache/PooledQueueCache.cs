@@ -5,6 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
+using Orleans.Streaming;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -218,6 +219,16 @@ namespace Orleans.Providers.Streams.Common
                 cursor.CurrentBlock = newestBlock;
                 cursor.Index = newestBlock.Value.NewestMessageIndex;
                 cursor.SequenceToken = newestBlock.Value.GetNewestSequenceToken(cacheDataAdapter);
+                return;
+            }
+            if (sequenceToken is OldestInStreamToken)
+            {
+                // Start from the oldest message in cache
+                var block = messageBlocks.Last;
+                cursor.State = CursorStates.Set;
+                cursor.CurrentBlock = block;
+                cursor.Index = block.Value.OldestMessageIndex;
+                cursor.SequenceToken = block.Value.GetOldestSequenceToken(cacheDataAdapter);
                 return;
             }
 
