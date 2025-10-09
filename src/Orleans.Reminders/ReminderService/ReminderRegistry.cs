@@ -24,12 +24,11 @@ namespace Orleans.Runtime.ReminderService
 
         public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, TimeSpan dueTime, TimeSpan period)
         {
-            // Perform input volatility checks that are consistent with System.Threading.Timer
-            // http://referencesource.microsoft.com/#mscorlib/system/threading/timer.cs,c454f2afe745d4d3,references
-            if (dueTime.Ticks < 0 && dueTime != Timeout.InfiniteTimeSpan)
+            // Perform input volatility checks 
+            if (dueTime.Ticks < 0)
                 throw new ArgumentOutOfRangeException(nameof(dueTime), "Cannot use negative dueTime to create a reminder");
            
-            if (period.Ticks < 0 && period != Timeout.InfiniteTimeSpan)
+            if (period.Ticks < 0)
                 throw new ArgumentOutOfRangeException(nameof(period), "Cannot use negative period to create a reminder");
           
             var minReminderPeriod = options.MinimumReminderPeriod;
