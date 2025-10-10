@@ -1,0 +1,134 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace Orleans.ScheduledJobs;
+
+public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJob>
+{
+    private readonly PriorityQueue<JobBucket, DateTimeOffset> _queue = new();
+    private readonly Dictionary<string, JobBucket> _jobsIdToBucket = new();
+    private readonly Dictionary<DateTimeOffset, JobBucket> _buckets = new();
+    private bool _isComplete = false;
+    private object _syncLock = new();
+
+    public int Count => _queue.Count;
+
+    public void Enqueue(IScheduledJob job)
+    {
+        lock (_syncLock)
+        {
+            if (_isComplete)
+                throw new InvalidOperationException("Cannot enqueue job to a frozen queue.");
+
+            var bucket = GetJobBucket(job.DueTime);
+            bucket.AddJob(job);
+            _jobsIdToBucket[job.Id] = bucket;
+        }
+    }
+
+    public void MarkAsComplete()
+    {
+        lock (_syncLock)
+        {
+            _isComplete = true;
+        }
+    }
+
+    public void CancelJob(string jobId)
+    {
+        lock (_syncLock)
+        {
+            if (_jobsIdToBucket.TryGetValue(jobId, out var bucket))
+            {
+                bucket.RemoveJob(jobId);
+                _jobsIdToBucket.Remove(jobId);
+                // Note: The bucket remains in the priority queue until processed
+            }
+        }
+    }
+
+    // ValueTask<ScheduledJob> WaitJobAsync(CancellationToken cancellationToken = default)
+
+    public async IAsyncEnumerator<IScheduledJob> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+    {
+        var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        while (true)
+        {
+            IScheduledJob? job = null;
+            lock (_syncLock)
+            {
+                if (_queue.Count == 0)
+                {
+                    if (_isComplete)
+                    {
+                        yield break; // Exit if the queue is frozen and empty
+                    }
+                }
+                else
+                {
+                    var nextBucket = _queue.Peek();
+                    if (nextBucket.DueTime < DateTimeOffset.Now)
+                    {
+                        if (nextBucket.Count == 0)
+                        {
+                            _queue.Dequeue(); // Remove empty bucket
+                        }
+                        else
+                        {
+                            job = nextBucket.Jobs.First();
+                        }
+                    }
+                }
+            }
+            if (job != null)
+            {
+                yield return job;
+            }
+            else
+            {
+                await timer.WaitForNextTickAsync(cancellationToken);
+            }
+        }
+    }
+
+    private JobBucket GetJobBucket(DateTimeOffset dueTime)
+    {
+        var key = new DateTimeOffset(dueTime.Year, dueTime.Month, dueTime.Day, dueTime.Hour, dueTime.Minute, dueTime.Second, dueTime.Offset);
+        if (!_buckets.TryGetValue(key, out var bucket))
+        {
+            bucket = new JobBucket(key);
+            _buckets[dueTime] = bucket;
+            _queue.Enqueue(bucket, key);
+        }
+        return bucket;
+    }   
+}
+
+internal class JobBucket
+{
+    private readonly Dictionary<string, IScheduledJob> _jobs = new();
+
+    public int Count => _jobs.Count;
+
+    public DateTimeOffset DueTime { get; private set; }
+
+    public IEnumerable<IScheduledJob> Jobs => _jobs.Values;
+
+    public JobBucket(DateTimeOffset dueTime)
+    {
+        DueTime = dueTime;
+    }
+
+    public void AddJob(IScheduledJob job)
+    {
+        _jobs[job.Id] = job;
+    }
+
+    public void RemoveJob(string jobId)
+    {
+        _jobs.Remove(jobId);
+    }
+}
