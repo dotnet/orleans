@@ -297,7 +297,7 @@ public class StateMachineManagerTests : StateMachineTestBase
         
         // The manager should have recovered the state for dictToKeep,
         // and created a DurableNothing placeholder for dictToRetire (we cant test for it at this point). 
-        await SafeAssertEqual(1, "a", dictToKeep2);
+        Assert.Equal(1, dictToKeep2["a"]);
 
         // We advance time by half the grace period to see if we can save it from purging.
         timeProvider.Advance(period / 2);
@@ -311,11 +311,12 @@ public class StateMachineManagerTests : StateMachineTestBase
         var dictToKeep3 = CreateTestMachine(DictToKeepKey, sut3.Manager);
         var dictToRetire3 = CreateTestMachine(DictToRetireKey, sut3.Manager);
 
-        await sut3.Lifecycle.OnStart();;
+        await sut3.Lifecycle.OnStart();
 
-        await SafeAssertEqual(10, "a", dictToKeep3);
+        Assert.Equal(10, dictToKeep3["a"]);
+
         // The fact this entry ["b", 1] exists proves that the state of dictToRetire was preserved, even though we did not register it in step 2.
-        await SafeAssertEqual(1, "b", dictToRetire3);
+        Assert.Equal(1, dictToRetire3["b"]);
 
         // By advancing time by another half-period we cover the full period. But since we have re-introduced dictToRetire, we should have un-retired it.
         // This is similar to step 2, but there we avoided purging due to time not being due, whereas here we avoid purging due to re-registration.
@@ -353,7 +354,7 @@ public class StateMachineManagerTests : StateMachineTestBase
         var dictToRetire5 = CreateTestMachine(DictToRetireKey, sut5.Manager);
 
         await sut5.Lifecycle.OnStart();
-        await SafeAssertEqual(10, "a", dictToKeep5);
+        Assert.Equal(10, dictToKeep5["a"]);
 
         // The retired dictionary should now be empty because its state was purged during the compaction.
         // Note that this is a new version of dictToRetire, since the original was removed. Idea here is
@@ -374,28 +375,6 @@ public class StateMachineManagerTests : StateMachineTestBase
             {
                 dict["a"] = i;
                 await manager.WriteStateAsync(CancellationToken.None);
-            }
-        }
-
-        // Sometimes the KVP is not (yet) available when a check is followed immediately after the lifecycle subject has started.
-        static async Task SafeAssertEqual(int expected, string key, DurableDictionary<string, int> dict)
-        {
-            const int MaxAttempts = 10;
-
-            var attempt = 0;
-
-            while (true)
-            {
-                try
-                {
-                    Assert.Equal(expected, dict[key]);
-                    break;
-                }
-                catch (KeyNotFoundException) when (attempt < MaxAttempts)
-                {
-                    attempt++;
-                    await Task.Delay(100);
-                }
             }
         }
     }
