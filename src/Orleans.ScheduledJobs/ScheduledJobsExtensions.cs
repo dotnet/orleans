@@ -1,3 +1,4 @@
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration.Internal;
 using Orleans.Hosting;
@@ -12,11 +13,23 @@ public static class ScheduledJobsExtensions
     {
         return builder.ConfigureServices(services =>
         {
+            services.AddScheduledJobs();
             services.AddSingleton<InMemoryJobShardManager>();
             services.AddFromExisting<JobShardManager, InMemoryJobShardManager>();
-            services.AddSingleton<LocalScheduledJobManager>();
-            services.AddFromExisting<ILocalScheduledJobManager, LocalScheduledJobManager>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalScheduledJobManager>();
         });
+    }
+
+    public static IServiceCollection AddScheduledJobs(this IServiceCollection services)
+    {
+        if (services.Any(service => service.ServiceType.Equals(typeof(LocalScheduledJobManager))))
+        {
+            return services;
+        }
+
+        services.AddSingleton<LocalScheduledJobManager>();
+        services.AddFromExisting<ILocalScheduledJobManager, LocalScheduledJobManager>();
+        services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalScheduledJobManager>();
+
+        return services;
     }
 }
