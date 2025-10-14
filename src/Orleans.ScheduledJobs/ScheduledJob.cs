@@ -9,7 +9,6 @@ public interface IScheduledJob
     string Name { get; init; }
     DateTimeOffset DueTime { get; init; }
     GrainId TargetGrainId { get; init; }
-    string ShardId { get; init; }
 }
 
 [GenerateSerializer]
