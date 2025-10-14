@@ -125,13 +125,12 @@ public sealed class AzureStorageJobShardManager : JobShardManager
         }
     }
 
-    private ValueTask InitializeIfNeeded()
+    private async ValueTask InitializeIfNeeded()
     {
-        if (_client != null) return ValueTask.CompletedTask;
+        if (_client != null) return;
 
         _client = _blobServiceClient.GetBlobContainerClient(_containerName);
-        _client.CreateIfNotExists();
-        return ValueTask.CompletedTask;
+        await _client.CreateIfNotExistsAsync();
     }
 
     private static Dictionary<string, string> CreateMetadata(SiloAddress siloAddress, DateTimeOffset minDueTime, DateTimeOffset maxDueTime)

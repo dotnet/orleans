@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 
@@ -20,6 +21,7 @@ public interface ILocalScheduledJobManager
 internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManager, ILifecycleParticipant<ISiloLifecycle>
 {
     private readonly JobShardManager _shardManager;
+    private readonly ILogger<LocalScheduledJobManager> _logger;
     private CancellationTokenSource _cts = new();
     private readonly ConcurrentDictionary<DateTimeOffset, ConcurrentBag<JobShard>> _shardCache = new();
     private readonly int MaxJobCountPerShard = 1000;
@@ -27,10 +29,11 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
 
     private static readonly IDictionary<string, string> EmptyMetadata = new Dictionary<string, string>();
 
-    public LocalScheduledJobManager(JobShardManager shardManager, SystemTargetShared shared)
+    public LocalScheduledJobManager(JobShardManager shardManager, SystemTargetShared shared, ILogger<LocalScheduledJobManager> logger)
         : base(SystemTargetGrainId.CreateGrainType("scheduledjobs-manager"), shared)
     {
         _shardManager = shardManager;
+        _logger = logger;
     }
 
     public async Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime)
@@ -39,9 +42,10 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
         // Try to get all the available shards for this key
         var shards = _shardCache.GetOrAdd(key, _ => new ConcurrentBag<JobShard>());
         // Find a shard that can accept this job
+        // TODO more efficient lookup
         foreach (var shard in shards)
         {
-            if (shard.StartTime <= dueTime && shard.EndTime >= dueTime && await shard.GetJobCount() <= MaxJobCountPerShard)
+            if (!shard.IsComplete && shard.StartTime <= dueTime && shard.EndTime >= dueTime && await shard.GetJobCount() <= MaxJobCountPerShard)
             {
                 return await shard.ScheduleJobAsync(target, jobName, dueTime);
             }
@@ -128,8 +132,7 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
                 }
                 catch (Exception ex)
                 {
-                    // TODO Log the exception
-                    Console.WriteLine($"Error executing job {job.Id}: {ex}");
+                    _logger.LogError(ex, "Error executing job {JobId}", job.Id);
                 }
             }
             // Unregister the shard

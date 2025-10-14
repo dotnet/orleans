@@ -6,7 +6,7 @@ using Orleans.ScheduledJobs;
 
 namespace Orleans.Hosting;
 
-public static class  ScheduledJobsExtension
+public static class ScheduledJobsExtensions
 {
     public static ISiloBuilder UseInMemoryScheduledJobs(this ISiloBuilder builder)
     {

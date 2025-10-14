@@ -11,7 +11,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJob>
     private readonly PriorityQueue<JobBucket, DateTimeOffset> _queue = new();
     private readonly Dictionary<string, JobBucket> _jobsIdToBucket = new();
     private readonly Dictionary<DateTimeOffset, JobBucket> _buckets = new();
-    private bool _isComplete = false;
+    private bool _isFrozen;
     private object _syncLock = new();
 
     public int Count => _queue.Count;
@@ -20,7 +20,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJob>
     {
         lock (_syncLock)
         {
-            if (_isComplete)
+            if (_isFrozen)
                 throw new InvalidOperationException("Cannot enqueue job to a frozen queue.");
 
             var bucket = GetJobBucket(job.DueTime);
@@ -29,11 +29,11 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJob>
         }
     }
 
-    public void MarkAsComplete()
+    public void MarkAsFrozen()
     {
         lock (_syncLock)
         {
-            _isComplete = true;
+            _isFrozen = true;
         }
     }
 
@@ -62,7 +62,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJob>
             {
                 if (_queue.Count == 0)
                 {
-                    if (_isComplete)
+                    if (_isFrozen)
                     {
                         yield break; // Exit if the queue is frozen and empty
                     }
@@ -100,14 +100,14 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJob>
         if (!_buckets.TryGetValue(key, out var bucket))
         {
             bucket = new JobBucket(key);
-            _buckets[dueTime] = bucket;
+            _buckets[key] = bucket;
             _queue.Enqueue(bucket, key);
         }
         return bucket;
     }   
 }
 
-internal class JobBucket
+internal sealed class JobBucket
 {
     private readonly Dictionary<string, IScheduledJob> _jobs = new();
 

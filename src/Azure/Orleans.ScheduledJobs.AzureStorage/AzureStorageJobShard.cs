@@ -121,7 +121,7 @@ internal sealed class AzureStorageJobShard : JobShard
     public override Task MarkAsComplete()
     {
         IsComplete = true;
-        _jobQueue.MarkAsComplete();
+        _jobQueue.MarkAsFrozen();
         return Task.CompletedTask;
     }
 }
