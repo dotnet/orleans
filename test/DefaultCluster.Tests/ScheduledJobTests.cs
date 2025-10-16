@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Orleans.Internal;
 using TestExtensions;
 using Xunit;
 
@@ -28,11 +29,16 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
         var job4 = await grain.ScheduleJobAsync("TestJob4", dueTime);
         var job5 = await grain.ScheduleJobAsync("TestJob5", dueTime.AddSeconds(1));
         // Wait for the job to run
-        await Task.Delay(TimeSpan.FromSeconds(10));
-        Assert.True(await grain.HasJobRan(job1.Id), "The scheduled job did not run as expected.");
-        Assert.True(await grain.HasJobRan(job2.Id), "The scheduled job did not run as expected.");
-        Assert.True(await grain.HasJobRan(job3.Id), "The scheduled job did not run as expected.");
-        Assert.True(await grain.HasJobRan(job4.Id), "The scheduled job did not run as expected.");
-        Assert.True(await grain.HasJobRan(job5.Id), "The scheduled job did not run as expected.");
+        foreach (var job in new[] { job1, job2, job3, job4, job5 })
+        {
+            try
+            {
+                await grain.WaitForJobToRun(job.Id).WithTimeout(TimeSpan.FromSeconds(10));
+            }
+            catch (TimeoutException)
+            {
+                Assert.Fail($"The scheduled job {job.Name} did not run within the expected time.");
+            }
+        }
     }
 }
