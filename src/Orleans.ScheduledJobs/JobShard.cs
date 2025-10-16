@@ -33,7 +33,7 @@ public abstract class JobShard
     }
 
     // Move to the ShardManager?
-    public abstract Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime);
+    public abstract Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata = null);
 
     public abstract IAsyncEnumerable<IScheduledJob> ConsumeScheduledJobsAsync();
 
@@ -53,7 +53,7 @@ internal class InMemoryJobShard : JobShard
         _jobQueue = new InMemoryJobQueue();
     }
 
-    public override Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime)
+    public override Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata = null)
     {
         if (IsComplete)
             throw new InvalidOperationException("Cannot schedule job on a complete shard.");
@@ -67,7 +67,8 @@ internal class InMemoryJobShard : JobShard
             TargetGrainId = target,
             Name = jobName,
             DueTime = dueTime,
-            ShardId = Id
+            ShardId = Id,
+            Metadata = metadata
         };
         _jobQueue.Enqueue(job);
         return Task.FromResult(job);

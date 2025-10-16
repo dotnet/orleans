@@ -44,13 +44,13 @@ internal sealed class AzureStorageJobShard : JobShard
         _jobCount--;
     }
 
-    public override async Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime)
+    public override async Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata = null)
     {
         if (IsComplete)
             throw new InvalidOperationException("Cannot schedule job on a complete shard.");
 
         var jobId = Guid.NewGuid().ToString();
-        var operation = JobOperation.CreateAddOperation(jobId, jobName, dueTime, target);
+        var operation = JobOperation.CreateAddOperation(jobId, jobName, dueTime, target, metadata);
         await AppendOperation(operation);
         _jobCount++;
         var job = new ScheduledJob
@@ -59,7 +59,8 @@ internal sealed class AzureStorageJobShard : JobShard
             Name = jobName,
             DueTime = dueTime,
             TargetGrainId = target,
-            ShardId = Id
+            ShardId = Id,
+            Metadata = metadata,
         };
         _jobQueue.Enqueue(job);
         return job;
@@ -110,7 +111,8 @@ internal sealed class AzureStorageJobShard : JobShard
                 Name = op.Name!,
                 DueTime = op.DueTime!.Value,
                 TargetGrainId = op.TargetGrainId!.Value,
-                ShardId = Id
+                ShardId = Id,
+                Metadata = op.Metadata,
             });
         }
         _jobCount = dictionary.Count;
@@ -140,9 +142,10 @@ internal struct JobOperation
     public string? Name { get; init; }
     public DateTimeOffset? DueTime { get; init; }
     public GrainId? TargetGrainId { get; init; }
+    public IReadOnlyDictionary<string, string>? Metadata { get; init; }
 
-    public static JobOperation CreateAddOperation(string id, string name, DateTimeOffset dueTime, GrainId targetGrainId) =>
-        new() { Type = OperationType.Add, Id = id, Name = name, DueTime = dueTime, TargetGrainId = targetGrainId };
+    public static JobOperation CreateAddOperation(string id, string name, DateTimeOffset dueTime, GrainId targetGrainId, IReadOnlyDictionary<string,string>? metadata) =>
+        new() { Type = OperationType.Add, Id = id, Name = name, DueTime = dueTime, TargetGrainId = targetGrainId, Metadata = metadata };
 
     public static JobOperation CreateRemoveOperation(string id) =>
         new() { Type = OperationType.Remove, Id = id };

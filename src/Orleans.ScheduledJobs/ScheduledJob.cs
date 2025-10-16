@@ -1,19 +1,21 @@
 using System;
+using System.Collections.Generic;
 using Orleans.Runtime;
 
 namespace Orleans.ScheduledJobs;
 
 public interface IScheduledJob
 {
-    string Id { get; init; }
-    string Name { get; init; }
-    DateTimeOffset DueTime { get; init; }
-    GrainId TargetGrainId { get; init; }
+    string Id { get; }
+    string Name { get; }
+    DateTimeOffset DueTime { get; }
+    GrainId TargetGrainId { get; }
+    IReadOnlyDictionary<string, string>? Metadata { get; }
 }
 
 [GenerateSerializer]
 [Alias("Orleans.ScheduledJobs.ScheduledJob")]
-public class ScheduledJob : IScheduledJob
+public sealed class ScheduledJob : IScheduledJob
 {
     [Id(0)]
     public required string Id { get; init; }
@@ -25,4 +27,6 @@ public class ScheduledJob : IScheduledJob
     public GrainId TargetGrainId { get; init; }
     [Id(4)]
     public required string ShardId { get; init; }
+    [Id(5)]
+    public IReadOnlyDictionary<string, string>? Metadata { get; init; }
 }
