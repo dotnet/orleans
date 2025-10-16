@@ -126,8 +126,8 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
                     // Use Poly for retries? put it back in the shard on failure?
                     var target = this.RuntimeClient.InternalGrainFactory
                         .GetGrain(job.TargetGrainId)
-                        .AsReference<IScheduledJobReceiver>();
-                    await target.ReceiveScheduledJobAsync(job);
+                        .AsReference<IScheduledJobReceiverExtension>();
+                    await target.DeliverScheduledJobAsync(job, new CancellationToken());
                     await shard.RemoveJobAsync(job.Id);
                 }
                 catch (Exception ex)

@@ -9,7 +9,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains;
 
-public class ScheduledJobGrain : Grain, IScheduledJobGrain, IScheduledJobReceiver
+public class ScheduledJobGrain : Grain, IScheduledJobGrain, IScheduledJobHandler
 {
     private Dictionary<string, bool> jobRunStatus = new();
     private readonly ILocalScheduledJobManager _localScheduledJobManager;
@@ -26,10 +26,10 @@ public class ScheduledJobGrain : Grain, IScheduledJobGrain, IScheduledJobReceive
         return Task.FromResult(jobRunStatus.TryGetValue(jobId, out var ran) && ran);
     }
 
-    public Task ReceiveScheduledJobAsync(IScheduledJob job)
+    public Task ExecuteJobAsync(IScheduledJobContext ctx, CancellationToken cancellationToken)
     {
-        _logger.LogInformation($"Job {job.Id} received at {DateTime.UtcNow}");
-        jobRunStatus[job.Id] = true;
+        _logger.LogInformation($"Job {ctx.Job.Id} received at {DateTime.UtcNow}");
+        jobRunStatus[ctx.Job.Id] = true;
         return Task.CompletedTask;
     }
 

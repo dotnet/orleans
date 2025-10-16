@@ -1,5 +1,6 @@
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Configuration.Internal;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -29,6 +30,11 @@ public static class ScheduledJobsExtensions
         services.AddSingleton<LocalScheduledJobManager>();
         services.AddFromExisting<ILocalScheduledJobManager, LocalScheduledJobManager>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalScheduledJobManager>();
+        services.AddKeyedTransient<IGrainExtension>(typeof(IScheduledJobReceiverExtension), (sp, _) =>
+        {
+            var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
+            return new ScheduledJobReceiverExtension(grainContextAccessor.GrainContext, sp.GetRequiredService<ILogger<ScheduledJobReceiverExtension>>());
+        });
 
         return services;
     }
