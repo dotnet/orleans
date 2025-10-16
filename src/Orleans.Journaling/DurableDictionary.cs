@@ -211,10 +211,10 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
         OnSet(key, value);
     }
 
-    private bool ApplyRemove(K key) => _items.Remove(key);
+    internal bool ApplyRemove(K key) => _items.Remove(key);
     private void ApplyClear() => _items.Clear();
 
-    private IStateMachineLogWriter GetStorage()
+    protected virtual IStateMachineLogWriter GetStorage()
     {
         Debug.Assert(_storage is not null);
         return _storage;
