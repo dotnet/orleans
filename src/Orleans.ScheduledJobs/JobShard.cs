@@ -40,6 +40,8 @@ public abstract class JobShard
     public abstract Task RemoveJobAsync(string jobId);
 
     public abstract Task MarkAsComplete();
+
+    public abstract Task RetryJobLaterAsync(IScheduledJobContext jobContext, DateTimeOffset newDueTime);
 }
 
 [DebuggerDisplay("ShardId={Id}, StartTime={StartTime}, EndTime={EndTime}, JobCount={JobCount}")]
@@ -70,7 +72,7 @@ internal class InMemoryJobShard : JobShard
             ShardId = Id,
             Metadata = metadata
         };
-        _jobQueue.Enqueue(job);
+        _jobQueue.Enqueue(job, 0);
         return Task.FromResult(job);
     }
 
@@ -91,6 +93,12 @@ internal class InMemoryJobShard : JobShard
     {
         IsComplete = true;
         _jobQueue.MarkAsFrozen();
+        return Task.CompletedTask;
+    }
+
+    public override Task RetryJobLaterAsync(IScheduledJobContext jobContext, DateTimeOffset newDueTime)
+    {
+        _jobQueue.RetryJobLater(jobContext, newDueTime);
         return Task.CompletedTask;
     }
 }

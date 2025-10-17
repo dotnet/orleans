@@ -1,6 +1,8 @@
+using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -27,6 +29,7 @@ public static class ScheduledJobsExtensions
             return services;
         }
 
+        services.AddSingleton<IConfigurationValidator, ScheduledJobsOptionsValidator>();
         services.AddSingleton<LocalScheduledJobManager>();
         services.AddFromExisting<ILocalScheduledJobManager, LocalScheduledJobManager>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalScheduledJobManager>();

@@ -6,6 +6,8 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 
@@ -22,18 +24,19 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
 {
     private readonly JobShardManager _shardManager;
     private readonly ILogger<LocalScheduledJobManager> _logger;
+    private readonly ScheduledJobsOptions _options;
     private CancellationTokenSource _cts = new();
     private readonly ConcurrentDictionary<DateTimeOffset, ConcurrentBag<JobShard>> _shardCache = new();
     private readonly int MaxJobCountPerShard = 1000;
-    private readonly TimeSpan ShardDuration = TimeSpan.FromHours(1);
 
     private static readonly IDictionary<string, string> EmptyMetadata = new Dictionary<string, string>();
 
-    public LocalScheduledJobManager(JobShardManager shardManager, SystemTargetShared shared, ILogger<LocalScheduledJobManager> logger)
+    public LocalScheduledJobManager(JobShardManager shardManager, IOptions<ScheduledJobsOptions> options, SystemTargetShared shared, ILogger<LocalScheduledJobManager> logger)
         : base(SystemTargetGrainId.CreateGrainType("scheduledjobs-manager"), shared)
     {
         _shardManager = shardManager;
         _logger = logger;
+        _options = options.Value;
     }
 
     public async Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime)
@@ -51,7 +54,7 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
             }
         }
         // No available shard found, create a new one
-        var newShard = await _shardManager.RegisterShard(this.Silo, key, key.Add(ShardDuration), EmptyMetadata);
+        var newShard = await _shardManager.RegisterShard(this.Silo, key, key.Add(_options.ShardDuration), EmptyMetadata);
         shards.Add(newShard);
         var job = await newShard.ScheduleJobAsync(target, jobName, dueTime);
         this.QueueTask(() => RunShard(newShard)).Ignore();
@@ -91,7 +94,7 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
                 {
                     foreach (var shard in shards)
                     {
-                        RunShard(shard).Ignore(); // TODO: keep track of running shards
+                        RunShard(shard).Ignore(); // TODO: keep track of running shaFrds
                     }
                 }
                 await Task.Delay(TimeSpan.FromMinutes(1), _cts.Token);
@@ -133,6 +136,11 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error executing job {JobId}", jobContext.Job.Id);
+                    var retryTime = _options.ShouldRetry(jobContext, ex);
+                    if (retryTime != null)
+                    {
+                        // TODO
+                    }
                 }
             }
             // Unregister the shard

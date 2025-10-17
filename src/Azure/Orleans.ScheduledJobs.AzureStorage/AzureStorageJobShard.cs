@@ -62,7 +62,7 @@ internal sealed class AzureStorageJobShard : JobShard
             ShardId = Id,
             Metadata = metadata,
         };
-        _jobQueue.Enqueue(job);
+        _jobQueue.Enqueue(job, 0);
         return job;
     }
 
@@ -86,7 +86,9 @@ internal sealed class AzureStorageJobShard : JobShard
         using var reader = new StreamReader(stream);
 
         // Rebuild state by replaying operations
-        var dictionary = new Dictionary<string, JobOperation>();
+        var addedJobs = new Dictionary<string, JobOperation>();
+        var deletedJobs = new HashSet<string>();
+        var jobRetryCounters = new Dictionary<string, int>();
         while (!reader.EndOfStream)
         {
             var line = await reader.ReadLineAsync();
@@ -95,16 +97,35 @@ internal sealed class AzureStorageJobShard : JobShard
             switch (operation.Type)
             {
                 case JobOperation.OperationType.Add:
-                    dictionary[operation.Id] = operation;
+                    if (!deletedJobs.Contains(operation.Id))
+                    {
+                        addedJobs[operation.Id] = operation;
+                    }
                     break;
                 case JobOperation.OperationType.Remove:
-                    dictionary.Remove(operation.Id);
+                    deletedJobs.Add(operation.Id);
+                    addedJobs.Remove(operation.Id);
+                    jobRetryCounters.Remove(operation.Id);
+                    break;
+                case JobOperation.OperationType.Retry:
+                    if (!deletedJobs.Contains(operation.Id))
+                    {
+                        if (!jobRetryCounters.ContainsKey(operation.Id))
+                        {
+                            jobRetryCounters[operation.Id] = 1;
+                        }
+                        else
+                        {
+                            jobRetryCounters[operation.Id]++;
+                        }
+                    }
                     break;
             }
         }
         // Rebuild the priority queue
-        foreach (var op in dictionary.Values)
+        foreach (var op in addedJobs.Values)
         {
+            jobRetryCounters.TryGetValue(op.Id, out var retryCounter);
             _jobQueue.Enqueue(new ScheduledJob
             {
                 Id = op.Id,
@@ -113,9 +134,10 @@ internal sealed class AzureStorageJobShard : JobShard
                 TargetGrainId = op.TargetGrainId!.Value,
                 ShardId = Id,
                 Metadata = op.Metadata,
-            });
+            },
+            retryCounter);
         }
-        _jobCount = dictionary.Count;
+        _jobCount = addedJobs.Count;
 
         ETag = response.Value.Details.ETag;
     }
@@ -126,6 +148,12 @@ internal sealed class AzureStorageJobShard : JobShard
         _jobQueue.MarkAsFrozen();
         return Task.CompletedTask;
     }
+
+    public override async Task RetryJobLaterAsync(IScheduledJobContext jobContext, DateTimeOffset newDueTime)
+    {
+        await AppendOperation(JobOperation.CreateRetryOperation(jobContext.Job.Id));
+        _jobQueue.RetryJobLater(jobContext, newDueTime);
+    }
 }
 
 internal struct JobOperation
@@ -133,7 +161,8 @@ internal struct JobOperation
     public enum OperationType
     {
         Add,
-        Remove
+        Remove,
+        Retry,
     }
 
     public OperationType Type { get; init; }
@@ -149,4 +178,7 @@ internal struct JobOperation
 
     public static JobOperation CreateRemoveOperation(string id) =>
         new() { Type = OperationType.Remove, Id = id };
+
+    public static JobOperation CreateRetryOperation(string id) =>
+        new() { Type = OperationType.Retry, Id = id };
 }

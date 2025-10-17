@@ -16,7 +16,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
 
     public int Count => _queue.Count;
 
-    public void Enqueue(IScheduledJob job)
+    public void Enqueue(IScheduledJob job, int dequeueCount)
     {
         lock (_syncLock)
         {
@@ -24,7 +24,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
                 throw new InvalidOperationException("Cannot enqueue job to a frozen queue.");
 
             var bucket = GetJobBucket(job.DueTime);
-            bucket.AddJob(job);
+            bucket.AddJob(job, dequeueCount);
             _jobsIdToBucket[job.Id] = bucket;
         }
     }
@@ -50,7 +50,20 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
         }
     }
 
-    // ValueTask<ScheduledJob> WaitJobAsync(CancellationToken cancellationToken = default)
+    public void RetryJobLater(IScheduledJobContext jobContext, DateTimeOffset newDueTime)
+    {
+        var jobId = jobContext.Job.Id;
+        lock (_syncLock)
+        {
+            if (_jobsIdToBucket.TryGetValue(jobId, out var oldBucket))
+            {
+                oldBucket.RemoveJob(jobId);
+                _jobsIdToBucket.Remove(jobId);
+                var newBucket = GetJobBucket(newDueTime);
+                newBucket.AddJob(jobContext.Job, jobContext.DequeueCount);
+            }
+        }
+    }
 
     public async IAsyncEnumerator<IScheduledJobContext> GetAsyncEnumerator(CancellationToken cancellationToken = default)
     {
@@ -58,6 +71,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
         while (true)
         {
             IScheduledJob? job = null;
+            int dequeueCount = 0;
             lock (_syncLock)
             {
                 if (_queue.Count == 0)
@@ -78,14 +92,14 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
                         }
                         else
                         {
-                            job = nextBucket.Jobs.First();
+                            (job, dequeueCount) = nextBucket.Jobs.First();
                         }
                     }
                 }
             }
             if (job != null)
             {
-                yield return new ScheduledJobContext(job, Guid.NewGuid().ToString());
+                yield return new ScheduledJobContext(job, Guid.NewGuid().ToString(), dequeueCount + 1);
             }
             else
             {
@@ -109,26 +123,28 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
 
 internal sealed class JobBucket
 {
-    private readonly Dictionary<string, IScheduledJob> _jobs = new();
+    private readonly Dictionary<string, (IScheduledJob Job, int DequeueCount)> _jobs = new();
 
     public int Count => _jobs.Count;
 
     public DateTimeOffset DueTime { get; private set; }
 
-    public IEnumerable<IScheduledJob> Jobs => _jobs.Values;
+    public IEnumerable<(IScheduledJob Job, int DequeueCount)> Jobs => _jobs.Values;
+
+    public (IScheduledJob Job, int DequeueCount) this[string jobId] => _jobs[jobId];
 
     public JobBucket(DateTimeOffset dueTime)
     {
         DueTime = dueTime;
     }
 
-    public void AddJob(IScheduledJob job)
+    public void AddJob(IScheduledJob job, int dequeueCount)
     {
-        _jobs[job.Id] = job;
+        _jobs[job.Id] = (job, dequeueCount);
     }
 
-    public void RemoveJob(string jobId)
+    public bool RemoveJob(string jobId)
     {
-        _jobs.Remove(jobId);
+        return _jobs.Remove(jobId);
     }
 }

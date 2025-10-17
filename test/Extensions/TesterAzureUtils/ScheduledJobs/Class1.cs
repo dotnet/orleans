@@ -199,6 +199,38 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         Assert.Equal(shard1.Id, shards[0].Id);
     }
 
+    [Fact, TestCategory("Azure"), TestCategory("Functional")]
+    public async Task AzureStorageJobShardManager_RetryJobLater()
+    {
+        var options = Options.Create(new AzureStorageJobShardOptions());
+        options.Value.ConfigureTestDefaults();
+        options.Value.ContainerName = "jobshardmanager" + Guid.NewGuid();
+        var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var membershipService = new InMemoryClusterMembershipService();
+        var manager = new AzureStorageJobShardManager(options, membershipService);
+        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
+        var date = DateTime.UtcNow;
+        var shard1 = await manager.RegisterShard(localAddress, date, date.AddYears(1), _metadata);
+        // Schedule a job
+        var job =  await shard1.ScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5));
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(40));
+        await foreach (var jobCtx in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        {
+            Assert.Equal("job1", jobCtx.Job.Name);
+            var newDueTime = DateTimeOffset.UtcNow.AddSeconds(10);
+            await shard1.RetryJobLaterAsync(jobCtx, newDueTime);
+            break;
+        }
+        // Consume again
+        await foreach (var jobCtx in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        {
+            Assert.Equal("job1", jobCtx.Job.Name);
+            await shard1.RemoveJobAsync(jobCtx.Job.Id);
+            break;
+        }
+        await manager.UnregisterShard(localAddress, shard1);
+    }
+
     private class InMemoryClusterMembershipService : IClusterMembershipService
     {
         public ClusterMembershipSnapshot CurrentSnapshot => new ClusterMembershipSnapshot(silos.ToImmutableDictionary(), new MembershipVersion(_version));

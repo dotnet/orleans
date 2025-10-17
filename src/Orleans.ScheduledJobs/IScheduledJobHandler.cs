@@ -8,6 +8,8 @@ public interface IScheduledJobContext
     IScheduledJob Job { get; }
 
     string RunId { get; }
+
+    int DequeueCount { get; }
 }
 
 [GenerateSerializer]
@@ -19,10 +21,14 @@ internal class ScheduledJobContext : IScheduledJobContext
     [Id(1)]
     public string RunId { get; }
 
-    public ScheduledJobContext(IScheduledJob job, string runId)
+    [Id(2)]
+    public int DequeueCount { get; }
+
+    public ScheduledJobContext(IScheduledJob job, string runId, int retryCount)
     {
         Job = job;
         RunId = runId;
+        DequeueCount = retryCount;
     }
 }
 
