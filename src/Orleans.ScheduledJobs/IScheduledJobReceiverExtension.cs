@@ -8,7 +8,7 @@ namespace Orleans.ScheduledJobs;
 
 internal interface IScheduledJobReceiverExtension : IGrainExtension
 {
-    Task DeliverScheduledJobAsync(IScheduledJob job, CancellationToken cancellationToken);
+    Task DeliverScheduledJobAsync(IScheduledJobContext context, CancellationToken cancellationToken);
 }
 
 internal sealed class ScheduledJobReceiverExtension : IScheduledJobReceiverExtension
@@ -22,9 +22,8 @@ internal sealed class ScheduledJobReceiverExtension : IScheduledJobReceiverExten
         _logger = logger;
     }
 
-    public async Task DeliverScheduledJobAsync(IScheduledJob job, CancellationToken cancellationToken)
+    public async Task DeliverScheduledJobAsync(IScheduledJobContext context, CancellationToken cancellationToken)
     {
-        var context = new ScheduledJobContext(job);
         if (_grain.GrainInstance is IScheduledJobHandler handler)
         {
             try
@@ -33,7 +32,7 @@ internal sealed class ScheduledJobReceiverExtension : IScheduledJobReceiverExten
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error executing scheduled job {JobId} on grain {GrainId}", job.Id, _grain.GrainId);
+                _logger.LogError(ex, "Error executing scheduled job {JobId} on grain {GrainId}", context.Job.Id, _grain.GrainId);
                 throw;
             }
         }
@@ -41,16 +40,6 @@ internal sealed class ScheduledJobReceiverExtension : IScheduledJobReceiverExten
         {
             _logger.LogError("Grain {GrainId} does not implement IScheduledJobHandler", _grain.GrainId);
             throw new InvalidOperationException($"Grain {_grain.GrainId} does not implement IScheduledJobHandler");
-        }
-    }
-
-    private class ScheduledJobContext : IScheduledJobContext
-    {
-        public IScheduledJob Job { get; }
-
-        public ScheduledJobContext(IScheduledJob job)
-        {
-            Job = job;
         }
     }
 }

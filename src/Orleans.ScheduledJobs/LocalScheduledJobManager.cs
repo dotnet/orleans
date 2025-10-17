@@ -116,7 +116,7 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
             }
 
             // Process all jobs in the shard
-            await foreach (var job in shard.ConsumeScheduledJobsAsync().WithCancellation(_cts.Token))
+            await foreach (var jobContext in shard.ConsumeScheduledJobsAsync().WithCancellation(_cts.Token))
             {
                 try
                 {
@@ -125,14 +125,14 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
                     // TODO: Do it in parallel, with concurrency limit
                     // Use Poly for retries? put it back in the shard on failure?
                     var target = this.RuntimeClient.InternalGrainFactory
-                        .GetGrain(job.TargetGrainId)
+                        .GetGrain(jobContext.Job.TargetGrainId)
                         .AsReference<IScheduledJobReceiverExtension>();
-                    await target.DeliverScheduledJobAsync(job, new CancellationToken());
-                    await shard.RemoveJobAsync(job.Id);
+                    await target.DeliverScheduledJobAsync(jobContext, new CancellationToken());
+                    await shard.RemoveJobAsync(jobContext.Job.Id);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error executing job {JobId}", job.Id);
+                    _logger.LogError(ex, "Error executing job {JobId}", jobContext.Job.Id);
                 }
             }
             // Unregister the shard

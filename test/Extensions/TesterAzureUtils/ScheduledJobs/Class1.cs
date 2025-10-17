@@ -102,10 +102,10 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
 
         var counter = 1;
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        await foreach (var job in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
         {
-            Assert.Equal($"job{counter}", job.Name);
-            await shard1.RemoveJobAsync(job.Id);
+            Assert.Equal($"job{counter}", jobCtx.Job.Name);
+            await shard1.RemoveJobAsync(jobCtx.Job.Id);
             counter++;
         }
         Assert.Equal(5, counter);
@@ -144,10 +144,10 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(40));
         await shard1.MarkAsComplete();
         await shard1.RemoveJobAsync(jobToCancel.Id);
-        await foreach (var job in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
         {
-            Assert.Equal($"job{counter}", job.Name);
-            await shard1.RemoveJobAsync(job.Id);
+            Assert.Equal($"job{counter}", jobCtx.Job.Name);
+            await shard1.RemoveJobAsync(jobCtx.Job.Id);
             counter++;
         }
         Assert.Equal(4, counter);
@@ -183,12 +183,12 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
 
         var counter = 1;
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(40));
-        await foreach (var job in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
         {
-            Assert.Equal($"job{counter}", job.Name);
+            Assert.Equal($"job{counter}", jobCtx.Job.Name);
             if (counter == 2)
                 break;
-            await shard1.RemoveJobAsync(job.Id);
+            await shard1.RemoveJobAsync(jobCtx.Job.Id);
             counter++;
         }
         Assert.Equal(2, counter);

@@ -31,7 +31,7 @@ internal sealed class AzureStorageJobShard : JobShard
         return ValueTask.FromResult(_jobCount);
     }
 
-    public override IAsyncEnumerable<IScheduledJob> ConsumeScheduledJobsAsync()
+    public override IAsyncEnumerable<IScheduledJobContext> ConsumeScheduledJobsAsync()
     {
         return _jobQueue;
     }

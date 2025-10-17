@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.ScheduledJobs;
 
-public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJob>
+public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
 {
     private readonly PriorityQueue<JobBucket, DateTimeOffset> _queue = new();
     private readonly Dictionary<string, JobBucket> _jobsIdToBucket = new();
@@ -52,7 +52,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJob>
 
     // ValueTask<ScheduledJob> WaitJobAsync(CancellationToken cancellationToken = default)
 
-    public async IAsyncEnumerator<IScheduledJob> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+    public async IAsyncEnumerator<IScheduledJobContext> GetAsyncEnumerator(CancellationToken cancellationToken = default)
     {
         var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
         while (true)
@@ -85,7 +85,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJob>
             }
             if (job != null)
             {
-                yield return job;
+                yield return new ScheduledJobContext(job, Guid.NewGuid().ToString());
             }
             else
             {

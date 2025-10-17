@@ -35,7 +35,7 @@ public abstract class JobShard
     // Move to the ShardManager?
     public abstract Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata = null);
 
-    public abstract IAsyncEnumerable<IScheduledJob> ConsumeScheduledJobsAsync();
+    public abstract IAsyncEnumerable<IScheduledJobContext> ConsumeScheduledJobsAsync();
 
     public abstract Task RemoveJobAsync(string jobId);
 
@@ -74,7 +74,7 @@ internal class InMemoryJobShard : JobShard
         return Task.FromResult(job);
     }
 
-    public override IAsyncEnumerable<IScheduledJob> ConsumeScheduledJobsAsync() // todo rename
+    public override IAsyncEnumerable<IScheduledJobContext> ConsumeScheduledJobsAsync() 
     {
         return _jobQueue; 
     }
