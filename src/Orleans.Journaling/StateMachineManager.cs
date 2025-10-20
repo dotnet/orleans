@@ -81,7 +81,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     private Task Start()
     {
         using var suppressExecutionContext = new ExecutionContextSuppressor();
-        return WorkLoop();
+        return Task.Run(WorkLoop);
     }
 
     private async Task WorkLoop()
