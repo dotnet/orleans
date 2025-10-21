@@ -80,38 +80,43 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
         lock (_lockObj)
         {
             long thisSequenceNumber = _totalItemsEnqueued++;
-            int count = _workItems.Count;
+            int countBefore = _workItems.Count;
 
             _workItems.Enqueue(task);
+
             int maxPendingItemsLimit = _schedulingOptions.MaxPendingWorkItemsSoftLimit;
-            if (maxPendingItemsLimit > 0 && count > maxPendingItemsLimit)
+            if (maxPendingItemsLimit > 0 && countBefore > maxPendingItemsLimit)
             {
                 var now = Environment.TickCount64;
                 if (now > _lastLongQueueWarningTimestamp + 10_000)
                 {
-                    LogTooManyTasksInQueue(count, maxPendingItemsLimit);
+                    LogTooManyTasksInQueue(countBefore, maxPendingItemsLimit);
                 }
 
                 _lastLongQueueWarningTimestamp = now;
             }
 
-            if (_state != WorkGroupStatus.Waiting)
+            if (_state is WorkGroupStatus.Waiting)
             {
-                return;
+                _state = WorkGroupStatus.Runnable;
             }
 
-            _state = WorkGroupStatus.Runnable;
-#if DEBUG
-            if (_log.IsEnabled(LogLevel.Trace))
+            // We schedule ourself for execution even if we are running but the countBefore == 0,
+            // to ensure this enqueued task is not left stranded.
+            if (_state is WorkGroupStatus.Runnable || (_state is WorkGroupStatus.Running && countBefore == 0))
             {
-                _log.LogTrace(
-                    "Add to RunQueue {Task}, #{SequenceNumber}, onto {GrainContext}",
-                    task,
-                    thisSequenceNumber,
-                    GrainContext);
-            }
+#if DEBUG
+                if (_log.IsEnabled(LogLevel.Trace))
+                {
+                    _log.LogTrace(
+                        "Add to RunQueue {Task}, #{SequenceNumber}, onto {GrainContext}",
+                        task,
+                        thisSequenceNumber,
+                        GrainContext);
+                }
 #endif
-            ScheduleExecution(this);
+                ScheduleExecution(this);
+            }
         }
     }
 
@@ -156,19 +161,16 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
                 Task task;
                 lock (_lockObj)
                 {
-                    _state = WorkGroupStatus.Running;
-
-                    // Get the first Work Item on the list
-                    if (_workItems.Count > 0)
+                    if (_workItems.Count == 0)
                     {
-                        _currentTask = task = _workItems.Dequeue();
-                        _currentTaskStarted = taskStart;
-                    }
-                    else
-                    {
-                        // If the list is empty, then we're done
                         break;
                     }
+
+                    // We have work — mark Running and deque.
+
+                    _state = WorkGroupStatus.Running;
+                    _currentTask = task = _workItems.Dequeue();
+                    _currentTaskStarted = taskStart;
                 }
 
 #if DEBUG
