@@ -81,9 +81,11 @@ internal sealed partial class ActivationData :
         Debug.Assert(_serviceScope != null, "_serviceScope must not be null.");
         _workItemGroup = createWorkItemGroup(this);
         Debug.Assert(_workItemGroup != null, "_workItemGroup must not be null.");
-        _messageLoopTask = this.RunOrQueueTask(RunMessageLoop);
+        _messageLoopTask = new Task<Task>(static state => ((ActivationData)state!).RunMessageLoop(), this);
+        _workItemGroup.QueueTask(_messageLoopTask);
     }
 
+    public TaskScheduler TaskScheduler => _workItemGroup.TaskScheduler;
     public IGrainRuntime GrainRuntime => _shared.Runtime;
     public object? GrainInstance { get; private set; }
     public GrainAddress Address { get; private set; }

@@ -98,13 +98,11 @@ namespace Orleans.Runtime.Scheduler
 #endif
             // Try to run the task.
             bool done = TryExecuteTask(task);
+#if DEBUG
             if (!done)
             {
-#if DEBUG
                 LogWarnTryExecuteTaskNotDone(task.Id, task.Status);
-#endif
             }
-#if DEBUG
 
             LogTraceTryExecuteTaskInlineCompleted(myId, task.Id, Thread.CurrentThread.ManagedThreadId, done);
 #endif

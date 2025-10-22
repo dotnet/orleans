@@ -1,9 +1,14 @@
+#nullable enable
 using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.ExceptionServices;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
+using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
@@ -45,7 +50,7 @@ namespace Orleans.Runtime
             _grainReferenceActivator = grainReferenceActivator;
         }
 
-        public bool TryGet(GrainType grainType, out IGrainContextActivator activator)
+        public bool TryGet(GrainType grainType, [NotNullWhen(true)] out IGrainContextActivator? activator)
         {
             if (!_grainClassMap.TryGetGrainClass(grainType, out var grainClass) || !typeof(IGrain).IsAssignableFrom(grainClass))
             {
@@ -124,17 +129,28 @@ namespace Orleans.Runtime
                     _sharedComponents);
 
                 RuntimeContext.SetExecutionContext(context, out var originalContext);
-
                 try
                 {
-                    // Instantiate the grain itself
-                    var instance = _grainActivator.CreateInstance(context);
-                    context.SetGrainInstance(instance);
-                }
-                catch (Exception exception)
-                {
-                    LogErrorFailedToConstructGrain(_grainLogger, exception, activationAddress.GrainId);
-                    throw;
+                    using var _ = new ExecutionContextSuppressor();
+
+                    // Synchronously invoke the constructor from the default TaskScheduler to hide any ambient task scheduler.
+                    ExceptionDispatchInfo? edi = null;
+                    var task = new Task(() =>
+                    {
+                        try
+                        {
+                            // Instantiate the grain itself
+                            var instance = _grainActivator.CreateInstance(context);
+                            context.SetGrainInstance(instance);
+                        }
+                        catch (Exception exception)
+                        {
+                            LogErrorFailedToConstructGrain(_grainLogger, exception, activationAddress.GrainId);
+                            edi = ExceptionDispatchInfo.Capture(exception);
+                        }
+                    });
+                    task.RunSynchronously(context.TaskScheduler);
+                    edi?.Throw();
                 }
                 finally
                 {
