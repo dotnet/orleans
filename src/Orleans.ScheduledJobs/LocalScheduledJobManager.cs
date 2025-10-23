@@ -17,7 +17,7 @@ namespace Orleans.ScheduledJobs;
 
 public interface ILocalScheduledJobManager
 {
-    Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime);
+    Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata = null);
 
     Task<bool> TryCancelScheduledJobAsync(IScheduledJob job);
 }
@@ -51,7 +51,7 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
         _options = options.Value;
     }
 
-    public async Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime)
+    public async Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata = null)
     {
         var key = GetShardKey(dueTime);
         // Try to get all the available shards for this key
@@ -62,14 +62,14 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
         {
             if (!shard.IsComplete && shard.StartTime <= dueTime && shard.EndTime >= dueTime && await shard.GetJobCount() <= MaxJobCountPerShard)
             {
-                return await shard.ScheduleJobAsync(target, jobName, dueTime);
+                return await shard.ScheduleJobAsync(target, jobName, dueTime, metadata);
             }
         }
         // No available shard found, create a new one, assigning it to this silo if the shard start time is near
         var assignToMe = key.Add(TimeSpan.FromMinutes(5)) > DateTimeOffset.UtcNow;
         var newShard = await _shardManager.RegisterShard(this.Silo, key, key.Add(_options.ShardDuration), EmptyMetadata, assignToMe, _cts.Token);
         shards.TryAdd(newShard.Id, newShard);
-        var job = await newShard.ScheduleJobAsync(target, jobName, dueTime);
+        var job = await newShard.ScheduleJobAsync(target, jobName, dueTime, metadata);
         if (assignToMe)
         {
             RunShard(newShard).Ignore(); // TODO: keep track of running shards
