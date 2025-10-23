@@ -28,7 +28,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     private readonly StateMachineManagerState _stateMachineIds;
     private readonly StateMachinesRetirementTracker _retirementTracker;
     private readonly TimeSpan _retirementGracePeriod;
-    private readonly Task _workLoop;
+    private Task? _workLoop;
     private ManagerState _state;
     private Task? _pendingWrite;
     private ulong _nextStateMachineId = MinApplicationStateMachineId;
@@ -52,8 +52,6 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
         _stateMachinesMap[0] = _stateMachineIds;
 
         _retirementTracker = new StateMachinesRetirementTracker(this, StringCodec, DateTimeCodec, serializerSessionPool);
-
-        _workLoop = Start();
     }
 
     public void RegisterStateMachine(string name, IDurableStateMachine stateMachine)
@@ -102,6 +100,8 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     {
         cancellationToken.ThrowIfCancellationRequested();
         _shutdownCancellation.Token.ThrowIfCancellationRequested();
+        Debug.Assert(_workLoop is null, "InitializeAsync should only be called once.");
+        _workLoop = Start();
 
         Task task;
         lock (_lock)
@@ -472,7 +472,10 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     {
         _shutdownCancellation.Cancel();
         _workSignal.Signal();
-        await _workLoop.WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+        if (_workLoop is { } task)
+        {
+            await task.WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+        }
     }
 
     void IDisposable.Dispose()
