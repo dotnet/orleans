@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.ScheduledJobs;
@@ -23,18 +25,26 @@ public interface ILocalScheduledJobManager
 internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManager, ILifecycleParticipant<ISiloLifecycle>
 {
     private readonly JobShardManager _shardManager;
+    private readonly IAsyncEnumerable<ClusterMembershipSnapshot> _clusterMembershipUpdates;
     private readonly ILogger<LocalScheduledJobManager> _logger;
     private readonly ScheduledJobsOptions _options;
     private CancellationTokenSource _cts = new();
+    private Task? _listenForClusterChangesTask = null;
     private readonly ConcurrentDictionary<DateTimeOffset, ConcurrentBag<JobShard>> _shardCache = new();
     private readonly int MaxJobCountPerShard = 1000;
 
     private static readonly IDictionary<string, string> EmptyMetadata = new Dictionary<string, string>();
 
-    public LocalScheduledJobManager(JobShardManager shardManager, IOptions<ScheduledJobsOptions> options, SystemTargetShared shared, ILogger<LocalScheduledJobManager> logger)
+    public LocalScheduledJobManager(
+        JobShardManager shardManager,
+        IClusterMembershipService clusterMembership,
+        IOptions<ScheduledJobsOptions> options,
+        SystemTargetShared shared,
+        ILogger<LocalScheduledJobManager> logger)
         : base(SystemTargetGrainId.CreateGrainType("scheduledjobs-manager"), shared)
     {
         _shardManager = shardManager;
+        _clusterMembershipUpdates = clusterMembership.MembershipUpdates;
         _logger = logger;
         _options = options.Value;
     }
@@ -70,20 +80,58 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
             ct => Stop(ct));
     }
 
-    private Task Stop(CancellationToken ct)
+    private Task Start(CancellationToken ct)
+    {
+        using var _ = new ExecutionContextSuppressor();
+        _listenForClusterChangesTask = Task.Factory.StartNew(
+            state => ((LocalScheduledJobManager)state!).ProcessMembershipUpdates(),
+            this,
+            CancellationToken.None,
+            TaskCreationOptions.None,
+            WorkItemGroup.TaskScheduler).Unwrap();
+        _listenForClusterChangesTask.Ignore();
+        return Task.CompletedTask;
+    }
+
+    private async Task Stop(CancellationToken ct)
     {
         // TODO Wait for running shards to complete
         _cts.Cancel();
-        return Task.CompletedTask;
+        if (_listenForClusterChangesTask != null)
+        {
+            await _listenForClusterChangesTask;
+            _listenForClusterChangesTask = null;
+        }
     }
 
-    private Task Start(CancellationToken ct)
+    private async Task ProcessMembershipUpdates()
     {
-        this.QueueTask(WatchForShardsAsync);
-        return Task.CompletedTask;
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+        var current = new HashSet<SiloAddress>();
+        await foreach (var membershipSnapshot in _clusterMembershipUpdates.WithCancellation(_cts.Token))
+        {
+            try
+            {
+                // Get active members.
+                var update = new HashSet<SiloAddress>(membershipSnapshot.Members.Values
+                    .Where(member => member.Status == SiloStatus.Active)
+                    .Select(member => member.SiloAddress));
+
+                // If active list has changed, track new list and notify.
+                if (!current.SetEquals(update))
+                {
+                    current = update;
+                    await GetOrphanedShardsAsync();
+                }
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Error processing cluster membership update.");
+            }
+        }
     }
 
-    private async Task WatchForShardsAsync()
+    private async Task GetOrphanedShardsAsync()
     {
         try
         {
