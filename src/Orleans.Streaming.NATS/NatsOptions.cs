@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using Orleans.Runtime;
 using NATS.Client.Core;
 
 namespace Orleans.Streaming.NATS;
@@ -49,5 +50,17 @@ public class NatsOptions
     /// <summary>
     /// System.Text.Json serializer options to be used by the NATS provider.
     /// </summary>
-    public JsonSerializerOptions JsonSerializerOptions { get; set; } = default!;
+    public JsonSerializerOptions? JsonSerializerOptions { get; set; }
+}
+
+public class NatsStreamOptionsValidator(NatsOptions options, string? name = null) : IConfigurationValidator
+{
+    public void ValidateConfiguration()
+    {
+        if (string.IsNullOrWhiteSpace(options.StreamName))
+        {
+            throw new OrleansConfigurationException(
+                $"The {nameof(NatsOptions.StreamName)} is required for the NATS stream provider '{name}'.");
+        }
+    }
 }
