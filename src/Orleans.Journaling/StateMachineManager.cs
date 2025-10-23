@@ -22,7 +22,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     private readonly Queue<WorkItem> _workQueue = new();
     private readonly CancellationTokenSource _shutdownCancellation = new();
     private readonly StateMachineManagerState _stateMachineIds;
-    private readonly Task _workLoop;
+    private Task? _workLoop;
     private ManagerState _state;
     private Task? _pendingWrite;
     private ulong _nextStateMachineId = MinApplicationStateMachineId;
@@ -40,8 +40,6 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
         // This allows us to recover the list of state machines ids without having to store it separately.
         _stateMachineIds = new StateMachineManagerState(this, StringCodec, UInt64Codec, serializerSessionPool);
         _stateMachinesMap[0] = _stateMachineIds;
-
-        _workLoop = Start();
     }
 
     public void RegisterStateMachine(string name, IDurableStateMachine stateMachine)
@@ -65,6 +63,8 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     {
         cancellationToken.ThrowIfCancellationRequested();
         _shutdownCancellation.Token.ThrowIfCancellationRequested();
+        Debug.Assert(_workLoop is null, "InitializeAsync should only be called once.");
+        _workLoop = Start();
 
         Task task;
         lock (_lock)
@@ -379,7 +379,10 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     {
         _shutdownCancellation.Cancel();
         _workSignal.Signal();
-        await _workLoop.WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+        if (_workLoop is { } task)
+        {
+            await task.WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+        }
     }
 
     void IDisposable.Dispose()

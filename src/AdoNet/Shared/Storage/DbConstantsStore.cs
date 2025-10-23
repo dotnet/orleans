@@ -44,7 +44,7 @@ namespace Orleans.Tests.SqlUtils
                                     startEscapeIndicator: '"',
                                     endEscapeIndicator: '"',
                                     unionAllSelectTemplate: " UNION ALL SELECT ",
-                                    isSynchronousAdoNetImplementation: true, //there are some intermittent PostgreSQL problems too, see more discussion at https://github.com/dotnet/orleans/pull/2949.
+                                    isSynchronousAdoNetImplementation: false,
                                     supportsStreamNatively: true,
                                     supportsCommandCancellation: true, // See https://dev.mysql.com/doc/connector-net/en/connector-net-ref-mysqlclient-mysqlcommandmembers.html.
                                     commandInterceptor: NoOpCommandInterceptor.Instance)

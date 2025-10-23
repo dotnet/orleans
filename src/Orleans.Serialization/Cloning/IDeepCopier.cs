@@ -289,6 +289,7 @@ namespace Orleans.Serialization.Cloning
             [typeof(UInt128)] = true,
             [typeof(Int128)] = true,
 #endif
+            [typeof(System.Numerics.BigInteger)] = true,
 #if NET5_0_OR_GREATER
             [typeof(Half)] = true,
 #endif
