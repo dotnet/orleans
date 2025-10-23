@@ -233,6 +233,101 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         await manager.UnregisterShard(localAddress, shard1);
     }
 
+    [Fact, TestCategory("Azure"), TestCategory("Functional")]
+    public async Task AzureStorageJobShardManager_JobMetadata()
+    {
+        var options = Options.Create(new AzureStorageJobShardOptions());
+        options.Value.ConfigureTestDefaults();
+        options.Value.ContainerName = "jobshardmanager" + Guid.NewGuid();
+
+        var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var membershipService = new InMemoryClusterMembershipService();
+        var manager = new AzureStorageJobShardManager(options, membershipService);
+
+        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
+
+        var date = DateTime.UtcNow;
+        var shard1 = await manager.RegisterShard(localAddress, date, date.AddYears(1), _metadata, assignToCreator: true);
+
+        // Schedule jobs with different metadata
+        var jobMetadata1 = new Dictionary<string, string>
+        {
+            { "Priority", "High" },
+            { "Category", "Payment" },
+            { "RequestId", "12345" }
+        };
+        var jobMetadata2 = new Dictionary<string, string>
+        {
+            { "Priority", "Low" },
+            { "Category", "Notification" }
+        };
+
+        var job1 = await shard1.ScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), jobMetadata1);
+        var job2 = await shard1.ScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(10), jobMetadata2);
+        var job3 = await shard1.ScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddSeconds(15));
+
+        // Verify metadata is set on the scheduled jobs
+        Assert.NotNull(job1.Metadata);
+        Assert.Equal(3, job1.Metadata.Count);
+        Assert.Equal("High", job1.Metadata["Priority"]);
+        Assert.Equal("Payment", job1.Metadata["Category"]);
+        Assert.Equal("12345", job1.Metadata["RequestId"]);
+
+        Assert.NotNull(job2.Metadata);
+        Assert.Equal(2, job2.Metadata.Count);
+        Assert.Equal("Low", job2.Metadata["Priority"]);
+        Assert.Equal("Notification", job2.Metadata["Category"]);
+
+        Assert.Null(job3.Metadata);
+
+        // Mark the local silo as dead and create a new incarnation to test metadata persistence
+        membershipService.SetSiloStatus(localAddress, SiloStatus.Dead);
+        localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 1);
+        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
+
+        // Take over the shard
+        manager = new AzureStorageJobShardManager(options, membershipService);
+        var shards = await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1));
+        Assert.Single(shards);
+        shard1 = shards[0];
+
+        // Consume jobs and verify metadata is preserved
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var jobsConsumed = 0;
+        await foreach (var jobCtx in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        {
+            jobsConsumed++;
+            
+            if (jobCtx.Job.Name == "job1")
+            {
+                Assert.NotNull(jobCtx.Job.Metadata);
+                Assert.Equal(3, jobCtx.Job.Metadata.Count);
+                Assert.Equal("High", jobCtx.Job.Metadata["Priority"]);
+                Assert.Equal("Payment", jobCtx.Job.Metadata["Category"]);
+                Assert.Equal("12345", jobCtx.Job.Metadata["RequestId"]);
+            }
+            else if (jobCtx.Job.Name == "job2")
+            {
+                Assert.NotNull(jobCtx.Job.Metadata);
+                Assert.Equal(2, jobCtx.Job.Metadata.Count);
+                Assert.Equal("Low", jobCtx.Job.Metadata["Priority"]);
+                Assert.Equal("Notification", jobCtx.Job.Metadata["Category"]);
+            }
+            else if (jobCtx.Job.Name == "job3")
+            {
+                Assert.Null(jobCtx.Job.Metadata);
+            }
+
+            await shard1.RemoveJobAsync(jobCtx.Job.Id);
+        }
+
+        Assert.Equal(3, jobsConsumed);
+        await manager.UnregisterShard(localAddress, shard1);
+
+        // No unassigned shards
+        Assert.Empty(await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1)));
+    }
+
     private class InMemoryClusterMembershipService : IClusterMembershipService
     {
         public ClusterMembershipSnapshot CurrentSnapshot => new ClusterMembershipSnapshot(silos.ToImmutableDictionary(), new MembershipVersion(_version));
