@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Storage.Blobs;
@@ -19,11 +20,12 @@ internal sealed class AzureStorageJobShard : JobShard
     private InMemoryJobQueue _jobQueue;
     private int _jobCount = 0;
 
-    public AzureStorageJobShard(string id, DateTimeOffset startTime, DateTimeOffset endTime, AppendBlobClient blobClient)
+    public AzureStorageJobShard(string id, DateTimeOffset startTime, DateTimeOffset endTime, AppendBlobClient blobClient, ETag? eTag = default)
         : base(id, startTime, endTime)
     {
         BlobClient = blobClient;
         _jobQueue = new InMemoryJobQueue();
+        ETag = eTag;
     }
 
     public override ValueTask<int> GetJobCount()
@@ -66,6 +68,15 @@ internal sealed class AzureStorageJobShard : JobShard
         return job;
     }
 
+    public async Task UpdateBlobMetadata(IDictionary<string, string> metadata, CancellationToken cancellationToken)
+    {
+        var result = await BlobClient.SetMetadataAsync(
+            metadata,
+            new BlobRequestConditions { IfMatch = ETag },
+            cancellationToken);
+        ETag = result.Value.ETag;
+    }
+
     private async Task AppendOperation(JobOperation operation)
     {
         var content = BinaryData.FromObjectAsJson(operation).ToString() + Environment.NewLine;
@@ -78,8 +89,6 @@ internal sealed class AzureStorageJobShard : JobShard
 
     public async ValueTask InitializeAsync()
     {
-        if (ETag is not null) return; // already initialized
-
         // Load existing blob
         var response = await BlobClient.DownloadAsync();
         using var stream = response.Value.Content;
@@ -151,7 +160,7 @@ internal sealed class AzureStorageJobShard : JobShard
 
     public override async Task RetryJobLaterAsync(IScheduledJobContext jobContext, DateTimeOffset newDueTime)
     {
-        await AppendOperation(JobOperation.CreateRetryOperation(jobContext.Job.Id));
+        await AppendOperation(JobOperation.CreateRetryOperation(jobContext.Job.Id, newDueTime));
         _jobQueue.RetryJobLater(jobContext, newDueTime);
     }
 }
@@ -179,6 +188,6 @@ internal struct JobOperation
     public static JobOperation CreateRemoveOperation(string id) =>
         new() { Type = OperationType.Remove, Id = id };
 
-    public static JobOperation CreateRetryOperation(string id) =>
-        new() { Type = OperationType.Retry, Id = id };
+    public static JobOperation CreateRetryOperation(string id, DateTimeOffset dueTime) =>
+        new() { Type = OperationType.Retry, Id = id, DueTime = dueTime };
 }

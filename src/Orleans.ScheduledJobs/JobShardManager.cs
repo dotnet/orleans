@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -7,18 +8,18 @@ namespace Orleans.ScheduledJobs;
 
 public abstract class JobShardManager
 {
-    public abstract Task<List<JobShard>> GetJobShardsAsync(SiloAddress siloAddress, DateTimeOffset maxDueTime);
+    public abstract Task<List<JobShard>> AssignJobShardsAsync(SiloAddress siloAddress, DateTimeOffset maxDueTime, CancellationToken cancellationToken = default);
 
-    public abstract Task<JobShard> RegisterShard(SiloAddress siloAddress, DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string,string> metadata);
+    public abstract Task<JobShard> RegisterShard(SiloAddress siloAddress, DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string,string> metadata, bool assignToCreator = true, CancellationToken cancellationToken = default);
 
-    public abstract Task UnregisterShard(SiloAddress siloAddress, JobShard shard);
+    public abstract Task UnregisterShard(SiloAddress siloAddress, JobShard shard, CancellationToken cancellationToken = default);
 }
 
 internal class InMemoryJobShardManager : JobShardManager
 {
     private readonly Dictionary<string, List<InMemoryJobShard>> _shardStore = new();
 
-    public override Task<List<JobShard>> GetJobShardsAsync(SiloAddress siloAddress, DateTimeOffset maxDueTime)
+    public override Task<List<JobShard>> AssignJobShardsAsync(SiloAddress siloAddress, DateTimeOffset maxDueTime, CancellationToken cancellationToken = default)
     {
         var key = siloAddress.ToString();
         if (_shardStore.TryGetValue(key, out var shards))
@@ -36,7 +37,7 @@ internal class InMemoryJobShardManager : JobShardManager
         return Task.FromResult(new List<JobShard>());
     }
 
-    public override Task<JobShard> RegisterShard(SiloAddress siloAddress, DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata)
+    public override Task<JobShard> RegisterShard(SiloAddress siloAddress, DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, bool assignToCreator = true, CancellationToken cancellationToken = default)
     {
         var key = siloAddress.ToString();
         if (!_shardStore.ContainsKey(key))
@@ -45,11 +46,14 @@ internal class InMemoryJobShardManager : JobShardManager
         }
         var shardId = $"{key}-{Guid.NewGuid()}";
         var newShard = new InMemoryJobShard(shardId, minDueTime, maxDueTime);
-        _shardStore[key].Add(newShard);
+        if (assignToCreator)
+        {
+            _shardStore[key].Add(newShard);
+        }
         return Task.FromResult((JobShard)newShard);
     }
 
-    public override Task UnregisterShard(SiloAddress siloAddress, JobShard shard)
+    public override Task UnregisterShard(SiloAddress siloAddress, JobShard shard, CancellationToken cancellationToken = default)
     {
         var key = siloAddress.ToString();
         if (_shardStore.TryGetValue(key, out var shards))

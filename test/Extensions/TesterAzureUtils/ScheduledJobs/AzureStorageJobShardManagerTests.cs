@@ -40,14 +40,15 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
 
         // Register multiple shards and ensure they are distinct
         // two of them have the same time range
-        var shard1 = await manager.RegisterShard(localAddress, date, maxDate, _metadata);
-        var shard2 = await manager.RegisterShard(localAddress, date, maxDate, _metadata);
-        var shard3 = await manager.RegisterShard(localAddress, date.AddHours(2), maxDate, _metadata);
+        var shard1 = await manager.RegisterShard(localAddress, date, maxDate, _metadata, assignToCreator: true);
+        var shard2 = await manager.RegisterShard(localAddress, date, maxDate, _metadata, assignToCreator: true);
+        var shard3 = await manager.RegisterShard(localAddress, date.AddHours(2), maxDate, _metadata, assignToCreator: false);
 
         Assert.Distinct([shard1.Id, shard2.Id, shard3.Id]);
 
-        // No unassigned shards
-        Assert.Empty(await manager.GetJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1)));
+        // shard3 was not assigned to the creator silo
+        var assignedShard = Assert.Single(await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(3)));
+        Assert.Equal(shard3.Id, assignedShard.Id);
 
         // Mark the local silo as dead, and create a new incarnation
         membershipService.SetSiloStatus(localAddress, SiloStatus.Dead);
@@ -55,7 +56,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
         // Now we can take over the two first shards
-        var shards = await manager.GetJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1));
+        var shards = await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1));
         Assert.Equal(2, shards.Count);
         Assert.Contains(shard1.Id, shards.Select(s => s.Id));
         Assert.Contains(shard2.Id, shards.Select(s => s.Id));
@@ -65,7 +66,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         membershipService.SetSiloStatus(otherSilo, SiloStatus.Active);
 
         // No unassigned shards
-        Assert.Empty(await manager.GetJobShardsAsync(otherSilo, DateTime.UtcNow.AddHours(1)));
+        Assert.Empty(await manager.AssignJobShardsAsync(otherSilo, DateTime.UtcNow.AddHours(1)));
     }
 
     [Fact, TestCategory("Azure"), TestCategory("Functional")]
@@ -82,7 +83,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
         var date = DateTime.UtcNow;
-        var shard1 = await manager.RegisterShard(localAddress, date, date.AddHours(1), _metadata);
+        var shard1 = await manager.RegisterShard(localAddress, date, date.AddHours(1), _metadata, assignToCreator: false);
 
         // Schedule some jobs
         await shard1.ScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5));
@@ -96,7 +97,8 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
         // Take over the shard
-        var shards = await manager.GetJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1));
+        manager = new AzureStorageJobShardManager(options, membershipService);
+        var shards = await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1));
         Assert.Single(shards);
         shard1 = shards[0];
 
@@ -112,7 +114,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         await manager.UnregisterShard(localAddress, shard1);
 
         // No unassigned shards
-        Assert.Empty(await manager.GetJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1)));
+        Assert.Empty(await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1)));
     }
 
     [Fact, TestCategory("Azure"), TestCategory("Functional")]
@@ -155,7 +157,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         await manager.UnregisterShard(localAddress, shard1);
 
         // No unassigned shards
-        Assert.Empty(await manager.GetJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1)));
+        Assert.Empty(await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1)));
     }
 
     [Fact, TestCategory("Azure"), TestCategory("Functional")]
@@ -173,7 +175,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
         var date = DateTime.UtcNow;
-        var shard1 = await manager.RegisterShard(localAddress, date, date.AddYears(1), _metadata);
+        var shard1 = await manager.RegisterShard(localAddress, date, date.AddYears(1), _metadata, assignToCreator: true);
 
         // Schedule some jobs
         await shard1.ScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5));
@@ -194,7 +196,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         Assert.Equal(2, counter);
         await manager.UnregisterShard(localAddress, shard1);
 
-        var shards = await manager.GetJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1));
+        var shards = await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1));
         Assert.Single(shards);
         Assert.Equal(shard1.Id, shards[0].Id);
     }
