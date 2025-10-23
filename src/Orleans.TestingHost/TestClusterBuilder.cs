@@ -179,7 +179,7 @@ namespace Orleans.TestingHost
             string prefix = "testcluster-";
             int randomSuffix = Random.Shared.Next(1000);
             DateTime now = DateTime.UtcNow;
-            string DateTimeFormat = @"yyyy-MM-dd\tHH-mm-ss";
+            string DateTimeFormat = @"yyyy-MM-dd-HH-mm-ss";
             return $"{prefix}{now.ToString(DateTimeFormat, CultureInfo.InvariantCulture)}-{randomSuffix}";
         }
 
