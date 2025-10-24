@@ -100,7 +100,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                 var blobClient = _client.GetAppendBlobClient(blob.Name);
                 var metadata = blob.Metadata;
                 metadata["Owner"] = siloAddress.ToParsableString();
-                shard = new AzureStorageJobShard(blob.Name, minDueTime, maxDueTime, blobClient, blob.Properties.ETag);
+                shard = new AzureStorageJobShard(blob.Name, minDueTime, maxDueTime, blobClient, metadata, blob.Properties.ETag);
                 if (!await TryTakeOwnership(shard, metadata, siloAddress, cancellationToken))
                 {
                     // Someone else took over the shard
@@ -148,7 +148,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         {
             var shardId = $"{minDueTime:yyyyMMddHHmm}-{siloAddress.ToParsableString()}-{i}"; // todo make sure this is a valid blob name
             var blobClient = _client.GetAppendBlobClient(shardId);
-            var metadataInfo = CreateMetadata(siloAddress, minDueTime, maxDueTime); // TODO MERGE with input metadata
+            var metadataInfo = CreateMetadata(metadata, siloAddress, minDueTime, maxDueTime);
             if (assignToCreator)
             {
                 metadataInfo["Owner"] = siloAddress.ToParsableString();
@@ -171,7 +171,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                 continue;
             }
             
-            var shard = new AzureStorageJobShard(shardId, minDueTime, maxDueTime, blobClient);
+            var shard = new AzureStorageJobShard(shardId, minDueTime, maxDueTime, blobClient, metadata);
             await shard.InitializeAsync();
             _jobShardCache[shardId] = shard;
             LogShardRegistered(_logger, shardId, siloAddress, assignToCreator);
@@ -222,9 +222,9 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         LogInitialized(_logger, _containerName);
     }
 
-    private static Dictionary<string, string> CreateMetadata(SiloAddress siloAddress, DateTimeOffset minDueTime, DateTimeOffset maxDueTime)
+    private static Dictionary<string, string> CreateMetadata(IDictionary<string, string> existingMetadata, SiloAddress siloAddress, DateTimeOffset minDueTime, DateTimeOffset maxDueTime)
     {
-        var metadata = new Dictionary<string, string>
+        var metadata = new Dictionary<string, string>(existingMetadata)
         {
             { "Creator", siloAddress.ToParsableString() },
             { "MinDueTime", minDueTime.ToString("o") },

@@ -20,12 +20,13 @@ internal sealed class AzureStorageJobShard : JobShard
     private InMemoryJobQueue _jobQueue;
     private int _jobCount = 0;
 
-    public AzureStorageJobShard(string id, DateTimeOffset startTime, DateTimeOffset endTime, AppendBlobClient blobClient, ETag? eTag = default)
+    public AzureStorageJobShard(string id, DateTimeOffset startTime, DateTimeOffset endTime, AppendBlobClient blobClient, IDictionary<string, string>? metadata = null, ETag? eTag = default)
         : base(id, startTime, endTime)
     {
         BlobClient = blobClient;
         _jobQueue = new InMemoryJobQueue();
         ETag = eTag;
+        Metadata = metadata;
     }
 
     public override ValueTask<int> GetJobCount()
@@ -75,6 +76,7 @@ internal sealed class AzureStorageJobShard : JobShard
             new BlobRequestConditions { IfMatch = ETag },
             cancellationToken);
         ETag = result.Value.ETag;
+        Metadata = metadata;
     }
 
     private async Task AppendOperation(JobOperation operation)
