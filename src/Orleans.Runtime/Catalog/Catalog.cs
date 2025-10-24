@@ -21,6 +21,11 @@ namespace Orleans.Runtime
         private readonly GrainContextActivator grainActivator;
         private ISiloStatusOracle _siloStatusOracle;
 
+        // Lock striping is used for activation creation to reduce contention
+        private const int LockCount = 32; // Must be a power of 2
+        private const int LockMask = LockCount - 1;
+        private readonly object[] _locks = new object[LockCount];
+
         public Catalog(
             ILocalSiloDetails localSiloDetails,
             GrainDirectoryResolver grainDirectoryResolver,
@@ -40,6 +45,12 @@ namespace Orleans.Runtime
             this.logger = loggerFactory.CreateLogger<Catalog>();
             this.activationCollector = activationCollector;
 
+            // Initialize lock striping array
+            for (var i = 0; i < LockCount; i++)
+            {
+                _locks[i] = new object();
+            }
+
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
             MessagingProcessingInstruments.RegisterActivationDataAllObserve(() =>
@@ -56,6 +67,19 @@ namespace Orleans.Runtime
                 return counter;
             });
             shared.ActivationDirectory.RecordNewTarget(this);
+        }
+
+        /// <summary>
+        /// Gets the lock for a specific grain ID using consistent hashing.
+        /// </summary>
+        /// <param name="grainId">The grain ID to get the lock for.</param>
+        /// <returns>The lock object for the specified grain ID.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private object GetStripedLock(in GrainId grainId)
+        {
+            var hash = grainId.GetUniformHashCode();
+            var lockIndex = (int)(hash & LockMask);
+            return _locks[lockIndex];
         }
 
         /// <summary>
@@ -115,8 +139,7 @@ namespace Orleans.Runtime
                 return null;
             }
 
-            // Lock over all activations to try to prevent multiple instances of the same activation being created concurrently.
-            lock (activations)
+            lock (GetStripedLock(grainId))
             {
                 if (TryGetGrainContext(grainId, out result))
                 {
@@ -298,24 +321,22 @@ namespace Orleans.Runtime
             try
             {
                 // scan all activations in activation directory and deactivate the ones that the removed silo is their primary partition owner.
-                lock (activations)
+                // Note: No lock needed here since ActivationDirectory uses ConcurrentDictionary which provides thread-safe enumeration
+                foreach (var activation in activations)
                 {
-                    foreach (var activation in activations)
+                    try
                     {
-                        try
-                        {
-                            var activationData = activation.Value;
-                            var placementStrategy = activationData.GetComponent<PlacementStrategy>();
-                            var isUsingGrainDirectory = placementStrategy is { IsUsingGrainDirectory: true };
-                            if (!isUsingGrainDirectory || !grainDirectoryResolver.IsUsingDefaultDirectory(activationData.GrainId.Type)) continue;
-                            if (!updatedSilo.Equals(directory.GetPrimaryForGrain(activationData.GrainId))) continue;
+                        var activationData = activation.Value;
+                        var placementStrategy = activationData.GetComponent<PlacementStrategy>();
+                        var isUsingGrainDirectory = placementStrategy is { IsUsingGrainDirectory: true };
+                        if (!isUsingGrainDirectory || !grainDirectoryResolver.IsUsingDefaultDirectory(activationData.GrainId.Type)) continue;
+                        if (!updatedSilo.Equals(directory.GetPrimaryForGrain(activationData.GrainId))) continue;
 
-                            activationsToShutdown.Add(activationData);
-                        }
-                        catch (Exception exc)
-                        {
-                            LogErrorCatalogSiloStatusChangeNotification(new(updatedSilo), exc);
-                        }
+                        activationsToShutdown.Add(activationData);
+                    }
+                    catch (Exception exc)
+                    {
+                        LogErrorCatalogSiloStatusChangeNotification(new(updatedSilo), exc);
                     }
                 }
 

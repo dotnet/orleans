@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -53,7 +54,8 @@ internal sealed partial class ActivationRepartitioner : IMessageStatisticsSink
             {
                 foreach (var message in drainBuffer[..count])
                 {
-                    if (!_messageFilter.IsAcceptable(message, out var isSenderMigratable, out var isTargetMigratable))
+                    if (!IsFullyAddressed(message) || // The silo addresses (likely the target) is set null some time later (after the message is recorded), this can lead to a NRE
+                        !_messageFilter.IsAcceptable(message, out var isSenderMigratable, out var isTargetMigratable))
                     {
                         continue;
                     }
@@ -118,7 +120,7 @@ internal sealed partial class ActivationRepartitioner : IMessageStatisticsSink
         }
 
         // Sender and target need to be fully addressable to know where to move to or towards.
-        if (!message.IsSenderFullyAddressed || !message.IsTargetFullyAddressed)
+        if (!IsFullyAddressed(message))
         {
             return;
         }
@@ -128,6 +130,10 @@ internal sealed partial class ActivationRepartitioner : IMessageStatisticsSink
             _pendingMessageEvent.Signal();
         }
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsFullyAddressed(Message message) =>
+        message.IsSenderFullyAddressed && message.IsTargetFullyAddressed;
 
     async ValueTask IActivationRepartitionerSystemTarget.FlushBuffers()
     {
