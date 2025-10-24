@@ -229,6 +229,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         await foreach (var jobCtx in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
         {
             Assert.Equal("job1", jobCtx.Job.Name);
+            Assert.NotEqual(job.DueTime, jobCtx.Job.DueTime);
             await shard1.RemoveJobAsync(jobCtx.Job.Id);
             break;
         }

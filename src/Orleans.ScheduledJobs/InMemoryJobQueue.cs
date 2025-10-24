@@ -53,6 +53,15 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
     public void RetryJobLater(IScheduledJobContext jobContext, DateTimeOffset newDueTime)
     {
         var jobId = jobContext.Job.Id;
+        var newJob = new ScheduledJob
+        {
+            Id = jobContext.Job.Id,
+            Name = jobContext.Job.Name,
+            DueTime = newDueTime,
+            TargetGrainId = jobContext.Job.TargetGrainId,
+            ShardId = jobContext.Job.ShardId,
+            Metadata = jobContext.Job.Metadata
+        };
         lock (_syncLock)
         {
             if (_jobsIdToBucket.TryGetValue(jobId, out var oldBucket))
@@ -60,7 +69,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
                 oldBucket.RemoveJob(jobId);
                 _jobsIdToBucket.Remove(jobId);
                 var newBucket = GetJobBucket(newDueTime);
-                newBucket.AddJob(jobContext.Job, jobContext.DequeueCount);
+                newBucket.AddJob(newJob, jobContext.DequeueCount);
             }
         }
     }

@@ -97,7 +97,7 @@ internal sealed class AzureStorageJobShard : JobShard
         // Rebuild state by replaying operations
         var addedJobs = new Dictionary<string, JobOperation>();
         var deletedJobs = new HashSet<string>();
-        var jobRetryCounters = new Dictionary<string, int>();
+        var jobRetryCounters = new Dictionary<string, (int dequeueCount, DateTimeOffset? newDueTime)>();
         while (!reader.EndOfStream)
         {
             var line = await reader.ReadLineAsync();
@@ -121,11 +121,13 @@ internal sealed class AzureStorageJobShard : JobShard
                     {
                         if (!jobRetryCounters.ContainsKey(operation.Id))
                         {
-                            jobRetryCounters[operation.Id] = 1;
+                            jobRetryCounters[operation.Id] = (1, operation.DueTime);
                         }
                         else
                         {
-                            jobRetryCounters[operation.Id]++;
+                            var entry = jobRetryCounters[operation.Id];
+                            entry.dequeueCount++;
+                            entry.newDueTime = operation.DueTime; 
                         }
                     }
                     break;
@@ -134,7 +136,13 @@ internal sealed class AzureStorageJobShard : JobShard
         // Rebuild the priority queue
         foreach (var op in addedJobs.Values)
         {
-            jobRetryCounters.TryGetValue(op.Id, out var retryCounter);
+            var retryCounter = 0;
+            var dueTime = op.DueTime!.Value;
+            if (jobRetryCounters.TryGetValue(op.Id, out var retryEntries))
+            {
+                retryCounter = retryEntries.dequeueCount;
+                dueTime = retryEntries.newDueTime ?? dueTime;
+            }
             _jobQueue.Enqueue(new ScheduledJob
             {
                 Id = op.Id,
