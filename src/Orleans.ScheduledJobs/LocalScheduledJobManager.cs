@@ -74,7 +74,7 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
         var job = await newShard.ScheduleJobAsync(target, jobName, dueTime, metadata);
         if (assignToMe)
         {
-            RunShard(newShard).Ignore(); // TODO: keep track of running shards
+            StartRunningShardTracked(newShard);
         }
         return job;
     }
@@ -153,9 +153,26 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
         {
             foreach (var shard in shards)
             {
-                RunShard(shard).Ignore(); // TODO: keep track of running shaFrds
+                StartRunningShardTracked(shard);
             }
         }
+    }
+
+    private void StartRunningShardTracked(JobShard shard)
+    {
+        var shardTask = Task.Run(async () =>
+        {
+            try
+            {
+                await RunShard(shard);
+            }
+            finally
+            {
+                _runningShards.TryRemove(shard.Id, out _);
+            }
+        });
+        
+        _runningShards.TryAdd(shard.Id, shardTask);
     }
 
     private async Task RunShard(JobShard shard)
