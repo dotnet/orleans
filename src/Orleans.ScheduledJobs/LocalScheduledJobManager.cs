@@ -34,6 +34,7 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
     private readonly ConcurrentDictionary<DateTimeOffset, ConcurrentDictionary<string, JobShard>> _shardCache = new();
     private readonly ConcurrentDictionary<string, Task> _runningShards = new();
     private readonly int MaxJobCountPerShard = 1000;
+    private readonly SemaphoreSlim _jobConcurrencyLimiter;
 
     private static readonly IDictionary<string, string> EmptyMetadata = new Dictionary<string, string>();
 
@@ -49,6 +50,7 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
         _clusterMembershipUpdates = clusterMembership.MembershipUpdates;
         _logger = logger;
         _options = options.Value;
+        _jobConcurrencyLimiter = new SemaphoreSlim(_options.MaxConcurrentJobsPerSilo);
     }
 
     public async Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata = null)
@@ -172,16 +174,14 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
             {
                 try
                 {
-                    // Parallel.ForEachAsync would be nice here
-                    // or SemaphoreSlim to limit concurrency
-                    // TODO: Do it in parallel, with concurrency limit
+                    await _jobConcurrencyLimiter.WaitAsync(_cts.Token);
                     var target = this.RuntimeClient.InternalGrainFactory
                         .GetGrain(jobContext.Job.TargetGrainId)
                         .AsReference<IScheduledJobReceiverExtension>();
-                    await target.DeliverScheduledJobAsync(jobContext, new CancellationToken()); // todo
+                    await target.DeliverScheduledJobAsync(jobContext, _cts.Token);
                     await shard.RemoveJobAsync(jobContext.Job.Id);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not TaskCanceledException)
                 {
                     _logger.LogError(ex, "Error executing job {JobId}", jobContext.Job.Id);
                     var retryTime = _options.ShouldRetry(jobContext, ex);
@@ -190,9 +190,20 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
                         await shard.RetryJobLaterAsync(jobContext, retryTime.Value);
                     }
                 }
+                finally
+                {
+                    _jobConcurrencyLimiter.Release();
+                }
             }
             // Unregister the shard
-            await _shardManager.UnregisterShard(this.Silo, shard, _cts.Token);
+            try
+            {
+                await _shardManager.UnregisterShard(this.Silo, shard, _cts.Token);
+            }
+            catch (Exception ex) when (ex is not TaskCanceledException)
+            {
+                _logger.LogError(ex, "Error unregistering shard {ShardId}", shard.Id);
+            }
         }
         catch (TaskCanceledException)
         {
