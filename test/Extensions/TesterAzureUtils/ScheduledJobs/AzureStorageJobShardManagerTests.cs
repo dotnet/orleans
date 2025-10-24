@@ -21,7 +21,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         { "Purpose", "Testing" }
     };
 
-    [Fact, TestCategory("Azure"), TestCategory("Functional")]
+    [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_Creation_Assignation()
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
@@ -69,7 +69,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         Assert.Empty(await manager.AssignJobShardsAsync(otherSilo, DateTime.UtcNow.AddHours(1)));
     }
 
-    [Fact, TestCategory("Azure"), TestCategory("Functional")]
+    [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_ReadFrozenShard()
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
@@ -117,7 +117,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         Assert.Empty(await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1)));
     }
 
-    [Fact, TestCategory("Azure"), TestCategory("Functional")]
+    [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_LiveShard()
     {
         var startTime = DateTime.UtcNow;
@@ -160,7 +160,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         Assert.Empty(await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1)));
     }
 
-    [Fact, TestCategory("Azure"), TestCategory("Functional")]
+    [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_StopProcessingShard()
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
@@ -201,7 +201,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         Assert.Equal(shard1.Id, shards[0].Id);
     }
 
-    [Fact, TestCategory("Azure"), TestCategory("Functional")]
+    [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_RetryJobLater()
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
@@ -233,7 +233,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         await manager.UnregisterShard(localAddress, shard1);
     }
 
-    [Fact, TestCategory("Azure"), TestCategory("Functional")]
+    [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_JobMetadata()
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
@@ -328,7 +328,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         Assert.Empty(await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1)));
     }
 
-    [Fact, TestCategory("Azure"), TestCategory("Functional")]
+    [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_JobCancellation()
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
