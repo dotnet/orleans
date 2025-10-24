@@ -3,8 +3,8 @@
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.ScheduledJobs.AzureStorage</PackageId>
-    <Title>Microsoft Orleans Azure Storage ScheduledJobs Provider</Title>
-    <Description>Microsoft Orleans reminders provider backed by Azure Storage</Description>
+    <Title>Microsoft Orleans Azure Storage Scheduled Jobs Provider</Title>
+    <Description>Microsoft Orleans scheduled jobs provider backed by Azure Blob Storage</Description>
     <PackageTags>$(PackageTags) Azure Storage</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.ScheduledJobs.AzureStorage</AssemblyName>

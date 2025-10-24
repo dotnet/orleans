@@ -100,9 +100,10 @@ internal sealed class AzureStorageJobShard : JobShard
         var addedJobs = new Dictionary<string, JobOperation>();
         var deletedJobs = new HashSet<string>();
         var jobRetryCounters = new Dictionary<string, (int dequeueCount, DateTimeOffset? newDueTime)>();
-        while (!reader.EndOfStream)
+        
+        string? line;
+        while ((line = await reader.ReadLineAsync()) is not null)
         {
-            var line = await reader.ReadLineAsync();
             if (string.IsNullOrWhiteSpace(line)) continue;
             var operation = JsonSerializer.Deserialize<JobOperation>(line);
             switch (operation.Type)
