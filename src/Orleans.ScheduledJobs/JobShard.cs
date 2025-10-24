@@ -92,7 +92,7 @@ internal class InMemoryJobShard : JobShard
     public override Task MarkAsComplete()
     {
         IsComplete = true;
-        _jobQueue.MarkAsFrozen();
+        _jobQueue.MarkAsComplete();
         return Task.CompletedTask;
     }
 

@@ -11,7 +11,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
     private readonly PriorityQueue<JobBucket, DateTimeOffset> _queue = new();
     private readonly Dictionary<string, JobBucket> _jobsIdToBucket = new();
     private readonly Dictionary<DateTimeOffset, JobBucket> _buckets = new();
-    private bool _isFrozen;
+    private bool _isComplete;
     private object _syncLock = new();
 
     public int Count => _queue.Count;
@@ -20,8 +20,8 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
     {
         lock (_syncLock)
         {
-            if (_isFrozen)
-                throw new InvalidOperationException("Cannot enqueue job to a frozen queue.");
+            if (_isComplete)
+                throw new InvalidOperationException("Cannot enqueue job to a completed queue.");
 
             var bucket = GetJobBucket(job.DueTime);
             bucket.AddJob(job, dequeueCount);
@@ -29,11 +29,11 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
         }
     }
 
-    public void MarkAsFrozen()
+    public void MarkAsComplete()
     {
         lock (_syncLock)
         {
-            _isFrozen = true;
+            _isComplete = true;
         }
     }
 
@@ -76,7 +76,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
             {
                 if (_queue.Count == 0)
                 {
-                    if (_isFrozen)
+                    if (_isComplete)
                     {
                         yield break; // Exit if the queue is frozen and empty
                     }
