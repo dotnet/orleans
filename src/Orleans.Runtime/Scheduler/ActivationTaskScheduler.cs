@@ -12,7 +12,7 @@ namespace Orleans.Runtime.Scheduler
     /// <summary>
     /// A single-concurrency, in-order task scheduler for per-activation work scheduling.
     /// </summary>
-    [DebuggerDisplay("ActivationTaskScheduler-{myId} RunQueue={workerGroup.WorkItemCount}")]
+    [DebuggerDisplay("ActivationTaskScheduler RunQueue={workerGroup.ExternalWorkItemCount} GrainContext={workerGroup.GrainContext}")]
     internal sealed partial class ActivationTaskScheduler : TaskScheduler
     {
         private readonly ILogger logger;
@@ -98,13 +98,11 @@ namespace Orleans.Runtime.Scheduler
 #endif
             // Try to run the task.
             bool done = TryExecuteTask(task);
+#if DEBUG
             if (!done)
             {
-#if DEBUG
                 LogWarnTryExecuteTaskNotDone(task.Id, task.Status);
-#endif
             }
-#if DEBUG
 
             LogTraceTryExecuteTaskInlineCompleted(myId, task.Id, Thread.CurrentThread.ManagedThreadId, done);
 #endif
