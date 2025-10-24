@@ -2,6 +2,7 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -96,6 +97,7 @@ namespace Orleans.Runtime
             private readonly GrainTypeSharedContext _sharedComponents;
             private readonly ILogger<Grain> _grainLogger;
             private readonly Func<IGrainContext, WorkItemGroup> _createWorkItemGroup;
+            private readonly Action<object?> _startActivation;
 
             public ActivationDataActivator(
                 IGrainActivator grainActivator,
@@ -118,6 +120,7 @@ namespace Orleans.Runtime
                     _workItemGroupLogger,
                     _activationTaskSchedulerLogger,
                     _schedulingOptions);
+                 _startActivation = state => ((ActivationData)state!).Start(_grainActivator);
             }
 
             public IGrainContext CreateContext(GrainAddress activationAddress)
@@ -128,43 +131,21 @@ namespace Orleans.Runtime
                     _serviceProvider,
                     _sharedComponents);
 
-                RuntimeContext.SetExecutionContext(context, out var originalContext);
-                try
-                {
-                    using var _ = new ExecutionContextSuppressor();
-
-                    // Synchronously invoke the constructor from the default TaskScheduler to hide any ambient task scheduler.
-                    ExceptionDispatchInfo? edi = null;
-                    var task = new Task(() =>
-                    {
-                        try
-                        {
-                            // Instantiate the grain itself
-                            var instance = _grainActivator.CreateInstance(context);
-                            context.SetGrainInstance(instance);
-                        }
-                        catch (Exception exception)
-                        {
-                            LogErrorFailedToConstructGrain(_grainLogger, exception, activationAddress.GrainId);
-                            edi = ExceptionDispatchInfo.Capture(exception);
-                        }
-                    });
-                    task.RunSynchronously(context.TaskScheduler);
-                    edi?.Throw();
-                }
-                finally
-                {
-                    RuntimeContext.ResetExecutionContext(originalContext);
-                }
-
+                using var ecSuppressor = ExecutionContext.SuppressFlow();
+                _ = Task.Factory.StartNew(
+                    _startActivation,
+                    context,
+                    CancellationToken.None,
+                    TaskCreationOptions.DenyChildAttach,
+                    context.ActivationTaskScheduler);
                 return context;
             }
 
             [LoggerMessage(
                 Level = LogLevel.Error,
-                Message = "Failed to construct grain '{GrainId}'."
+                Message = "Failed to dispose grain '{GrainId}'."
             )]
-            private static partial void LogErrorFailedToConstructGrain(ILogger logger, Exception exception, GrainId grainId);
+            private static partial void LogErrorFailedToDisposeGrain(ILogger logger, Exception exception, GrainId grainId);
         }
     }
 

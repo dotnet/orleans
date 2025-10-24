@@ -12,7 +12,7 @@ namespace Orleans.Runtime.Scheduler
     /// <summary>
     /// A single-concurrency, in-order task scheduler for per-activation work scheduling.
     /// </summary>
-    [DebuggerDisplay("ActivationTaskScheduler-{myId} RunQueue={workerGroup.WorkItemCount}")]
+    [DebuggerDisplay("ActivationTaskScheduler RunQueue={workerGroup.ExternalWorkItemCount} GrainContext={workerGroup.GrainContext}")]
     internal sealed partial class ActivationTaskScheduler : TaskScheduler
     {
         private readonly ILogger logger;
