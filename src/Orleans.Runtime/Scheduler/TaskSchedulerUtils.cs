@@ -10,7 +10,7 @@ namespace Orleans.Runtime.Scheduler
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void QueueAction(this ActivationTaskScheduler taskScheduler, Action action)
         {
-            using var suppressExecutionContext = new ExecutionContextSuppressor(); 
+            using var suppressExecutionContext = new ExecutionContextSuppressor();
 
             var task = new Task(action);
             task.Start(taskScheduler);
