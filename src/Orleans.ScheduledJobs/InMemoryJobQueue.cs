@@ -6,6 +6,10 @@ using System.Threading.Tasks;
 
 namespace Orleans.ScheduledJobs;
 
+/// <summary>
+/// Provides an in-memory priority queue for managing scheduled jobs based on their due times.
+/// Jobs are organized into time-based buckets and enumerated asynchronously as they become due.
+/// </summary>
 public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
 {
     private readonly PriorityQueue<JobBucket, DateTimeOffset> _queue = new();
@@ -14,8 +18,17 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
     private bool _isComplete;
     private object _syncLock = new();
 
-    public int Count => _queue.Count;
+    /// <summary>
+    /// Gets the total number of jobs currently in the queue.
+    /// </summary>
+    public int Count => _jobsIdToBucket.Count;
 
+    /// <summary>
+    /// Adds a scheduled job to the queue with the specified dequeue count.
+    /// </summary>
+    /// <param name="job">The scheduled job to enqueue.</param>
+    /// <param name="dequeueCount">The number of times this job has been dequeued previously.</param>
+    /// <exception cref="InvalidOperationException">Thrown when attempting to enqueue a job to a completed queue.</exception>
     public void Enqueue(IScheduledJob job, int dequeueCount)
     {
         lock (_syncLock)
@@ -29,6 +42,10 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
         }
     }
 
+    /// <summary>
+    /// Marks the queue as complete, preventing any further jobs from being enqueued.
+    /// Once marked complete, the queue will finish processing remaining jobs and then terminate enumeration.
+    /// </summary>
     public void MarkAsComplete()
     {
         lock (_syncLock)
@@ -37,6 +54,13 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
         }
     }
 
+    /// <summary>
+    /// Cancels a scheduled job by removing it from the queue.
+    /// </summary>
+    /// <param name="jobId">The unique identifier of the job to cancel.</param>
+    /// <remarks>
+    /// The job's bucket remains in the priority queue until processed, but the job itself is removed immediately.
+    /// </remarks>
     public void CancelJob(string jobId)
     {
         lock (_syncLock)
@@ -50,6 +74,15 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
         }
     }
 
+    /// <summary>
+    /// Reschedules a job for retry with a new due time.
+    /// </summary>
+    /// <param name="jobContext">The context of the job to retry.</param>
+    /// <param name="newDueTime">The new due time for the job.</param>
+    /// <remarks>
+    /// The job is removed from its current bucket and added to a new bucket based on the specified due time.
+    /// The dequeue count from the context is preserved.
+    /// </remarks>
     public void RetryJobLater(IScheduledJobContext jobContext, DateTimeOffset newDueTime)
     {
         var jobId = jobContext.Job.Id;
@@ -70,10 +103,19 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
                 _jobsIdToBucket.Remove(jobId);
                 var newBucket = GetJobBucket(newDueTime);
                 newBucket.AddJob(newJob, jobContext.DequeueCount);
+                _jobsIdToBucket[jobId] = newBucket;
             }
         }
     }
 
+    /// <summary>
+    /// Returns an asynchronous enumerator that yields scheduled jobs as they become due.
+    /// </summary>
+    /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+    /// <returns>
+    /// An async enumerator that returns <see cref="IScheduledJobContext"/> instances for jobs that are due.
+    /// The enumerator checks for due jobs every second and terminates when the queue is marked complete and empty.
+    /// </returns>
     public async IAsyncEnumerator<IScheduledJobContext> GetAsyncEnumerator(CancellationToken cancellationToken = default)
     {
         var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
@@ -102,6 +144,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
                         else
                         {
                             (job, dequeueCount) = nextBucket.Jobs.First();
+                            nextBucket.RemoveJob(job.Id);
                         }
                     }
                 }
