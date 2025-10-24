@@ -27,6 +27,7 @@ namespace Orleans.Runtime;
 /// MUST lock this object for any concurrent access
 /// Consider: compartmentalize by usage, e.g., using separate interfaces for data for catalog, etc.
 /// </summary>
+[DebuggerDisplay("GrainId = {GrainId}, State = {State}, Waiting = {WaitingCount}, Executing = {IsCurrentlyExecuting}")]
 internal sealed partial class ActivationData :
     IGrainContext,
     ICollectibleGrainContext,
@@ -62,7 +63,7 @@ internal sealed partial class ActivationData :
     // The task representing this activation's message loop.
     // This field is assigned and never read and exists only for debugging purposes (eg, in memory dumps, to associate a loop task with an activation).
 #pragma warning disable IDE0052 // Remove unread private members
-    private readonly Task _messageLoopTask;
+    private Task? _messageLoopTask;
 #pragma warning restore IDE0052 // Remove unread private members
 
     public ActivationData(
@@ -81,9 +82,28 @@ internal sealed partial class ActivationData :
         Debug.Assert(_serviceScope != null, "_serviceScope must not be null.");
         _workItemGroup = createWorkItemGroup(this);
         Debug.Assert(_workItemGroup != null, "_workItemGroup must not be null.");
-        _messageLoopTask = this.RunOrQueueTask(RunMessageLoop);
     }
 
+    public void Start(IGrainActivator grainActivator)
+    {
+        Debug.Assert(Equals(ActivationTaskScheduler, TaskScheduler.Current));
+        lock (this)
+        {
+            try
+            {
+                var instance = grainActivator.CreateInstance(this);
+                SetGrainInstance(instance);
+            }
+            catch (Exception exception)
+            {
+                Deactivate(new(DeactivationReasonCode.ActivationFailed, exception, "Error constructing grain instance."), CancellationToken.None);
+            }
+
+            _messageLoopTask = RunMessageLoop();
+        }
+    }
+
+    public TaskScheduler ActivationTaskScheduler => _workItemGroup.TaskScheduler;
     public IGrainRuntime GrainRuntime => _shared.Runtime;
     public object? GrainInstance { get; private set; }
     public GrainAddress Address { get; private set; }
@@ -914,7 +934,7 @@ internal sealed partial class ActivationData :
         }
 
         var implementation = ActivationServices.GetKeyedService<IGrainExtension>(typeof(TExtensionInterface));
-        if (!(implementation is TExtensionInterface typedResult))
+        if (implementation is not TExtensionInterface typedResult)
         {
             throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TExtensionInterface)} is installed on this instance and no implementations are registered for automated install");
         }
@@ -1510,6 +1530,12 @@ internal sealed partial class ActivationData :
 
     private async Task ActivateAsync(Dictionary<string, object>? requestContextData, CancellationToken cancellationToken)
     {
+        if (State != ActivationState.Creating)
+        {
+            LogIgnoringActivateAttempt(_shared.Logger, this, State);
+            return;
+        }
+
         // A chain of promises that will have to complete in order to complete the activation
         // Register with the grain directory and call the Activate method on the new activation.
         try
@@ -2324,6 +2350,12 @@ internal sealed partial class ActivationData :
         Level = LogLevel.Warning,
         Message = "Failed to register grain {Grain} in grain directory")]
     private static partial void LogFailedToRegisterGrain(ILogger logger, Exception exception, ActivationData grain);
+
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Ignoring activation request for {Grain} because this grain is in the '{State}' state")]
+    private static partial void LogIgnoringActivateAttempt(ILogger logger, ActivationData grain, ActivationState state);
 
     [LoggerMessage(
         EventId = (int)ErrorCode.Catalog_BeforeCallingActivate,
