@@ -33,6 +33,11 @@ public interface IScheduledJob
     /// Gets optional metadata associated with this scheduled job.
     /// </summary>
     IReadOnlyDictionary<string, string>? Metadata { get; }
+
+    /// <summary>
+    /// Gets the identifier of the shard that manages this scheduled job.
+    /// </summary>
+    string ShardId { get; init; }
 }
 
 /// <summary>

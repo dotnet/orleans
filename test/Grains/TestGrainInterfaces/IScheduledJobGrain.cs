@@ -12,6 +12,8 @@ public interface IScheduledJobGrain : IGrainWithStringKey
 {
     Task<IScheduledJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime);
 
+    Task<bool> TryCancelJobAsync(IScheduledJob job);
+
     Task<bool> HasJobRan(string jobId);
 
     [AlwaysInterleave]

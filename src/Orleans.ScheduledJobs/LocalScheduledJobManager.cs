@@ -200,14 +200,19 @@ internal class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManage
         }
     }
 
-    private DateTimeOffset GetShardKey(DateTimeOffset scheduledTime)
+    public async Task<bool> TryCancelScheduledJobAsync(IScheduledJob job)
     {
-        return new DateTime(scheduledTime.Year, scheduledTime.Month, scheduledTime.Day, scheduledTime.Hour, scheduledTime.Minute, 0);
+        var key = GetShardKey(job.DueTime);
+        if (!_shardCache.TryGetValue(key, out var shards) || !shards.TryGetValue(job.ShardId, out var shard))
+        {
+            return false;
+        }
+        await shard.RemoveJobAsync(job.Id);
+        return true;
     }
 
-    public Task<bool> TryCancelScheduledJobAsync(IScheduledJob job)
+    private static DateTimeOffset GetShardKey(DateTimeOffset scheduledTime)
     {
-        // TODO: Implement job cancellation
-        return Task.FromResult(false);
+        return new DateTime(scheduledTime.Year, scheduledTime.Month, scheduledTime.Day, scheduledTime.Hour, scheduledTime.Minute, 0);
     }
 }

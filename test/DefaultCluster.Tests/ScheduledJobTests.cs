@@ -25,9 +25,11 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
         Assert.Equal("TestJob", job1.Name);
         Assert.Equal(dueTime, job1.DueTime);
         var job2 = await grain.ScheduleJobAsync("TestJob2", dueTime);
-        var job3 = await grain.ScheduleJobAsync("TestJob3", dueTime.AddSeconds(2));
+        var job3 = await grain.ScheduleJobAsync("TestJob3", dueTime.AddSeconds(4));
         var job4 = await grain.ScheduleJobAsync("TestJob4", dueTime);
         var job5 = await grain.ScheduleJobAsync("TestJob5", dueTime.AddSeconds(1));
+        var canceledJob = await grain.ScheduleJobAsync("CanceledJob", dueTime.AddSeconds(2));
+        Assert.True(await grain.TryCancelJobAsync(canceledJob));
         // Wait for the job to run
         foreach (var job in new[] { job1, job2, job3, job4, job5 })
         {
@@ -40,5 +42,7 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
                 Assert.Fail($"The scheduled job {job.Name} did not run within the expected time.");
             }
         }
+        // Verify the canceled job did not run
+        Assert.False(await grain.HasJobRan(canceledJob.Id));
     }
 }

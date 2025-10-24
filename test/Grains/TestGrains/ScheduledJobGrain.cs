@@ -47,4 +47,9 @@ public class ScheduledJobGrain : Grain, IScheduledJobGrain, IScheduledJobHandler
 
         await taskResult.Task;
     }
+
+    public async Task<bool> TryCancelJobAsync(IScheduledJob job)
+    {
+        return await _localScheduledJobManager.TryCancelScheduledJobAsync(job);
+    }
 }
