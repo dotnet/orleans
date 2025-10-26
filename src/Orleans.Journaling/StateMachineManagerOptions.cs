@@ -22,5 +22,5 @@ public sealed class StateMachineManagerOptions
     /// <summary>
     /// The default value of <see cref="RetirementGracePeriod"/>.
     /// </summary>
-    public static readonly TimeSpan DEFAULT_RETIREMENT_GRACE_PERIOD = TimeSpan.FromHours(1);
+    public static readonly TimeSpan DEFAULT_RETIREMENT_GRACE_PERIOD = TimeSpan.FromDays(7);
 }

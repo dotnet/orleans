@@ -49,9 +49,12 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
         // The list of known state machines is itself stored as a durable state machine with the implicit id 0.
         // This allows us to recover the list of state machines ids without having to store it separately.
         _stateMachineIds = new StateMachineManagerState(this, StringCodec, UInt64Codec, serializerSessionPool);
-        _stateMachinesMap[0] = _stateMachineIds;
+        _stateMachinesMap[StateMachineManagerState.Id] = _stateMachineIds;
 
+        // The retirement tracker is a special internal state machine with a fixed id.
+        // It is not stored in _stateMachineIds and does not participate in the general name->id mapping.
         _retirementTracker = new StateMachinesRetirementTracker(this, StringCodec, DateTimeCodec, serializerSessionPool);
+        _stateMachinesMap[StateMachinesRetirementTracker.Id] = _retirementTracker;
     }
 
     public void RegisterStateMachine(string name, IDurableStateMachine stateMachine)
@@ -69,7 +72,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
                     // log during recovery but has not been re-registered. We effectively are "staging" the resurrection of the machine.
                     // The removal from the tracker is handled within the serialized loop. This is to prevent logical race conditions with the recovery process.
                     // We also make sure to apply any buffered data that could have occured while the vessel took this machine's place.
-                    stateMachine.Reset(new StateMachineLogWriter(this, new(_stateMachineIds[name])));          
+                    stateMachine.Reset(new StateMachineLogWriter(this, new(_stateMachineIds[name])));      
                     foreach (var entry in vessel.BufferedData)
                     {
                         stateMachine.Apply(new ReadOnlySequence<byte>(entry));
@@ -266,7 +269,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
                                 if (!_stateMachineIds.ContainsKey(name))
                                 {
                                     // Doing so will trigger a reset, since _stateMachineIds will call OnSetStateMachineId, which resets the state machine in question.
-                                    _stateMachineIds[name] = name == StateMachinesRetirementTracker.Name ? StateMachinesRetirementTracker.Id : _nextStateMachineId++;
+                                    _stateMachineIds[name] = _nextStateMachineId++;
                                 }
                             }
                         }
@@ -537,9 +540,11 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
         IFieldCodec<ulong> valueCodec,
         SerializerSessionPool serializerSessionPool) : DurableDictionary<string, ulong>(keyCodec, valueCodec, serializerSessionPool)
     {
+        public const int Id = 0;
+
         private readonly StateMachineManager _manager = manager;
 
-        public void ResetVolatileState() => ((IDurableStateMachine)this).Reset(new StateMachineLogWriter(_manager, new(0)));
+        public void ResetVolatileState() => ((IDurableStateMachine)this).Reset(new StateMachineLogWriter(_manager, new(Id)));
 
         protected override void OnSet(string key, ulong value) => _manager.OnSetStateMachineId(key, value);
     }
@@ -550,10 +555,9 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     /// <remarks>Resurrecting of retired machines is supported.</remarks>
     private sealed class StateMachinesRetirementTracker(
         StateMachineManager manager, IFieldCodec<string> keyCodec, IFieldCodec<DateTime> valueCodec, SerializerSessionPool sessionPool)
-            : DurableDictionary<string, DateTime>(Name, manager, keyCodec, valueCodec, sessionPool)
+            : DurableDictionary<string, DateTime>(keyCodec, valueCodec, sessionPool)
     {
         public const int Id = 1;
-        public const string Name = "orleans_retirement_tracker";
 
         private readonly StateMachineLogWriter _logWriter = new(manager, new(Id));
 
