@@ -456,7 +456,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
                 var vessel = new RetiredStateMachineVessel();
 
                 // We must not make the vessel self-register with the manager, since it will
-                // result in a late-registration after the manger is 'ready'. Instead we add it inline here.
+                // result in a late-registration after the manager is 'ready'. Instead we add it inline here.
 
                 _stateMachines.Add(name, vessel);
                 _stateMachinesMap[id] = vessel;
