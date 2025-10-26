@@ -558,7 +558,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     }
 
     /// <summary>
-    /// Used to keep retired machines into a purgatory state until time-based purging or if a comeback ocurrs.
+    /// Used to keep retired machines into a purgatory state until time-based purging or if a comeback occurs.
     /// This keeps buffering entries and dumps them back into the log upon compaction.
     /// </summary>
     [DebuggerDisplay(nameof(RetiredStateMachineVessel))]
