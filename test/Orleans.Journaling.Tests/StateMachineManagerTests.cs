@@ -274,7 +274,7 @@ public class StateMachineManagerTests : StateMachineTestBase
 
         // -------------- STEP 1 --------------
 
-        // We begin with 2 dictionaries, one of which we will retire by means of not registering it in the manger.
+        // We begin with 2 dictionaries, one of which we will retire by means of not registering it in the manager.
         // This would be in the real-world developers removing it from the grain's ctor as a dependecy.
         var sut1 = CreateTestSystem(storage, timeProvider);
         var dictToKeep1 = CreateTestMachine(DictToKeepKey, sut1.Manager);
