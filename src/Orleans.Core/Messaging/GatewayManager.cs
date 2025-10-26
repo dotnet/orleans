@@ -410,9 +410,9 @@ namespace Orleans.Messaging
 
         [LoggerMessage(
             Level = LogLevel.Information,
-            Message = "Closing connection to '{Endpoint}' because it has been marked as dead."
+            Message = "Closing connection to '{EndPoint}' because it has been marked as dead."
         )]
-        private static partial void LogClosingConnectionToDeadGateway(ILogger logger, SiloAddress endpoint);
+        private static partial void LogClosingConnectionToDeadGateway(ILogger logger, SiloAddress endPoint);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.GatewayManager_AllGatewaysDead,
