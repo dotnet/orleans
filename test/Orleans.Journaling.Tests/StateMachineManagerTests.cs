@@ -337,7 +337,7 @@ public class StateMachineManagerTests : StateMachineTestBase
         // It should have created a DurableNothing placeholder for dictToRetire, but we can not test for that.
 
 
-        // This time we advance time to cover the full period. Note that this is necccessary because a side effect of step 3
+        // This time we advance time to cover the full period. Note that this is necessary because a side effect of step 3
         // was that dictToRetire was removed from the tracker (since it came back), so just triggering a compaction won't cut it
         // as time to retire will essentially be reset to "now".
         timeProvider.Advance(period);
