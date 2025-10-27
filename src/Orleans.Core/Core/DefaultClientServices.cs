@@ -22,6 +22,7 @@ using Microsoft.Extensions.Hosting;
 using System.Collections.Generic;
 using Orleans.Serialization.Internal;
 using System;
+using System.Linq;
 using Orleans.Hosting;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
@@ -217,7 +218,17 @@ namespace Orleans
                         ?? throw new InvalidOperationException($"{kind} provider, '{name}', of type {type}, does not implement {typeof(IProviderBuilder<IClientBuilder>)}.");
                 }
 
-                throw new InvalidOperationException($"Could not find {kind} provider named '{name}'. This can indicate that either the 'Microsoft.Orleans.Sdk' package the provider's package are not referenced by your application.");
+                var knownProvidersOfKind = knownProviderTypes
+                    .Where(kvp => string.Equals(kvp.Key.Kind, kind, StringComparison.OrdinalIgnoreCase))
+                    .Select(kvp => kvp.Key.Name)
+                    .OrderBy(n => n)
+                    .ToList();
+
+                var knownProvidersMessage = knownProvidersOfKind.Count > 0
+                    ? $" Known {kind} providers: {string.Join(", ", knownProvidersOfKind)}."
+                    : string.Empty;
+
+                throw new InvalidOperationException($"Could not find {kind} provider named '{name}'. This can indicate that either the 'Microsoft.Orleans.Sdk' package the provider's package are not referenced by your application.{knownProvidersMessage}");
             }
 
             static Dictionary<(string Kind, string Name), Type> GetRegisteredProviders()
