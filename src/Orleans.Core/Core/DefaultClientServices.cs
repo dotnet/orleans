@@ -228,7 +228,7 @@ namespace Orleans
                     ? $" Known {kind} providers: {string.Join(", ", knownProvidersOfKind)}."
                     : string.Empty;
 
-                throw new InvalidOperationException($"Could not find {kind} provider named '{name}'. This can indicate that either the 'Microsoft.Orleans.Sdk' package the provider's package are not referenced by your application.{knownProvidersMessage}");
+                throw new InvalidOperationException($"Could not find {kind} provider named '{name}'. This can indicate that either the 'Microsoft.Orleans.Sdk' or the provider's package are not referenced by your application.{knownProvidersMessage}");
             }
 
             static Dictionary<(string Kind, string Name), Type> GetRegisteredProviders()

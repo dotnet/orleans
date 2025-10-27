@@ -50,7 +50,7 @@ namespace NonSilo.Tests
             // Verify the error message includes information about known providers
             // The exact list will depend on what providers are registered, but the message should contain "Known Clustering providers:"
             // if there are any registered Clustering providers
-            Assert.Contains("This can indicate that either the 'Microsoft.Orleans.Sdk' package the provider's package are not referenced", exception.Message);
+            Assert.Contains("This can indicate that either the 'Microsoft.Orleans.Sdk' or the provider's package are not referenced", exception.Message);
         }
 
         /// <summary>
