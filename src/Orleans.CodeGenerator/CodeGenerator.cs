@@ -67,6 +67,27 @@ namespace Orleans.CodeGenerator
 
             // Expand the set of referenced assemblies
             MetadataModel.ApplicationParts.Add(compilationAsm.MetadataName);
+            
+            // Scan the compilation assembly for RegisterProvider attributes
+            if (compilationAsm.GetAttributes(LibraryTypes.RegisterProviderAttribute, out var compilationProviderAttrs))
+            {
+                foreach (var attr in compilationProviderAttrs)
+                {
+                    if (attr.ConstructorArguments.Length >= 4)
+                    {
+                        var name = attr.ConstructorArguments[0].Value as string;
+                        var kind = attr.ConstructorArguments[1].Value as string;
+                        var target = attr.ConstructorArguments[2].Value as string;
+                        var type = attr.ConstructorArguments[3].Value as INamedTypeSymbol;
+
+                        if (name is not null && kind is not null && target is not null && type is not null)
+                        {
+                            MetadataModel.RegisteredProviders.Add((target, kind, name, type.ToOpenTypeSyntax()));
+                        }
+                    }
+                }
+            }
+            
             foreach (var reference in LibraryTypes.Compilation.References)
             {
                 if (LibraryTypes.Compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol asm)
