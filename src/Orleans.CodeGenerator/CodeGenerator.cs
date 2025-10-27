@@ -82,6 +82,25 @@ namespace Orleans.CodeGenerator
                         MetadataModel.ApplicationParts.Add((string)attr.ConstructorArguments.First().Value);
                     }
                 }
+
+                if (asm.GetAttributes(LibraryTypes.RegisterProviderAttribute, out var providerAttrs))
+                {
+                    foreach (var attr in providerAttrs)
+                    {
+                        if (attr.ConstructorArguments.Length >= 4)
+                        {
+                            var name = attr.ConstructorArguments[0].Value as string;
+                            var kind = attr.ConstructorArguments[1].Value as string;
+                            var target = attr.ConstructorArguments[2].Value as string;
+                            var type = attr.ConstructorArguments[3].Value as INamedTypeSymbol;
+
+                            if (name is not null && kind is not null && target is not null && type is not null)
+                            {
+                                MetadataModel.RegisteredProviders.Add((target, kind, name, type.ToOpenTypeSyntax()));
+                            }
+                        }
+                    }
+                }
             }
 
             // The mapping of proxy base types to a mapping of return types to invokable base types. Used to set default invokable base types for each proxy base type.
