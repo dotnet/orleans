@@ -69,24 +69,7 @@ namespace Orleans.CodeGenerator
             MetadataModel.ApplicationParts.Add(compilationAsm.MetadataName);
             
             // Scan the compilation assembly for RegisterProvider attributes
-            if (compilationAsm.GetAttributes(LibraryTypes.RegisterProviderAttribute, out var compilationProviderAttrs))
-            {
-                foreach (var attr in compilationProviderAttrs)
-                {
-                    if (attr.ConstructorArguments.Length >= 4)
-                    {
-                        var name = attr.ConstructorArguments[0].Value as string;
-                        var kind = attr.ConstructorArguments[1].Value as string;
-                        var target = attr.ConstructorArguments[2].Value as string;
-                        var type = attr.ConstructorArguments[3].Value as INamedTypeSymbol;
-
-                        if (name is not null && kind is not null && target is not null && type is not null)
-                        {
-                            MetadataModel.RegisteredProviders.Add((target, kind, name, type.ToOpenTypeSyntax()));
-                        }
-                    }
-                }
-            }
+            CollectRegisteredProviders(compilationAsm);
             
             foreach (var reference in LibraryTypes.Compilation.References)
             {
@@ -104,24 +87,7 @@ namespace Orleans.CodeGenerator
                     }
                 }
 
-                if (asm.GetAttributes(LibraryTypes.RegisterProviderAttribute, out var providerAttrs))
-                {
-                    foreach (var attr in providerAttrs)
-                    {
-                        if (attr.ConstructorArguments.Length >= 4)
-                        {
-                            var name = attr.ConstructorArguments[0].Value as string;
-                            var kind = attr.ConstructorArguments[1].Value as string;
-                            var target = attr.ConstructorArguments[2].Value as string;
-                            var type = attr.ConstructorArguments[3].Value as INamedTypeSymbol;
-
-                            if (name is not null && kind is not null && target is not null && type is not null)
-                            {
-                                MetadataModel.RegisteredProviders.Add((target, kind, name, type.ToOpenTypeSyntax()));
-                            }
-                        }
-                    }
-                }
+                CollectRegisteredProviders(asm);
             }
 
             // The mapping of proxy base types to a mapping of return types to invokable base types. Used to set default invokable base types for each proxy base type.
@@ -506,6 +472,28 @@ namespace Orleans.CodeGenerator
                 else
                 {
                     ComputeAssembliesToExamine(declaringAsm, expandedAssemblies);
+                }
+            }
+        }
+
+        private void CollectRegisteredProviders(IAssemblySymbol assembly)
+        {
+            if (assembly.GetAttributes(LibraryTypes.RegisterProviderAttribute, out var providerAttrs))
+            {
+                foreach (var attr in providerAttrs)
+                {
+                    if (attr.ConstructorArguments.Length >= 4)
+                    {
+                        var name = attr.ConstructorArguments[0].Value as string;
+                        var kind = attr.ConstructorArguments[1].Value as string;
+                        var target = attr.ConstructorArguments[2].Value as string;
+                        var type = attr.ConstructorArguments[3].Value as INamedTypeSymbol;
+
+                        if (name is not null && kind is not null && target is not null && type is not null)
+                        {
+                            MetadataModel.RegisteredProviders.Add((target, kind, name, type.ToOpenTypeSyntax()));
+                        }
+                    }
                 }
             }
         }
