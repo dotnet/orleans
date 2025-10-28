@@ -4,7 +4,7 @@
 Microsoft Orleans Scheduled Jobs provides a distributed, scalable system for scheduling one-time jobs that execute at a specific time. Unlike Orleans Reminders which are designed for recurring tasks, Scheduled Jobs are ideal for one-time future events such as appointment notifications, delayed processing, scheduled workflow steps, and time-based triggers.
 
 **Key Features:**
-- **One-time Execution**: Jobs are scheduled to run once at a specific time
+- **At Least One-time Execution**: Jobs are scheduled to run at least once
 - **Persistent**: Jobs survive grain deactivation and silo restarts
 - **Distributed**: Jobs are automatically distributed and rebalanced across silos
 - **Reliable**: Failed jobs can be automatically retried with configurable policies
