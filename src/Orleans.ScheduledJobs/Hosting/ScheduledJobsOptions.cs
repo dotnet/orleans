@@ -22,7 +22,7 @@ public sealed class ScheduledJobsOptions
             return null;
         }
         var delay = TimeSpan.FromSeconds(Math.Pow(2, jobContext.DequeueCount));
-        return DateTimeOffset.Now.Add(delay);
+        return DateTimeOffset.UtcNow.Add(delay);
     }
 }
 
