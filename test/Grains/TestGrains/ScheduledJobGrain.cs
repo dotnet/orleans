@@ -28,7 +28,7 @@ public class ScheduledJobGrain : Grain, IScheduledJobGrain, IScheduledJobHandler
 
     public Task ExecuteJobAsync(IScheduledJobContext ctx, CancellationToken cancellationToken)
     {
-        _logger.LogInformation($"Job {ctx.Job.Id} received at {DateTime.UtcNow}");
+        _logger.LogInformation("Job {JobId} received at {ReceivedTime}", ctx.Job.Id, DateTime.UtcNow);
         jobRunStatus[ctx.Job.Id].SetResult();
         return Task.CompletedTask;
     }
