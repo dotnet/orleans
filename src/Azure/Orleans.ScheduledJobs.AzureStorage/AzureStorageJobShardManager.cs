@@ -171,7 +171,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                 continue;
             }
             
-            var shard = new AzureStorageJobShard(shardId, minDueTime, maxDueTime, blobClient, metadata);
+            var shard = new AzureStorageJobShard(shardId, minDueTime, maxDueTime, blobClient, metadata, null);
             await shard.InitializeAsync();
             _jobShardCache[shardId] = shard;
             LogShardRegistered(_logger, shardId, siloAddress, assignToCreator);

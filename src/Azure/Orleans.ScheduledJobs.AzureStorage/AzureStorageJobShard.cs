@@ -20,7 +20,7 @@ internal sealed class AzureStorageJobShard : JobShard
     private InMemoryJobQueue _jobQueue;
     private int _jobCount = 0;
 
-    public AzureStorageJobShard(string id, DateTimeOffset startTime, DateTimeOffset endTime, AppendBlobClient blobClient, IDictionary<string, string>? metadata = null, ETag? eTag = default)
+    public AzureStorageJobShard(string id, DateTimeOffset startTime, DateTimeOffset endTime, AppendBlobClient blobClient, IDictionary<string, string>? metadata, ETag? eTag)
         : base(id, startTime, endTime)
     {
         BlobClient = blobClient;
@@ -47,10 +47,12 @@ internal sealed class AzureStorageJobShard : JobShard
         _jobCount--;
     }
 
-    public override async Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata = null)
+    public override async Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata)
     {
         if (IsComplete)
+        {
             throw new InvalidOperationException("Cannot schedule job on a complete shard.");
+        }
 
         var jobId = Guid.NewGuid().ToString();
         var operation = JobOperation.CreateAddOperation(jobId, jobName, dueTime, target, metadata);
