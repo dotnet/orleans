@@ -48,9 +48,8 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         await InitializeIfNeeded(cancellationToken);
         LogAssigningShards(_logger, siloAddress, maxDateTime, _containerName);
 
-        var blobs = _client.GetBlobsAsync(traits: BlobTraits.Metadata, cancellationToken: cancellationToken);
         var result = new List<IJobShard>();
-        await foreach (var blob in blobs.WithCancellation(cancellationToken))
+        await foreach (var blob in _client.GetBlobsAsync(traits: BlobTraits.Metadata, cancellationToken: cancellationToken))
         {
             // Get the owner and creator of the shard
             var (owner, creator, membershipVersion, minDueTime, maxDueTime) = ParseMetadata(blob.Metadata);
@@ -70,9 +69,9 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
             }
 
             // Check if the owner is valid
-            var ownerIsActive = owner is not null && _clusterMembership.CurrentSnapshot.GetSiloStatus(owner) == SiloStatus.Active;
+            var ownerStatus = owner is not null ? _clusterMembership.CurrentSnapshot.GetSiloStatus(owner) : SiloStatus.None;
 
-            if (ownerIsActive)
+            if (ownerStatus is not SiloStatus.Dead and not SiloStatus.None)
             {
                 // Owner is still active, skip this shard
                 LogShardStillOwned(_logger, blob.Name, owner!);
@@ -80,7 +79,8 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
             }
 
             // Check if the creator is still active
-            var creatorIsActive = creator is not null && _clusterMembership.CurrentSnapshot.GetSiloStatus(creator) == SiloStatus.Active;
+            var creatorStatus = creator is not null ? _clusterMembership.CurrentSnapshot.GetSiloStatus(creator) : SiloStatus.None;
+            var creatorIsActive = creatorStatus is not SiloStatus.Dead and not SiloStatus.None;
 
             AzureStorageJobShard? shard = null;
             
