@@ -43,16 +43,16 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
     {
     }
 
-    public override async Task<List<IJobShard>> AssignJobShardsAsync(SiloAddress siloAddress, DateTimeOffset maxDateTime, CancellationToken cancellationToken = default)
+    public override async Task<List<IJobShard>> AssignJobShardsAsync(SiloAddress siloAddress, DateTimeOffset maxShardStartTime, CancellationToken cancellationToken = default)
     {
         await InitializeIfNeeded(cancellationToken);
-        LogAssigningShards(_logger, siloAddress, maxDateTime, _containerName);
+        LogAssigningShards(_logger, siloAddress, maxShardStartTime, _containerName);
 
         var result = new List<IJobShard>();
         await foreach (var blob in _client.GetBlobsAsync(traits: BlobTraits.Metadata, cancellationToken: cancellationToken))
         {
             // Get the owner and creator of the shard
-            var (owner, creator, membershipVersion, minDueTime, maxDueTime) = ParseMetadata(blob.Metadata);
+            var (owner, creator, membershipVersion, shardStartTime, maxDueTime) = ParseMetadata(blob.Metadata);
 
             // Check if the membership version is more recent than our current version
             if (membershipVersion > _clusterMembership.CurrentSnapshot.Version)
@@ -61,10 +61,10 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                 await _clusterMembership.Refresh(membershipVersion);
             }
 
-            if (minDueTime > maxDateTime)
+            if (shardStartTime > maxShardStartTime)
             {
                 // This shard is too new, stop there
-                LogShardTooNew(_logger, blob.Name, minDueTime, maxDateTime);
+                LogShardTooNew(_logger, blob.Name, shardStartTime, maxShardStartTime);
                 break;
             }
 
@@ -106,7 +106,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                 LogClaimingShard(_logger, blob.Name, siloAddress, creatorIsActive, siloAddress.Equals(creator));
                 var blobClient = _client.GetAppendBlobClient(blob.Name);
                 var metadata = blob.Metadata;
-                shard = new AzureStorageJobShard(blob.Name, minDueTime, maxDueTime, blobClient, metadata, blob.Properties.ETag);
+                shard = new AzureStorageJobShard(blob.Name, shardStartTime, maxDueTime, blobClient, metadata, blob.Properties.ETag);
                 if (!await TryTakeOwnership(shard, metadata, siloAddress, cancellationToken))
                 {
                     // Someone else took over the shard
@@ -277,7 +277,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
 
     [LoggerMessage(
         Level = LogLevel.Trace,
-        Message = "Shard '{ShardId}' is too new (MinDueTime={MinDueTime}, MaxDateTime={MaxDateTime})"
+        Message = "Ignoring shard '{ShardId}' since its start time is greater than specified maximum (MinDueTime={MinDueTime}, MaxDateTime={MaxDateTime})"
     )]
     private static partial void LogShardTooNew(ILogger logger, string shardId, DateTime minDueTime, DateTimeOffset maxDateTime);
 

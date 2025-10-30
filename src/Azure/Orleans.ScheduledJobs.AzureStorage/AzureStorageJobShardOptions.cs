@@ -18,5 +18,5 @@ public class AzureStorageJobShardOptions
     /// <summary>
     /// Gets or sets the name of the container used to store scheduled jobs.
     /// </summary>
-    public string ContainerName { get; set; } = "scheduled-jobs";
+    public string ContainerName { get; set; } = "jobs";
 }

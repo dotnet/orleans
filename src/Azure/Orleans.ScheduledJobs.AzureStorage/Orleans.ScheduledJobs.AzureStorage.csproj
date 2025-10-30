@@ -10,8 +10,10 @@
     <AssemblyName>Orleans.ScheduledJobs.AzureStorage</AssemblyName>
     <RootNamespace>Orleans.ScheduledJobs.AzureStorage</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <DefineConstants>$(DefineConstants);ORLEANS_REMINDERS</DefineConstants>
+    <DefineConstants>$(DefineConstants)</DefineConstants>
     <Nullable>enable</Nullable>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
   </PropertyGroup>
 
   <ItemGroup>
