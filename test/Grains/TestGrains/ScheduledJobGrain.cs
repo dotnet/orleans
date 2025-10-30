@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.ScheduledJobs;
@@ -35,7 +36,7 @@ public class ScheduledJobGrain : Grain, IScheduledJobGrain, IScheduledJobHandler
 
     public async Task<IScheduledJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime)
     {
-        var job = await _localScheduledJobManager.ScheduleJobAsync(this.GetGrainId(), jobName, scheduledTime);
+        var job = await _localScheduledJobManager.ScheduleJobAsync(this.GetGrainId(), jobName, scheduledTime, null, CancellationToken.None);
         jobRunStatus[job.Id] = new TaskCompletionSource();
         return job;
     }
@@ -43,13 +44,15 @@ public class ScheduledJobGrain : Grain, IScheduledJobGrain, IScheduledJobHandler
     public async Task WaitForJobToRun(string jobId)
     {
         if (!jobRunStatus.TryGetValue(jobId, out var taskResult))
+        {
             throw new InvalidOperationException($"Job {jobId} was not scheduled on this grain.");
+        }
 
         await taskResult.Task;
     }
 
     public async Task<bool> TryCancelJobAsync(IScheduledJob job)
     {
-        return await _localScheduledJobManager.TryCancelScheduledJobAsync(job);
+        return await _localScheduledJobManager.TryCancelScheduledJobAsync(job, CancellationToken.None);
     }
 }

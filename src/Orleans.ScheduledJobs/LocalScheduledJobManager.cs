@@ -27,15 +27,17 @@ public interface ILocalScheduledJobManager
     /// <param name="jobName">The name of the job for identification purposes.</param>
     /// <param name="dueTime">The date and time when the job should be executed.</param>
     /// <param name="metadata">Optional metadata associated with the job.</param>
+    /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation that returns the scheduled job.</returns>
-    Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata = null);
+    Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken);
 
     /// <summary>
     /// Attempts to cancel a previously scheduled job.
     /// </summary>
     /// <param name="job">The scheduled job to cancel.</param>
+    /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation that returns <see langword="true"/> if the job was successfully canceled; otherwise, <see langword="false"/>.</returns>
-    Task<bool> TryCancelScheduledJobAsync(IScheduledJob job);
+    Task<bool> TryCancelScheduledJobAsync(IScheduledJob job, CancellationToken cancellationToken);
 }
 
 /// <inheritdoc/>
@@ -71,7 +73,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
     }
 
     /// <inheritdoc/>
-    public async Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata = null)
+    public async Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)
     {
         LogSchedulingJob(_logger, jobName, target, dueTime);
         
@@ -94,7 +96,9 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         var assignToMe = key.Add(TimeSpan.FromMinutes(5)) > DateTimeOffset.UtcNow;
         LogCreatingNewShard(_logger, key, assignToMe);
         
-        var newShard = await _shardManager.RegisterShard(this.Silo, key, key.Add(_options.ShardDuration), EmptyMetadata, assignToMe, _cts.Token);
+        // Use a linked cancellation token that combines the provided token with the internal one
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
+        var newShard = await _shardManager.RegisterShard(this.Silo, key, key.Add(_options.ShardDuration), EmptyMetadata, assignToMe, linkedCts.Token);
         shards.TryAdd(newShard.Id, newShard);
         var scheduledJob = await newShard.ScheduleJobAsync(target, jobName, dueTime, metadata);
         
@@ -293,7 +297,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
     }
 
     /// <inheritdoc/>
-    public async Task<bool> TryCancelScheduledJobAsync(IScheduledJob job)
+    public async Task<bool> TryCancelScheduledJobAsync(IScheduledJob job, CancellationToken cancellationToken)
     {
         LogCancellingJob(_logger, job.Id, job.Name, job.ShardId);
         
