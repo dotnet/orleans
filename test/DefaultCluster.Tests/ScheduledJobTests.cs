@@ -94,7 +94,7 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
             ["Priority"] = "High"
         };
 
-        var job = await grain.ScheduleJobWithMetadataAsync("MetadataJob", dueTime, metadata);
+        var job = await grain.ScheduleJobAsync("MetadataJob", dueTime, metadata);
         Assert.NotNull(job);
         Assert.NotNull(job.Metadata);
         Assert.Equal(3, job.Metadata.Count);
@@ -235,7 +235,7 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
         var metadata = new Dictionary<string, string> { ["Key"] = "Value" };
 
-        var job = await grain.ScheduleJobWithMetadataAsync("PropertyTestJob", dueTime, metadata);
+        var job = await grain.ScheduleJobAsync("PropertyTestJob", dueTime, metadata);
 
         Assert.NotNull(job.Id);
         Assert.NotEmpty(job.Id);

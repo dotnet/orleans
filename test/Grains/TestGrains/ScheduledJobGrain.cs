@@ -40,14 +40,7 @@ public class ScheduledJobGrain : Grain, IScheduledJobGrain, IScheduledJobHandler
         return Task.CompletedTask;
     }
 
-    public async Task<IScheduledJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime)
-    {
-        var job = await _localScheduledJobManager.ScheduleJobAsync(this.GetGrainId(), jobName, scheduledTime, null, CancellationToken.None);
-        jobRunStatus[job.Id] = new TaskCompletionSource();
-        return job;
-    }
-
-    public async Task<IScheduledJob> ScheduleJobWithMetadataAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata)
+    public async Task<IScheduledJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string>? metadata = null)
     {
         var job = await _localScheduledJobManager.ScheduleJobAsync(this.GetGrainId(), jobName, scheduledTime, metadata, CancellationToken.None);
         jobRunStatus[job.Id] = new TaskCompletionSource();
