@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure;
@@ -239,7 +240,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
             { "Creator", siloAddress.ToParsableString() },
             { "MinDueTime", minDueTime.ToString("o") },
             { "MaxDueTime", maxDueTime.ToString("o") },
-            { "MembershipVersion", membershipVersion.ToString() }
+            { "MembershipVersion", membershipVersion.Value.ToString(CultureInfo.InvariantCulture) }
         };
 
         return metadata;

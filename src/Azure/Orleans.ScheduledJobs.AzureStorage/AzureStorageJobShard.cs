@@ -148,7 +148,7 @@ internal sealed class AzureStorageJobShard : JobShard
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
 
         var cancellationToken = _shutdownCts.Token;
-        
+        // TODO: AppendBlob has a limit of 50,000 blocks. Implement blob rotation when this limit is approached.
         try
         {
             await foreach (var operation in _storageOperationChannel.Reader.ReadAllAsync(cancellationToken))
@@ -201,19 +201,21 @@ internal sealed class AzureStorageJobShard : JobShard
         Metadata = metadata;
     }
 
+    // TODO: Optimize using ArrayPool<byte>, Utf8Formatter, and stackalloc to reduce allocations
     private static byte[] EncodeNetstring(string data)
     {
         var dataBytes = System.Text.Encoding.UTF8.GetBytes(data);
-        var lengthPrefix = System.Text.Encoding.ASCII.GetBytes($"{dataBytes.Length}:");
+        var lengthPrefix = System.Text.Encoding.UTF8.GetBytes($"{dataBytes.Length}:");
         var result = new byte[lengthPrefix.Length + dataBytes.Length + 1];
         
         lengthPrefix.CopyTo(result, 0);
         dataBytes.CopyTo(result, lengthPrefix.Length);
-        result[^1] = (byte)',';
+        result[^1] = (byte)'\n';
         
         return result;
     }
 
+    // TODO: Optimize using ArrayPool<byte>, Utf8Parser, and return ReadOnlyMemory<byte> to reduce allocations
     private static async IAsyncEnumerable<string> ReadNetstringsAsync(Stream stream)
     {
         using var reader = new StreamReader(stream, leaveOpen: true);
@@ -262,11 +264,11 @@ internal sealed class AzureStorageJobShard : JobShard
                 totalRead += read;
             }
 
-            // Read trailing comma
-            var comma = reader.Read();
-            if (comma != ',')
+            // Read trailing newline
+            var newline = reader.Read();
+            if (newline != '\n')
             {
-                throw new InvalidDataException($"Expected ',' at end of netstring, got '{(char)comma}'");
+                throw new InvalidDataException($"Expected newline at end of netstring, got '{(char)newline}'");
             }
 
             yield return new string(buffer);
