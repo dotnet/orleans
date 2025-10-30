@@ -40,7 +40,7 @@ public class ScheduledJobGrain : Grain, IScheduledJobGrain, IScheduledJobHandler
         return Task.CompletedTask;
     }
 
-    public async Task<IScheduledJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string>? metadata = null)
+    public async Task<IScheduledJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null)
     {
         var job = await _localScheduledJobManager.ScheduleJobAsync(this.GetGrainId(), jobName, scheduledTime, metadata, CancellationToken.None);
         jobRunStatus[job.Id] = new TaskCompletionSource();
@@ -51,7 +51,9 @@ public class ScheduledJobGrain : Grain, IScheduledJobGrain, IScheduledJobHandler
     {
         if (!jobRunStatus.TryGetValue(jobId, out var taskResult))
         {
-            throw new InvalidOperationException($"Job {jobId} was not scheduled on this grain.");
+            // The job might not have been scheduled on this grain.
+            jobRunStatus[jobId] = new TaskCompletionSource();
+            taskResult = jobRunStatus[jobId];
         }
 
         await taskResult.Task;

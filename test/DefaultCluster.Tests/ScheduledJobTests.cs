@@ -270,4 +270,27 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
         Assert.NotNull(context);
         Assert.Equal(1, context.DequeueCount);
     }
+
+    [Fact, TestCategory("BVT"), TestCategory("ScheduledJobs")]
+    public async Task Test_ScheduleJobOnAnotherGrain()
+    {
+        var schedulerGrain = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ISchedulerGrain>("scheduler-grain");
+        var targetGrain = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("target-grain");
+        var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
+
+        var job = await schedulerGrain.ScheduleJobOnAnotherGrainAsync("target-grain", "CrossGrainJob", dueTime);
+
+        Assert.NotNull(job);
+        Assert.Equal("CrossGrainJob", job.Name);
+        Assert.Equal(dueTime, job.DueTime);
+
+        await targetGrain.WaitForJobToRun(job.Id).WithTimeout(TimeSpan.FromSeconds(10));
+
+        Assert.True(await targetGrain.HasJobRan(job.Id));
+
+        var context = await targetGrain.GetJobContext(job.Id);
+        Assert.NotNull(context);
+        Assert.Equal(job.Id, context.Job.Id);
+        Assert.Equal("CrossGrainJob", context.Job.Name);
+    }
 }
