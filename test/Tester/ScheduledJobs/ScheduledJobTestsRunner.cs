@@ -1,25 +1,30 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
+using Orleans;
 using Orleans.Internal;
 using Orleans.ScheduledJobs;
-using TestExtensions;
 using Xunit;
 
-namespace DefaultCluster.Tests;
+namespace Tester.ScheduledJobs;
 
-public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
+/// <summary>
+/// Contains the test logic for scheduled jobs that can be run against different providers.
+/// This class is provider-agnostic and can be reused by test classes for InMemory, Azure, and other providers.
+/// </summary>
+public class ScheduledJobTestsRunner
 {
-    public ScheduledJobTests(DefaultClusterFixture fixture) : base(fixture)
+    private readonly IGrainFactory _grainFactory;
+
+    public ScheduledJobTestsRunner(IGrainFactory grainFactory)
     {
+        _grainFactory = grainFactory;
     }
 
-    [Fact, TestCategory("BVT"), TestCategory("ScheduledJobs")]
-    public async Task Test_ScheduledJobGrain()
+    public async Task ScheduledJobGrain()
     {
-        var grain = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-job-grain");
+        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-job-grain");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(5);
         var job1 = await grain.ScheduleJobAsync("TestJob", dueTime);
         Assert.NotNull(job1);
@@ -47,10 +52,9 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
         Assert.False(await grain.HasJobRan(canceledJob.Id));
     }
 
-    [Fact, TestCategory("BVT"), TestCategory("ScheduledJobs")]
-    public async Task Test_JobExecutionOrder()
+    public async Task JobExecutionOrder()
     {
-        var grain = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-execution-order");
+        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-execution-order");
         var baseTime = DateTimeOffset.UtcNow.AddSeconds(2);
 
         var job1 = await grain.ScheduleJobAsync("FirstJob", baseTime);
@@ -69,10 +73,9 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
         Assert.True(time2 < time3, $"Job2 executed at {time2}, Job3 at {time3}");
     }
 
-    [Fact, TestCategory("BVT"), TestCategory("ScheduledJobs")]
-    public async Task Test_PastDueTime()
+    public async Task PastDueTime()
     {
-        var grain = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-past-due");
+        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-past-due");
         var pastTime = DateTimeOffset.UtcNow.AddSeconds(-5);
 
         var job = await grain.ScheduleJobAsync("PastDueJob", pastTime);
@@ -82,10 +85,9 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
         Assert.True(await grain.HasJobRan(job.Id));
     }
 
-    [Fact, TestCategory("BVT"), TestCategory("ScheduledJobs")]
-    public async Task Test_JobWithMetadata()
+    public async Task JobWithMetadata()
     {
-        var grain = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-metadata");
+        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-metadata");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
         var metadata = new Dictionary<string, string>
         {
@@ -110,12 +112,11 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
         Assert.Equal("user123", context.Job.Metadata["UserId"]);
     }
 
-    [Fact, TestCategory("BVT"), TestCategory("ScheduledJobs")]
-    public async Task Test_MultipleGrains()
+    public async Task MultipleGrains()
     {
-        var grain1 = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-grain-1");
-        var grain2 = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-grain-2");
-        var grain3 = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-grain-3");
+        var grain1 = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-grain-1");
+        var grain2 = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-grain-2");
+        var grain3 = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-grain-3");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
 
         var job1 = await grain1.ScheduleJobAsync("Job1", dueTime);
@@ -135,10 +136,9 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
         Assert.False(await grain3.HasJobRan(job1.Id));
     }
 
-    [Fact, TestCategory("BVT"), TestCategory("ScheduledJobs")]
-    public async Task Test_DuplicateJobNames()
+    public async Task DuplicateJobNames()
     {
-        var grain = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-duplicate-names");
+        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-duplicate-names");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
 
         var job1 = await grain.ScheduleJobAsync("SameName", dueTime);
@@ -162,10 +162,9 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
         Assert.True(await grain.HasJobRan(job3.Id));
     }
 
-    [Fact, TestCategory("BVT"), TestCategory("ScheduledJobs")]
-    public async Task Test_CancelNonExistentJob()
+    public async Task CancelNonExistentJob()
     {
-        var grain = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-cancel-nonexistent");
+        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-cancel-nonexistent");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(10);
 
         var job = await grain.ScheduleJobAsync("RealJob", dueTime);
@@ -186,10 +185,9 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
         Assert.False(await grain.HasJobRan(fakeJob.Id));
     }
 
-    [Fact, TestCategory("BVT"), TestCategory("ScheduledJobs")]
-    public async Task Test_CancelAlreadyExecutedJob()
+    public async Task CancelAlreadyExecutedJob()
     {
-        var grain = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-cancel-executed");
+        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-cancel-executed");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(2);
 
         var job = await grain.ScheduleJobAsync("QuickJob", dueTime);
@@ -201,10 +199,9 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
         Assert.False(cancelResult);
     }
 
-    [Fact, TestCategory("BVT"), TestCategory("ScheduledJobs")]
-    public async Task Test_ConcurrentScheduling()
+    public async Task ConcurrentScheduling()
     {
-        var grain = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-concurrent");
+        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-concurrent");
         var baseTime = DateTimeOffset.UtcNow.AddSeconds(5);
         var jobCount = 20;
 
@@ -228,10 +225,9 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
         }
     }
 
-    [Fact, TestCategory("BVT"), TestCategory("ScheduledJobs")]
-    public async Task Test_JobPropertiesVerification()
+    public async Task JobPropertiesVerification()
     {
-        var grain = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-properties");
+        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-properties");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
         var metadata = new Dictionary<string, string> { ["Key"] = "Value" };
 
@@ -256,10 +252,9 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
         Assert.NotEmpty(context.RunId);
     }
 
-    [Fact, TestCategory("BVT"), TestCategory("ScheduledJobs")]
-    public async Task Test_DequeueCount()
+    public async Task DequeueCount()
     {
-        var grain = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-dequeue-count");
+        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-dequeue-count");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
 
         var job = await grain.ScheduleJobAsync("DequeueTestJob", dueTime);
@@ -271,11 +266,10 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
         Assert.Equal(1, context.DequeueCount);
     }
 
-    [Fact, TestCategory("BVT"), TestCategory("ScheduledJobs")]
-    public async Task Test_ScheduleJobOnAnotherGrain()
+    public async Task ScheduleJobOnAnotherGrain()
     {
-        var schedulerGrain = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.ISchedulerGrain>("scheduler-grain");
-        var targetGrain = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("target-grain");
+        var schedulerGrain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.ISchedulerGrain>("scheduler-grain");
+        var targetGrain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("target-grain");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
 
         var job = await schedulerGrain.ScheduleJobOnAnotherGrainAsync("target-grain", "CrossGrainJob", dueTime);
@@ -294,10 +288,9 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
         Assert.Equal("CrossGrainJob", context.Job.Name);
     }
 
-    [Fact, TestCategory("BVT"), TestCategory("ScheduledJobs")]
-    public async Task Test_JobRetry()
+    public async Task JobRetry()
     {
-        var grain = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IRetryTestGrain>("retry-test-grain");
+        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IRetryTestGrain>("retry-test-grain");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(2);
         var metadata = new Dictionary<string, string>
         {
