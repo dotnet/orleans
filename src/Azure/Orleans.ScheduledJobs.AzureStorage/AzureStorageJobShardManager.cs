@@ -43,13 +43,13 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
     {
     }
 
-    public override async Task<List<JobShard>> AssignJobShardsAsync(SiloAddress siloAddress, DateTimeOffset maxDateTime, CancellationToken cancellationToken = default)
+    public override async Task<List<IJobShard>> AssignJobShardsAsync(SiloAddress siloAddress, DateTimeOffset maxDateTime, CancellationToken cancellationToken = default)
     {
         await InitializeIfNeeded(cancellationToken);
         LogAssigningShards(_logger, siloAddress, maxDateTime, _containerName);
 
         var blobs = _client.GetBlobsAsync(traits: BlobTraits.Metadata, cancellationToken: cancellationToken);
-        var result = new List<JobShard>();
+        var result = new List<IJobShard>();
         await foreach (var blob in blobs.WithCancellation(cancellationToken))
         {
             // Get the owner and creator of the shard
@@ -107,8 +107,8 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                     LogShardOwnershipConflict(_logger, blob.Name, siloAddress);
                     continue;
                 }
-                await shard.InitializeAsync();
-                await shard.MarkAsComplete();
+                await shard.InitializeAsync(cancellationToken);
+                await shard.MarkAsCompleteAsync(cancellationToken);
             }
 
             if (shard != null)
@@ -139,7 +139,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         }
     }
 
-    public override async Task<JobShard> RegisterShard(SiloAddress siloAddress, DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, bool assignToCreator = true, CancellationToken cancellationToken = default)
+    public override async Task<IJobShard> RegisterShard(SiloAddress siloAddress, DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, bool assignToCreator = true, CancellationToken cancellationToken = default)
     {
         await InitializeIfNeeded(cancellationToken);
         LogRegisteringShard(_logger, siloAddress, minDueTime, maxDueTime, assignToCreator, _containerName);
@@ -172,14 +172,14 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
             }
             
             var shard = new AzureStorageJobShard(shardId, minDueTime, maxDueTime, blobClient, metadata, null);
-            await shard.InitializeAsync();
+            await shard.InitializeAsync(cancellationToken);
             _jobShardCache[shardId] = shard;
             LogShardRegistered(_logger, shardId, siloAddress, assignToCreator);
             return shard;
         }
     }
 
-    public override async Task UnregisterShard(SiloAddress siloAddress, JobShard shard, CancellationToken cancellationToken = default)
+    public override async Task UnregisterShard(SiloAddress siloAddress, IJobShard shard, CancellationToken cancellationToken = default)
     {
         var azureShard = shard as AzureStorageJobShard ?? throw new ArgumentException("Shard is not an AzureStorageJobShard", nameof(shard));
         LogUnregisteringShard(_logger, shard.Id, siloAddress);

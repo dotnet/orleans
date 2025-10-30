@@ -1,104 +1,234 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
-using Orleans.Runtime.Utilities;
 
 namespace Orleans.ScheduledJobs;
 
-public abstract class JobShard
+/// <summary>
+/// Represents a shard of scheduled jobs that manages a collection of jobs within a specific time range.
+/// A job shard is responsible for storing, retrieving, and managing the lifecycle of scheduled jobs
+/// that fall within its designated time window.
+/// </summary>
+/// <remarks>
+/// Job shards are used to partition scheduled jobs across time ranges to improve scalability
+/// and performance. Each shard has a defined start and end time that determines which jobs
+/// it manages. Shards can be marked as complete when all jobs within their time range
+/// have been processed.
+/// </remarks>
+public interface IJobShard
 {
-    // split?
+    /// <summary>
+    /// Gets the unique identifier for this job shard.
+    /// </summary>
+    string Id { get; }
 
+    /// <summary>
+    /// Gets the start time of the time range managed by this shard.
+    /// </summary>
+    DateTimeOffset StartTime { get; }
+
+    /// <summary>
+    /// Gets the end time of the time range managed by this shard.
+    /// </summary>
+    DateTimeOffset EndTime { get; }
+
+    /// <summary>
+    /// Gets optional metadata associated with this job shard.
+    /// </summary>
+    IDictionary<string, string>? Metadata { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether this shard has been marked as complete.
+    /// </summary>
+    /// <remarks>
+    /// When a shard is marked as complete, no new jobs can be scheduled on it.
+    /// </remarks>
+    bool IsComplete { get; }
+
+    /// <summary>
+    /// Consumes scheduled jobs from this shard in order of their due time.
+    /// </summary>
+    /// <returns>An asynchronous enumerable of scheduled job contexts.</returns>
+    IAsyncEnumerable<IScheduledJobContext> ConsumeScheduledJobsAsync();
+
+    /// <summary>
+    /// Gets the number of jobs currently scheduled in this shard.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation. The task result contains the job count.</returns>
+    ValueTask<int> GetJobCount();
+
+    /// <summary>
+    /// Marks this shard as complete, preventing new jobs from being scheduled.
+    /// </summary>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    Task MarkAsCompleteAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Removes a scheduled job from this shard.
+    /// </summary>
+    /// <param name="jobId">The unique identifier of the job to remove.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    Task RemoveJobAsync(string jobId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reschedules a job to be retried at a later time.
+    /// </summary>
+    /// <param name="jobContext">The context of the job to retry.</param>
+    /// <param name="newDueTime">The new due time for the job.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    Task RetryJobLaterAsync(IScheduledJobContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Schedules a new job on this shard.
+    /// </summary>
+    /// <param name="target">The grain identifier of the target grain that will execute the job.</param>
+    /// <param name="jobName">The name of the job to schedule.</param>
+    /// <param name="dueTime">The time when the job should be executed.</param>
+    /// <param name="metadata">Optional metadata to associate with the job.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains the scheduled job.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when attempting to schedule a job on a complete shard.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the due time is outside the shard's time range.</exception>
+    Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// Base implementation of <see cref="IJobShard"/> that provides common functionality for job shard implementations.
+/// </summary>
+public abstract class JobShard : IJobShard
+{
+    private readonly InMemoryJobQueue _jobQueue;
+
+    /// <inheritdoc/>
     public string Id { get; protected set; }
 
+    /// <inheritdoc/>
     public DateTimeOffset StartTime { get; protected set; }
 
+    /// <inheritdoc/>
     public DateTimeOffset EndTime { get; protected set; }
 
+    /// <inheritdoc/>
     public IDictionary<string, string>? Metadata { get; protected set; }
 
+    /// <inheritdoc/>
     public bool IsComplete { get; protected set; } = false;
 
-    public abstract ValueTask<int> GetJobCount();
-
+    /// <summary>
+    /// Initializes a new instance of the <see cref="JobShard"/> class.
+    /// </summary>
+    /// <param name="id">The unique identifier for this job shard.</param>
+    /// <param name="startTime">The start time of the time range managed by this shard.</param>
+    /// <param name="endTime">The end time of the time range managed by this shard.</param>
     protected JobShard(string id, DateTimeOffset startTime, DateTimeOffset endTime)
     {
         Id = id;
         StartTime = startTime;
         EndTime = endTime;
-    }
-
-    // Move to the ShardManager?
-    public abstract Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata);
-
-    public abstract IAsyncEnumerable<IScheduledJobContext> ConsumeScheduledJobsAsync();
-
-    public abstract Task RemoveJobAsync(string jobId);
-
-    public abstract Task MarkAsComplete();
-
-    public abstract Task RetryJobLaterAsync(IScheduledJobContext jobContext, DateTimeOffset newDueTime);
-}
-
-[DebuggerDisplay("ShardId={Id}, StartTime={StartTime}, EndTime={EndTime}, JobCount={JobCount}")]
-internal class InMemoryJobShard : JobShard
-{
-    private readonly InMemoryJobQueue _jobQueue;
-
-    public InMemoryJobShard(string shardId, DateTimeOffset minDueTime, DateTimeOffset maxDueTime)
-        : base(shardId, minDueTime, maxDueTime)
-    {
         _jobQueue = new InMemoryJobQueue();
     }
 
-    public override Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata)
+    /// <inheritdoc/>
+    public ValueTask<int> GetJobCount() => ValueTask.FromResult(_jobQueue.Count);
+
+    /// <inheritdoc/>
+    public IAsyncEnumerable<IScheduledJobContext> ConsumeScheduledJobsAsync()
+    {
+        return _jobQueue;
+    }
+
+    /// <inheritdoc/>
+    public async Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)
     {
         if (IsComplete)
+        {
             throw new InvalidOperationException("Cannot schedule job on a complete shard.");
+        }
 
         if (dueTime < StartTime || dueTime > EndTime)
-            throw new ArgumentOutOfRangeException(nameof(dueTime), "Scheduled time is out of shard bounds.");
-
-        IScheduledJob job = new ScheduledJob
         {
-            Id = Guid.NewGuid().ToString(),
+            throw new ArgumentOutOfRangeException(nameof(dueTime), "Scheduled time is out of shard bounds.");
+        }
+
+        var jobId = Guid.NewGuid().ToString();
+        var job = new ScheduledJob
+        {
+            Id = jobId,
             TargetGrainId = target,
             Name = jobName,
             DueTime = dueTime,
             ShardId = Id,
             Metadata = metadata
         };
+
+        await PersistAddJobAsync(jobId, jobName, dueTime, target, metadata, cancellationToken);
         _jobQueue.Enqueue(job, 0);
-        return Task.FromResult(job);
+        return job;
     }
 
-    public override IAsyncEnumerable<IScheduledJobContext> ConsumeScheduledJobsAsync() 
+    /// <inheritdoc/>
+    public async Task RemoveJobAsync(string jobId, CancellationToken cancellationToken)
     {
-        return _jobQueue; 
-    }
-
-    public override Task RemoveJobAsync(string jobId)
-    {
+        await PersistRemoveJobAsync(jobId, cancellationToken);
         _jobQueue.CancelJob(jobId);
-        return Task.CompletedTask;
     }
 
-    public override ValueTask<int> GetJobCount() => ValueTask.FromResult(_jobQueue.Count);
-
-    public override Task MarkAsComplete()
+    /// <inheritdoc/>
+    public Task MarkAsCompleteAsync(CancellationToken cancellationToken)
     {
         IsComplete = true;
         _jobQueue.MarkAsComplete();
         return Task.CompletedTask;
     }
 
-    public override Task RetryJobLaterAsync(IScheduledJobContext jobContext, DateTimeOffset newDueTime)
+    /// <inheritdoc/>
+    public async Task RetryJobLaterAsync(IScheduledJobContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken)
     {
+        await PersistRetryJobAsync(jobContext.Job.Id, newDueTime, cancellationToken);
         _jobQueue.RetryJobLater(jobContext, newDueTime);
-        return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// Enqueues a job into the in-memory queue with the specified dequeue count.
+    /// </summary>
+    /// <param name="job">The job to enqueue.</param>
+    /// <param name="dequeueCount">The number of times this job has been dequeued.</param>
+    protected void EnqueueJob(IScheduledJob job, int dequeueCount)
+    {
+        _jobQueue.Enqueue(job, dequeueCount);
+    }
+
+    /// <summary>
+    /// Persists the addition of a new job to the underlying storage.
+    /// </summary>
+    /// <param name="jobId">The unique identifier of the job.</param>
+    /// <param name="jobName">The name of the job.</param>
+    /// <param name="dueTime">The time when the job should be executed.</param>
+    /// <param name="target">The grain identifier of the target grain.</param>
+    /// <param name="metadata">Optional metadata to associate with the job.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    protected abstract Task PersistAddJobAsync(string jobId, string jobName, DateTimeOffset dueTime, GrainId target, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Persists the removal of a job from the underlying storage.
+    /// </summary>
+    /// <param name="jobId">The unique identifier of the job to remove.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    protected abstract Task PersistRemoveJobAsync(string jobId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Persists the rescheduling of a job to the underlying storage.
+    /// </summary>
+    /// <param name="jobId">The unique identifier of the job to retry.</param>
+    /// <param name="newDueTime">The new due time for the job.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    protected abstract Task PersistRetryJobAsync(string jobId, DateTimeOffset newDueTime, CancellationToken cancellationToken);
 }

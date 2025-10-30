@@ -50,7 +50,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
     private CancellationTokenSource _cts = new();
     private Task? _listenForClusterChangesTask = null;
     private Task? _watchForShardtoStartTask = null;
-    private readonly ConcurrentDictionary<DateTimeOffset, ConcurrentDictionary<string, JobShard>> _shardCache = new();
+    private readonly ConcurrentDictionary<DateTimeOffset, ConcurrentDictionary<string, IJobShard>> _shardCache = new();
     private readonly ConcurrentDictionary<string, Task> _runningShards = new();
     private readonly int MaxJobCountPerShard = 1000;
     private readonly SemaphoreSlim _jobConcurrencyLimiter;
@@ -79,14 +79,14 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         
         var key = GetShardKey(dueTime);
         // Try to get all the available shards for this key
-        var shards = _shardCache.GetOrAdd(key, _ => new ConcurrentDictionary<string, JobShard>());
+        var shards = _shardCache.GetOrAdd(key, _ => new ConcurrentDictionary<string, IJobShard>());
         // Find a shard that can accept this job
         // TODO more efficient lookup
         foreach (var shard in shards.Select(s => s.Value))
         {
             if (!shard.IsComplete && shard.StartTime <= dueTime && shard.EndTime >= dueTime && await shard.GetJobCount() <= MaxJobCountPerShard)
             {
-                var job = await shard.ScheduleJobAsync(target, jobName, dueTime, metadata);
+                var job = await shard.ScheduleJobAsync(target, jobName, dueTime, metadata, cancellationToken);
                 LogJobScheduled(_logger, jobName, job.Id, shard.Id, target);
                 return job;
             }
@@ -100,7 +100,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
         var newShard = await _shardManager.RegisterShard(this.Silo, key, key.Add(_options.ShardDuration), EmptyMetadata, assignToMe, linkedCts.Token);
         shards.TryAdd(newShard.Id, newShard);
-        var scheduledJob = await newShard.ScheduleJobAsync(target, jobName, dueTime, metadata);
+        var scheduledJob = await newShard.ScheduleJobAsync(target, jobName, dueTime, metadata, linkedCts.Token);
         
         LogJobScheduled(_logger, jobName, scheduledJob.Id, newShard.Id, target);
         
@@ -208,7 +208,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         }
     }
 
-    private void StartRunningShardTracked(JobShard shard)
+    private void StartRunningShardTracked(IJobShard shard)
     {
         LogStartingShard(_logger, shard.Id, shard.StartTime, shard.EndTime);
         
@@ -227,7 +227,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         _runningShards.TryAdd(shard.Id, shardTask);
     }
 
-    private async Task RunShard(JobShard shard)
+    private async Task RunShard(IJobShard shard)
     {
         try
         {
@@ -253,7 +253,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
                         .GetGrain(jobContext.Job.TargetGrainId)
                         .AsReference<IScheduledJobReceiverExtension>();
                     await target.DeliverScheduledJobAsync(jobContext, _cts.Token);
-                    await shard.RemoveJobAsync(jobContext.Job.Id);
+                    await shard.RemoveJobAsync(jobContext.Job.Id, _cts.Token);
                     
                     LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
                 }
@@ -264,7 +264,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
                     if (retryTime is not null)
                     {
                         LogRetryingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, retryTime.Value, jobContext.DequeueCount);
-                        await shard.RetryJobLaterAsync(jobContext, retryTime.Value);
+                        await shard.RetryJobLaterAsync(jobContext, retryTime.Value, _cts.Token);
                     }
                     else
                     {
@@ -307,8 +307,10 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
             LogJobCancellationFailed(_logger, job.Id, job.Name, job.ShardId);
             return false;
         }
-        
-        await shard.RemoveJobAsync(job.Id);
+
+        // Use a linked cancellation token that combines the provided token with the internal one
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
+        await shard.RemoveJobAsync(job.Id, linkedCts.Token);
         LogJobCancelled(_logger, job.Id, job.Name, job.ShardId);
         return true;
     }

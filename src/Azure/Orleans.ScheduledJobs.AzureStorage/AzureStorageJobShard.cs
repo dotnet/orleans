@@ -17,58 +17,30 @@ internal sealed class AzureStorageJobShard : JobShard
     internal AppendBlobClient BlobClient { get; init; }
     internal ETag? ETag { get; private set; }
 
-    private InMemoryJobQueue _jobQueue;
-    private int _jobCount = 0;
-
     public AzureStorageJobShard(string id, DateTimeOffset startTime, DateTimeOffset endTime, AppendBlobClient blobClient, IDictionary<string, string>? metadata, ETag? eTag)
         : base(id, startTime, endTime)
     {
         BlobClient = blobClient;
-        _jobQueue = new InMemoryJobQueue();
         ETag = eTag;
         Metadata = metadata;
     }
 
-    public override ValueTask<int> GetJobCount()
+    protected override async Task PersistAddJobAsync(string jobId, string jobName, DateTimeOffset dueTime, GrainId target, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)
     {
-        return ValueTask.FromResult(_jobCount);
+        var operation = JobOperation.CreateAddOperation(jobId, jobName, dueTime, target, metadata);
+        await AppendOperation(operation, cancellationToken);
     }
 
-    public override IAsyncEnumerable<IScheduledJobContext> ConsumeScheduledJobsAsync()
-    {
-        return _jobQueue;
-    }
-
-    public override async Task RemoveJobAsync(string jobId)
+    protected override async Task PersistRemoveJobAsync(string jobId, CancellationToken cancellationToken)
     {
         var operation = JobOperation.CreateRemoveOperation(jobId);
-        await AppendOperation(operation);
-        _jobQueue.CancelJob(jobId);
-        _jobCount--;
+        await AppendOperation(operation, cancellationToken);
     }
 
-    public override async Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata)
+    protected override async Task PersistRetryJobAsync(string jobId, DateTimeOffset newDueTime, CancellationToken cancellationToken)
     {
-        if (IsComplete)
-        {
-            throw new InvalidOperationException("Cannot schedule job on a complete shard.");
-        }
-
-        var jobId = Guid.NewGuid().ToString();
-        var operation = JobOperation.CreateAddOperation(jobId, jobName, dueTime, target, metadata);
-        await AppendOperation(operation);
-        _jobCount++;
-        var job = new ScheduledJob
-        {
-            Id = jobId,
-            Name = jobName,
-            DueTime = dueTime,
-            TargetGrainId = target,
-            ShardId = Id,
-            Metadata = metadata,
-        };
-        _jobQueue.Enqueue(job, 0);
-        return job;
+        var operation = JobOperation.CreateRetryOperation(jobId, newDueTime);
+        await AppendOperation(operation, cancellationToken);
     }
 
     public async Task UpdateBlobMetadata(IDictionary<string, string> metadata, CancellationToken cancellationToken)
@@ -81,14 +53,86 @@ internal sealed class AzureStorageJobShard : JobShard
         Metadata = metadata;
     }
 
-    private async Task AppendOperation(JobOperation operation)
+    public async ValueTask InitializeAsync(CancellationToken cancellationToken)
+    {
+        // Load existing blob
+        var response = await BlobClient.DownloadAsync(cancellationToken: cancellationToken);
+        using var stream = response.Value.Content;
+
+        // Rebuild state by replaying operations
+        var addedJobs = new Dictionary<string, JobOperation>();
+        var deletedJobs = new HashSet<string>();
+        var jobRetryCounters = new Dictionary<string, (int dequeueCount, DateTimeOffset? newDueTime)>();
+        
+        await foreach (var netstringData in ReadNetstringsAsync(stream))
+        {
+            var operation = JsonSerializer.Deserialize(netstringData, JobOperationJsonContext.Default.JobOperation);
+            switch (operation.Type)
+            {
+                case JobOperation.OperationType.Add:
+                    if (!deletedJobs.Contains(operation.Id))
+                    {
+                        addedJobs[operation.Id] = operation;
+                    }
+                    break;
+                case JobOperation.OperationType.Remove:
+                    deletedJobs.Add(operation.Id);
+                    addedJobs.Remove(operation.Id);
+                    jobRetryCounters.Remove(operation.Id);
+                    break;
+                case JobOperation.OperationType.Retry:
+                    if (!deletedJobs.Contains(operation.Id))
+                    {
+                        if (!jobRetryCounters.ContainsKey(operation.Id))
+                        {
+                            jobRetryCounters[operation.Id] = (1, operation.DueTime);
+                        }
+                        else
+                        {
+                            var entry = jobRetryCounters[operation.Id];
+                            entry.dequeueCount++;
+                            entry.newDueTime = operation.DueTime; 
+                        }
+                    }
+                    break;
+            }
+        }
+
+        // Rebuild the priority queue
+        foreach (var op in addedJobs.Values)
+        {
+            var retryCounter = 0;
+            var dueTime = op.DueTime!.Value;
+            if (jobRetryCounters.TryGetValue(op.Id, out var retryEntries))
+            {
+                retryCounter = retryEntries.dequeueCount;
+                dueTime = retryEntries.newDueTime ?? dueTime;
+            }
+
+            EnqueueJob(new ScheduledJob
+            {
+                Id = op.Id,
+                Name = op.Name!,
+                DueTime = dueTime,
+                TargetGrainId = op.TargetGrainId!.Value,
+                ShardId = Id,
+                Metadata = op.Metadata,
+            },
+            retryCounter);
+        }
+
+        ETag = response.Value.Details.ETag;
+    }
+
+    private async Task AppendOperation(JobOperation operation, CancellationToken cancellationToken)
     {
         var json = JsonSerializer.Serialize(operation, JobOperationJsonContext.Default.JobOperation);
         var content = EncodeNetstring(json);
         using var stream = new MemoryStream(content);
         var result = await BlobClient.AppendBlockAsync(
                     stream,
-                    new AppendBlobAppendBlockOptions { Conditions = new AppendBlobRequestConditions { IfMatch = ETag } });
+                    new AppendBlobAppendBlockOptions { Conditions = new AppendBlobRequestConditions { IfMatch = ETag } },
+                    cancellationToken);
         ETag = result.Value.ETag;
     }
 
@@ -162,88 +206,5 @@ internal sealed class AzureStorageJobShard : JobShard
 
             yield return new string(buffer);
         }
-    }
-
-    public async ValueTask InitializeAsync()
-    {
-        // Load existing blob
-        var response = await BlobClient.DownloadAsync();
-        using var stream = response.Value.Content;
-
-        // Rebuild state by replaying operations
-        var addedJobs = new Dictionary<string, JobOperation>();
-        var deletedJobs = new HashSet<string>();
-        var jobRetryCounters = new Dictionary<string, (int dequeueCount, DateTimeOffset? newDueTime)>();
-        
-        await foreach (var netstringData in ReadNetstringsAsync(stream))
-        {
-            var operation = JsonSerializer.Deserialize(netstringData, JobOperationJsonContext.Default.JobOperation);
-            switch (operation.Type)
-            {
-                case JobOperation.OperationType.Add:
-                    if (!deletedJobs.Contains(operation.Id))
-                    {
-                        addedJobs[operation.Id] = operation;
-                    }
-                    break;
-                case JobOperation.OperationType.Remove:
-                    deletedJobs.Add(operation.Id);
-                    addedJobs.Remove(operation.Id);
-                    jobRetryCounters.Remove(operation.Id);
-                    break;
-                case JobOperation.OperationType.Retry:
-                    if (!deletedJobs.Contains(operation.Id))
-                    {
-                        if (!jobRetryCounters.ContainsKey(operation.Id))
-                        {
-                            jobRetryCounters[operation.Id] = (1, operation.DueTime);
-                        }
-                        else
-                        {
-                            var entry = jobRetryCounters[operation.Id];
-                            entry.dequeueCount++;
-                            entry.newDueTime = operation.DueTime; 
-                        }
-                    }
-                    break;
-            }
-        }
-        // Rebuild the priority queue
-        foreach (var op in addedJobs.Values)
-        {
-            var retryCounter = 0;
-            var dueTime = op.DueTime!.Value;
-            if (jobRetryCounters.TryGetValue(op.Id, out var retryEntries))
-            {
-                retryCounter = retryEntries.dequeueCount;
-                dueTime = retryEntries.newDueTime ?? dueTime;
-            }
-            _jobQueue.Enqueue(new ScheduledJob
-            {
-                Id = op.Id,
-                Name = op.Name!,
-                DueTime = op.DueTime!.Value,
-                TargetGrainId = op.TargetGrainId!.Value,
-                ShardId = Id,
-                Metadata = op.Metadata,
-            },
-            retryCounter);
-        }
-        _jobCount = addedJobs.Count;
-
-        ETag = response.Value.Details.ETag;
-    }
-
-    public override Task MarkAsComplete()
-    {
-        IsComplete = true;
-        _jobQueue.MarkAsComplete();
-        return Task.CompletedTask;
-    }
-
-    public override async Task RetryJobLaterAsync(IScheduledJobContext jobContext, DateTimeOffset newDueTime)
-    {
-        await AppendOperation(JobOperation.CreateRetryOperation(jobContext.Job.Id, newDueTime));
-        _jobQueue.RetryJobLater(jobContext, newDueTime);
     }
 }
