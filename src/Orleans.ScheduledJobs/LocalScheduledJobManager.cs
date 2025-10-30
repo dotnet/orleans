@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
@@ -22,9 +23,8 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
     private readonly IAsyncEnumerable<ClusterMembershipSnapshot> _clusterMembershipUpdates;
     private readonly ILogger<LocalScheduledJobManager> _logger;
     private readonly ScheduledJobsOptions _options;
-    private CancellationTokenSource _cts = new();
+    private readonly CancellationTokenSource _cts = new();
     private Task? _listenForClusterChangesTask = null;
-    private Task? _watchForShardtoStartTask = null;
     private readonly ConcurrentDictionary<string, IJobShard> _shardCache = new();
     private readonly ConcurrentDictionary<DateTimeOffset, IJobShard> _writeableShards = new();
     private readonly ConcurrentDictionary<string, Task> _runningShards = new();
@@ -126,7 +126,6 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
                 CancellationToken.None,
                 TaskCreationOptions.None,
                 WorkItemGroup.TaskScheduler).Unwrap();
-            _listenForClusterChangesTask.Ignore();
         }
         
         LogStarted(_logger);
@@ -138,15 +137,10 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         LogStopping(_logger, _runningShards.Count);
         
         _cts.Cancel();
-        if (_watchForShardtoStartTask is not null)
-        {
-            await _watchForShardtoStartTask;
-            _watchForShardtoStartTask = null;
-        }
         
         if (_listenForClusterChangesTask is not null)
         {
-            await _listenForClusterChangesTask;
+            await _listenForClusterChangesTask.SuppressThrowing(); // never return?
             _listenForClusterChangesTask = null;
         }
         
@@ -170,7 +164,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
 
     private async Task ProcessMembershipUpdates()
     {
-        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
         var current = new HashSet<SiloAddress>();
         await foreach (var membershipSnapshot in _clusterMembershipUpdates.WithCancellation(_cts.Token))
         {
