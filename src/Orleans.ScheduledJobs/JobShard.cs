@@ -84,17 +84,16 @@ public interface IJobShard : IAsyncDisposable
     Task RetryJobLaterAsync(IScheduledJobContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Schedules a new job on this shard.
+    /// Attempts to schedule a new job on this shard.
     /// </summary>
     /// <param name="target">The grain identifier of the target grain that will execute the job.</param>
     /// <param name="jobName">The name of the job to schedule.</param>
     /// <param name="dueTime">The time when the job should be executed.</param>
     /// <param name="metadata">Optional metadata to associate with the job.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <returns>A task that represents the asynchronous operation. The task result contains the scheduled job.</returns>
-    /// <exception cref="InvalidOperationException">Thrown when attempting to schedule a job on a complete shard.</exception>
+    /// <returns>A task that represents the asynchronous operation. The task result contains the scheduled job if successful, or null if the job could not be scheduled (e.g., the shard was marked as complete).</returns>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the due time is outside the shard's time range.</exception>
-    Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken);
+    Task<IScheduledJob?> TryScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -143,11 +142,11 @@ public abstract class JobShard : IJobShard
     }
 
     /// <inheritdoc/>
-    public async Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)
+    public async Task<IScheduledJob?> TryScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)
     {
         if (IsComplete)
         {
-            throw new InvalidOperationException("Cannot schedule job on a complete shard.");
+            return null;
         }
 
         if (dueTime < StartTime || dueTime > EndTime)

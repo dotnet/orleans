@@ -89,10 +89,10 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         var shard1 = await manager.RegisterShard(localAddress, date, date.AddHours(1), _metadata, assignToCreator: false);
 
         // Schedule some jobs
-        await shard1.ScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
-        await shard1.ScheduleJobAsync(GrainId.Create("type", "target1"), "job3", DateTime.UtcNow.AddSeconds(10), null, CancellationToken.None);
-        await shard1.ScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(6), null, CancellationToken.None);
-        await shard1.ScheduleJobAsync(GrainId.Create("type", "target1"), "job4", DateTime.UtcNow.AddSeconds(15), null, CancellationToken.None);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job3", DateTime.UtcNow.AddSeconds(10), null, CancellationToken.None);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(6), null, CancellationToken.None);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job4", DateTime.UtcNow.AddSeconds(15), null, CancellationToken.None);
 
         // Mark the local silo as dead, and create a new incarnation
         membershipService.SetSiloStatus(localAddress, SiloStatus.Dead);
@@ -139,11 +139,11 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         var shard1 = await manager.RegisterShard(localAddress, date, date.AddYears(1), _metadata);
 
         // Schedule some jobs
-        await shard1.ScheduleJobAsync(GrainId.Create("type", "target1"), "job0", startTime.AddSeconds(5), null, CancellationToken.None);
-        await shard1.ScheduleJobAsync(GrainId.Create("type", "target1"), "job2", startTime.AddSeconds(10), null, CancellationToken.None);
-        await shard1.ScheduleJobAsync(GrainId.Create("type", "target2"), "job1", startTime.AddSeconds(6), null, CancellationToken.None);
-        var lastJob = await shard1.ScheduleJobAsync(GrainId.Create("type", "target1"), "job3", startTime.AddSeconds(15), null, CancellationToken.None);
-        var jobToCancel = await shard1.ScheduleJobAsync(GrainId.Create("type", "target1"), "job4", startTime.AddSeconds(25), null, CancellationToken.None);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job0", startTime.AddSeconds(5), null, CancellationToken.None);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job2", startTime.AddSeconds(10), null, CancellationToken.None);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job1", startTime.AddSeconds(6), null, CancellationToken.None);
+        var lastJob = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job3", startTime.AddSeconds(15), null, CancellationToken.None);
+        var jobToCancel = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job4", startTime.AddSeconds(25), null, CancellationToken.None);
 
         var counter = 0;
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(40));
@@ -181,10 +181,10 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         var shard1 = await manager.RegisterShard(localAddress, date, date.AddYears(1), _metadata, assignToCreator: true);
 
         // Schedule some jobs
-        await shard1.ScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
-        await shard1.ScheduleJobAsync(GrainId.Create("type", "target1"), "job3", DateTime.UtcNow.AddSeconds(10), null, CancellationToken.None);
-        await shard1.ScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(6), null, CancellationToken.None);
-        await shard1.ScheduleJobAsync(GrainId.Create("type", "target1"), "job4", DateTime.UtcNow.AddSeconds(15), null, CancellationToken.None);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job3", DateTime.UtcNow.AddSeconds(10), null, CancellationToken.None);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(6), null, CancellationToken.None);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job4", DateTime.UtcNow.AddSeconds(15), null, CancellationToken.None);
 
         var counter = 1;
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(40));
@@ -217,7 +217,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         var date = DateTime.UtcNow;
         var shard1 = await manager.RegisterShard(localAddress, date, date.AddYears(1), _metadata);
         // Schedule a job
-        var job =  await shard1.ScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
+        var job =  await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(40));
         await foreach (var jobCtx in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
         {
@@ -266,9 +266,9 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
             { "Category", "Notification" }
         };
 
-        var job1 = await shard1.ScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), jobMetadata1, CancellationToken.None);
-        var job2 = await shard1.ScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(10), jobMetadata2, CancellationToken.None);
-        var job3 = await shard1.ScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddSeconds(15), null, CancellationToken.None);
+        var job1 = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), jobMetadata1, CancellationToken.None);
+        var job2 = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(10), jobMetadata2, CancellationToken.None);
+        var job3 = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddSeconds(15), null, CancellationToken.None);
 
         // Verify metadata is set on the scheduled jobs
         Assert.NotNull(job1.Metadata);
@@ -349,10 +349,10 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         var shard1 = await manager.RegisterShard(localAddress, date, date.AddYears(1), _metadata, assignToCreator: true);
 
         // Schedule multiple jobs
-        var job1 = await shard1.ScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
-        var job2 = await shard1.ScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(10), null, CancellationToken.None);
-        var job3 = await shard1.ScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddSeconds(15), null, CancellationToken.None);
-        var job4 = await shard1.ScheduleJobAsync(GrainId.Create("type", "target4"), "job4", DateTime.UtcNow.AddSeconds(20), null, CancellationToken.None);
+        var job1 = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
+        var job2 = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(10), null, CancellationToken.None);
+        var job3 = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddSeconds(15), null, CancellationToken.None);
+        var job4 = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target4"), "job4", DateTime.UtcNow.AddSeconds(20), null, CancellationToken.None);
 
         // Cancel job2 before processing starts
         await shard1.RemoveJobAsync(job2.Id, CancellationToken.None);
@@ -545,7 +545,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         var date = DateTime.UtcNow;
         var shard = await manager.RegisterShard(silo1Address, date, date.AddHours(1), _metadata, assignToCreator: true);
 
-        await shard.ScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
+        await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await manager.UnregisterShard(silo2Address, shard));
@@ -572,8 +572,8 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         var date = DateTime.UtcNow;
         var shard = await manager.RegisterShard(localAddress, date, date.AddHours(1), _metadata, assignToCreator: true);
 
-        await shard.ScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
-        await shard.ScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(10), null, CancellationToken.None);
+        await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
+        await shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(10), null, CancellationToken.None);
 
         var jobCount = await shard.GetJobCount();
         Assert.Equal(2, jobCount);

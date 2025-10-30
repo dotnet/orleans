@@ -61,9 +61,12 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         {
             if (!shard.IsComplete && shard.StartTime <= dueTime && shard.EndTime >= dueTime && await shard.GetJobCount() <= MaxJobCountPerShard)
             {
-                var job = await shard.ScheduleJobAsync(target, jobName, dueTime, metadata, cancellationToken);
-                LogJobScheduled(_logger, jobName, job.Id, shard.Id, target);
-                return job;
+                var job = await shard.TryScheduleJobAsync(target, jobName, dueTime, metadata, cancellationToken);
+                if (job is not null)
+                {
+                    LogJobScheduled(_logger, jobName, job.Id, shard.Id, target);
+                    return job;
+                }
             }
         }
         
@@ -75,8 +78,13 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
         var newShard = await _shardManager.RegisterShard(this.Silo, key, key.Add(_options.ShardDuration), EmptyMetadata, assignToMe, linkedCts.Token);
         shards.TryAdd(newShard.Id, newShard);
-        var scheduledJob = await newShard.ScheduleJobAsync(target, jobName, dueTime, metadata, linkedCts.Token);
+        var scheduledJob = await newShard.TryScheduleJobAsync(target, jobName, dueTime, metadata, linkedCts.Token);
         
+        if (scheduledJob is null)
+        {
+            throw new InvalidOperationException("Failed to schedule job on newly created shard.");
+        }
+
         LogJobScheduled(_logger, jobName, scheduledJob.Id, newShard.Id, target);
         
         if (assignToMe)
