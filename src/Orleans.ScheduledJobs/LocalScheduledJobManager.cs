@@ -15,6 +15,16 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.ScheduledJobs;
 
+// Class that contains a collection of job shards for a specific shard key
+// Handle concurrency so we don't create multiple shards for the same key if not needed.
+// Expose a method to enqueue a job to an appropriate shard. If no shard can accept the job,
+// create a new one thanks to the factory emthod passed in the constructor.
+// MAKE SURE TO HANDLE CONCURRENCY WHEN ADDING A NEW SHARD
+internal class JobShardEntry 
+{
+    
+}
+
 /// <inheritdoc/>
 internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManager, ILifecycleParticipant<ISiloLifecycle>
 {
@@ -25,10 +35,11 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
     private CancellationTokenSource _cts = new();
     private Task? _listenForClusterChangesTask = null;
     private Task? _watchForShardtoStartTask = null;
-    private readonly ConcurrentDictionary<DateTimeOffset, ConcurrentDictionary<string, IJobShard>> _shardCache = new();
+    private readonly ConcurrentDictionary<string, IJobShard> _shardCache = new();
+    private readonly ConcurrentDictionary<DateTimeOffset, IJobShard> _writeableShards = new();
     private readonly ConcurrentDictionary<string, Task> _runningShards = new();
-    private readonly int MaxJobCountPerShard = 1000;
     private readonly SemaphoreSlim _jobConcurrencyLimiter;
+    private readonly SemaphoreSlim _shardCreationLock = new(1, 1);
 
     private static readonly IDictionary<string, string> EmptyMetadata = new Dictionary<string, string>();
 
@@ -53,46 +64,55 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         LogSchedulingJob(_logger, jobName, target, dueTime);
         
         var key = GetShardKey(dueTime);
-        // Try to get all the available shards for this key
-        var shards = _shardCache.GetOrAdd(key, _ => new ConcurrentDictionary<string, IJobShard>());
-        // Find a shard that can accept this job
-        // TODO more efficient lookup
-        foreach (var shard in shards.Select(s => s.Value))
+
+        IScheduledJob? job = null;
+        while (job is null)
         {
-            if (!shard.IsComplete && shard.StartTime <= dueTime && shard.EndTime >= dueTime && await shard.GetJobCount() <= MaxJobCountPerShard)
+            if (_writeableShards.TryGetValue(key, out var jobShard))
             {
-                var job = await shard.TryScheduleJobAsync(target, jobName, dueTime, metadata, cancellationToken);
+                job =  await jobShard.TryScheduleJobAsync(target, jobName, dueTime, metadata, cancellationToken);
                 if (job is not null)
                 {
-                    LogJobScheduled(_logger, jobName, job.Id, shard.Id, target);
+                    LogJobScheduled(_logger, jobName, job.Id, jobShard.Id, target);
                     return job;
                 }
             }
-        }
-        
-        // No available shard found, create a new one, assigning it to this silo if the shard start time is near
-        var assignToMe = key.Add(TimeSpan.FromMinutes(5)) > DateTimeOffset.UtcNow;
-        LogCreatingNewShard(_logger, key, assignToMe);
-        
-        // Use a linked cancellation token that combines the provided token with the internal one
-        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
-        var newShard = await _shardManager.RegisterShard(this.Silo, key, key.Add(_options.ShardDuration), EmptyMetadata, assignToMe, linkedCts.Token);
-        shards.TryAdd(newShard.Id, newShard);
-        var scheduledJob = await newShard.TryScheduleJobAsync(target, jobName, dueTime, metadata, linkedCts.Token);
-        
-        if (scheduledJob is null)
-        {
-            throw new InvalidOperationException("Failed to schedule job on newly created shard.");
-        }
 
-        LogJobScheduled(_logger, jobName, scheduledJob.Id, newShard.Id, target);
-        
-        if (assignToMe)
-        {
-            StartRunningShardTracked(newShard);
+            // No available shard found, create a new one
+            // TODO: Use a more fine-grained locking mechanism (e.g., per-shard-key lock) to avoid blocking all shard creations
+            await _shardCreationLock.WaitAsync(cancellationToken);
+            try
+            {
+                // Double-check if shard was created while waiting for lock
+                if (_writeableShards.TryGetValue(key, out jobShard))
+                {
+                    job = await jobShard.TryScheduleJobAsync(target, jobName, dueTime, metadata, cancellationToken);
+                    if (job is not null)
+                    {
+                        LogJobScheduled(_logger, jobName, job.Id, jobShard.Id, target);
+                        return job;
+                    }
+                }
+
+                // Assign to this silo if the shard start time is near
+                var assignToMe = key.Add(TimeSpan.FromMinutes(5)) > DateTimeOffset.UtcNow;
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
+                var newShard = await _shardManager.RegisterShard(this.Silo, key, key.Add(_options.ShardDuration), EmptyMetadata, assignToMe, linkedCts.Token);
+                LogCreatingNewShard(_logger, key, assignToMe);
+                _writeableShards[key] = newShard;
+                _shardCache.TryAdd(newShard.Id, newShard);
+                if (assignToMe)
+                {
+                    StartRunningShardTracked(newShard);
+                }
+            }
+            finally
+            {
+                _shardCreationLock.Release();
+            }
         }
-        
-        return scheduledJob;
+        // This point should never be reached
+        throw new InvalidOperationException("Failed to schedule job");
     }
 
     public void Participate(ISiloLifecycle lifecycle)
@@ -143,18 +163,15 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         await Task.WhenAll(_runningShards.Values.ToArray());
         
         // Dispose any remaining shards in the cache
-        foreach (var shardGroup in _shardCache.Values)
+        foreach (var shard in _shardCache.Values)
         {
-            foreach (var shard in shardGroup.Values)
+            try
             {
-                try
-                {
-                    await shard.DisposeAsync();
-                }
-                catch (Exception ex)
-                {
-                    LogErrorDisposingShard(_logger, ex, shard.Id);
-                }
+                await shard.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                LogErrorDisposingShard(_logger, ex, shard.Id);
             }
         }
         
@@ -272,7 +289,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
             // Dispose the shard to clean up any resources (e.g., background tasks, channels)
             try
             {
-                _shardCache.TryRemove(GetShardKey(shard.StartTime), out _);
+                _shardCache.TryRemove(shard.Id, out _);
                 await Task.WhenAll(tasks.Values);
                 await shard.DisposeAsync();
             }
@@ -326,8 +343,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
     {
         LogCancellingJob(_logger, job.Id, job.Name, job.ShardId);
         
-        var key = GetShardKey(job.DueTime);
-        if (!_shardCache.TryGetValue(key, out var shards) || !shards.TryGetValue(job.ShardId, out var shard))
+        if (!_shardCache.TryGetValue(job.ShardId, out var shard))
         {
             LogJobCancellationFailed(_logger, job.Id, job.Name, job.ShardId);
             return false;
