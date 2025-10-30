@@ -126,7 +126,6 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         var startTime = DateTime.UtcNow;
         var options = Options.Create(new AzureStorageJobShardOptions());
         options.Value.ConfigureTestDefaults();
-        options.Value.MaxShardDuration = TimeSpan.FromSeconds(20);
         options.Value.ContainerName = "jobshardmanager" + Guid.NewGuid();
 
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
@@ -168,7 +167,6 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
         options.Value.ConfigureTestDefaults();
-        options.Value.MaxShardDuration = TimeSpan.FromSeconds(20);
         options.Value.ContainerName = "jobshardmanager" + Guid.NewGuid();
 
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);

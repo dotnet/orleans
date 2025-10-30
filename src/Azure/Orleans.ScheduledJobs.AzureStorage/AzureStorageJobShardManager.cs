@@ -11,6 +11,7 @@ using Azure.Storage.Blobs.Specialized;
 using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 using Orleans.Runtime;
 
 namespace Orleans.ScheduledJobs.AzureStorage;

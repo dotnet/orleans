@@ -1,32 +1,33 @@
-using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.ScheduledJobs;
 
 namespace Orleans.Hosting;
 
+/// <summary>
+/// Extensions to <see cref="ISiloBuilder"/> for configuring scheduled jobs.
+/// </summary>
 public static class ScheduledJobsExtensions
 {
-    public static ISiloBuilder UseInMemoryScheduledJobs(this ISiloBuilder builder)
-    {
-        return builder.ConfigureServices(services =>
-        {
-            services.AddScheduledJobs();
-            services.AddSingleton<InMemoryJobShardManager>();
-            services.AddFromExisting<JobShardManager, InMemoryJobShardManager>();
-        });
-    }
+    /// <summary>
+    /// Adds support for scheduled jobs to this silo.
+    /// </summary>
+    /// <param name="builder">The builder.</param>
+    /// <returns>The silo builder.</returns>
+    public static ISiloBuilder AddScheduledJobs(this ISiloBuilder builder) => builder.ConfigureServices(services => AddScheduledJobs(services));
 
-    public static IServiceCollection AddScheduledJobs(this IServiceCollection services)
+    /// <summary>
+    /// Adds support for scheduled jobs to this silo.
+    /// </summary>
+    /// <param name="services">The services.</param>
+    public static void AddScheduledJobs(this IServiceCollection services)
     {
         if (services.Any(service => service.ServiceType.Equals(typeof(LocalScheduledJobManager))))
         {
-            return services;
+            return;
         }
 
         services.AddSingleton<IConfigurationValidator, ScheduledJobsOptionsValidator>();
@@ -38,7 +39,36 @@ public static class ScheduledJobsExtensions
             var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
             return new ScheduledJobReceiverExtension(grainContextAccessor.GrainContext, sp.GetRequiredService<ILogger<ScheduledJobReceiverExtension>>());
         });
+    }
 
+    /// <summary>
+    /// Configures scheduled jobs storage using an in-memory, non-persistent store.
+    /// </summary>
+    /// <remarks>
+    /// Note that this is for development and testing scenarios only and should not be used in production.
+    /// </remarks>
+    /// <param name="builder">The silo host builder.</param>
+    /// <returns>The provided <see cref="ISiloBuilder"/>, for chaining.</returns>
+    public static ISiloBuilder UseInMemoryScheduledJobs(this ISiloBuilder builder)
+    {
+        builder.AddScheduledJobs();
+
+        builder.ConfigureServices(services => services.UseInMemoryScheduledJobs());
+        return builder;
+    }
+
+    /// <summary>
+    /// Configures scheduled jobs storage using an in-memory, non-persistent store.
+    /// </summary>
+    /// <remarks>
+    /// Note that this is for development and testing scenarios only and should not be used in production.
+    /// </remarks>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The provided <see cref="IServiceCollection"/>, for chaining.</returns>
+    internal static IServiceCollection UseInMemoryScheduledJobs(this IServiceCollection services)
+    {
+        services.AddSingleton<InMemoryJobShardManager>();
+        services.AddFromExisting<JobShardManager, InMemoryJobShardManager>();
         return services;
     }
 }

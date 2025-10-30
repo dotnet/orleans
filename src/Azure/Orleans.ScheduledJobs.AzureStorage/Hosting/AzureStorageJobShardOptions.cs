@@ -1,15 +1,9 @@
-using System;
 using Azure.Storage.Blobs;
 
-namespace Orleans.ScheduledJobs.AzureStorage;
+namespace Orleans.Hosting;
 
 public class AzureStorageJobShardOptions
 {
-    /// <summary>
-    /// The maximum duration of a job shard.
-    /// </summary>
-    public TimeSpan MaxShardDuration { get; set; } = TimeSpan.FromHours(1);
-
     /// <summary>
     /// Gets or sets the <see cref="BlobServiceClient"/> instance used to store job shards.
     /// </summary>

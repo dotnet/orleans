@@ -59,7 +59,7 @@ namespace Tester.AzureUtils
             return options;
         }
 
-        public static Orleans.ScheduledJobs.AzureStorage.AzureStorageJobShardOptions ConfigureTestDefaults(this Orleans.ScheduledJobs.AzureStorage.AzureStorageJobShardOptions options)
+        public static AzureStorageJobShardOptions ConfigureTestDefaults(this AzureStorageJobShardOptions options)
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
