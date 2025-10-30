@@ -53,7 +53,14 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         await foreach (var blob in blobs.WithCancellation(cancellationToken))
         {
             // Get the owner and creator of the shard
-            var (owner, creator, minDueTime, maxDueTime) = ParseMetadata(blob.Metadata);
+            var (owner, creator, membershipVersion, minDueTime, maxDueTime) = ParseMetadata(blob.Metadata);
+
+            // Check if the membership version is more recent than our current version
+            if (membershipVersion > _clusterMembership.CurrentSnapshot.Version)
+            {
+                // Refresh membership to at least that version
+                await _clusterMembership.Refresh(membershipVersion);
+            }
 
             if (minDueTime > maxDateTime)
             {
@@ -83,7 +90,6 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                 LogReclaimingShardFromCache(_logger, blob.Name, siloAddress);
                 var blobClient = shard.BlobClient;
                 var metadata = blob.Metadata;
-                metadata["Owner"] = siloAddress.ToParsableString();
                 if (!await TryTakeOwnership(shard, metadata, siloAddress, cancellationToken))
                 {
                     // Someone else took over the shard, remove from cache
@@ -99,7 +105,6 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                 LogClaimingShard(_logger, blob.Name, siloAddress, creatorIsActive, siloAddress.Equals(creator));
                 var blobClient = _client.GetAppendBlobClient(blob.Name);
                 var metadata = blob.Metadata;
-                metadata["Owner"] = siloAddress.ToParsableString();
                 shard = new AzureStorageJobShard(blob.Name, minDueTime, maxDueTime, blobClient, metadata, blob.Properties.ETag);
                 if (!await TryTakeOwnership(shard, metadata, siloAddress, cancellationToken))
                 {
@@ -124,6 +129,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         async Task<bool> TryTakeOwnership(AzureStorageJobShard shard, IDictionary<string, string> metadata, SiloAddress newOwner, CancellationToken ct)
         {
             metadata["Owner"] = newOwner.ToParsableString();
+            metadata["MembershipVersion"] = _clusterMembership.CurrentSnapshot.Version.ToString();
             try
             {
                 await shard.UpdateBlobMetadata(metadata, ct);
@@ -148,7 +154,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         {
             var shardId = $"{minDueTime:yyyyMMddHHmm}-{siloAddress.ToParsableString()}-{i}"; // todo make sure this is a valid blob name
             var blobClient = _client.GetAppendBlobClient(shardId);
-            var metadataInfo = CreateMetadata(metadata, siloAddress, minDueTime, maxDueTime);
+            var metadataInfo = CreateMetadata(metadata, siloAddress, _clusterMembership.CurrentSnapshot.Version, minDueTime, maxDueTime);
             if (assignToCreator)
             {
                 metadataInfo["Owner"] = siloAddress.ToParsableString();
@@ -191,7 +197,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         {
             // There are still jobs in the shard, unregister it
             var metadata = properties.Value.Metadata;
-            var (owner, _, _, _) = ParseMetadata(metadata);
+            var (owner, _, _, _, _) = ParseMetadata(metadata);
 
             if (owner != siloAddress)
             {
@@ -222,25 +228,29 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         LogInitialized(_logger, _containerName);
     }
 
-    private static Dictionary<string, string> CreateMetadata(IDictionary<string, string> existingMetadata, SiloAddress siloAddress, DateTimeOffset minDueTime, DateTimeOffset maxDueTime)
+    private static Dictionary<string, string> CreateMetadata(IDictionary<string, string> existingMetadata, SiloAddress siloAddress, MembershipVersion membershipVersion, DateTimeOffset minDueTime, DateTimeOffset maxDueTime)
     {
         var metadata = new Dictionary<string, string>(existingMetadata)
         {
             { "Creator", siloAddress.ToParsableString() },
             { "MinDueTime", minDueTime.ToString("o") },
-            { "MaxDueTime", maxDueTime.ToString("o") }
+            { "MaxDueTime", maxDueTime.ToString("o") },
+            { "MembershipVersion", membershipVersion.ToString() }
         };
 
         return metadata;
     }
 
-    private static (SiloAddress? owner, SiloAddress? creator, DateTime minDueTime, DateTime maxDueTime) ParseMetadata(IDictionary<string, string> metadata)
+    private static (SiloAddress? owner, SiloAddress? creator, MembershipVersion membershipVersion, DateTime minDueTime, DateTime maxDueTime) ParseMetadata(IDictionary<string, string> metadata)
     {
         var owner = metadata.TryGetValue("Owner", out var ownerStr) ? SiloAddress.FromParsableString(ownerStr) : null;
         var creator = metadata.TryGetValue("Creator", out var creatorStr) ? SiloAddress.FromParsableString(creatorStr) : null;
+        var membershipVersion = metadata.TryGetValue("MembershipVersion", out var membershipVersionStr) && long.TryParse(membershipVersionStr, out var versionValue)
+            ? new MembershipVersion(versionValue)
+            : MembershipVersion.MinValue;
         var minDueTime = metadata.TryGetValue("MinDueTime", out var minDueTimeStr) && DateTime.TryParse(minDueTimeStr, out var minDt) ? minDt : DateTime.MinValue;
         var maxDueTime = metadata.TryGetValue("MaxDueTime", out var maxDueTimeStr) && DateTime.TryParse(maxDueTimeStr, out var maxDt) ? maxDt : DateTime.MaxValue;
-        return (owner, creator, minDueTime.ToUniversalTime(), maxDueTime.ToUniversalTime());
+        return (owner, creator, membershipVersion, minDueTime.ToUniversalTime(), maxDueTime.ToUniversalTime());
     }
 
     [LoggerMessage(
