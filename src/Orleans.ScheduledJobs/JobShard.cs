@@ -71,8 +71,8 @@ public interface IJobShard : IAsyncDisposable
     /// </summary>
     /// <param name="jobId">The unique identifier of the job to remove.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <returns>A task that represents the asynchronous operation.</returns>
-    Task RemoveJobAsync(string jobId, CancellationToken cancellationToken);
+    /// <returns>A task that represents the asynchronous operation. The task result contains true if the job was successfully removed, or false if the job was not found.</returns>
+    Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Reschedules a job to be retried at a later time.
@@ -171,10 +171,10 @@ public abstract class JobShard : IJobShard
     }
 
     /// <inheritdoc/>
-    public async Task RemoveJobAsync(string jobId, CancellationToken cancellationToken)
+    public async Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken)
     {
         await PersistRemoveJobAsync(jobId, cancellationToken);
-        _jobQueue.CancelJob(jobId);
+        return _jobQueue.CancelJob(jobId);
     }
 
     /// <inheritdoc/>

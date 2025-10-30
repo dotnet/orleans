@@ -341,9 +341,9 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
 
         // Use a linked cancellation token that combines the provided token with the internal one
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
-        await shard.RemoveJobAsync(job.Id, linkedCts.Token);
+        var wasRemoved = await shard.RemoveJobAsync(job.Id, linkedCts.Token);
         LogJobCancelled(_logger, job.Id, job.Name, job.ShardId);
-        return true;
+        return wasRemoved;
     }
 
     private static DateTimeOffset GetShardKey(DateTimeOffset scheduledTime)
