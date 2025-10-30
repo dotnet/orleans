@@ -101,8 +101,7 @@ internal sealed class AzureStorageJobShard : JobShard
                         else
                         {
                             var entry = jobRetryCounters[operation.Id];
-                            entry.dequeueCount++;
-                            entry.newDueTime = operation.DueTime; 
+                            jobRetryCounters[operation.Id] = (entry.dequeueCount + 1, operation.DueTime);
                         }
                     }
                     break;

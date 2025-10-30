@@ -135,7 +135,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
                 else
                 {
                     var nextBucket = _queue.Peek();
-                    if (nextBucket.DueTime < DateTimeOffset.Now)
+                    if (nextBucket.DueTime < DateTimeOffset.UtcNow)
                     {
                         if (nextBucket.Count == 0)
                         {
