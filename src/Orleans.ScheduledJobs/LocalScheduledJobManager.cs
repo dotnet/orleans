@@ -227,24 +227,13 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
     private void StartRunningShardTracked(IJobShard shard)
     {
         LogStartingShard(_logger, shard.Id, shard.StartTime, shard.EndTime);
-        
-        var shardTask = Task.Run(async () =>
-        {
-            try
-            {
-                await RunShard(shard);
-            }
-            finally
-            {
-                _runningShards.TryRemove(shard.Id, out _);
-            }
-        });
-        
-        _runningShards.TryAdd(shard.Id, shardTask);
+        _runningShards.TryAdd(shard.Id, RunShard(shard));
     }
 
     private async Task RunShard(IJobShard shard)
     {
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
+
         var tasks = new ConcurrentDictionary<string, Task>();
         try
         {
@@ -292,6 +281,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
                 _shardCache.TryRemove(shard.Id, out _);
                 await Task.WhenAll(tasks.Values);
                 await shard.DisposeAsync();
+                _runningShards.TryRemove(shard.Id, out _);
             }
             catch (Exception ex)
             {
@@ -358,6 +348,6 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
 
     private static DateTimeOffset GetShardKey(DateTimeOffset scheduledTime)
     {
-        return new DateTime(scheduledTime.Year, scheduledTime.Month, scheduledTime.Day, scheduledTime.Hour, scheduledTime.Minute, 0);
+        return new DateTimeOffset(scheduledTime.Year, scheduledTime.Month, scheduledTime.Day, scheduledTime.Hour, scheduledTime.Minute, 0, scheduledTime.Offset);
     }
 }
