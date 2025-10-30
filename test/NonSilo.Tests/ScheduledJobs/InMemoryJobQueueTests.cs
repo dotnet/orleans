@@ -147,8 +147,9 @@ public class InMemoryJobQueueTests
         var job = CreateJob("job1", DateTimeOffset.UtcNow.AddSeconds(5));
 
         queue.Enqueue(job, 0);
-        queue.CancelJob("job1");
+        var removed = queue.CancelJob("job1");
 
+        Assert.True(removed);
         Assert.Equal(0, queue.Count);
     }
 
@@ -180,8 +181,9 @@ public class InMemoryJobQueueTests
     {
         var queue = new InMemoryJobQueue();
 
-        queue.CancelJob("non-existent-job");
+        var removed = queue.CancelJob("non-existent-job");
 
+        Assert.False(removed);
         Assert.Equal(0, queue.Count);
     }
 

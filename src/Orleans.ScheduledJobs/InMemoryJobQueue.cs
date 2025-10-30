@@ -58,19 +58,23 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
     /// Cancels a scheduled job by removing it from the queue.
     /// </summary>
     /// <param name="jobId">The unique identifier of the job to cancel.</param>
+    /// <returns>True if the job was found and removed; false if the job was not found.</returns>
     /// <remarks>
     /// The job's bucket remains in the priority queue until processed, but the job itself is removed immediately.
     /// </remarks>
-    public void CancelJob(string jobId)
+    public bool CancelJob(string jobId)
     {
         lock (_syncLock)
         {
             if (_jobsIdToBucket.TryGetValue(jobId, out var bucket))
             {
-                bucket.RemoveJob(jobId);
+                var removed = bucket.RemoveJob(jobId);
                 _jobsIdToBucket.Remove(jobId);
                 // Note: The bucket remains in the priority queue until processed
+                return removed;
             }
+
+            return false;
         }
     }
 
