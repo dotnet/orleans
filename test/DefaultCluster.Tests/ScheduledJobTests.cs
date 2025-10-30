@@ -293,4 +293,44 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
         Assert.Equal(job.Id, context.Job.Id);
         Assert.Equal("CrossGrainJob", context.Job.Name);
     }
+
+    [Fact, TestCategory("BVT"), TestCategory("ScheduledJobs")]
+    public async Task Test_JobRetry()
+    {
+        var grain = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IRetryTestGrain>("retry-test-grain");
+        var dueTime = DateTimeOffset.UtcNow.AddSeconds(2);
+        var metadata = new Dictionary<string, string>
+        {
+            ["FailUntilAttempt"] = "3"
+        };
+
+        var job = await grain.ScheduleJobAsync("RetryJob", dueTime, metadata);
+
+        Assert.NotNull(job);
+        Assert.Equal("RetryJob", job.Name);
+        Assert.NotNull(job.Metadata);
+        Assert.Equal("3", job.Metadata["FailUntilAttempt"]);
+
+        // Wait for the job to eventually succeed (with retries)
+        // Default retry policy: retry up to 5 times with exponential backoff (1s, 2s, 4s, 8s, 16s)
+        // We expect 3 attempts: fail at DequeueCount=1, fail at DequeueCount=2, succeed at DequeueCount=3
+        // Total time: ~2s (initial) + 1s (first retry delay) + 2s (second retry delay) = ~5s
+        await grain.WaitForJobToSucceed(job.Id).WithTimeout(TimeSpan.FromSeconds(15));
+
+        Assert.True(await grain.HasJobSucceeded(job.Id));
+
+        var attemptCount = await grain.GetJobExecutionAttemptCount(job.Id);
+        Assert.Equal(3, attemptCount);
+
+        var dequeueCountHistory = await grain.GetJobDequeueCountHistory(job.Id);
+        Assert.Equal(3, dequeueCountHistory.Count);
+        Assert.Equal(1, dequeueCountHistory[0]);
+        Assert.Equal(2, dequeueCountHistory[1]);
+        Assert.Equal(3, dequeueCountHistory[2]);
+
+        var finalContext = await grain.GetFinalJobContext(job.Id);
+        Assert.NotNull(finalContext);
+        Assert.Equal(3, finalContext.DequeueCount);
+        Assert.Equal(job.Id, finalContext.Job.Id);
+    }
 }
