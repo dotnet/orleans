@@ -6,12 +6,22 @@ using Orleans.Runtime;
 
 namespace Orleans.ScheduledJobs;
 
+/// <summary>
+/// Extension interface for grains that can receive scheduled job invocations.
+/// </summary>
 internal interface IScheduledJobReceiverExtension : IGrainExtension
 {
+    /// <summary>
+    /// Delivers a scheduled job to the grain for execution.
+    /// </summary>
+    /// <param name="context">The context containing information about the scheduled job.</param>
+    /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     Task DeliverScheduledJobAsync(IScheduledJobContext context, CancellationToken cancellationToken);
 }
 
-internal sealed class ScheduledJobReceiverExtension : IScheduledJobReceiverExtension
+/// <inheritdoc />
+internal sealed partial class ScheduledJobReceiverExtension : IScheduledJobReceiverExtension
 {
     private readonly IGrainContext _grain;
     private readonly ILogger<ScheduledJobReceiverExtension> _logger;
@@ -32,14 +42,20 @@ internal sealed class ScheduledJobReceiverExtension : IScheduledJobReceiverExten
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error executing scheduled job {JobId} on grain {GrainId}", context.Job.Id, _grain.GrainId);
+                LogErrorExecutingScheduledJob(ex, context.Job.Id, _grain.GrainId);
                 throw;
             }
         }
         else
         {
-            _logger.LogError("Grain {GrainId} does not implement IScheduledJobHandler", _grain.GrainId);
+            LogGrainDoesNotImplementHandler(_grain.GrainId);
             throw new InvalidOperationException($"Grain {_grain.GrainId} does not implement IScheduledJobHandler");
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Error executing scheduled job {JobId} on grain {GrainId}")]
+    private partial void LogErrorExecutingScheduledJob(Exception exception, string jobId, GrainId grainId);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Grain {GrainId} does not implement IScheduledJobHandler")]
+    private partial void LogGrainDoesNotImplementHandler(GrainId grainId);
 }
