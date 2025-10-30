@@ -10,7 +10,7 @@ public sealed class ScheduledJobsOptions
 {
     public TimeSpan ShardDuration { get; set; } = TimeSpan.FromHours(1);
 
-    public int MaxConcurrentJobsPerSilo { get; set; } = 10;
+    public int MaxConcurrentJobsPerSilo { get; set; } = 10_000 * Environment.ProcessorCount;
 
     public Func<IScheduledJobContext, Exception, DateTimeOffset?> ShouldRetry { get; set; } = DefaultShouldRetry;
 
