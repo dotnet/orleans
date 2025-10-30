@@ -193,7 +193,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         LogUnregisteringShard(_logger, shard.Id, siloAddress);
         
         var conditions = new BlobRequestConditions { IfMatch = azureShard.ETag };
-        var count = await shard.GetJobCount();
+        var count = await shard.GetJobCountAsync();
         var properties = await azureShard.BlobClient.GetPropertiesAsync(conditions, cancellationToken);
         if (count > 0)
         {

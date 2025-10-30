@@ -358,7 +358,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         await shard1.RemoveJobAsync(job2.Id, CancellationToken.None);
 
         // Verify initial job count (should be 3 after cancellation)
-        var jobCount = await shard1.GetJobCount();
+        var jobCount = await shard1.GetJobCountAsync();
         Assert.Equal(3, jobCount);
 
         // Start consuming jobs
@@ -403,7 +403,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         shard1 = shards[0];
 
         // Verify no jobs remain (job1 and job3 were removed after consumption, job2 and job4 were cancelled)
-        var remainingJobCount = await shard1.GetJobCount();
+        var remainingJobCount = await shard1.GetJobCountAsync();
         Assert.Equal(0, remainingJobCount);
 
         // Ensure no jobs are yielded when consuming
@@ -552,7 +552,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
 
         Assert.Contains("Cannot unregister a shard owned by another silo", exception.Message);
 
-        var jobCount = await shard.GetJobCount();
+        var jobCount = await shard.GetJobCountAsync();
         Assert.Equal(1, jobCount);
     }
 
@@ -575,7 +575,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
         await shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(10), null, CancellationToken.None);
 
-        var jobCount = await shard.GetJobCount();
+        var jobCount = await shard.GetJobCountAsync();
         Assert.Equal(2, jobCount);
 
         await manager.UnregisterShard(localAddress, shard);
@@ -590,7 +590,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         Assert.Single(shards);
         Assert.Equal(shard.Id, shards[0].Id);
 
-        var remainingJobs = await shards[0].GetJobCount();
+        var remainingJobs = await shards[0].GetJobCountAsync();
         Assert.Equal(2, remainingJobs);
     }
 

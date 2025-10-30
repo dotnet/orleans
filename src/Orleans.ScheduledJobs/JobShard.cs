@@ -40,12 +40,12 @@ public interface IJobShard : IAsyncDisposable
     IDictionary<string, string>? Metadata { get; }
 
     /// <summary>
-    /// Gets a value indicating whether this shard has been marked as complete.
+    /// Gets a value indicating whether this shard has been marked as complete and is no longer accepting new jobs.
     /// </summary>
     /// <remarks>
-    /// When a shard is marked as complete, no new jobs can be scheduled on it.
+    /// When a shard is marked as complete (via <see cref="MarkAsCompleteAsync"/>), no new jobs can be added to it.
     /// </remarks>
-    bool IsComplete { get; }
+    bool IsAddingCompleted { get; }
 
     /// <summary>
     /// Consumes scheduled jobs from this shard in order of their due time.
@@ -57,7 +57,7 @@ public interface IJobShard : IAsyncDisposable
     /// Gets the number of jobs currently scheduled in this shard.
     /// </summary>
     /// <returns>A task that represents the asynchronous operation. The task result contains the job count.</returns>
-    ValueTask<int> GetJobCount();
+    ValueTask<int> GetJobCountAsync();
 
     /// <summary>
     /// Marks this shard as complete, preventing new jobs from being scheduled.
@@ -116,7 +116,7 @@ public abstract class JobShard : IJobShard
     public IDictionary<string, string>? Metadata { get; protected set; }
 
     /// <inheritdoc/>
-    public bool IsComplete { get; protected set; } = false;
+    public bool IsAddingCompleted { get; protected set; } = false;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JobShard"/> class.
@@ -133,7 +133,7 @@ public abstract class JobShard : IJobShard
     }
 
     /// <inheritdoc/>
-    public ValueTask<int> GetJobCount() => ValueTask.FromResult(_jobQueue.Count);
+    public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(_jobQueue.Count);
 
     /// <inheritdoc/>
     public IAsyncEnumerable<IScheduledJobContext> ConsumeScheduledJobsAsync()
@@ -144,7 +144,7 @@ public abstract class JobShard : IJobShard
     /// <inheritdoc/>
     public async Task<IScheduledJob?> TryScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)
     {
-        if (IsComplete)
+        if (IsAddingCompleted)
         {
             return null;
         }
@@ -180,7 +180,7 @@ public abstract class JobShard : IJobShard
     /// <inheritdoc/>
     public Task MarkAsCompleteAsync(CancellationToken cancellationToken)
     {
-        IsComplete = true;
+        IsAddingCompleted = true;
         _jobQueue.MarkAsComplete();
         return Task.CompletedTask;
     }
