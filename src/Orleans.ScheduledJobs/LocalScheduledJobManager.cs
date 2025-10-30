@@ -245,6 +245,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
 
     private async Task RunShard(IJobShard shard)
     {
+        var tasks = new ConcurrentDictionary<string, Task>();
         try
         {
             if (shard.StartTime > DateTime.UtcNow)
@@ -260,39 +261,12 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
             // Process all jobs in the shard
             await foreach (var jobContext in shard.ConsumeScheduledJobsAsync().WithCancellation(_cts.Token))
             {
-                try
-                {
-                    await _jobConcurrencyLimiter.WaitAsync(_cts.Token);
-                    LogExecutingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.Job.TargetGrainId, jobContext.Job.DueTime);
-                    
-                    var target = this.RuntimeClient.InternalGrainFactory
-                        .GetGrain(jobContext.Job.TargetGrainId)
-                        .AsReference<IScheduledJobReceiverExtension>();
-                    await target.DeliverScheduledJobAsync(jobContext, _cts.Token);
-                    await shard.RemoveJobAsync(jobContext.Job.Id, _cts.Token);
-                    
-                    LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
-                }
-                catch (Exception ex) when (ex is not TaskCanceledException)
-                {
-                    LogErrorExecutingJob(_logger, ex, jobContext.Job.Id);
-                    var retryTime = _options.ShouldRetry(jobContext, ex);
-                    if (retryTime is not null)
-                    {
-                        LogRetryingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, retryTime.Value, jobContext.DequeueCount);
-                        await shard.RetryJobLaterAsync(jobContext, retryTime.Value, _cts.Token);
-                    }
-                    else
-                    {
-                        LogJobFailedNoRetry(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.DequeueCount);
-                    }
-                }
-                finally
-                {
-                    _jobConcurrencyLimiter.Release();
-                }
+                // Wait for concurrency slot
+                await _jobConcurrencyLimiter.WaitAsync(_cts.Token);
+                // Start processing the job. RunJob will release the semaphore when done and remove itself from the tasks dictionary
+                tasks[jobContext.Job.Id] = RunJob(jobContext, shard, tasks);
             }
-            
+
             LogCompletedProcessingShard(_logger, shard.Id);
             
             // Unregister the shard
@@ -316,12 +290,51 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
             try
             {
                 _shardCache.TryRemove(GetShardKey(shard.StartTime), out _);
+                await Task.WhenAll(tasks.Values);
                 await shard.DisposeAsync();
             }
             catch (Exception ex)
             {
                 LogErrorDisposingShard(_logger, ex, shard.Id);
             }
+        }
+    }
+
+    private async Task RunJob(IScheduledJobContext jobContext, IJobShard shard, ConcurrentDictionary<string, Task> runningTasks)
+    {
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
+
+        try
+        {
+            LogExecutingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.Job.TargetGrainId, jobContext.Job.DueTime);
+
+            var target = this.RuntimeClient.InternalGrainFactory
+            .GetGrain(jobContext.Job.TargetGrainId)
+            .AsReference<IScheduledJobReceiverExtension>();
+            
+            await target.DeliverScheduledJobAsync(jobContext, _cts.Token);
+            await shard.RemoveJobAsync(jobContext.Job.Id, _cts.Token);
+
+            LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
+        }
+        catch (Exception ex) when (ex is not TaskCanceledException)
+        {
+            LogErrorExecutingJob(_logger, ex, jobContext.Job.Id);
+            var retryTime = _options.ShouldRetry(jobContext, ex);
+            if (retryTime is not null)
+            {
+                LogRetryingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, retryTime.Value, jobContext.DequeueCount);
+                await shard.RetryJobLaterAsync(jobContext, retryTime.Value, _cts.Token);
+            }
+            else
+            {
+                LogJobFailedNoRetry(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.DequeueCount);
+            }
+        }
+        finally
+        {
+            _jobConcurrencyLimiter.Release();
+            runningTasks.TryRemove(jobContext.Job.Id, out _);
         }
     }
 
