@@ -15,16 +15,6 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.ScheduledJobs;
 
-// Class that contains a collection of job shards for a specific shard key
-// Handle concurrency so we don't create multiple shards for the same key if not needed.
-// Expose a method to enqueue a job to an appropriate shard. If no shard can accept the job,
-// create a new one thanks to the factory emthod passed in the constructor.
-// MAKE SURE TO HANDLE CONCURRENCY WHEN ADDING A NEW SHARD
-internal class JobShardEntry 
-{
-    
-}
-
 /// <inheritdoc/>
 internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManager, ILifecycleParticipant<ISiloLifecycle>
 {
