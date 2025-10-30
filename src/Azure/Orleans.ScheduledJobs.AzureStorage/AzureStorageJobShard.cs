@@ -83,12 +83,85 @@ internal sealed class AzureStorageJobShard : JobShard
 
     private async Task AppendOperation(JobOperation operation)
     {
-        var content = BinaryData.FromObjectAsJson(operation).ToString() + Environment.NewLine;
-        using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
+        var json = JsonSerializer.Serialize(operation, JobOperationJsonContext.Default.JobOperation);
+        var content = EncodeNetstring(json);
+        using var stream = new MemoryStream(content);
         var result = await BlobClient.AppendBlockAsync(
                     stream,
                     new AppendBlobAppendBlockOptions { Conditions = new AppendBlobRequestConditions { IfMatch = ETag } });
         ETag = result.Value.ETag;
+    }
+
+    private static byte[] EncodeNetstring(string data)
+    {
+        var dataBytes = System.Text.Encoding.UTF8.GetBytes(data);
+        var lengthPrefix = System.Text.Encoding.ASCII.GetBytes($"{dataBytes.Length}:");
+        var result = new byte[lengthPrefix.Length + dataBytes.Length + 1];
+        
+        lengthPrefix.CopyTo(result, 0);
+        dataBytes.CopyTo(result, lengthPrefix.Length);
+        result[^1] = (byte)',';
+        
+        return result;
+    }
+
+    private static async IAsyncEnumerable<string> ReadNetstringsAsync(Stream stream)
+    {
+        using var reader = new StreamReader(stream, leaveOpen: true);
+        
+        while (true)
+        {
+            // Read length
+            var lengthStr = "";
+            while (true)
+            {
+                var ch = reader.Read();
+                if (ch == -1)
+                {
+                    yield break;
+                }
+                
+                if (ch == ':')
+                {
+                    break;
+                }
+                
+                lengthStr += (char)ch;
+            }
+
+            if (string.IsNullOrWhiteSpace(lengthStr))
+            {
+                yield break;
+            }
+
+            if (!int.TryParse(lengthStr, out var length))
+            {
+                throw new InvalidDataException($"Invalid netstring length: {lengthStr}");
+            }
+
+            // Read data
+            var buffer = new char[length];
+            var totalRead = 0;
+            while (totalRead < length)
+            {
+                var read = await reader.ReadAsync(buffer, totalRead, length - totalRead);
+                if (read == 0)
+                {
+                    throw new InvalidDataException("Unexpected end of stream while reading netstring data");
+                }
+                
+                totalRead += read;
+            }
+
+            // Read trailing comma
+            var comma = reader.Read();
+            if (comma != ',')
+            {
+                throw new InvalidDataException($"Expected ',' at end of netstring, got '{(char)comma}'");
+            }
+
+            yield return new string(buffer);
+        }
     }
 
     public async ValueTask InitializeAsync()
@@ -96,18 +169,15 @@ internal sealed class AzureStorageJobShard : JobShard
         // Load existing blob
         var response = await BlobClient.DownloadAsync();
         using var stream = response.Value.Content;
-        using var reader = new StreamReader(stream);
 
         // Rebuild state by replaying operations
         var addedJobs = new Dictionary<string, JobOperation>();
         var deletedJobs = new HashSet<string>();
         var jobRetryCounters = new Dictionary<string, (int dequeueCount, DateTimeOffset? newDueTime)>();
         
-        string? line;
-        while ((line = await reader.ReadLineAsync()) is not null)
+        await foreach (var netstringData in ReadNetstringsAsync(stream))
         {
-            if (string.IsNullOrWhiteSpace(line)) continue;
-            var operation = JsonSerializer.Deserialize<JobOperation>(line);
+            var operation = JsonSerializer.Deserialize(netstringData, JobOperationJsonContext.Default.JobOperation);
             switch (operation.Type)
             {
                 case JobOperation.OperationType.Add:
@@ -176,31 +246,4 @@ internal sealed class AzureStorageJobShard : JobShard
         await AppendOperation(JobOperation.CreateRetryOperation(jobContext.Job.Id, newDueTime));
         _jobQueue.RetryJobLater(jobContext, newDueTime);
     }
-}
-
-internal struct JobOperation
-{
-    public enum OperationType
-    {
-        Add,
-        Remove,
-        Retry,
-    }
-
-    public OperationType Type { get; init; }
-
-    public string Id { get; init; }
-    public string? Name { get; init; }
-    public DateTimeOffset? DueTime { get; init; }
-    public GrainId? TargetGrainId { get; init; }
-    public IReadOnlyDictionary<string, string>? Metadata { get; init; }
-
-    public static JobOperation CreateAddOperation(string id, string name, DateTimeOffset dueTime, GrainId targetGrainId, IReadOnlyDictionary<string,string>? metadata) =>
-        new() { Type = OperationType.Add, Id = id, Name = name, DueTime = dueTime, TargetGrainId = targetGrainId, Metadata = metadata };
-
-    public static JobOperation CreateRemoveOperation(string id) =>
-        new() { Type = OperationType.Remove, Id = id };
-
-    public static JobOperation CreateRetryOperation(string id, DateTimeOffset dueTime) =>
-        new() { Type = OperationType.Retry, Id = id, DueTime = dueTime };
 }
