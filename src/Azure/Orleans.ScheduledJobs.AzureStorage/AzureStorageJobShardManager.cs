@@ -92,8 +92,9 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                 var metadata = blob.Metadata;
                 if (!await TryTakeOwnership(shard, metadata, siloAddress, cancellationToken))
                 {
-                    // Someone else took over the shard, remove from cache
+                    // Someone else took over the shard, remove from cache and dispose
                     _jobShardCache.TryRemove(blob.Name, out _);
+                    await shard.DisposeAsync();
                     LogShardOwnershipConflict(_logger, blob.Name, siloAddress);
                     continue;
                 }
@@ -216,6 +217,9 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
             await azureShard.BlobClient.DeleteIfExistsAsync(conditions: conditions, cancellationToken: cancellationToken);
             LogShardDeleted(_logger, shard.Id, siloAddress);
         }
+
+        // Dispose the shard's resources (background storage processor, etc.)
+        await azureShard.DisposeAsync();
     }
 
     private async ValueTask InitializeIfNeeded(CancellationToken cancellationToken = default)

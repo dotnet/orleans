@@ -159,6 +159,22 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         
         await Task.WhenAll(_runningShards.Values.ToArray());
         
+        // Dispose any remaining shards in the cache
+        foreach (var shardGroup in _shardCache.Values)
+        {
+            foreach (var shard in shardGroup.Values)
+            {
+                try
+                {
+                    await shard.DisposeAsync();
+                }
+                catch (Exception ex)
+                {
+                    LogErrorDisposingShard(_logger, ex, shard.Id);
+                }
+            }
+        }
+        
         LogStopped(_logger);
     }
 
@@ -293,6 +309,19 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         catch (TaskCanceledException)
         {
             LogShardCancelled(_logger, shard.Id);
+        }
+        finally
+        {
+            // Dispose the shard to clean up any resources (e.g., background tasks, channels)
+            try
+            {
+                _shardCache.TryRemove(GetShardKey(shard.StartTime), out _);
+                await shard.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                LogErrorDisposingShard(_logger, ex, shard.Id);
+            }
         }
     }
 
@@ -458,6 +487,12 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         Message = "Shard {ShardId} processing cancelled"
     )]
     private static partial void LogShardCancelled(ILogger logger, string shardId);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error disposing shard {ShardId}"
+    )]
+    private static partial void LogErrorDisposingShard(ILogger logger, Exception exception, string shardId);
 
     [LoggerMessage(
         Level = LogLevel.Debug,

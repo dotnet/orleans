@@ -17,7 +17,7 @@ namespace Orleans.ScheduledJobs;
 /// it manages. Shards can be marked as complete when all jobs within their time range
 /// have been processed.
 /// </remarks>
-public interface IJobShard
+public interface IJobShard : IAsyncDisposable
 {
     /// <summary>
     /// Gets the unique identifier for this job shard.
@@ -231,4 +231,11 @@ public abstract class JobShard : IJobShard
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
     protected abstract Task PersistRetryJobAsync(string jobId, DateTimeOffset newDueTime, CancellationToken cancellationToken);
+
+    /// <inheritdoc/>
+    public virtual ValueTask DisposeAsync()
+    {
+        GC.SuppressFinalize(this);
+        return default;
+    }
 }

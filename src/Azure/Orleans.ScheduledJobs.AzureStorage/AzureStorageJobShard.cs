@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Storage.Blobs;
@@ -14,6 +15,10 @@ namespace Orleans.ScheduledJobs.AzureStorage;
 
 internal sealed class AzureStorageJobShard : JobShard
 {
+    private readonly Channel<StorageOperation> _storageOperationChannel;
+    private readonly Task _storageProcessorTask;
+    private readonly CancellationTokenSource _shutdownCts = new();
+
     internal AppendBlobClient BlobClient { get; init; }
     internal ETag? ETag { get; private set; }
 
@@ -23,34 +28,40 @@ internal sealed class AzureStorageJobShard : JobShard
         BlobClient = blobClient;
         ETag = eTag;
         Metadata = metadata;
+        
+        // Create unbounded channel for storage operations
+        // In the future, we could add batching here
+        _storageOperationChannel = Channel.CreateUnbounded<StorageOperation>(new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = false
+        });
+        
+        // Start the background task that processes storage operations
+        _storageProcessorTask = ProcessStorageOperationsAsync();
     }
 
     protected override async Task PersistAddJobAsync(string jobId, string jobName, DateTimeOffset dueTime, GrainId target, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)
     {
         var operation = JobOperation.CreateAddOperation(jobId, jobName, dueTime, target, metadata);
-        await AppendOperation(operation, cancellationToken);
+        await EnqueueStorageOperationAsync(StorageOperation.CreateAppendOperation(operation), cancellationToken);
     }
 
     protected override async Task PersistRemoveJobAsync(string jobId, CancellationToken cancellationToken)
     {
         var operation = JobOperation.CreateRemoveOperation(jobId);
-        await AppendOperation(operation, cancellationToken);
+        await EnqueueStorageOperationAsync(StorageOperation.CreateAppendOperation(operation), cancellationToken);
     }
 
     protected override async Task PersistRetryJobAsync(string jobId, DateTimeOffset newDueTime, CancellationToken cancellationToken)
     {
         var operation = JobOperation.CreateRetryOperation(jobId, newDueTime);
-        await AppendOperation(operation, cancellationToken);
+        await EnqueueStorageOperationAsync(StorageOperation.CreateAppendOperation(operation), cancellationToken);
     }
 
     public async Task UpdateBlobMetadata(IDictionary<string, string> metadata, CancellationToken cancellationToken)
     {
-        var result = await BlobClient.SetMetadataAsync(
-            metadata,
-            new BlobRequestConditions { IfMatch = ETag },
-            cancellationToken);
-        ETag = result.Value.ETag;
-        Metadata = metadata;
+        await EnqueueStorageOperationAsync(StorageOperation.CreateMetadataOperation(metadata), cancellationToken);
     }
 
     public async ValueTask InitializeAsync(CancellationToken cancellationToken)
@@ -124,16 +135,71 @@ internal sealed class AzureStorageJobShard : JobShard
         ETag = response.Value.Details.ETag;
     }
 
-    private async Task AppendOperation(JobOperation operation, CancellationToken cancellationToken)
+    private async Task EnqueueStorageOperationAsync(StorageOperation operation, CancellationToken cancellationToken)
+    {
+        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        operation.CompletionSource = tcs;
+        
+        await _storageOperationChannel.Writer.WriteAsync(operation, cancellationToken);
+        await tcs.Task;
+    }
+
+    private async Task ProcessStorageOperationsAsync()
+    {
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
+
+        var cancellationToken = _shutdownCts.Token;
+        
+        try
+        {
+            await foreach (var operation in _storageOperationChannel.Reader.ReadAllAsync(cancellationToken))
+            {
+                try
+                {
+                    switch (operation.Type)
+                    {
+                        case StorageOperationType.AppendJobOperation:
+                            await AppendJobOperationAsync(operation.JobOperation!.Value, cancellationToken);
+                            break;
+                        case StorageOperationType.UpdateMetadata:
+                            await UpdateMetadataAsync(operation.Metadata!, cancellationToken);
+                            break;
+                    }
+                    
+                    operation.CompletionSource?.TrySetResult(true);
+                }
+                catch (Exception ex)
+                {
+                    operation.CompletionSource?.TrySetException(ex);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected during shutdown
+        }
+    }
+
+    private async Task AppendJobOperationAsync(JobOperation operation, CancellationToken cancellationToken)
     {
         var json = JsonSerializer.Serialize(operation, JobOperationJsonContext.Default.JobOperation);
         var content = EncodeNetstring(json);
         using var stream = new MemoryStream(content);
         var result = await BlobClient.AppendBlockAsync(
-                    stream,
-                    new AppendBlobAppendBlockOptions { Conditions = new AppendBlobRequestConditions { IfMatch = ETag } },
-                    cancellationToken);
+            stream,
+            new AppendBlobAppendBlockOptions { Conditions = new AppendBlobRequestConditions { IfMatch = ETag } },
+            cancellationToken);
         ETag = result.Value.ETag;
+    }
+
+    private async Task UpdateMetadataAsync(IDictionary<string, string> metadata, CancellationToken cancellationToken)
+    {
+        var result = await BlobClient.SetMetadataAsync(
+            metadata,
+            new BlobRequestConditions { IfMatch = ETag },
+            cancellationToken);
+        ETag = result.Value.ETag;
+        Metadata = metadata;
     }
 
     private static byte[] EncodeNetstring(string data)
@@ -206,5 +272,60 @@ internal sealed class AzureStorageJobShard : JobShard
 
             yield return new string(buffer);
         }
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        // Signal shutdown
+        _shutdownCts.Cancel();
+        
+        // Complete the channel to stop accepting new operations
+        _storageOperationChannel.Writer.Complete();
+        
+        // Wait for the background processor to finish
+        try
+        {
+            await _storageProcessorTask;
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+        
+        _shutdownCts.Dispose();
+        
+        await base.DisposeAsync();
+    }
+}
+
+internal enum StorageOperationType
+{
+    AppendJobOperation,
+    UpdateMetadata
+}
+
+internal sealed class StorageOperation
+{
+    public required StorageOperationType Type { get; init; }
+    public JobOperation? JobOperation { get; init; }
+    public IDictionary<string, string>? Metadata { get; init; }
+    public TaskCompletionSource<bool>? CompletionSource { get; set; }
+
+    public static StorageOperation CreateAppendOperation(JobOperation jobOperation)
+    {
+        return new StorageOperation
+        {
+            Type = StorageOperationType.AppendJobOperation,
+            JobOperation = jobOperation
+        };
+    }
+
+    public static StorageOperation CreateMetadataOperation(IDictionary<string, string> metadata)
+    {
+        return new StorageOperation
+        {
+            Type = StorageOperationType.UpdateMetadata,
+            Metadata = metadata
+        };
     }
 }
