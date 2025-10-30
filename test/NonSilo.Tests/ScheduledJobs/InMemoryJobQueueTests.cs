@@ -17,7 +17,7 @@ public class InMemoryJobQueueTests
     public void Enqueue_AddsJobToQueue()
     {
         var queue = new InMemoryJobQueue();
-        var job = CreateJob("job1", DateTimeOffset.Now.AddSeconds(1));
+        var job = CreateJob("job1", DateTimeOffset.UtcNow.AddSeconds(1));
 
         queue.Enqueue(job, 0);
 
@@ -28,9 +28,9 @@ public class InMemoryJobQueueTests
     public void Enqueue_MultipleJobs_IncreasesCount()
     {
         var queue = new InMemoryJobQueue();
-        var job1 = CreateJob("job1", DateTimeOffset.Now.AddSeconds(1));
-        var job2 = CreateJob("job2", DateTimeOffset.Now.AddSeconds(2));
-        var job3 = CreateJob("job3", DateTimeOffset.Now.AddSeconds(3));
+        var job1 = CreateJob("job1", DateTimeOffset.UtcNow.AddSeconds(1));
+        var job2 = CreateJob("job2", DateTimeOffset.UtcNow.AddSeconds(2));
+        var job3 = CreateJob("job3", DateTimeOffset.UtcNow.AddSeconds(3));
 
         queue.Enqueue(job1, 0);
         queue.Enqueue(job2, 0);
@@ -45,7 +45,7 @@ public class InMemoryJobQueueTests
         var queue = new InMemoryJobQueue();
         queue.MarkAsComplete();
 
-        var job = CreateJob("job1", DateTimeOffset.Now.AddSeconds(1));
+        var job = CreateJob("job1", DateTimeOffset.UtcNow.AddSeconds(1));
 
         Assert.Throws<InvalidOperationException>(() => queue.Enqueue(job, 0));
     }
@@ -54,7 +54,7 @@ public class InMemoryJobQueueTests
     public async Task GetAsyncEnumerator_ReturnsJobsInDueTimeOrder()
     {
         var queue = new InMemoryJobQueue();
-        var now = DateTimeOffset.Now;
+        var now = DateTimeOffset.UtcNow;
         var job1 = CreateJob("job1", now.AddMilliseconds(-100));
         var job2 = CreateJob("job2", now.AddMilliseconds(-50));
 
@@ -78,7 +78,7 @@ public class InMemoryJobQueueTests
     public async Task GetAsyncEnumerator_IncrementsDequeueCount()
     {
         var queue = new InMemoryJobQueue();
-        var job = CreateJob("job1", DateTimeOffset.Now.AddMilliseconds(-100));
+        var job = CreateJob("job1", DateTimeOffset.UtcNow.AddMilliseconds(-100));
 
         queue.Enqueue(job, 0);
         queue.MarkAsComplete();
@@ -94,7 +94,7 @@ public class InMemoryJobQueueTests
     public async Task GetAsyncEnumerator_WithInitialDequeueCount_IncrementsCorrectly()
     {
         var queue = new InMemoryJobQueue();
-        var job = CreateJob("job1", DateTimeOffset.Now.AddMilliseconds(-100));
+        var job = CreateJob("job1", DateTimeOffset.UtcNow.AddMilliseconds(-100));
 
         queue.Enqueue(job, 3);
         queue.MarkAsComplete();
@@ -110,16 +110,16 @@ public class InMemoryJobQueueTests
     public async Task GetAsyncEnumerator_WaitsForDueTime()
     {
         var queue = new InMemoryJobQueue();
-        var futureTime = DateTimeOffset.Now.AddSeconds(2);
+        var futureTime = DateTimeOffset.UtcNow.AddSeconds(2);
         var job = CreateJob("job1", futureTime);
 
         queue.Enqueue(job, 0);
         queue.MarkAsComplete();
 
-        var startTime = DateTimeOffset.Now;
+        var startTime = DateTimeOffset.UtcNow;
         await foreach (var context in queue.WithCancellation(CancellationToken.None))
         {
-            var elapsed = DateTimeOffset.Now - startTime;
+            var elapsed = DateTimeOffset.UtcNow - startTime;
             Assert.True(elapsed.TotalSeconds >= 1.5, $"Job was dequeued too early. Elapsed: {elapsed.TotalSeconds}s");
             break;
         }
@@ -144,7 +144,7 @@ public class InMemoryJobQueueTests
     public void CancelJob_RemovesJobFromQueue()
     {
         var queue = new InMemoryJobQueue();
-        var job = CreateJob("job1", DateTimeOffset.Now.AddSeconds(5));
+        var job = CreateJob("job1", DateTimeOffset.UtcNow.AddSeconds(5));
 
         queue.Enqueue(job, 0);
         queue.CancelJob("job1");
@@ -156,8 +156,8 @@ public class InMemoryJobQueueTests
     public async Task CancelJob_PreventsJobFromBeingDequeued()
     {
         var queue = new InMemoryJobQueue();
-        var job1 = CreateJob("job1", DateTimeOffset.Now.AddMilliseconds(-100));
-        var job2 = CreateJob("job2", DateTimeOffset.Now.AddMilliseconds(-50));
+        var job1 = CreateJob("job1", DateTimeOffset.UtcNow.AddMilliseconds(-100));
+        var job2 = CreateJob("job2", DateTimeOffset.UtcNow.AddMilliseconds(-50));
 
         queue.Enqueue(job1, 0);
         queue.Enqueue(job2, 0);
@@ -189,13 +189,13 @@ public class InMemoryJobQueueTests
     public void RetryJobLater_MovesJobToNewDueTime()
     {
         var queue = new InMemoryJobQueue();
-        var originalDueTime = DateTimeOffset.Now.AddSeconds(1);
+        var originalDueTime = DateTimeOffset.UtcNow.AddSeconds(1);
         var job = CreateJob("job1", originalDueTime);
 
         queue.Enqueue(job, 0);
 
         var context = CreateJobContext(job, "run1", 1);
-        var newDueTime = DateTimeOffset.Now.AddSeconds(10);
+        var newDueTime = DateTimeOffset.UtcNow.AddSeconds(10);
 
         queue.RetryJobLater(context, newDueTime);
 
@@ -206,12 +206,12 @@ public class InMemoryJobQueueTests
     public async Task RetryJobLater_PreservesDequeueCount()
     {
         var queue = new InMemoryJobQueue();
-        var job = CreateJob("job1", DateTimeOffset.Now.AddMilliseconds(-100));
+        var job = CreateJob("job1", DateTimeOffset.UtcNow.AddMilliseconds(-100));
 
         queue.Enqueue(job, 5);
 
         var context = CreateJobContext(job, "run1", 5);
-        var newDueTime = DateTimeOffset.Now.AddMilliseconds(-50);
+        var newDueTime = DateTimeOffset.UtcNow.AddMilliseconds(-50);
 
         queue.RetryJobLater(context, newDueTime);
         queue.MarkAsComplete();
@@ -228,10 +228,10 @@ public class InMemoryJobQueueTests
     public void RetryJobLater_NonExistentJob_DoesNotThrow()
     {
         var queue = new InMemoryJobQueue();
-        var job = CreateJob("job1", DateTimeOffset.Now.AddSeconds(1));
+        var job = CreateJob("job1", DateTimeOffset.UtcNow.AddSeconds(1));
         var context = CreateJobContext(job, "run1", 1);
 
-        queue.RetryJobLater(context, DateTimeOffset.Now.AddSeconds(10));
+        queue.RetryJobLater(context, DateTimeOffset.UtcNow.AddSeconds(10));
 
         Assert.Equal(0, queue.Count);
     }
@@ -240,7 +240,7 @@ public class InMemoryJobQueueTests
     public async Task GetAsyncEnumerator_RespectsEmptyBuckets()
     {
         var queue = new InMemoryJobQueue();
-        var dueTime = DateTimeOffset.Now.AddMilliseconds(-100);
+        var dueTime = DateTimeOffset.UtcNow.AddMilliseconds(-100);
         var job1 = CreateJob("job1", dueTime);
         var job2 = CreateJob("job2", dueTime);
 
@@ -264,7 +264,7 @@ public class InMemoryJobQueueTests
     public async Task GetAsyncEnumerator_HandlesMultipleDueTimes()
     {
         var queue = new InMemoryJobQueue();
-        var now = DateTimeOffset.Now;
+        var now = DateTimeOffset.UtcNow;
         var job1 = CreateJob("job1", now.AddSeconds(-5));
         var job2 = CreateJob("job2", now.AddSeconds(-3));
         var job3 = CreateJob("job3", now.AddSeconds(-1));
@@ -291,7 +291,7 @@ public class InMemoryJobQueueTests
     public async Task GetAsyncEnumerator_GeneratesUniqueRunIds()
     {
         var queue = new InMemoryJobQueue();
-        var job = CreateJob("job1", DateTimeOffset.Now.AddMilliseconds(-100));
+        var job = CreateJob("job1", DateTimeOffset.UtcNow.AddMilliseconds(-100));
 
         queue.Enqueue(job, 0);
         queue.MarkAsComplete();

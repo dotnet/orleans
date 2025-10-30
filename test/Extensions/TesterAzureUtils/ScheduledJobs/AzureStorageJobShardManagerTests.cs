@@ -38,7 +38,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         var manager = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
-        var date = DateTimeOffset.Now;
+        var date = DateTimeOffset.UtcNow;
         var maxDate = date.AddHours(1);
 
         // Register multiple shards and ensure they are distinct
@@ -156,7 +156,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
             counter++;
         }
         Assert.Equal(4, counter);
-        Assert.True(lastJob.DueTime <= DateTimeOffset.Now);
+        Assert.True(lastJob.DueTime <= DateTimeOffset.UtcNow);
         await manager.UnregisterShard(localAddress, shard1);
 
         // No unassigned shards

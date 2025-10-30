@@ -251,7 +251,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
             if (shard.StartTime > DateTime.UtcNow)
             {
                 // Wait until the shard's start time
-                var delay = shard.StartTime - DateTimeOffset.Now;
+                var delay = shard.StartTime - DateTimeOffset.UtcNow;
                 LogWaitingForShardStartTime(_logger, shard.Id, delay, shard.StartTime);
                 await Task.Delay(delay, _cts.Token); 
             }

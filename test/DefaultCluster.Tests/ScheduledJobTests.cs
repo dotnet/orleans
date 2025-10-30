@@ -19,7 +19,7 @@ public class ScheduledJobTests : HostedTestClusterEnsureDefaultStarted
     public async Task Test_ScheduledJobGrain()
     {
         var grain = this.GrainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-job-grain");
-        var dueTime = DateTimeOffset.Now.AddSeconds(5);
+        var dueTime = DateTimeOffset.UtcNow.AddSeconds(5);
         var job1 = await grain.ScheduleJobAsync("TestJob", dueTime);
         Assert.NotNull(job1);
         Assert.Equal("TestJob", job1.Name);
