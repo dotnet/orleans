@@ -75,9 +75,8 @@ internal sealed class AzureStorageJobShard : JobShard
         var deletedJobs = new HashSet<string>();
         var jobRetryCounters = new Dictionary<string, (int dequeueCount, DateTimeOffset? newDueTime)>();
         
-        await foreach (var netstringData in NetstringEncoder.DecodeAsync(stream))
+        await foreach (var operation in NetstringJsonSerializer.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation))
         {
-            var operation = JsonSerializer.Deserialize(netstringData, JobOperationJsonContext.Default.JobOperation);
             switch (operation.Type)
             {
                 case JobOperation.OperationType.Add:
@@ -185,8 +184,7 @@ internal sealed class AzureStorageJobShard : JobShard
 
     private async Task AppendJobOperationAsync(JobOperation operation, CancellationToken cancellationToken)
     {
-        var json = JsonSerializer.Serialize(operation, JobOperationJsonContext.Default.JobOperation);
-        var content = NetstringEncoder.Encode(json);
+        var content = NetstringJsonSerializer.Encode(operation, JobOperationJsonContext.Default.JobOperation);
         using var stream = new MemoryStream(content);
         var result = await BlobClient.AppendBlockAsync(
             stream,
