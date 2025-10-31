@@ -20,6 +20,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
 {
     private readonly BlobServiceClient _blobServiceClient;
     private readonly string _containerName;
+    private readonly string _blobPrefix;
     private BlobContainerClient _client = null!;
     private readonly IClusterMembershipService _clusterMembership;
     private readonly ConcurrentDictionary<string, AzureStorageJobShard> _jobShardCache = new();
@@ -28,20 +29,23 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
     public AzureStorageJobShardManager(
         BlobServiceClient client,
         string containerName,
+        string blobPrefix,
         IClusterMembershipService clusterMembership,
         ILogger<AzureStorageJobShardManager> logger)
     {
         _blobServiceClient = client;
         _containerName = containerName;
+        _blobPrefix = blobPrefix;
         _clusterMembership = clusterMembership;
         _logger = logger;
     }
 
     public AzureStorageJobShardManager(
+        ILocalSiloDetails localSiloDetails,
         IOptions<AzureStorageJobShardOptions> options,
         IClusterMembershipService clusterMembership,
         ILogger<AzureStorageJobShardManager> logger)
-        : this(options.Value.BlobServiceClient, options.Value.ContainerName, clusterMembership, logger)
+        : this(options.Value.BlobServiceClient, options.Value.ContainerName, localSiloDetails.ClusterId, clusterMembership, logger)
     {
     }
 
@@ -51,7 +55,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         LogAssigningShards(_logger, siloAddress, maxShardStartTime, _containerName);
 
         var result = new List<IJobShard>();
-        await foreach (var blob in _client.GetBlobsAsync(traits: BlobTraits.Metadata, cancellationToken: cancellationToken))
+        await foreach (var blob in _client.GetBlobsAsync(traits: BlobTraits.Metadata, cancellationToken: cancellationToken, prefix: _blobPrefix))
         {
             // Get the owner and creator of the shard
             var (owner, creator, membershipVersion, shardStartTime, maxDueTime) = ParseMetadata(blob.Metadata);
@@ -155,7 +159,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         
         for (var i = 0;; i++) // TODO limit the number of attempts
         {
-            var shardId = $"{minDueTime:yyyyMMddHHmm}-{siloAddress.ToParsableString()}-{i}"; // todo make sure this is a valid blob name
+            var shardId = $"{_blobPrefix}-{minDueTime:yyyyMMddHHmm}-{siloAddress.ToParsableString()}-{i}"; // todo make sure this is a valid blob name
             var blobClient = _client.GetAppendBlobClient(shardId);
             var metadataInfo = CreateMetadata(metadata, siloAddress, _clusterMembership.CurrentSnapshot.Version, minDueTime, maxDueTime);
             if (assignToCreator)

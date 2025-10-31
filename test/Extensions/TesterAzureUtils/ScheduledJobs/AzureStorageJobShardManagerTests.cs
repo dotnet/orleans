@@ -29,13 +29,12 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
         options.Value.ConfigureTestDefaults();
-        options.Value.ContainerName = "jobshardmanager" + Guid.NewGuid();
 
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
 
         var membershipService = new InMemoryClusterMembershipService();
 
-        var manager = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, "creation-assignation-" + Guid.NewGuid(), membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
         var date = DateTimeOffset.UtcNow;
@@ -77,11 +76,11 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
         options.Value.ConfigureTestDefaults();
-        options.Value.ContainerName = "jobshardmanager" + Guid.NewGuid();
 
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var membershipService = new InMemoryClusterMembershipService();
-        var manager = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var prefix = "read-frozen-shard-" + Guid.NewGuid();
+        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
 
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
@@ -100,7 +99,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
         // Take over the shard
-        manager = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
         var shards = await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1));
         Assert.Single(shards);
         shard1 = shards[0];
@@ -126,11 +125,10 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         var startTime = DateTime.UtcNow;
         var options = Options.Create(new AzureStorageJobShardOptions());
         options.Value.ConfigureTestDefaults();
-        options.Value.ContainerName = "jobshardmanager" + Guid.NewGuid();
 
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var membershipService = new InMemoryClusterMembershipService();
-        var manager = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, "live-shard-" + Guid.NewGuid(), membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
 
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
@@ -167,11 +165,10 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
         options.Value.ConfigureTestDefaults();
-        options.Value.ContainerName = "jobshardmanager" + Guid.NewGuid();
 
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var membershipService = new InMemoryClusterMembershipService();
-        var manager = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, "stop-processing-" + Guid.NewGuid(), membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
 
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
@@ -207,10 +204,9 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
         options.Value.ConfigureTestDefaults();
-        options.Value.ContainerName = "jobshardmanager" + Guid.NewGuid();
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var membershipService = new InMemoryClusterMembershipService();
-        var manager = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, "retry-job-later-" + Guid.NewGuid(), membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
         var date = DateTime.UtcNow;
         var shard1 = await manager.RegisterShard(localAddress, date, date.AddYears(1), _metadata);
@@ -240,11 +236,11 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
         options.Value.ConfigureTestDefaults();
-        options.Value.ContainerName = "jobshardmanager" + Guid.NewGuid();
 
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var membershipService = new InMemoryClusterMembershipService();
-        var manager = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var prefix = "job-metadata-" + Guid.NewGuid();
+        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
 
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
@@ -288,7 +284,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
         // Take over the shard
-        manager = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
         var shards = await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1));
         Assert.Single(shards);
         shard1 = shards[0];
@@ -335,11 +331,11 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
         options.Value.ConfigureTestDefaults();
-        options.Value.ContainerName = "jobshardmanager" + Guid.NewGuid();
 
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var membershipService = new InMemoryClusterMembershipService();
-        var manager = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var prefix = "job-cancellation-" + Guid.NewGuid();
+        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
 
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
@@ -395,7 +391,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
         // Take over the shard
-        manager = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
         var shards = await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1));
         Assert.Single(shards);
         shard1 = shards[0];
@@ -422,7 +418,6 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
         options.Value.ConfigureTestDefaults();
-        options.Value.ContainerName = "jobshardmanager" + Guid.NewGuid();
 
         var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
@@ -431,8 +426,9 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         membershipService.SetSiloStatus(silo1Address, SiloStatus.Active);
         membershipService.SetSiloStatus(silo2Address, SiloStatus.Active);
 
-        var manager1 = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
-        var manager2 = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var prefix = "concurrent-ownership-" + Guid.NewGuid();
+        var manager1 = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var manager2 = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
 
         var date = DateTime.UtcNow;
 
@@ -460,13 +456,12 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
         options.Value.ConfigureTestDefaults();
-        options.Value.ContainerName = "jobshardmanager" + Guid.NewGuid();
 
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var membershipService = new InMemoryClusterMembershipService();
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
-        var manager = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, "registration-retry-" + Guid.NewGuid(), membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
 
         var date = DateTime.UtcNow;
 
@@ -476,9 +471,9 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
 
         Assert.Distinct([shard1.Id, shard2.Id, shard3.Id]);
 
-        Assert.StartsWith($"{date:yyyyMMddHHmm}-{localAddress.ToParsableString()}-", shard1.Id);
-        Assert.StartsWith($"{date:yyyyMMddHHmm}-{localAddress.ToParsableString()}-", shard2.Id);
-        Assert.StartsWith($"{date:yyyyMMddHHmm}-{localAddress.ToParsableString()}-", shard3.Id);
+        Assert.Contains($"{date:yyyyMMddHHmm}-{localAddress.ToParsableString()}-", shard1.Id);
+        Assert.Contains($"{date:yyyyMMddHHmm}-{localAddress.ToParsableString()}-", shard2.Id);
+        Assert.Contains($"{date:yyyyMMddHHmm}-{localAddress.ToParsableString()}-", shard3.Id);
     }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
@@ -486,7 +481,6 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
         options.Value.ConfigureTestDefaults();
-        options.Value.ContainerName = "jobshardmanager" + Guid.NewGuid();
 
         var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
@@ -495,7 +489,8 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         var membershipService = new InMemoryClusterMembershipService();
         membershipService.SetSiloStatus(silo1Address, SiloStatus.Active);
 
-        var manager = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var prefix = "multiple-silos-" + Guid.NewGuid();
+        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
 
         var date = DateTime.UtcNow;
         var shard = await manager.RegisterShard(silo1Address, date, date.AddHours(1), _metadata, assignToCreator: false);
@@ -504,8 +499,8 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         membershipService.SetSiloStatus(silo2Address, SiloStatus.Active);
         membershipService.SetSiloStatus(silo3Address, SiloStatus.Active);
 
-        var manager2 = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
-        var manager3 = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var manager2 = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var manager3 = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
 
         var task2 = manager2.AssignJobShardsAsync(silo2Address, DateTime.UtcNow.AddHours(1));
         var task3 = manager3.AssignJobShardsAsync(silo3Address, DateTime.UtcNow.AddHours(1));
@@ -529,7 +524,6 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
         options.Value.ConfigureTestDefaults();
-        options.Value.ContainerName = "jobshardmanager" + Guid.NewGuid();
 
         var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
@@ -538,7 +532,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         membershipService.SetSiloStatus(silo1Address, SiloStatus.Active);
         membershipService.SetSiloStatus(silo2Address, SiloStatus.Active);
 
-        var manager = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, "unregister-wrong-owner-" + Guid.NewGuid(), membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
 
         var date = DateTime.UtcNow;
         var shard = await manager.RegisterShard(silo1Address, date, date.AddHours(1), _metadata, assignToCreator: true);
@@ -559,13 +553,13 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
         options.Value.ConfigureTestDefaults();
-        options.Value.ContainerName = "jobshardmanager" + Guid.NewGuid();
 
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var membershipService = new InMemoryClusterMembershipService();
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
-        var manager = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var prefix = "unregister-jobs-remaining-" + Guid.NewGuid();
+        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
 
         var date = DateTime.UtcNow;
         var shard = await manager.RegisterShard(localAddress, date, date.AddHours(1), _metadata, assignToCreator: true);
@@ -582,7 +576,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         var newSiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 1);
         membershipService.SetSiloStatus(newSiloAddress, SiloStatus.Active);
 
-        var newManager = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var newManager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
         var shards = await newManager.AssignJobShardsAsync(newSiloAddress, DateTime.UtcNow.AddHours(1));
 
         Assert.Single(shards);
@@ -597,13 +591,13 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
     {
         var options = Options.Create(new AzureStorageJobShardOptions());
         options.Value.ConfigureTestDefaults();
-        options.Value.ContainerName = "jobshardmanager" + Guid.NewGuid();
 
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var membershipService = new InMemoryClusterMembershipService();
         membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
-        var manager = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var prefix = "metadata-merge-" + Guid.NewGuid();
+        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
 
         var date = DateTime.UtcNow;
         var customMetadata = new Dictionary<string, string>
@@ -620,7 +614,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         membershipService.SetSiloStatus(localAddress, SiloStatus.Dead);
         membershipService.SetSiloStatus(localAddress2, SiloStatus.Active);
 
-        var manager2 = new AzureStorageJobShardManager(options, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        var manager2 = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance);
         var shard2 = await manager2.RegisterShard(localAddress, date, date.AddHours(1), customMetadata, assignToCreator: false);
         Assert.NotNull(shard2.Metadata);
         Assert.Equal(customMetadata, shard2.Metadata);
@@ -641,7 +635,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
             _version++;
         }
 
-        public ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        public ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
 
         public Task<bool> TryKill(SiloAddress siloAddress) => throw new NotImplementedException();
     }
