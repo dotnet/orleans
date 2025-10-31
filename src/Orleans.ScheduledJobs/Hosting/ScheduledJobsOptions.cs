@@ -6,12 +6,31 @@ using Orleans.ScheduledJobs;
 
 namespace Orleans.Hosting;
 
+/// <summary>
+/// Configuration options for the scheduled jobs feature.
+/// </summary>
 public sealed class ScheduledJobsOptions
 {
+    /// <summary>
+    /// Gets or sets the duration of each job shard. Smaller values reduce latency but increase overhead.
+    /// For optimal alignment with hour boundaries, choose durations that evenly divide 60 minutes
+    /// (e.g., 1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30, or 60 minutes) to avoid bucket drift across hours.
+    /// Default: 1 hour.
+    /// </summary>
     public TimeSpan ShardDuration { get; set; } = TimeSpan.FromHours(1);
 
+    /// <summary>
+    /// Gets or sets the maximum number of jobs that can be executed concurrently on a single silo.
+    /// Default: 10,000 × processor count.
+    /// </summary>
     public int MaxConcurrentJobsPerSilo { get; set; } = 10_000 * Environment.ProcessorCount;
 
+    /// <summary>
+    /// Gets or sets the function that determines whether a failed job should be retried and when.
+    /// The function receives the job context and the exception that caused the failure, and returns
+    /// the time when the job should be retried, or <see langword="null"/> if the job should not be retried.
+    /// Default: Retry up to 5 times with exponential backoff (2^n seconds).
+    /// </summary>
     public Func<IScheduledJobContext, Exception, DateTimeOffset?> ShouldRetry { get; set; } = DefaultShouldRetry;
 
     private static DateTimeOffset? DefaultShouldRetry(IScheduledJobContext jobContext, Exception ex)

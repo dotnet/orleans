@@ -84,8 +84,8 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
                     }
                 }
 
-                // Assign to this silo if the shard start time is near
-                var assignToMe = key.Add(TimeSpan.FromMinutes(5)) > DateTimeOffset.UtcNow;
+                // Assign to this silo if the shard start time is within the next 5 minutes
+                var assignToMe = key <= DateTimeOffset.UtcNow.Add(TimeSpan.FromMinutes(5));
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
                 var newShard = await _shardManager.RegisterShard(this.Silo, key, key.Add(_options.ShardDuration), EmptyMetadata, assignToMe, linkedCts.Token);
                 LogCreatingNewShard(_logger, key, assignToMe);
@@ -331,8 +331,32 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         return wasRemoved;
     }
 
-    private static DateTimeOffset GetShardKey(DateTimeOffset scheduledTime)
+    /// <summary>
+    /// Calculates the shard key for a scheduled time using epoch-based bucketing.
+    /// This ensures all times within the same shard duration window map to the same key,
+    /// regardless of the configured <see cref="ScheduledJobsOptions.ShardDuration"/>.
+    /// </summary>
+    /// <param name="scheduledTime">The time when the job is scheduled to run.</param>
+    /// <returns>The UTC start time of the shard bucket containing the scheduled time.</returns>
+    /// <example>
+    /// For ShardDuration = 1 hour:
+    /// - 14:37:25 -> 14:00:00
+    /// - 14:59:59 -> 14:00:00
+    /// - 15:00:00 -> 15:00:00
+    /// 
+    /// For ShardDuration = 15 minutes:
+    /// - 14:37:25 -> 14:30:00
+    /// - 14:44:59 -> 14:30:00
+    /// - 14:45:00 -> 14:45:00
+    /// </example>
+    private DateTimeOffset GetShardKey(DateTimeOffset scheduledTime)
     {
-        return new DateTimeOffset(scheduledTime.Year, scheduledTime.Month, scheduledTime.Day, scheduledTime.Hour, scheduledTime.Minute, 0, scheduledTime.Offset);
+        // Calculate which time bucket the scheduled time falls into using integer division.
+        // This works for any duration (minutes, hours, days) and guarantees consistent
+        // shard alignment across all silos in the cluster.
+        var shardDurationTicks = _options.ShardDuration.Ticks;
+        var epochTicks = scheduledTime.UtcTicks;
+        var bucketTicks = (epochTicks / shardDurationTicks) * shardDurationTicks;
+        return new DateTimeOffset(bucketTicks, TimeSpan.Zero);
     }
 }
