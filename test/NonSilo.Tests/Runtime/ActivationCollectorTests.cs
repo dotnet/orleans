@@ -175,5 +175,66 @@ namespace UnitTests.Runtime
 
             Assert.Equal(1, collector._activationCount);
         }
+
+        [Fact]
+        public async Task DeactivateInDueTimeOrder_HandlesRaceDuringEnumeration()
+        {
+            var grainCollectionOptions = Options.Create(new GrainCollectionOptions());
+
+            var logger = NullLogger<ActivationCollector>.Instance;
+            var statsProvider = Substitute.For<IEnvironmentStatisticsProvider>();
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+
+            var collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, statsProvider);
+            var timer = Substitute.For<IAsyncTimer>();
+            timer.NextTick().Returns(Task.FromResult(false));
+            var timerFactory = Substitute.For<IAsyncTimerFactory>();
+            timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>()).Returns(timer);
+
+            var wsLogger = NullLogger<ActivationWorkingSet>.Instance;
+            var workingSet = new ActivationWorkingSet(timerFactory, wsLogger, new[] { collector });
+
+            var activations = new List<(ICollectibleGrainContext, IActivationWorkingSetMember)>();
+
+            for (int i = 0; i < 100; i++)
+            {
+                var activation = Substitute.For<ICollectibleGrainContext, IActivationWorkingSetMember>();
+                activation.CollectionAgeLimit.Returns(TimeSpan.FromMinutes(1));
+                activation.IsValid.Returns(true);
+                activation.IsExemptFromCollection.Returns(false);
+                activation.IsInactive.Returns(true);
+                activation.Deactivated.Returns(Task.CompletedTask).AndDoes(_ => { Interlocked.Decrement(ref collector._activationCount); });
+                ((IActivationWorkingSetMember)activation).IsCandidateForRemoval(Arg.Any<bool>()).Returns(true);
+
+                workingSet.OnActivated(activation as IActivationWorkingSetMember);
+                activations.Add((activation, activation as IActivationWorkingSetMember));
+            }
+
+            var deactivateTask = Task.Run(async () =>
+            {
+                await collector.DeactivateInDueTimeOrder(50, CancellationToken.None);
+            });
+
+            var addRemoveTask = Task.Run(() =>
+            {
+                for (int i = 0; i < 50; i++)
+                {
+                    var activation = Substitute.For<ICollectibleGrainContext, IActivationWorkingSetMember>();
+                    activation.CollectionAgeLimit.Returns(TimeSpan.FromMinutes(1));
+                    activation.IsValid.Returns(true);
+                    activation.IsExemptFromCollection.Returns(false);
+                    activation.IsInactive.Returns(true);
+                    activation.Deactivated.Returns(Task.CompletedTask).AndDoes(_ => { Interlocked.Decrement(ref collector._activationCount); });
+                    ((IActivationWorkingSetMember)activation).IsCandidateForRemoval(Arg.Any<bool>()).Returns(true);
+
+                    workingSet.OnActivated(activation as IActivationWorkingSetMember);
+                    Thread.Sleep(1);
+                }
+            });
+
+            await Task.WhenAll(deactivateTask, addRemoveTask);
+
+            Assert.True(collector._activationCount >= 0);
+        }
     }
 }
