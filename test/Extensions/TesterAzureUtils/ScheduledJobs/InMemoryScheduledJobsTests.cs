@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Tester.AzureUtils.ScheduledJobs;
 
-public class AzureStorageScheduledJobTests : TestClusterPerTest
+public class InMemoryScheduledJobsTests : TestClusterPerTest
 {
     private ScheduledJobTestsRunner _runner;
 

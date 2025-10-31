@@ -136,7 +136,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         async Task<bool> TryTakeOwnership(AzureStorageJobShard shard, IDictionary<string, string> metadata, SiloAddress newOwner, CancellationToken ct)
         {
             metadata["Owner"] = newOwner.ToParsableString();
-            metadata["MembershipVersion"] = _clusterMembership.CurrentSnapshot.Version.ToString();
+            metadata["MembershipVersion"] = _clusterMembership.CurrentSnapshot.Version.Value.ToString();
             try
             {
                 await shard.UpdateBlobMetadata(metadata, ct);

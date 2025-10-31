@@ -5,11 +5,11 @@ using Xunit;
 
 namespace DefaultCluster.Tests;
 
-public class InMemoryScheduledJobTests : HostedTestClusterEnsureDefaultStarted
+public class InMemoryScheduledJobsTests : HostedTestClusterEnsureDefaultStarted
 {
     private readonly ScheduledJobTestsRunner _runner;
 
-    public InMemoryScheduledJobTests(DefaultClusterFixture fixture) : base(fixture)
+    public InMemoryScheduledJobsTests(DefaultClusterFixture fixture) : base(fixture)
     {
         _runner = new ScheduledJobTestsRunner(this.GrainFactory);
     }
