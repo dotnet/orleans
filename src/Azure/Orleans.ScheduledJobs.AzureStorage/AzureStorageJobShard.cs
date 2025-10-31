@@ -175,7 +175,11 @@ internal sealed class AzureStorageJobShard : JobShard
         }
         catch (OperationCanceledException)
         {
-            // Expected during shutdown
+            // Expected during shutdown - cancel all pending operations
+            while (_storageOperationChannel.Reader.TryRead(out var operation))
+            {
+                operation.CompletionSource?.TrySetCanceled(cancellationToken);
+            }
         }
     }
 
