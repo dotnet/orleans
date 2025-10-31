@@ -8,7 +8,6 @@ using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
-using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
@@ -69,7 +68,8 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
 
             if (shardStartTime > maxShardStartTime)
             {
-                // This shard is too new, stop there
+                // This shard is too new. Since blobs are returned in alphabetical order and our blob names
+                // contain timestamps (yyyyMMddHHmm format), all subsequent blobs will also be too new.
                 LogShardTooNew(_logger, blob.Name, shardStartTime, maxShardStartTime);
                 break;
             }
