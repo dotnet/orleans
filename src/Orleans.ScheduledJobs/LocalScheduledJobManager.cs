@@ -39,7 +39,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         IOptions<ScheduledJobsOptions> options,
         SystemTargetShared shared,
         ILogger<LocalScheduledJobManager> logger)
-        : base(SystemTargetGrainId.CreateGrainType("scheduledjobs-manager"), shared)
+        : base(SystemTargetGrainId.CreateGrainType("job-manager"), shared)
     {
         _shardManager = shardManager;
         _clusterMembershipUpdates = clusterMembership.MembershipUpdates;
