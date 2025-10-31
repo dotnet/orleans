@@ -325,7 +325,7 @@ public class InMemoryJobQueueTests
         });
     }
 
-    private static IScheduledJob CreateJob(string id, DateTimeOffset dueTime)
+    private static ScheduledJob CreateJob(string id, DateTimeOffset dueTime)
     {
         return new ScheduledJob
         {
@@ -338,7 +338,7 @@ public class InMemoryJobQueueTests
         };
     }
 
-    private static IScheduledJobContext CreateJobContext(IScheduledJob job, string runId, int dequeueCount)
+    private static IScheduledJobContext CreateJobContext(ScheduledJob job, string runId, int dequeueCount)
     {
         var context = Substitute.For<IScheduledJobContext>();
         context.Job.Returns(job);

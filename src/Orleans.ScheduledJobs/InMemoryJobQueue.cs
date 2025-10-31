@@ -29,7 +29,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
     /// <param name="job">The scheduled job to enqueue.</param>
     /// <param name="dequeueCount">The number of times this job has been dequeued previously.</param>
     /// <exception cref="InvalidOperationException">Thrown when attempting to enqueue a job to a completed queue.</exception>
-    public void Enqueue(IScheduledJob job, int dequeueCount)
+    public void Enqueue(ScheduledJob job, int dequeueCount)
     {
         lock (_syncLock)
         {
@@ -125,7 +125,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
         var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
         while (true)
         {
-            IScheduledJob? job = null;
+            ScheduledJob? job = null;
             int dequeueCount = 0;
             lock (_syncLock)
             {
@@ -179,22 +179,22 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
 
 internal sealed class JobBucket
 {
-    private readonly Dictionary<string, (IScheduledJob Job, int DequeueCount)> _jobs = new();
+    private readonly Dictionary<string, (ScheduledJob Job, int DequeueCount)> _jobs = new();
 
     public int Count => _jobs.Count;
 
     public DateTimeOffset DueTime { get; private set; }
 
-    public IEnumerable<(IScheduledJob Job, int DequeueCount)> Jobs => _jobs.Values;
+    public IEnumerable<(ScheduledJob Job, int DequeueCount)> Jobs => _jobs.Values;
 
-    public (IScheduledJob Job, int DequeueCount) this[string jobId] => _jobs[jobId];
+    public (ScheduledJob Job, int DequeueCount) this[string jobId] => _jobs[jobId];
 
     public JobBucket(DateTimeOffset dueTime)
     {
         DueTime = dueTime;
     }
 
-    public void AddJob(IScheduledJob job, int dequeueCount)
+    public void AddJob(ScheduledJob job, int dequeueCount)
     {
         _jobs[job.Id] = (job, dequeueCount);
     }

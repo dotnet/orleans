@@ -76,7 +76,7 @@ public class RetryTestGrain : Grain, IRetryTestGrain, IScheduledJobHandler
         return Task.CompletedTask;
     }
 
-    public async Task<IScheduledJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null)
+    public async Task<ScheduledJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null)
     {
         var job = await _localScheduledJobManager.ScheduleJobAsync(
             this.GetGrainId(),

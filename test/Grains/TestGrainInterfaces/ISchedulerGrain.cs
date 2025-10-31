@@ -6,5 +6,5 @@ namespace UnitTests.GrainInterfaces;
 
 public interface ISchedulerGrain : IGrainWithStringKey
 {
-    Task<IScheduledJob> ScheduleJobOnAnotherGrainAsync(string targetGrainKey, string jobName, DateTimeOffset scheduledTime);
+    Task<ScheduledJob> ScheduleJobOnAnotherGrainAsync(string targetGrainKey, string jobName, DateTimeOffset scheduledTime);
 }

@@ -23,7 +23,7 @@ public class SchedulerGrain : Grain, ISchedulerGrain
         _logger = logger;
     }
 
-    public async Task<IScheduledJob> ScheduleJobOnAnotherGrainAsync(string targetGrainKey, string jobName, DateTimeOffset scheduledTime)
+    public async Task<ScheduledJob> ScheduleJobOnAnotherGrainAsync(string targetGrainKey, string jobName, DateTimeOffset scheduledTime)
     {
         var targetGrain = _grainFactory.GetGrain<IScheduledJobGrain>(targetGrainKey);
         var targetGrainId = targetGrain.GetGrainId();

@@ -7,45 +7,9 @@ namespace Orleans.ScheduledJobs;
 /// <summary>
 /// Represents a scheduled job that will be executed at a specific time.
 /// </summary>
-public interface IScheduledJob
-{
-    /// <summary>
-    /// Gets the unique identifier for this scheduled job.
-    /// </summary>
-    string Id { get; }
-    
-    /// <summary>
-    /// Gets the name of the scheduled job.
-    /// </summary>
-    string Name { get; }
-    
-    /// <summary>
-    /// Gets the time when this job is due to be executed.
-    /// </summary>
-    DateTimeOffset DueTime { get; }
-    
-    /// <summary>
-    /// Gets the identifier of the target grain that will handle this job.
-    /// </summary>
-    GrainId TargetGrainId { get; }
-    
-    /// <summary>
-    /// Gets optional metadata associated with this scheduled job.
-    /// </summary>
-    IReadOnlyDictionary<string, string>? Metadata { get; }
-
-    /// <summary>
-    /// Gets the identifier of the shard that manages this scheduled job.
-    /// </summary>
-    string ShardId { get; init; }
-}
-
-/// <summary>
-/// Represents a scheduled job with shard information.
-/// </summary>
 [GenerateSerializer]
 [Alias("Orleans.ScheduledJobs.ScheduledJob")]
-public sealed class ScheduledJob : IScheduledJob
+public sealed class ScheduledJob
 {
     /// <summary>
     /// Gets the unique identifier for this scheduled job.

@@ -49,13 +49,13 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
     }
 
     /// <inheritdoc/>
-    public async Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)
+    public async Task<ScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)
     {
         LogSchedulingJob(_logger, jobName, target, dueTime);
         
         var key = GetShardKey(dueTime);
 
-        IScheduledJob? job = null;
+        ScheduledJob? job = null;
         while (job is null)
         {
             if (_writeableShards.TryGetValue(key, out var jobShard))
@@ -314,7 +314,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
     }
 
     /// <inheritdoc/>
-    public async Task<bool> TryCancelScheduledJobAsync(IScheduledJob job, CancellationToken cancellationToken)
+    public async Task<bool> TryCancelScheduledJobAsync(ScheduledJob job, CancellationToken cancellationToken)
     {
         LogCancellingJob(_logger, job.Id, job.Name, job.ShardId);
         

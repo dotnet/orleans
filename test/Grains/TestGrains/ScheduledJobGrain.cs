@@ -40,7 +40,7 @@ public class ScheduledJobGrain : Grain, IScheduledJobGrain, IScheduledJobHandler
         return Task.CompletedTask;
     }
 
-    public async Task<IScheduledJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null)
+    public async Task<ScheduledJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null)
     {
         var job = await _localScheduledJobManager.ScheduleJobAsync(this.GetGrainId(), jobName, scheduledTime, metadata, CancellationToken.None);
         jobRunStatus[job.Id] = new TaskCompletionSource();
@@ -59,7 +59,7 @@ public class ScheduledJobGrain : Grain, IScheduledJobGrain, IScheduledJobHandler
         await taskResult.Task;
     }
 
-    public async Task<bool> TryCancelJobAsync(IScheduledJob job)
+    public async Task<bool> TryCancelJobAsync(ScheduledJob job)
     {
         return await _localScheduledJobManager.TryCancelScheduledJobAsync(job, CancellationToken.None);
     }

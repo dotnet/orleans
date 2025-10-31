@@ -205,7 +205,7 @@ public class ScheduledJobTestsRunner
         var baseTime = DateTimeOffset.UtcNow.AddSeconds(5);
         var jobCount = 20;
 
-        var scheduleTasks = new List<Task<IScheduledJob>>();
+        var scheduleTasks = new List<Task<ScheduledJob>>();
         for (int i = 0; i < jobCount; i++)
         {
             scheduleTasks.Add(grain.ScheduleJobAsync($"ConcurrentJob{i}", baseTime.AddMilliseconds(i * 100)));

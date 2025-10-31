@@ -20,7 +20,7 @@ public interface ILocalScheduledJobManager
     /// <param name="metadata">Optional metadata associated with the job.</param>
     /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation that returns the scheduled job.</returns>
-    Task<IScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken);
+    Task<ScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken);
 
     /// <summary>
     /// Attempts to cancel a previously scheduled job.
@@ -28,5 +28,5 @@ public interface ILocalScheduledJobManager
     /// <param name="job">The scheduled job to cancel.</param>
     /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation that returns <see langword="true"/> if the job was successfully canceled; otherwise, <see langword="false"/>.</returns>
-    Task<bool> TryCancelScheduledJobAsync(IScheduledJob job, CancellationToken cancellationToken);
+    Task<bool> TryCancelScheduledJobAsync(ScheduledJob job, CancellationToken cancellationToken);
 }

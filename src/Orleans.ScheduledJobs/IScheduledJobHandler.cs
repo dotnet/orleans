@@ -11,7 +11,7 @@ public interface IScheduledJobContext
     /// <summary>
     /// Gets the scheduled job being executed.
     /// </summary>
-    IScheduledJob Job { get; }
+    ScheduledJob Job { get; }
 
     /// <summary>
     /// Gets the unique identifier for this execution run.
@@ -34,7 +34,7 @@ internal class ScheduledJobContext : IScheduledJobContext
     /// Gets the scheduled job being executed.
     /// </summary>
     [Id(0)]
-    public IScheduledJob Job { get; }
+    public ScheduledJob Job { get; }
 
     /// <summary>
     /// Gets the unique identifier for this execution run.
@@ -54,7 +54,7 @@ internal class ScheduledJobContext : IScheduledJobContext
     /// <param name="job">The scheduled job to execute.</param>
     /// <param name="runId">The unique identifier for this execution run.</param>
     /// <param name="retryCount">The number of times this job has been dequeued, including retries.</param>
-    public ScheduledJobContext(IScheduledJob job, string runId, int retryCount)
+    public ScheduledJobContext(ScheduledJob job, string runId, int retryCount)
     {
         Job = job;
         RunId = runId;

@@ -93,7 +93,7 @@ public interface IJobShard : IAsyncDisposable
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A task that represents the asynchronous operation. The task result contains the scheduled job if successful, or null if the job could not be scheduled (e.g., the shard was marked as complete).</returns>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the due time is outside the shard's time range.</exception>
-    Task<IScheduledJob?> TryScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken);
+    Task<ScheduledJob?> TryScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -142,7 +142,7 @@ public abstract class JobShard : IJobShard
     }
 
     /// <inheritdoc/>
-    public async Task<IScheduledJob?> TryScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)
+    public async Task<ScheduledJob?> TryScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)
     {
         if (IsAddingCompleted)
         {
@@ -197,7 +197,7 @@ public abstract class JobShard : IJobShard
     /// </summary>
     /// <param name="job">The job to enqueue.</param>
     /// <param name="dequeueCount">The number of times this job has been dequeued.</param>
-    protected void EnqueueJob(IScheduledJob job, int dequeueCount)
+    protected void EnqueueJob(ScheduledJob job, int dequeueCount)
     {
         _jobQueue.Enqueue(job, dequeueCount);
     }
