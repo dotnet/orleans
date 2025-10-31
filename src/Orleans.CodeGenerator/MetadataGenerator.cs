@@ -115,11 +115,11 @@ namespace Orleans.CodeGenerator
                 body.Add(ExpressionStatement(InvocationExpression(addRegisteredProviderMethod,
                     ArgumentList(SeparatedList(new[]
                     {
-                        Argument(TupleExpression(SeparatedList(new ExpressionSyntax[]
+                        Argument(TupleExpression(SeparatedList(new ArgumentSyntax[]
                         {
-                            LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Target)),
-                            LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Kind)),
-                            LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Name))
+                            Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Target))),
+                            Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Kind))),
+                            Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Name)))
                         }))),
                         Argument(TypeOfExpression(provider.Type))
                     })))));
