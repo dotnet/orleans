@@ -276,13 +276,13 @@ internal sealed class AzureStorageJobShard : JobShard
     }
 
     public override async ValueTask DisposeAsync()
-    {
-        // Signal shutdown
-        _shutdownCts.Cancel();
-        
+    {        
         // Complete the channel to stop accepting new operations
         _storageOperationChannel.Writer.Complete();
-        
+
+        // Signal shutdown
+        _shutdownCts.Cancel();
+
         // Wait for the background processor to finish
         try
         {

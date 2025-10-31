@@ -641,7 +641,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
             _version++;
         }
 
-        public ValueTask Refresh(MembershipVersion minimumVersion = default) => throw new NotImplementedException();
+        public ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
         public Task<bool> TryKill(SiloAddress siloAddress) => throw new NotImplementedException();
     }

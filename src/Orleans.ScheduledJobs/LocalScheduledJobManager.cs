@@ -117,7 +117,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
     private Task Start(CancellationToken ct)
     {
         LogStarting(_logger);
-        
+
         using (var _ = new ExecutionContextSuppressor())
         {
             _listenForClusterChangesTask = Task.Factory.StartNew(
@@ -126,8 +126,9 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
                 CancellationToken.None,
                 TaskCreationOptions.None,
                 WorkItemGroup.TaskScheduler).Unwrap();
+            _listenForClusterChangesTask.Ignore();
         }
-        
+
         LogStarted(_logger);
         return Task.CompletedTask;
     }
@@ -140,8 +141,8 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         
         if (_listenForClusterChangesTask is not null)
         {
-            await _listenForClusterChangesTask.SuppressThrowing(); // never return?
-            _listenForClusterChangesTask = null;
+            await _listenForClusterChangesTask;
+            //_listenForClusterChangesTask = null;
         }
         
         await Task.WhenAll(_runningShards.Values.ToArray());

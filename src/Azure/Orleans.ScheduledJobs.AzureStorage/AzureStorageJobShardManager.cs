@@ -60,7 +60,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
             if (membershipVersion > _clusterMembership.CurrentSnapshot.Version)
             {
                 // Refresh membership to at least that version
-                await _clusterMembership.Refresh(membershipVersion);
+                await _clusterMembership.Refresh(membershipVersion, cancellationToken);
             }
 
             if (shardStartTime > maxShardStartTime)
