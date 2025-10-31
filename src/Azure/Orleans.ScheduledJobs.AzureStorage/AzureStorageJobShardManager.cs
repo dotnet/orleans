@@ -120,7 +120,9 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                     continue;
                 }
                 await shard.InitializeAsync(cancellationToken);
+                // We don't want to add new jobs to shards that we just took ownership of
                 await shard.MarkAsCompleteAsync(cancellationToken);
+                _jobShardCache[blob.Name] = shard;
             }
 
             if (shard != null)
@@ -197,9 +199,17 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         var azureShard = shard as AzureStorageJobShard ?? throw new ArgumentException("Shard is not an AzureStorageJobShard", nameof(shard));
         LogUnregisteringShard(_logger, shard.Id, siloAddress);
         
-        var conditions = new BlobRequestConditions { IfMatch = azureShard.ETag };
+        // Stop the background storage processor to ensure no more changes can happen
+        await azureShard.StopProcessorAsync();
+        
+        // Now we can safely get a consistent view of the state
         var count = await shard.GetJobCountAsync();
-        var properties = await azureShard.BlobClient.GetPropertiesAsync(conditions, cancellationToken);
+        // We want to make sure to get the latest properties
+        var properties = await azureShard.BlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+        // But we don't want to update the metadata if the ETag has changed
+        var currentETag = properties.Value.ETag;
+        var conditions = new BlobRequestConditions { IfMatch = currentETag };
+        
         if (count > 0)
         {
             // There are still jobs in the shard, unregister it
@@ -221,10 +231,11 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         {
             // No jobs left, we can delete the shard
             await azureShard.BlobClient.DeleteIfExistsAsync(conditions: conditions, cancellationToken: cancellationToken);
+            _jobShardCache.TryRemove(shard.Id, out _);
             LogShardDeleted(_logger, shard.Id, siloAddress);
         }
 
-        // Dispose the shard's resources (background storage processor, etc.)
+        // Dispose the shard's resources
         await azureShard.DisposeAsync();
     }
 
@@ -251,16 +262,16 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         return metadata;
     }
 
-    private static (SiloAddress? owner, SiloAddress? creator, MembershipVersion membershipVersion, DateTime minDueTime, DateTime maxDueTime) ParseMetadata(IDictionary<string, string> metadata)
+    private static (SiloAddress? owner, SiloAddress? creator, MembershipVersion membershipVersion, DateTimeOffset minDueTime, DateTimeOffset maxDueTime) ParseMetadata(IDictionary<string, string> metadata)
     {
         var owner = metadata.TryGetValue("Owner", out var ownerStr) ? SiloAddress.FromParsableString(ownerStr) : null;
         var creator = metadata.TryGetValue("Creator", out var creatorStr) ? SiloAddress.FromParsableString(creatorStr) : null;
         var membershipVersion = metadata.TryGetValue("MembershipVersion", out var membershipVersionStr) && long.TryParse(membershipVersionStr, out var versionValue)
             ? new MembershipVersion(versionValue)
             : MembershipVersion.MinValue;
-        var minDueTime = metadata.TryGetValue("MinDueTime", out var minDueTimeStr) && DateTime.TryParse(minDueTimeStr, out var minDt) ? minDt : DateTime.MinValue;
-        var maxDueTime = metadata.TryGetValue("MaxDueTime", out var maxDueTimeStr) && DateTime.TryParse(maxDueTimeStr, out var maxDt) ? maxDt : DateTime.MaxValue;
-        return (owner, creator, membershipVersion, minDueTime.ToUniversalTime(), maxDueTime.ToUniversalTime());
+        var minDueTime = metadata.TryGetValue("MinDueTime", out var minDueTimeStr) && DateTimeOffset.TryParse(minDueTimeStr, out var minDt) ? minDt : DateTimeOffset.MinValue;
+        var maxDueTime = metadata.TryGetValue("MaxDueTime", out var maxDueTimeStr) && DateTimeOffset.TryParse(maxDueTimeStr, out var maxDt) ? maxDt : DateTimeOffset.MaxValue;
+        return (owner, creator, membershipVersion, minDueTime, maxDueTime);
     }
 
     [LoggerMessage(
@@ -285,7 +296,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         Level = LogLevel.Trace,
         Message = "Ignoring shard '{ShardId}' since its start time is greater than specified maximum (MinDueTime={MinDueTime}, MaxDateTime={MaxDateTime})"
     )]
-    private static partial void LogShardTooNew(ILogger logger, string shardId, DateTime minDueTime, DateTimeOffset maxDateTime);
+    private static partial void LogShardTooNew(ILogger logger, string shardId, DateTimeOffset minDueTime, DateTimeOffset maxDateTime);
 
     [LoggerMessage(
         Level = LogLevel.Trace,

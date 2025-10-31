@@ -279,26 +279,34 @@ internal sealed class AzureStorageJobShard : JobShard
         }
     }
 
-    public override async ValueTask DisposeAsync()
-    {        
-        // Complete the channel to stop accepting new operations
-        _storageOperationChannel.Writer.Complete();
+    /// <summary>
+    /// Stops the background storage processor and waits for all pending operations to complete.
+    /// After calling this method, no new storage operations can be enqueued.
+    /// This method is idempotent and can be called multiple times safely.
+    /// </summary>
+    internal async Task StopProcessorAsync()
+    {
+        // Complete the channel to stop accepting new operations (idempotent operation)
+        if (_storageOperationChannel.Writer.TryComplete())
+        {
+            _shutdownCts.Cancel();
+        }
 
-        // Signal shutdown
-        _shutdownCts.Cancel();
-
-        // Wait for the background processor to finish
+        // Wait for the background processor to finish all pending operations
         try
         {
             await _storageProcessorTask;
         }
         catch (OperationCanceledException)
         {
-            // Expected
+            // Expected during normal shutdown
         }
-        
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        await StopProcessorAsync();
         _shutdownCts.Dispose();
-        
         await base.DisposeAsync();
     }
 }
