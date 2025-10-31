@@ -1,9 +1,11 @@
 using System.Collections.Immutable;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Serialization;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Orleans.Journaling.Tests;
 
@@ -16,10 +18,12 @@ public abstract class StateMachineTestBase
     protected readonly SerializerSessionPool SessionPool;
     protected readonly ICodecProvider CodecProvider;
     protected readonly ILoggerFactory LoggerFactory;
+    protected readonly StateMachineManagerOptions ManagerOptions = new();
 
     protected StateMachineTestBase()
     {
         var services = new ServiceCollection();
+
         services.AddSerializer();
         services.AddLogging(builder => builder.AddConsole());
 
@@ -40,11 +44,14 @@ public abstract class StateMachineTestBase
     /// <summary>
     /// Creates a state machine manager with in-memory storage
     /// </summary>
-    internal (IStateMachineManager Manager, IStateMachineStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystem(IStateMachineStorage? storage = null)
+    internal (IStateMachineManager Manager, IStateMachineStorage Storage, ILifecycleSubject Lifecycle)
+        CreateTestSystem(IStateMachineStorage? storage = null, TimeProvider? provider = null)
     {
         storage ??= CreateStorage();
+        provider ??= TimeProvider.System;
+
         var logger = LoggerFactory.CreateLogger<StateMachineManager>();
-        var manager = new StateMachineManager(storage, logger, SessionPool);
+        var manager = new StateMachineManager(storage, logger, Options.Create(ManagerOptions), SessionPool, provider);
         var lifecycle = new GrainLifecycle(LoggerFactory.CreateLogger<GrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);

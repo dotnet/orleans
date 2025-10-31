@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -254,6 +255,127 @@ public class StateMachineManagerTests : StateMachineTestBase
         for (int i = 0; i < itemCount; i++)
         {
             Assert.Equal($"Value {i}", recoveredDict[i]);
+        }
+    }
+
+    /// <summary>
+    /// Tests the full lifecycle of a retired state machine. It is preserved and also reintroduced through an
+    /// early compaction, but purged eventually after its grace period expires on later compactions.
+    /// </summary>
+    [Fact]
+    public async Task StateMachineManager_AutoRetiringStateMachines()
+    {
+        const string DictToKeepKey = "dictToKeep";
+        const string DictToRetireKey = "dictToRetire";
+
+        var period = ManagerOptions.RetirementGracePeriod;
+        var timeProvider = new FakeTimeProvider(DateTime.UtcNow);
+        var storage = CreateStorage();
+
+        // -------------- STEP 1 --------------
+
+        // We begin with 2 dictionaries, one of which we will retire by means of not registering it in the manager.
+        // This would be in the real-world developers removing it from the grain's ctor as a dependency.
+        var sut1 = CreateTestSystem(storage, timeProvider);
+        var dictToKeep1 = CreateTestMachine(DictToKeepKey, sut1.Manager);
+        var dictToRetire2 = CreateTestMachine(DictToRetireKey, sut1.Manager);
+
+        await sut1.Lifecycle.OnStart();
+
+        dictToKeep1.Add("a", 1);
+        dictToRetire2.Add("b", 1);
+
+        await sut1.Manager.WriteStateAsync(CancellationToken.None);
+
+        // -------------- STEP 2 --------------
+
+        // This time, we only register the dictionary we want to keep, this marks dictToRetire as retired.
+        var sut2 = CreateTestSystem(storage, timeProvider);
+        var dictToKeep2 = CreateTestMachine(DictToKeepKey, sut2.Manager);
+
+        await sut2.Lifecycle.OnStart();
+        
+        // The manager should have recovered the state for dictToKeep,
+        // and created a DurableNothing placeholder for dictToRetire (we cant test for it at this point). 
+        Assert.Equal(1, dictToKeep2["a"]);
+
+        // We advance time by half the grace period to see if we can save it from purging.
+        timeProvider.Advance(period / 2);
+
+        await TriggerCompaction(sut2.Manager, dictToKeep2);
+
+        // -------------- STEP 3 --------------
+
+        // Verify that the retired dictionary was NOT purged by this compaction, as only half the time has passed.
+        var sut3 = CreateTestSystem(storage, timeProvider);
+        var dictToKeep3 = CreateTestMachine(DictToKeepKey, sut3.Manager);
+        var dictToRetire3 = CreateTestMachine(DictToRetireKey, sut3.Manager);
+
+        await sut3.Lifecycle.OnStart();
+
+        Assert.Equal(10, dictToKeep3["a"]);
+
+        // The fact this entry ["b", 1] exists proves that the state of dictToRetire was preserved, even though we did not register it in step 2.
+        Assert.Equal(1, dictToRetire3["b"]);
+
+        // By advancing time by another half-period we cover the full period. But since we have re-introduced dictToRetire, we should have un-retired it.
+        // This is similar to step 2, but there we avoided purging due to time not being due, whereas here we avoid purging due to re-registration.
+        timeProvider.Advance(period / 2);
+
+        await TriggerCompaction(sut3.Manager, dictToKeep3);
+
+        // -------------- STEP 4 --------------
+
+        // Because of re-registration is step 3 (to test it was not purged), this means dictToRetire has been removed from the tracker.
+        // Again as in step 2, we only register the dictionary we want to keep, this marks dictToRetire as retired.
+        var sut4 = CreateTestSystem(storage, timeProvider);
+        var dictToKeep4 = CreateTestMachine(DictToKeepKey, sut4.Manager);
+
+        await sut4.Lifecycle.OnStart();
+
+        // The manager should have recovered the state for dictToKeep.
+        // It should have created a DurableNothing placeholder for dictToRetire, but we can not test for that.
+
+
+        // This time we advance time to cover the full period. Note that this is necessary because a side effect of step 3
+        // was that dictToRetire was removed from the tracker (since it came back), so just triggering a compaction won't cut it
+        // as time to retire will essentially be reset to "now".
+        timeProvider.Advance(period);
+
+        // This compaction should finally purge it.
+        await TriggerCompaction(sut4.Manager, dictToKeep4);
+
+        // -------------- STEP 5 --------------
+
+        // At this point, the manager has performed a snapshot, so it should have purged the dictToRetire data.
+        // By registering both dictionaries again, we should see what state remains after the snapshot.
+        var sut5 = CreateTestSystem(storage, timeProvider);
+        var dictToKeep5 = CreateTestMachine(DictToKeepKey, sut5.Manager);
+        var dictToRetire5 = CreateTestMachine(DictToRetireKey, sut5.Manager);
+
+        await sut5.Lifecycle.OnStart();
+        Assert.Equal(10, dictToKeep5["a"]);
+
+        // The retired dictionary should now be empty because its state was purged during the compaction.
+        // Note that this is a new version of dictToRetire, since the original was removed. Idea here is
+        // that if we can register a new dictToRetire (with the same key), it means that the machine itself
+        // has been removed but also the data, otherwise a previous machine would have had at least one
+        // entry i.e. ["b", 1].
+
+        Assert.Empty(dictToRetire5);
+
+        // Note: The retirement of state machines has the nice benefit of being able to reuse machine names.
+
+        DurableDictionary<string, int> CreateTestMachine(string key, IStateMachineManager manager) =>
+            new(key, manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+
+        static async Task TriggerCompaction(IStateMachineManager manager, DurableDictionary<string, int> dict)
+        {
+            for (var i = 0; i < 11; i++)
+            {
+                dict["a"] = i;
+                await manager.WriteStateAsync(CancellationToken.None);
+            }
         }
     }
 }
