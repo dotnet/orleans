@@ -94,7 +94,6 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
             if (_jobShardCache.TryGetValue(blob.Name, out shard))
             {
                 LogReclaimingShardFromCache(_logger, blob.Name, siloAddress);
-                var blobClient = shard.BlobClient;
                 var metadata = blob.Metadata;
                 if (!await TryTakeOwnership(shard, metadata, siloAddress, cancellationToken))
                 {
@@ -115,7 +114,8 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                 shard = new AzureStorageJobShard(blob.Name, shardStartTime, maxDueTime, blobClient, metadata, blob.Properties.ETag);
                 if (!await TryTakeOwnership(shard, metadata, siloAddress, cancellationToken))
                 {
-                    // Someone else took over the shard
+                    // Someone else took over the shard, dispose and continue
+                    await shard.DisposeAsync();
                     LogShardOwnershipConflict(_logger, blob.Name, siloAddress);
                     continue;
                 }
