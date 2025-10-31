@@ -249,12 +249,12 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
                 await _shardManager.UnregisterShard(this.Silo, shard, _cts.Token);
                 LogUnregisteredShard(_logger, shard.Id);
             }
-            catch (Exception ex) when (ex is not TaskCanceledException)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 LogErrorUnregisteringShard(_logger, ex, shard.Id);
             }
         }
-        catch (TaskCanceledException)
+        catch (OperationCanceledException)
         {
             LogShardCancelled(_logger, shard.Id);
         }
