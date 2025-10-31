@@ -75,7 +75,7 @@ internal sealed class AzureStorageJobShard : JobShard
         var deletedJobs = new HashSet<string>();
         var jobRetryCounters = new Dictionary<string, (int dequeueCount, DateTimeOffset? newDueTime)>();
         
-        await foreach (var netstringData in ReadNetstringsAsync(stream))
+        await foreach (var netstringData in NetstringEncoder.DecodeAsync(stream))
         {
             var operation = JsonSerializer.Deserialize(netstringData, JobOperationJsonContext.Default.JobOperation);
             switch (operation.Type)
@@ -186,7 +186,7 @@ internal sealed class AzureStorageJobShard : JobShard
     private async Task AppendJobOperationAsync(JobOperation operation, CancellationToken cancellationToken)
     {
         var json = JsonSerializer.Serialize(operation, JobOperationJsonContext.Default.JobOperation);
-        var content = EncodeNetstring(json);
+        var content = NetstringEncoder.Encode(json);
         using var stream = new MemoryStream(content);
         var result = await BlobClient.AppendBlockAsync(
             stream,
@@ -205,79 +205,7 @@ internal sealed class AzureStorageJobShard : JobShard
         Metadata = metadata;
     }
 
-    // TODO: Optimize using ArrayPool<byte>, Utf8Formatter, and stackalloc to reduce allocations
-    private static byte[] EncodeNetstring(string data)
-    {
-        var dataBytes = System.Text.Encoding.UTF8.GetBytes(data);
-        var lengthPrefix = System.Text.Encoding.UTF8.GetBytes($"{dataBytes.Length}:");
-        var result = new byte[lengthPrefix.Length + dataBytes.Length + 1];
-        
-        lengthPrefix.CopyTo(result, 0);
-        dataBytes.CopyTo(result, lengthPrefix.Length);
-        result[^1] = (byte)'\n';
-        
-        return result;
-    }
 
-    // TODO: Optimize using ArrayPool<byte>, Utf8Parser, and return ReadOnlyMemory<byte> to reduce allocations
-    private static async IAsyncEnumerable<string> ReadNetstringsAsync(Stream stream)
-    {
-        using var reader = new StreamReader(stream, leaveOpen: true);
-        
-        while (true)
-        {
-            // Read length
-            var lengthStr = "";
-            while (true)
-            {
-                var ch = reader.Read();
-                if (ch == -1)
-                {
-                    yield break;
-                }
-                
-                if (ch == ':')
-                {
-                    break;
-                }
-                
-                lengthStr += (char)ch;
-            }
-
-            if (string.IsNullOrWhiteSpace(lengthStr))
-            {
-                yield break;
-            }
-
-            if (!int.TryParse(lengthStr, out var length))
-            {
-                throw new InvalidDataException($"Invalid netstring length: {lengthStr}");
-            }
-
-            // Read data
-            var buffer = new char[length];
-            var totalRead = 0;
-            while (totalRead < length)
-            {
-                var read = await reader.ReadAsync(buffer, totalRead, length - totalRead);
-                if (read == 0)
-                {
-                    throw new InvalidDataException("Unexpected end of stream while reading netstring data");
-                }
-                
-                totalRead += read;
-            }
-
-            // Read trailing newline
-            var newline = reader.Read();
-            if (newline != '\n')
-            {
-                throw new InvalidDataException($"Expected newline at end of netstring, got '{(char)newline}'");
-            }
-
-            yield return new string(buffer);
-        }
-    }
 
     /// <summary>
     /// Stops the background storage processor and waits for all pending operations to complete.
