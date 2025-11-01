@@ -362,7 +362,7 @@ namespace Orleans.Runtime
 
             var candidates = new List<ICollectibleGrainContext>(count);
 
-            foreach (var bucket in buckets.OrderBy(b => b.Key))
+            foreach (var bucket in buckets.ToList().OrderBy(b => b.Key))
             {
                 foreach (var item in bucket.Value.Items)
                 {
