@@ -292,6 +292,12 @@ namespace Orleans.Journaling
         public override readonly string ToString() { throw null; }
     }
 
+    public sealed partial class StateMachineManagerOptions
+    {
+        public static readonly System.TimeSpan DEFAULT_RETIREMENT_GRACE_PERIOD;
+        public System.TimeSpan RetirementGracePeriod { get { throw null; } set { } }
+    }
+
     public readonly partial struct StateMachineStorageWriter
     {
         private readonly object _dummy;
