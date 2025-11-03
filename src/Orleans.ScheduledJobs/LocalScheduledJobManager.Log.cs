@@ -20,9 +20,9 @@ internal partial class LocalScheduledJobManager
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "Creating new shard for key {ShardKey}, assigned to this silo: {AssignToMe}"
+        Message = "Creating new shard for key {ShardKey}"
     )]
-    private static partial void LogCreatingNewShard(ILogger logger, DateTimeOffset shardKey, bool assignToMe);
+    private static partial void LogCreatingNewShard(ILogger logger, DateTimeOffset shardKey);
 
     [LoggerMessage(
         Level = LogLevel.Information,

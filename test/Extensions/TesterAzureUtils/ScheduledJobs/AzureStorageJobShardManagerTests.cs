@@ -10,13 +10,16 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orleans.Internal;
+using Orleans.ScheduledJobs;
 using Orleans.ScheduledJobs.AzureStorage;
 using Xunit;
+using Xunit.Sdk;
 
 namespace Tester.AzureUtils.ScheduledJobs;
 
 [TestCategory("ScheduledJobs")]
-public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
+public class AzureStorageJobShardManagerTests : AzureStorageBasicTests, IAsyncDisposable
 {
     private readonly IDictionary<string, string> _metadata = new Dictionary<string, string>
     {
@@ -24,68 +27,117 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         { "Purpose", "Testing" }
     };
 
+    internal InMemoryClusterMembershipService MembershipService { get; }
+
+    internal IOptions<AzureStorageJobShardOptions> StorageOptions { get; }
+
+    public AzureStorageJobShardManagerTests()
+    {
+        MembershipService = new InMemoryClusterMembershipService();
+        StorageOptions = Options.Create(new AzureStorageJobShardOptions());
+        StorageOptions.Value.ConfigureTestDefaults();
+        StorageOptions.Value.ContainerName = "test-container-" + Guid.NewGuid().ToString("N");
+    }
+
+    public async ValueTask DisposeAsync() 
+    {
+        // Cleanup storage container
+        var client = StorageOptions.Value.BlobServiceClient;
+        var container = client.GetBlobContainerClient(StorageOptions.Value.ContainerName);
+        await container.DeleteIfExistsAsync();
+    }
+
+    public class TestLocalSiloDetails : ILocalSiloDetails
+    {
+        public TestLocalSiloDetails(SiloAddress siloAddress)
+        {
+            SiloAddress = siloAddress;
+        }
+
+        public string Name => SiloAddress.ToString();
+
+        public string ClusterId => "TestCluster";
+
+        public string DnsHostName => SiloAddress.ToString();
+
+        public SiloAddress SiloAddress { get; }
+
+        public SiloAddress GatewayAddress => SiloAddress;
+    }
+
+    internal AzureStorageJobShardManager CreateManager(SiloAddress siloAddress)
+    {
+        var localSiloDetails = new TestLocalSiloDetails(siloAddress);
+        return new AzureStorageJobShardManager(localSiloDetails, StorageOptions, MembershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+    }
+
+    internal void SetSiloStatus(SiloAddress siloAddress, SiloStatus status)
+    {
+        MembershipService.SetSiloStatus(siloAddress, status);
+    }
+
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_Creation_Assignation()
     {
-        var options = Options.Create(new AzureStorageJobShardOptions());
-        options.Value.ConfigureTestDefaults();
+        var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
 
-        var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
-
-        var membershipService = new InMemoryClusterMembershipService();
-
-        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, "creation-assignation-" + Guid.NewGuid(), membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
+        SetSiloStatus(silo1Address, SiloStatus.Active);
+        SetSiloStatus(silo2Address, SiloStatus.Active);
+        var silo1Manager = CreateManager(silo1Address);
+        var silo2Manager = CreateManager(silo2Address);
 
         var date = DateTimeOffset.UtcNow;
         var maxDate = date.AddHours(1);
 
         // Register multiple shards and ensure they are distinct
         // two of them have the same time range
-        var shard1 = await manager.RegisterShard(localAddress, date, maxDate, _metadata, assignToCreator: true);
-        var shard2 = await manager.RegisterShard(localAddress, date, maxDate, _metadata, assignToCreator: true);
-        var shard3 = await manager.RegisterShard(localAddress, date.AddHours(2), maxDate, _metadata, assignToCreator: false);
+        var shard1 = await silo1Manager.CreateShardAsync(date, maxDate, _metadata, CancellationToken.None);
+        var shard2 = await silo1Manager.CreateShardAsync(date, maxDate, _metadata, CancellationToken.None);
+        var shard3 = await silo1Manager.CreateShardAsync(date.AddHours(2), maxDate, _metadata, CancellationToken.None);
 
         Assert.Distinct([shard1.Id, shard2.Id, shard3.Id]);
 
-        // shard3 was not assigned to the creator silo
-        var assignedShard = Assert.Single(await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(3)));
-        Assert.Equal(shard3.Id, assignedShard.Id);
+        // All shards are now assigned to the creator silo
+        var assignedShards = await silo1Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), CancellationToken.None);
+        Assert.Equal(3, assignedShards.Count);
+        Assert.Contains(shard1.Id, assignedShards.Select(s => s.Id));
+        Assert.Contains(shard2.Id, assignedShards.Select(s => s.Id));
+        Assert.Contains(shard3.Id, assignedShards.Select(s => s.Id));
+        var emptyShards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), CancellationToken.None);
+        Assert.Empty(emptyShards);
 
-        // Mark the local silo as dead, and create a new incarnation
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Dead);
-        localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 1);
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
+        // Mark the local silo as dead
+        SetSiloStatus(silo1Address, SiloStatus.Dead);
 
-        // Now we can take over the two first shards
-        var shards = await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1));
-        Assert.Equal(2, shards.Count);
+        // Now we can take over all three shards
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), CancellationToken.None);
+        Assert.Equal(3, shards.Count);
         Assert.Contains(shard1.Id, shards.Select(s => s.Id));
         Assert.Contains(shard2.Id, shards.Select(s => s.Id));
+        Assert.Contains(shard3.Id, shards.Select(s => s.Id));
 
         // Register another silo
-        var otherSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
-        membershipService.SetSiloStatus(otherSilo, SiloStatus.Active);
+        var silo3Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5002), 0);
+        SetSiloStatus(silo3Address, SiloStatus.Active);
+        var silo3Manager = CreateManager(silo3Address);
 
         // No unassigned shards
-        Assert.Empty(await manager.AssignJobShardsAsync(otherSilo, DateTime.UtcNow.AddHours(1)));
+        Assert.Empty(await silo3Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None));
     }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_ReadFrozenShard()
     {
-        var options = Options.Create(new AzureStorageJobShardOptions());
-        options.Value.ConfigureTestDefaults();
-
-        var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
-        var membershipService = new InMemoryClusterMembershipService();
-        var prefix = "read-frozen-shard-" + Guid.NewGuid();
-        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
-
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
+        var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
+        SetSiloStatus(silo1Address, SiloStatus.Active);
+        SetSiloStatus(silo2Address, SiloStatus.Active);
+        var silo1Manager = CreateManager(silo1Address);
+        var silo2Manager = CreateManager(silo2Address);
 
         var date = DateTime.UtcNow;
-        var shard1 = await manager.RegisterShard(localAddress, date, date.AddHours(1), _metadata, assignToCreator: false);
+        var shard1 = await silo1Manager.CreateShardAsync(date, date.AddHours(1), _metadata, CancellationToken.None);
 
         // Schedule some jobs
         await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
@@ -93,14 +145,11 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         await shard1.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(6), null, CancellationToken.None);
         await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job4", DateTime.UtcNow.AddSeconds(15), null, CancellationToken.None);
 
-        // Mark the local silo as dead, and create a new incarnation
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Dead);
-        localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 1);
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
+        // Mark the silo1 as dead, and create a new incarnation
+        SetSiloStatus(silo1Address, SiloStatus.Dead);
 
         // Take over the shard
-        manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
-        var shards = await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1));
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None);
         Assert.Single(shards);
         shard1 = shards[0];
 
@@ -113,27 +162,23 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
             counter++;
         }
         Assert.Equal(5, counter);
-        await manager.UnregisterShard(localAddress, shard1);
+        await silo2Manager.UnregisterShardAsync(shard1, CancellationToken.None);
 
         // No unassigned shards
-        Assert.Empty(await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1)));
+        Assert.Empty(await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None));
     }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_LiveShard()
     {
         var startTime = DateTime.UtcNow;
-        var options = Options.Create(new AzureStorageJobShardOptions());
-        options.Value.ConfigureTestDefaults();
-
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
-        var membershipService = new InMemoryClusterMembershipService();
-        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, "live-shard-" + Guid.NewGuid(), membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
+        SetSiloStatus(localAddress, SiloStatus.Active);
+        var manager =CreateManager(localAddress);
 
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
         var date = DateTime.UtcNow;
-        var shard1 = await manager.RegisterShard(localAddress, date, date.AddYears(1), _metadata);
+        var shard1 = await manager.CreateShardAsync(date, date.AddYears(1), _metadata, CancellationToken.None);
 
         // Schedule some jobs
         await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job0", startTime.AddSeconds(5), null, CancellationToken.None);
@@ -154,26 +199,22 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         }
         Assert.Equal(4, counter);
         Assert.True(lastJob.DueTime <= DateTimeOffset.UtcNow);
-        await manager.UnregisterShard(localAddress, shard1);
+        await manager.UnregisterShardAsync(shard1, CancellationToken.None);
 
         // No unassigned shards
-        Assert.Empty(await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1)));
+        Assert.Empty(await manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None));
     }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_StopProcessingShard()
     {
-        var options = Options.Create(new AzureStorageJobShardOptions());
-        options.Value.ConfigureTestDefaults();
-
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
-        var membershipService = new InMemoryClusterMembershipService();
-        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, "stop-processing-" + Guid.NewGuid(), membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
+        SetSiloStatus(localAddress, SiloStatus.Active);
+        var manager = CreateManager(localAddress);
 
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
 
         var date = DateTime.UtcNow;
-        var shard1 = await manager.RegisterShard(localAddress, date, date.AddYears(1), _metadata, assignToCreator: true);
+        var shard1 = await manager.CreateShardAsync(date, date.AddYears(1), _metadata, CancellationToken.None);
 
         // Schedule some jobs
         await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
@@ -192,9 +233,9 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
             counter++;
         }
         Assert.Equal(2, counter);
-        await manager.UnregisterShard(localAddress, shard1);
+        await manager.UnregisterShardAsync(shard1, CancellationToken.None);
 
-        var shards = await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1));
+        var shards = await manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None);
         Assert.Single(shards);
         Assert.Equal(shard1.Id, shards[0].Id);
     }
@@ -202,16 +243,13 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_RetryJobLater()
     {
-        var options = Options.Create(new AzureStorageJobShardOptions());
-        options.Value.ConfigureTestDefaults();
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
-        var membershipService = new InMemoryClusterMembershipService();
-        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, "retry-job-later-" + Guid.NewGuid(), membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
+        SetSiloStatus(localAddress, SiloStatus.Active);
+        var manager = CreateManager(localAddress);
         var date = DateTime.UtcNow;
-        var shard1 = await manager.RegisterShard(localAddress, date, date.AddYears(1), _metadata);
+        var shard1 = await manager.CreateShardAsync(date, date.AddYears(1), _metadata, CancellationToken.None);
         // Schedule a job
-        var job =  await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
+        var job = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(40));
         await foreach (var jobCtx in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
         {
@@ -228,26 +266,25 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
             await shard1.RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
             break;
         }
-        await manager.UnregisterShard(localAddress, shard1);
+        await manager.UnregisterShardAsync(shard1, CancellationToken.None);
     }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_JobMetadata()
     {
-        var options = Options.Create(new AzureStorageJobShardOptions());
-        options.Value.ConfigureTestDefaults();
+        // Initialize 2 silos with two managers
+        var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
 
-        var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
-        var membershipService = new InMemoryClusterMembershipService();
-        var prefix = "job-metadata-" + Guid.NewGuid();
-        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
-
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
+        SetSiloStatus(silo1Address, SiloStatus.Active);
+        SetSiloStatus(silo2Address, SiloStatus.Active);
+        var silo1Manager = CreateManager(silo1Address);
+        var silo2Manager = CreateManager(silo2Address);
 
         var date = DateTime.UtcNow;
-        var shard1 = await manager.RegisterShard(localAddress, date, date.AddYears(1), _metadata, assignToCreator: true);
+        var shard = await silo1Manager.CreateShardAsync(date, date.AddYears(1), _metadata, CancellationToken.None);
 
-        // Schedule jobs with different metadata
+        // Schedule jobs with different metadata on a single shard
         var jobMetadata1 = new Dictionary<string, string>
         {
             { "Priority", "High" },
@@ -260,118 +297,85 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
             { "Category", "Notification" }
         };
 
-        var job1 = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), jobMetadata1, CancellationToken.None);
-        var job2 = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(10), jobMetadata2, CancellationToken.None);
-        var job3 = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddSeconds(15), null, CancellationToken.None);
+        var job1 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), jobMetadata1, CancellationToken.None);
+        var job2 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(10), jobMetadata2, CancellationToken.None);
+        var job3 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddSeconds(15), null, CancellationToken.None);
 
         // Verify metadata is set on the scheduled jobs
-        Assert.NotNull(job1.Metadata);
-        Assert.Equal(3, job1.Metadata.Count);
-        Assert.Equal("High", job1.Metadata["Priority"]);
-        Assert.Equal("Payment", job1.Metadata["Category"]);
-        Assert.Equal("12345", job1.Metadata["RequestId"]);
-
-        Assert.NotNull(job2.Metadata);
-        Assert.Equal(2, job2.Metadata.Count);
-        Assert.Equal("Low", job2.Metadata["Priority"]);
-        Assert.Equal("Notification", job2.Metadata["Category"]);
-
+        Assert.Equal(jobMetadata1, job1.Metadata);
+        Assert.Equal(jobMetadata2, job2.Metadata);
         Assert.Null(job3.Metadata);
 
-        // Mark the local silo as dead and create a new incarnation to test metadata persistence
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Dead);
-        localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 1);
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
+        // Mark the silo owning the shard as dead
+        SetSiloStatus(silo1Address, SiloStatus.Dead);
 
-        // Take over the shard
-        manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
-        var shards = await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1));
+        // Take over the shard with the other silo
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None);
         Assert.Single(shards);
-        shard1 = shards[0];
+        shard = shards[0];
 
         // Consume jobs and verify metadata is preserved
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        var jobsConsumed = 0;
-        await foreach (var jobCtx in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        var consumedJobs = new List<ScheduledJob>();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await foreach (var jobCtx in shard.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
         {
-            jobsConsumed++;
-            
-            if (jobCtx.Job.Name == "job1")
-            {
-                Assert.NotNull(jobCtx.Job.Metadata);
-                Assert.Equal(3, jobCtx.Job.Metadata.Count);
-                Assert.Equal("High", jobCtx.Job.Metadata["Priority"]);
-                Assert.Equal("Payment", jobCtx.Job.Metadata["Category"]);
-                Assert.Equal("12345", jobCtx.Job.Metadata["RequestId"]);
-            }
-            else if (jobCtx.Job.Name == "job2")
-            {
-                Assert.NotNull(jobCtx.Job.Metadata);
-                Assert.Equal(2, jobCtx.Job.Metadata.Count);
-                Assert.Equal("Low", jobCtx.Job.Metadata["Priority"]);
-                Assert.Equal("Notification", jobCtx.Job.Metadata["Category"]);
-            }
-            else if (jobCtx.Job.Name == "job3")
-            {
-                Assert.Null(jobCtx.Job.Metadata);
-            }
-
-            await shard1.RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
+            consumedJobs.Add(jobCtx.Job);
+            await shard.RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
         }
 
-        Assert.Equal(3, jobsConsumed);
-        await manager.UnregisterShard(localAddress, shard1);
+        Assert.Equal(3, consumedJobs.Count);
+        
+        var consumedJob1 = consumedJobs.First(j => j.Name == "job1");
+        var consumedJob2 = consumedJobs.First(j => j.Name == "job2");
+        var consumedJob3 = consumedJobs.First(j => j.Name == "job3");
 
-        // No unassigned shards
-        Assert.Empty(await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1)));
+        Assert.Equal(jobMetadata1, consumedJob1.Metadata);
+        Assert.Equal(jobMetadata2, consumedJob2.Metadata);
+        Assert.Null(consumedJob3.Metadata);
+
+        await silo2Manager.UnregisterShardAsync(shard, CancellationToken.None);
     }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_JobCancellation()
     {
-        var options = Options.Create(new AzureStorageJobShardOptions());
-        options.Value.ConfigureTestDefaults();
+        // Initialize 2 silos with two managers
+        var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
 
-        var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
-        var membershipService = new InMemoryClusterMembershipService();
-        var prefix = "job-cancellation-" + Guid.NewGuid();
-        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
-
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
+        SetSiloStatus(silo1Address, SiloStatus.Active);
+        SetSiloStatus(silo2Address, SiloStatus.Active);
+        var silo1Manager = CreateManager(silo1Address);
+        var silo2Manager = CreateManager(silo2Address);
 
         var date = DateTime.UtcNow;
-        var shard1 = await manager.RegisterShard(localAddress, date, date.AddYears(1), _metadata, assignToCreator: true);
+        var shard = await silo1Manager.CreateShardAsync(date, date.AddYears(1), _metadata, CancellationToken.None);
 
-        // Schedule multiple jobs
-        var job1 = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
-        var job2 = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(10), null, CancellationToken.None);
-        var job3 = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddSeconds(15), null, CancellationToken.None);
-        var job4 = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target4"), "job4", DateTime.UtcNow.AddSeconds(20), null, CancellationToken.None);
+        // Schedule multiple jobs in a single shard
+        var job1 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
+        var job2 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(10), null, CancellationToken.None);
+        var job3 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddSeconds(15), null, CancellationToken.None);
+        var job4 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target4"), "job4", DateTime.UtcNow.AddSeconds(20), null, CancellationToken.None);
 
         // Cancel job2 before processing starts
-        await shard1.RemoveJobAsync(job2.Id, CancellationToken.None);
-
-        // Verify initial job count (should be 3 after cancellation)
-        var jobCount = await shard1.GetJobCountAsync();
-        Assert.Equal(3, jobCount);
+        await shard.RemoveJobAsync(job2.Id, CancellationToken.None);
 
         // Start consuming jobs
         var consumedJobs = new List<string>();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        
-        await foreach (var jobCtx in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+
+        await foreach (var jobCtx in shard.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
         {
             consumedJobs.Add(jobCtx.Job.Name);
-            
+
             // Cancel job4 during processing (after job1 is consumed)
             if (jobCtx.Job.Name == "job1")
             {
-                await shard1.RemoveJobAsync(job4.Id, CancellationToken.None);
+                await shard.RemoveJobAsync(job4.Id, CancellationToken.None);
             }
-            
-            await shard1.RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
-            
-            // Stop after consuming 2 jobs (job1 and job3)
+
+            await shard.RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
+
             if (consumedJobs.Count >= 2)
             {
                 break;
@@ -385,228 +389,150 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         Assert.DoesNotContain("job2", consumedJobs);
         Assert.DoesNotContain("job4", consumedJobs);
 
-        // Mark shard as dead and reassign to verify cancelled jobs are not in storage
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Dead);
-        localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 1);
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
+        // Mark the shard owner silo as dead and reassign to verify cancelled jobs are not in storage
+        SetSiloStatus(silo1Address, SiloStatus.Dead);
 
-        // Take over the shard
-        manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
-        var shards = await manager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1));
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None);
         Assert.Single(shards);
-        shard1 = shards[0];
+        shard = shards[0];
 
-        // Verify no jobs remain (job1 and job3 were removed after consumption, job2 and job4 were cancelled)
-        var remainingJobCount = await shard1.GetJobCountAsync();
-        Assert.Equal(0, remainingJobCount);
-
-        // Ensure no jobs are yielded when consuming
         var hasJobs = false;
         cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        await foreach (var jobCtx in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shard.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
         {
             hasJobs = true;
             break;
         }
 
         Assert.False(hasJobs);
-        await manager.UnregisterShard(localAddress, shard1);
+        await silo2Manager.UnregisterShardAsync(shard, CancellationToken.None);
     }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_ConcurrentShardAssignment_OwnershipConflicts()
     {
-        var options = Options.Create(new AzureStorageJobShardOptions());
-        options.Value.ConfigureTestDefaults();
-
+        // Initialize 3 silos with 3 managers
         var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
+        var silo3Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5002), 0);
 
-        var membershipService = new InMemoryClusterMembershipService();
-        membershipService.SetSiloStatus(silo1Address, SiloStatus.Active);
-        membershipService.SetSiloStatus(silo2Address, SiloStatus.Active);
-
-        var prefix = "concurrent-ownership-" + Guid.NewGuid();
-        var manager1 = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
-        var manager2 = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
+        SetSiloStatus(silo1Address, SiloStatus.Active);
+        SetSiloStatus(silo2Address, SiloStatus.Active);
+        SetSiloStatus(silo3Address, SiloStatus.Active);
+        var silo1Manager = CreateManager(silo1Address);
+        var silo2Manager = CreateManager(silo2Address);
+        var silo3Manager = CreateManager(silo3Address);
 
         var date = DateTime.UtcNow;
 
-        var shard = await manager1.RegisterShard(silo1Address, date, date.AddHours(1), _metadata, assignToCreator: false);
+        // Create two shards on the first silo
+        var shard1 = await silo1Manager.CreateShardAsync(date, date.AddHours(1), _metadata, CancellationToken.None);
+        var shard2 = await silo1Manager.CreateShardAsync(date, date.AddHours(2), _metadata, CancellationToken.None);
 
-        membershipService.SetSiloStatus(silo1Address, SiloStatus.Dead);
+        // Mark the first silo as dead
+        SetSiloStatus(silo1Address, SiloStatus.Dead);
 
-        var assignTask1 = manager1.AssignJobShardsAsync(silo2Address, DateTime.UtcNow.AddHours(1));
-        var assignTask2 = manager2.AssignJobShardsAsync(silo2Address, DateTime.UtcNow.AddHours(1));
+        // Concurrently try to assign shards from silo2 and silo3
+        var assignTask2 = silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), CancellationToken.None);
+        var assignTask3 = silo3Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), CancellationToken.None);
 
-        await Task.WhenAll(assignTask1, assignTask2);
+        await Task.WhenAll(assignTask2, assignTask3);
 
-        var shards1 = await assignTask1;
         var shards2 = await assignTask2;
+        var shards3 = await assignTask3;
 
-        var totalAssigned = shards1.Count + shards2.Count;
-        Assert.Equal(1, totalAssigned);
+        // Verify that only one silo was able to assign each shard (no duplicates)
+        var totalAssignments = shards2.Count + shards3.Count;
+        Assert.Equal(2, totalAssignments);
 
-        var assignedShard = shards1.Count > 0 ? shards1[0] : shards2[0];
-        Assert.Equal(shard.Id, assignedShard.Id);
+        var allAssignedShardIds = shards2.Select(s => s.Id).Concat(shards3.Select(s => s.Id)).ToList();
+        Assert.Contains(shard1.Id, allAssignedShardIds);
+        Assert.Contains(shard2.Id, allAssignedShardIds);
+        Assert.Equal(2, allAssignedShardIds.Distinct().Count());
     }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_ShardRegistrationRetry_IdCollisions()
     {
-        var options = Options.Create(new AzureStorageJobShardOptions());
-        options.Value.ConfigureTestDefaults();
-
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
-        var membershipService = new InMemoryClusterMembershipService();
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
+        SetSiloStatus(localAddress, SiloStatus.Active);
 
-        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, "registration-retry-" + Guid.NewGuid(), membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
+        var manager = CreateManager(localAddress);
 
         var date = DateTime.UtcNow;
 
-        var shard1 = await manager.RegisterShard(localAddress, date, date.AddHours(1), _metadata, assignToCreator: true);
-        var shard2 = await manager.RegisterShard(localAddress, date, date.AddHours(1), _metadata, assignToCreator: true);
-        var shard3 = await manager.RegisterShard(localAddress, date, date.AddHours(1), _metadata, assignToCreator: true);
+        var shard1 = await manager.CreateShardAsync(date, date.AddHours(1), _metadata, CancellationToken.None);
+        var shard2 = await manager.CreateShardAsync(date, date.AddHours(1), _metadata, CancellationToken.None);
+        var shard3 = await manager.CreateShardAsync(date, date.AddHours(1), _metadata, CancellationToken.None);
 
         Assert.Distinct([shard1.Id, shard2.Id, shard3.Id]);
-
-        Assert.Contains($"{date:yyyyMMddHHmm}-{localAddress.ToParsableString()}-", shard1.Id);
-        Assert.Contains($"{date:yyyyMMddHHmm}-{localAddress.ToParsableString()}-", shard2.Id);
-        Assert.Contains($"{date:yyyyMMddHHmm}-{localAddress.ToParsableString()}-", shard3.Id);
-    }
-
-    [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
-    public async Task AzureStorageJobShardManager_MultipleSilosCompetingForShard()
-    {
-        var options = Options.Create(new AzureStorageJobShardOptions());
-        options.Value.ConfigureTestDefaults();
-
-        var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
-        var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
-        var silo3Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5002), 0);
-
-        var membershipService = new InMemoryClusterMembershipService();
-        membershipService.SetSiloStatus(silo1Address, SiloStatus.Active);
-
-        var prefix = "multiple-silos-" + Guid.NewGuid();
-        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
-
-        var date = DateTime.UtcNow;
-        var shard = await manager.RegisterShard(silo1Address, date, date.AddHours(1), _metadata, assignToCreator: false);
-
-        membershipService.SetSiloStatus(silo1Address, SiloStatus.Dead);
-        membershipService.SetSiloStatus(silo2Address, SiloStatus.Active);
-        membershipService.SetSiloStatus(silo3Address, SiloStatus.Active);
-
-        var manager2 = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
-        var manager3 = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
-
-        var task2 = manager2.AssignJobShardsAsync(silo2Address, DateTime.UtcNow.AddHours(1));
-        var task3 = manager3.AssignJobShardsAsync(silo3Address, DateTime.UtcNow.AddHours(1));
-
-        await Task.WhenAll(task2, task3);
-
-        var shards2 = await task2;
-        var shards3 = await task3;
-
-        var totalAssignments = shards2.Count + shards3.Count;
-        Assert.Equal(1, totalAssignments);
-
-        var assignedToSilo2 = shards2.Any(s => s.Id == shard.Id);
-        var assignedToSilo3 = shards3.Any(s => s.Id == shard.Id);
-
-        Assert.True(assignedToSilo2 ^ assignedToSilo3);
-    }
-
-    [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
-    public async Task AzureStorageJobShardManager_UnregisterShard_WrongOwner()
-    {
-        var options = Options.Create(new AzureStorageJobShardOptions());
-        options.Value.ConfigureTestDefaults();
-
-        var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
-        var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
-
-        var membershipService = new InMemoryClusterMembershipService();
-        membershipService.SetSiloStatus(silo1Address, SiloStatus.Active);
-        membershipService.SetSiloStatus(silo2Address, SiloStatus.Active);
-
-        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, "unregister-wrong-owner-" + Guid.NewGuid(), membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
-
-        var date = DateTime.UtcNow;
-        var shard = await manager.RegisterShard(silo1Address, date, date.AddHours(1), _metadata, assignToCreator: true);
-
-        await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
-
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await manager.UnregisterShard(silo2Address, shard));
-
-        Assert.Contains("Cannot unregister a shard owned by another silo", exception.Message);
-
-        var jobCount = await shard.GetJobCountAsync();
-        Assert.Equal(1, jobCount);
     }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_UnregisterShard_WithJobsRemaining()
     {
-        var options = Options.Create(new AzureStorageJobShardOptions());
-        options.Value.ConfigureTestDefaults();
+        // Initialize 2 silos with 2 managers
+        var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
 
-        var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
-        var membershipService = new InMemoryClusterMembershipService();
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
-
-        var prefix = "unregister-jobs-remaining-" + Guid.NewGuid();
-        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
+        SetSiloStatus(silo1Address, SiloStatus.Active);
+        SetSiloStatus(silo2Address, SiloStatus.Active);
+        var silo1Manager = CreateManager(silo1Address);
+        var silo2Manager = CreateManager(silo2Address);
 
         var date = DateTime.UtcNow;
-        var shard = await manager.RegisterShard(localAddress, date, date.AddHours(1), _metadata, assignToCreator: true);
+        var shard = await silo1Manager.CreateShardAsync(date, date.AddHours(1), _metadata, CancellationToken.None);
 
+        // Create a shard on silo1, schedule some jobs, then unregister the shard
         await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
         await shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(10), null, CancellationToken.None);
 
-        var jobCount = await shard.GetJobCountAsync();
-        Assert.Equal(2, jobCount);
+        await silo1Manager.UnregisterShardAsync(shard, CancellationToken.None);
 
-        await manager.UnregisterShard(localAddress, shard);
+        // The shard should NOT have been deleted since there were jobs remaining
+        SetSiloStatus(silo1Address, SiloStatus.Dead);
 
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Dead);
-        var newSiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 1);
-        membershipService.SetSiloStatus(newSiloAddress, SiloStatus.Active);
-
-        var newManager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
-        var shards = await newManager.AssignJobShardsAsync(newSiloAddress, DateTime.UtcNow.AddHours(1));
-
+        // Take over the shard from silo2 and consume the jobs
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None);
         Assert.Single(shards);
         Assert.Equal(shard.Id, shards[0].Id);
 
-        var remainingJobs = await shards[0].GetJobCountAsync();
-        Assert.Equal(2, remainingJobs);
+        var consumedJobs = new List<string>();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        await foreach (var jobCtx in shards[0].ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        {
+            consumedJobs.Add(jobCtx.Job.Name);
+            await shards[0].RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
+        }
+
+        Assert.Equal(2, consumedJobs.Count);
+        Assert.Contains("job1", consumedJobs);
+        Assert.Contains("job2", consumedJobs);
+        await silo2Manager.UnregisterShardAsync(shards[0], CancellationToken.None);
     }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShardManager_ShardMetadataMerge()
     {
-        var options = Options.Create(new AzureStorageJobShardOptions());
-        options.Value.ConfigureTestDefaults();
+        // Initialize 2 silos with 2 managers
+        var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
 
-        var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
-        var membershipService = new InMemoryClusterMembershipService();
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
-
-        var prefix = "metadata-merge-" + Guid.NewGuid();
-        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
+        SetSiloStatus(silo1Address, SiloStatus.Active);
+        SetSiloStatus(silo2Address, SiloStatus.Active);
+        var silo1Manager = CreateManager(silo1Address);
+        var silo2Manager = CreateManager(silo2Address);
 
         var date = DateTime.UtcNow;
+
+        // Create a shard on silo1 with some metadata, then update the metadata and verify it is merged correctly
         var customMetadata = new Dictionary<string, string>
         {
             { "Environment", "Production" },
             { "TenantId", "tenant-123" }
         };
 
-        var shard = await manager.RegisterShard(localAddress, date, date.AddHours(1), customMetadata, assignToCreator: false);
+        var shard = await silo1Manager.CreateShardAsync(date, date.AddHours(1), customMetadata, CancellationToken.None);
         Assert.NotNull(shard.Metadata);
         Assert.All(customMetadata, kvp =>
         {
@@ -614,17 +540,21 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
             Assert.Equal(kvp.Value, shard.Metadata[kvp.Key]);
         });
 
-        var localAddress2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 1);
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Dead);
-        membershipService.SetSiloStatus(localAddress2, SiloStatus.Active);
+        // Schedule a job to ensure shard persistence
+        await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
 
-        var manager2 = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
-        var shard2 = await manager2.RegisterShard(localAddress, date, date.AddHours(1), customMetadata, assignToCreator: false);
-        Assert.NotNull(shard2.Metadata);
+        SetSiloStatus(silo1Address, SiloStatus.Dead);
+
+        // Take over the shard from silo2 and verify the metadata is preserved
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None);
+        Assert.Single(shards);
+        shard = shards[0];
+
+        Assert.NotNull(shard.Metadata);
         Assert.All(customMetadata, kvp =>
         {
-            Assert.True(shard2.Metadata.ContainsKey(kvp.Key));
-            Assert.Equal(kvp.Value, shard2.Metadata[kvp.Key]);
+            Assert.True(shard.Metadata.ContainsKey(kvp.Key));
+            Assert.Equal(kvp.Value, shard.Metadata[kvp.Key]);
         });
     }
 
@@ -633,22 +563,19 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShard_MultipleOperationsBatched()
     {
-        var options = Options.Create(new AzureStorageJobShardOptions());
-        options.Value.ConfigureTestDefaults();
-        options.Value.MinBatchSize = 5; // Wait for at least 5 operations
-        options.Value.BatchFlushInterval = TimeSpan.FromMilliseconds(100);
+        // Configure batching options to batch multiple operations
+        StorageOptions.Value.MinBatchSize = 5;
+        StorageOptions.Value.MaxBatchSize = 50;
+        StorageOptions.Value.BatchFlushInterval = TimeSpan.FromMilliseconds(100);
 
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
-        var membershipService = new InMemoryClusterMembershipService();
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
-
-        var prefix = "batched-ops-" + Guid.NewGuid();
-        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
+        SetSiloStatus(localAddress, SiloStatus.Active);
+        var manager = CreateManager(localAddress);
 
         var date = DateTime.UtcNow;
-        var shard = await manager.RegisterShard(localAddress, date, date.AddHours(1), _metadata, assignToCreator: true);
+        var shard = await manager.CreateShardAsync(date, date.AddHours(1), _metadata, CancellationToken.None);
 
-        // Schedule 10 jobs rapidly
+        // Schedule 10 jobs rapidly to trigger batching
         var tasks = new List<Task>();
         for (int i = 0; i < 10; i++)
         {
@@ -657,39 +584,48 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
 
         await Task.WhenAll(tasks);
 
-        // Verify all jobs were persisted by reloading shard
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Dead);
-        localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 1);
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
+        // Wait for batches to flush
+        await Task.Delay(TimeSpan.FromMilliseconds(300));
 
-        var newManager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
-        var shards = await newManager.AssignJobShardsAsync(localAddress, DateTime.UtcNow.AddHours(1));
+        // Verify batching occurred - should have fewer committed blocks than individual operations
+        var azureShard = (AzureStorageJobShard)shard;
+        Assert.True(azureShard.CommitedBlockCount < 10, $"Expected batching to reduce block count, but got {azureShard.CommitedBlockCount}");
+
+        // Verify all jobs were persisted by marking silo as dead and reassigning
+        SetSiloStatus(localAddress, SiloStatus.Dead);
+        var newSiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 1);
+        SetSiloStatus(newSiloAddress, SiloStatus.Active);
+
+        var newManager = CreateManager(newSiloAddress);
+        var shards = await newManager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None);
         Assert.Single(shards);
 
-        var jobCount = await shards[0].GetJobCountAsync();
-        Assert.Equal(10, jobCount);
+        var consumedJobs = new List<string>();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        await foreach (var jobCtx in shards[0].ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        {
+            consumedJobs.Add(jobCtx.Job.Name);
+            await shards[0].RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
+        }
 
-        await newManager.UnregisterShard(localAddress, shards[0]);
+        Assert.Equal(10, consumedJobs.Count);
+        await newManager.UnregisterShardAsync(shards[0], CancellationToken.None);
     }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShard_PartialBatchFlushesOnTimeout()
     {
-        var options = Options.Create(new AzureStorageJobShardOptions());
-        options.Value.ConfigureTestDefaults();
-        options.Value.MaxBatchSize = 100;
-        options.Value.MinBatchSize = 10; // Require 10 operations
-        options.Value.BatchFlushInterval = TimeSpan.FromMilliseconds(500);
+        // Configure batching to require 10 operations but with a short timeout
+        StorageOptions.Value.MinBatchSize = 10;
+        StorageOptions.Value.MaxBatchSize = 100;
+        StorageOptions.Value.BatchFlushInterval = TimeSpan.FromMilliseconds(200);
 
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
-        var membershipService = new InMemoryClusterMembershipService();
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
-
-        var prefix = "partial-batch-timeout-" + Guid.NewGuid();
-        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
+        SetSiloStatus(localAddress, SiloStatus.Active);
+        var manager = CreateManager(localAddress);
 
         var date = DateTime.UtcNow;
-        var shard = await manager.RegisterShard(localAddress, date, date.AddHours(1), _metadata, assignToCreator: true);
+        var shard = await manager.CreateShardAsync(date, date.AddHours(1), _metadata, CancellationToken.None);
 
         // Schedule only 3 jobs (less than MinBatchSize of 10)
         var tasks = new Task[3];
@@ -697,83 +633,122 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         tasks[1] = shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(6), null, CancellationToken.None);
         tasks[2] = shard.TryScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddSeconds(7), null, CancellationToken.None);
 
-        // Get the number of committed blocks on the blob
         await Task.WhenAll(tasks);
+
+        // Verify that the partial batch was flushed - should have 1 committed block
         var azureShard = (AzureStorageJobShard)shard;
-        Assert.True(azureShard.CommitedBlockCount < 3);
+        Assert.Equal(1, azureShard.CommitedBlockCount);
 
-        // Verify jobs were persisted
-        var jobCount = await shard.GetJobCountAsync();
-        Assert.Equal(3, jobCount);
+        // Verify jobs were persisted despite not reaching MinBatchSize
+        SetSiloStatus(localAddress, SiloStatus.Dead);
+        var newSiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 1);
+        SetSiloStatus(newSiloAddress, SiloStatus.Active);
 
-        await manager.UnregisterShard(localAddress, shard);
+        var newManager = CreateManager(newSiloAddress);
+        var shards = await newManager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None);
+        Assert.Single(shards);
+
+        var consumedJobs = new List<string>();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        await foreach (var jobCtx in shards[0].ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        {
+            consumedJobs.Add(jobCtx.Job.Name);
+            await shards[0].RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
+        }
+
+        Assert.Equal(3, consumedJobs.Count);
+        await newManager.UnregisterShardAsync(shards[0], CancellationToken.None);
     }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShard_MaxBatchSizeEnforced()
     {
-        var options = Options.Create(new AzureStorageJobShardOptions());
-        options.Value.ConfigureTestDefaults();
-        options.Value.MinBatchSize = 1;
-        options.Value.MaxBatchSize = 20; // Limit to 20 operations per batch
+        // Configure batching with a small max batch size
+        StorageOptions.Value.MinBatchSize = 1;
+        StorageOptions.Value.MaxBatchSize = 20;
+        StorageOptions.Value.BatchFlushInterval = TimeSpan.FromMilliseconds(50);
 
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
-        var membershipService = new InMemoryClusterMembershipService();
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
-
-        var prefix = "max-batch-size-" + Guid.NewGuid();
-        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
+        SetSiloStatus(localAddress, SiloStatus.Active);
+        var manager = CreateManager(localAddress);
 
         var date = DateTime.UtcNow;
-        var shard = await manager.RegisterShard(localAddress, date, date.AddHours(1), _metadata, assignToCreator: true);
+        var shard = await manager.CreateShardAsync(date, date.AddHours(1), _metadata, CancellationToken.None);
 
-        // Schedule 50 jobs rapidly
+        // Schedule 50 jobs rapidly (exceeds MaxBatchSize of 20)
         var tasks = new List<Task>();
         for (int i = 0; i < 50; i++)
         {
-            tasks.Add(shard.TryScheduleJobAsync(GrainId.Create("type", $"target{i}"), $"job{i}", DateTime.UtcNow.AddSeconds(i + 5), null, CancellationToken.None));
+            tasks.Add(shard.TryScheduleJobAsync(GrainId.Create("type", $"target{i}"), $"job{i}", DateTime.UtcNow.AddMilliseconds(i + 5), null, CancellationToken.None));
         }
 
         await Task.WhenAll(tasks);
 
-        // Verify all jobs were persisted (should be split into multiple batches)
-        var jobCount = await shard.GetJobCountAsync();
-        Assert.Equal(50, jobCount);
+        // Wait for all batches to flush
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
 
-        await manager.UnregisterShard(localAddress, shard);
+        // Verify multiple batches were created due to MaxBatchSize limit
+        // With 50 jobs and MaxBatchSize=20, expect at least 3 blocks (50/20 = 2.5, rounded up)
+        var azureShard = (AzureStorageJobShard)shard;
+        Assert.True(azureShard.CommitedBlockCount >= 3, $"Expected at least 3 blocks for 50 jobs with MaxBatchSize=20, but got {azureShard.CommitedBlockCount}");
+
+        // Verify all jobs were persisted (should be split into multiple batches)
+        SetSiloStatus(localAddress, SiloStatus.Dead);
+        var newSiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 1);
+        SetSiloStatus(newSiloAddress, SiloStatus.Active);
+
+        var newManager = CreateManager(newSiloAddress);
+        var shards = await newManager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None);
+        Assert.Single(shards);
+
+        var consumedJobs = new List<string>();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await foreach (var jobCtx in shards[0].ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        {
+            consumedJobs.Add(jobCtx.Job.Name);
+            await shards[0].RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
+        }
+
+        Assert.Equal(50, consumedJobs.Count);
+        await newManager.UnregisterShardAsync(shards[0], CancellationToken.None);
     }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
     public async Task AzureStorageJobShard_MetadataOperationsBreakBatches()
     {
-        var options = Options.Create(new AzureStorageJobShardOptions());
-        options.Value.ConfigureTestDefaults();
-        options.Value.MinBatchSize = 10; // Require large batch
-        options.Value.BatchFlushInterval = TimeSpan.FromMilliseconds(500);
+        // Configure batching to require large batch
+        StorageOptions.Value.MinBatchSize = 10;
+        StorageOptions.Value.MaxBatchSize = 100;
+        StorageOptions.Value.BatchFlushInterval = TimeSpan.FromSeconds(5);
 
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
-        var membershipService = new InMemoryClusterMembershipService();
-        membershipService.SetSiloStatus(localAddress, SiloStatus.Active);
-
-        var prefix = "metadata-breaks-batch-" + Guid.NewGuid();
-        var manager = new AzureStorageJobShardManager(options.Value.BlobServiceClient, options.Value.ContainerName, prefix, membershipService, NullLogger<AzureStorageJobShardManager>.Instance, options.Value);
+        SetSiloStatus(localAddress, SiloStatus.Active);
+        var manager = CreateManager(localAddress);
 
         var date = DateTime.UtcNow;
-        var shard = await manager.RegisterShard(localAddress, date, date.AddHours(1), _metadata, assignToCreator: true);
+        var shard = await manager.CreateShardAsync(date, date.AddHours(1), _metadata, CancellationToken.None);
 
         // Schedule 5 jobs (less than MinBatchSize)
+        var tasks = new List<Task>();
         for (int i = 0; i < 5; i++)
         {
-            _ = shard.TryScheduleJobAsync(GrainId.Create("type", $"target{i}"), $"job{i}", DateTime.UtcNow.AddSeconds(i + 5), null, CancellationToken.None);
+            tasks.Add(shard.TryScheduleJobAsync(GrainId.Create("type", $"target{i}"), $"job{i}", DateTime.UtcNow.AddMilliseconds(i + 5), null, CancellationToken.None));
         }
 
         // Give operations time to queue
         await Task.Delay(50);
 
-        // Update metadata (should flush pending batch and process immediately)
+        // Verify no blocks committed yet (batch still pending)
         var azureShard = (AzureStorageJobShard)shard;
+        var blockCountBefore = azureShard.CommitedBlockCount;
+
+        // Update metadata (should flush pending batch and process immediately)
         var newMetadata = new Dictionary<string, string>(shard.Metadata) { ["Updated"] = "true" };
         await azureShard.UpdateBlobMetadata(newMetadata, CancellationToken.None);
+
+        await Task.WhenAll(tasks);
+
+        Assert.True(azureShard.CommitedBlockCount > blockCountBefore, "Expected metadata update to flush pending batch");
 
         // Verify metadata was updated
         var props = await azureShard.BlobClient.GetPropertiesAsync();
@@ -781,15 +756,29 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests
         Assert.Equal("true", props.Value.Metadata["Updated"]);
 
         // Verify jobs were persisted (even though batch was incomplete)
-        var jobCount = await shard.GetJobCountAsync();
-        Assert.Equal(5, jobCount);
+        SetSiloStatus(localAddress, SiloStatus.Dead);
+        var newSiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 1);
+        SetSiloStatus(newSiloAddress, SiloStatus.Active);
 
-        await manager.UnregisterShard(localAddress, shard);
+        var newManager = CreateManager(newSiloAddress);
+        var shards = await newManager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None);
+        Assert.Single(shards);
+
+        var consumedJobs = new List<string>();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        await foreach (var jobCtx in shards[0].ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        {
+            consumedJobs.Add(jobCtx.Job.Name);
+            await shards[0].RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
+        }
+
+        Assert.Equal(5, consumedJobs.Count);
+        await newManager.UnregisterShardAsync(shards[0], CancellationToken.None);
     }
 
     #endregion
 
-    private class InMemoryClusterMembershipService : IClusterMembershipService
+    public class InMemoryClusterMembershipService : IClusterMembershipService
     {
         public ClusterMembershipSnapshot CurrentSnapshot => new ClusterMembershipSnapshot(silos.ToImmutableDictionary(), new MembershipVersion(_version));
 

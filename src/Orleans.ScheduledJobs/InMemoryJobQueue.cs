@@ -144,6 +144,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
                         if (nextBucket.Count == 0)
                         {
                             _queue.Dequeue(); // Remove empty bucket
+                            continue;
                         }
                         else
                         {

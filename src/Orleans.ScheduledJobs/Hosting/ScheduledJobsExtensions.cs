@@ -67,7 +67,11 @@ public static class ScheduledJobsExtensions
     /// <returns>The provided <see cref="IServiceCollection"/>, for chaining.</returns>
     internal static IServiceCollection UseInMemoryScheduledJobs(this IServiceCollection services)
     {
-        services.AddSingleton<InMemoryJobShardManager>();
+        services.AddSingleton<InMemoryJobShardManager>(sp =>
+        {
+            var siloDetails = sp.GetRequiredService<ILocalSiloDetails>();
+            return new InMemoryJobShardManager(siloDetails.SiloAddress);
+        });
         services.AddFromExisting<JobShardManager, InMemoryJobShardManager>();
         return services;
     }

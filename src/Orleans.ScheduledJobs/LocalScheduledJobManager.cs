@@ -84,17 +84,13 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
                     }
                 }
 
-                // Assign to this silo if the shard start time is within the next 5 minutes
-                var assignToMe = key <= DateTimeOffset.UtcNow.Add(TimeSpan.FromMinutes(5));
+                // Always assign to creator
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
-                var newShard = await _shardManager.RegisterShard(this.Silo, key, key.Add(_options.ShardDuration), EmptyMetadata, assignToMe, linkedCts.Token);
-                LogCreatingNewShard(_logger, key, assignToMe);
+                var newShard = await _shardManager.CreateShardAsync(key, key.Add(_options.ShardDuration), EmptyMetadata, linkedCts.Token);
+                LogCreatingNewShard(_logger, key);
                 _writeableShards[key] = newShard;
                 _shardCache.TryAdd(newShard.Id, newShard);
-                if (assignToMe)
-                {
-                    StartRunningShardTracked(newShard);
-                }
+                StartRunningShardTracked(newShard);
             }
             finally
             {
@@ -194,13 +190,17 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
     {
         LogCheckingForUnassignedShards(_logger);
         
-        var shards = await _shardManager.AssignJobShardsAsync(this.Silo, DateTime.UtcNow.AddHours(1), _cts.Token);
+        var shards = await _shardManager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), _cts.Token);
         if (shards.Count > 0)
         {
             LogAssignedShards(_logger, shards.Count);
             foreach (var shard in shards)
             {
-                StartRunningShardTracked(shard);
+                // Only start the shard if it's not already running
+                if (!_runningShards.ContainsKey(shard.Id))
+                {
+                    StartRunningShardTracked(shard);
+                }
             }
         }
         else
@@ -246,7 +246,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
             // Unregister the shard
             try
             {
-                await _shardManager.UnregisterShard(this.Silo, shard, _cts.Token);
+                await _shardManager.UnregisterShardAsync(shard, _cts.Token);
                 LogUnregisteredShard(_logger, shard.Id);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
