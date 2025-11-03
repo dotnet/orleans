@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "DashboardCohosted": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:55355;http://localhost:55356"
+    }
+  }
+}
