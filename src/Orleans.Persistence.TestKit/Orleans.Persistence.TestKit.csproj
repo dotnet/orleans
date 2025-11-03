@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Persistence.TestKit</PackageId>
+    <Title>Microsoft Orleans Persistence test kit for xUnit</Title>
+    <Description>xUnit test kit library for testing custom IGrainStorage implementations</Description>
+    <PackageTags>$(PackageTags) PersistenceTestKit</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Persistence.TestKit</AssemblyName>
+    <RootNamespace>Orleans.Persistence.TestKit</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.extensibility.core" />
+    <PackageReference Include="xunit.extensibility.execution" />
+    <PackageReference Include="xunit.assert" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
+    <ProjectReference Include="..\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+  </ItemGroup>
+
+</Project>
