@@ -6,8 +6,6 @@
 
 	// Features to add to the dev container. More info: https://containers.dev/features
 	"features": {
-		"ghcr.io/devcontainers/features/azure-cli:1": {},
-		"ghcr.io/azure/azure-dev/azd:0": {},
 		"ghcr.io/devcontainers/features/docker-in-docker": {},
 		"ghcr.io/devcontainers/features/github-cli:1": {}
 	},
@@ -22,10 +20,7 @@
 		"vscode": {
 			"extensions": [
 				"ms-dotnettools.csdevkit",
-				"ms-azuretools.vscode-bicep",
-				"ms-azuretools.azure-dev",
-				"GitHub.copilot",
-				"ms-kubernetes-tools.vscode-kubernetes-tools"
+				"GitHub.copilot"
 			],
 			"settings": {
 				"remote.autoForwardPorts": true,
@@ -39,5 +34,5 @@
 	},
 
 	"onCreateCommand": "dotnet restore",
-	"postStartCommand": "dotnet dev-certs https --trust"
+	"postStartCommand": "dotnet dev-certs https --trust || true"
 }
