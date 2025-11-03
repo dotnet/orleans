@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
@@ -10,6 +11,7 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 using Orleans.Runtime;
+using Orleans.Serialization.Buffers.Adaptors;
 
 namespace Orleans.ScheduledJobs.AzureStorage;
 
@@ -74,8 +76,8 @@ internal sealed class AzureStorageJobShard : JobShard
         var addedJobs = new Dictionary<string, JobOperation>();
         var deletedJobs = new HashSet<string>();
         var jobRetryCounters = new Dictionary<string, (int dequeueCount, DateTimeOffset? newDueTime)>();
-        
-        await foreach (var operation in NetstringJsonSerializer.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation))
+
+        await foreach (var operation in NetstringJsonSerializer<JobOperation>.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation, cancellationToken))
         {
             switch (operation.Type)
             {
@@ -184,13 +186,23 @@ internal sealed class AzureStorageJobShard : JobShard
 
     private async Task AppendJobOperationAsync(JobOperation operation, CancellationToken cancellationToken)
     {
-        var content = NetstringJsonSerializer.Encode(operation, JobOperationJsonContext.Default.JobOperation);
-        using var stream = new MemoryStream(content);
-        var result = await BlobClient.AppendBlockAsync(
-            stream,
-            new AppendBlobAppendBlockOptions { Conditions = new AppendBlobRequestConditions { IfMatch = ETag } },
-            cancellationToken);
-        ETag = result.Value.ETag;
+        using var stream = PooledBufferStream.Rent();
+        //using var stream = new MemoryStream();
+        try
+        {
+            stream.Position = 0;
+            NetstringJsonSerializer<JobOperation>.Encode(operation, stream, JobOperationJsonContext.Default.JobOperation);
+            stream.Position = 0;
+            var result = await BlobClient.AppendBlockAsync(
+                stream,
+                new AppendBlobAppendBlockOptions { Conditions = new AppendBlobRequestConditions { IfMatch = ETag } },
+                cancellationToken);
+            ETag = result.Value.ETag;
+        }
+        finally
+        {
+            PooledBufferStream.Return(stream);
+        }
     }
 
     private async Task UpdateMetadataAsync(IDictionary<string, string> metadata, CancellationToken cancellationToken)

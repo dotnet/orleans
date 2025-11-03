@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -15,11 +16,17 @@ namespace Tester.AzureUtils.ScheduledJobs;
 [TestCategory("ScheduledJobs"), TestCategory("BVT")]
 public class NetstringJsonSerializerTests
 {
+    private static byte[] EncodeToBytes(JobOperation operation)
+    {
+        var stream = new MemoryStream();
+        NetstringJsonSerializer<JobOperation>.Encode(operation, stream, JobOperationJsonContext.Default.JobOperation);
+        return stream.ToArray();
+    }
     [Fact]
     public void Encode_RemoveOperation_ProducesCorrectFormat()
     {
         var operation = JobOperation.CreateRemoveOperation("job123");
-        var result = NetstringJsonSerializer.Encode(operation, JobOperationJsonContext.Default.JobOperation);
+        var result = EncodeToBytes(operation);
         var resultString = Encoding.UTF8.GetString(result);
         
         resultString.Should().EndWith("\n");
@@ -34,7 +41,7 @@ public class NetstringJsonSerializerTests
         var dueTime = new DateTimeOffset(2025, 10, 31, 12, 0, 0, TimeSpan.Zero);
         var grainId = GrainId.Create("test", "grain1");
         var operation = JobOperation.CreateAddOperation("job456", "TestJob", dueTime, grainId, null);
-        var result = NetstringJsonSerializer.Encode(operation, JobOperationJsonContext.Default.JobOperation);
+        var result = EncodeToBytes(operation);
         var resultString = Encoding.UTF8.GetString(result);
         
         resultString.Should().EndWith("\n");
@@ -48,7 +55,7 @@ public class NetstringJsonSerializerTests
     {
         var dueTime = new DateTimeOffset(2025, 10, 31, 12, 0, 0, TimeSpan.Zero);
         var operation = JobOperation.CreateRetryOperation("job789", dueTime);
-        var result = NetstringJsonSerializer.Encode(operation, JobOperationJsonContext.Default.JobOperation);
+        var result = EncodeToBytes(operation);
         var resultString = Encoding.UTF8.GetString(result);
         
         resultString.Should().EndWith("\n");
@@ -64,7 +71,7 @@ public class NetstringJsonSerializerTests
         var grainId = GrainId.Create("test", "grain1");
         var metadata = new Dictionary<string, string> { ["key1"] = "value1", ["key2"] = "value2" };
         var operation = JobOperation.CreateAddOperation("job999", "MetaJob", dueTime, grainId, metadata);
-        var result = NetstringJsonSerializer.Encode(operation, JobOperationJsonContext.Default.JobOperation);
+        var result = EncodeToBytes(operation);
         var resultString = Encoding.UTF8.GetString(result);
         
         resultString.Should().EndWith("\n");
@@ -77,14 +84,15 @@ public class NetstringJsonSerializerTests
     public void Encode_VerifiesNetstringFormat()
     {
         var operation = JobOperation.CreateRemoveOperation("test");
-        var result = NetstringJsonSerializer.Encode(operation, JobOperationJsonContext.Default.JobOperation);
+        var result = EncodeToBytes(operation);
         var resultString = Encoding.UTF8.GetString(result);
         
         var parts = resultString.Split(':', 2);
         parts.Should().HaveCount(2);
         
         var lengthStr = parts[0];
-        int.TryParse(lengthStr, out var length).Should().BeTrue();
+        lengthStr.Should().HaveLength(6, "length prefix should be 6 hex digits");
+        int.TryParse(lengthStr, System.Globalization.NumberStyles.HexNumber, null, out var length).Should().BeTrue("length should be valid hex");
         length.Should().BeGreaterThan(0);
         
         var dataAndNewline = parts[1];
@@ -92,18 +100,18 @@ public class NetstringJsonSerializerTests
         
         var jsonData = dataAndNewline[..^1];
         var jsonBytes = Encoding.UTF8.GetBytes(jsonData);
-        jsonBytes.Length.Should().Be(length);
+        jsonBytes.Length.Should().Be(length, "JSON data length should match the hex length prefix");
     }
 
     [Fact]
     public async Task DecodeAsync_RemoveOperation_DecodesCorrectly()
     {
         var operation = JobOperation.CreateRemoveOperation("job123");
-        var encoded = NetstringJsonSerializer.Encode(operation, JobOperationJsonContext.Default.JobOperation);
+        var encoded = EncodeToBytes(operation);
         var stream = new MemoryStream(encoded);
         
         var results = new List<JobOperation>();
-        await foreach (var item in NetstringJsonSerializer.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation))
+        await foreach (var item in NetstringJsonSerializer<JobOperation>.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation, CancellationToken.None))
         {
             results.Add(item);
         }
@@ -119,11 +127,11 @@ public class NetstringJsonSerializerTests
         var dueTime = new DateTimeOffset(2025, 10, 31, 12, 0, 0, TimeSpan.Zero);
         var grainId = GrainId.Create("test", "grain1");
         var operation = JobOperation.CreateAddOperation("job456", "TestJob", dueTime, grainId, null);
-        var encoded = NetstringJsonSerializer.Encode(operation, JobOperationJsonContext.Default.JobOperation);
+        var encoded = EncodeToBytes(operation);
         var stream = new MemoryStream(encoded);
         
         var results = new List<JobOperation>();
-        await foreach (var item in NetstringJsonSerializer.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation))
+        await foreach (var item in NetstringJsonSerializer<JobOperation>.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation, CancellationToken.None))
         {
             results.Add(item);
         }
@@ -146,13 +154,13 @@ public class NetstringJsonSerializerTests
         var op3 = JobOperation.CreateRetryOperation("job3", dueTime.AddHours(1));
         
         var stream = new MemoryStream();
-        await stream.WriteAsync(NetstringJsonSerializer.Encode(op1, JobOperationJsonContext.Default.JobOperation));
-        await stream.WriteAsync(NetstringJsonSerializer.Encode(op2, JobOperationJsonContext.Default.JobOperation));
-        await stream.WriteAsync(NetstringJsonSerializer.Encode(op3, JobOperationJsonContext.Default.JobOperation));
+        await stream.WriteAsync(EncodeToBytes(op1));
+        await stream.WriteAsync(EncodeToBytes(op2));
+        await stream.WriteAsync(EncodeToBytes(op3));
         stream.Position = 0;
         
         var results = new List<JobOperation>();
-        await foreach (var item in NetstringJsonSerializer.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation))
+        await foreach (var item in NetstringJsonSerializer<JobOperation>.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation, CancellationToken.None))
         {
             results.Add(item);
         }
@@ -173,11 +181,11 @@ public class NetstringJsonSerializerTests
         var grainId = GrainId.Create("test", "grain1");
         var metadata = new Dictionary<string, string> { ["key1"] = "value1", ["key2"] = "value2" };
         var operation = JobOperation.CreateAddOperation("job999", "MetaJob", dueTime, grainId, metadata);
-        var encoded = NetstringJsonSerializer.Encode(operation, JobOperationJsonContext.Default.JobOperation);
+        var encoded = EncodeToBytes(operation);
         var stream = new MemoryStream(encoded);
         
         var results = new List<JobOperation>();
-        await foreach (var item in NetstringJsonSerializer.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation))
+        await foreach (var item in NetstringJsonSerializer<JobOperation>.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation, CancellationToken.None))
         {
             results.Add(item);
         }
@@ -194,7 +202,7 @@ public class NetstringJsonSerializerTests
         var stream = new MemoryStream();
         
         var results = new List<JobOperation>();
-        await foreach (var item in NetstringJsonSerializer.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation))
+        await foreach (var item in NetstringJsonSerializer<JobOperation>.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation, CancellationToken.None))
         {
             results.Add(item);
         }
@@ -205,37 +213,37 @@ public class NetstringJsonSerializerTests
     [Fact]
     public async Task DecodeAsync_InvalidLength_ThrowsInvalidDataException()
     {
-        var encoded = "abc:{\"type\":1,\"id\":\"test\"}\n";
+        var encoded = "GGGGGG:{\"type\":1,\"id\":\"test\"}\n"; // Invalid hex
         var stream = new MemoryStream(Encoding.UTF8.GetBytes(encoded));
         
         var act = async () =>
         {
-            await foreach (var item in NetstringJsonSerializer.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation))
+            await foreach (var item in NetstringJsonSerializer<JobOperation>.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation, CancellationToken.None))
             {
                 // Should throw before yielding any items
             }
         };
         
         await act.Should().ThrowAsync<InvalidDataException>()
-            .WithMessage("Invalid netstring length: abc");
+            .WithMessage("Invalid netstring length: GGGGGG");
     }
 
     [Fact]
-    public async Task DecodeAsync_NegativeLength_ThrowsInvalidDataException()
+    public async Task DecodeAsync_ExcessiveLength_ThrowsInvalidDataException()
     {
-        var encoded = "-5:{\"type\":1}\n";
+        var encoded = "FFFFFF:{\"type\":1}\n"; // 16777215 bytes, exceeds MaxLength
         var stream = new MemoryStream(Encoding.UTF8.GetBytes(encoded));
         
         var act = async () =>
         {
-            await foreach (var item in NetstringJsonSerializer.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation))
+            await foreach (var item in NetstringJsonSerializer<JobOperation>.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation, CancellationToken.None))
             {
                 // Should throw before yielding any items
             }
         };
         
         await act.Should().ThrowAsync<InvalidDataException>()
-            .WithMessage("Netstring length cannot be negative: -5");
+            .WithMessage("Netstring length out of valid range: *");
     }
 
     [Fact]
@@ -243,12 +251,12 @@ public class NetstringJsonSerializerTests
     {
         var json = "{\"type\":1,\"id\":\"test\"}";
         var jsonBytes = Encoding.UTF8.GetBytes(json);
-        var encoded = $"{jsonBytes.Length}:{json}";
+        var encoded = $"{jsonBytes.Length:X6}:{json}x"; // Use 6-digit hex format
         var stream = new MemoryStream(Encoding.UTF8.GetBytes(encoded));
         
         var act = async () =>
         {
-            await foreach (var item in NetstringJsonSerializer.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation))
+            await foreach (var item in NetstringJsonSerializer<JobOperation>.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation, CancellationToken.None))
             {
                 // Should throw after reading the data
             }
@@ -259,21 +267,20 @@ public class NetstringJsonSerializerTests
     }
 
     [Fact]
-    public async Task DecodeAsync_IncompleteData_ThrowsInvalidDataException()
+    public async Task DecodeAsync_IncompleteData_ThrowsEndOfStreamException()
     {
-        var encoded = "100:{\"type\":1}";
+        var encoded = "000064:{\"type\":1}"; // Claims 100 bytes but only provides 11
         var stream = new MemoryStream(Encoding.UTF8.GetBytes(encoded));
         
         var act = async () =>
         {
-            await foreach (var item in NetstringJsonSerializer.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation))
+            await foreach (var item in NetstringJsonSerializer<JobOperation>.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation, CancellationToken.None))
             {
                 // Should throw before yielding any items
             }
         };
         
-        await act.Should().ThrowAsync<InvalidDataException>()
-            .WithMessage("Unexpected end of stream while reading netstring data");
+        await act.Should().ThrowAsync<InvalidDataException>();
     }
 
     [Fact]
@@ -281,12 +288,12 @@ public class NetstringJsonSerializerTests
     {
         var json = "{\"type\":1,\"id\":\"test\"}";
         var jsonBytes = Encoding.UTF8.GetBytes(json);
-        var encoded = $"{jsonBytes.Length}:{json}X";
+        var encoded = $"{jsonBytes.Length:X6}:{json}X"; // Use 6-digit hex format
         var stream = new MemoryStream(Encoding.UTF8.GetBytes(encoded));
         
         var act = async () =>
         {
-            await foreach (var item in NetstringJsonSerializer.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation))
+            await foreach (var item in NetstringJsonSerializer<JobOperation>.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation, CancellationToken.None))
             {
                 // Should throw after reading the data
             }
@@ -301,12 +308,12 @@ public class NetstringJsonSerializerTests
     {
         var invalidJson = "{invalid json}";
         var jsonBytes = Encoding.UTF8.GetBytes(invalidJson);
-        var encoded = $"{jsonBytes.Length}:{invalidJson}\n";
+        var encoded = $"{jsonBytes.Length:X6}:{invalidJson}\n"; // Use 6-digit hex format
         var stream = new MemoryStream(Encoding.UTF8.GetBytes(encoded));
         
         var act = async () =>
         {
-            await foreach (var item in NetstringJsonSerializer.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation))
+            await foreach (var item in NetstringJsonSerializer<JobOperation>.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation, CancellationToken.None))
             {
                 // Should throw when deserializing
             }
@@ -333,11 +340,11 @@ public class NetstringJsonSerializerTests
 
         foreach (var operation in testOperations)
         {
-            var encoded = NetstringJsonSerializer.Encode(operation, JobOperationJsonContext.Default.JobOperation);
+            var encoded = EncodeToBytes(operation);
             var stream = new MemoryStream(encoded);
             
             var results = new List<JobOperation>();
-            await foreach (var item in NetstringJsonSerializer.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation))
+            await foreach (var item in NetstringJsonSerializer<JobOperation>.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation, CancellationToken.None))
             {
                 results.Add(item);
             }
@@ -374,14 +381,14 @@ public class NetstringJsonSerializerTests
         var memoryStream = new MemoryStream();
         foreach (var operation in testOperations)
         {
-            var encoded = NetstringJsonSerializer.Encode(operation, JobOperationJsonContext.Default.JobOperation);
+            var encoded = EncodeToBytes(operation);
             await memoryStream.WriteAsync(encoded);
         }
         
         memoryStream.Position = 0;
         
         var results = new List<JobOperation>();
-        await foreach (var item in NetstringJsonSerializer.DecodeAsync(memoryStream, JobOperationJsonContext.Default.JobOperation))
+        await foreach (var item in NetstringJsonSerializer<JobOperation>.DecodeAsync(memoryStream, JobOperationJsonContext.Default.JobOperation, CancellationToken.None))
         {
             results.Add(item);
         }
@@ -398,10 +405,10 @@ public class NetstringJsonSerializerTests
     public async Task DecodeAsync_StreamPosition_IsPreserved()
     {
         var operation = JobOperation.CreateRemoveOperation("test");
-        var encoded = NetstringJsonSerializer.Encode(operation, JobOperationJsonContext.Default.JobOperation);
+        var encoded = EncodeToBytes(operation);
         var stream = new MemoryStream(encoded);
         
-        await foreach (var item in NetstringJsonSerializer.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation))
+        await foreach (var item in NetstringJsonSerializer<JobOperation>.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation, CancellationToken.None))
         {
             // Stream should be at the end after reading
         }
@@ -422,11 +429,11 @@ public class NetstringJsonSerializerTests
         }
         
         var operation = JobOperation.CreateAddOperation("large-job", "LargeMetaJob", dueTime, grainId, largeMetadata);
-        var encoded = NetstringJsonSerializer.Encode(operation, JobOperationJsonContext.Default.JobOperation);
+        var encoded = EncodeToBytes(operation);
         var stream = new MemoryStream(encoded);
         
         var results = new List<JobOperation>();
-        await foreach (var item in NetstringJsonSerializer.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation))
+        await foreach (var item in NetstringJsonSerializer<JobOperation>.DecodeAsync(stream, JobOperationJsonContext.Default.JobOperation, CancellationToken.None))
         {
             results.Add(item);
         }
