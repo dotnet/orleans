@@ -204,4 +204,50 @@ public abstract class GrainStorageTestRunner
             }
         });
     }
+
+    /// <summary>
+    /// Tests that reading a non-existent state returns RecordExists=false.
+    /// </summary>
+    public virtual async Task PersistenceStorage_ReadNonExistentState()
+    {
+        var grainTypeName = "TestGrain";
+        var (grainId, grainState) = GetTestReferenceAndState(Random.Shared.NextInt64(), null);
+
+        await Storage.ReadStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+
+        Assert.False(grainState.RecordExists);
+        Assert.Null(grainState.ETag);
+    }
+
+    /// <summary>
+    /// Tests write, clear, and write cycle to ensure state can be re-written after clearing.
+    /// </summary>
+    public virtual async Task PersistenceStorage_WriteClearWrite()
+    {
+        var grainTypeName = "TestGrain";
+        var (grainId, grainState) = GetTestReferenceAndState(Random.Shared.NextInt64(), null);
+        grainState.State.A = "First";
+        grainState.State.B = 1;
+
+        await Storage.WriteStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        var firstETag = grainState.ETag;
+        Assert.NotNull(firstETag);
+        Assert.True(grainState.RecordExists);
+
+        await Storage.ClearStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        var clearedETag = grainState.ETag;
+        Assert.NotEqual(firstETag, clearedETag);
+        Assert.False(grainState.RecordExists);
+
+        grainState.State = new TestState1 { A = "Second", B = 2 };
+        await Storage.WriteStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        var secondETag = grainState.ETag;
+        Assert.NotEqual(clearedETag, secondETag);
+        Assert.True(grainState.RecordExists);
+
+        var readState = new GrainState<TestState1> { State = new TestState1() };
+        await Storage.ReadStateAsync(grainTypeName, grainId, readState).ConfigureAwait(false);
+        Assert.Equal("Second", readState.State.A);
+        Assert.Equal(2, readState.State.B);
+    }
 }

@@ -77,6 +77,8 @@ The `GrainStorageTestRunner` base class provides the following test methods:
 ### Basic Operations
 
 - **`PersistenceStorage_WriteReadIdCyrillic()`**: Tests basic write and read operations
+- **`PersistenceStorage_ReadNonExistentState()`**: Tests that reading a non-existent state returns RecordExists=false
+- **`PersistenceStorage_WriteClearWrite()`**: Tests write, clear, and write cycle to ensure state can be re-written after clearing
 
 ### Consistency Tests
 
@@ -86,6 +88,23 @@ The `GrainStorageTestRunner` base class provides the following test methods:
 ### Concurrency Tests
 
 - **`PersistenceStorage_WriteReadWriteReadStatesInParallel()`**: Tests parallel write and read operations with multiple grains
+
+## Testing Approach
+
+This test kit provides **direct IGrainStorage testing**, which differs from grain-based tests:
+
+- **Direct Storage Testing** (this kit): Tests the `IGrainStorage` interface directly without requiring grain implementations
+- **Grain-Based Testing** (e.g., `GrainPersistenceTestsRunner`): Tests storage through actual grain operations
+
+Both approaches are valuable:
+- Direct storage tests validate the storage provider implementation in isolation
+- Grain-based tests validate the full persistence pipeline including grain lifecycle
+
+This test kit is recommended for:
+- Testing custom storage providers
+- Verifying storage behavior before deploying to production
+- Quick iteration during storage provider development
+- Testing edge cases and error handling
 
 ## Advanced Usage
 
