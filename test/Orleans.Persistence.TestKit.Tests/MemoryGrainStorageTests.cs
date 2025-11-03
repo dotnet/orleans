@@ -52,4 +52,16 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
     {
         return PersistenceStorage_WriteReadWriteReadStatesInParallel("MemoryTest", 50);
     }
+
+    [Fact]
+    public Task ReadNonExistent()
+    {
+        return PersistenceStorage_ReadNonExistentState();
+    }
+
+    [Fact]
+    public Task WriteClearWriteCycle()
+    {
+        return PersistenceStorage_WriteClearWrite();
+    }
 }
