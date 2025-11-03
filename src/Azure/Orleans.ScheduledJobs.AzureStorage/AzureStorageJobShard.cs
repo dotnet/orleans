@@ -1,15 +1,19 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using System.Transactions;
 using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Serialization.Buffers.Adaptors;
 
@@ -20,19 +24,21 @@ internal sealed class AzureStorageJobShard : JobShard
     private readonly Channel<StorageOperation> _storageOperationChannel;
     private readonly Task _storageProcessorTask;
     private readonly CancellationTokenSource _shutdownCts = new();
+    private readonly AzureStorageJobShardOptions _options;
 
     internal AppendBlobClient BlobClient { get; init; }
     internal ETag? ETag { get; private set; }
+    internal int CommitedBlockCount { get; private set; }
 
-    public AzureStorageJobShard(string id, DateTimeOffset startTime, DateTimeOffset endTime, AppendBlobClient blobClient, IDictionary<string, string>? metadata, ETag? eTag)
+    public AzureStorageJobShard(string id, DateTimeOffset startTime, DateTimeOffset endTime, AppendBlobClient blobClient, IDictionary<string, string>? metadata, ETag? eTag, AzureStorageJobShardOptions options)
         : base(id, startTime, endTime)
     {
         BlobClient = blobClient;
         ETag = eTag;
         Metadata = metadata;
+        _options = options;
         
         // Create unbounded channel for storage operations
-        // In the future, we could add batching here
         _storageOperationChannel = Channel.CreateUnbounded<StorageOperation>(new UnboundedChannelOptions
         {
             SingleReader = true,
@@ -150,27 +156,69 @@ internal sealed class AzureStorageJobShard : JobShard
 
         var cancellationToken = _shutdownCts.Token;
         // TODO: AppendBlob has a limit of 50,000 blocks. Implement blob rotation when this limit is approached.
+        var batchOperations = new List<StorageOperation>(_options.MaxBatchSize);
+        
         try
         {
-            await foreach (var operation in _storageOperationChannel.Reader.ReadAllAsync(cancellationToken))
+            while (await _storageOperationChannel.Reader.WaitToReadAsync(cancellationToken))
             {
-                try
+                // Read first operation
+                if (!_storageOperationChannel.Reader.TryRead(out var firstOperation))
                 {
-                    switch (operation.Type)
-                    {
-                        case StorageOperationType.AppendJobOperation:
-                            await AppendJobOperationAsync(operation.JobOperation!.Value, cancellationToken);
-                            break;
-                        case StorageOperationType.UpdateMetadata:
-                            await UpdateMetadataAsync(operation.Metadata!, cancellationToken);
-                            break;
-                    }
-                    
-                    operation.CompletionSource?.TrySetResult(true);
+                    continue;
                 }
-                catch (Exception ex)
+
+                // Handle metadata operations immediately (cannot be batched)
+                if (firstOperation.Type is StorageOperationType.UpdateMetadata)
                 {
-                    operation.CompletionSource?.TrySetException(ex);
+                    try
+                    {
+                        await UpdateMetadataAsync(firstOperation.Metadata!, cancellationToken);
+                        firstOperation.CompletionSource?.TrySetResult(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        firstOperation.CompletionSource?.TrySetException(ex);
+                    }
+                    continue;
+                }
+
+                // Collect job operations for batching
+                batchOperations.Add(firstOperation);
+
+                // Try to collect more operations up to the maximum batch size
+                if (TryCollectJobOperationsForBatch(batchOperations))
+                {
+                    // Not enough operations to meet the minimum batch size, wait for more or timeout
+                    await Task.Delay(_options.BatchFlushInterval, cancellationToken);
+                    TryCollectJobOperationsForBatch(batchOperations);
+                }
+
+                // Process the batch of job operations
+                if (batchOperations.Count > 0)
+                {
+                    try
+                    {
+                        await AppendJobOperationBatchAsync(batchOperations, cancellationToken);
+
+                        // Mark all operations as completed
+                        foreach (var op in batchOperations)
+                        {
+                            op.CompletionSource?.TrySetResult(true);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Mark all operations as failed
+                        foreach (var op in batchOperations)
+                        {
+                            op.CompletionSource?.TrySetException(ex);
+                        }
+                    }
+                    finally
+                    {
+                        batchOperations.Clear();
+                    }
                 }
             }
         }
@@ -182,22 +230,45 @@ internal sealed class AzureStorageJobShard : JobShard
                 operation.CompletionSource?.TrySetCanceled(cancellationToken);
             }
         }
-    }
 
-    private async Task AppendJobOperationAsync(JobOperation operation, CancellationToken cancellationToken)
+        // Local function to collect job operations for batching. Returns true if more operations can be collected.
+        bool TryCollectJobOperationsForBatch(List<StorageOperation> batchOperations)
+        {
+            // Collect more jobs, up to a maximum batch size
+            while (batchOperations.Count < _options.MaxBatchSize && _storageOperationChannel.Reader.TryPeek(out var nextOperation))
+            {
+                if (nextOperation.Type is StorageOperationType.UpdateMetadata)
+                {
+                    // Stop batching if we encounter a metadata operation
+                    return false;
+                }
+                _storageOperationChannel.Reader.TryRead(out var operation);
+                Debug.Assert(operation != null);
+                batchOperations.Add(operation!);
+            }
+            return batchOperations.Count != _options.MaxBatchSize;
+        }
+    }
+    private async Task AppendJobOperationBatchAsync(List<StorageOperation> operations, CancellationToken cancellationToken)
     {
         using var stream = PooledBufferStream.Rent();
-        //using var stream = new MemoryStream();
         try
         {
-            stream.Position = 0;
-            NetstringJsonSerializer<JobOperation>.Encode(operation, stream, JobOperationJsonContext.Default.JobOperation);
+            stream.Position = 0; // TODO Remove that once PooledBufferStream fixed
+            
+            // Encode all job operations into a single stream
+            foreach (var operation in operations)
+            {
+                NetstringJsonSerializer<JobOperation>.Encode(operation.JobOperation!.Value, stream, JobOperationJsonContext.Default.JobOperation);
+            }
+            var str = System.Text.Encoding.UTF8.GetString(stream.ToArray());
             stream.Position = 0;
             var result = await BlobClient.AppendBlockAsync(
                 stream,
                 new AppendBlobAppendBlockOptions { Conditions = new AppendBlobRequestConditions { IfMatch = ETag } },
                 cancellationToken);
             ETag = result.Value.ETag;
+            CommitedBlockCount = result.Value.BlobCommittedBlockCount;
         }
         finally
         {
