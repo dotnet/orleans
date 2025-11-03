@@ -34,7 +34,7 @@ public class TestState1 : IEquatable<TestState1>
     /// <inheritdoc/>
     public bool Equals(TestState1 other)
     {
-        if (ReferenceEquals(other, null))
+        if (other is null)
         {
             return false;
         }
@@ -48,7 +48,7 @@ public class TestState1 : IEquatable<TestState1>
         unchecked
         {
             int hash = 17;
-            hash = hash * 23 + EqualityComparer<string>.Default.GetHashCode(A);
+            hash = hash * 23 + (A is not null ? EqualityComparer<string>.Default.GetHashCode(A) : 0);
             hash = hash * 23 + B.GetHashCode();
             hash = hash * 23 + C.GetHashCode();
 
