@@ -36,6 +36,23 @@ public abstract class GrainStorageTestFixture : IAsyncLifetime
     protected abstract string StorageProviderName { get; }
 
     /// <summary>
+    /// Checks preconditions before initializing the cluster.
+    /// Override this to check for external dependencies (e.g., Azure Storage emulator).
+    /// </summary>
+    /// <exception cref="SkipException">Thrown if preconditions are not met.</exception>
+    protected virtual void CheckPreconditionsOrThrow()
+    {
+    }
+
+    /// <summary>
+    /// Ensures that preconditions are met. Call this from test constructors to skip tests if preconditions fail.
+    /// </summary>
+    public void EnsurePreconditionsMet()
+    {
+        CheckPreconditionsOrThrow();
+    }
+
+    /// <summary>
     /// Configures the silo with the storage provider to test.
     /// </summary>
     /// <param name="siloBuilder">The silo builder to configure.</param>
@@ -61,6 +78,8 @@ public abstract class GrainStorageTestFixture : IAsyncLifetime
     /// <inheritdoc/>
     public virtual async Task InitializeAsync()
     {
+        CheckPreconditionsOrThrow();
+
         var builder = new InProcessTestClusterBuilder();
         
         builder.ConfigureSilo((siloBuilder) =>
