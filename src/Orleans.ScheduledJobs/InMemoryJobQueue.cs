@@ -16,7 +16,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
     private readonly Dictionary<string, JobBucket> _jobsIdToBucket = new();
     private readonly Dictionary<DateTimeOffset, JobBucket> _buckets = new();
     private bool _isComplete;
-    private object _syncLock = new();
+    private readonly object _syncLock = new();
 
     /// <summary>
     /// Gets the total number of jobs currently in the queue.
@@ -29,8 +29,11 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
     /// <param name="job">The scheduled job to enqueue.</param>
     /// <param name="dequeueCount">The number of times this job has been dequeued previously.</param>
     /// <exception cref="InvalidOperationException">Thrown when attempting to enqueue a job to a completed queue.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when job is null.</exception>
     public void Enqueue(ScheduledJob job, int dequeueCount)
     {
+        ArgumentNullException.ThrowIfNull(job);
+
         lock (_syncLock)
         {
             if (_isComplete)
@@ -68,10 +71,11 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
         {
             if (_jobsIdToBucket.TryGetValue(jobId, out var bucket))
             {
-                var removed = bucket.RemoveJob(jobId);
+                // Try to remove from bucket (may already be dequeued)
+                bucket.RemoveJob(jobId);
                 _jobsIdToBucket.Remove(jobId);
                 // Note: The bucket remains in the priority queue until processed
-                return removed;
+                return true;
             }
 
             return false;
@@ -99,6 +103,7 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
             ShardId = jobContext.Job.ShardId,
             Metadata = jobContext.Job.Metadata
         };
+
         lock (_syncLock)
         {
             if (_jobsIdToBucket.TryGetValue(jobId, out var oldBucket))
@@ -122,41 +127,57 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
     /// </returns>
     public async IAsyncEnumerator<IScheduledJobContext> GetAsyncEnumerator(CancellationToken cancellationToken = default)
     {
-        var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
         while (true)
         {
-            ScheduledJob? job = null;
-            int dequeueCount = 0;
+            JobBucket? bucketToProcess = null;
+            DateTimeOffset bucketKey = default;
+
             lock (_syncLock)
             {
-                if (_queue.Count == 0)
+                if (Count == 0)
                 {
                     if (_isComplete)
                     {
                         yield break; // Exit if the queue is frozen and empty
                     }
                 }
-                else
+                else if (_queue.Count > 0)
                 {
                     var nextBucket = _queue.Peek();
                     if (nextBucket.DueTime < DateTimeOffset.UtcNow)
                     {
-                        if (nextBucket.Count == 0)
-                        {
-                            _queue.Dequeue(); // Remove empty bucket
-                            continue;
-                        }
-                        else
-                        {
-                            (job, dequeueCount) = nextBucket.Jobs.First();
-                            nextBucket.RemoveJob(job.Id);
-                        }
+                        // Dequeue the entire bucket to process outside the lock
+                        bucketToProcess = _queue.Dequeue();
+                        bucketKey = bucketToProcess.DueTime;
                     }
                 }
             }
-            if (job != null)
+
+            if (bucketToProcess is not null)
             {
-                yield return new ScheduledJobContext(job, Guid.NewGuid().ToString(), dequeueCount + 1);
+                // Process all jobs in the bucket outside the lock for better concurrency
+                foreach (var (job, dequeueCount) in bucketToProcess.Jobs.ToList())
+                {
+                    // Verify job hasn't been cancelled while we were processing
+                    bool shouldYield;
+                    lock (_syncLock)
+                    {
+                        shouldYield = _jobsIdToBucket.ContainsKey(job.Id);
+                        // Keep job in _jobsIdToBucket for explicit removal via CancelJob/RetryJobLater
+                    }
+
+                    if (shouldYield)
+                    {
+                        yield return new ScheduledJobContext(job, Guid.NewGuid().ToString(), dequeueCount + 1);
+                    }
+                }
+
+                // Clean up the bucket from dictionary after processing all jobs
+                lock (_syncLock)
+                {
+                    _buckets.Remove(bucketKey);
+                }
             }
             else
             {
@@ -167,7 +188,10 @@ public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
 
     private JobBucket GetJobBucket(DateTimeOffset dueTime)
     {
+        // Truncate to second precision and add 1 second to normalize bucket key
+        // This ensures all jobs within the same second (e.g., 12:00:00.000-12:00:00.999) share the same bucket (12:00:01)
         var key = new DateTimeOffset(dueTime.Year, dueTime.Month, dueTime.Day, dueTime.Hour, dueTime.Minute, dueTime.Second, dueTime.Offset);
+        key = key.AddSeconds(1);
         if (!_buckets.TryGetValue(key, out var bucket))
         {
             bucket = new JobBucket(key);
@@ -187,8 +211,6 @@ internal sealed class JobBucket
     public DateTimeOffset DueTime { get; private set; }
 
     public IEnumerable<(ScheduledJob Job, int DequeueCount)> Jobs => _jobs.Values;
-
-    public (ScheduledJob Job, int DequeueCount) this[string jobId] => _jobs[jobId];
 
     public JobBucket(DateTimeOffset dueTime)
     {
