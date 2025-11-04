@@ -25,6 +25,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
     private readonly ScheduledJobsOptions _options;
     private readonly CancellationTokenSource _cts = new();
     private Task? _listenForClusterChangesTask = null;
+    private Task? _periodicCheckTask = null;
     private readonly ConcurrentDictionary<string, IJobShard> _shardCache = new();
     private readonly ConcurrentDictionary<DateTimeOffset, IJobShard> _writeableShards = new();
     private readonly ConcurrentDictionary<string, Task> _runningShards = new();
@@ -123,6 +124,14 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
                 TaskCreationOptions.None,
                 WorkItemGroup.TaskScheduler).Unwrap();
             _listenForClusterChangesTask.Ignore();
+
+            _periodicCheckTask = Task.Factory.StartNew(
+                state => ((LocalScheduledJobManager)state!).PeriodicShardCheck(),
+                this,
+                CancellationToken.None,
+                TaskCreationOptions.None,
+                WorkItemGroup.TaskScheduler).Unwrap();
+            _periodicCheckTask.Ignore();
         }
 
         LogStarted(_logger);
@@ -139,6 +148,11 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         {
             await _listenForClusterChangesTask;
             //_listenForClusterChangesTask = null;
+        }
+
+        if (_periodicCheckTask is not null)
+        {
+            await _periodicCheckTask;
         }
         
         await Task.WhenAll(_runningShards.Values.ToArray());
@@ -196,6 +210,9 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
             LogAssignedShards(_logger, shards.Count);
             foreach (var shard in shards)
             {
+                // Add to cache so periodic check can find it
+                _shardCache.TryAdd(shard.Id, shard);
+                
                 // Only start the shard if it's not already running
                 if (!_runningShards.ContainsKey(shard.Id))
                 {
@@ -211,8 +228,56 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
 
     private void StartRunningShardTracked(IJobShard shard)
     {
+        // Only start if not already running
+        if (_runningShards.ContainsKey(shard.Id))
+        {
+            return;
+        }
+
+        // Only start if it's time to start (within buffer period)
+        if (!ShouldStartShardNow(shard))
+        {
+            LogShardNotReadyYet(_logger, shard.Id, shard.StartTime);
+            return;
+        }
+
         LogStartingShard(_logger, shard.Id, shard.StartTime, shard.EndTime);
         _runningShards.TryAdd(shard.Id, RunShard(shard));
+    }
+
+    private bool ShouldStartShardNow(IJobShard shard)
+    {
+        var activationTime = shard.StartTime.Subtract(_options.ShardActivationBufferPeriod);
+        return DateTimeOffset.UtcNow >= activationTime;
+    }
+
+    private async Task PeriodicShardCheck()
+    {
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(10));
+
+        while (!_cts.Token.IsCancellationRequested)
+        {
+            try
+            {
+                await timer.WaitForNextTickAsync(_cts.Token);
+
+                LogCheckingPendingShards(_logger);
+                foreach (var shard in _shardCache.Values)
+                {
+                    StartRunningShardTracked(shard);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                LogErrorInPeriodicCheck(_logger, ex);
+            }
+        }
     }
 
     private async Task RunShard(IJobShard shard)

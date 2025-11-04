@@ -167,4 +167,22 @@ internal partial class LocalScheduledJobManager
         Message = "Job {JobId} (Name: '{JobName}') cancelled from shard {ShardId}"
     )]
     private static partial void LogJobCancelled(ILogger logger, string jobId, string jobName, string shardId);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Shard {ShardId} not ready yet. Start time: {StartTime}"
+    )]
+    private static partial void LogShardNotReadyYet(ILogger logger, string shardId, DateTimeOffset startTime);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Checking for pending shards to start"
+    )]
+    private static partial void LogCheckingPendingShards(ILogger logger);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error in periodic shard check"
+    )]
+    private static partial void LogErrorInPeriodicCheck(ILogger logger, Exception exception);
 }

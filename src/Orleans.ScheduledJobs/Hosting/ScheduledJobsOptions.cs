@@ -20,6 +20,13 @@ public sealed class ScheduledJobsOptions
     public TimeSpan ShardDuration { get; set; } = TimeSpan.FromHours(1);
 
     /// <summary>
+    /// Gets or sets how far in advance (before the shard's start time) the shard should
+    /// begin processing. This prevents holding idle shards for extended periods.
+    /// Default: 5 minutes.
+    /// </summary>
+    public TimeSpan ShardActivationBufferPeriod { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
     /// Gets or sets the maximum number of jobs that can be executed concurrently on a single silo.
     /// Default: 10,000 × processor count.
     /// </summary>
