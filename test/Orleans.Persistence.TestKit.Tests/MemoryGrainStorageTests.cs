@@ -30,38 +30,38 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
     }
 
     [Fact]
-    public Task BasicWriteRead()
+    public Task PersistenceStorage_WriteReadIdCyrillic()
     {
-        return PersistenceStorage_WriteReadIdCyrillic();
+        return base.PersistenceStorage_WriteReadIdCyrillic();
     }
 
     [Fact]
-    public Task DuplicateInsertFails()
+    public Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException()
     {
-        return PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
+        return base.PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
     }
 
     [Fact]
-    public Task InconsistentETagFails()
+    public Task PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException()
     {
-        return PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
+        return base.PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
     }
 
     [Fact]
-    public Task ConcurrentOperations()
+    public Task PersistenceStorage_WriteReadWriteReadStatesInParallel()
     {
-        return PersistenceStorage_WriteReadWriteReadStatesInParallel("MemoryTest", 50);
+        return base.PersistenceStorage_WriteReadWriteReadStatesInParallel("MemoryTest", 50);
     }
 
     [Fact]
-    public Task ReadNonExistent()
+    public Task PersistenceStorage_ReadNonExistentState()
     {
-        return PersistenceStorage_ReadNonExistentState();
+        return base.PersistenceStorage_ReadNonExistentState();
     }
 
     [Fact]
-    public Task WriteClearWriteCycle()
+    public Task PersistenceStorage_WriteClearWrite()
     {
-        return PersistenceStorage_WriteClearWrite();
+        return base.PersistenceStorage_WriteClearWrite();
     }
 }

@@ -41,38 +41,38 @@ public class AzureTableGrainStorageTestKitTests : GrainStorageTestRunner, IClass
     }
 
     [SkippableFact]
-    public Task BasicWriteRead()
+    public Task PersistenceStorage_WriteReadIdCyrillic()
     {
-        return PersistenceStorage_WriteReadIdCyrillic();
+        return base.PersistenceStorage_WriteReadIdCyrillic();
     }
 
     [SkippableFact]
-    public Task DuplicateInsertFails()
+    public Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException()
     {
-        return PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
+        return base.PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
     }
 
     [SkippableFact]
-    public Task InconsistentETagFails()
+    public Task PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException()
     {
-        return PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
+        return base.PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
     }
 
     [SkippableFact]
-    public Task ConcurrentOperations()
+    public Task PersistenceStorage_WriteReadWriteReadStatesInParallel()
     {
-        return PersistenceStorage_WriteReadWriteReadStatesInParallel("AzureTableTest", 50);
+        return base.PersistenceStorage_WriteReadWriteReadStatesInParallel("AzureTableTest", 50);
     }
 
     [SkippableFact]
-    public Task ReadNonExistent()
+    public Task PersistenceStorage_ReadNonExistentState()
     {
-        return PersistenceStorage_ReadNonExistentState();
+        return base.PersistenceStorage_ReadNonExistentState();
     }
 
     [SkippableFact]
-    public Task WriteClearWriteCycle()
+    public Task PersistenceStorage_WriteClearWrite()
     {
-        return PersistenceStorage_WriteClearWrite();
+        return base.PersistenceStorage_WriteClearWrite();
     }
 }
