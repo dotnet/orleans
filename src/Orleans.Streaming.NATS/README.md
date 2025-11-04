@@ -90,7 +90,7 @@ public class StreamProcessingGrain : Grain, IStreamProcessingGrain
         
         // Get a reference to a specific stream
         _stream = _streamProvider.GetStream<MyEvent>(
-            streamId: StreamId.Create("MyStreamNamespace", this.GetPrimaryKey()));
+            StreamId.Create("MyStreamNamespace", this.GetPrimaryKey()));
         
         await base.OnActivateAsync(cancellationToken);
     }
