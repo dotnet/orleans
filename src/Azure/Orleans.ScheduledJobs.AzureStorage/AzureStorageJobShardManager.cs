@@ -25,6 +25,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
     private readonly IClusterMembershipService _clusterMembership;
     private readonly ConcurrentDictionary<string, AzureStorageJobShard> _jobShardCache = new();
     private readonly ILogger<AzureStorageJobShardManager> _logger;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly AzureStorageJobShardOptions _options;
     private long _shardCounter = 0; // For generating unique shard IDs
 
@@ -35,14 +36,15 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         string blobPrefix,
         AzureStorageJobShardOptions options,
         IClusterMembershipService clusterMembership,
-        ILogger<AzureStorageJobShardManager> logger)
+        ILoggerFactory loggerFactory)
         : base(siloAddress)
     {
         _blobServiceClient = client;
         _containerName = containerName;
         _blobPrefix = blobPrefix;
         _clusterMembership = clusterMembership;
-        _logger = logger;
+        _logger = loggerFactory.CreateLogger<AzureStorageJobShardManager>();
+        _loggerFactory = loggerFactory;
         _options = options;
     }
 
@@ -50,8 +52,8 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         ILocalSiloDetails localSiloDetails,
         IOptions<AzureStorageJobShardOptions> options,
         IClusterMembershipService clusterMembership,
-        ILogger<AzureStorageJobShardManager> logger)
-        : this(localSiloDetails.SiloAddress, options.Value.BlobServiceClient, options.Value.ContainerName, localSiloDetails.ClusterId,  options.Value, clusterMembership, logger)
+        ILoggerFactory loggerFactory)
+        : this(localSiloDetails.SiloAddress, options.Value.BlobServiceClient, options.Value.ContainerName, localSiloDetails.ClusterId,  options.Value, clusterMembership, loggerFactory)
     {
     }
 
@@ -116,7 +118,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                 LogClaimingShard(_logger, blob.Name, SiloAddress, owner);
                 var blobClient = _client.GetAppendBlobClient(blob.Name);
                 var metadata = blob.Metadata;
-                var orphanedShard = new AzureStorageJobShard(blob.Name, shardStartTime, maxDueTime, blobClient, metadata, blob.Properties.ETag, _options);
+                var orphanedShard = new AzureStorageJobShard(blob.Name, shardStartTime, maxDueTime, blobClient, metadata, blob.Properties.ETag, _options, _loggerFactory.CreateLogger<AzureStorageJobShard>());
                 if (!await TryTakeOwnership(orphanedShard, metadata, SiloAddress, cancellationToken))
                 {
                     // Someone else took over the shard, dispose and continue
@@ -207,7 +209,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                 continue;
             }
             
-            var shard = new AzureStorageJobShard(shardId, minDueTime, maxDueTime, blobClient, metadataInfo, null, _options);
+            var shard = new AzureStorageJobShard(shardId, minDueTime, maxDueTime, blobClient, metadataInfo, null, _options, _loggerFactory.CreateLogger<AzureStorageJobShard>());
             await shard.InitializeAsync(cancellationToken);
             _jobShardCache[shardId] = shard;
             LogShardRegistered(_logger, shardId, SiloAddress);

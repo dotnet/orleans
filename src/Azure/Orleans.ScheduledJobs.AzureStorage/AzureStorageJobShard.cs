@@ -13,30 +13,33 @@ using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
+using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Serialization.Buffers.Adaptors;
 
 namespace Orleans.ScheduledJobs.AzureStorage;
 
-internal sealed class AzureStorageJobShard : JobShard
+internal sealed partial class AzureStorageJobShard : JobShard
 {
     private readonly Channel<StorageOperation> _storageOperationChannel;
     private readonly Task _storageProcessorTask;
     private readonly CancellationTokenSource _shutdownCts = new();
     private readonly AzureStorageJobShardOptions _options;
+    private readonly ILogger<AzureStorageJobShard> _logger;
 
     internal AppendBlobClient BlobClient { get; init; }
     internal ETag? ETag { get; private set; }
     internal int CommitedBlockCount { get; private set; }
 
-    public AzureStorageJobShard(string id, DateTimeOffset startTime, DateTimeOffset endTime, AppendBlobClient blobClient, IDictionary<string, string>? metadata, ETag? eTag, AzureStorageJobShardOptions options)
+    public AzureStorageJobShard(string id, DateTimeOffset startTime, DateTimeOffset endTime, AppendBlobClient blobClient, IDictionary<string, string>? metadata, ETag? eTag, AzureStorageJobShardOptions options, ILogger<AzureStorageJobShard> logger)
         : base(id, startTime, endTime)
     {
         BlobClient = blobClient;
         ETag = eTag;
         Metadata = metadata;
         _options = options;
+        _logger = logger;
         
         // Create unbounded channel for storage operations
         _storageOperationChannel = Channel.CreateUnbounded<StorageOperation>(new UnboundedChannelOptions
@@ -51,29 +54,36 @@ internal sealed class AzureStorageJobShard : JobShard
 
     protected override async Task PersistAddJobAsync(string jobId, string jobName, DateTimeOffset dueTime, GrainId target, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)
     {
+        LogAddingJob(_logger, jobId, jobName, Id, dueTime);
         var operation = JobOperation.CreateAddOperation(jobId, jobName, dueTime, target, metadata);
         await EnqueueStorageOperationAsync(StorageOperation.CreateAppendOperation(operation), cancellationToken);
     }
 
     protected override async Task PersistRemoveJobAsync(string jobId, CancellationToken cancellationToken)
     {
+        LogRemovingJob(_logger, jobId, Id);
         var operation = JobOperation.CreateRemoveOperation(jobId);
         await EnqueueStorageOperationAsync(StorageOperation.CreateAppendOperation(operation), cancellationToken);
     }
 
     protected override async Task PersistRetryJobAsync(string jobId, DateTimeOffset newDueTime, CancellationToken cancellationToken)
     {
+        LogRetryingJob(_logger, jobId, Id, newDueTime);
         var operation = JobOperation.CreateRetryOperation(jobId, newDueTime);
         await EnqueueStorageOperationAsync(StorageOperation.CreateAppendOperation(operation), cancellationToken);
     }
 
     public async Task UpdateBlobMetadata(IDictionary<string, string> metadata, CancellationToken cancellationToken)
     {
+        LogUpdatingMetadata(_logger, Id);
         await EnqueueStorageOperationAsync(StorageOperation.CreateMetadataOperation(metadata), cancellationToken);
     }
 
     public async ValueTask InitializeAsync(CancellationToken cancellationToken)
     {
+        LogInitializingShard(_logger, Id);
+        var sw = Stopwatch.StartNew();
+        
         // Load existing blob
         var response = await BlobClient.DownloadAsync(cancellationToken: cancellationToken);
         using var stream = response.Value.Content;
@@ -139,6 +149,9 @@ internal sealed class AzureStorageJobShard : JobShard
         }
 
         ETag = response.Value.Details.ETag;
+        
+        sw.Stop();
+        LogShardInitialized(_logger, Id, addedJobs.Count, sw.ElapsedMilliseconds);
     }
 
     private async Task EnqueueStorageOperationAsync(StorageOperation operation, CancellationToken cancellationToken)
@@ -171,10 +184,12 @@ internal sealed class AzureStorageJobShard : JobShard
                     try
                     {
                         await UpdateMetadataAsync(firstOperation.Metadata!, cancellationToken);
+                        LogMetadataUpdated(_logger, Id);
                         firstOperation.CompletionSource.TrySetResult();
                     }
                     catch (Exception ex)
                     {
+                        LogErrorUpdatingMetadata(_logger, ex, Id);
                         firstOperation.CompletionSource?.TrySetException(ex);
                     }
                     continue;
@@ -187,6 +202,10 @@ internal sealed class AzureStorageJobShard : JobShard
                 if (TryCollectJobOperationsForBatch(batchOperations))
                 {
                     // Not enough operations to meet the minimum batch size, wait for more or timeout
+                    if (batchOperations.Count < _options.MinBatchSize)
+                    {
+                        LogWaitingForBatch(_logger, batchOperations.Count, _options.MinBatchSize, Id);
+                    }
                     await Task.Delay(_options.BatchFlushInterval, cancellationToken);
                     TryCollectJobOperationsForBatch(batchOperations);
                 }
@@ -196,6 +215,7 @@ internal sealed class AzureStorageJobShard : JobShard
                 {
                     try
                     {
+                        LogFlushingBatch(_logger, batchOperations.Count, Id);
                         await AppendJobOperationBatchAsync(batchOperations, cancellationToken);
 
                         // Mark all operations as completed
@@ -206,6 +226,8 @@ internal sealed class AzureStorageJobShard : JobShard
                     }
                     catch (Exception ex)
                     {
+                        LogErrorWritingBatch(_logger, ex, batchOperations.Count, Id);
+                        
                         // Mark all operations as failed
                         foreach (var op in batchOperations)
                         {
@@ -253,6 +275,7 @@ internal sealed class AzureStorageJobShard : JobShard
 
     private async Task AppendJobOperationBatchAsync(List<StorageOperation> operations, CancellationToken cancellationToken)
     {
+        var sw = Stopwatch.StartNew();
         using var stream = PooledBufferStream.Rent();
         try
         {
@@ -271,6 +294,21 @@ internal sealed class AzureStorageJobShard : JobShard
                 cancellationToken);
             ETag = result.Value.ETag;
             CommitedBlockCount = result.Value.BlobCommittedBlockCount;
+            
+            sw.Stop();
+            LogBatchWritten(_logger, operations.Count, Id, sw.ElapsedMilliseconds, CommitedBlockCount);
+            
+            // Warn if approaching the 50,000 block limit (warn at 80%)
+            if (CommitedBlockCount > 40000)
+            {
+                LogApproachingBlockLimit(_logger, Id, CommitedBlockCount);
+            }
+            
+            // Warn if batch is unusually large
+            if (operations.Count > _options.MaxBatchSize * 0.8)
+            {
+                LogLargeBatch(_logger, Id, operations.Count, _options.MaxBatchSize);
+            }
         }
         finally
         {
@@ -295,6 +333,8 @@ internal sealed class AzureStorageJobShard : JobShard
     /// </summary>
     internal async Task StopProcessorAsync(CancellationToken cancellationToken)
     {
+        LogStoppingProcessor(_logger, Id);
+        
         // Complete the channel to stop accepting new operations (idempotent operation)
         if (_storageOperationChannel.Writer.TryComplete())
         {
@@ -305,10 +345,12 @@ internal sealed class AzureStorageJobShard : JobShard
         try
         {
             await _storageProcessorTask.WaitAsync(cancellationToken);
+            LogProcessorStopped(_logger, Id);
         }
         catch (OperationCanceledException)
         {
             // Expected during normal shutdown
+            LogProcessorStopped(_logger, Id);
         }
     }
 

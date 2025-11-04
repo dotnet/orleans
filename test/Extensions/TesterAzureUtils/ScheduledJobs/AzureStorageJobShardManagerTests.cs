@@ -68,7 +68,7 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests, IAsyncDi
     internal AzureStorageJobShardManager CreateManager(SiloAddress siloAddress)
     {
         var localSiloDetails = new TestLocalSiloDetails(siloAddress);
-        return new AzureStorageJobShardManager(localSiloDetails, StorageOptions, MembershipService, NullLogger<AzureStorageJobShardManager>.Instance);
+        return new AzureStorageJobShardManager(localSiloDetails, StorageOptions, MembershipService, NullLoggerFactory.Instance);
     }
 
     internal void SetSiloStatus(SiloAddress siloAddress, SiloStatus status)
