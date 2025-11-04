@@ -102,6 +102,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
             _segments.Clear();
             _length = 0;
             _capacity = 0;
+            Position = 0;
         }
 
         /// <summary>
