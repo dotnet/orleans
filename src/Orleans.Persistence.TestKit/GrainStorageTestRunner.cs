@@ -250,4 +250,116 @@ public abstract class GrainStorageTestRunner
         Assert.Equal("Second", readState.State.A);
         Assert.Equal(2, readState.State.B);
     }
+
+    /// <summary>
+    /// Tests the full write-clear-read cycle including verification that state is properly initialized after clear.
+    /// This test verifies that after clearing, a new write creates a fresh state that can be read back.
+    /// </summary>
+    public virtual async Task PersistenceStorage_WriteClearRead()
+    {
+        var grainTypeName = "TestGrain";
+        var (grainId, grainState) = GetTestReferenceAndState(Random.Shared.NextInt64(), null);
+        grainState.State.A = "Original";
+        grainState.State.B = 42;
+        grainState.State.C = 100;
+
+        // Write initial state
+        await Storage.WriteStateAsync(grainTypeName, grainId, grainState);
+        var writtenStateVersion = grainState.ETag;
+        Assert.True(grainState.RecordExists);
+
+        // Clear the state
+        await Storage.ClearStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        var clearedStateVersion = grainState.ETag;
+        Assert.NotEqual(writtenStateVersion, clearedStateVersion);
+        Assert.False(grainState.RecordExists);
+
+        // Write new state after clear
+        var newState = new GrainState<TestState1> { State = new TestState1(), ETag = clearedStateVersion };
+        await Storage.WriteStateAsync(grainTypeName, grainId, newState).ConfigureAwait(false);
+        Assert.Equal(newState.State, Activator.CreateInstance<TestState1>());
+        Assert.True(newState.RecordExists);
+
+        // Read back and verify it's the default state
+        var readBackState = new GrainState<TestState1> { State = new TestState1() };
+        await Storage.ReadStateAsync(grainTypeName, grainId, readBackState).ConfigureAwait(false);
+        Assert.True(readBackState.RecordExists);
+        Assert.Equal(default(string), readBackState.State.A);
+        Assert.Equal(0, readBackState.State.B);
+        Assert.Equal(0L, readBackState.State.C);
+    }
+
+    /// <summary>
+    /// Tests storage operations with string-based grain keys.
+    /// </summary>
+    public virtual async Task PersistenceStorage_WriteRead_StringKey()
+    {
+        var grainTypeName = "TestGrain";
+        var stringKey = $"StringKey-{Guid.NewGuid()}";
+        var (grainId, grainState) = GetTestReferenceAndState(stringKey, null);
+        grainState.State.A = "TestString";
+        grainState.State.B = 123;
+
+        await Store_WriteRead(grainTypeName, grainId, grainState).ConfigureAwait(false);
+
+        // Verify we can read it back with the same key
+        var readState = new GrainState<TestState1> { State = new TestState1() };
+        await Storage.ReadStateAsync(grainTypeName, grainId, readState).ConfigureAwait(false);
+        Assert.Equal("TestString", readState.State.A);
+        Assert.Equal(123, readState.State.B);
+        Assert.True(readState.RecordExists);
+    }
+
+    /// <summary>
+    /// Tests storage operations with integer-based grain keys.
+    /// </summary>
+    public virtual async Task PersistenceStorage_WriteRead_IntegerKey()
+    {
+        var grainTypeName = "TestGrain";
+        var integerKey = Random.Shared.NextInt64();
+        var (grainId, grainState) = GetTestReferenceAndState(integerKey, null);
+        grainState.State.A = "TestInteger";
+        grainState.State.B = 456;
+        grainState.State.C = integerKey;
+
+        await Store_WriteRead(grainTypeName, grainId, grainState).ConfigureAwait(false);
+
+        // Verify we can read it back with the same key
+        var readState = new GrainState<TestState1> { State = new TestState1() };
+        await Storage.ReadStateAsync(grainTypeName, grainId, readState).ConfigureAwait(false);
+        Assert.Equal("TestInteger", readState.State.A);
+        Assert.Equal(456, readState.State.B);
+        Assert.Equal(integerKey, readState.State.C);
+        Assert.True(readState.RecordExists);
+    }
+
+    /// <summary>
+    /// Tests that ETag updates properly on successive writes.
+    /// </summary>
+    public virtual async Task PersistenceStorage_ETagChangesOnWrite()
+    {
+        var grainTypeName = "TestGrain";
+        var (grainId, grainState) = GetTestReferenceAndState(Random.Shared.NextInt64(), null);
+        
+        // First write
+        grainState.State.A = "Version1";
+        await Storage.WriteStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        var etag1 = grainState.ETag;
+        Assert.NotNull(etag1);
+
+        // Second write
+        grainState.State.A = "Version2";
+        await Storage.WriteStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        var etag2 = grainState.ETag;
+        Assert.NotNull(etag2);
+        Assert.NotEqual(etag1, etag2);
+
+        // Third write
+        grainState.State.A = "Version3";
+        await Storage.WriteStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        var etag3 = grainState.ETag;
+        Assert.NotNull(etag3);
+        Assert.NotEqual(etag2, etag3);
+        Assert.NotEqual(etag1, etag3);
+    }
 }

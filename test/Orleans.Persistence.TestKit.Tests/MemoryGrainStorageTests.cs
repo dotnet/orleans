@@ -64,4 +64,28 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
     {
         return base.PersistenceStorage_WriteClearWrite();
     }
+
+    [Fact]
+    public Task PersistenceStorage_WriteClearRead()
+    {
+        return base.PersistenceStorage_WriteClearRead();
+    }
+
+    [Fact]
+    public Task PersistenceStorage_WriteRead_StringKey()
+    {
+        return base.PersistenceStorage_WriteRead_StringKey();
+    }
+
+    [Fact]
+    public Task PersistenceStorage_WriteRead_IntegerKey()
+    {
+        return base.PersistenceStorage_WriteRead_IntegerKey();
+    }
+
+    [Fact]
+    public Task PersistenceStorage_ETagChangesOnWrite()
+    {
+        return base.PersistenceStorage_ETagChangesOnWrite();
+    }
 }

@@ -79,11 +79,18 @@ The `GrainStorageTestRunner` base class provides the following test methods:
 - **`PersistenceStorage_WriteReadIdCyrillic()`**: Tests basic write and read operations
 - **`PersistenceStorage_ReadNonExistentState()`**: Tests that reading a non-existent state returns RecordExists=false
 - **`PersistenceStorage_WriteClearWrite()`**: Tests write, clear, and write cycle to ensure state can be re-written after clearing
+- **`PersistenceStorage_WriteClearRead()`**: Tests the full write-clear-read cycle with verification that state is properly initialized after clear
+
+### Key Type Tests
+
+- **`PersistenceStorage_WriteRead_StringKey()`**: Tests storage operations with string-based grain keys
+- **`PersistenceStorage_WriteRead_IntegerKey()`**: Tests storage operations with integer-based grain keys
 
 ### Consistency Tests
 
 - **`PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException()`**: Verifies that attempting to insert duplicate data throws `InconsistentStateException`
 - **`PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException()`**: Verifies that writing with an incorrect ETag throws `InconsistentStateException`
+- **`PersistenceStorage_ETagChangesOnWrite()`**: Tests that ETag updates properly on successive writes
 
 ### Concurrency Tests
 
