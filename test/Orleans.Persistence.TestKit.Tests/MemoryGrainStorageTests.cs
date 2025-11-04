@@ -60,6 +60,12 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
     }
 
     [Fact]
+    public Task PersistenceStorage_ReadNonExistentStateHasNonNullState()
+    {
+        return base.PersistenceStorage_ReadNonExistentStateHasNonNullState();
+    }
+
+    [Fact]
     public Task PersistenceStorage_WriteClearWrite()
     {
         return base.PersistenceStorage_WriteClearWrite();
@@ -69,6 +75,12 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
     public Task PersistenceStorage_WriteClearRead()
     {
         return base.PersistenceStorage_WriteClearRead();
+    }
+
+    [Fact]
+    public Task PersistenceStorage_WriteReadClearReadCycle()
+    {
+        return base.PersistenceStorage_WriteReadClearReadCycle();
     }
 
     [Fact]
@@ -87,5 +99,41 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
     public Task PersistenceStorage_ETagChangesOnWrite()
     {
         return base.PersistenceStorage_ETagChangesOnWrite();
+    }
+
+    [Fact]
+    public Task PersistenceStorage_ClearBeforeWrite()
+    {
+        return base.PersistenceStorage_ClearBeforeWrite();
+    }
+
+    [Fact]
+    public Task PersistenceStorage_ClearStateDoesNotNullifyState()
+    {
+        return base.PersistenceStorage_ClearStateDoesNotNullifyState();
+    }
+
+    [Fact]
+    public Task PersistenceStorage_ClearUpdatesETag()
+    {
+        return base.PersistenceStorage_ClearUpdatesETag();
+    }
+
+    [Fact]
+    public Task PersistenceStorage_ReadAfterClear()
+    {
+        return base.PersistenceStorage_ReadAfterClear();
+    }
+
+    [Fact]
+    public Task PersistenceStorage_MultipleClearOperations()
+    {
+        return base.PersistenceStorage_MultipleClearOperations();
+    }
+
+    [Fact]
+    public Task PersistenceStorage_WriteWithSameValuesUpdatesETag()
+    {
+        return base.PersistenceStorage_WriteWithSameValuesUpdatesETag();
     }
 }

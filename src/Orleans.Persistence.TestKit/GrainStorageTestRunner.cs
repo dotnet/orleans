@@ -362,4 +362,195 @@ public abstract class GrainStorageTestRunner
         Assert.NotEqual(etag2, etag3);
         Assert.NotEqual(etag1, etag3);
     }
+
+    /// <summary>
+    /// Tests that calling Clear before any write works correctly.
+    /// Verifies that RecordExists is false and State is not null after clearing non-existent state.
+    /// </summary>
+    public virtual async Task PersistenceStorage_ClearBeforeWrite()
+    {
+        var grainTypeName = "TestGrain";
+        var (grainId, grainState) = GetTestReferenceAndState(Random.Shared.NextInt64(), null);
+
+        // Clear state that was never written
+        await Storage.ClearStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+
+        // State should still be initialized (not null), but record shouldn't exist
+        Assert.NotNull(grainState.State);
+        Assert.False(grainState.RecordExists);
+    }
+
+    /// <summary>
+    /// Tests that State property is never null after Clear operation.
+    /// Verifies the State object remains initialized even after clearing.
+    /// </summary>
+    public virtual async Task PersistenceStorage_ClearStateDoesNotNullifyState()
+    {
+        var grainTypeName = "TestGrain";
+        var (grainId, grainState) = GetTestReferenceAndState(Random.Shared.NextInt64(), null);
+        grainState.State.A = "TestData";
+        grainState.State.B = 100;
+
+        // Write and then clear
+        await Storage.WriteStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        Assert.True(grainState.RecordExists);
+        Assert.NotNull(grainState.State);
+
+        await Storage.ClearStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        
+        // State object should not be null even after clear
+        Assert.NotNull(grainState.State);
+        Assert.False(grainState.RecordExists);
+    }
+
+    /// <summary>
+    /// Tests that ETag changes after Clear operation.
+    /// Some providers may set ETag to null on clear, others may update it - both are acceptable.
+    /// </summary>
+    public virtual async Task PersistenceStorage_ClearUpdatesETag()
+    {
+        var grainTypeName = "TestGrain";
+        var (grainId, grainState) = GetTestReferenceAndState(Random.Shared.NextInt64(), null);
+        grainState.State.A = "TestData";
+
+        // Write state
+        await Storage.WriteStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        var writeETag = grainState.ETag;
+        Assert.NotNull(writeETag);
+
+        // Clear state
+        await Storage.ClearStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        var clearETag = grainState.ETag;
+
+        // ETag should have changed (either to null or a new value)
+        Assert.NotEqual(writeETag, clearETag);
+        Assert.False(grainState.RecordExists);
+    }
+
+    /// <summary>
+    /// Tests reading state after it has been cleared.
+    /// Verifies that reading a cleared state returns RecordExists=false and State is not null.
+    /// </summary>
+    public virtual async Task PersistenceStorage_ReadAfterClear()
+    {
+        var grainTypeName = "TestGrain";
+        var (grainId, grainState) = GetTestReferenceAndState(Random.Shared.NextInt64(), null);
+        grainState.State.A = "OriginalData";
+        grainState.State.B = 42;
+
+        // Write, clear, then read
+        await Storage.WriteStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        await Storage.ClearStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+
+        // Read the cleared state
+        var readState = new GrainState<TestState1> { State = new TestState1() };
+        await Storage.ReadStateAsync(grainTypeName, grainId, readState).ConfigureAwait(false);
+
+        // After reading a cleared state
+        Assert.False(readState.RecordExists);
+        Assert.NotNull(readState.State); // State should still be initialized
+    }
+
+    /// <summary>
+    /// Tests multiple successive clear operations.
+    /// Verifies that clearing an already-cleared state is idempotent.
+    /// </summary>
+    public virtual async Task PersistenceStorage_MultipleClearOperations()
+    {
+        var grainTypeName = "TestGrain";
+        var (grainId, grainState) = GetTestReferenceAndState(Random.Shared.NextInt64(), null);
+        grainState.State.A = "TestData";
+
+        // Write state
+        await Storage.WriteStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        Assert.True(grainState.RecordExists);
+
+        // First clear
+        await Storage.ClearStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        var firstClearETag = grainState.ETag;
+        Assert.False(grainState.RecordExists);
+
+        // Second clear - should be idempotent
+        await Storage.ClearStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        Assert.False(grainState.RecordExists);
+        Assert.NotNull(grainState.State);
+    }
+
+    /// <summary>
+    /// Tests that State property remains initialized (not null) after reading non-existent state.
+    /// </summary>
+    public virtual async Task PersistenceStorage_ReadNonExistentStateHasNonNullState()
+    {
+        var grainTypeName = "TestGrain";
+        var (grainId, grainState) = GetTestReferenceAndState(Random.Shared.NextInt64(), null);
+
+        // Read state that was never written
+        await Storage.ReadStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+
+        // State should be initialized even though nothing was written
+        Assert.False(grainState.RecordExists);
+        Assert.NotNull(grainState.State);
+        Assert.Null(grainState.ETag);
+    }
+
+    /// <summary>
+    /// Tests write-read-clear-read cycle to verify state transitions.
+    /// </summary>
+    public virtual async Task PersistenceStorage_WriteReadClearReadCycle()
+    {
+        var grainTypeName = "TestGrain";
+        var (grainId, grainState) = GetTestReferenceAndState(Random.Shared.NextInt64(), null);
+        grainState.State.A = "InitialValue";
+        grainState.State.B = 99;
+
+        // Write
+        await Storage.WriteStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        var writeETag = grainState.ETag;
+        Assert.True(grainState.RecordExists);
+
+        // Read back
+        var readState1 = new GrainState<TestState1> { State = new TestState1() };
+        await Storage.ReadStateAsync(grainTypeName, grainId, readState1).ConfigureAwait(false);
+        Assert.True(readState1.RecordExists);
+        Assert.Equal("InitialValue", readState1.State.A);
+        Assert.Equal(99, readState1.State.B);
+        Assert.Equal(writeETag, readState1.ETag);
+
+        // Clear
+        await Storage.ClearStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        Assert.False(grainState.RecordExists);
+
+        // Read after clear
+        var readState2 = new GrainState<TestState1> { State = new TestState1() };
+        await Storage.ReadStateAsync(grainTypeName, grainId, readState2).ConfigureAwait(false);
+        Assert.False(readState2.RecordExists);
+        Assert.NotNull(readState2.State);
+    }
+
+    /// <summary>
+    /// Tests that updating state with the same values still updates the ETag.
+    /// </summary>
+    public virtual async Task PersistenceStorage_WriteWithSameValuesUpdatesETag()
+    {
+        var grainTypeName = "TestGrain";
+        var (grainId, grainState) = GetTestReferenceAndState(Random.Shared.NextInt64(), null);
+        grainState.State.A = "SameValue";
+        grainState.State.B = 123;
+
+        // First write
+        await Storage.WriteStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        var etag1 = grainState.ETag;
+        Assert.NotNull(etag1);
+
+        // Write again with same values
+        grainState.State.A = "SameValue";
+        grainState.State.B = 123;
+        await Storage.WriteStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+        var etag2 = grainState.ETag;
+        Assert.NotNull(etag2);
+
+        // ETag should still change even though values are the same
+        Assert.NotEqual(etag1, etag2);
+    }
 }
+
