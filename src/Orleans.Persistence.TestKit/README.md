@@ -57,16 +57,16 @@ public class MyStorageTests : GrainStorageTestRunner, IClassFixture<MyStorageTes
     }
 
     [Fact]
-    public Task WriteReadTest() => PersistenceStorage_WriteReadIdCyrillic();
+    public Task PersistenceStorage_WriteReadIdCyrillic() => base.PersistenceStorage_WriteReadIdCyrillic();
 
     [Fact]
-    public Task DuplicateWriteTest() => PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
+    public Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException() => base.PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
 
     [Fact]
-    public Task InconsistentWriteTest() => PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
+    public Task PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException() => base.PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
 
     [Fact]
-    public Task ParallelWriteReadTest() => PersistenceStorage_WriteReadWriteReadStatesInParallel();
+    public Task PersistenceStorage_WriteReadWriteReadStatesInParallel() => base.PersistenceStorage_WriteReadWriteReadStatesInParallel();
 }
 ```
 
@@ -193,16 +193,16 @@ public class MemoryStorageTests : GrainStorageTestRunner, IClassFixture<MemorySt
     }
 
     [Fact]
-    public Task BasicWriteRead() => PersistenceStorage_WriteReadIdCyrillic();
+    public Task PersistenceStorage_WriteReadIdCyrillic() => base.PersistenceStorage_WriteReadIdCyrillic();
 
     [Fact]
-    public Task DuplicateInsertFails() => PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
+    public Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException() => base.PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
 
     [Fact]
-    public Task InconsistentETagFails() => PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
+    public Task PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException() => base.PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
 
     [Fact]
-    public Task ConcurrentOperations() => PersistenceStorage_WriteReadWriteReadStatesInParallel();
+    public Task PersistenceStorage_WriteReadWriteReadStatesInParallel() => base.PersistenceStorage_WriteReadWriteReadStatesInParallel();
 }
 ```
 
