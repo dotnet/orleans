@@ -31,6 +31,7 @@ public static class ScheduledJobsExtensions
         }
 
         services.AddSingleton<IConfigurationValidator, ScheduledJobsOptionsValidator>();
+        services.AddSingleton<ShardExecutor>();
         services.AddSingleton<LocalScheduledJobManager>();
         services.AddFromExisting<ILocalScheduledJobManager, LocalScheduledJobManager>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalScheduledJobManager>();
