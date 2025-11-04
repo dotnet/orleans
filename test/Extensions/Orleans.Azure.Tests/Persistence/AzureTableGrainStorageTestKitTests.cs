@@ -75,4 +75,28 @@ public class AzureTableGrainStorageTestKitTests : GrainStorageTestRunner, IClass
     {
         return base.PersistenceStorage_WriteClearWrite();
     }
+
+    [SkippableFact]
+    public Task PersistenceStorage_WriteClearRead()
+    {
+        return base.PersistenceStorage_WriteClearRead();
+    }
+
+    [SkippableFact]
+    public Task PersistenceStorage_WriteRead_StringKey()
+    {
+        return base.PersistenceStorage_WriteRead_StringKey();
+    }
+
+    [SkippableFact]
+    public Task PersistenceStorage_WriteRead_IntegerKey()
+    {
+        return base.PersistenceStorage_WriteRead_IntegerKey();
+    }
+
+    [SkippableFact]
+    public Task PersistenceStorage_ETagChangesOnWrite()
+    {
+        return base.PersistenceStorage_ETagChangesOnWrite();
+    }
 }
