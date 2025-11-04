@@ -71,6 +71,12 @@ public class AzureTableGrainStorageTestKitTests : GrainStorageTestRunner, IClass
     }
 
     [SkippableFact]
+    public Task PersistenceStorage_ReadNonExistentStateHasNonNullState()
+    {
+        return base.PersistenceStorage_ReadNonExistentStateHasNonNullState();
+    }
+
+    [SkippableFact]
     public Task PersistenceStorage_WriteClearWrite()
     {
         return base.PersistenceStorage_WriteClearWrite();
@@ -80,6 +86,12 @@ public class AzureTableGrainStorageTestKitTests : GrainStorageTestRunner, IClass
     public Task PersistenceStorage_WriteClearRead()
     {
         return base.PersistenceStorage_WriteClearRead();
+    }
+
+    [SkippableFact]
+    public Task PersistenceStorage_WriteReadClearReadCycle()
+    {
+        return base.PersistenceStorage_WriteReadClearReadCycle();
     }
 
     [SkippableFact]
@@ -98,5 +110,41 @@ public class AzureTableGrainStorageTestKitTests : GrainStorageTestRunner, IClass
     public Task PersistenceStorage_ETagChangesOnWrite()
     {
         return base.PersistenceStorage_ETagChangesOnWrite();
+    }
+
+    [SkippableFact]
+    public Task PersistenceStorage_ClearBeforeWrite()
+    {
+        return base.PersistenceStorage_ClearBeforeWrite();
+    }
+
+    [SkippableFact]
+    public Task PersistenceStorage_ClearStateDoesNotNullifyState()
+    {
+        return base.PersistenceStorage_ClearStateDoesNotNullifyState();
+    }
+
+    [SkippableFact]
+    public Task PersistenceStorage_ClearUpdatesETag()
+    {
+        return base.PersistenceStorage_ClearUpdatesETag();
+    }
+
+    [SkippableFact]
+    public Task PersistenceStorage_ReadAfterClear()
+    {
+        return base.PersistenceStorage_ReadAfterClear();
+    }
+
+    [SkippableFact]
+    public Task PersistenceStorage_MultipleClearOperations()
+    {
+        return base.PersistenceStorage_MultipleClearOperations();
+    }
+
+    [SkippableFact]
+    public Task PersistenceStorage_WriteWithSameValuesUpdatesETag()
+    {
+        return base.PersistenceStorage_WriteWithSameValuesUpdatesETag();
     }
 }

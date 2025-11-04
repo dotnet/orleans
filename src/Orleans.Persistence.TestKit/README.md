@@ -78,19 +78,30 @@ The `GrainStorageTestRunner` base class provides the following test methods:
 
 - **`PersistenceStorage_WriteReadIdCyrillic()`**: Tests basic write and read operations
 - **`PersistenceStorage_ReadNonExistentState()`**: Tests that reading a non-existent state returns RecordExists=false
+- **`PersistenceStorage_ReadNonExistentStateHasNonNullState()`**: Verifies State property is not null after reading non-existent state
 - **`PersistenceStorage_WriteClearWrite()`**: Tests write, clear, and write cycle to ensure state can be re-written after clearing
 - **`PersistenceStorage_WriteClearRead()`**: Tests the full write-clear-read cycle with verification that state is properly initialized after clear
+- **`PersistenceStorage_WriteReadClearReadCycle()`**: Tests complete write-read-clear-read cycle to verify state transitions
 
 ### Key Type Tests
 
 - **`PersistenceStorage_WriteRead_StringKey()`**: Tests storage operations with string-based grain keys
 - **`PersistenceStorage_WriteRead_IntegerKey()`**: Tests storage operations with integer-based grain keys
 
+### Clear/Delete Operation Tests
+
+- **`PersistenceStorage_ClearBeforeWrite()`**: Tests that calling Clear before any write works correctly
+- **`PersistenceStorage_ClearStateDoesNotNullifyState()`**: Verifies that State property is never null after Clear operation
+- **`PersistenceStorage_ClearUpdatesETag()`**: Tests that ETag changes after Clear operation
+- **`PersistenceStorage_ReadAfterClear()`**: Tests reading state after it has been cleared
+- **`PersistenceStorage_MultipleClearOperations()`**: Tests multiple successive clear operations are idempotent
+
 ### Consistency Tests
 
 - **`PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException()`**: Verifies that attempting to insert duplicate data throws `InconsistentStateException`
 - **`PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException()`**: Verifies that writing with an incorrect ETag throws `InconsistentStateException`
 - **`PersistenceStorage_ETagChangesOnWrite()`**: Tests that ETag updates properly on successive writes
+- **`PersistenceStorage_WriteWithSameValuesUpdatesETag()`**: Tests that updating state with same values still updates ETag
 
 ### Concurrency Tests
 
