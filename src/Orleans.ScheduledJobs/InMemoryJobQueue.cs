@@ -10,7 +10,7 @@ namespace Orleans.ScheduledJobs;
 /// Provides an in-memory priority queue for managing scheduled jobs based on their due times.
 /// Jobs are organized into time-based buckets and enumerated asynchronously as they become due.
 /// </summary>
-public class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
+internal sealed class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
 {
     private readonly PriorityQueue<JobBucket, DateTimeOffset> _queue = new();
     private readonly Dictionary<string, JobBucket> _jobsIdToBucket = new();
