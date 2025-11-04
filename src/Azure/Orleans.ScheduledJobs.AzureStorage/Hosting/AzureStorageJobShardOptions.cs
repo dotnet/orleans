@@ -34,4 +34,9 @@ public class AzureStorageJobShardOptions
     /// Default is 50 milliseconds.
     /// </summary>
     public TimeSpan BatchFlushInterval { get; set; } = TimeSpan.FromMilliseconds(50);
+    
+    /// <summary>
+    /// Gets or sets the maximum number of retries for creating a blob for a job shard in case of name collisions.
+    /// </summary>
+    public int MaxBlobCreationRetries { get; internal set; } = 3;
 }

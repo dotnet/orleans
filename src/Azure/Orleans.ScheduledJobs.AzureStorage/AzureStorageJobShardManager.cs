@@ -26,6 +26,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
     private readonly ConcurrentDictionary<string, AzureStorageJobShard> _jobShardCache = new();
     private readonly ILogger<AzureStorageJobShardManager> _logger;
     private readonly AzureStorageJobShardOptions _options;
+    private long _shardCounter = 0; // For generating unique shard IDs
 
     public AzureStorageJobShardManager(
         SiloAddress siloAddress,
@@ -63,7 +64,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         await foreach (var blob in _client.GetBlobsAsync(traits: BlobTraits.Metadata, cancellationToken: cancellationToken, prefix: _blobPrefix))
         {
             // Get the owner and creator of the shard
-            var (owner, creator, membershipVersion, shardStartTime, maxDueTime) = ParseMetadata(blob.Metadata);
+            var (owner, membershipVersion, shardStartTime, maxDueTime) = ParseMetadata(blob.Metadata);
 
             // Check if the membership version is more recent than our current version
             if (membershipVersion > _clusterMembership.CurrentSnapshot.Version)
@@ -109,15 +110,10 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                 LogShardStillOwned(_logger, blob.Name, owner!);
                 continue;
             }
-
-            // Check if the creator is still active
-            var creatorStatus = creator is not null ? _clusterMembership.CurrentSnapshot.GetSiloStatus(creator) : SiloStatus.None;
-            var creatorIsActive = creatorStatus is not SiloStatus.Dead and not SiloStatus.None;
-
-            // Try to claim orphaned shard - only if the creator is not active or I am the creator
-            if (!creatorIsActive || SiloAddress.Equals(creator))
+            else
             {
-                LogClaimingShard(_logger, blob.Name, SiloAddress, creatorIsActive, SiloAddress.Equals(creator));
+                // Try to claim orphaned shard
+                LogClaimingShard(_logger, blob.Name, SiloAddress, owner);
                 var blobClient = _client.GetAppendBlobClient(blob.Name);
                 var metadata = blob.Metadata;
                 var orphanedShard = new AzureStorageJobShard(blob.Name, shardStartTime, maxDueTime, blobClient, metadata, blob.Properties.ETag, _options);
@@ -181,9 +177,11 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         await InitializeIfNeeded(cancellationToken);
         LogRegisteringShard(_logger, SiloAddress, minDueTime, maxDueTime, _containerName);
         
-        for (var i = 0;; i++) // TODO limit the number of attempts
+        var i = 0;
+        while (true)
         {
-            var shardId = $"{_blobPrefix}-{minDueTime:yyyyMMddHHmm}-{SiloAddress.ToParsableString()}-{i}"; // todo make sure this is a valid blob name
+            var counter = Interlocked.Increment(ref _shardCounter);
+            var shardId = $"{_blobPrefix}-{minDueTime:yyyyMMddHHmm}-{SiloAddress.ToParsableString()}-{counter}";
             var blobClient = _client.GetAppendBlobClient(shardId);
             var metadataInfo = CreateMetadata(metadata, SiloAddress, _clusterMembership.CurrentSnapshot.Version, minDueTime, maxDueTime);
             metadataInfo["Owner"] = SiloAddress.ToParsableString();
@@ -199,7 +197,11 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
             }
             catch (RequestFailedException ex)
             {
-                if (i > 100) throw; // Prevent infinite loop
+                i++;
+                if (i > _options.MaxBlobCreationRetries)
+                {
+                    throw new InvalidOperationException($"Failed to create shard blob '{shardId}' after {i} attempts", ex);
+                }
                 // Blob already exists, try again with a different name
                 LogShardRegistrationRetry(_logger, ex, shardId, i);
                 continue;
@@ -225,22 +227,22 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         var count = await shard.GetJobCountAsync();
         // We want to make sure to get the latest properties
         var properties = await azureShard.BlobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+
         // But we don't want to update the metadata if the ETag has changed
         var currentETag = properties.Value.ETag;
         var conditions = new BlobRequestConditions { IfMatch = currentETag };
-        
+        var metadata = properties.Value.Metadata;
+        var (owner, _, _, _) = ParseMetadata(metadata);
+
+        if (owner != SiloAddress)
+        {
+            LogUnregisterWrongOwner(_logger, shard.Id, SiloAddress, owner);
+            throw new InvalidOperationException("Cannot unregister a shard owned by another silo");
+        }
+
         if (count > 0)
         {
             // There are still jobs in the shard, unregister it
-            var metadata = properties.Value.Metadata;
-            var (owner, _, _, _, _) = ParseMetadata(metadata);
-
-            if (owner != SiloAddress)
-            {
-                LogUnregisterWrongOwner(_logger, shard.Id, SiloAddress, owner);
-                throw new InvalidOperationException("Cannot unregister a shard owned by another silo");
-            }
-
             metadata.Remove("Owner");
             var response = await azureShard.BlobClient.SetMetadataAsync(metadata, conditions, cancellationToken);
             _jobShardCache.TryRemove(shard.Id, out _);
@@ -272,7 +274,6 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
     {
         var metadata = new Dictionary<string, string>(existingMetadata)
         {
-            { "Creator", siloAddress.ToParsableString() },
             { "MinDueTime", minDueTime.ToString("o") },
             { "MaxDueTime", maxDueTime.ToString("o") },
             { "MembershipVersion", membershipVersion.Value.ToString(CultureInfo.InvariantCulture) }
@@ -281,16 +282,15 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         return metadata;
     }
 
-    private static (SiloAddress? owner, SiloAddress? creator, MembershipVersion membershipVersion, DateTimeOffset minDueTime, DateTimeOffset maxDueTime) ParseMetadata(IDictionary<string, string> metadata)
+    private static (SiloAddress? owner, MembershipVersion membershipVersion, DateTimeOffset minDueTime, DateTimeOffset maxDueTime) ParseMetadata(IDictionary<string, string> metadata)
     {
         var owner = metadata.TryGetValue("Owner", out var ownerStr) ? SiloAddress.FromParsableString(ownerStr) : null;
-        var creator = metadata.TryGetValue("Creator", out var creatorStr) ? SiloAddress.FromParsableString(creatorStr) : null;
         var membershipVersion = metadata.TryGetValue("MembershipVersion", out var membershipVersionStr) && long.TryParse(membershipVersionStr, out var versionValue)
             ? new MembershipVersion(versionValue)
             : MembershipVersion.MinValue;
         var minDueTime = metadata.TryGetValue("MinDueTime", out var minDueTimeStr) && DateTimeOffset.TryParse(minDueTimeStr, out var minDt) ? minDt : DateTimeOffset.MinValue;
         var maxDueTime = metadata.TryGetValue("MaxDueTime", out var maxDueTimeStr) && DateTimeOffset.TryParse(maxDueTimeStr, out var maxDt) ? maxDt : DateTimeOffset.MaxValue;
-        return (owner, creator, membershipVersion, minDueTime, maxDueTime);
+        return (owner, membershipVersion, minDueTime, maxDueTime);
     }
 
     [LoggerMessage(
@@ -331,9 +331,9 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
 
     [LoggerMessage(
         Level = LogLevel.Debug,
-        Message = "Claiming shard '{ShardId}' for silo {SiloAddress} (CreatorIsActive={CreatorIsActive}, IsCreator={IsCreator})"
+        Message = "Claiming shard '{ShardId}' for silo {SiloAddress} (Previous Owner={PreviousOwner})"
     )]
-    private static partial void LogClaimingShard(ILogger logger, string shardId, SiloAddress siloAddress, bool creatorIsActive, bool isCreator);
+    private static partial void LogClaimingShard(ILogger logger, string shardId, SiloAddress siloAddress, SiloAddress? previousOwner);
 
     [LoggerMessage(
         Level = LogLevel.Warning,
