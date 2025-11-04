@@ -219,7 +219,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         LogUnregisteringShard(_logger, shard.Id, SiloAddress);
         
         // Stop the background storage processor to ensure no more changes can happen
-        await azureShard.StopProcessorAsync();
+        await azureShard.StopProcessorAsync(cancellationToken);
         
         // Now we can safely get a consistent view of the state
         var count = await shard.GetJobCountAsync();

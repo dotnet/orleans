@@ -143,11 +143,8 @@ internal sealed class AzureStorageJobShard : JobShard
 
     private async Task EnqueueStorageOperationAsync(StorageOperation operation, CancellationToken cancellationToken)
     {
-        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        operation.CompletionSource = tcs;
-        
         await _storageOperationChannel.Writer.WriteAsync(operation, cancellationToken);
-        await tcs.Task;
+        await operation.CompletionSource.Task;
     }
 
     private async Task ProcessStorageOperationsAsync()
@@ -174,7 +171,7 @@ internal sealed class AzureStorageJobShard : JobShard
                     try
                     {
                         await UpdateMetadataAsync(firstOperation.Metadata!, cancellationToken);
-                        firstOperation.CompletionSource?.TrySetResult(true);
+                        firstOperation.CompletionSource.TrySetResult();
                     }
                     catch (Exception ex)
                     {
@@ -204,7 +201,7 @@ internal sealed class AzureStorageJobShard : JobShard
                         // Mark all operations as completed
                         foreach (var op in batchOperations)
                         {
-                            op.CompletionSource?.TrySetResult(true);
+                            op.CompletionSource.TrySetResult();
                         }
                     }
                     catch (Exception ex)
@@ -223,6 +220,10 @@ internal sealed class AzureStorageJobShard : JobShard
             }
         }
         catch (OperationCanceledException)
+        {
+            // Ignore
+        }
+        finally
         {
             // Expected during shutdown - cancel all pending operations
             while (_storageOperationChannel.Reader.TryRead(out var operation))
@@ -249,6 +250,7 @@ internal sealed class AzureStorageJobShard : JobShard
             return batchOperations.Count != _options.MaxBatchSize;
         }
     }
+
     private async Task AppendJobOperationBatchAsync(List<StorageOperation> operations, CancellationToken cancellationToken)
     {
         using var stream = PooledBufferStream.Rent();
@@ -286,14 +288,12 @@ internal sealed class AzureStorageJobShard : JobShard
         Metadata = metadata;
     }
 
-
-
     /// <summary>
     /// Stops the background storage processor and waits for all pending operations to complete.
     /// After calling this method, no new storage operations can be enqueued.
     /// This method is idempotent and can be called multiple times safely.
     /// </summary>
-    internal async Task StopProcessorAsync()
+    internal async Task StopProcessorAsync(CancellationToken cancellationToken)
     {
         // Complete the channel to stop accepting new operations (idempotent operation)
         if (_storageOperationChannel.Writer.TryComplete())
@@ -304,7 +304,7 @@ internal sealed class AzureStorageJobShard : JobShard
         // Wait for the background processor to finish all pending operations
         try
         {
-            await _storageProcessorTask;
+            await _storageProcessorTask.WaitAsync(cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -314,7 +314,7 @@ internal sealed class AzureStorageJobShard : JobShard
 
     public override async ValueTask DisposeAsync()
     {
-        await StopProcessorAsync();
+        await StopProcessorAsync(CancellationToken.None);
         _shutdownCts.Dispose();
         await base.DisposeAsync();
     }
@@ -331,7 +331,7 @@ internal sealed class StorageOperation
     public required StorageOperationType Type { get; init; }
     public JobOperation? JobOperation { get; init; }
     public IDictionary<string, string>? Metadata { get; init; }
-    public TaskCompletionSource<bool>? CompletionSource { get; set; }
+    public TaskCompletionSource CompletionSource { get; init; } = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public static StorageOperation CreateAppendOperation(JobOperation jobOperation)
     {
