@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -96,7 +97,7 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
         var tasks = new List<Task>();
         for (int i = 0; i < 10; i++)
         {
-            tasks.Add(shard.TryScheduleJobAsync(GrainId.Create("type", $"target{i}"), $"job{i}", DateTime.UtcNow.AddSeconds(i + 5), null, CancellationToken.None));
+            tasks.Add(shard.TryScheduleJobAsync(GrainId.Create("type", $"target{i}"), $"job{i}", date.AddMilliseconds(i*10), null, CancellationToken.None));
         }
 
         await Task.WhenAll(tasks);
@@ -146,9 +147,9 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
 
         // Schedule only 3 jobs (less than MinBatchSize of 10)
         var tasks = new Task[3];
-        tasks[0] = shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
-        tasks[1] = shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(6), null, CancellationToken.None);
-        tasks[2] = shard.TryScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddSeconds(7), null, CancellationToken.None);
+        tasks[0] = shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", date.AddSeconds(1), null, CancellationToken.None);
+        tasks[1] = shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", date.AddSeconds(2), null, CancellationToken.None);
+        tasks[2] = shard.TryScheduleJobAsync(GrainId.Create("type", "target3"), "job3", date.AddSeconds(3), null, CancellationToken.None);
 
         await Task.WhenAll(tasks);
 
@@ -196,7 +197,7 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
         var tasks = new List<Task>();
         for (int i = 0; i < 50; i++)
         {
-            tasks.Add(shard.TryScheduleJobAsync(GrainId.Create("type", $"target{i}"), $"job{i}", DateTime.UtcNow.AddMilliseconds(i + 5), null, CancellationToken.None));
+            tasks.Add(shard.TryScheduleJobAsync(GrainId.Create("type", $"target{i}"), $"job{i}", date.AddMilliseconds(i), null, CancellationToken.None));
         }
 
         await Task.WhenAll(tasks);
@@ -249,7 +250,7 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
         var tasks = new List<Task>();
         for (int i = 0; i < 5; i++)
         {
-            tasks.Add(shard.TryScheduleJobAsync(GrainId.Create("type", $"target{i}"), $"job{i}", DateTime.UtcNow.AddMilliseconds(i + 5), null, CancellationToken.None));
+            tasks.Add(shard.TryScheduleJobAsync(GrainId.Create("type", $"target{i}"), $"job{i}", date.AddMilliseconds(i), null, CancellationToken.None));
         }
 
         // Give operations time to queue
@@ -263,8 +264,7 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
         var newMetadata = new Dictionary<string, string>(shard.Metadata) { ["Updated"] = "true" };
         await azureShard.UpdateBlobMetadata(newMetadata, CancellationToken.None);
 
-        await Task.WhenAll(tasks);
-
+        Assert.All(tasks, t => Assert.True(t.IsCompletedSuccessfully, "Expected all job scheduling tasks to complete successfully"));
         Assert.True(azureShard.CommitedBlockCount > blockCountBefore, "Expected metadata update to flush pending batch");
 
         // Verify metadata was updated
@@ -276,6 +276,11 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
         SetSiloStatus(localAddress, SiloStatus.Dead);
         var newSiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 1);
         SetSiloStatus(newSiloAddress, SiloStatus.Active);
+
+        // Reconfigure batching to make test faster
+        StorageOptions.Value.MinBatchSize = 1;
+        StorageOptions.Value.MaxBatchSize = 1;
+        StorageOptions.Value.BatchFlushInterval = TimeSpan.FromMilliseconds(100);
 
         var newManager = CreateManager(newSiloAddress);
         var shards = await newManager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None);

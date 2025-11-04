@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
@@ -55,50 +56,149 @@ public abstract class JobShardManager
 
 internal class InMemoryJobShardManager : JobShardManager
 {
-    private readonly Dictionary<string, List<IJobShard>> _shardStore = new();
+    // Shared storage across all manager instances to support multi-silo scenarios
+    private static readonly Dictionary<string, ShardOwnership> _globalShardStore = new();
+    private static readonly SemaphoreSlim _asyncLock = new(1, 1);
+    private readonly IClusterMembershipService? _membershipService;
 
     public InMemoryJobShardManager(SiloAddress siloAddress) : base(siloAddress)
     {
     }
 
-    public override Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, CancellationToken cancellationToken)
+    public InMemoryJobShardManager(SiloAddress siloAddress, IClusterMembershipService membershipService) : base(siloAddress)
     {
-        var key = SiloAddress.ToString();
-        if (_shardStore.TryGetValue(key, out var shards))
+        _membershipService = membershipService;
+    }
+
+    /// <summary>
+    /// Clears all shards from the global store. For testing purposes only.
+    /// </summary>
+    internal static async Task ClearAllShardsAsync()
+    {
+        await _asyncLock.WaitAsync();
+        try
         {
-            var result = new List<IJobShard>();
-            foreach (var shard in shards)
+            _globalShardStore.Clear();
+        }
+        finally
+        {
+            _asyncLock.Release();
+        }
+    }
+
+    public override async Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, CancellationToken cancellationToken)
+    {
+        var alreadyOwnedShards = new List<IJobShard>();
+        var stolenShards = new List<IJobShard>();
+        
+        await _asyncLock.WaitAsync(cancellationToken);
+        try
+        {
+            var snapshot = _membershipService?.CurrentSnapshot;
+            var deadSilos = new HashSet<string>();
+            
+            if (snapshot is not null)
             {
-                if (shard.EndTime <= maxDueTime)
+                foreach (var member in snapshot.Members.Values)
                 {
-                    result.Add(shard);
+                    if (member.Status == SiloStatus.Dead)
+                    {
+                        deadSilos.Add(member.SiloAddress.ToString());
+                    }
                 }
             }
-            return Task.FromResult(result);
+
+            // Assign shards from dead silos or orphaned shards
+            foreach (var kvp in _globalShardStore)
+            {
+                var shardId = kvp.Key;
+                var ownership = kvp.Value;
+                
+                // Skip shards that are already owned by this silo
+                if (ownership.OwnerSiloAddress == SiloAddress.ToString())
+                {
+                    if (ownership.Shard.StartTime <= maxDueTime)
+                    {
+                        alreadyOwnedShards.Add(ownership.Shard);
+                    }
+                }
+                // Take over orphaned shards or shards from dead silos
+                else if (ownership.OwnerSiloAddress is null || deadSilos.Contains(ownership.OwnerSiloAddress))
+                {
+                    if (ownership.Shard.StartTime <= maxDueTime)
+                    {
+                        ownership.OwnerSiloAddress = SiloAddress.ToString();
+                        stolenShards.Add(ownership.Shard);
+                    }
+                }
+            }
         }
-        return Task.FromResult(new List<IJobShard>());
+        finally
+        {
+            _asyncLock.Release();
+        }
+
+        foreach (var shard in stolenShards)
+        {
+            // Mark stolen shards as complete
+            await shard.MarkAsCompleteAsync(CancellationToken.None);
+        }
+
+        return [.. alreadyOwnedShards, .. stolenShards];
     }
 
-    public override Task<IJobShard> CreateShardAsync(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, CancellationToken cancellationToken)
+    public override async Task<IJobShard> CreateShardAsync(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, CancellationToken cancellationToken)
     {
-        var key = SiloAddress.ToString();
-        if (!_shardStore.ContainsKey(key))
+        await _asyncLock.WaitAsync(cancellationToken);
+        try
         {
-            _shardStore[key] = [];
+            var shardId = $"{SiloAddress}-{Guid.NewGuid()}";
+            var newShard = new InMemoryJobShard(shardId, minDueTime, maxDueTime, metadata);
+            
+            _globalShardStore[shardId] = new ShardOwnership
+            {
+                Shard = newShard,
+                OwnerSiloAddress = SiloAddress.ToString()
+            };
+            
+            return newShard;
         }
-        var shardId = $"{key}-{Guid.NewGuid()}";
-        var newShard = new InMemoryJobShard(shardId, minDueTime, maxDueTime);
-        _shardStore[key].Add(newShard);
-        return Task.FromResult((IJobShard)newShard);
+        finally
+        {
+            _asyncLock.Release();
+        }
     }
 
-    public override Task UnregisterShardAsync(IJobShard shard, CancellationToken cancellationToken)
+    public override async Task UnregisterShardAsync(IJobShard shard, CancellationToken cancellationToken)
     {
-        var key = SiloAddress.ToString();
-        if (_shardStore.TryGetValue(key, out var shards))
+        var jobCount = await shard.GetJobCountAsync();
+        
+        await _asyncLock.WaitAsync(cancellationToken);
+        try
         {
-            shards.RemoveAll(s => s.Id == shard.Id);
+            // Only remove shards that have no jobs remaining
+            if (_globalShardStore.TryGetValue(shard.Id, out var ownership))
+            {
+                if (jobCount == 0)
+                {
+                    _globalShardStore.Remove(shard.Id);
+                }
+                else
+                {
+                    // Mark as unowned so another silo can pick it up
+                    ownership.OwnerSiloAddress = null;
+                }
+            }
         }
-        return Task.CompletedTask;
+        finally
+        {
+            _asyncLock.Release();
+        }
+    }
+
+    private sealed class ShardOwnership
+    {
+        public required IJobShard Shard { get; init; }
+        public string? OwnerSiloAddress { get; set; }
     }
 }

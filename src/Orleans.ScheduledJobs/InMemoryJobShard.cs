@@ -10,9 +10,10 @@ namespace Orleans.ScheduledJobs;
 [DebuggerDisplay("ShardId={Id}, StartTime={StartTime}, EndTime={EndTime}")]
 internal sealed class InMemoryJobShard : JobShard
 {
-    public InMemoryJobShard(string shardId, DateTimeOffset minDueTime, DateTimeOffset maxDueTime)
+    public InMemoryJobShard(string shardId, DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string>? metadata)
         : base(shardId, minDueTime, maxDueTime)
     {
+        Metadata = metadata;
     }
 
     protected override Task PersistAddJobAsync(string jobId, string jobName, DateTimeOffset dueTime, GrainId target, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)

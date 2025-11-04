@@ -71,7 +71,8 @@ public static class ScheduledJobsExtensions
         services.AddSingleton<InMemoryJobShardManager>(sp =>
         {
             var siloDetails = sp.GetRequiredService<ILocalSiloDetails>();
-            return new InMemoryJobShardManager(siloDetails.SiloAddress);
+            var membershipService = sp.GetRequiredService<IClusterMembershipService>();
+            return new InMemoryJobShardManager(siloDetails.SiloAddress, membershipService);
         });
         services.AddFromExisting<JobShardManager, InMemoryJobShardManager>();
         return services;
