@@ -116,7 +116,7 @@ public abstract class JobShard : IJobShard
     public IDictionary<string, string>? Metadata { get; protected set; }
 
     /// <inheritdoc/>
-    public bool IsAddingCompleted { get; protected set; } = false;
+    public bool IsAddingCompleted { get; protected set; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JobShard"/> class.
