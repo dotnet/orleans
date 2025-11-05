@@ -12,7 +12,7 @@ using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 
-namespace Orleans.ScheduledJobs;
+namespace Orleans.DurableJobs;
 
 /// <inheritdoc/>
 internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManager, ILifecycleParticipant<ISiloLifecycle>

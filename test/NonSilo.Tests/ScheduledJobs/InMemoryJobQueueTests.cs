@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.ScheduledJobs;
+using Orleans.DurableJobs;
 using Orleans.Runtime;
 using NSubstitute;
 using Xunit;

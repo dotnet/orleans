@@ -3,8 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
-using Orleans.ScheduledJobs;
-using Orleans.ScheduledJobs.AzureStorage;
+using Orleans.DurableJobs;
+using Orleans.DurableJobs.AzureStorage;
 
 namespace Orleans.Hosting;
 
@@ -65,7 +65,7 @@ public static class AzureStorageScheduledJobsExtensions
     {
         services.AddScheduledJobs();
         services.AddSingleton<AzureStorageJobShardManager>();
-        services.AddFromExisting<JobShardManager, AzureStorageJobShardManager>();
+        services.AddFromExisting<Orleans.DurableJobs.JobShardManager, AzureStorageJobShardManager>();
         services.Configure<AzureStorageJobShardOptions>(configure);
         services.ConfigureFormatter<AzureStorageJobShardOptions>();
         return services;
@@ -87,7 +87,7 @@ public static class AzureStorageScheduledJobsExtensions
     {
         services.AddScheduledJobs();
         services.AddSingleton<AzureStorageJobShardManager>();
-        services.AddFromExisting<JobShardManager, AzureStorageJobShardManager>();
+        services.AddFromExisting<Orleans.DurableJobs.JobShardManager, AzureStorageJobShardManager>();
         configureOptions?.Invoke(services.AddOptions<AzureStorageJobShardOptions>());
         services.ConfigureFormatter<AzureStorageJobShardOptions>();
         services.AddTransient<IConfigurationValidator>(sp => new AzureStorageJobShardOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureStorageJobShardOptions>>().Get(Options.DefaultName), Options.DefaultName));

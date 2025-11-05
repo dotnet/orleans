@@ -2,7 +2,7 @@ using System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
-using Orleans.ScheduledJobs;
+using Orleans.DurableJobs;
 
 namespace Orleans.Hosting;
 

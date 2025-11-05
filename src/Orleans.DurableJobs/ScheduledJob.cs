@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Orleans.Runtime;
 
-namespace Orleans.ScheduledJobs;
+namespace Orleans.DurableJobs;
 
 /// <summary>
 /// Represents a scheduled job that will be executed at a specific time.

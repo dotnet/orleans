@@ -1,7 +1,7 @@
 using System;
 using Microsoft.Extensions.Logging;
 
-namespace Orleans.ScheduledJobs.AzureStorage;
+namespace Orleans.DurableJobs.AzureStorage;
 
 internal sealed partial class AzureStorageJobShard
 {

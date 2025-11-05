@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Orleans.ScheduledJobs;
+namespace Orleans.DurableJobs;
 
 /// <summary>
 /// Provides an in-memory priority queue for managing scheduled jobs based on their due times.

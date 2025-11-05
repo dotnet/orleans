@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-namespace Orleans.ScheduledJobs;
+namespace Orleans.DurableJobs;
 
 [DebuggerDisplay("ShardId={Id}, StartTime={StartTime}, EndTime={EndTime}")]
 internal sealed class InMemoryJobShard : JobShard

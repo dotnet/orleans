@@ -18,7 +18,7 @@ using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Serialization.Buffers.Adaptors;
 
-namespace Orleans.ScheduledJobs.AzureStorage;
+namespace Orleans.DurableJobs.AzureStorage;
 
 internal sealed partial class AzureStorageJobShard : JobShard
 {

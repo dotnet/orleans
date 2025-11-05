@@ -123,7 +123,7 @@ builder.UseOrleans(siloBuilder =>
 ### Email Scheduling with Cancellation
 ```csharp
 using Orleans;
-using Orleans.ScheduledJobs;
+using Orleans.DurableJobs;
 
 public interface IEmailGrain : IGrainWithStringKey
 {

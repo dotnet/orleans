@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-namespace Orleans.ScheduledJobs;
+namespace Orleans.DurableJobs;
 
 /// <summary>
 /// Represents a shard of scheduled jobs that manages a collection of jobs within a specific time range.

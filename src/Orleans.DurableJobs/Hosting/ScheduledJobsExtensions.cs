@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration.Internal;
 using Orleans.Runtime;
-using Orleans.ScheduledJobs;
+using Orleans.DurableJobs;
 
 namespace Orleans.Hosting;
 

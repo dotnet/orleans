@@ -6,7 +6,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
-using Orleans.ScheduledJobs;
+using Orleans.DurableJobs;
 using Xunit;
 
 namespace Tester.ScheduledJobs;

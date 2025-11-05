@@ -10,7 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Serialization.Buffers.Adaptors;
 
-namespace Orleans.ScheduledJobs.AzureStorage;
+namespace Orleans.DurableJobs.AzureStorage;
 
 /// <summary>
 /// Provides methods for serializing and deserializing JSON data using the netstring format.

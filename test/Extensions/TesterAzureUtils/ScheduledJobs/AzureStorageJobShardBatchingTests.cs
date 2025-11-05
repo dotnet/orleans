@@ -9,8 +9,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.Runtime;
-using Orleans.ScheduledJobs;
-using Orleans.ScheduledJobs.AzureStorage;
+using Orleans.DurableJobs;
+using Orleans.DurableJobs.AzureStorage;
 using Tester.AzureUtils;
 using Xunit;
 

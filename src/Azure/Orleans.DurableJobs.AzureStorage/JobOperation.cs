@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Orleans.Runtime;
 
-namespace Orleans.ScheduledJobs.AzureStorage;
+namespace Orleans.DurableJobs.AzureStorage;
 
 /// <summary>
 /// Represents an operation to be performed on a scheduled job.

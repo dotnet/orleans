@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.Runtime;
 
-namespace Orleans.ScheduledJobs;
+namespace Orleans.DurableJobs;
 
 /// <summary>
 /// Handles the execution of job shards and individual scheduled jobs.

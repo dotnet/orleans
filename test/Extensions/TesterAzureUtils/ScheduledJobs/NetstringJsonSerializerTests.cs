@@ -8,7 +8,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Orleans.Runtime;
-using Orleans.ScheduledJobs.AzureStorage;
+using Orleans.DurableJobs.AzureStorage;
 using Xunit;
 
 namespace Tester.AzureUtils.ScheduledJobs;

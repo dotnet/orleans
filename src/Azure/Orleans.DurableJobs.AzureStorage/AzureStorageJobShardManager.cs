@@ -14,7 +14,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.Runtime;
 
-namespace Orleans.ScheduledJobs.AzureStorage;
+namespace Orleans.DurableJobs.AzureStorage;
 
 public sealed partial class AzureStorageJobShardManager : JobShardManager
 {
@@ -57,12 +57,12 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
     {
     }
 
-    public override async Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxShardStartTime, CancellationToken cancellationToken)
+    public override async Task<List<Orleans.DurableJobs.IJobShard>> AssignJobShardsAsync(DateTimeOffset maxShardStartTime, CancellationToken cancellationToken)
     {
         await InitializeIfNeeded(cancellationToken);
         LogAssigningShards(_logger, SiloAddress, maxShardStartTime, _containerName);
 
-        var result = new List<IJobShard>();
+        var result = new List<Orleans.DurableJobs.IJobShard>();
         await foreach (var blob in _client.GetBlobsAsync(traits: BlobTraits.Metadata, cancellationToken: cancellationToken, prefix: _blobPrefix))
         {
             // Get the owner and creator of the shard
@@ -174,7 +174,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         }
     }
 
-    public override async Task<IJobShard> CreateShardAsync(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, CancellationToken cancellationToken)
+    public override async Task<Orleans.DurableJobs.IJobShard> CreateShardAsync(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, CancellationToken cancellationToken)
     {
         await InitializeIfNeeded(cancellationToken);
         LogRegisteringShard(_logger, SiloAddress, minDueTime, maxDueTime, _containerName);
@@ -217,7 +217,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         }
     }
 
-    public override async Task UnregisterShardAsync(IJobShard shard, CancellationToken cancellationToken)
+    public override async Task UnregisterShardAsync(Orleans.DurableJobs.IJobShard shard, CancellationToken cancellationToken)
     {
         var azureShard = shard as AzureStorageJobShard ?? throw new ArgumentException("Shard is not an AzureStorageJobShard", nameof(shard));
         LogUnregisteringShard(_logger, shard.Id, SiloAddress);

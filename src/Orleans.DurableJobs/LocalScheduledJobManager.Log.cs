@@ -2,7 +2,7 @@ using System;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
-namespace Orleans.ScheduledJobs;
+namespace Orleans.DurableJobs;
 
 internal partial class LocalScheduledJobManager
 {

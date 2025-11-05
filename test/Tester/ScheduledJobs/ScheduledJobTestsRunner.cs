@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Internal;
-using Orleans.ScheduledJobs;
+using Orleans.DurableJobs;
 using Xunit;
 
 namespace Tester.ScheduledJobs;
