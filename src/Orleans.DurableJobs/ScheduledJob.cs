@@ -5,20 +5,20 @@ using Orleans.Runtime;
 namespace Orleans.DurableJobs;
 
 /// <summary>
-/// Represents a scheduled job that will be executed at a specific time.
+/// Represents a durable job that will be executed at a specific time.
 /// </summary>
 [GenerateSerializer]
-[Alias("Orleans.ScheduledJobs.ScheduledJob")]
-public sealed class ScheduledJob
+[Alias("Orleans.DurableJobs.DurableJob")]
+public sealed class DurableJob
 {
     /// <summary>
-    /// Gets the unique identifier for this scheduled job.
+    /// Gets the unique identifier for this durable job.
     /// </summary>
     [Id(0)]
     public required string Id { get; init; }
     
     /// <summary>
-    /// Gets the name of the scheduled job.
+    /// Gets the name of the durable job.
     /// </summary>
     [Id(1)]
     public required string Name { get; init; }
@@ -36,13 +36,13 @@ public sealed class ScheduledJob
     public GrainId TargetGrainId { get; init; }
     
     /// <summary>
-    /// Gets the identifier of the shard that manages this scheduled job.
+    /// Gets the identifier of the shard that manages this durable job.
     /// </summary>
     [Id(4)]
     public required string ShardId { get; init; }
     
     /// <summary>
-    /// Gets optional metadata associated with this scheduled job.
+    /// Gets optional metadata associated with this durable job.
     /// </summary>
     [Id(5)]
     public IReadOnlyDictionary<string, string>? Metadata { get; init; }

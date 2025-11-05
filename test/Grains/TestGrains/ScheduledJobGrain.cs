@@ -10,18 +10,18 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains;
 
-public class ScheduledJobGrain : Grain, IScheduledJobGrain, IScheduledJobHandler
+public class DurableJobGrain : Grain, IDurableJobGrain, IDurableJobHandler
 {
     private Dictionary<string, TaskCompletionSource> jobRunStatus = new();
     private Dictionary<string, DateTimeOffset> jobExecutionTimes = new();
-    private Dictionary<string, IScheduledJobContext> jobContexts = new();
+    private Dictionary<string, IDurableJobContext> jobContexts = new();
     private Dictionary<string, bool> cancellationTokenStatus = new();
-    private readonly ILocalScheduledJobManager _localScheduledJobManager;
-    private readonly ILogger<ScheduledJobGrain> _logger;
+    private readonly ILocalDurableJobManager _localDurableJobManager;
+    private readonly ILogger<DurableJobGrain> _logger;
 
-    public ScheduledJobGrain(ILocalScheduledJobManager localScheduledJobManager, ILogger<ScheduledJobGrain> logger)
+    public DurableJobGrain(ILocalDurableJobManager localDurableJobManager, ILogger<DurableJobGrain> logger)
     {
-        _localScheduledJobManager = localScheduledJobManager;
+        _localDurableJobManager = localDurableJobManager;
         _logger = logger;
     }
 
@@ -30,7 +30,7 @@ public class ScheduledJobGrain : Grain, IScheduledJobGrain, IScheduledJobHandler
         return Task.FromResult(jobRunStatus.TryGetValue(jobId, out var taskResult) && taskResult.Task.IsCompleted);
     }
 
-    public Task ExecuteJobAsync(IScheduledJobContext ctx, CancellationToken cancellationToken)
+    public Task ExecuteJobAsync(IDurableJobContext ctx, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Job {JobId} received at {ReceivedTime}", ctx.Job.Id, DateTime.UtcNow);
         jobExecutionTimes[ctx.Job.Id] = DateTimeOffset.UtcNow;
@@ -40,9 +40,9 @@ public class ScheduledJobGrain : Grain, IScheduledJobGrain, IScheduledJobHandler
         return Task.CompletedTask;
     }
 
-    public async Task<ScheduledJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null)
+    public async Task<DurableJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null)
     {
-        var job = await _localScheduledJobManager.ScheduleJobAsync(this.GetGrainId(), jobName, scheduledTime, metadata, CancellationToken.None);
+        var job = await _localDurableJobManager.ScheduleJobAsync(this.GetGrainId(), jobName, scheduledTime, metadata, CancellationToken.None);
         jobRunStatus[job.Id] = new TaskCompletionSource();
         return job;
     }
@@ -59,9 +59,9 @@ public class ScheduledJobGrain : Grain, IScheduledJobGrain, IScheduledJobHandler
         await taskResult.Task;
     }
 
-    public async Task<bool> TryCancelJobAsync(ScheduledJob job)
+    public async Task<bool> TryCancelJobAsync(DurableJob job)
     {
-        return await _localScheduledJobManager.TryCancelScheduledJobAsync(job, CancellationToken.None);
+        return await _localDurableJobManager.TryCancelDurableJobAsync(job, CancellationToken.None);
     }
 
     public Task<DateTimeOffset> GetJobExecutionTime(string jobId)
@@ -74,7 +74,7 @@ public class ScheduledJobGrain : Grain, IScheduledJobGrain, IScheduledJobHandler
         return Task.FromResult(time);
     }
 
-    public Task<IScheduledJobContext> GetJobContext(string jobId)
+    public Task<IDurableJobContext> GetJobContext(string jobId)
     {
         if (!jobContexts.TryGetValue(jobId, out var ctx))
         {

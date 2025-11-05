@@ -13,19 +13,19 @@ using Microsoft.Extensions.Options;
 using Orleans.Internal;
 using Orleans.DurableJobs;
 using Orleans.DurableJobs.AzureStorage;
-using Orleans.Tests.ScheduledJobs.AzureStorage;
-using Tester.ScheduledJobs;
+using Orleans.Tests.DurableJobs.AzureStorage;
+using Tester.DurableJobs;
 using Xunit;
 using Xunit.Sdk;
 
-namespace Tester.AzureUtils.ScheduledJobs;
+namespace Tester.AzureUtils.DurableJobs;
 
 /// <summary>
 /// Azure Storage-specific tests for job shard manager functionality.
 /// Common tests are delegated to <see cref="JobShardManagerTestsRunner"/> for reusability across providers.
 /// Provider-specific tests (e.g., batching) remain here.
 /// </summary>
-[TestCategory("ScheduledJobs")]
+[TestCategory("DurableJobs")]
 public class AzureStorageJobShardManagerTests : AzureStorageBasicTests, IAsyncDisposable
 {
     private readonly AzureStorageJobShardManagerTestFixture _fixture;

@@ -1,7 +1,7 @@
-# Microsoft Orleans Scheduled Jobs
+# Microsoft Orleans Durable Jobs
 
 ## Introduction
-Microsoft Orleans Scheduled Jobs provides a distributed, scalable system for scheduling one-time jobs that execute at a specific time. Unlike Orleans Reminders which are designed for recurring tasks, Scheduled Jobs are ideal for one-time future events such as appointment notifications, delayed processing, scheduled workflow steps, and time-based triggers.
+Microsoft Orleans Durable Jobs provides a distributed, scalable system for scheduling one-time jobs that execute at a specific time. Unlike Orleans Reminders which are designed for recurring tasks, Durable Jobs are ideal for one-time future events such as appointment notifications, delayed processing, scheduled workflow steps, and time-based triggers.
 
 **Key Features:**
 - **At Least One-time Execution**: Jobs are scheduled to run at least once
@@ -17,13 +17,13 @@ Microsoft Orleans Scheduled Jobs provides a distributed, scalable system for sch
 To use this package, install it via NuGet:
 
 ```shell
-dotnet add package Microsoft.Orleans.ScheduledJobs
+dotnet add package Microsoft.Orleans.DurableJobs
 ```
 
 For production scenarios with persistence, also install a storage provider:
 
 ```shell
-dotnet add package Microsoft.Orleans.ScheduledJobs.AzureStorage
+dotnet add package Microsoft.Orleans.DurableJobs.AzureStorage
 ```
 
 ### Configuration
@@ -39,8 +39,8 @@ builder.UseOrleans(siloBuilder =>
 {
     siloBuilder
         .UseLocalhostClustering()
-        // Configure in-memory scheduled jobs (no persistence)
-        .UseInMemoryScheduledJobs();
+        // Configure in-memory Durable Jobs (no persistence)
+        .UseInMemoryDurableJobs();
 });
 
 await builder.Build().RunAsync();
@@ -57,13 +57,13 @@ builder.UseOrleans(siloBuilder =>
 {
     siloBuilder
         .UseLocalhostClustering()
-        // Configure Azure Storage scheduled jobs
-        .UseAzureStorageScheduledJobs(options =>
+        // Configure Azure Storage Durable Jobs
+        .UseAzureStorageDurableJobs(options =>
         {
             options.Configure(o =>
             {
                 o.BlobServiceClient = new Azure.Storage.Blobs.BlobServiceClient("YOUR_CONNECTION_STRING");
-                o.ContainerName = "scheduled-jobs";
+                o.ContainerName = "durable-jobs";
             });
         });
 });
@@ -77,10 +77,10 @@ builder.UseOrleans(siloBuilder =>
 {
     siloBuilder
         .UseLocalhostClustering()
-        .UseInMemoryScheduledJobs()
+        .UseInMemoryDurableJobs()
         .ConfigureServices(services =>
         {
-            services.Configure<ScheduledJobsOptions>(options =>
+            services.Configure<DurableJobsOptions>(options =>
             {
                 // Duration of each job shard (jobs are partitioned by time)
                 options.ShardDuration = TimeSpan.FromMinutes(5);
@@ -108,10 +108,10 @@ builder.UseOrleans(siloBuilder =>
 
 ### Basic Job Scheduling
 
-#### 1. Implement the IScheduledJobHandler Interface
+#### 1. Implement the IDurableJobHandler Interface
 ```csharp
 using Orleans;
-using Orleans.ScheduledJobs;
+using Orleans.DurableJobs;
 
 public interface INotificationGrain : IGrainWithStringKey
 {
@@ -119,14 +119,14 @@ public interface INotificationGrain : IGrainWithStringKey
     Task CancelScheduledNotification();
 }
 
-public class NotificationGrain : Grain, INotificationGrain, IScheduledJobHandler
+public class NotificationGrain : Grain, INotificationGrain, IDurableJobHandler
 {
-    private readonly ILocalScheduledJobManager _jobManager;
+    private readonly ILocalDurableJobManager _jobManager;
     private readonly ILogger<NotificationGrain> _logger;
-    private IScheduledJob? _scheduledJob;
+    private IDurableJob? _durableJob;
 
     public NotificationGrain(
-        ILocalScheduledJobManager jobManager,
+        ILocalDurableJobManager jobManager,
         ILogger<NotificationGrain> logger)
     {
         _jobManager = jobManager;
@@ -141,7 +141,7 @@ public class NotificationGrain : Grain, INotificationGrain, IScheduledJobHandler
             ["Message"] = message
         };
 
-        _scheduledJob = await _jobManager.ScheduleJobAsync(
+        _durableJob = await _jobManager.ScheduleJobAsync(
             this.GetGrainId(),
             "SendNotification",
             sendTime,
@@ -149,28 +149,28 @@ public class NotificationGrain : Grain, INotificationGrain, IScheduledJobHandler
 
         _logger.LogInformation(
             "Scheduled notification for user {UserId} at {SendTime} (JobId: {JobId})",
-            userId, sendTime, _scheduledJob.Id);
+            userId, sendTime, _durableJob.Id);
     }
 
     public async Task CancelScheduledNotification()
     {
-        if (_scheduledJob is null)
+        if (_durableJob is null)
         {
             _logger.LogWarning("No scheduled notification to cancel");
             return;
         }
 
-        var canceled = await _jobManager.TryCancelScheduledJobAsync(_scheduledJob);
-        _logger.LogInformation("Notification {JobId} canceled: {Canceled}", _scheduledJob.Id, canceled);
+        var canceled = await _jobManager.TryCancelDurableJobAsync(_durableJob);
+        _logger.LogInformation("Notification {JobId} canceled: {Canceled}", _durableJob.Id, canceled);
         
         if (canceled)
         {
-            _scheduledJob = null;
+            _durableJob = null;
         }
     }
 
-    // This method is called when the scheduled job executes
-    public Task ExecuteJobAsync(IScheduledJobContext context, CancellationToken cancellationToken)
+    // This method is called when the durable job executes
+    public Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
     {
         var userId = this.GetPrimaryKeyString();
         var message = context.Job.Metadata?["Message"];
@@ -182,7 +182,7 @@ public class NotificationGrain : Grain, INotificationGrain, IScheduledJobHandler
         // Send the notification here
         // If this throws an exception, the job can be retried based on your retry policy
         
-        _scheduledJob = null;
+        _durableJob = null;
         return Task.CompletedTask;
     }
 }
@@ -196,15 +196,15 @@ public interface IOrderGrain : IGrainWithGuidKey
     Task CancelOrder();
 }
 
-public class OrderGrain : Grain, IOrderGrain, IScheduledJobHandler
+public class OrderGrain : Grain, IOrderGrain, IDurableJobHandler
 {
-    private readonly ILocalScheduledJobManager _jobManager;
+    private readonly ILocalDurableJobManager _jobManager;
     private readonly IOrderService _orderService;
     private readonly IGrainFactory _grainFactory;
     private readonly ILogger<OrderGrain> _logger;
 
     public OrderGrain(
-        ILocalScheduledJobManager jobManager,
+        ILocalDurableJobManager jobManager,
         IOrderService orderService,
         IGrainFactory grainFactory,
         ILogger<OrderGrain> logger)
@@ -253,7 +253,7 @@ public class OrderGrain : Grain, IOrderGrain, IScheduledJobHandler
         await _orderService.CancelOrderAsync(orderId);
     }
 
-    public async Task ExecuteJobAsync(IScheduledJobContext context, CancellationToken cancellationToken)
+    public async Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
     {
         var step = context.Job.Metadata!["Step"];
         var orderId = this.GetPrimaryKey();
@@ -270,7 +270,7 @@ public class OrderGrain : Grain, IOrderGrain, IScheduledJobHandler
         }
     }
 
-    private async Task HandleDeliveryReminder(IScheduledJobContext context, CancellationToken ct)
+    private async Task HandleDeliveryReminder(IDurableJobContext context, CancellationToken ct)
     {
         var customerId = context.Job.Metadata!["CustomerId"];
         var orderNumber = context.Job.Metadata["OrderNumber"];
@@ -299,12 +299,12 @@ public class OrderGrain : Grain, IOrderGrain, IScheduledJobHandler
 
 #### Job with Retry Logic
 ```csharp
-public class PaymentProcessorGrain : Grain, IScheduledJobHandler
+public class PaymentProcessorGrain : Grain, IDurableJobHandler
 {
     private readonly IPaymentService _paymentService;
     private readonly ILogger<PaymentProcessorGrain> _logger;
 
-    public Task ExecuteJobAsync(IScheduledJobContext context, CancellationToken cancellationToken)
+    public Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
     {
         var paymentId = context.Job.Metadata?["PaymentId"];
         
@@ -333,11 +333,11 @@ public class PaymentProcessorGrain : Grain, IScheduledJobHandler
 
 #### Tracking Job Completion
 ```csharp
-public class WorkflowGrain : Grain, IScheduledJobHandler
+public class WorkflowGrain : Grain, IDurableJobHandler
 {
     private readonly Dictionary<string, TaskCompletionSource> _pendingJobs = new();
 
-    public async Task<IScheduledJob> ScheduleWorkflowStep(string stepName, DateTimeOffset executeAt)
+    public async Task<IDurableJob> ScheduleWorkflowStep(string stepName, DateTimeOffset executeAt)
     {
         var job = await _jobManager.ScheduleJobAsync(
             this.GetGrainId(),
@@ -357,7 +357,7 @@ public class WorkflowGrain : Grain, IScheduledJobHandler
         }
     }
 
-    public Task ExecuteJobAsync(IScheduledJobContext context, CancellationToken cancellationToken)
+    public Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
     {
         // Execute the workflow step...
         
@@ -406,13 +406,13 @@ public class WorkflowGrain : Grain, IScheduledJobHandler
 
 ## Configuration Reference
 
-### ScheduledJobsOptions
+### DurableJobsOptions
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `ShardDuration` | `TimeSpan` | 1 minute | Duration of each job shard. Smaller values reduce latency but increase overhead. |
 | `MaxConcurrentJobsPerSilo` | `int` | 100 | Maximum number of jobs that can execute simultaneously on a silo. |
-| `ShouldRetry` | `Func<IScheduledJobContext, Exception, DateTimeOffset?>` | 3 retries with exp. backoff | Determines if a failed job should be retried. Return the new due time or `null` to not retry. |
+| `ShouldRetry` | `Func<IDurableJobContext, Exception, DateTimeOffset?>` | 3 retries with exp. backoff | Determines if a failed job should be retried. Return the new due time or `null` to not retry. |
 
 ## Best Practices
 
@@ -423,7 +423,7 @@ public class WorkflowGrain : Grain, IScheduledJobHandler
 
 2. **Implement Idempotent Job Handlers**: Jobs may be retried, ensure handlers are idempotent
    ```csharp
-   public async Task ExecuteJobAsync(IScheduledJobContext context, CancellationToken ct)
+   public async Task ExecuteJobAsync(IDurableJobContext context, CancellationToken ct)
    {
        var jobId = context.Job.Id;
        // Check if already processed
@@ -446,7 +446,7 @@ public class WorkflowGrain : Grain, IScheduledJobHandler
 
 4. **Handle Cancellation**: Respect the cancellation token
    ```csharp
-   public async Task ExecuteJobAsync(IScheduledJobContext context, CancellationToken ct)
+   public async Task ExecuteJobAsync(IDurableJobContext context, CancellationToken ct)
    {
        await SomeLongRunningOperation(ct);
    }

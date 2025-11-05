@@ -4,7 +4,7 @@ using Orleans.Runtime;
 
 namespace Orleans.DurableJobs;
 
-internal partial class LocalScheduledJobManager
+internal partial class LocalDurableJobManager
 {
     [LoggerMessage(
         Level = LogLevel.Debug,
@@ -20,25 +20,25 @@ internal partial class LocalScheduledJobManager
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "LocalScheduledJobManager starting"
+        Message = "LocalDurableJobManager starting"
     )]
     private static partial void LogStarting(ILogger logger);
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "LocalScheduledJobManager started"
+        Message = "LocalDurableJobManager started"
     )]
     private static partial void LogStarted(ILogger logger);
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "LocalScheduledJobManager stopping. Running shards: {RunningShardCount}"
+        Message = "LocalDurableJobManager stopping. Running shards: {RunningShardCount}"
     )]
     private static partial void LogStopping(ILogger logger, int runningShardCount);
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "LocalScheduledJobManager stopped"
+        Message = "LocalDurableJobManager stopped"
     )]
     private static partial void LogStopped(ILogger logger);
 

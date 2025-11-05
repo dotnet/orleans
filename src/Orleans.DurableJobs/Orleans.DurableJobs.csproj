@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.DurableJobs</PackageId>
-    <Title>Microsoft Orleans Scheduled Jobs Library</Title>
-    <Description>Scheduled Jobs library for Microsoft Orleans used on the server.</Description>
+    <Title>Microsoft Orleans Durable Jobs Library</Title>
+    <Description>Durable Jobs library for Microsoft Orleans used on the server.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>

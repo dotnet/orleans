@@ -3,12 +3,12 @@
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.DurableJobs.AzureStorage</PackageId>
-    <Title>Microsoft Orleans Azure Storage Scheduled Jobs Provider</Title>
-    <Description>Microsoft Orleans scheduled jobs provider backed by Azure Blob Storage</Description>
+    <Title>Microsoft Orleans Azure Storage Durable Jobs Provider</Title>
+    <Description>Microsoft Orleans durable jobs provider backed by Azure Blob Storage</Description>
     <PackageTags>$(PackageTags) Azure Storage</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
-    <AssemblyName>Orleans.ScheduledJobs.AzureStorage</AssemblyName>
-    <RootNamespace>Orleans.ScheduledJobs.AzureStorage</RootNamespace>
+    <AssemblyName>Orleans.DurableJobs.AzureStorage</AssemblyName>
+    <RootNamespace>Orleans.DurableJobs.AzureStorage</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <DefineConstants>$(DefineConstants)</DefineConstants>
     <Nullable>enable</Nullable>

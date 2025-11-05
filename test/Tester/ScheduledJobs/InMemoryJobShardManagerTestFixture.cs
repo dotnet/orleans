@@ -2,7 +2,7 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.DurableJobs;
 
-namespace Tester.ScheduledJobs;
+namespace Tester.DurableJobs;
 
 /// <summary>
 /// InMemory implementation of <see cref="IJobShardManagerTestFixture"/>.

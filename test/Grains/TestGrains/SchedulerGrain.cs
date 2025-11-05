@@ -9,23 +9,23 @@ namespace UnitTests.Grains;
 
 public class SchedulerGrain : Grain, ISchedulerGrain
 {
-    private readonly ILocalScheduledJobManager _localScheduledJobManager;
+    private readonly ILocalDurableJobManager _localDurableJobManager;
     private readonly IGrainFactory _grainFactory;
     private readonly ILogger<SchedulerGrain> _logger;
 
     public SchedulerGrain(
-        ILocalScheduledJobManager localScheduledJobManager,
+        ILocalDurableJobManager localDurableJobManager,
         IGrainFactory grainFactory,
         ILogger<SchedulerGrain> logger)
     {
-        _localScheduledJobManager = localScheduledJobManager;
+        _localDurableJobManager = localDurableJobManager;
         _grainFactory = grainFactory;
         _logger = logger;
     }
 
-    public async Task<ScheduledJob> ScheduleJobOnAnotherGrainAsync(string targetGrainKey, string jobName, DateTimeOffset scheduledTime)
+    public async Task<DurableJob> ScheduleJobOnAnotherGrainAsync(string targetGrainKey, string jobName, DateTimeOffset scheduledTime)
     {
-        var targetGrain = _grainFactory.GetGrain<IScheduledJobGrain>(targetGrainKey);
+        var targetGrain = _grainFactory.GetGrain<IDurableJobGrain>(targetGrainKey);
         var targetGrainId = targetGrain.GetGrainId();
 
         _logger.LogInformation(
@@ -34,7 +34,7 @@ public class SchedulerGrain : Grain, ISchedulerGrain
             targetGrainKey,
             this.GetPrimaryKeyString());
 
-        var job = await _localScheduledJobManager.ScheduleJobAsync(
+        var job = await _localDurableJobManager.ScheduleJobAsync(
             targetGrainId,
             jobName,
             scheduledTime,

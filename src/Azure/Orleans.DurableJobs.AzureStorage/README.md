@@ -1,7 +1,7 @@
-# Microsoft Orleans Scheduled Jobs for Azure Storage
+# Microsoft Orleans Durable Jobs for Azure Storage
 
 ## Introduction
-Microsoft Orleans Scheduled Jobs for Azure Storage provides persistent storage for Orleans scheduled jobs using Azure Blob Storage. This allows your Orleans applications to schedule jobs that survive silo restarts, grain deactivation, and cluster reconfigurations. Jobs are stored in append blobs, providing efficient storage and retrieval for time-based job scheduling.
+Microsoft Orleans Durable Jobs for Azure Storage provides persistent storage for Orleans Durable Jobs using Azure Blob Storage. This allows your Orleans applications to schedule jobs that survive silo restarts, grain deactivation, and cluster reconfigurations. Jobs are stored in append blobs, providing efficient storage and retrieval for time-based job scheduling.
 
 ## Getting Started
 
@@ -9,8 +9,8 @@ Microsoft Orleans Scheduled Jobs for Azure Storage provides persistent storage f
 To use this package, install it via NuGet along with the core package:
 
 ```shell
-dotnet add package Microsoft.Orleans.ScheduledJobs
-dotnet add package Microsoft.Orleans.ScheduledJobs.AzureStorage
+dotnet add package Microsoft.Orleans.DurableJobs
+dotnet add package Microsoft.Orleans.DurableJobs.AzureStorage
 ```
 
 ### Configuration
@@ -27,12 +27,12 @@ builder.UseOrleans(siloBuilder =>
 {
     siloBuilder
         .UseAzureStorageClustering(options => options.ConfigureTableServiceClient("YOUR_STORAGE_ACCOUNT_URI"))
-        .UseAzureStorageScheduledJobs(options =>
+        .UseAzureStorageDurableJobs(options =>
         {
             options.Configure(o =>
             {
                 o.BlobServiceClient = new BlobServiceClient("YOUR_AZURE_STORAGE_CONNECTION_STRING");
-                o.ContainerName = "scheduled-jobs";
+                o.ContainerName = "durable-jobs";
             });
         });
 });
@@ -53,7 +53,7 @@ builder.UseOrleans(siloBuilder =>
 {
     siloBuilder
         .UseAzureStorageClustering(options => options.ConfigureTableServiceClient("YOUR_STORAGE_ACCOUNT_URI"))
-        .UseAzureStorageScheduledJobs(options =>
+        .UseAzureStorageDurableJobs(options =>
         {
             options.Configure(o =>
             {
@@ -61,7 +61,7 @@ builder.UseOrleans(siloBuilder =>
                 o.BlobServiceClient = new BlobServiceClient(
                     new Uri("https://youraccount.blob.core.windows.net"),
                     credential);
-                o.ContainerName = "scheduled-jobs";
+                o.ContainerName = "durable-jobs";
             });
         });
 });
@@ -78,18 +78,18 @@ builder.UseOrleans(siloBuilder =>
 {
     siloBuilder
         .UseAzureStorageClustering(options => options.ConfigureTableServiceClient(connectionString))
-        .UseAzureStorageScheduledJobs(options =>
+        .UseAzureStorageDurableJobs(options =>
         {
             options.Configure(o =>
             {
                 o.BlobServiceClient = new BlobServiceClient(connectionString);
                 // Use different containers for different environments
-                o.ContainerName = $"scheduled-jobs-{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")?.ToLowerInvariant()}";
+                o.ContainerName = $"durable-jobs-{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")?.ToLowerInvariant()}";
             });
         })
         .ConfigureServices(services =>
         {
-            services.Configure<ScheduledJobsOptions>(options =>
+            services.Configure<DurableJobsOptions>(options =>
             {
                 // Shard duration: balance between latency and storage overhead
                 options.ShardDuration = TimeSpan.FromMinutes(5);
@@ -131,15 +131,15 @@ public interface IEmailGrain : IGrainWithStringKey
     Task CancelScheduledEmail();
 }
 
-public class EmailGrain : Grain, IEmailGrain, IScheduledJobHandler
+public class EmailGrain : Grain, IEmailGrain, IDurableJobHandler
 {
-    private readonly ILocalScheduledJobManager _jobManager;
+    private readonly ILocalDurableJobManager _jobManager;
     private readonly IEmailService _emailService;
     private readonly ILogger<EmailGrain> _logger;
-    private IScheduledJob? _scheduledEmailJob;
+    private IDurableJob? _durableEmailJob;
 
     public EmailGrain(
-        ILocalScheduledJobManager jobManager,
+        ILocalDurableJobManager jobManager,
         IEmailService emailService,
         ILogger<EmailGrain> logger)
     {
@@ -157,7 +157,7 @@ public class EmailGrain : Grain, IEmailGrain, IScheduledJobHandler
             ["Body"] = body
         };
 
-        _scheduledEmailJob = await _jobManager.ScheduleJobAsync(
+        _durableEmailJob = await _jobManager.ScheduleJobAsync(
             this.GetGrainId(),
             "SendEmail",
             sendTime,
@@ -165,30 +165,30 @@ public class EmailGrain : Grain, IEmailGrain, IScheduledJobHandler
 
         _logger.LogInformation(
             "Scheduled email to {EmailAddress} for {SendTime} (JobId: {JobId})",
-            emailAddress, sendTime, _scheduledEmailJob.Id);
+            emailAddress, sendTime, _durableEmailJob.Id);
     }
 
     public async Task CancelScheduledEmail()
     {
-        if (_scheduledEmailJob is null)
+        if (_durableEmailJob is null)
         {
             _logger.LogWarning("No scheduled email to cancel");
             return;
         }
 
-        var canceled = await _jobManager.TryCancelScheduledJobAsync(_scheduledEmailJob);
+        var canceled = await _jobManager.TryCancelDurableJobAsync(_durableEmailJob);
         if (canceled)
         {
-            _logger.LogInformation("Email job {JobId} canceled successfully", _scheduledEmailJob.Id);
-            _scheduledEmailJob = null;
+            _logger.LogInformation("Email job {JobId} canceled successfully", _durableEmailJob.Id);
+            _durableEmailJob = null;
         }
         else
         {
-            _logger.LogWarning("Failed to cancel email job {JobId} (may have already executed)", _scheduledEmailJob.Id);
+            _logger.LogWarning("Failed to cancel email job {JobId} (may have already executed)", _durableEmailJob.Id);
         }
     }
 
-    public async Task ExecuteJobAsync(IScheduledJobContext context, CancellationToken cancellationToken)
+    public async Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
     {
         var emailAddress = this.GetPrimaryKeyString();
         var subject = context.Job.Metadata?["Subject"];
@@ -202,7 +202,7 @@ public class EmailGrain : Grain, IEmailGrain, IScheduledJobHandler
         {
             await _emailService.SendEmailAsync(emailAddress, subject, body, cancellationToken);
             _logger.LogInformation("Email sent successfully to {EmailAddress}", emailAddress);
-            _scheduledEmailJob = null;
+            _durableEmailJob = null;
         }
         catch (Exception ex)
         {
@@ -221,16 +221,16 @@ public interface IOrderGrain : IGrainWithGuidKey
     Task CancelOrder();
 }
 
-public class OrderGrain : Grain, IOrderGrain, IScheduledJobHandler
+public class OrderGrain : Grain, IOrderGrain, IDurableJobHandler
 {
-    private readonly ILocalScheduledJobManager _jobManager;
+    private readonly ILocalDurableJobManager _jobManager;
     private readonly IOrderService _orderService;
     private readonly IGrainFactory _grainFactory;
     private readonly ILogger<OrderGrain> _logger;
     private OrderDetails? _orderDetails;
 
     public OrderGrain(
-        ILocalScheduledJobManager jobManager,
+        ILocalDurableJobManager jobManager,
         IOrderService orderService,
         IGrainFactory grainFactory,
         ILogger<OrderGrain> logger)
@@ -286,7 +286,7 @@ public class OrderGrain : Grain, IOrderGrain, IScheduledJobHandler
         _logger.LogInformation("Order {OrderId} canceled", orderId);
     }
 
-    public async Task ExecuteJobAsync(IScheduledJobContext context, CancellationToken cancellationToken)
+    public async Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
     {
         var step = context.Job.Metadata!["Step"];
         var orderId = this.GetPrimaryKey();
@@ -311,7 +311,7 @@ public class OrderGrain : Grain, IOrderGrain, IScheduledJobHandler
         }
     }
 
-    private async Task HandlePaymentReminder(IScheduledJobContext context, CancellationToken ct)
+    private async Task HandlePaymentReminder(IDurableJobContext context, CancellationToken ct)
     {
         var orderId = this.GetPrimaryKey();
         var order = await _orderService.GetOrderAsync(orderId, ct);
@@ -430,7 +430,7 @@ public enum OrderStatus
 
 ### Concurrency Settings
 ```csharp
-services.Configure<ScheduledJobsOptions>(options =>
+services.Configure<DurableJobsOptions>(options =>
 {
     // Adjust based on your workload and Azure Storage limits
     options.MaxConcurrentJobsPerSilo = 50;
@@ -449,8 +449,8 @@ services.Configure<ScheduledJobsOptions>(options =>
 
 ### Enable Logging
 ```csharp
-builder.Logging.AddFilter("Orleans.ScheduledJobs", LogLevel.Information);
-builder.Logging.AddFilter("Orleans.ScheduledJobs.AzureStorage", LogLevel.Information);
+builder.Logging.AddFilter("Orleans.DurableJobs", LogLevel.Information);
+builder.Logging.AddFilter("Orleans.DurableJobs.AzureStorage", LogLevel.Information);
 ```
 
 ### Key Metrics to Monitor
@@ -487,7 +487,7 @@ var blobServiceClient = new BlobServiceClient(storageAccountUri, credential);
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Azure Blob Storage Documentation](https://learn.microsoft.com/azure/storage/blobs/)
-- [Orleans Scheduled Jobs Core Package](../../../Orleans.ScheduledJobs/README.md)
+- [Orleans Durable Jobs Core Package](../../../Orleans.DurableJobs/README.md)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

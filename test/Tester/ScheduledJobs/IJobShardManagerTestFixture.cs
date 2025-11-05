@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.DurableJobs;
 
-namespace Tester.ScheduledJobs;
+namespace Tester.DurableJobs;
 
 /// <summary>
 /// Defines the contract for provider-specific test fixtures used by <see cref="JobShardManagerTestsRunner"/>.

@@ -7,10 +7,10 @@ using System.Threading.Tasks;
 namespace Orleans.DurableJobs;
 
 /// <summary>
-/// Provides an in-memory priority queue for managing scheduled jobs based on their due times.
+/// Provides an in-memory priority queue for managing durable jobs based on their due times.
 /// Jobs are organized into time-based buckets and enumerated asynchronously as they become due.
 /// </summary>
-internal sealed class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
+internal sealed class InMemoryJobQueue : IAsyncEnumerable<IDurableJobContext>
 {
     private readonly PriorityQueue<JobBucket, DateTimeOffset> _queue = new();
     private readonly Dictionary<string, JobBucket> _jobsIdToBucket = new();
@@ -24,13 +24,13 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
     public int Count => _jobsIdToBucket.Count;
 
     /// <summary>
-    /// Adds a scheduled job to the queue with the specified dequeue count.
+    /// Adds a durable job to the queue with the specified dequeue count.
     /// </summary>
-    /// <param name="job">The scheduled job to enqueue.</param>
+    /// <param name="job">The durable job to enqueue.</param>
     /// <param name="dequeueCount">The number of times this job has been dequeued previously.</param>
     /// <exception cref="InvalidOperationException">Thrown when attempting to enqueue a job to a completed queue.</exception>
     /// <exception cref="ArgumentNullException">Thrown when job is null.</exception>
-    public void Enqueue(ScheduledJob job, int dequeueCount)
+    public void Enqueue(DurableJob job, int dequeueCount)
     {
         ArgumentNullException.ThrowIfNull(job);
 
@@ -58,7 +58,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
     }
 
     /// <summary>
-    /// Cancels a scheduled job by removing it from the queue.
+    /// Cancels a durable job by removing it from the queue.
     /// </summary>
     /// <param name="jobId">The unique identifier of the job to cancel.</param>
     /// <returns>True if the job was found and removed; false if the job was not found.</returns>
@@ -91,10 +91,10 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
     /// The job is removed from its current bucket and added to a new bucket based on the specified due time.
     /// The dequeue count from the context is preserved.
     /// </remarks>
-    public void RetryJobLater(IScheduledJobContext jobContext, DateTimeOffset newDueTime)
+    public void RetryJobLater(IDurableJobContext jobContext, DateTimeOffset newDueTime)
     {
         var jobId = jobContext.Job.Id;
-        var newJob = new ScheduledJob
+        var newJob = new DurableJob
         {
             Id = jobContext.Job.Id,
             Name = jobContext.Job.Name,
@@ -118,14 +118,14 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
     }
 
     /// <summary>
-    /// Returns an asynchronous enumerator that yields scheduled jobs as they become due.
+    /// Returns an asynchronous enumerator that yields durable jobs as they become due.
     /// </summary>
     /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
     /// <returns>
-    /// An async enumerator that returns <see cref="IScheduledJobContext"/> instances for jobs that are due.
+    /// An async enumerator that returns <see cref="IDurableJobContext"/> instances for jobs that are due.
     /// The enumerator checks for due jobs every second and terminates when the queue is marked complete and empty.
     /// </returns>
-    public async IAsyncEnumerator<IScheduledJobContext> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+    public async IAsyncEnumerator<IDurableJobContext> GetAsyncEnumerator(CancellationToken cancellationToken = default)
     {
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
         while (true)
@@ -169,7 +169,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
 
                     if (shouldYield)
                     {
-                        yield return new ScheduledJobContext(job, Guid.NewGuid().ToString(), dequeueCount + 1);
+                        yield return new DurableJobContext(job, Guid.NewGuid().ToString(), dequeueCount + 1);
                     }
                 }
 
@@ -204,20 +204,20 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IScheduledJobContext>
 
 internal sealed class JobBucket
 {
-    private readonly Dictionary<string, (ScheduledJob Job, int DequeueCount)> _jobs = new();
+    private readonly Dictionary<string, (DurableJob Job, int DequeueCount)> _jobs = new();
 
     public int Count => _jobs.Count;
 
     public DateTimeOffset DueTime { get; private set; }
 
-    public IEnumerable<(ScheduledJob Job, int DequeueCount)> Jobs => _jobs.Values;
+    public IEnumerable<(DurableJob Job, int DequeueCount)> Jobs => _jobs.Values;
 
     public JobBucket(DateTimeOffset dueTime)
     {
         DueTime = dueTime;
     }
 
-    public void AddJob(ScheduledJob job, int dequeueCount)
+    public void AddJob(DurableJob job, int dequeueCount)
     {
         _jobs[job.Id] = (job, dequeueCount);
     }

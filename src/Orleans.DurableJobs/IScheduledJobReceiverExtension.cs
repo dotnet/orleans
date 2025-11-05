@@ -7,34 +7,34 @@ using Orleans.Runtime;
 namespace Orleans.DurableJobs;
 
 /// <summary>
-/// Extension interface for grains that can receive scheduled job invocations.
+/// Extension interface for grains that can receive durable job invocations.
 /// </summary>
-internal interface IScheduledJobReceiverExtension : IGrainExtension
+internal interface IDurableJobReceiverExtension : IGrainExtension
 {
     /// <summary>
-    /// Delivers a scheduled job to the grain for execution.
+    /// Delivers a durable job to the grain for execution.
     /// </summary>
-    /// <param name="context">The context containing information about the scheduled job.</param>
+    /// <param name="context">The context containing information about the durable job.</param>
     /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    Task DeliverScheduledJobAsync(IScheduledJobContext context, CancellationToken cancellationToken);
+    Task DeliverDurableJobAsync(IDurableJobContext context, CancellationToken cancellationToken);
 }
 
 /// <inheritdoc />
-internal sealed partial class ScheduledJobReceiverExtension : IScheduledJobReceiverExtension
+internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverExtension
 {
     private readonly IGrainContext _grain;
-    private readonly ILogger<ScheduledJobReceiverExtension> _logger;
+    private readonly ILogger<DurableJobReceiverExtension> _logger;
 
-    public ScheduledJobReceiverExtension(IGrainContext grain, ILogger<ScheduledJobReceiverExtension> logger)
+    public DurableJobReceiverExtension(IGrainContext grain, ILogger<DurableJobReceiverExtension> logger)
     {
         _grain = grain;
         _logger = logger;
     }
 
-    public async Task DeliverScheduledJobAsync(IScheduledJobContext context, CancellationToken cancellationToken)
+    public async Task DeliverDurableJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
     {
-        if (_grain.GrainInstance is IScheduledJobHandler handler)
+        if (_grain.GrainInstance is IDurableJobHandler handler)
         {
             try
             {
@@ -42,20 +42,20 @@ internal sealed partial class ScheduledJobReceiverExtension : IScheduledJobRecei
             }
             catch (Exception ex)
             {
-                LogErrorExecutingScheduledJob(ex, context.Job.Id, _grain.GrainId);
+                LogErrorExecutingDurableJob(ex, context.Job.Id, _grain.GrainId);
                 throw;
             }
         }
         else
         {
             LogGrainDoesNotImplementHandler(_grain.GrainId);
-            throw new InvalidOperationException($"Grain {_grain.GrainId} does not implement IScheduledJobHandler");
+            throw new InvalidOperationException($"Grain {_grain.GrainId} does not implement IDurableJobHandler");
         }
     }
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Error executing scheduled job {JobId} on grain {GrainId}")]
-    private partial void LogErrorExecutingScheduledJob(Exception exception, string jobId, GrainId grainId);
+    [LoggerMessage(Level = LogLevel.Error, Message = "Error executing durable job {JobId} on grain {GrainId}")]
+    private partial void LogErrorExecutingDurableJob(Exception exception, string jobId, GrainId grainId);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Grain {GrainId} does not implement IScheduledJobHandler")]
+    [LoggerMessage(Level = LogLevel.Error, Message = "Grain {GrainId} does not implement IDurableJobHandler")]
     private partial void LogGrainDoesNotImplementHandler(GrainId grainId);
 }

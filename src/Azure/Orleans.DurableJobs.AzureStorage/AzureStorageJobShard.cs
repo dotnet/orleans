@@ -136,7 +136,7 @@ internal sealed partial class AzureStorageJobShard : JobShard
                 dueTime = retryEntries.newDueTime ?? dueTime;
             }
 
-            EnqueueJob(new ScheduledJob
+            EnqueueJob(new DurableJob
             {
                 Id = op.Id,
                 Name = op.Name!,

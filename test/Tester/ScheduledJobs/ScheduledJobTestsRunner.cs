@@ -6,25 +6,26 @@ using Orleans;
 using Orleans.Internal;
 using Orleans.DurableJobs;
 using Xunit;
+using UnitTests.GrainInterfaces;
 
-namespace Tester.ScheduledJobs;
+namespace Tester.DurableJobs;
 
 /// <summary>
-/// Contains the test logic for scheduled jobs that can be run against different providers.
+/// Contains the test logic for durable jobs that can be run against different providers.
 /// This class is provider-agnostic and can be reused by test classes for InMemory, Azure, and other providers.
 /// </summary>
-public class ScheduledJobTestsRunner
+public class DurableJobTestsRunner
 {
     private readonly IGrainFactory _grainFactory;
 
-    public ScheduledJobTestsRunner(IGrainFactory grainFactory)
+    public DurableJobTestsRunner(IGrainFactory grainFactory)
     {
         _grainFactory = grainFactory;
     }
 
-    public async Task ScheduledJobGrain()
+    public async Task DurableJobGrain()
     {
-        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-job-grain");
+        var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-job-grain");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(5);
         var job1 = await grain.ScheduleJobAsync("TestJob", dueTime);
         Assert.NotNull(job1);
@@ -45,7 +46,7 @@ public class ScheduledJobTestsRunner
             }
             catch (TimeoutException)
             {
-                Assert.Fail($"The scheduled job {job.Name} did not run within the expected time.");
+                Assert.Fail($"The durable job {job.Name} did not run within the expected time.");
             }
         }
         // Verify the canceled job did not run
@@ -54,7 +55,7 @@ public class ScheduledJobTestsRunner
 
     public async Task JobExecutionOrder()
     {
-        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-execution-order");
+        var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-execution-order");
         var baseTime = DateTimeOffset.UtcNow.AddSeconds(2);
 
         var job1 = await grain.ScheduleJobAsync("FirstJob", baseTime);
@@ -75,7 +76,7 @@ public class ScheduledJobTestsRunner
 
     public async Task PastDueTime()
     {
-        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-past-due");
+        var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-past-due");
         var pastTime = DateTimeOffset.UtcNow.AddSeconds(-5);
 
         var job = await grain.ScheduleJobAsync("PastDueJob", pastTime);
@@ -87,7 +88,7 @@ public class ScheduledJobTestsRunner
 
     public async Task JobWithMetadata()
     {
-        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-metadata");
+        var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-metadata");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
         var metadata = new Dictionary<string, string>
         {
@@ -114,9 +115,9 @@ public class ScheduledJobTestsRunner
 
     public async Task MultipleGrains()
     {
-        var grain1 = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-grain-1");
-        var grain2 = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-grain-2");
-        var grain3 = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-grain-3");
+        var grain1 = _grainFactory.GetGrain<IDurableJobGrain>("test-grain-1");
+        var grain2 = _grainFactory.GetGrain<IDurableJobGrain>("test-grain-2");
+        var grain3 = _grainFactory.GetGrain<IDurableJobGrain>("test-grain-3");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
 
         var job1 = await grain1.ScheduleJobAsync("Job1", dueTime);
@@ -138,7 +139,7 @@ public class ScheduledJobTestsRunner
 
     public async Task DuplicateJobNames()
     {
-        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-duplicate-names");
+        var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-duplicate-names");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
 
         var job1 = await grain.ScheduleJobAsync("SameName", dueTime);
@@ -164,12 +165,12 @@ public class ScheduledJobTestsRunner
 
     public async Task CancelNonExistentJob()
     {
-        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-cancel-nonexistent");
+        var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-cancel-nonexistent");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(10);
 
         var job = await grain.ScheduleJobAsync("RealJob", dueTime);
         
-        var fakeJob = new ScheduledJob
+        var fakeJob = new DurableJob
         {
             Id = "non-existent-id",
             Name = "FakeJob",
@@ -187,7 +188,7 @@ public class ScheduledJobTestsRunner
 
     public async Task CancelAlreadyExecutedJob()
     {
-        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-cancel-executed");
+        var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-cancel-executed");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(2);
 
         var job = await grain.ScheduleJobAsync("QuickJob", dueTime);
@@ -201,11 +202,11 @@ public class ScheduledJobTestsRunner
 
     public async Task ConcurrentScheduling()
     {
-        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-concurrent");
+        var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-concurrent");
         var baseTime = DateTimeOffset.UtcNow.AddSeconds(5);
         var jobCount = 20;
 
-        var scheduleTasks = new List<Task<ScheduledJob>>();
+        var scheduleTasks = new List<Task<DurableJob>>();
         for (int i = 0; i < jobCount; i++)
         {
             scheduleTasks.Add(grain.ScheduleJobAsync($"ConcurrentJob{i}", baseTime.AddMilliseconds(i * 100)));
@@ -227,7 +228,7 @@ public class ScheduledJobTestsRunner
 
     public async Task JobPropertiesVerification()
     {
-        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-properties");
+        var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-properties");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
         var metadata = new Dictionary<string, string> { ["Key"] = "Value" };
 
@@ -254,7 +255,7 @@ public class ScheduledJobTestsRunner
 
     public async Task DequeueCount()
     {
-        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("test-dequeue-count");
+        var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-dequeue-count");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
 
         var job = await grain.ScheduleJobAsync("DequeueTestJob", dueTime);
@@ -268,8 +269,8 @@ public class ScheduledJobTestsRunner
 
     public async Task ScheduleJobOnAnotherGrain()
     {
-        var schedulerGrain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.ISchedulerGrain>("scheduler-grain");
-        var targetGrain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IScheduledJobGrain>("target-grain");
+        var schedulerGrain = _grainFactory.GetGrain<ISchedulerGrain>("scheduler-grain");
+        var targetGrain = _grainFactory.GetGrain<IDurableJobGrain>("target-grain");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
 
         var job = await schedulerGrain.ScheduleJobOnAnotherGrainAsync("target-grain", "CrossGrainJob", dueTime);
@@ -290,7 +291,7 @@ public class ScheduledJobTestsRunner
 
     public async Task JobRetry()
     {
-        var grain = _grainFactory.GetGrain<UnitTests.GrainInterfaces.IRetryTestGrain>("retry-test-grain");
+        var grain = _grainFactory.GetGrain<IRetryTestGrain>("retry-test-grain");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(2);
         var metadata = new Dictionary<string, string>
         {

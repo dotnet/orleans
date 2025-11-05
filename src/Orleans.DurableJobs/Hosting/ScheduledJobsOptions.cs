@@ -7,9 +7,9 @@ using Orleans.DurableJobs;
 namespace Orleans.Hosting;
 
 /// <summary>
-/// Configuration options for the scheduled jobs feature.
+/// Configuration options for the durable jobs feature.
 /// </summary>
-public sealed class ScheduledJobsOptions
+public sealed class DurableJobsOptions
 {
     /// <summary>
     /// Gets or sets the duration of each job shard. Smaller values reduce latency but increase overhead.
@@ -38,9 +38,9 @@ public sealed class ScheduledJobsOptions
     /// the time when the job should be retried, or <see langword="null"/> if the job should not be retried.
     /// Default: Retry up to 5 times with exponential backoff (2^n seconds).
     /// </summary>
-    public Func<IScheduledJobContext, Exception, DateTimeOffset?> ShouldRetry { get; set; } = DefaultShouldRetry;
+    public Func<IDurableJobContext, Exception, DateTimeOffset?> ShouldRetry { get; set; } = DefaultShouldRetry;
 
-    private static DateTimeOffset? DefaultShouldRetry(IScheduledJobContext jobContext, Exception ex)
+    private static DateTimeOffset? DefaultShouldRetry(IDurableJobContext jobContext, Exception ex)
     {
         // Default retry logic: retry up to 5 times with exponential backoff
         if (jobContext.DequeueCount >= 5)
@@ -52,12 +52,12 @@ public sealed class ScheduledJobsOptions
     }
 }
 
-public sealed class ScheduledJobsOptionsValidator : IConfigurationValidator
+public sealed class DurableJobsOptionsValidator : IConfigurationValidator
 {
-    private readonly ILogger<ScheduledJobsOptionsValidator> _logger;
-    private readonly IOptions<ScheduledJobsOptions> _options;
+    private readonly ILogger<DurableJobsOptionsValidator> _logger;
+    private readonly IOptions<DurableJobsOptions> _options;
 
-    public ScheduledJobsOptionsValidator(ILogger<ScheduledJobsOptionsValidator> logger, IOptions<ScheduledJobsOptions> options)
+    public DurableJobsOptionsValidator(ILogger<DurableJobsOptionsValidator> logger, IOptions<DurableJobsOptions> options)
     {
         _logger = logger;
         _options = options;
@@ -68,12 +68,12 @@ public sealed class ScheduledJobsOptionsValidator : IConfigurationValidator
         var options = _options.Value;
         if (options.ShardDuration <= TimeSpan.Zero)
         {
-            throw new OrleansConfigurationException("ScheduledJobsOptions.ShardDuration must be greater than zero.");
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardDuration must be greater than zero.");
         }
         if (options.ShouldRetry == null)
         {
-            throw new OrleansConfigurationException("ScheduledJobsOptions.ShouldRetry must not be null.");
+            throw new OrleansConfigurationException("DurableJobsOptions.ShouldRetry must not be null.");
         }
-        _logger.LogInformation("ScheduledJobsOptions validated: ShardDuration={ShardDuration}", options.ShardDuration);
+        _logger.LogInformation("DurableJobsOptions validated: ShardDuration={ShardDuration}", options.ShardDuration);
     }
 }

@@ -8,11 +8,11 @@ using Orleans.DurableJobs;
 
 namespace UnitTests.GrainInterfaces;
 
-public interface IScheduledJobGrain : IGrainWithStringKey
+public interface IDurableJobGrain : IGrainWithStringKey
 {
-    Task<ScheduledJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null);
+    Task<DurableJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null);
 
-    Task<bool> TryCancelJobAsync(ScheduledJob job);
+    Task<bool> TryCancelJobAsync(DurableJob job);
 
     Task<bool> HasJobRan(string jobId);
 
@@ -21,7 +21,7 @@ public interface IScheduledJobGrain : IGrainWithStringKey
 
     Task<DateTimeOffset> GetJobExecutionTime(string jobId);
 
-    Task<IScheduledJobContext> GetJobContext(string jobId);
+    Task<IDurableJobContext> GetJobContext(string jobId);
 
     Task<bool> WasCancellationTokenCancelled(string jobId);
 }

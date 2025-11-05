@@ -8,9 +8,9 @@ using Orleans.Runtime;
 using Orleans.DurableJobs;
 using Orleans.DurableJobs.AzureStorage;
 using Tester.AzureUtils;
-using Tester.ScheduledJobs;
+using Tester.DurableJobs;
 
-namespace Orleans.Tests.ScheduledJobs.AzureStorage;
+namespace Orleans.Tests.DurableJobs.AzureStorage;
 
 /// <summary>
 /// Azure Storage implementation of <see cref="IJobShardManagerTestFixture"/>.

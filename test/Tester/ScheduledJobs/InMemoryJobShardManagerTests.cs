@@ -1,13 +1,13 @@
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Tester.ScheduledJobs;
+namespace Tester.DurableJobs;
 
 /// <summary>
 /// Tests for <see cref="InMemoryJobShardManager"/> using the <see cref="JobShardManagerTestsRunner"/>.
 /// These tests verify shard lifecycle management, ownership, and failover semantics for the InMemory provider.
 /// </summary>
-[TestCategory("BVT"), TestCategory("ScheduledJobs")]
+[TestCategory("BVT"), TestCategory("DurableJobs")]
 public class InMemoryJobShardManagerTests : IAsyncLifetime
 {
     private readonly InMemoryJobShardManagerTestFixture _fixture;

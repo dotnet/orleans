@@ -4,14 +4,14 @@ using System.Threading.Tasks;
 namespace Orleans.DurableJobs;
 
 /// <summary>
-/// Provides contextual information about a scheduled job execution.
+/// Provides contextual information about a durable job execution.
 /// </summary>
-public interface IScheduledJobContext
+public interface IDurableJobContext
 {
     /// <summary>
-    /// Gets the scheduled job being executed.
+    /// Gets the durable job being executed.
     /// </summary>
-    ScheduledJob Job { get; }
+    DurableJob Job { get; }
 
     /// <summary>
     /// Gets the unique identifier for this execution run.
@@ -25,16 +25,16 @@ public interface IScheduledJobContext
 }
 
 /// <summary>
-/// Represents the execution context for a scheduled job.
+/// Represents the execution context for a durable job.
 /// </summary>
 [GenerateSerializer]
-internal class ScheduledJobContext : IScheduledJobContext
+internal class DurableJobContext : IDurableJobContext
 {
     /// <summary>
-    /// Gets the scheduled job being executed.
+    /// Gets the durable job being executed.
     /// </summary>
     [Id(0)]
-    public ScheduledJob Job { get; }
+    public DurableJob Job { get; }
 
     /// <summary>
     /// Gets the unique identifier for this execution run.
@@ -49,12 +49,12 @@ internal class ScheduledJobContext : IScheduledJobContext
     public int DequeueCount { get; }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ScheduledJobContext"/> class.
+    /// Initializes a new instance of the <see cref="DurableJobContext"/> class.
     /// </summary>
-    /// <param name="job">The scheduled job to execute.</param>
+    /// <param name="job">The durable job to execute.</param>
     /// <param name="runId">The unique identifier for this execution run.</param>
     /// <param name="retryCount">The number of times this job has been dequeued, including retries.</param>
-    public ScheduledJobContext(ScheduledJob job, string runId, int retryCount)
+    public DurableJobContext(DurableJob job, string runId, int retryCount)
     {
         Job = job;
         RunId = runId;
@@ -63,22 +63,22 @@ internal class ScheduledJobContext : IScheduledJobContext
 }
 
 /// <summary>
-/// Defines the interface for handling scheduled job execution.
-/// Grains implement this interface to receive and process scheduled jobs.
+/// Defines the interface for handling durable job execution.
+/// Grains implement this interface to receive and process durable jobs.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Grains that implement this interface can be targeted by scheduled jobs.
+/// Grains that implement this interface can be targeted by durable jobs.
 /// The <see cref="ExecuteJobAsync"/> method is invoked when the job's due time is reached.
 /// </para>
 /// <example>
-/// The following example demonstrates a grain that implements <see cref="IScheduledJobHandler"/>:
+/// The following example demonstrates a grain that implements <see cref="IDurableJobHandler"/>:
 /// <code>
-/// public class MyGrain : Grain, IScheduledJobHandler
+/// public class MyGrain : Grain, IDurableJobHandler
 /// {
-///     public Task ExecuteJobAsync(IScheduledJobContext context, CancellationToken cancellationToken)
+///     public Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
 ///     {
-///         // Process the scheduled job
+///         // Process the durable job
 ///         var jobName = context.Job.Name;
 ///         var dueTime = context.Job.DueTime;
 ///         
@@ -90,24 +90,24 @@ internal class ScheduledJobContext : IScheduledJobContext
 /// </code>
 /// </example>
 /// </remarks>
-public interface IScheduledJobHandler
+public interface IDurableJobHandler
 {
     /// <summary>
-    /// Executes the scheduled job with the provided context.
+    /// Executes the durable job with the provided context.
     /// </summary>
-    /// <param name="context">The context containing information about the scheduled job execution.</param>
+    /// <param name="context">The context containing information about the durable job execution.</param>
     /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
     /// <returns>A task that represents the asynchronous job execution operation.</returns>
     /// <remarks>
     /// <para>
-    /// This method is invoked by the Orleans scheduled jobs infrastructure when a job's due time is reached.
+    /// This method is invoked by the Orleans durable jobs infrastructure when a job's due time is reached.
     /// Implementations should handle job execution logic and can use information from the <paramref name="context"/>
     /// to access job metadata, dequeue count for retry logic, and other execution details.
     /// </para>
     /// <para>
     /// If the method throws an exception and a retry policy is configured, the job may be retried.
-    /// The <see cref="IScheduledJobContext.DequeueCount"/> property can be used to determine if this is a retry attempt.
+    /// The <see cref="IDurableJobContext.DequeueCount"/> property can be used to determine if this is a retry attempt.
     /// </para>
     /// </remarks>
-    Task ExecuteJobAsync(IScheduledJobContext context, CancellationToken cancellationToken);
+    Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken);
 }

@@ -11,24 +11,24 @@ using Orleans.Runtime;
 namespace Orleans.DurableJobs;
 
 /// <summary>
-/// Handles the execution of job shards and individual scheduled jobs.
+/// Handles the execution of job shards and individual durable jobs.
 /// </summary>
 internal sealed partial class ShardExecutor
 {
     private readonly IInternalGrainFactory _grainFactory;
     private readonly ILogger<ShardExecutor> _logger;
-    private readonly ScheduledJobsOptions _options;
+    private readonly DurableJobsOptions _options;
     private readonly SemaphoreSlim _jobConcurrencyLimiter;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ShardExecutor"/> class.
     /// </summary>
     /// <param name="grainFactory">The grain factory for creating grain references.</param>
-    /// <param name="options">The scheduled jobs configuration options.</param>
+    /// <param name="options">The durable jobs configuration options.</param>
     /// <param name="logger">The logger instance.</param>
     public ShardExecutor(
         IInternalGrainFactory grainFactory,
-        IOptions<ScheduledJobsOptions> options,
+        IOptions<DurableJobsOptions> options,
         ILogger<ShardExecutor> logger)
     {
         _grainFactory = grainFactory;
@@ -61,7 +61,7 @@ internal sealed partial class ShardExecutor
             LogBeginProcessingShard(_logger, shard.Id);
 
             // Process all jobs in the shard
-            await foreach (var jobContext in shard.ConsumeScheduledJobsAsync().WithCancellation(cancellationToken))
+            await foreach (var jobContext in shard.ConsumeDurableJobsAsync().WithCancellation(cancellationToken))
             {
                 // Wait for concurrency slot
                 await _jobConcurrencyLimiter.WaitAsync(cancellationToken);
@@ -84,7 +84,7 @@ internal sealed partial class ShardExecutor
     }
 
     private async Task RunJobAsync(
-        IScheduledJobContext jobContext,
+        IDurableJobContext jobContext,
         IJobShard shard,
         ConcurrentDictionary<string, Task> runningTasks,
         CancellationToken cancellationToken)
@@ -97,9 +97,9 @@ internal sealed partial class ShardExecutor
 
             var target = _grainFactory
                 .GetGrain(jobContext.Job.TargetGrainId)
-                .AsReference<IScheduledJobReceiverExtension>();
+                .AsReference<IDurableJobReceiverExtension>();
 
-            await target.DeliverScheduledJobAsync(jobContext, cancellationToken);
+            await target.DeliverDurableJobAsync(jobContext, cancellationToken);
             await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
 
             LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);

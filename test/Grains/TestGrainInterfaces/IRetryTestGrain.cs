@@ -8,7 +8,7 @@ namespace UnitTests.GrainInterfaces;
 
 public interface IRetryTestGrain : IGrainWithStringKey
 {
-    Task<ScheduledJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null);
+    Task<DurableJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null);
 
     Task<bool> HasJobSucceeded(string jobId);
 
@@ -19,5 +19,5 @@ public interface IRetryTestGrain : IGrainWithStringKey
 
     Task<List<int>> GetJobDequeueCountHistory(string jobId);
 
-    Task<IScheduledJobContext> GetFinalJobContext(string jobId);
+    Task<IDurableJobContext> GetFinalJobContext(string jobId);
 }

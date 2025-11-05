@@ -11,7 +11,7 @@ public class AzureStorageJobShardOptions
     public BlobServiceClient BlobServiceClient { get; set; } = null!;
 
     /// <summary>
-    /// Gets or sets the name of the container used to store scheduled jobs.
+    /// Gets or sets the name of the container used to store durable jobs.
     /// </summary>
     public string ContainerName { get; set; } = "jobs";
 

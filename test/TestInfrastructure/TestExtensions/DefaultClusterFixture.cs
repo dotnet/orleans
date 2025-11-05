@@ -58,7 +58,7 @@ namespace TestExtensions
                 hostBuilder
                     .Configure<SiloMessagingOptions>(o => o.ClientGatewayShutdownNotificationTimeout = default)
                     .UseInMemoryReminderService()
-                    .UseInMemoryScheduledJobs()
+                    .UseInMemoryDurableJobs()
                     .AddMemoryGrainStorageAsDefault()
                     .AddMemoryGrainStorage("MemoryStore");
             }

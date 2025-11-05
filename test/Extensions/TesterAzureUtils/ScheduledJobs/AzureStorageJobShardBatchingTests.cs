@@ -14,13 +14,13 @@ using Orleans.DurableJobs.AzureStorage;
 using Tester.AzureUtils;
 using Xunit;
 
-namespace Tester.AzureUtils.ScheduledJobs;
+namespace Tester.AzureUtils.DurableJobs;
 
 /// <summary>
 /// Azure Storage-specific tests for job shard batching functionality.
 /// These tests verify Azure-specific batching behaviors that don't apply to all providers.
 /// </summary>
-[TestCategory("ScheduledJobs")]
+[TestCategory("DurableJobs")]
 public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncDisposable
 {
     private readonly IDictionary<string, string> _metadata = new Dictionary<string, string>
@@ -120,7 +120,7 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
 
         var consumedJobs = new List<string>();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        await foreach (var jobCtx in shards[0].ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shards[0].ConsumeDurableJobsAsync().WithCancellation(cts.Token))
         {
             consumedJobs.Add(jobCtx.Job.Name);
             await shards[0].RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
@@ -168,7 +168,7 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
 
         var consumedJobs = new List<string>();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        await foreach (var jobCtx in shards[0].ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shards[0].ConsumeDurableJobsAsync().WithCancellation(cts.Token))
         {
             consumedJobs.Add(jobCtx.Job.Name);
             await shards[0].RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
@@ -221,7 +221,7 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
 
         var consumedJobs = new List<string>();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await foreach (var jobCtx in shards[0].ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shards[0].ConsumeDurableJobsAsync().WithCancellation(cts.Token))
         {
             consumedJobs.Add(jobCtx.Job.Name);
             await shards[0].RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
@@ -288,7 +288,7 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
 
         var consumedJobs = new List<string>();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        await foreach (var jobCtx in shards[0].ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shards[0].ConsumeDurableJobsAsync().WithCancellation(cts.Token))
         {
             consumedJobs.Add(jobCtx.Job.Name);
             await shards[0].RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);

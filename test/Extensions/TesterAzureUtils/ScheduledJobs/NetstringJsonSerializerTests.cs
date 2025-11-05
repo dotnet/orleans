@@ -11,9 +11,9 @@ using Orleans.Runtime;
 using Orleans.DurableJobs.AzureStorage;
 using Xunit;
 
-namespace Tester.AzureUtils.ScheduledJobs;
+namespace Tester.AzureUtils.DurableJobs;
 
-[TestCategory("ScheduledJobs"), TestCategory("BVT")]
+[TestCategory("DurableJobs"), TestCategory("BVT")]
 public class NetstringJsonSerializerTests
 {
     private static byte[] EncodeToBytes(JobOperation operation)

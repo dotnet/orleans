@@ -15,13 +15,13 @@ using Orleans.Runtime.Internal;
 namespace Orleans.DurableJobs;
 
 /// <inheritdoc/>
-internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJobManager, ILifecycleParticipant<ISiloLifecycle>
+internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobManager, ILifecycleParticipant<ISiloLifecycle>
 {
     private readonly JobShardManager _shardManager;
     private readonly ShardExecutor _shardExecutor;
     private readonly IAsyncEnumerable<ClusterMembershipSnapshot> _clusterMembershipUpdates;
-    private readonly ILogger<LocalScheduledJobManager> _logger;
-    private readonly ScheduledJobsOptions _options;
+    private readonly ILogger<LocalDurableJobManager> _logger;
+    private readonly DurableJobsOptions _options;
     private readonly CancellationTokenSource _cts = new();
     private Task? _listenForClusterChangesTask;
     private Task? _periodicCheckTask;
@@ -35,13 +35,13 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
 
     private static readonly IDictionary<string, string> EmptyMetadata = new Dictionary<string, string>();
 
-    public LocalScheduledJobManager(
+    public LocalDurableJobManager(
         JobShardManager shardManager,
         ShardExecutor shardExecutor,
         IClusterMembershipService clusterMembership,
-        IOptions<ScheduledJobsOptions> options,
+        IOptions<DurableJobsOptions> options,
         SystemTargetShared shared,
-        ILogger<LocalScheduledJobManager> logger)
+        ILogger<LocalDurableJobManager> logger)
         : base(SystemTargetGrainId.CreateGrainType("job-manager"), shared)
     {
         _shardManager = shardManager;
@@ -52,7 +52,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
     }
 
     /// <inheritdoc/>
-    public async Task<ScheduledJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)
+    public async Task<DurableJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)
     {
         LogSchedulingJob(_logger, jobName, target, dueTime);
         
@@ -105,7 +105,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
     public void Participate(ISiloLifecycle lifecycle)
     {
         lifecycle.Subscribe(
-            nameof(LocalScheduledJobManager),
+            nameof(LocalDurableJobManager),
             ServiceLifecycleStage.Active,
             ct => Start(ct),
             ct => Stop(ct));
@@ -118,7 +118,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
         using (var _ = new ExecutionContextSuppressor())
         {
             _listenForClusterChangesTask = Task.Factory.StartNew(
-                state => ((LocalScheduledJobManager)state!).ProcessMembershipUpdates(),
+                state => ((LocalDurableJobManager)state!).ProcessMembershipUpdates(),
                 this,
                 CancellationToken.None,
                 TaskCreationOptions.None,
@@ -126,7 +126,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
             _listenForClusterChangesTask.Ignore();
 
             _periodicCheckTask = Task.Factory.StartNew(
-                state => ((LocalScheduledJobManager)state!).PeriodicShardCheck(),
+                state => ((LocalDurableJobManager)state!).PeriodicShardCheck(),
                 this,
                 CancellationToken.None,
                 TaskCreationOptions.None,
@@ -160,7 +160,7 @@ internal partial class LocalScheduledJobManager : SystemTarget, ILocalScheduledJ
     }
 
     /// <inheritdoc/>
-    public async Task<bool> TryCancelScheduledJobAsync(ScheduledJob job, CancellationToken cancellationToken)
+    public async Task<bool> TryCancelDurableJobAsync(DurableJob job, CancellationToken cancellationToken)
     {
         LogCancellingJob(_logger, job.Id, job.Name, job.ShardId);
         

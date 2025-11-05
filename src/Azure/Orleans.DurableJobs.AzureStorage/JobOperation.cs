@@ -7,7 +7,7 @@ using Orleans.Runtime;
 namespace Orleans.DurableJobs.AzureStorage;
 
 /// <summary>
-/// Represents an operation to be performed on a scheduled job.
+/// Represents an operation to be performed on a durable job.
 /// </summary>
 internal struct JobOperation
 {

@@ -9,11 +9,11 @@ using Orleans.Runtime;
 using Orleans.DurableJobs;
 using Xunit;
 
-namespace Tester.ScheduledJobs;
+namespace Tester.DurableJobs;
 
 /// <summary>
 /// Contains provider-agnostic test logic for job shard managers that can be run against different providers.
-/// This class is similar to <see cref="ScheduledJobTestsRunner"/> but operates at the infrastructure layer,
+/// This class is similar to <see cref="DurableJobTestsRunner"/> but operates at the infrastructure layer,
 /// testing shard lifecycle management, ownership, and failover semantics.
 /// </summary>
 public class JobShardManagerTestsRunner
@@ -135,7 +135,7 @@ public class JobShardManagerTestsRunner
 
         var counter = 1;
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        await foreach (var jobCtx in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
         {
             Assert.Equal($"job{counter}", jobCtx.Job.Name);
             await shard1.RemoveJobAsync(jobCtx.Job.Id, cts.Token);
@@ -173,7 +173,7 @@ public class JobShardManagerTestsRunner
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         await shard1.MarkAsCompleteAsync(CancellationToken.None);
         await shard1.RemoveJobAsync(jobToCancel.Id, CancellationToken.None);
-        await foreach (var jobCtx in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
         {
             Assert.Equal($"job{counter}", jobCtx.Job.Name);
             await shard1.RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
@@ -221,7 +221,7 @@ public class JobShardManagerTestsRunner
         var job2 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(2), jobMetadata2, CancellationToken.None);
         var job3 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddSeconds(3), null, CancellationToken.None);
 
-        // Verify metadata is set on the scheduled jobs
+        // Verify metadata is set on the durable jobs
         Assert.Equal(jobMetadata1, job1.Metadata);
         Assert.Equal(jobMetadata2, job2.Metadata);
         Assert.Null(job3.Metadata);
@@ -235,9 +235,9 @@ public class JobShardManagerTestsRunner
         shard = shards[0];
 
         // Consume jobs and verify metadata is preserved
-        var consumedJobs = new List<ScheduledJob>();
+        var consumedJobs = new List<DurableJob>();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await foreach (var jobCtx in shard.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shard.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
         {
             consumedJobs.Add(jobCtx.Job);
             await shard.RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
@@ -370,7 +370,7 @@ public class JobShardManagerTestsRunner
 
         var counter = 1;
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(40));
-        await foreach (var jobCtx in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
         {
             Assert.Equal($"job{counter}", jobCtx.Job.Name);
             if (counter == 2)
@@ -400,7 +400,7 @@ public class JobShardManagerTestsRunner
         // Schedule a job
         var job = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(1), null, CancellationToken.None);
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(40));
-        await foreach (var jobCtx in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
         {
             Assert.Equal("job1", jobCtx.Job.Name);
             var newDueTime = DateTimeOffset.UtcNow.AddSeconds(1);
@@ -409,7 +409,7 @@ public class JobShardManagerTestsRunner
         }
 
         // Consume again
-        await foreach (var jobCtx in shard1.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
         {
             Assert.Equal("job1", jobCtx.Job.Name);
             Assert.NotEqual(job.DueTime, jobCtx.Job.DueTime);
@@ -450,7 +450,7 @@ public class JobShardManagerTestsRunner
         var consumedJobs = new List<string>();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        await foreach (var jobCtx in shard.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shard.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
         {
             consumedJobs.Add(jobCtx.Job.Name);
 
@@ -484,7 +484,7 @@ public class JobShardManagerTestsRunner
 
         var hasJobs = false;
         cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        await foreach (var jobCtx in shard.ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shard.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
         {
             hasJobs = true;
             break;
@@ -546,7 +546,7 @@ public class JobShardManagerTestsRunner
 
         var consumedJobs = new List<string>();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        await foreach (var jobCtx in shards[0].ConsumeScheduledJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shards[0].ConsumeDurableJobsAsync().WithCancellation(cts.Token))
         {
             consumedJobs.Add(jobCtx.Job.Name);
             await shards[0].RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
