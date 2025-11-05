@@ -20,7 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
     <ProjectReference Include="$(SourceRoot)\src\Azure\Orleans.Reminders.AzureStorage\Orleans.Reminders.AzureStorage.csproj" />
-    <ProjectReference Include="$(SourceRoot)\src\Azure\Orleans.ScheduledJobs.AzureStorage\Orleans.ScheduledJobs.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)\src\Azure\Orleans.DurableJobs.AzureStorage\Orleans.DurableJobs.AzureStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)\src\Azure\Orleans.GrainDirectory.AzureStorage\Orleans.GrainDirectory.AzureStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)\src\Azure\Orleans.Streaming.AzureStorage\Orleans.Streaming.AzureStorage.csproj" />
   </ItemGroup>
