@@ -1,30 +1,25 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
+    <PackageId>Microsoft.Orleans.DurableJobs</PackageId>
+    <Title>Microsoft Orleans Scheduled Jobs Library</Title>
+    <Description>Scheduled Jobs library for Microsoft Orleans used on the server.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageId>Microsoft.Orleans.ScheduledJobs.AzureStorage</PackageId>
-    <Title>Microsoft Orleans Azure Storage Scheduled Jobs Provider</Title>
-    <Description>Microsoft Orleans scheduled jobs provider backed by Azure Blob Storage</Description>
-    <PackageTags>$(PackageTags) Azure Storage</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
-    <AssemblyName>Orleans.ScheduledJobs.AzureStorage</AssemblyName>
-    <RootNamespace>Orleans.ScheduledJobs.AzureStorage</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     <DefineConstants>$(DefineConstants)</DefineConstants>
-    <Nullable>enable</Nullable>
     <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
     <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.DurableJobs\Orleans.DurableJobs.csproj" />
-    <PackageReference Include="Azure.Core" />
-    <PackageReference Include="Azure.Storage.Blobs" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Orleans.Sdk\Orleans.Sdk.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
-
 </Project>
