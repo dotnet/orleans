@@ -1,11 +1,14 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Configuration;
 
 namespace Orleans.Journaling;
+
 public static class HostingExtensions
 {
     public static ISiloBuilder AddStateMachineStorage(this ISiloBuilder builder)
     {
+        builder.Services.AddOptions<StateMachineManagerOptions>();
         builder.Services.TryAddScoped<IStateMachineStorage>(sp => sp.GetRequiredService<IStateMachineStorageProvider>().Create(sp.GetRequiredService<IGrainContext>()));
         builder.Services.TryAddScoped<IStateMachineManager, StateMachineManager>();
         builder.Services.TryAddKeyedScoped(typeof(IDurableDictionary<,>), KeyedService.AnyKey, typeof(DurableDictionary<,>));
