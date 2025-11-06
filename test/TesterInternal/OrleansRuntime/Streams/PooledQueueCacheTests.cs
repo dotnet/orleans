@@ -370,7 +370,7 @@ namespace UnitTests.OrleansRuntime.Streams
             // Get a cursor at the oldest entry
             var cursor = cache.GetCursor(stream, OldestInStreamToken.Instance);
 
-            // Should have a cursor a able to walk the two messages
+            // Should have a cursor able to walk the two messages
             Assert.NotNull(cursor);
 
             Assert.True(cache.TryGetNextMessage(cursor, out var _));
