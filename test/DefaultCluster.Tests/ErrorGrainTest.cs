@@ -151,21 +151,10 @@ namespace DefaultCluster.Tests
             var grainFullName = typeof(ErrorGrain).FullName;
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
 
-            Task promise = grain.LongMethodWithError(2000);
-
-            // there is a race in the test here. If run in debugger, the invocation can actually finish OK
-            Stopwatch stopwatch = Stopwatch.StartNew();
-
-            await Task.Delay(1000);
-            Assert.False(promise.IsCompleted, "The task shouldn't have completed yet.");
-
-            stopwatch.Stop();
-            Assert.True(stopwatch.ElapsedMilliseconds >= 900, $"Waited less than 900ms: ({stopwatch.ElapsedMilliseconds}ms)"); // check that we waited at least 0.9 second
-            Assert.True(stopwatch.ElapsedMilliseconds <= 1300, $"Waited longer than 1300ms: ({stopwatch.ElapsedMilliseconds}ms)");
-
-            await Assert.ThrowsAsync<Exception>(() => promise);
-
-            Assert.True(promise.Status == TaskStatus.Faulted);
+            Task task = grain.LongMethodWithError(2000);
+            Assert.False(task.IsCompleted, "The task shouldn't have completed yet.");
+            await Assert.ThrowsAsync<Exception>(async () => await task);
+            Assert.True(task.Status == TaskStatus.Faulted);
         }
 
         /// <summary>

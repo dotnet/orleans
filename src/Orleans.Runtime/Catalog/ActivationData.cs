@@ -518,6 +518,11 @@ internal sealed partial class ActivationData :
 
     public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default)
     {
+        StartMigratingOnScheduler(requestContext, tcs: null, cancellationToken);
+    }
+
+    private void StartMigratingOnScheduler(Dictionary<string, object>? requestContext, TaskCompletionSource? tcs, CancellationToken cancellationToken)
+    {
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
 
@@ -525,50 +530,59 @@ internal sealed partial class ActivationData :
         {
             // The grain is executing and is already deactivating, so just set the migration context and return.
             StartMigratingCore(requestContext, null);
+            tcs?.TrySetResult();
         }
         else
         {
             // We use a named work item since it is cheaper than allocating a Task and has the benefit of being named.
-            _workItemGroup.QueueWorkItem(new MigrateWorkItem(this, requestContext, cts));
+            var workItem = new MigrateWorkItem(this, requestContext, tcs, cts);
+            _workItemGroup.QueueWorkItem(workItem);
         }
     }
 
-    private async Task StartMigratingAsync(Dictionary<string, object>? requestContext, CancellationTokenSource cts)
+    private async Task StartMigratingAsync(Dictionary<string, object>? requestContext, TaskCompletionSource? deactivationInitiatedTcs, CancellationTokenSource cts)
     {
-        lock (this)
-        {
-            if (State is not (ActivationState.Activating or ActivationState.Valid or ActivationState.Deactivating))
-            {
-                return;
-            }
-        }
-
         try
         {
-            var newLocation = await PlaceMigratingGrainAsync(requestContext, cts.Token);
-            if (newLocation is null)
-            {
-                // Will not deactivate/migrate.
-                return;
-            }
-
             lock (this)
             {
-                if (!DeactivateCore(new DeactivationReason(DeactivationReasonCode.Migrating, "Migrating to a new location."), cts.Token))
+                if (State is not (ActivationState.Activating or ActivationState.Valid or ActivationState.Deactivating))
                 {
-                    // Grain is not able to start deactivating or has already completed.
+                    return;
+                }
+            }
+
+            try
+            {
+                var newLocation = await PlaceMigratingGrainAsync(requestContext, cts.Token);
+                if (newLocation is null)
+                {
+                    // Will not deactivate/migrate.
                     return;
                 }
 
-                StartMigratingCore(requestContext, newLocation);
-            }
+                lock (this)
+                {
+                    if (!DeactivateCore(new DeactivationReason(DeactivationReasonCode.Migrating, "Migrating to a new location."), cts.Token))
+                    {
+                        // Grain is not able to start deactivating or has already completed.
+                        return;
+                    }
 
-            LogDebugMigrating(_shared.Logger, GrainId, newLocation);
+                    StartMigratingCore(requestContext, newLocation);
+                }
+
+                LogDebugMigrating(_shared.Logger, GrainId, newLocation);
+            }
+            catch (Exception exception)
+            {
+                LogErrorSelectingMigrationDestination(_shared.Logger, exception, GrainId);
+                return;
+            }
         }
-        catch (Exception exception)
+        finally
         {
-            LogErrorSelectingMigrationDestination(_shared.Logger, exception, GrainId);
-            return;
+            deactivationInitiatedTcs?.TrySetResult();
         }
     }
 
@@ -615,7 +629,7 @@ internal sealed partial class ActivationData :
 
     public void Deactivate(DeactivationReason reason, CancellationToken cancellationToken = default) => DeactivateCore(reason, cancellationToken);
 
-    public bool DeactivateCore(DeactivationReason reason, CancellationToken cancellationToken)
+    private bool DeactivateCore(DeactivationReason reason, CancellationToken cancellationToken)
     {
         lock (this)
         {
@@ -1874,8 +1888,9 @@ internal sealed partial class ActivationData :
 
     ValueTask IGrainManagementExtension.MigrateOnIdle()
     {
-        Migrate(RequestContext.CallContextData?.Value.Values, CancellationToken.None);
-        return default;
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        StartMigratingOnScheduler(RequestContext.CallContextData?.Value.Values, tcs, CancellationToken.None);
+        return new(tcs.Task);
     }
 
     private void UnregisterMessageTarget()
@@ -2202,13 +2217,14 @@ internal sealed partial class ActivationData :
         public readonly Dictionary<string, object>? RequestContext = requestContext;
     }
 
-    private class MigrateWorkItem(ActivationData activation, Dictionary<string, object>? requestContext, CancellationTokenSource cts) : WorkItemBase
+    private class MigrateWorkItem(ActivationData activation, Dictionary<string, object>? requestContext, TaskCompletionSource? tcs, CancellationTokenSource cts) : WorkItemBase
     {
+        private readonly TaskCompletionSource? _tcs = tcs;
         public override string Name => "Migrate";
 
         public override IGrainContext GrainContext => activation;
 
-        public override void Execute() => activation.StartMigratingAsync(requestContext, cts).Ignore();
+        public override void Execute() => activation.StartMigratingAsync(requestContext, _tcs, cts).Ignore();
     }
 
     [LoggerMessage(
