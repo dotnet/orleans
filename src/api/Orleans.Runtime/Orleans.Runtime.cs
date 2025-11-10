@@ -479,10 +479,13 @@ namespace Orleans.Hosting
 
     public static partial class SiloBuilderStartupExtensions
     {
+        [System.Obsolete("AddStartupTask is deprecated. Use BackgroundService or IHostedService instead. See https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/startup-tasks for more information.", false)]
         public static ISiloBuilder AddStartupTask(this ISiloBuilder builder, Runtime.IStartupTask startupTask, int stage = 20000) { throw null; }
 
+        [System.Obsolete("AddStartupTask is deprecated. Use BackgroundService or IHostedService instead. See https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/startup-tasks for more information.", false)]
         public static ISiloBuilder AddStartupTask(this ISiloBuilder builder, System.Func<System.IServiceProvider, System.Threading.CancellationToken, System.Threading.Tasks.Task> startupTask, int stage = 20000) { throw null; }
 
+        [System.Obsolete("AddStartupTask is deprecated. Use BackgroundService or IHostedService instead. See https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/startup-tasks for more information.", false)]
         public static ISiloBuilder AddStartupTask<TStartup>(this ISiloBuilder builder, int stage = 20000)
             where TStartup : class, Runtime.IStartupTask { throw null; }
     }
@@ -702,7 +705,7 @@ namespace Orleans.Runtime
 
         System.Collections.Generic.IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates { get; }
 
-        System.Threading.Tasks.ValueTask Refresh(MembershipVersion minimumVersion = default);
+        System.Threading.Tasks.ValueTask Refresh(MembershipVersion minimumVersion = default, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task<bool> TryKill(SiloAddress siloAddress);
     }
 
@@ -803,6 +806,7 @@ namespace Orleans.Runtime
         bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer);
     }
 
+    [System.Obsolete("IStartupTask is deprecated. Use BackgroundService or IHostedService instead. See https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/startup-tasks for more information.", false)]
     public partial interface IStartupTask
     {
         System.Threading.Tasks.Task Execute(System.Threading.CancellationToken cancellationToken);
