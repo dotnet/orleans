@@ -705,7 +705,7 @@ namespace Orleans.Runtime
 
         System.Collections.Generic.IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates { get; }
 
-        System.Threading.Tasks.ValueTask Refresh(MembershipVersion minimumVersion = default, System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.ValueTask Refresh(MembershipVersion minimumVersion = default);
         System.Threading.Tasks.Task<bool> TryKill(SiloAddress siloAddress);
     }
 
