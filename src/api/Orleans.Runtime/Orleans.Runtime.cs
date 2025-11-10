@@ -485,7 +485,6 @@ namespace Orleans.Hosting
         [System.Obsolete("AddStartupTask is deprecated. Use BackgroundService or IHostedService instead. See https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/startup-tasks for more information.", false)]
         public static ISiloBuilder AddStartupTask(this ISiloBuilder builder, System.Func<System.IServiceProvider, System.Threading.CancellationToken, System.Threading.Tasks.Task> startupTask, int stage = 20000) { throw null; }
 
-        [System.Obsolete("AddStartupTask is deprecated. Use BackgroundService or IHostedService instead. See https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/startup-tasks for more information.", false)]
         public static ISiloBuilder AddStartupTask<TStartup>(this ISiloBuilder builder, int stage = 20000)
             where TStartup : class, Runtime.IStartupTask { throw null; }
     }
