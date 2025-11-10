@@ -49,15 +49,14 @@ namespace UnitTests.Grains
             throw new Exception("GetAxBError(a,b)-Exception");
         }
 
-        public Task LongMethod(int waitTime)
+        public async Task LongMethod(int waitTime)
         {
-            Thread.Sleep(waitTime);
-            return Task.CompletedTask;
+            await Task.Delay(waitTime);
         }
 
-        public Task LongMethodWithError(int waitTime)
+        public async Task LongMethodWithError(int waitTime)
         {
-            Thread.Sleep(waitTime);
+            await Task.Delay(waitTime);
             throw new Exception("LongMethodWithError");
         }
 
@@ -100,14 +99,17 @@ namespace UnitTests.Grains
             logger.LogInformation("UnobservedErrorDelayed()");
             bool doThrow = true;
             // the grain method rturns OK, but leaves some unobserved promise
-            Task<long> promise = Task<long>.Factory.StartNew(() =>
+            Task<long> promise = Task.Factory.StartNew(async () =>
             {
                 if (!doThrow)
-                    return 0;
-                Thread.Sleep(100);
+                {
+                    return 0L;
+                }
+
+                await Task.Delay(100);
                 logger.LogInformation("About to throw 1.5.");
                 throw new ArgumentException("ErrorGrain left Delayed Unobserved Error 1.5.");
-            });
+            }).Unwrap();
             promise = null;
             GC.Collect();
             GC.WaitForPendingFinalizers();
