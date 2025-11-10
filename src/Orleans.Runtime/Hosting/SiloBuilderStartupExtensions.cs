@@ -28,6 +28,7 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="ISiloBuilder"/>.
         /// </returns>
+        [Obsolete("AddStartupTask is deprecated. Use BackgroundService or IHostedService instead. See https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/startup-tasks for more information.", error: false)]
         public static ISiloBuilder AddStartupTask<TStartup>(
             this ISiloBuilder builder,
             int stage = ServiceLifecycleStage.Active)
@@ -51,6 +52,7 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="ISiloBuilder"/>.
         /// </returns>
+        [Obsolete("AddStartupTask is deprecated. Use BackgroundService or IHostedService instead. See https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/startup-tasks for more information.", error: false)]
         public static ISiloBuilder AddStartupTask(
             this ISiloBuilder builder,
             IStartupTask startupTask,
@@ -74,6 +76,7 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="ISiloBuilder"/>.
         /// </returns>
+        [Obsolete("AddStartupTask is deprecated. Use BackgroundService or IHostedService instead. See https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/startup-tasks for more information.", error: false)]
         public static ISiloBuilder AddStartupTask(
             this ISiloBuilder builder,
             Func<IServiceProvider, CancellationToken, Task> startupTask,

@@ -8,6 +8,8 @@ using UnitTests.GrainInterfaces;
 
 using Xunit;
 
+#pragma warning disable CS0618 // Type or member is obsolete
+
 namespace DefaultCluster.Tests
 {
     [TestCategory("BVT"), TestCategory("Lifecycle")]
