@@ -103,7 +103,7 @@ internal sealed partial class ActivationData :
         }
     }
 
-    public TaskScheduler ActivationTaskScheduler => _workItemGroup.TaskScheduler;
+    public ActivationTaskScheduler ActivationTaskScheduler => _workItemGroup.TaskScheduler;
     public IGrainRuntime GrainRuntime => _shared.Runtime;
     public object? GrainInstance { get; private set; }
     public GrainAddress Address { get; private set; }
