@@ -25,7 +25,6 @@ namespace DefaultCluster.Tests.General
             {
                 var grain = GrainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
                 var expectedState = Random.Shared.Next();
-                await grain.SetState(expectedState);
                 var originalAddress = await grain.GetGrainAddress();
                 GrainAddress newAddress;
                 do
@@ -33,6 +32,7 @@ namespace DefaultCluster.Tests.General
                     // Trigger migration without setting a placement hint, so the grain placement provider will be
                     // free to select any location including the existing one.
                     await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+                    await grain.SetState(expectedState);
                     newAddress = await grain.GetGrainAddress();
                 } while (originalAddress == newAddress);
 
@@ -250,12 +250,12 @@ namespace DefaultCluster.Tests.General
             RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
             await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
 
-            var newAddress = await grain.GetGrainAddress();
-            Assert.Equal(targetHost, newAddress.SiloAddress);
-
             // The grain should have lost its state during the failed migration.
             var newState = await grain.GetState();
             Assert.NotEqual(expectedState, newState);
+
+            var newAddress = await grain.GetGrainAddress();
+            Assert.Equal(targetHost, newAddress.SiloAddress);
         }
 
         /// <summary>

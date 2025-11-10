@@ -518,111 +518,33 @@ internal sealed partial class ActivationData :
 
     public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default)
     {
-        var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
-
-        if (Equals(RuntimeContext.Current) && State is ActivationState.Deactivating)
-        {
-            // The grain is executing and is already deactivating, so just set the migration context and return.
-            StartMigratingCore(requestContext, null);
-        }
-        else
-        {
-            // We use a named work item since it is cheaper than allocating a Task and has the benefit of being named.
-            _workItemGroup.QueueWorkItem(new MigrateWorkItem(this, requestContext, cts));
-        }
-    }
-
-    private async Task StartMigratingAsync(Dictionary<string, object>? requestContext, CancellationTokenSource cts)
-    {
         lock (this)
         {
             if (State is not (ActivationState.Activating or ActivationState.Valid or ActivationState.Deactivating))
             {
                 return;
             }
-        }
 
-        try
-        {
-            var newLocation = await PlaceMigratingGrainAsync(requestContext, cts.Token);
-            if (newLocation is null)
+            // If migration has not already been started, set a migration context to capture any state which should be transferred.
+            // Doing this signals to the deactivation process that a migration is occurring, so it is important that this happens before we begin deactivation.
+            DehydrationContext ??= new(_shared.SerializerSessionPool, requestContext);
+
+            if (State is not ActivationState.Deactivating)
             {
-                // Will not deactivate/migrate.
-                return;
+                // Start deactivating the grain to prepare for migration.
+                Deactivate(new DeactivationReason(DeactivationReasonCode.Migrating, "Migrating to a new location."), cancellationToken);
             }
-
-            lock (this)
-            {
-                if (!DeactivateCore(new DeactivationReason(DeactivationReasonCode.Migrating, "Migrating to a new location."), cts.Token))
-                {
-                    // Grain is not able to start deactivating or has already completed.
-                    return;
-                }
-
-                StartMigratingCore(requestContext, newLocation);
-            }
-
-            LogDebugMigrating(_shared.Logger, GrainId, newLocation);
-        }
-        catch (Exception exception)
-        {
-            LogErrorSelectingMigrationDestination(_shared.Logger, exception, GrainId);
-            return;
         }
     }
 
-    private void StartMigratingCore(Dictionary<string, object>? requestContext, SiloAddress? newLocation)
-    {
-        if (DehydrationContext is not null)
-        {
-            // Migration has already started.
-            return;
-        }
-
-        // Set a migration context to capture any state which should be transferred.
-        // Doing this signals to the deactivation process that a migration is occurring, so it is important that this happens before we begin deactivation.
-        DehydrationContext = new(_shared.SerializerSessionPool, requestContext);
-        ForwardingAddress = newLocation;
-    }
-
-    private async ValueTask<SiloAddress?> PlaceMigratingGrainAsync(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
-    {
-        var placementService = _shared.Runtime.ServiceProvider.GetRequiredService<PlacementService>();
-        var newLocation = await placementService.PlaceGrainAsync(GrainId, requestContext, PlacementStrategy).WaitAsync(cancellationToken);
-
-        // If a new (different) host is not selected, do not migrate.
-        if (newLocation == Address.SiloAddress || newLocation is null)
-        {
-            // No more appropriate silo was selected for this grain. The migration attempt will be aborted.
-            // This could be because this is the only (compatible) silo for the grain or because the placement director chose this
-            // silo for some other reason.
-            if (newLocation is null)
-            {
-                LogDebugPlacementStrategyFailedToSelectDestination(_shared.Logger, PlacementStrategy, GrainId);
-            }
-            else
-            {
-                LogDebugPlacementStrategySelectedCurrentSilo(_shared.Logger, PlacementStrategy, GrainId);
-            }
-
-            // Will not migrate.
-            return null;
-        }
-
-        return newLocation;
-    }
-
-    public void Deactivate(DeactivationReason reason, CancellationToken cancellationToken = default) => DeactivateCore(reason, cancellationToken);
-
-    public bool DeactivateCore(DeactivationReason reason, CancellationToken cancellationToken)
+    public void Deactivate(DeactivationReason reason, CancellationToken cancellationToken = default)
     {
         lock (this)
         {
             var state = State;
             if (state is ActivationState.Invalid)
             {
-                return false;
+                return;
             }
 
             if (DeactivationReason.ReasonCode == DeactivationReasonCode.None)
@@ -646,8 +568,6 @@ internal sealed partial class ActivationData :
                 ScheduleOperation(new Command.Deactivate(cts, state));
             }
         }
-
-        return true;
     }
 
     private void DeactivateStuckActivation()
@@ -1709,7 +1629,7 @@ internal sealed partial class ActivationData :
     /// </summary>
     private async Task FinishDeactivating(ActivationState previousState, CancellationToken cancellationToken)
     {
-        var migrated = false;
+        var migrating = false;
         var encounteredError = false;
         try
         {
@@ -1763,41 +1683,14 @@ internal sealed partial class ActivationData :
                 && _shared.MigrationManager is { } migrationManager
                 && !cancellationToken.IsCancellationRequested)
             {
-                try
-                {
-                    ForwardingAddress ??= await PlaceMigratingGrainAsync(context.RequestContext, cancellationToken);
-
-                    if (ForwardingAddress is { } forwardingAddress)
-                    {
-                        // Populate the dehydration context.
-                        if (context.RequestContext is { } requestContext)
-                        {
-                            RequestContextExtensions.Import(requestContext);
-                        }
-
-                        OnDehydrate(context.MigrationContext);
-
-                        // Send the dehydration context to the target host.
-                        await migrationManager.MigrateAsync(forwardingAddress, GrainId, context.MigrationContext).AsTask().WaitAsync(cancellationToken);
-                        _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, forwardingAddress);
-                        migrated = true;
-                    }
-                }
-                catch (Exception exception)
-                {
-                    LogFailedToMigrateActivation(_shared.Logger, exception, this);
-                }
-                finally
-                {
-                    RequestContext.Clear();
-                }
+                migrating = await StartMigrationAsync(context, migrationManager, cancellationToken);
             }
 
             // If the instance is being deactivated due to a directory failure, we should not unregister it.
             var isDirectoryFailure = DeactivationReason.ReasonCode is DeactivationReasonCode.DirectoryFailure;
             var isShuttingDown = DeactivationReason.ReasonCode is DeactivationReasonCode.ShuttingDown;
 
-            if (!migrated && IsUsingGrainDirectory && !cancellationToken.IsCancellationRequested && !isDirectoryFailure && !isShuttingDown)
+            if (!migrating && IsUsingGrainDirectory && !cancellationToken.IsCancellationRequested && !isDirectoryFailure && !isShuttingDown)
             {
                 // Unregister from directory.
                 // If the grain was migrated, the new activation will perform a check-and-set on the registration itself.
@@ -1828,7 +1721,7 @@ internal sealed partial class ActivationData :
         {
             CatalogInstruments.ActivationShutdownViaDeactivateStuckActivation();
         }
-        else if (migrated)
+        else if (migrating)
         {
             CatalogInstruments.ActivationShutdownViaMigration();
         }
@@ -1855,6 +1748,41 @@ internal sealed partial class ActivationData :
         // Signal deactivation
         GetDeactivationCompletionSource().TrySetResult(true);
         _workSignal.Signal();
+
+        async ValueTask<bool> StartMigrationAsync(DehydrationContextHolder context, IActivationMigrationManager migrationManager, CancellationToken cancellationToken)
+        {
+            try
+            {
+                if (ForwardingAddress is null)
+                {
+                    var selectedAddress = await PlaceMigratingGrainAsync(context.RequestContext, cancellationToken);
+                    if (selectedAddress is null)
+                    {
+                        return false;
+                    }
+
+                    ForwardingAddress = selectedAddress;
+                }
+
+                // Populate the dehydration context.
+                if (context.RequestContext is { } requestContext)
+                {
+                    RequestContextExtensions.Import(requestContext);
+                }
+
+                OnDehydrate(context.MigrationContext);
+
+                // Send the dehydration context to the target host.
+                await migrationManager.MigrateAsync(ForwardingAddress, GrainId, context.MigrationContext).AsTask().WaitAsync(cancellationToken);
+                _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, ForwardingAddress);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                LogFailedToMigrateActivation(_shared.Logger, exception, this);
+                return false;
+            }
+        }
     }
 
     private TaskCompletionSource<bool> GetDeactivationCompletionSource()
@@ -1872,10 +1800,49 @@ internal sealed partial class ActivationData :
         return default;
     }
 
-    ValueTask IGrainManagementExtension.MigrateOnIdle()
+    async ValueTask IGrainManagementExtension.MigrateOnIdle()
     {
-        Migrate(RequestContext.CallContextData?.Value.Values, CancellationToken.None);
-        return default;
+        var requestContextData = RequestContext.CallContextData?.Value.Values;
+        var selectedAddress = await PlaceMigratingGrainAsync(requestContextData, CancellationToken.None);
+        if (selectedAddress is null)
+        {
+            return;
+        }
+
+        // Only migrate if a different silo was selected.
+        ForwardingAddress = selectedAddress;
+        LogDebugMigrating(_shared.Logger, GrainId, ForwardingAddress);
+        Migrate(requestContextData, cancellationToken: CancellationToken.None);
+    }
+
+    private async ValueTask<SiloAddress?> PlaceMigratingGrainAsync(Dictionary<string, object>? requestContextData, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var placementService = _shared.Runtime.ServiceProvider.GetRequiredService<PlacementService>();
+            var selectedAddress = await placementService.PlaceGrainAsync(GrainId, requestContextData, PlacementStrategy);
+
+            if (selectedAddress is null)
+            {
+                // No appropriate silo was selected for this grain.
+                LogDebugPlacementStrategyFailedToSelectDestination(_shared.Logger, PlacementStrategy, GrainId);
+                return null;
+            }
+            else if (selectedAddress == _shared.Runtime.SiloAddress)
+            {
+                // This could be because this is the only (compatible) silo for the grain or because the placement director chose this
+                // silo for some other reason.
+                LogDebugPlacementStrategySelectedCurrentSilo(_shared.Logger, PlacementStrategy, GrainId);
+                return null;
+            }
+
+            return selectedAddress;
+        }
+        catch (Exception exception)
+        {
+            LogErrorSelectingMigrationDestination(_shared.Logger, exception, GrainId);
+            return null;
+        }
     }
 
     private void UnregisterMessageTarget()
@@ -2200,15 +2167,6 @@ internal sealed partial class ActivationData :
     {
         public readonly MigrationContext MigrationContext = new(sessionPool);
         public readonly Dictionary<string, object>? RequestContext = requestContext;
-    }
-
-    private class MigrateWorkItem(ActivationData activation, Dictionary<string, object>? requestContext, CancellationTokenSource cts) : WorkItemBase
-    {
-        public override string Name => "Migrate";
-
-        public override IGrainContext GrainContext => activation;
-
-        public override void Execute() => activation.StartMigratingAsync(requestContext, cts).Ignore();
     }
 
     [LoggerMessage(

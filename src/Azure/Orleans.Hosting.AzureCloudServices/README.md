@@ -55,7 +55,9 @@ public class WorkerRole : RoleEntryPoint
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Hosting in Azure](https://learn.microsoft.com/en-us/dotnet/orleans/host/azure-cloud-services)
+- [Hosting in Azure App Service](https://learn.microsoft.com/en-us/dotnet/orleans/deployment/deploy-to-azure-app-service)
+- [Hosting in Azure Container Apps](https://learn.microsoft.com/en-us/dotnet/orleans/deployment/deploy-to-azure-container-apps)
+- [Hosting in Service Fabric](https://learn.microsoft.com/en-us/dotnet/orleans/deployment/service-fabric)
 - [Silo Configuration](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/typical-configurations)
 
 ## Feedback & Contributing
