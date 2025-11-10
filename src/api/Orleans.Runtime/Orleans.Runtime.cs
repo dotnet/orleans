@@ -479,7 +479,6 @@ namespace Orleans.Hosting
 
     public static partial class SiloBuilderStartupExtensions
     {
-        [System.Obsolete("AddStartupTask is deprecated. Use BackgroundService or IHostedService instead. See https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/startup-tasks for more information.", false)]
         public static ISiloBuilder AddStartupTask(this ISiloBuilder builder, Runtime.IStartupTask startupTask, int stage = 20000) { throw null; }
 
         [System.Obsolete("AddStartupTask is deprecated. Use BackgroundService or IHostedService instead. See https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/startup-tasks for more information.", false)]
