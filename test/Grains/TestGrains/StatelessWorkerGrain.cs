@@ -5,7 +5,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    [StatelessWorker(MaxLocalWorkers)]
+    [StatelessWorker(MaxLocalWorkers, removeIdleWorkers: false)]
     public class StatelessWorkerGrain : Grain, IStatelessWorkerGrain
     {
         public const int MaxLocalWorkers = 1;
