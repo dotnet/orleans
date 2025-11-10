@@ -805,7 +805,6 @@ namespace Orleans.Runtime
         bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer);
     }
 
-    [System.Obsolete("IStartupTask is deprecated. Use BackgroundService or IHostedService instead. See https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/startup-tasks for more information.", false)]
     public partial interface IStartupTask
     {
         System.Threading.Tasks.Task Execute(System.Threading.CancellationToken cancellationToken);
