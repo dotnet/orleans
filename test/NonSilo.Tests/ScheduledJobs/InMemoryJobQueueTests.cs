@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.ScheduledJobs;
+using Orleans.DurableJobs;
 using Orleans.Runtime;
 using NSubstitute;
 using Xunit;
 
-namespace NonSilo.Tests.ScheduledJobs;
+namespace NonSilo.Tests.DurableJobs;
 
-[TestCategory("ScheduledJobs")]
+[TestCategory("DurableJobs")]
 public class InMemoryJobQueueTests
 {
     [Fact]
@@ -62,7 +62,7 @@ public class InMemoryJobQueueTests
         queue.Enqueue(job2, 0);
         queue.MarkAsComplete();
 
-        var results = new List<IScheduledJobContext>();
+        var results = new List<IDurableJobContext>();
         await foreach (var context in queue.WithCancellation(CancellationToken.None))
         {
             results.Add(context);
@@ -252,7 +252,7 @@ public class InMemoryJobQueueTests
         queue.CancelJob("job2");
         queue.MarkAsComplete();
 
-        var results = new List<IScheduledJobContext>();
+        var results = new List<IDurableJobContext>();
         await foreach (var context in queue.WithCancellation(CancellationToken.None))
         {
             results.Add(context);
@@ -325,9 +325,9 @@ public class InMemoryJobQueueTests
         });
     }
 
-    private static ScheduledJob CreateJob(string id, DateTimeOffset dueTime)
+    private static DurableJob CreateJob(string id, DateTimeOffset dueTime)
     {
-        return new ScheduledJob
+        return new DurableJob
         {
             Id = id,
             Name = id,
@@ -338,9 +338,9 @@ public class InMemoryJobQueueTests
         };
     }
 
-    private static IScheduledJobContext CreateJobContext(ScheduledJob job, string runId, int dequeueCount)
+    private static IDurableJobContext CreateJobContext(DurableJob job, string runId, int dequeueCount)
     {
-        var context = Substitute.For<IScheduledJobContext>();
+        var context = Substitute.For<IDurableJobContext>();
         context.Job.Returns(job);
         context.RunId.Returns(runId);
         context.DequeueCount.Returns(dequeueCount);

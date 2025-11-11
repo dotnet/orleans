@@ -1,10 +1,10 @@
 using System;
 using System.Threading.Tasks;
-using Orleans.ScheduledJobs;
+using Orleans.DurableJobs;
 
 namespace UnitTests.GrainInterfaces;
 
 public interface ISchedulerGrain : IGrainWithStringKey
 {
-    Task<ScheduledJob> ScheduleJobOnAnotherGrainAsync(string targetGrainKey, string jobName, DateTimeOffset scheduledTime);
+    Task<DurableJob> ScheduleJobOnAnotherGrainAsync(string targetGrainKey, string jobName, DateTimeOffset scheduledTime);
 }

@@ -3,23 +3,23 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.ScheduledJobs;
+using Orleans.DurableJobs;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains;
 
-public class RetryTestGrain : Grain, IRetryTestGrain, IScheduledJobHandler
+public class RetryTestGrain : Grain, IRetryTestGrain, IDurableJobHandler
 {
     private readonly Dictionary<string, TaskCompletionSource> _jobSuccessStatus = new();
     private readonly Dictionary<string, int> _jobExecutionAttempts = new();
     private readonly Dictionary<string, List<int>> _jobDequeueCountHistory = new();
-    private readonly Dictionary<string, IScheduledJobContext> _finalJobContexts = new();
-    private readonly ILocalScheduledJobManager _localScheduledJobManager;
+    private readonly Dictionary<string, IDurableJobContext> _finalJobContexts = new();
+    private readonly ILocalDurableJobManager _localDurableJobManager;
     private readonly ILogger<RetryTestGrain> _logger;
 
-    public RetryTestGrain(ILocalScheduledJobManager localScheduledJobManager, ILogger<RetryTestGrain> logger)
+    public RetryTestGrain(ILocalDurableJobManager localDurableJobManager, ILogger<RetryTestGrain> logger)
     {
-        _localScheduledJobManager = localScheduledJobManager;
+        _localDurableJobManager = localDurableJobManager;
         _logger = logger;
     }
 
@@ -28,7 +28,7 @@ public class RetryTestGrain : Grain, IRetryTestGrain, IScheduledJobHandler
         return Task.FromResult(_jobSuccessStatus.TryGetValue(jobId, out var tcs) && tcs.Task.IsCompleted);
     }
 
-    public Task ExecuteJobAsync(IScheduledJobContext ctx, CancellationToken cancellationToken)
+    public Task ExecuteJobAsync(IDurableJobContext ctx, CancellationToken cancellationToken)
     {
         var jobId = ctx.Job.Id;
         
@@ -76,9 +76,9 @@ public class RetryTestGrain : Grain, IRetryTestGrain, IScheduledJobHandler
         return Task.CompletedTask;
     }
 
-    public async Task<ScheduledJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null)
+    public async Task<DurableJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null)
     {
-        var job = await _localScheduledJobManager.ScheduleJobAsync(
+        var job = await _localDurableJobManager.ScheduleJobAsync(
             this.GetGrainId(),
             jobName,
             scheduledTime,
@@ -122,7 +122,7 @@ public class RetryTestGrain : Grain, IRetryTestGrain, IScheduledJobHandler
         return Task.FromResult(history);
     }
 
-    public Task<IScheduledJobContext> GetFinalJobContext(string jobId)
+    public Task<IDurableJobContext> GetFinalJobContext(string jobId)
     {
         if (!_finalJobContexts.TryGetValue(jobId, out var ctx))
         {
