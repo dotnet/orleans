@@ -146,12 +146,12 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         
         if (_listenForClusterChangesTask is not null)
         {
-            await _listenForClusterChangesTask;
+            await _listenForClusterChangesTask.SuppressThrowing();
         }
 
         if (_periodicCheckTask is not null)
         {
-            await _periodicCheckTask;
+            await _periodicCheckTask.SuppressThrowing();
         }
         
         await Task.WhenAll(_runningShards.Values.ToArray());
@@ -180,26 +180,36 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
         var current = new HashSet<SiloAddress>();
-        
-        await foreach (var membershipSnapshot in _clusterMembershipUpdates.WithCancellation(_cts.Token))
-        {
-            try
-            {
-                // Get active members
-                var update = new HashSet<SiloAddress>(membershipSnapshot.Members.Values
-                    .Where(member => member.Status == SiloStatus.Active)
-                    .Select(member => member.SiloAddress));
 
-                // If active list has changed, trigger immediate shard check
-                if (!current.SetEquals(update))
+        try
+        {
+            await foreach (var membershipSnapshot in _clusterMembershipUpdates.WithCancellation(_cts.Token))
+            {
+                try
                 {
-                    current = update;
-                    _shardCheckSignal.Release();
+                    // Get active members
+                    var update = new HashSet<SiloAddress>(membershipSnapshot.Members.Values
+                        .Where(member => member.Status == SiloStatus.Active)
+                        .Select(member => member.SiloAddress));
+
+                    // If active list has changed, trigger immediate shard check
+                    if (!current.SetEquals(update))
+                    {
+                        current = update;
+                        _shardCheckSignal.Release();
+                    }
+                }
+                catch (Exception exception)
+                {
+                    LogErrorProcessingClusterMembership(_logger, exception);
                 }
             }
-            catch (Exception exception)
+        }
+        catch (OperationCanceledException)
+        {
+            if (!_cts.Token.IsCancellationRequested)
             {
-                LogErrorProcessingClusterMembership(_logger, exception);
+                throw;
             }
         }
     }
@@ -210,14 +220,19 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(10));
 
+        Task timerTask = Task.CompletedTask;
         while (!_cts.Token.IsCancellationRequested)
         {
             try
             {
                 // Wait for either periodic timer OR signal from membership changes
-                var timerTask = timer.WaitForNextTickAsync(_cts.Token);
+                if (timerTask.IsCompleted)
+                {
+                    timerTask = timer.WaitForNextTickAsync(_cts.Token).AsTask();
+                }
+
                 var signalTask = _shardCheckSignal.WaitAsync(_cts.Token);
-                await Task.WhenAny(timerTask.AsTask(), signalTask);
+                await Task.WhenAny(timerTask, signalTask);
 
                 LogCheckingPendingShards(_logger);
                 
@@ -259,6 +274,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             catch (Exception ex)
             {
                 LogErrorInPeriodicCheck(_logger, ex);
+                await Task.Delay(TimeSpan.FromSeconds(5), _cts.Token).SuppressThrowing();
             }
         }
     }
