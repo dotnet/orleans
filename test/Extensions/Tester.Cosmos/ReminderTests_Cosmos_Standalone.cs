@@ -33,8 +33,6 @@ public class ReminderTests_Cosmos_Standalone
         _log = _loggerFactory.CreateLogger<ReminderTests_Cosmos_Standalone>();
 
         _serviceId = Guid.NewGuid().ToString();
-
-        TestUtils.ConfigureClientThreadPoolSettingsForStorageTests(1000);
     }
 
     [SkippableFact, TestCategory("Reminders"), TestCategory("Performance")]

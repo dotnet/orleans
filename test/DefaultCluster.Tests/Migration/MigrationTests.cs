@@ -1,8 +1,10 @@
 using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core.Internal;
 using Orleans.Placement;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
+using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
 
@@ -238,11 +240,26 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT")]
         public async Task FailDehydrationTest()
         {
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
             var grain = GrainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
             var expectedState = Random.Shared.Next();
             await grain.SetState(expectedState);
             var originalAddress = await grain.GetGrainAddress();
             var targetHost = Fixture.HostedCluster.GetActiveSilos().Select(s => s.SiloAddress).First(address => address != originalAddress.SiloAddress);
+
+            // Wait for membership to stabilize and for cluster manifests to be propagated.
+            // We do this by repeatedly trying to activate a grain on the target silo.
+            var primaryGrainFactory = ((InProcessSiloHandle)Fixture.HostedCluster.Primary).ServiceProvider.GetRequiredService<IGrainFactory>();
+            SiloAddress grainOnOtherSiloAddr;
+            do
+            {
+                cts.Token.ThrowIfCancellationRequested();
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
+                var grainOnOtherSilo = primaryGrainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
+                var addr = await grainOnOtherSilo.GetGrainAddress();
+                grainOnOtherSiloAddr = addr.SiloAddress;
+                await Task.Delay(100);
+            } while (!targetHost.Equals(grainOnOtherSiloAddr));
 
             // Trigger migration, setting a placement hint to coerce the placement director to use the target silo
             // Also, tell the grain to fail to dehydrate (by stuffing some data into the request context which tells it to throw)

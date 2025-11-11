@@ -2,6 +2,6 @@
   <PropertyGroup>
     <RootNamespace>UnitTests.Interfaces</RootNamespace>
     <AssemblyName>TestInterfaces</AssemblyName>
-    <TargetFramework>$(TestTargetFrameworks)</TargetFramework>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 </Project>

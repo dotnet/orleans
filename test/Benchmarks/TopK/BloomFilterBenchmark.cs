@@ -6,8 +6,7 @@ using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Configs;
-using BenchmarkDotNet.Reports;
-using Benchmarks.Utilities;
+using Benchmarks.Serialization.Utilities;
 using Orleans.Runtime.Placement.Repartitioning;
 
 namespace Benchmarks.TopK;

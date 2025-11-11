@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <IsTestProject>true</IsTestProject>
@@ -12,6 +12,7 @@
   <ItemGroup>
     <PackageReference Include="CsCheck" />
     <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.core" />
     <PackageReference Include="xunit.extensibility.core" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
@@ -19,6 +20,17 @@
     <PackageReference Include="FSharp.Core" />
     <PackageReference Include="Google.Protobuf" />
     <PackageReference Include="Grpc.Tools" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'netcoreapp3.1'">
+    <PackageReference Update="CsCheck" VersionOverride="2.14.1"/>
+    <PackageReference Update="Microsoft.NET.Test.Sdk" VersionOverride="17.11.1"/>
+    <PackageReference Update="xunit.runner.visualstudio" VersionOverride="2.4.5"/>
+    <PackageReference Update="xunit" VersionOverride="2.4.2" />
+    <PackageReference Update="xunit.assert" VersionOverride="2.4.2" />
+    <PackageReference Update="xunit.core" VersionOverride="2.4.2" />
+    <PackageReference Update="xunit.extensibility.core" VersionOverride="2.4.2" />
+    <PackageReference Update="xunit.extensibility.execution" VersionOverride="2.4.2" />
   </ItemGroup>
 
   <ItemGroup>

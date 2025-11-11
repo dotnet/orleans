@@ -21,7 +21,6 @@ namespace Tester.AzureUtils
         public AzureTableDataManagerStressTests(ITestOutputHelper output)
         {
             this.output = output;
-            TestingUtils.ConfigureThreadPoolSettingsForStorageTests();
 
             // Pre-create table, if required
             manager = new UnitTestAzureTableDataManager();

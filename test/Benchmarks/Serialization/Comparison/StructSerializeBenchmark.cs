@@ -1,6 +1,4 @@
 using BenchmarkDotNet.Attributes;
-using Benchmarks.Models;
-using Benchmarks.Utilities;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,116 +10,118 @@ using SerializerSession = Orleans.Serialization.Session.SerializerSession;
 using Utf8JsonNS = Utf8Json;
 using Hyperion;
 using ZeroFormatter;
+using Benchmarks.Serialization.Models;
+using Benchmarks.Serialization.Utilities;
 
-namespace Benchmarks.Comparison
+namespace Benchmarks.Serialization.Comparison;
+
+/// <summary>
+/// Compares Orleans serialization performance against other popular serializers for struct types.
+/// </summary>
+[Trait("Category", "Benchmark")]
+[Config(typeof(BenchmarkConfig))]
+[BenchmarkCategory("Serialization")]
+[PayloadSizeColumn]
+public class StructSerializeBenchmark
 {
-    /// <summary>
-    /// Compares Orleans serialization performance against other popular serializers for struct types.
-    /// </summary>
-    [Trait("Category", "Benchmark")]
-    [Config(typeof(BenchmarkConfig))]
-    [PayloadSizeColumn]
-    public class StructSerializeBenchmark
+    private static readonly IntStruct Input = IntStruct.Create();
+
+    private static readonly Hyperion.Serializer HyperionSerializer = new(SerializerOptions.Default.WithKnownTypes(new[] { typeof(IntStruct) }));
+    private static readonly Hyperion.SerializerSession HyperionSession;
+
+    private static readonly Serializer<IntStruct> Serializer;
+    private static readonly byte[] Data;
+    private static readonly SerializerSession Session;
+    private static readonly MemoryStream ProtoBuffer = new();
+    private static readonly MemoryStream HyperionBuffer = new();
+
+    private static readonly MemoryStream Utf8JsonOutput = new();
+    private static readonly Utf8JsonNS.IJsonFormatterResolver Utf8JsonResolver = Utf8JsonNS.Resolvers.StandardResolver.Default;
+
+    private static readonly MemoryStream SystemTextJsonOutput = new();
+    private static readonly Utf8JsonWriter SystemTextJsonWriter;
+
+    static StructSerializeBenchmark()
     {
-        private static readonly IntStruct Input = IntStruct.Create();
+        // 
+        var services = new ServiceCollection()
+            .AddSerializer()
+            .BuildServiceProvider();
+        Serializer = services.GetRequiredService<Serializer<IntStruct>>();
+        Data = new byte[1000];
+        Session = services.GetRequiredService<SerializerSessionPool>().GetSession();
 
-        private static readonly Hyperion.Serializer HyperionSerializer = new(SerializerOptions.Default.WithKnownTypes(new[] { typeof(IntStruct) }));
-        private static readonly Hyperion.SerializerSession HyperionSession;
+        HyperionSession = HyperionSerializer.GetSerializerSession();
 
-        private static readonly Serializer<IntStruct> Serializer;
-        private static readonly byte[] Data;
-        private static readonly SerializerSession Session;
-        private static readonly MemoryStream ProtoBuffer = new();
-        private static readonly MemoryStream HyperionBuffer = new();
+        SystemTextJsonWriter = new Utf8JsonWriter(SystemTextJsonOutput);
+    }
 
-        private static readonly MemoryStream Utf8JsonOutput = new();
-        private static readonly Utf8JsonNS.IJsonFormatterResolver Utf8JsonResolver = Utf8JsonNS.Resolvers.StandardResolver.Default;
+    [Benchmark(Baseline = true)]
+    public long Orleans()
+    {
+        Session.Reset();
+        return Serializer.Serialize(Input, Data, Session);
+    }
 
-        private static readonly MemoryStream SystemTextJsonOutput = new();
-        private static readonly Utf8JsonWriter SystemTextJsonWriter;
+    [Benchmark]
+    public long Utf8Json()
+    {
+        Utf8JsonOutput.Position = 0;
+        Utf8JsonNS.JsonSerializer.Serialize(Utf8JsonOutput, Input, Utf8JsonResolver);
+        return Utf8JsonOutput.Length;
+    }
 
-        static StructSerializeBenchmark()
-        {
-            // 
-            var services = new ServiceCollection()
-                .AddSerializer()
-                .BuildServiceProvider();
-            Serializer = services.GetRequiredService<Serializer<IntStruct>>();
-            Data = new byte[1000];
-            Session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+    [Benchmark]
+    public long SystemTextJson()
+    {
+        SystemTextJsonOutput.Position = 0;
+        System.Text.Json.JsonSerializer.Serialize(SystemTextJsonWriter, Input);
 
-            HyperionSession = HyperionSerializer.GetSerializerSession();
+        SystemTextJsonWriter.Reset();
+        return SystemTextJsonOutput.Length;
+    }
 
-            SystemTextJsonWriter = new Utf8JsonWriter(SystemTextJsonOutput);
-        }
+    [Benchmark]
+    public int MessagePackCSharp()
+    {
+        var bytes = MessagePack.MessagePackSerializer.Serialize(Input);
+        return bytes.Length;
+    }
 
-        [Benchmark(Baseline = true)]
-        public long Orleans()
-        {
-            Session.Reset();
-            return Serializer.Serialize(Input, Data, Session);
-        }
+    [Benchmark]
+    public long ProtobufNet()
+    {
+        ProtoBuffer.Position = 0;
+        ProtoBuf.Serializer.Serialize(ProtoBuffer, Input);
+        return ProtoBuffer.Length;
+    }
 
-        [Benchmark]
-        public long Utf8Json()
-        {
-            Utf8JsonOutput.Position = 0;
-            Utf8JsonNS.JsonSerializer.Serialize(Utf8JsonOutput, Input, Utf8JsonResolver);
-            return Utf8JsonOutput.Length;
-        }
+    [Benchmark]
+    public long Hyperion()
+    {
+        HyperionBuffer.Position = 0;
+        HyperionSerializer.Serialize(Input, HyperionBuffer, HyperionSession);
+        return HyperionBuffer.Length;
+    }
 
-        [Benchmark]
-        public long SystemTextJson()
-        {
-            SystemTextJsonOutput.Position = 0;
-            System.Text.Json.JsonSerializer.Serialize(SystemTextJsonWriter, Input);
+    //[Benchmark]
+    public int ZeroFormatter()
+    {
+        var bytes = ZeroFormatterSerializer.Serialize(Input);
+        return bytes.Length;
+    }
 
-            SystemTextJsonWriter.Reset();
-            return SystemTextJsonOutput.Length;
-        }
+    [Benchmark]
+    public int NewtonsoftJson()
+    {
+        var bytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(Input));
+        return bytes.Length;
+    }
 
-        [Benchmark]
-        public int MessagePackCSharp()
-        {
-            var bytes = MessagePack.MessagePackSerializer.Serialize(Input);
-            return bytes.Length;
-        }
-
-        [Benchmark]
-        public long ProtobufNet()
-        {
-            ProtoBuffer.Position = 0;
-            ProtoBuf.Serializer.Serialize(ProtoBuffer, Input);
-            return ProtoBuffer.Length;
-        }
-
-        [Benchmark]
-        public long Hyperion()
-        {
-            HyperionBuffer.Position = 0;
-            HyperionSerializer.Serialize(Input, HyperionBuffer, HyperionSession);
-            return HyperionBuffer.Length;
-        }
-
-        //[Benchmark]
-        public int ZeroFormatter()
-        {
-            var bytes = ZeroFormatterSerializer.Serialize(Input);
-            return bytes.Length;
-        }
-
-        [Benchmark]
-        public int NewtonsoftJson()
-        {
-            var bytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(Input));
-            return bytes.Length;
-        }
-
-        [Benchmark(Description = "SpanJson")]
-        public int SpanJsonUtf8()
-        {
-            var bytes = SpanJson.JsonSerializer.Generic.Utf8.Serialize(Input);
-            return bytes.Length;
-        }
+    [Benchmark(Description = "SpanJson")]
+    public int SpanJsonUtf8()
+    {
+        var bytes = SpanJson.JsonSerializer.Generic.Utf8.Serialize(Input);
+        return bytes.Length;
     }
 }

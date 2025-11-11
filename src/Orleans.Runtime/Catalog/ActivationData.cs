@@ -1828,7 +1828,7 @@ internal sealed partial class ActivationData :
                 LogDebugPlacementStrategyFailedToSelectDestination(_shared.Logger, PlacementStrategy, GrainId);
                 return null;
             }
-            else if (selectedAddress == _shared.Runtime.SiloAddress)
+            else if (selectedAddress.Equals(_shared.Runtime.SiloAddress))
             {
                 // This could be because this is the only (compatible) silo for the grain or because the placement director chose this
                 // silo for some other reason.

@@ -301,13 +301,12 @@ namespace Orleans.Hosting.Kubernetes
                         break;
                     }
 
-                    var pods = await _client.CoreV1.ListNamespacedPodWithHttpMessagesAsync(
+                    var pods = _client.CoreV1.WatchListNamespacedPodAsync(
                         namespaceParameter: _podNamespace,
                         labelSelector: _podLabelSelector,
-                        watch: true,
                         cancellationToken: _shutdownToken.Token);
 
-                    await foreach (var (eventType, pod) in pods.WatchAsync<V1PodList, V1Pod>(_shutdownToken.Token))
+                    await foreach (var (eventType, pod) in pods.WithCancellation(_shutdownToken.Token))
                     {
                         if (!_enableMonitoring || _shutdownToken.IsCancellationRequested)
                         {

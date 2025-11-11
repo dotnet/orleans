@@ -2,7 +2,7 @@
   <PropertyGroup>
     <RootNamespace>TestInternalDtosRefOrleans</RootNamespace>
     <AssemblyName>TestInternalDtosRefOrleans</AssemblyName>
-    <TargetFramework>$(MinTestTargetFramework)</TargetFramework>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 

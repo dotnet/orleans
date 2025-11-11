@@ -1,3 +1,5 @@
+#nullable enable
+
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
@@ -38,7 +40,7 @@ namespace Orleans.Transactions.DynamoDB
         private readonly string _service;
         public const int DefaultReadCapacityUnits = 10;
         public const int DefaultWriteCapacityUnits = 5;
-        private readonly ProvisionedThroughput _provisionedThroughput;
+        private readonly ProvisionedThroughput? _provisionedThroughput;
         private readonly bool _createIfNotExists;
         private readonly bool _updateIfExists;
         private readonly bool _useProvisionedThroughput;
@@ -46,7 +48,7 @@ namespace Orleans.Transactions.DynamoDB
             {
                 TableStatus.CREATING, TableStatus.UPDATING, TableStatus.ACTIVE
             });
-        private AmazonDynamoDBClient _ddbClient;
+        private AmazonDynamoDBClient _ddbClient = null!;
         private readonly ILogger _logger;
 
         /// <summary>
@@ -101,7 +103,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="secondaryIndexes">(optional) The secondary index definitions</param>
         /// <param name="ttlAttributeName">(optional) The name of the item attribute that indicates the item TTL (if null, ttl won't be enabled)</param>
         /// <returns></returns>
-        public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
+        public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex>? secondaryIndexes = null, string? ttlAttributeName = null)
         {
             if (!this._createIfNotExists && !this._updateIfExists)
             {
@@ -111,7 +113,7 @@ namespace Orleans.Transactions.DynamoDB
 
             try
             {
-                TableDescription tableDescription = await GetTableDescription(tableName);
+                TableDescription? tableDescription = await GetTableDescription(tableName);
                 await (tableDescription == null
                     ? CreateTableAsync(tableName, keys, attributes, secondaryIndexes, ttlAttributeName)
                     : UpdateTableAsync(tableDescription, attributes, secondaryIndexes, ttlAttributeName));
@@ -170,7 +172,7 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-        private async Task<TableDescription> GetTableDescription(string tableName)
+        private async Task<TableDescription?> GetTableDescription(string tableName)
         {
             try
             {
@@ -185,7 +187,7 @@ namespace Orleans.Transactions.DynamoDB
             return null;
         }
 
-        private async ValueTask CreateTableAsync(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
+        private async ValueTask CreateTableAsync(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex>? secondaryIndexes = null, string? ttlAttributeName = null)
         {
             if (!_createIfNotExists)
             {
@@ -236,7 +238,7 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-        private async ValueTask UpdateTableAsync(TableDescription tableDescription, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
+        private async ValueTask UpdateTableAsync(TableDescription tableDescription, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex>? secondaryIndexes = null, string? ttlAttributeName = null)
         {
             if (!this._updateIfExists)
             {
@@ -261,7 +263,7 @@ namespace Orleans.Transactions.DynamoDB
                 AttributeDefinitions = attributes,
                 BillingMode = this._useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
                 ProvisionedThroughput = _provisionedThroughput,
-                GlobalSecondaryIndexUpdates = this._useProvisionedThroughput
+                GlobalSecondaryIndexUpdates = this._useProvisionedThroughput && tableDescription.GlobalSecondaryIndexes is not null
                     ? tableDescription.GlobalSecondaryIndexes.Select(gsi => new GlobalSecondaryIndexUpdate
                     {
                         Update = new UpdateGlobalSecondaryIndexAction
@@ -289,16 +291,19 @@ namespace Orleans.Transactions.DynamoDB
                 // We can only have one GSI in CREATING state at one time.
                 // We also wait for all indexes to finish UPDATING as the table is not ready to receive queries from Orleans until all indexes are created.
                 List<GlobalSecondaryIndexDescription> globalSecondaryIndexes = tableDescription.GlobalSecondaryIndexes;
-                foreach (var globalSecondaryIndex in globalSecondaryIndexes)
+                if (globalSecondaryIndexes is not null)
                 {
-                    if (globalSecondaryIndex.IndexStatus == IndexStatus.CREATING
-                        || globalSecondaryIndex.IndexStatus == IndexStatus.UPDATING)
+                    foreach (var globalSecondaryIndex in globalSecondaryIndexes)
                     {
-                        tableDescription = await TableIndexWaitOnStatusAsync(tableDescription.TableName, globalSecondaryIndex.IndexName, globalSecondaryIndex.IndexStatus, IndexStatus.ACTIVE);
+                        if (globalSecondaryIndex.IndexStatus == IndexStatus.CREATING
+                            || globalSecondaryIndex.IndexStatus == IndexStatus.UPDATING)
+                        {
+                            tableDescription = await TableIndexWaitOnStatusAsync(tableDescription.TableName, globalSecondaryIndex.IndexName, globalSecondaryIndex.IndexStatus, IndexStatus.ACTIVE);
+                        }
                     }
                 }
 
-                var existingGlobalSecondaryIndexes = tableDescription.GlobalSecondaryIndexes.Select(globalSecondaryIndex => globalSecondaryIndex.IndexName).ToArray();
+                var existingGlobalSecondaryIndexes = tableDescription.GlobalSecondaryIndexes?.Select(globalSecondaryIndex => globalSecondaryIndex.IndexName).ToArray() ?? [];
                 var secondaryIndexesToCreate = (secondaryIndexes ?? Enumerable.Empty<GlobalSecondaryIndex>()).Where(secondaryIndex => !existingGlobalSecondaryIndexes.Contains(secondaryIndex.IndexName));
 
                 foreach (var secondaryIndex in secondaryIndexesToCreate)
@@ -344,7 +349,7 @@ namespace Orleans.Transactions.DynamoDB
             await TableIndexWaitOnStatusAsync(tableName, secondaryIndex.IndexName, IndexStatus.CREATING, IndexStatus.ACTIVE);
         }
 
-        private async ValueTask<TableDescription> TableUpdateTtlAsync(TableDescription tableDescription, string ttlAttributeName)
+        private async ValueTask<TableDescription> TableUpdateTtlAsync(TableDescription tableDescription, string? ttlAttributeName)
         {
             var describeTimeToLive = (await _ddbClient.DescribeTimeToLiveAsync(tableDescription.TableName)).TimeToLiveDescription;
 
@@ -386,7 +391,7 @@ namespace Orleans.Transactions.DynamoDB
 
         private async Task<TableDescription> TableWaitOnStatusAsync(string tableName, TableStatus whileStatus, TableStatus desiredStatus, int delay = 2000)
         {
-            TableDescription ret = null;
+            TableDescription? ret = null;
 
             do
             {
@@ -396,9 +401,9 @@ namespace Orleans.Transactions.DynamoDB
                 }
 
                 ret = await GetTableDescription(tableName);
-            } while (ret.TableStatus == whileStatus);
+            } while (ret?.TableStatus == whileStatus);
 
-            if (ret.TableStatus != desiredStatus)
+            if (ret is null || ret.TableStatus != desiredStatus)
             {
                 throw new InvalidOperationException($"Table {tableName} has failed to reach the desired status of {desiredStatus}");
             }
@@ -406,10 +411,10 @@ namespace Orleans.Transactions.DynamoDB
             return ret;
         }
 
-        private async Task<TableDescription> TableIndexWaitOnStatusAsync(string tableName, string indexName, IndexStatus whileStatus, IndexStatus desiredStatus = null, int delay = 2000)
+        private async Task<TableDescription> TableIndexWaitOnStatusAsync(string tableName, string indexName, IndexStatus whileStatus, IndexStatus? desiredStatus = null, int delay = 2000)
         {
-            TableDescription ret;
-            GlobalSecondaryIndexDescription index = null;
+            TableDescription? ret;
+            GlobalSecondaryIndexDescription? index = null;
 
             do
             {
@@ -419,10 +424,15 @@ namespace Orleans.Transactions.DynamoDB
                 }
 
                 ret = await GetTableDescription(tableName);
-                index = ret.GlobalSecondaryIndexes.Find(index => index.IndexName == indexName);
-            } while (index.IndexStatus == whileStatus);
+                index = ret?.GlobalSecondaryIndexes?.Find(index => index.IndexName == indexName);
+            } while (index?.IndexStatus == whileStatus);
 
-            if (desiredStatus != null && index.IndexStatus != desiredStatus)
+            if (ret is null)
+            {
+                throw new InvalidOperationException($"Table {tableName} not found");
+            }
+
+            if (desiredStatus != null && index?.IndexStatus != desiredStatus)
             {
                 throw new InvalidOperationException($"Index {indexName} in table {tableName} has failed to reach the desired status of {desiredStatus}");
             }
@@ -456,7 +466,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="conditionExpression">Optional conditional expression</param>
         /// <param name="conditionValues">Optional field/attribute values used in the conditional expression</param>
         /// <returns></returns>
-        public Task PutEntryAsync(string tableName, Dictionary<string, AttributeValue> fields, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null)
+        public Task PutEntryAsync(string tableName, Dictionary<string, AttributeValue> fields, string conditionExpression = "", Dictionary<string, AttributeValue>? conditionValues = null)
         {
             LogTraceCreatingTableEntry(_logger, tableName, new(fields));
 
@@ -491,8 +501,8 @@ namespace Orleans.Transactions.DynamoDB
         /// <remarks>The fields dictionary item values will be updated with the values returned from DynamoDB</remarks>
         /// <returns></returns>
         public async Task UpsertEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, Dictionary<string, AttributeValue> fields,
-            string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null, string extraExpression = "",
-            Dictionary<string, AttributeValue> extraExpressionValues = null)
+            string conditionExpression = "", Dictionary<string, AttributeValue>? conditionValues = null, string extraExpression = "",
+            Dictionary<string, AttributeValue>? extraExpressionValues = null)
         {
             LogTraceUpsertingEntry(_logger, new(fields), new(keys), tableName);
 
@@ -534,8 +544,8 @@ namespace Orleans.Transactions.DynamoDB
 
         public (string updateExpression, Dictionary<string, AttributeValue> expressionAttributeValues)
             ConvertUpdate(Dictionary<string, AttributeValue> fields,
-                Dictionary<string, AttributeValue> conditionValues = null,
-                string extraExpression = "", Dictionary<string, AttributeValue> extraExpressionValues = null)
+                Dictionary<string, AttributeValue>? conditionValues = null,
+                string extraExpression = "", Dictionary<string, AttributeValue>? extraExpressionValues = null)
         {
             var expressionAttributeValues = new Dictionary<string, AttributeValue>();
 
@@ -583,7 +593,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="conditionExpression">Optional conditional expression</param>
         /// <param name="conditionValues">Optional field/attribute values used in the conditional expression</param>
         /// <returns></returns>
-        public Task DeleteEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null)
+        public Task DeleteEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, string conditionExpression = "", Dictionary<string, AttributeValue>? conditionValues = null)
         {
             LogTraceDeletingTableEntry(_logger, tableName, new(keys));
 
@@ -656,7 +666,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="keys">The table entry keys to search for</param>
         /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null</param>
         /// <returns>The object translated by the resolver function</returns>
-        public async Task<TResult> ReadSingleEntryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
+        public async Task<TResult?> ReadSingleEntryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
         {
             try
             {
@@ -698,7 +708,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="lastEvaluatedKey">The primary key of the first item that this operation will evaluate. Use the value that was returned for LastEvaluatedKey in the previous operation</param>
         /// <param name="consistentRead">Determines the read consistency model. Note that if a GSI is used, this must be false.</param>
         /// <returns>The collection containing a list of objects translated by the resolver function and the LastEvaluatedKey for paged results</returns>
-        public async Task<(List<TResult> results, Dictionary<string, AttributeValue> lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue> lastEvaluatedKey = null, bool consistentRead = true) where TResult : class
+        public async Task<(List<TResult> results, Dictionary<string, AttributeValue> lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true) where TResult : class
         {
             try
             {
@@ -750,8 +760,8 @@ namespace Orleans.Transactions.DynamoDB
                 string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver,
                 string indexName = "", bool scanIndexForward = true, bool consistentRead = true) where TResult : class
         {
-            List<TResult> resultList = null;
-            Dictionary<string, AttributeValue> lastEvaluatedKey = null;
+            List<TResult>? resultList = null;
+            Dictionary<string, AttributeValue>? lastEvaluatedKey = null;
             do
             {
                 List<TResult> results;
@@ -765,9 +775,9 @@ namespace Orleans.Transactions.DynamoDB
                 {
                     resultList.AddRange(results);
                 }
-            } while (lastEvaluatedKey.Count != 0);
+            } while (lastEvaluatedKey?.Count > 0);
 
-            return resultList;
+            return resultList!;
         }
 
         /// <summary>
@@ -812,7 +822,7 @@ namespace Orleans.Transactions.DynamoDB
                         resultList.Add(resolver(item));
                     }
 
-                    if (response.LastEvaluatedKey.Count == 0)
+                    if (response.LastEvaluatedKey == null || response.LastEvaluatedKey.Count == 0)
                     {
                         break;
                     }
@@ -912,7 +922,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="deletes">Any deletes to be performed</param>
         /// <param name="conditionChecks">Any condition checks to be performed</param>
         /// <returns></returns>
-        public Task WriteTxAsync(IEnumerable<Put> puts = null, IEnumerable<Update> updates = null, IEnumerable<Delete> deletes = null, IEnumerable<ConditionCheck> conditionChecks = null)
+        public Task WriteTxAsync(IEnumerable<Put>? puts = null, IEnumerable<Update>? updates = null, IEnumerable<Delete>? deletes = null, IEnumerable<ConditionCheck>? conditionChecks = null)
         {
             try
             {
