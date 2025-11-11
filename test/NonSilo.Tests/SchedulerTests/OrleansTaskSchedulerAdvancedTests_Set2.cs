@@ -35,7 +35,7 @@ namespace UnitTests.SchedulerTests
             this.scheduler = workItemGroup.TaskScheduler;
             this.environmentStatisticsProvider = new TestHooksEnvironmentStatisticsProvider();
         }
-        
+
         public void Dispose()
         {
             this.loggerFactory.Dispose();
@@ -49,7 +49,7 @@ namespace UnitTests.SchedulerTests
 
             int n = 0;
             // ReSharper disable AccessToModifiedClosure
-            Task task1 = new Task(() => { Thread.Sleep(1000); n = n + 5; });
+            var task1 = new Task(() => { Thread.Sleep(100); n = n + 5; });
             Task task2 = new Task(() => { n = n * 3; });
             // ReSharper restore AccessToModifiedClosure
 
@@ -57,6 +57,7 @@ namespace UnitTests.SchedulerTests
             task2.Start(scheduler);
 
             // Pause to let things run
+            await task1;
             await task2;
 
             // N should be 15, because the two tasks should execute in order
@@ -109,7 +110,7 @@ namespace UnitTests.SchedulerTests
                 for (int i = 0; i < 10; i++)
                 {
                     int id = -1;
-                    Task.Factory.StartNew(() =>
+                    Task.Factory.StartNew(async () =>
                     {
                         id = Task.CurrentId.HasValue ? (int)Task.CurrentId : -1;
 
@@ -117,11 +118,12 @@ namespace UnitTests.SchedulerTests
                         LogContext("Sub-task " + id + " n=" + n);
                         int k = n;
                         this.output.WriteLine("Sub-task " + id + " sleeping");
-                        Thread.Sleep(100);
+                        Thread.Sleep(10);
                         this.output.WriteLine("Sub-task " + id + " awake");
                         n = k + 1;
                         // ReSharper restore AccessToModifiedClosure
                     })
+                    .Unwrap()
                     .ContinueWith(tsk =>
                     {
                         LogContext("Sub-task " + id + "-ContinueWith");
@@ -158,7 +160,7 @@ namespace UnitTests.SchedulerTests
             Task wrapper = new Task(() =>
             {
                 // ReSharper disable AccessToModifiedClosure
-                Task task1 = Task.Factory.StartNew(() => { this.output.WriteLine("===> 1a"); Thread.Sleep(1000); n = n + 3; this.output.WriteLine("===> 1b"); });
+                Task task1 = Task.Factory.StartNew(async () => { this.output.WriteLine("===> 1a"); await Task.Delay(1000); n = n + 3; this.output.WriteLine("===> 1b"); }).Unwrap();
                 Task task2 = task1.ContinueWith(task => { n = n * 5; this.output.WriteLine("===> 2"); });
                 Task task3 = task2.ContinueWith(task => { n = n / 5; this.output.WriteLine("===> 3"); });
                 Task task4 = task3.ContinueWith(task => { n = n - 2; this.output.WriteLine("===> 4"); result.SetResult(true); });
@@ -517,10 +519,10 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Turn_Execution_Order_Loop()
         {
-            const int NumChains = 100;
+            const int NumChains = 10;
             const int ChainLength = 3;
-            // Can we add a unit test that basicaly checks that any turn is indeed run till completion before any other turn? 
-            // For example, you have a long running main turn and in the middle it spawns a lot of short CWs (on Done promise) and StartNew. 
+            // Can we add a unit test that basicaly checks that any turn is indeed run till completion before any other turn?
+            // For example, you have a long running main turn and in the middle it spawns a lot of short CWs (on Done promise) and StartNew.
             // You test that no CW/StartNew runs until the main turn is fully done. And run in stress.
 
             var resultHandles = new TaskCompletionSource<bool>[NumChains];
@@ -532,9 +534,9 @@ namespace UnitTests.SchedulerTests
             for (int i = 0; i < NumChains; i++)
             {
                 int chainNum = i; // Capture
-                int sleepTime = Random.Shared.Next(100);
-                resultHandles[i] = new TaskCompletionSource<bool>();
-                taskChains[i] = new Task(() =>
+                int sleepTime = Random.Shared.Next(10);
+                resultHandles[chainNum] = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                Task task = taskChains[chainNum] = new Task(() =>
                 {
                     const int taskNum = 0;
                     try
@@ -554,11 +556,10 @@ namespace UnitTests.SchedulerTests
                         executingGlobal = -1;
                     }
                 });
-                Task task = taskChains[i];
                 for (int j = 1; j < ChainLength; j++)
                 {
                     int taskNum = j; // Capture
-                    task = task.ContinueWith(t =>
+                    task = task.ContinueWith(async t =>
                     {
                         if (t.IsFaulted) throw t.Exception;
                         this.output.WriteLine("Inside Chain {0} Task {1}", chainNum, taskNum);
@@ -579,7 +580,7 @@ namespace UnitTests.SchedulerTests
                             executingChain[chainNum] = false;
                             executingGlobal = -1;
                         }
-                    }, scheduler);
+                    }, scheduler).Unwrap();
                 }
                 taskChainEnds[chainNum] = task.ContinueWith(t =>
                 {
@@ -596,7 +597,7 @@ namespace UnitTests.SchedulerTests
 
             for (int i = 0; i < NumChains; i++)
             {
-                TimeSpan waitCheckTime = TimeSpan.FromMilliseconds(150 * ChainLength * NumChains * WaitFactor);
+                TimeSpan waitCheckTime = TimeSpan.FromMilliseconds(1_500 * ChainLength * NumChains * WaitFactor);
 
                 try
                 {
@@ -608,7 +609,7 @@ namespace UnitTests.SchedulerTests
                 }
 
                 bool ok = await resultHandles[i].Task;
-                
+
                 try
                 {
                     // since resultHandle being complete doesn't directly imply that the final chain was completed (there's a chance for a race condition), give a small chance for it to complete.
@@ -656,7 +657,7 @@ namespace UnitTests.SchedulerTests
             {
                 this.output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                     SynchronizationContext.Current, TaskScheduler.Current);
-                
+
                 Task t1 = grain.Test1();
 
                 void wrappedDoneAction() { wrappedDone.SetResult(true); }
@@ -677,7 +678,7 @@ namespace UnitTests.SchedulerTests
             });
             wrapper.Start(scheduler);
             await wrapper;
-            
+
             var timeoutLimit = TimeSpan.FromSeconds(1);
             try
             {

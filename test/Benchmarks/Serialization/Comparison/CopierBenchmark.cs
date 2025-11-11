@@ -1,8 +1,7 @@
 using System.Buffers;
 using BenchmarkDotNet.Attributes;
-using Benchmarks.Models;
 using Benchmarks.Serialization.Models;
-using Benchmarks.Utilities;
+using Benchmarks.Serialization.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
