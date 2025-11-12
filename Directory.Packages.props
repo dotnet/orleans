@@ -79,7 +79,7 @@
     <PackageVersion Include="CassandraCSharpDriver" Version="3.20.1" />
     <PackageVersion Include="NATS.Net" Version="2.6.4" />
     <!-- Test related packages -->
-    <PackageVersion Include="coverlet.collector" Version="6.0.2" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="coverlet.msbuild" Version="6.0.0" />
     <PackageVersion Include="AwesomeAssertions" Version="8.0.2" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
