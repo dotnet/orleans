@@ -141,7 +141,7 @@ export default class Silo extends React.Component<SiloProps> {
     const last = this.props.data[this.props.data.length - 1]!;
     const properties: { [key: string]: string | number } = {
       Clients: last.clientCount || '0',
-      'Messages recieved': last.receivedMessages || '0',
+      'Messages received': last.receivedMessages || '0',
       'Messages sent': last.sentMessages || '0',
       'Receive queue': last.receiveQueueLength || '0',
       'Request queue': last.requestQueueLength || '0',

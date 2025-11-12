@@ -61,11 +61,6 @@ internal sealed class GrainProfilerFilter(
 
             var grainMethodName = _formatMethodName(context);
 
-            if (grainMethodName == "ReceiveReminder")
-            {
-
-            }
-
             _profiler.Track(elapsedMs, context.Grain.GetType(), grainMethodName, isException);
         }
         catch (Exception ex)

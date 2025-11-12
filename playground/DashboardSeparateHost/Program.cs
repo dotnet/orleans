@@ -6,26 +6,17 @@ using TestGrains;
 //
 // In this sample we integrate the Dashboard Minimal APIs into the client application.
 //
-var siloHost =
-    Host.CreateDefaultBuilder(args)
-        .UseOrleans((_, builder) =>
-        {
-            builder.UseDevelopmentClustering(options => options.PrimarySiloEndpoint = new IPEndPoint(IPAddress.Loopback, 11111));
-            builder.UseInMemoryReminderService();
-            builder.AddMemoryGrainStorageAsDefault();
-            builder.ConfigureEndpoints(IPAddress.Loopback, 11111, 30000);
-            builder.Configure((ClusterOptions options) =>
-            {
-                options.ClusterId = "helloworldcluster";
-                options.ServiceId = "1";
-            });
-            builder.AddDashboard();
-        })
-        .ConfigureServices(services =>
-        {
-            services.AddSingleton<IHostedService, TestGrainsHostedService>();
-        })
-        .Build();
+var siloHostBuilder = Host.CreateApplicationBuilder(args);
+siloHostBuilder.UseOrleans(builder =>
+{
+    builder.UseDevelopmentClustering(options => options.PrimarySiloEndpoint = new IPEndPoint(IPAddress.Loopback, 11111));
+    builder.UseInMemoryReminderService();
+    builder.AddMemoryGrainStorageAsDefault();
+    builder.ConfigureEndpoints(IPAddress.Loopback, 11111, 30000);
+    builder.AddDashboard();
+});
+siloHostBuilder.Services.AddSingleton<IHostedService, TestGrainsHostedService>();
+using var siloHost = siloHostBuilder.Build();
 
 await siloHost.StartAsync();
 
@@ -38,11 +29,6 @@ var dashboardBuilder = WebApplication.CreateBuilder(args);
 dashboardBuilder.UseOrleansClient(clientBuilder =>
 {
     clientBuilder.UseStaticClustering(options => options.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 30000).ToGatewayUri()));
-    clientBuilder.Configure<ClusterOptions>(options =>
-    {
-        options.ClusterId = "helloworldcluster";
-        options.ServiceId = "1";
-    });
 
     // Add dashboard services
     clientBuilder.AddOrleansDashboard();

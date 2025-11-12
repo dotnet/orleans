@@ -370,12 +370,12 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
         try
         {
             var tasks = new List<Task>(_workers.Count);
-            var deactivationReson = new DeactivationReason(DeactivationReasonCode.RuntimeRequested, "Stateless worker grain context is being disposed.");
+            var deactivationReason = new DeactivationReason(DeactivationReasonCode.RuntimeRequested, "Stateless worker grain context is being disposed.");
             foreach (var worker in _workers)
             {
                 try
                 {
-                    worker.Deactivate(deactivationReson);
+                    worker.Deactivate(deactivationReason);
                     tasks.Add(worker.Deactivated);
                 }
                 catch (Exception exception)

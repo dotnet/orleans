@@ -52,17 +52,17 @@ internal sealed class GrainTraceEqualityComparer : IEqualityComparer<GrainTraceE
 
         if (obj.Grain != null)
         {
-            hashCode = hashCode * 23 + obj.Grain?.GetHashCode() ?? 0;
+            hashCode = hashCode * 23 + (obj.Grain?.GetHashCode() ?? 0);
         }
 
         if (obj.Grain != null)
         {
-            hashCode = hashCode * 23 + obj.Method?.GetHashCode() ?? 0;
+            hashCode = hashCode * 23 + (obj.Method?.GetHashCode() ?? 0);
         }
 
         if (obj.Grain != null && _withSiloAddress)
         {
-            hashCode = hashCode * 23 + obj.SiloAddress?.GetHashCode() ?? 0;
+            hashCode = hashCode * 23 + (obj.SiloAddress?.GetHashCode() ?? 0);
         }
 
         return hashCode;
