@@ -1,0 +1,65 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Frontend paths -->
+    <NpmAppRootDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Orleans.Dashboard.App'))</NpmAppRootDirectory>
+    <NpmBuildOutput>$([System.IO.Path]::GetFullPath('$(NpmAppRootDirectory)\dist\'))</NpmBuildOutput>
+  </PropertyGroup>
+
+  <!-- Collect frontend source files for incremental build tracking -->
+  <ItemGroup>
+    <NpmAppSources Include="$(NpmAppRootDirectory)\src\**\*" />
+    <NpmAppSources Include="$(NpmAppRootDirectory)\public\**\*" />
+    <NpmAppSources Include="$(NpmAppRootDirectory)\package.json" />
+    <NpmAppSources Include="$(NpmAppRootDirectory)\vite.config.ts" />
+    <NpmAppSources Include="$(NpmAppRootDirectory)\tsconfig.json" />
+    <NpmAppSources Include="$(NpmAppRootDirectory)\index.html" />
+  </ItemGroup>
+
+  <!-- Use a marker file for incremental build tracking -->
+  <PropertyGroup>
+    <NpmAppBuildMarker>$(BaseIntermediateOutputPath)\frontend.build.marker</NpmAppBuildMarker>
+  </PropertyGroup>
+
+  <Target
+    Name="DeleteNpmBuildMarker"
+    AfterTargets="Clean"
+    Condition="Exists($(NpmAppBuildMarker))">
+    <Delete Files="$(NpmAppBuildMarker)" />
+  </Target>
+
+  <!-- Build the frontend -->
+  <Target Name="BuildNpmApp" BeforeTargets="AssignTargetPaths;BeforeTargets;Compile" Inputs="@(NpmAppSources)" Outputs="$(NpmAppBuildMarker)">
+    <Exec
+      Command="npm install"
+      WorkingDirectory="$(NpmAppRootDirectory)"
+      ConsoleToMsBuild="true" />
+    <Exec
+      Command="npm run build" 
+      WorkingDirectory="$(NpmAppRootDirectory)"
+      ConsoleToMsBuild="true" />
+    <!-- Create marker file to track successful build -->
+    <Touch Files="$(NpmAppBuildMarker)" AlwaysCreate="true" />
+  </Target>
+
+  <!-- Include frontend assets as embedded resources -->
+  <ItemGroup>
+    <EmbeddedResource
+      Include="$(NpmBuildOutput)\**\*"
+      Condition="Exists('$(NpmBuildOutput)')"
+      Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)"
+      />
+  </ItemGroup>
+
+  <!-- Verify required frontend assets are present -->
+  <Target Name="ValidateFrontendAssets" BeforeTargets="CoreCompile" DependsOnTargets="BuildNpmApp">
+    <ItemGroup>
+      <RequiredAsset Include="$(NpmBuildOutput)\index.html" />
+      <RequiredAsset Include="$(NpmBuildOutput)\index.min.js" />
+      <MissingAsset Include="@(RequiredAsset)" Condition="!Exists('%(Identity)')" />
+    </ItemGroup>
+
+    <Error Condition="'@(MissingAsset)' != ''" Text="Required frontend assets are missing: @(MissingAsset, ', '). Frontend build may have failed." />
+  </Target>
+
+</Project>

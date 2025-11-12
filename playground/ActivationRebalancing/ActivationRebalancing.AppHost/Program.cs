@@ -1,3 +1,5 @@
+using Aspire.Hosting;
+
 var builder = DistributedApplication.CreateBuilder(args);
 
 var redis = builder.AddRedis("orleans-redis");

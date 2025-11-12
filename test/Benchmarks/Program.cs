@@ -273,6 +273,14 @@ namespace Benchmarks
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
             },
+            ["Dashboard"] = _ =>
+            {
+                BenchmarkRunner.Run<Benchmarks.Dashboard.DashboardGrainBenchmark>();
+            },
+            ["Dashboard.Manual"] = _ =>
+            {
+                new Benchmarks.Dashboard.ManualTests().Run();
+            },
             ["suite"] = args =>
             {
                 _ = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
