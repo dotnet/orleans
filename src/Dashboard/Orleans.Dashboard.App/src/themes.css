@@ -1,0 +1,408 @@
+/* Theme system using CSS custom properties */
+
+/* Light theme (default) */
+:root {
+  --log-bg: #fff;
+  --log-border: #ddd;
+  --log-color: #333;
+
+  --form-control-bg: #fff;
+  --form-control-border: #ccc;
+  --form-control-color: #333;
+
+  --log-filter-bg: #f5f5f5;
+  --log-filter-shadow: #d8d9da;
+
+  --app-main-bg: #fff;
+  --app-main-color: #333;
+
+  --app-content-header-bg: #fff;
+  --app-content-header-color: #333;
+
+  --info-box-bg: #fff;
+  --info-box-color: #333;
+  --info-box-text-color: #333;
+
+  --card-bg: #fff;
+  --card-color: #333;
+  --card-border-top: #663399;
+
+  --card-header-bg: #f5f5f5;
+  --card-header-color: #333;
+  --card-header-border: rgba(0,0,0,.125);
+
+  --card-body-bg: #fff;
+  --card-body-color: #333;
+
+  --table-border: #dee2e6;
+  --table-color: #333;
+  --table-striped-bg: rgba(0,0,0,.05);
+
+  --well-bg: #f5f5f5;
+  --well-border: #e3e3e3;
+  --well-color: #333;
+
+  --small-color: #6c757d;
+
+  --btn-default-bg: #fff;
+  --btn-default-border: #ccc;
+  --btn-default-color: #333;
+  --btn-default-hover-bg: #e6e6e6;
+  --btn-default-hover-border: #adadad;
+
+  --btn-primary-bg: #663399;
+  --btn-primary-border: #663399;
+  --btn-primary-color: #ffffff;
+  --btn-primary-hover-bg: #552d80;
+  --btn-primary-hover-border: #4d2873;
+
+  --link-color: #7952b3;
+  --link-hover-color: #663399;
+
+  --sidebar-bg: #f8f9fa;
+  --sidebar-nav-link-color: #495057;
+  --sidebar-nav-link-hover-bg: #e9ecef;
+  --sidebar-nav-link-hover-color: #212529;
+  --sidebar-nav-link-active-bg: #663399;
+  --sidebar-nav-link-active-color: #ffffff;
+  --sidebar-nav-icon-color: #6c757d;
+  --sidebar-nav-icon-active-color: #ffffff;
+  --sidebar-brand-bg: #ffffff;
+  --sidebar-brand-border: #dee2e6;
+  --sidebar-brand-title-color: #212529;
+  --sidebar-brand-version-color: #6c757d;
+}
+
+/* Override Bootstrap 5 CSS variables for light theme */
+[data-bs-theme="light"] {
+  --bs-body-bg: #fff;
+  --bs-body-color: #333;
+  --bs-table-bg: transparent;
+  --bs-table-color: #333;
+  --bs-card-bg: #fff;
+  --bs-card-color: #333;
+  --bs-border-color: #dee2e6;
+  --bs-primary: #663399;
+  --bs-primary-rgb: 102, 51, 153;
+  --bs-link-color: #7952b3;
+  --bs-link-hover-color: #663399;
+}
+
+/* Dark theme */
+body.dark-mode {
+  --log-bg: #1e282c;
+  --log-border: #333;
+  --log-color: silver;
+
+  --form-control-bg: #222d32;
+  --form-control-border: #333;
+  --form-control-color: #c2c7d0;
+
+  --log-filter-bg: #222d32;
+  --log-filter-shadow: #444c52;
+
+  --app-main-bg: #1e282c;
+  --app-main-color: #c2c7d0;
+
+  --app-content-header-bg: #1e282c;
+  --app-content-header-color: #c2c7d0;
+
+  --info-box-bg: #343a40;
+  --info-box-color: #c2c7d0;
+  --info-box-text-color: #c2c7d0;
+
+  --card-bg: #343a40;
+  --card-color: #c2c7d0;
+  --card-border-top: #8b6bb3;
+
+  --card-header-bg: #3d444b;
+  --card-header-color: #c2c7d0;
+  --card-header-border: #6c757d;
+
+  --card-body-bg: #343a40;
+  --card-body-color: #c2c7d0;
+
+  --table-border: #454d55;
+  --table-color: #c2c7d0;
+  --table-striped-bg: rgba(255,255,255,.05);
+
+  --well-bg: #343a40;
+  --well-border: #6c757d;
+  --well-color: #c2c7d0;
+
+  --small-color: #adb5bd;
+
+  --btn-default-bg: #454d55;
+  --btn-default-border: #6c757d;
+  --btn-default-color: #c2c7d0;
+  --btn-default-hover-bg: #545b62;
+  --btn-default-hover-border: #6c757d;
+
+  --btn-primary-bg: #663399;
+  --btn-primary-border: #663399;
+  --btn-primary-color: #ffffff;
+  --btn-primary-hover-bg: #552d80;
+  --btn-primary-hover-border: #4d2873;
+
+  --link-color: #a78bfa;
+  --link-hover-color: #c4b5fd;
+
+  --sidebar-bg: #343a40;
+  --sidebar-nav-link-color: #c2c7d0;
+  --sidebar-nav-link-hover-bg: #3d444b;
+  --sidebar-nav-link-hover-color: #ffffff;
+  --sidebar-nav-link-active-bg: #663399;
+  --sidebar-nav-link-active-color: #ffffff;
+  --sidebar-nav-icon-color: #c2c7d0;
+  --sidebar-nav-icon-active-color: #ffffff;
+  --sidebar-brand-bg: #343a40;
+  --sidebar-brand-border: #4b545c;
+  --sidebar-brand-title-color: #b8c7ce;
+  --sidebar-brand-version-color: #b8c7ce;
+}
+
+/* Override Bootstrap 5 CSS variables for dark theme */
+[data-bs-theme="dark"] {
+  --bs-body-bg: #1e282c;
+  --bs-body-color: #c2c7d0;
+  --bs-table-bg: transparent;
+  --bs-table-color: #c2c7d0;
+  --bs-card-bg: #343a40;
+  --bs-card-color: #c2c7d0;
+  --bs-border-color: #454d55;
+  --bs-primary: #663399;
+  --bs-primary-rgb: 102, 51, 153;
+  --bs-link-color: #a78bfa;
+  --bs-link-hover-color: #c4b5fd;
+}
+
+/* Apply theme variables to components */
+.log {
+  background: var(--log-bg) !important;
+  border: 1px solid var(--log-border) !important;
+  color: var(--log-color) !important;
+}
+
+.form-control {
+  background: var(--form-control-bg) !important;
+  border: 1px solid var(--form-control-border) !important;
+  color: var(--form-control-color) !important;
+}
+
+.log-filter {
+  background: var(--log-filter-bg) !important;
+  box-shadow: 4px -2px 5px 5px var(--log-filter-shadow) !important;
+}
+
+.app-main {
+  background: var(--app-main-bg) !important;
+  color: var(--app-main-color) !important;
+}
+
+.app-content {
+  background: var(--app-main-bg) !important;
+  color: var(--app-main-color) !important;
+}
+
+.app-content-header {
+  background: var(--app-content-header-bg) !important;
+  color: var(--app-content-header-color) !important;
+}
+
+.info-box {
+  background: var(--info-box-bg) !important;
+  color: var(--info-box-color) !important;
+}
+
+.info-box-text,
+.info-box-number {
+  color: var(--info-box-text-color) !important;
+}
+
+.card,
+.box {
+  background: var(--card-bg) !important;
+  color: var(--card-color) !important;
+  border-top-color: var(--card-border-top) !important;
+}
+
+.card-header,
+.box-header {
+  background: var(--card-header-bg) !important;
+  color: var(--card-header-color) !important;
+  border-bottom: 1px solid var(--card-header-border) !important;
+}
+
+.card-title,
+.box-title {
+  color: var(--card-header-color) !important;
+}
+
+.card-body,
+.box-body {
+  background: var(--card-body-bg) !important;
+  color: var(--card-body-color) !important;
+}
+
+.table > thead > tr > th,
+.table > tbody > tr > th,
+.table > tfoot > tr > th,
+.table > thead > tr > td,
+.table > tbody > tr > td,
+.table > tfoot > tr > td {
+  border-top: 1px solid var(--table-border) !important;
+  border-bottom: 1px solid var(--table-border) !important;
+  color: var(--table-color) !important;
+}
+
+.table-bordered > thead > tr > th,
+.table-bordered > tbody > tr > th,
+.table-bordered > tfoot > tr > th,
+.table-bordered > thead > tr > td,
+.table-bordered > tbody > tr > td,
+.table-bordered > tfoot > tr > td {
+  border: 1px solid var(--table-border) !important;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: var(--table-striped-bg) !important;
+}
+
+.well {
+  background: var(--well-bg) !important;
+  border: 1px solid var(--well-border) !important;
+  color: var(--well-color) !important;
+}
+
+small {
+  color: var(--small-color) !important;
+}
+
+.btn-default {
+  background-color: var(--btn-default-bg) !important;
+  border-color: var(--btn-default-border) !important;
+  color: var(--btn-default-color) !important;
+}
+
+.btn-default:hover {
+  background-color: var(--btn-default-hover-bg) !important;
+  border-color: var(--btn-default-hover-border) !important;
+}
+
+.btn-primary {
+  background-color: var(--btn-primary-bg) !important;
+  border-color: var(--btn-primary-border) !important;
+  color: var(--btn-primary-color) !important;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active {
+  background-color: var(--btn-primary-hover-bg) !important;
+  border-color: var(--btn-primary-hover-border) !important;
+  color: var(--btn-primary-color) !important;
+}
+
+a {
+  color: var(--link-color) !important;
+}
+
+a:hover {
+  color: var(--link-hover-color) !important;
+}
+
+/* Sidebar theming */
+.app-sidebar {
+  background-color: var(--sidebar-bg) !important;
+}
+
+.app-sidebar .sidebar {
+  background-color: var(--sidebar-bg) !important;
+}
+
+.nav-sidebar .nav-link {
+  color: var(--sidebar-nav-link-color) !important;
+}
+
+.nav-sidebar .nav-link:hover {
+  background-color: var(--sidebar-nav-link-hover-bg) !important;
+  color: var(--sidebar-nav-link-hover-color) !important;
+}
+
+.nav-sidebar .nav-link.active {
+  background-color: var(--sidebar-nav-link-active-bg) !important;
+  color: var(--sidebar-nav-link-active-color) !important;
+  margin-left: 0.5rem !important;
+  margin-right: 0.5rem !important;
+  border-radius: 0.25rem !important;
+}
+
+.nav-sidebar .nav-icon {
+  color: var(--sidebar-nav-icon-color) !important;
+}
+
+.nav-sidebar .nav-link.active .nav-icon {
+  color: var(--sidebar-nav-icon-active-color) !important;
+}
+
+.app-sidebar .brand-link {
+  background-color: var(--sidebar-brand-bg) !important;
+  border-bottom: 1px solid var(--sidebar-brand-border) !important;
+  padding: 15px !important;
+}
+
+.brand-title {
+  color: var(--sidebar-brand-title-color) !important;
+  font-weight: 500 !important;
+  margin-top: 5px !important;
+  margin-bottom: 0 !important;
+  font-size: 26px !important;
+}
+
+.brand-version {
+  color: var(--sidebar-brand-version-color) !important;
+  margin-top: 5px !important;
+  margin-bottom: 25px !important;
+}
+
+/* Bootstrap label/badge components - use purple theme */
+.label,
+.badge {
+  display: inline-block;
+  padding: 0.25em 0.6em;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: baseline;
+  border-radius: 0.375rem;
+}
+
+.label-primary,
+.badge-primary {
+  background-color: #663399 !important;
+  color: #ffffff !important;
+}
+
+/* Bootstrap alert components */
+.alert-info {
+  background-color: #e7ddf7 !important;
+  border-color: #c4b5fd !important;
+  color: #4c2a85 !important;
+}
+
+/* Progress bars */
+.progress-bar-primary,
+.bg-primary {
+  background-color: #663399 !important;
+}
+
+/* Bootstrap 3 legacy classes for backwards compatibility */
+.pull-right {
+  float: right !important;
+}
+
+.pull-left {
+  float: left !important;
+}

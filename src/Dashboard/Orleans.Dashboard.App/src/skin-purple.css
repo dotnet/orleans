@@ -1,0 +1,67 @@
+/* Custom purple skin for Orleans Dashboard (compatible with AdminLTE v3) */
+
+/* Sidebar styling */
+.skin-purple .main-sidebar,
+.skin-purple .sidebar {
+  background-color: #222d32;
+}
+
+.skin-purple .nav-sidebar .nav-link {
+  color: #b8c7ce;
+  border-left: 3px solid transparent;
+}
+
+.skin-purple .nav-sidebar .nav-link:hover {
+  color: #fff;
+  background: #1e282c;
+}
+
+.skin-purple .nav-sidebar .nav-link.active,
+.skin-purple .nav-sidebar .nav-item.menu-open > .nav-link {
+  color: #fff;
+  background: #1e282c;
+  border-left-color: #663399;
+}
+
+.skin-purple .nav-sidebar .nav-link p {
+  color: inherit;
+}
+
+/* Info box styling for purple theme */
+.skin-purple .info-box {
+  box-shadow: 0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2);
+  margin-bottom: 1rem;
+}
+
+.skin-purple .info-box-icon {
+  border-radius: .25rem 0 0 .25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.skin-purple .bg-purple {
+  background-color: #663399 !important;
+  color: #fff;
+}
+
+/* Panel/Box styling */
+.skin-purple .box,
+.skin-purple .card {
+  box-shadow: 0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2);
+}
+
+/* Ensure proper spacing */
+.skin-purple .content-wrapper {
+  min-height: 100vh;
+}
+
+/* Fix for sidebar menu items */
+.skin-purple .sidebar-menu > li.header {
+  color: #4b646f;
+  background: #1a2226;
+}
+
+.skin-purple .sidebar a:hover {
+  text-decoration: none;
+}

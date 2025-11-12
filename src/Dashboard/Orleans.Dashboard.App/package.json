@@ -1,0 +1,39 @@
+{
+  "name": "orleans-dashboard-app",
+  "private": true,
+  "version": "1.0.0",
+  "description": "An admin dashboard for Microsoft Orleans",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.1.0",
+    "admin-lte": "^4.0.0-rc.3",
+    "bootstrap": "^5.3.3",
+    "chart.js": "^4.4.8",
+    "eventthing": "^1.0.7",
+    "humanize-duration": "^3.32.1",
+    "react": "^18.3.1",
+    "react-chartjs-2": "^5.3.0",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.0",
+    "@types/humanize-duration": "^3.27.4",
+    "@types/react": "^18.3.26",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "eslint": "^9.18.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "typescript": "~5.7.3",
+    "vite": "^5.4.21",
+    "vite-plugin-commonjs": "^0.10.4"
+  },
+  "author": "Microsoft",
+  "license": "MIT"
+}

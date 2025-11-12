@@ -16,6 +16,10 @@
     <Project Path="playground/DashboardToy/DashboardToy.AppHost/DashboardToy.AppHost.csproj" />
     <Project Path="playground/DashboardToy/DashboardToy.Frontend/DashboardToy.Frontend.csproj" />
   </Folder>
+  <Folder Name="/playground/Dashboard/">
+    <Project Path="playground/DashboardCohosted/DashboardCohosted.csproj" />
+    <Project Path="playground/DashboardSeparateHost/DashboardSeparateHost.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="Directory.Build.props" />
@@ -47,6 +51,10 @@
     <Project Path="src/Orleans.Streaming/Orleans.Streaming.csproj" />
     <Project Path="src/Orleans.TestingHost/Orleans.TestingHost.csproj" />
     <Project Path="src/Serializers/Orleans.Serialization.Protobuf/Orleans.Serialization.Protobuf.csproj" />
+  </Folder>
+  <Folder Name="/src/Dashboard/">
+    <Project Path="src/Dashboard/Orleans.Dashboard.Abstractions/Orleans.Dashboard.Abstractions.csproj" />
+    <Project Path="src/Dashboard/Orleans.Dashboard/Orleans.Dashboard.csproj" />
   </Folder>
   <Folder Name="/src/Extensions/">
     <Project Path="src/Orleans.Clustering.Consul/Orleans.Clustering.Consul.csproj" />
@@ -112,6 +120,10 @@
     <Project Path="test/Tester/Tester.csproj" />
     <Project Path="test/TesterInternal/TesterInternal.csproj" />
   </Folder>
+  <Folder Name="/test/Dashboard/">
+    <Project Path="test/Orleans.Dashboard.Tests/Orleans.Dashboard.TestGrains/Orleans.Dashboard.TestGrains.csproj" />
+    <Project Path="test/Orleans.Dashboard.Tests/Orleans.Dashboard.UnitTests/Orleans.Dashboard.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/test/Benchmarks/">
     <Project Path="test/Benchmarks.AdoNet/Benchmarks.AdoNet.csproj" />
     <Project Path="test/Benchmarks/Benchmarks.csproj" />
@@ -119,11 +131,11 @@
     <Project Path="test/Grains/BenchmarkGrains/BenchmarkGrains.csproj" />
   </Folder>
   <Folder Name="/test/DistributedTests/">
+    <File Path="test/DistributedTests/README.md" />
     <Project Path="test/DistributedTests/DistributedTests.Client/DistributedTests.Client.csproj" />
     <Project Path="test/DistributedTests/DistributedTests.Common/DistributedTests.Common.csproj" />
     <Project Path="test/DistributedTests/DistributedTests.Grains/DistributedTests.Grains.csproj" />
     <Project Path="test/DistributedTests/DistributedTests.Server/DistributedTests.Server.csproj" />
-    <File Path="test/DistributedTests/README.md" />
   </Folder>
   <Folder Name="/test/Extensions/">
     <Project Path="test/Extensions/AWSUtils.Tests/AWSUtils.Tests.csproj" />

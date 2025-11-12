@@ -121,7 +121,7 @@ A Web-based [Tic-tac-toe](https://en.wikipedia.org/wiki/Tic-tac-toe) game using 
 </p>
 
 A Web application for voting on a set of choices. This sample demonstrates deployment to Kubernetes.
-The application uses [.NET Generic Host](https://docs.microsoft.com/dotnet/core/extensions/generic-host) to co-host [ASP.NET Core](https://docs.microsoft.com/aspnet/core) and Orleans as well as the [Orleans Dashboard](https://github.com/OrleansContrib/OrleansDashboard) together in the same process.
+The application uses [.NET Generic Host](https://docs.microsoft.com/dotnet/core/extensions/generic-host) to co-host [ASP.NET Core](https://docs.microsoft.com/aspnet/core) and Orleans as well as the [Orleans Dashboard](https://www.nuget.org/packages/Microsoft.Orleans.Dashboard) together in the same process.
 
 <p align="center">
     <img src="https://raw.githubusercontent.com/dotnet/samples/main/orleans/Voting/dashboard.png"/>
@@ -130,7 +130,7 @@ The application uses [.NET Generic Host](https://docs.microsoft.com/dotnet/core/
 ### Demonstrates
 
 - How to deploy an Orleans-based application to Kubernetes
-- How to configure the [Orleans Dashboard](https://github.com/OrleansContrib/OrleansDashboard)
+- How to configure the [Orleans Dashboard](https://www.nuget.org/packages/Microsoft.Orleans.Dashboard)
 
 ## [Chat Room](https://learn.microsoft.com/samples/dotnet/samples/orleans-chat-room-sample)
 
