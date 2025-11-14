@@ -34,7 +34,6 @@ public sealed class AzureAppendBlobStateMachineStorageOptions
     /// <summary>
     /// Gets or sets the client used to access the Azure Blob Service.
     /// </summary>
-    [Obsolete("Use ConfigureBlobServiceClient methods instead.")]
     public BlobServiceClient? BlobServiceClient
     {
         get => _blobServiceClient;

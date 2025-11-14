@@ -27,7 +27,7 @@ internal sealed class AzureBlobStorageGrainJournalingProviderBuilder : IProvider
             if (!string.IsNullOrEmpty(serviceKey))
             {
                 // Get a client by name.
-                options.ConfigureBlobServiceClient(_ => Task.FromResult(services.GetRequiredKeyedService<BlobServiceClient>(serviceKey)));
+                options.BlobServiceClient = services.GetRequiredKeyedService<BlobServiceClient>(serviceKey);
             }
             else
             {
@@ -44,11 +44,11 @@ internal sealed class AzureBlobStorageGrainJournalingProviderBuilder : IProvider
                 {
                     if (Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
                     {
-                        options.ConfigureBlobServiceClient(uri);
+                        options.BlobServiceClient = new(uri);
                     }
                     else
                     {
-                        options.ConfigureBlobServiceClient(connectionString);
+                        options.BlobServiceClient = new(connectionString);
                     }
                 }
             }
