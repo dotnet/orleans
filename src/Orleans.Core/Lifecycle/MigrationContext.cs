@@ -24,7 +24,7 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
     public MigrationContext(SerializerSessionPool sessionPool) => SessionPool = sessionPool;
 
     [Id(0), Immutable]
-    private readonly Dictionary<string, (int Offset, int Length)> _indices = new(StringComparer.Ordinal);
+    private Dictionary<string, (int Offset, int Length)> _indices = new(StringComparer.Ordinal);
 
     [Id(1), Immutable]
     private PooledBuffer _buffer = new();
@@ -79,9 +79,12 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
 
     public void Reset()
     {
-        _indices.Clear();
-        _buffer.Reset();
-        _buffer = default;
+        lock (_lock)
+        {
+            _indices = [];
+            _buffer.Reset();
+            _buffer = default;
+        }
     }
 
     public void Dispose() => Reset();
