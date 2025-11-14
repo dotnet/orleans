@@ -1218,20 +1218,27 @@ internal sealed partial class ActivationData :
         {
             Debug.Assert(context is not null);
 
-            // Note that these calls are in reverse order from Rehydrate, not for any particular reason other than symmetry.
-            (GrainInstance as IGrainMigrationParticipant)?.OnDehydrate(context);
-
-            if (_lifecycle is { } lifecycle)
-            {
-                foreach (var participant in lifecycle.GetMigrationParticipants())
-                {
-                    participant.OnDehydrate(context);
-                }
-            }
-
             if (IsUsingGrainDirectory)
             {
                 context.TryAddValue(GrainAddressMigrationContextKey, Address);
+            }
+
+            try
+            {
+                // Note that these calls are in reverse order from Rehydrate, not for any particular reason other than symmetry.
+                (GrainInstance as IGrainMigrationParticipant)?.OnDehydrate(context);
+
+                if (_lifecycle is { } lifecycle)
+                {
+                    foreach (var participant in lifecycle.GetMigrationParticipants())
+                    {
+                        participant.OnDehydrate(context);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                LogErrorDehydratingActivation(_shared.Logger, exception);
             }
         }
 
@@ -2266,6 +2273,12 @@ internal sealed partial class ActivationData :
         Message = "Dehydrated grain activation"
     )]
     private static partial void LogDehydratedActivation(ILogger logger);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error while dehydrating activation"
+    )]
+    private static partial void LogErrorDehydratingActivation(ILogger logger, Exception exception);
 
     [LoggerMessage(
         EventId = (int)ErrorCode.Catalog_RerouteAllQueuedMessages,

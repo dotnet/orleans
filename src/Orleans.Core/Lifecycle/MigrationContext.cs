@@ -18,13 +18,10 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
     private readonly object _lock = new();
 
     [NonSerialized]
-    internal SerializerSessionPool _sessionPool;
+    internal SerializerSessionPool SessionPool;
 
     [OrleansConstructor]
-    public MigrationContext(SerializerSessionPool sessionPool)
-    {
-        _sessionPool = sessionPool;
-    }
+    public MigrationContext(SerializerSessionPool sessionPool) => SessionPool = sessionPool;
 
     [Id(0), Immutable]
     private readonly Dictionary<string, (int Offset, int Length)> _indices = new(StringComparer.Ordinal);
@@ -54,7 +51,7 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
 
     public bool TryAddValue<T>(string key, T? value)
     {
-        if (_sessionPool.CodecProvider.TryGetCodec<T>() is { } codec)
+        if (SessionPool.CodecProvider.TryGetCodec<T>() is { } codec)
         {
             lock (_lock)
             {
@@ -63,7 +60,7 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
                 {
                     var startOffset = _buffer.Length;
 
-                    using var session = _sessionPool.GetSession();
+                    using var session = SessionPool.GetSession();
                     var writer = Writer.Create(this, session);
                     codec.WriteField(ref writer, 0, typeof(T), value!);
                     writer.Commit();
@@ -80,11 +77,14 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
 
     public IEnumerable<string> Keys => this;
 
-    public void Dispose()
+    public void Reset()
     {
+        _indices.Clear();
         _buffer.Reset();
         _buffer = default;
     }
+
+    public void Dispose() => Reset();
 
     public bool TryGetBytes(string key, out ReadOnlySequence<byte> value)
     {
@@ -100,9 +100,9 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
 
     public bool TryGetValue<T>(string key, [NotNullWhen(true)] out T? value)
     {
-        if (_indices.TryGetValue(key, out var record) && _sessionPool.CodecProvider.TryGetCodec<T>() is { } codec)
+        if (_indices.TryGetValue(key, out var record) && SessionPool.CodecProvider.TryGetCodec<T>() is { } codec)
         {
-            using var session = _sessionPool.GetSession();
+            using var session = SessionPool.GetSession();
             var source = _buffer.Slice(record.Offset, record.Length);
             var reader = Reader.Create(source, session);
             var field = reader.ReadFieldHeader();
@@ -140,6 +140,6 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
 
     internal sealed class SerializationHooks(SerializerSessionPool serializerSessionPool)
     {
-        public void OnDeserializing(MigrationContext context) => context._sessionPool = serializerSessionPool;
+        public void OnDeserializing(MigrationContext context) => context.SessionPool = serializerSessionPool;
     }
 }
