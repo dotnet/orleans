@@ -64,7 +64,7 @@ namespace Orleans.Messaging
             }
 
             var knownGateways = await this.gatewayListProvider.GetGateways();
-            if (knownGateways.Count == 0)
+            if (knownGateways == null || knownGateways.Count == 0)
             {
                 // this situation can occur if the client starts faster than the silos.
                 var providerName = this.gatewayListProvider.GetType().FullName;
