@@ -31,7 +31,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "typescript": "~5.7.3",
-    "vite": "^5.4.21",
+    "vite": "^7.2.2",
     "vite-plugin-commonjs": "^0.10.4"
   },
   "author": "Microsoft",
