@@ -222,7 +222,7 @@ namespace Orleans.Serialization.Buffers
         public void EnsureContiguous(int length)
         {
             // The current buffer is adequate.
-            if (_bufferPos + length < _currentSpan.Length)
+            if (_bufferPos + length <= _currentSpan.Length)
             {
                 return;
             }
