@@ -1315,7 +1315,7 @@ namespace Orleans.Serialization.UnitTests
             UInt128.MaxValue,
         ];
 
-        protected override Action<Action<UInt128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.V0, value.V1)));
+        protected override Action<Action<UInt128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.Item1, value.Item2)));
     }
 
     public class UInt128CopierTests(ITestOutputHelper output) : CopierTester<UInt128, IDeepCopier<UInt128>>(output)
@@ -1338,8 +1338,9 @@ namespace Orleans.Serialization.UnitTests
             UInt128.MaxValue,
         ];
 
-        protected override Action<Action<UInt128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.V0, value.V1)));
+        protected override Action<Action<UInt128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.Item1, value.Item2)));
     }
+#endif
 
     public class BigIntegerCodecTests(ITestOutputHelper output) : FieldCodecTester<BigInteger, BigIntegerCodec>(output)
     {
@@ -1366,16 +1367,18 @@ namespace Orleans.Serialization.UnitTests
             new BigInteger(uint.MaxValue) + 1,
             new BigInteger(ulong.MaxValue),
             new BigInteger(ulong.MaxValue) + 1,
+#if NET7_0_OR_GREATER
             (BigInteger)Int128.MaxValue,
             (BigInteger)Int128.MaxValue + 1,
             (BigInteger)UInt128.MaxValue,
             (BigInteger)UInt128.MaxValue + 1,
+            -(BigInteger)Int128.MaxValue,
+            -(BigInteger)UInt128.MaxValue,
+#endif
             -new BigInteger(byte.MaxValue),
             -new BigInteger(ushort.MaxValue),
             -new BigInteger(uint.MaxValue),
             -new BigInteger(ulong.MaxValue),
-            -(BigInteger)Int128.MaxValue,
-            -(BigInteger)UInt128.MaxValue,
             BigInteger.Parse("123456789012345678901234567890123456789012345678901234567890"),
             BigInteger.Parse("-123456789012345678901234567890123456789012345678901234567890"),
         ];
@@ -1445,7 +1448,6 @@ namespace Orleans.Serialization.UnitTests
             });
         };
     }
-#endif
 
     public class UInt64CodecTests(ITestOutputHelper output) : FieldCodecTester<ulong, UInt64Codec>(output)
     {
@@ -1619,7 +1621,7 @@ namespace Orleans.Serialization.UnitTests
             Int128.MaxValue,
         ];
 
-        protected override Action<Action<Int128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.V0, value.V1)));
+        protected override Action<Action<Int128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.Item1, value.Item2)));
     }
 
     public class Int128CopierTests(ITestOutputHelper output) : CopierTester<Int128, IDeepCopier<Int128>>(output)
@@ -1642,7 +1644,7 @@ namespace Orleans.Serialization.UnitTests
             Int128.MaxValue,
         ];
 
-        protected override Action<Action<Int128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.V0, value.V1)));
+        protected override Action<Action<Int128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.Item1, value.Item2)));
     }
 #endif
 

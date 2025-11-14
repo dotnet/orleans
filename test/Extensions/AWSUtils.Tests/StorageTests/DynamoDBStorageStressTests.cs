@@ -24,7 +24,6 @@ namespace AWSUtils.Tests.StorageTests
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
 
             this.output = output;
-            TestingUtils.ConfigureThreadPoolSettingsForStorageTests();
 
             manager = fixture.DataManager;
             PartitionKey = "PK-DynamoDBDataManagerStressTests-" + Guid.NewGuid();

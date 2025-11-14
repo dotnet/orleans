@@ -5,7 +5,7 @@ using System.Text.Json;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using Benchmarks.Serialization.Models;
-using Benchmarks.Utilities;
+using Benchmarks.Serialization.Utilities;
 using MessagePack;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
@@ -20,6 +20,7 @@ namespace Benchmarks.Serialization.Comparison;
 /// </summary>
 [GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
 [Config(typeof(BenchmarkConfig))]
+[BenchmarkCategory("Serialization")]
 public class ArraySerializeBenchmark
 {
     private static readonly MyVector3[] _value;

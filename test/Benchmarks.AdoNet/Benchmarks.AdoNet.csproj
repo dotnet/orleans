@@ -12,7 +12,6 @@
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" />
     <PackageReference Include="BenchmarkDotNet.Diagnostics.Windows" />
-    <PackageReference Include="Microsoft.CodeAnalysis" />
   </ItemGroup>
 
   <ItemGroup>

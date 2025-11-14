@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using FluentAssertions;
-using FluentAssertions.Equivalency;
+using AwesomeAssertions;
+using AwesomeAssertions.Equivalency;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.TestKit
@@ -22,7 +22,7 @@ namespace Orleans.Transactions.TestKit
         /// <param name="stateFactory">factory to create TState for test</param>
         /// <param name="grainFactory">grain Factory needed for test runner</param>
         /// <param name="testOutput">test output to helpful messages</param>
-        /// <param name="assertConfig">A reference to the FluentAssertions.Equivalency.EquivalencyOptions`1
+        /// <param name="assertConfig">A reference to the AwesomeAssertions.Equivalency.EquivalencyOptions`1
         ///     configuration object that can be used to influence the way the object graphs
         ///     are compared</param>
         protected TransactionalStateStorageTestRunner(Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory, Func<int, TState> stateFactory, 

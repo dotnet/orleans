@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using System.Reflection;
-using FluentAssertions;
+using AwesomeAssertions;
 using Orleans.Caching;
 using Orleans.Caching.Internal;
 using Xunit;

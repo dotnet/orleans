@@ -24,7 +24,6 @@ namespace Tester
             if (!usingLocalWAS)
             {
                 // Tests are using Azure Cloud Storage, not local WAS emulator.
-                ForceTlsVersion();
                 return;
             }
 
@@ -44,7 +43,6 @@ namespace Tester
             {
                 throw new SkipException("No connection string found. Skipping");
             }
-            ForceTlsVersion();
         }
 
         public static void CheckForRedis()
@@ -53,13 +51,6 @@ namespace Tester
             {
                 throw new SkipException("No connection string found. Skipping");
             }
-            ForceTlsVersion();
-        }
-
-        private static void ForceTlsVersion()
-        {
-            // Force TLS 1.2
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
         }
 
         public static double CalibrateTimings()
@@ -101,14 +92,6 @@ namespace Tester
             }
             Console.WriteLine("Time for {0} loops doing {1} = {2} {3} Memory used={4}", numIterations, what, duration, timeDeltaStr, memUsed);
             return duration;
-        }
-
-        public static void ConfigureClientThreadPoolSettingsForStorageTests(int NumDotNetPoolThreads = 200)
-        {
-            ThreadPool.SetMinThreads(NumDotNetPoolThreads, NumDotNetPoolThreads);
-            ServicePointManager.Expect100Continue = false;
-            ServicePointManager.DefaultConnectionLimit = NumDotNetPoolThreads; // 1000;
-            ServicePointManager.UseNagleAlgorithm = false;
         }
 
         public static async Task<int> GetActivationCount(IGrainFactory grainFactory, string grainTypeName)

@@ -5,6 +5,8 @@
     <Description>Microsoft Orleans library for hosting a silo in a testing project.</Description>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <!-- DurableJobs is pre-release, so we are suppressing NU5104 -->
+    <NoWarn>$(NoWarn);NU5104</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

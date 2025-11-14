@@ -12,7 +12,7 @@ dotnet add package Microsoft.Orleans.Persistence.AdoNet
 
 You will also need to install the appropriate database driver package for your database system:
 
-- SQL Server: `Microsoft.Data.SqlClient` or `System.Data.SqlClient`
+- SQL Server: `Microsoft.Data.SqlClient`
 - MySQL: `MySql.Data` or `MySqlConnector`
 - PostgreSQL: `Npgsql`
 - Oracle: `Oracle.ManagedDataAccess.Core`
@@ -32,10 +32,10 @@ var builder = Host.CreateApplicationBuilder(args)
             .UseLocalhostClustering()
             // Configure ADO.NET as grain storage
             .AddAdoNetGrainStorage(
-                name: "AdoNetStore", 
+                name: "AdoNetStore",
                 configureOptions: options =>
                 {
-                    options.Invariant = "System.Data.SqlClient";  // Or other providers like "MySql.Data.MySqlClient", "Npgsql", etc.
+                    options.Invariant = "Microsoft.Data.SqlClient";  // Or other providers like "MySql.Data.MySqlClient", "Npgsql", etc.
                     options.ConnectionString = "Server=localhost;Database=OrleansStorage;User Id=myUsername;******;";
                     // Optional: Configure custom queries
                     options.UseJsonFormat = true; // Store as JSON instead of binary

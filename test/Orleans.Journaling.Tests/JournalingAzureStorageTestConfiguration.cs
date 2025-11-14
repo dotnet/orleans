@@ -21,11 +21,11 @@ internal static class JournalingAzureStorageTestConfiguration
     {
         if (TestDefaultConfiguration.UseAadAuthentication)
         {
-            options.BlobServiceClient = new(TestDefaultConfiguration.DataBlobUri, TestDefaultConfiguration.TokenCredential);
+            options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataBlobUri, TestDefaultConfiguration.TokenCredential);
         }
         else
         {
-            options.BlobServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+            options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataConnectionString);
         }
 
         return options;
