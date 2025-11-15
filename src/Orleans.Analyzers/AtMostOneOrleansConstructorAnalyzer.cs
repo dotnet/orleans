@@ -1,8 +1,6 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Orleans.Analyzers
 {
@@ -21,18 +19,35 @@ namespace Orleans.Analyzers
         public override void Initialize(AnalysisContext context)
         {
             context.EnableConcurrentExecution();
-            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze);
-            context.RegisterSyntaxNodeAction(CheckSyntaxNode, SyntaxKind.ClassDeclaration, SyntaxKind.StructDeclaration);
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.RegisterCompilationStartAction(context =>
+            {
+                var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName("Orleans.GenerateSerializerAttribute");
+                if (generateSerializerAttributeSymbol is not null)
+                {
+                    context.RegisterSymbolAction(context => AnalyzeNamedType(context, generateSerializerAttributeSymbol), SymbolKind.NamedType);
+                }
+            });
         }
 
-        private void CheckSyntaxNode(SyntaxNodeAnalysisContext context)
+        private void AnalyzeNamedType(SymbolAnalysisContext context, INamedTypeSymbol generateSerializerAttributeSymbol)
         {
-            if (context.Node is TypeDeclarationSyntax declaration && SerializationAttributesHelper.ShouldGenerateSerializer(declaration))
+            var symbol = (INamedTypeSymbol)context.Symbol;
+            if (SerializationAttributesHelper.ShouldGenerateSerializer(symbol, generateSerializerAttributeSymbol))
             {
-                var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
-                if (analysis.AnnotatedConstructorCount > 1)
+                var foundAttribute = false;
+                foreach (var constructor in symbol.Constructors)
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(Rule, declaration.GetLocation()));
+                    if (constructor.HasAttribute(generateSerializerAttributeSymbol))
+                    {
+                        if (foundAttribute)
+                        {
+                            context.ReportDiagnostic(Diagnostic.Create(Rule, symbol.Locations[0]));
+                            return;
+                        }
+
+                        foundAttribute = true;
+                    }
                 }
             }
         }
