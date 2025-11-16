@@ -101,6 +101,7 @@
     <Project Path="src/Redis/Orleans.GrainDirectory.Redis/Orleans.GrainDirectory.Redis.csproj" />
     <Project Path="src/Redis/Orleans.Persistence.Redis/Orleans.Persistence.Redis.csproj" />
     <Project Path="src/Redis/Orleans.Reminders.Redis/Orleans.Reminders.Redis.csproj" />
+    <Project Path="src/Redis/Orleans.Streaming.Redis/Orleans.Streaming.Redis.csproj" Id="c80f7266-4a58-4fcc-9355-6b14cbb50828" />
   </Folder>
   <Folder Name="/src/Transactions/">
     <Project Path="src/Orleans.Transactions.TestKit.Base/Orleans.Transactions.TestKit.Base.csproj" />
