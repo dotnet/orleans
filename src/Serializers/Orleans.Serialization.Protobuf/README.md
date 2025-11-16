@@ -1,7 +1,9 @@
 # Microsoft Orleans Serialization for Protobuf
 
 ## Introduction
-Microsoft Orleans Serialization for Protobuf provides Protocol Buffers (Protobuf) serialization support for Microsoft Orleans. Protobuf is a compact, efficient binary serialization format developed by Google, which is ideal for high-performance scenarios requiring efficient serialization and deserialization.
+Microsoft Orleans Serialization for Protobuf provides Protocol Buffers (Protobuf) serialization support for Microsoft Orleans using **Google.Protobuf**. Protobuf is a compact, efficient binary serialization format developed by Google, which is ideal for high-performance scenarios requiring efficient serialization and deserialization.
+
+This package integrates Google's official `Google.Protobuf` library with Orleans, allowing you to use Protocol Buffers messages (generated from `.proto` files) in your grain interfaces and implementations.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -31,25 +33,41 @@ await builder.RunAsync();
 ```
 
 ## Example - Using Protobuf with a Custom Type
+This package supports Google.Protobuf types, which are defined using `.proto` files and generated using the Protocol Buffers compiler.
+
+First, define your message in a `.proto` file:
+
+```proto
+// MyData.proto
+syntax = "proto3";
+
+option csharp_namespace = "MyApp.Models";
+
+message MyProtobufClass {
+  string name = 1;
+  int32 age = 2;
+  repeated string tags = 3;
+}
+```
+
+Configure your project to generate C# classes from the `.proto` file by adding the following to your `.csproj`:
+
+```xml
+<ItemGroup>
+  <Protobuf Include="MyData.proto" GrpcServices="None" />
+  <PackageReference Include="Google.Protobuf" Version="3.25.0" />
+  <PackageReference Include="Grpc.Tools" Version="2.60.0" PrivateAssets="All" />
+</ItemGroup>
+```
+
+Then use the generated classes in your grain interfaces and implementation:
+
 ```csharp
 using Orleans;
-using ProtoBuf;
+using MyApp.Models;
 
-// Define a class with Protobuf attributes
-[ProtoContract]
-public class MyProtobufClass
-{
-    [ProtoMember(1)]
-    public string Name { get; set; }
-    
-    [ProtoMember(2)]
-    public int Age { get; set; }
-    
-    [ProtoMember(3)]
-    public List<string> Tags { get; set; }
-}
-
-// You can use it directly in your grain interfaces and implementation
+// The generated class implements IMessage from Google.Protobuf
+// and can be used directly in your grain interfaces
 public interface IMyGrain : IGrainWithStringKey
 {
     Task<MyProtobufClass> GetData();
@@ -73,50 +91,26 @@ public class MyGrain : Grain, IMyGrain
 }
 ```
 
-## Example - Using .proto Files
-You can also use standard .proto files and generate C# classes:
+## Using Google.Protobuf Collections
+Google.Protobuf provides specialized collection types that are automatically supported:
 
 ```proto
-// MyData.proto
 syntax = "proto3";
+option csharp_namespace = "MyApp.Models";
 
-option csharp_namespace = "MyApp.Protos";
-
-message Person {
-  string name = 1;
-  int32 age = 2;
-  repeated string tags = 3;
+message ComplexData {
+  // RepeatedField<T> for repeated fields
+  repeated string items = 1;
+  
+  // MapField<K, V> for map fields
+  map<string, int32> counts = 2;
+  
+  // ByteString for binary data
+  bytes data = 3;
 }
 ```
 
-Then reference the generated classes in your Orleans code:
-
-```csharp
-using MyApp.Protos;
-using Orleans;
-
-public interface IPersonGrain : IGrainWithStringKey
-{
-    Task<Person> GetPerson();
-    Task SetPerson(Person person);
-}
-
-public class PersonGrain : Grain, IPersonGrain
-{
-    private Person _person;
-
-    public Task<Person> GetPerson()
-    {
-        return Task.FromResult(_person);
-    }
-
-    public Task SetPerson(Person person)
-    {
-        _person = person;
-        return Task.CompletedTask;
-    }
-}
-```
+These collections (`RepeatedField<T>`, `MapField<TKey, TValue>`, and `ByteString`) are automatically serialized and copied by the Orleans.Serialization.Protobuf package.
 
 ## Documentation
 For more comprehensive documentation, please refer to:
