@@ -147,7 +147,7 @@ namespace Orleans.Runtime
                     return result;
                 }
 
-                if (!_siloStatusOracle.CurrentStatus.IsTerminating())
+                if (_siloStatusOracle.CurrentStatus == SiloStatus.Active)
                 {
                     var address = new GrainAddress
                     {
@@ -184,10 +184,11 @@ namespace Orleans.Runtime
             static IGrainContext UnableToCreateActivation(Catalog self, GrainId grainId)
             {
                 // Did not find and did not start placing new
-                var isTerminating = self._siloStatusOracle.CurrentStatus.IsTerminating();
-                if (isTerminating)
+                var status = self._siloStatusOracle.CurrentStatus;
+                var isTerminating = status.IsTerminating();
+                if (status is not SiloStatus.Active)
                 {
-                    self.LogDebugUnableToCreateActivationTerminating(grainId);
+                    self.LogDebugUnableToCreateActivationWhenNotActive(grainId);
                 }
                 else
                 {
@@ -412,10 +413,9 @@ namespace Orleans.Runtime
         private partial void LogDebugDeactivateAllActivations();
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.CatalogNonExistingActivation2,
             Level = LogLevel.Debug,
-            Message = "Unable to create activation for grain {GrainId} because this silo is terminating")]
-        private partial void LogDebugUnableToCreateActivationTerminating(GrainId grainId);
+            Message = "Unable to create activation for grain {GrainId} because this silo is not active.")]
+        private partial void LogDebugUnableToCreateActivationWhenNotActive(GrainId grainId);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.CatalogNonExistingActivation2,
