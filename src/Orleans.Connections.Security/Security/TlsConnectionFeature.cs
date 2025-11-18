@@ -19,7 +19,7 @@ namespace Orleans.Connections.Security
 
         public TlsCipherSuite? NegotiatedCipherSuite { get; set; }
 
-        public string HostName { get; set; }
+        public string HostName { get; set; } = string.Empty;
 
 #if NET10_0_OR_GREATER
 #pragma warning disable SYSLIB0058
