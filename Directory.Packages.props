@@ -69,8 +69,8 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.9.0" />
     <!-- 3rd party packages -->
     <PackageVersion Include="Google.Cloud.PubSub.V1" Version="1.0.0-beta13" />
-    <PackageVersion Include="AWSSDK.DynamoDBv2" Version="4.0.2.2" />
-    <PackageVersion Include="AWSSDK.SQS" Version="4.0.0.14" />
+    <PackageVersion Include="AWSSDK.DynamoDBv2" Version="4.0.9.6" />
+    <PackageVersion Include="AWSSDK.SQS" Version="4.0.2.3" />
     <PackageVersion Include="Consul" Version="1.7.14.2" />
     <PackageVersion Include="Google.Protobuf" Version="3.28.2" />
     <PackageVersion Include="protobuf-net" Version="3.2.30" />
