@@ -61,16 +61,6 @@ namespace Orleans.Tests.SqlUtils
 
                 },
                 {
-                    AdoNetInvariants.InvariantNameSqlServerDotnetCore,
-                    new DbConstants(startEscapeIndicator: '[',
-                                    endEscapeIndicator: ']',
-                                    unionAllSelectTemplate: " UNION ALL SELECT ",
-                                    isSynchronousAdoNetImplementation: false,
-                                    supportsStreamNatively: true,
-                                    supportsCommandCancellation: true,
-                                    commandInterceptor: NoOpCommandInterceptor.Instance)
-                },
-                {
                     AdoNetInvariants.InvariantNameMySqlConnector,
                     new DbConstants(startEscapeIndicator: '[',
                                     endEscapeIndicator: ']',

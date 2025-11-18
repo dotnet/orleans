@@ -63,7 +63,7 @@ namespace Orleans.Storage
     /// </para>
     /// <para>
     /// Optional configuration params:
-    /// <c>AdoInvariant</c> -- defaults to <c>System.Data.SqlClient</c>
+    /// <c>AdoInvariant</c> -- defaults to <c>Microsoft.Data.SqlClient</c>
     /// <c>UseJsonFormat</c> -- defaults to <c>false</c>
     /// <c>UseXmlFormat</c> -- defaults to <c>false</c>
     /// <c>UseBinaryFormat</c> -- defaults to <c>true</c>
