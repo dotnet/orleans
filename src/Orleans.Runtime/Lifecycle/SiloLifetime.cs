@@ -10,7 +10,7 @@ namespace Orleans.Runtime;
 #nullable enable
 
 /// <summary>
-/// Allows consumers to observe and participate in the Silo's lifecycle.
+/// Allows consumers to observe and participate in the silo's lifecycle.
 /// </summary>
 public interface ISiloLifetime
 {
