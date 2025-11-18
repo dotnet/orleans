@@ -1,4 +1,5 @@
 using System;
+using System.Net.Security;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
@@ -16,6 +17,13 @@ namespace Orleans.Connections.Security
 
         public SslProtocols Protocol { get; set; }
 
+        public TlsCipherSuite? NegotiatedCipherSuite { get; set; }
+
+        public string HostName { get; set; } = string.Empty;
+
+#if NET10_0_OR_GREATER
+#pragma warning disable SYSLIB0058
+#endif
         public CipherAlgorithmType CipherAlgorithm { get; set; }
 
         public int CipherStrength { get; set; }
@@ -27,6 +35,9 @@ namespace Orleans.Connections.Security
         public ExchangeAlgorithmType KeyExchangeAlgorithm { get; set; }
 
         public int KeyExchangeStrength { get; set; }
+#if NET10_0_OR_GREATER
+#pragma warning restore SYSLIB0058
+#endif
 
         public Task<X509Certificate2> GetRemoteCertificateAsync(CancellationToken cancellationToken)
         {
