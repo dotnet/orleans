@@ -288,7 +288,7 @@ namespace Orleans
     /// </remarks>
     /// <seealso cref="ActivatorUtilitiesConstructorAttribute" />
     [AttributeUsage(AttributeTargets.Constructor)]
-    [Obsolete("Use GeneratedActivatorConstructorAttribute instead. This atttribute is not recognized by Orleans.")]
+    [Obsolete("Use GeneratedActivatorConstructorAttribute instead. This attribute is not recognized by Orleans.")]
     public sealed class OrleansConstructorAttribute : ActivatorUtilitiesConstructorAttribute
     {
         /// <summary>
