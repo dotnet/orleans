@@ -423,9 +423,9 @@ namespace Orleans.Transactions.DynamoDB
 
                 ret = await GetTableDescription(tableName);
                 index = ret.GlobalSecondaryIndexes?.Find(index => index.IndexName == indexName);
-            } while (index.IndexStatus == whileStatus);
+            } while (index != null && index.IndexStatus == whileStatus);
 
-            if (desiredStatus != null && index.IndexStatus != desiredStatus)
+            if (desiredStatus != null && (index == null || index.IndexStatus != desiredStatus))
             {
                 throw new InvalidOperationException($"Index {indexName} in table {tableName} has failed to reach the desired status of {desiredStatus}");
             }
