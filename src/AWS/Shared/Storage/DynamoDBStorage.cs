@@ -301,8 +301,8 @@ namespace Orleans.Transactions.DynamoDB
                     }
                 }
 
-                var existingGlobalSecondaryIndexes = tableDescription.GlobalSecondaryIndexes?.Select(globalSecondaryIndex => globalSecondaryIndex.IndexName).ToArray();
-                var secondaryIndexesToCreate = (secondaryIndexes ?? Enumerable.Empty<GlobalSecondaryIndex>()).Where(secondaryIndex => existingGlobalSecondaryIndexes == null || !existingGlobalSecondaryIndexes.Contains(secondaryIndex.IndexName));
+                var existingGlobalSecondaryIndexes = tableDescription.GlobalSecondaryIndexes?.Select(globalSecondaryIndex => globalSecondaryIndex.IndexName).ToArray() ?? Array.Empty<string>();
+                var secondaryIndexesToCreate = (secondaryIndexes ?? Enumerable.Empty<GlobalSecondaryIndex>()).Where(secondaryIndex => !existingGlobalSecondaryIndexes.Contains(secondaryIndex.IndexName));
 
                 foreach (var secondaryIndex in secondaryIndexesToCreate)
                 {
