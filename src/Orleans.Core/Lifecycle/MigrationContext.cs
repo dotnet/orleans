@@ -11,16 +11,16 @@ using Orleans.Serialization.Session;
 
 namespace Orleans.Runtime;
 
-[GenerateSerializer, Immutable, Alias("MigrationCtx"), SerializationCallbacks(typeof(SerializationHooks))]
+[GenerateSerializer, Immutable, Alias("MigrationCtx")]
 internal sealed class MigrationContext : IDehydrationContext, IRehydrationContext, IDisposable, IEnumerable<string>, IBufferWriter<byte>
 {
     [NonSerialized]
     private readonly object _lock = new();
 
     [NonSerialized]
-    internal SerializerSessionPool _sessionPool;
+    internal readonly SerializerSessionPool _sessionPool;
 
-    [OrleansConstructor]
+    [GeneratedActivatorConstructor]
     public MigrationContext(SerializerSessionPool sessionPool)
     {
         _sessionPool = sessionPool;
@@ -136,10 +136,5 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
             boxed.Reset();
             _value = (Dictionary<string, (int Offset, int Length)>.KeyCollection.Enumerator)boxed;
         }
-    }
-
-    internal sealed class SerializationHooks(SerializerSessionPool serializerSessionPool)
-    {
-        public void OnDeserializing(MigrationContext context) => context._sessionPool = serializerSessionPool;
     }
 }
