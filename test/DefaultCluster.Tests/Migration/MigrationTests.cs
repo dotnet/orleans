@@ -309,21 +309,18 @@ namespace DefaultCluster.Tests.General
 
         public void OnDehydrate(IDehydrationContext migrationContext)
         {
+            if (RequestContext.Get("fail_rehydrate") is true)
+            {
+                migrationContext.TryAddValue("fail_rehydrate", true);
+            }
+
+            if (RequestContext.Get("fail_dehydrate") is true)
+            {
+                throw new InvalidOperationException("Failing to dehydrate on-command");
+            }
+
             migrationContext.TryAddValue("state", _state);
 
-            {
-                if (RequestContext.Get("fail_rehydrate") is bool fail && fail)
-                {
-                    migrationContext.TryAddValue("fail_rehydrate", true);
-                }
-            }
-
-            {
-                if (RequestContext.Get("fail_dehydrate") is bool fail && fail)
-                {
-                    throw new InvalidOperationException("Failing to dehydrate on-command");
-                }
-            }
         }
 
         public void OnRehydrate(IRehydrationContext migrationContext)

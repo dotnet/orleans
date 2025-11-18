@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
@@ -27,7 +28,7 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
     }
 
     [Id(0), Immutable]
-    private readonly Dictionary<string, (int Offset, int Length)> _indices = new(StringComparer.Ordinal);
+    private Dictionary<string, (int Offset, int Length)> _indices = new(StringComparer.Ordinal);
 
     [Id(1), Immutable]
     private PooledBuffer _buffer = new();
@@ -80,18 +81,27 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
 
     public IEnumerable<string> Keys => this;
 
-    public void Dispose()
+    public void Reset()
     {
-        _buffer.Reset();
-        _buffer = default;
+        lock (_lock)
+        {
+            _indices = [];
+            _buffer.Reset();
+            _buffer = default;
+        }
     }
+
+    public void Dispose() => Reset();
 
     public bool TryGetBytes(string key, out ReadOnlySequence<byte> value)
     {
-        if (_indices.TryGetValue(key, out var record))
+        lock (_lock)
         {
-            value = _buffer.AsReadOnlySequence().Slice(record.Offset, record.Length);
-            return true;
+            if (_indices.TryGetValue(key, out var record))
+            {
+                value = _buffer.AsReadOnlySequence().Slice(record.Offset, record.Length);
+                return true;
+            }
         }
 
         value = default;
@@ -100,14 +110,17 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
 
     public bool TryGetValue<T>(string key, [NotNullWhen(true)] out T? value)
     {
-        if (_indices.TryGetValue(key, out var record) && _sessionPool.CodecProvider.TryGetCodec<T>() is { } codec)
+        lock (_lock)
         {
-            using var session = _sessionPool.GetSession();
-            var source = _buffer.Slice(record.Offset, record.Length);
-            var reader = Reader.Create(source, session);
-            var field = reader.ReadFieldHeader();
-            value = codec.ReadValue(ref reader, field);
-            return value is not null;
+            if (_indices.TryGetValue(key, out var record) && _sessionPool.CodecProvider.TryGetCodec<T>() is { } codec)
+            {
+                using var session = _sessionPool.GetSession();
+                var source = _buffer.Slice(record.Offset, record.Length);
+                var reader = Reader.Create(source, session);
+                var field = reader.ReadFieldHeader();
+                value = codec.ReadValue(ref reader, field);
+                return value is not null;
+            }
         }
 
         value = default;
