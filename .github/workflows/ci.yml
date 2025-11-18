@@ -235,7 +235,7 @@ jobs:
         -- -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
-        ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;"
+        ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;TrustServerCertificate=True;"
     - name: Archive Test Results
       if: always()
       uses: actions/upload-artifact@v4
