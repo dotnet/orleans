@@ -56,7 +56,7 @@ public interface ISiloLifecycleStage
     /// </summary>
     /// <param name="callback">
     /// <para>The asynchronous operation to perform.</para>
-    /// <para><strong>Never <c>await</c> <see cref="Task"/></strong> for a callback as it will result in a deadlock!</para>
+    /// <para><strong>Never <c>await</c> <see cref="Task"/></strong> inside a callback, as it will result in a deadlock!</para>
     /// </param>
     /// <remarks>
     /// Disposing the returned value removes the callback from the lifecycle stage.
