@@ -286,8 +286,9 @@ namespace Orleans
     /// <remarks>
     /// At most one constructor can be annotated with this attribute. If multiple constructors are annotated, the presence of this attribute is ignored.
     /// </remarks>
-    /// <seealso cref="Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute" />
+    /// <seealso cref="ActivatorUtilitiesConstructorAttribute" />
     [AttributeUsage(AttributeTargets.Constructor)]
+    [Obsolete("Use GeneratedActivatorConstructorAttribute instead. This attribute is not recognized by Orleans.")]
     public sealed class OrleansConstructorAttribute : ActivatorUtilitiesConstructorAttribute
     {
         /// <summary>
@@ -531,7 +532,7 @@ namespace Orleans
     /// This attribute can be used to call constructors which require injected dependencies.
     /// </remarks>
     [AttributeUsage(AttributeTargets.Constructor)]
-    public sealed class GeneratedActivatorConstructorAttribute : Attribute
+    public sealed class GeneratedActivatorConstructorAttribute : ActivatorUtilitiesConstructorAttribute
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="GeneratedActivatorConstructorAttribute"/> class.

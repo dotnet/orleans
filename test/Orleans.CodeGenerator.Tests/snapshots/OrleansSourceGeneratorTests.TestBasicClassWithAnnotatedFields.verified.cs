@@ -133,27 +133,12 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "9.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Activator_DemoDataWithFields : global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoDataWithFields>
-    {
-        private readonly int _arg0;
-        private readonly string _arg1;
-        public Activator_DemoDataWithFields(int arg0, string arg1)
-        {
-            _arg0 = OrleansGeneratedCodeHelper.UnwrapService(this, arg0);
-            _arg1 = OrleansGeneratedCodeHelper.UnwrapService(this, arg1);
-        }
-
-        public global::TestProject.DemoDataWithFields Create() => new global::TestProject.DemoDataWithFields(_arg0, _arg1);
-    }
-
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "9.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
             config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_DemoDataWithFields));
             config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_DemoDataWithFields));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_DemoDataWithFields));
         }
     }
 }
