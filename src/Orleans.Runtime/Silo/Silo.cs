@@ -339,7 +339,7 @@ namespace Orleans.Runtime
 
             try
             {
-                await Task.Run(() => this.siloLifecycle.OnStop(cancellationToken), cancellationToken).ConfigureAwait(false);
+                await Task.Run(() => this.siloLifecycle.OnStop(cancellationToken), CancellationToken.None).ConfigureAwait(false);
             }
             finally
             {
@@ -422,7 +422,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    await Task.Run(() => this.messageCenter.Gateway.SendStopSendMessages(this.grainFactory), ct).WaitAsync(ct);
+                    await Task.Run(() => this.messageCenter.Gateway.SendStopSendMessages(this.grainFactory, ct), CancellationToken.None).WaitAsync(ct);
                 }
                 catch (Exception exception)
                 {
