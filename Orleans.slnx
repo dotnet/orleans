@@ -16,6 +16,10 @@
     <Project Path="playground/DashboardToy/DashboardToy.AppHost/DashboardToy.AppHost.csproj" />
     <Project Path="playground/DashboardToy/DashboardToy.Frontend/DashboardToy.Frontend.csproj" />
   </Folder>
+  <Folder Name="/playground/Dashboard/">
+    <Project Path="playground/DashboardCohosted/DashboardCohosted.csproj" />
+    <Project Path="playground/DashboardSeparateHost/DashboardSeparateHost.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="Directory.Build.props" />
@@ -34,6 +38,7 @@
     <Project Path="src/Orleans.Persistence.Memory/Orleans.Persistence.Memory.csproj" />
     <Project Path="src/Orleans.Reminders/Orleans.Reminders.csproj" />
     <Project Path="src/Orleans.Runtime/Orleans.Runtime.csproj" />
+    <Project Path="src/Orleans.DurableJobs/Orleans.DurableJobs.csproj" Id="ab4cc723-b3cf-4c32-be4c-1a180a49797c" />
     <Project Path="src/Orleans.Sdk/Orleans.Sdk.csproj" />
     <Project Path="src/Orleans.Serialization.Abstractions/Orleans.Serialization.Abstractions.csproj" />
     <Project Path="src/Orleans.Serialization.FSharp/Orleans.Serialization.FSharp.csproj" />
@@ -46,6 +51,10 @@
     <Project Path="src/Orleans.Streaming/Orleans.Streaming.csproj" />
     <Project Path="src/Orleans.TestingHost/Orleans.TestingHost.csproj" />
     <Project Path="src/Serializers/Orleans.Serialization.Protobuf/Orleans.Serialization.Protobuf.csproj" />
+  </Folder>
+  <Folder Name="/src/Dashboard/">
+    <Project Path="src/Dashboard/Orleans.Dashboard.Abstractions/Orleans.Dashboard.Abstractions.csproj" />
+    <Project Path="src/Dashboard/Orleans.Dashboard/Orleans.Dashboard.csproj" />
   </Folder>
   <Folder Name="/src/Extensions/">
     <Project Path="src/Orleans.Clustering.Consul/Orleans.Clustering.Consul.csproj" />
@@ -76,6 +85,7 @@
     <Project Path="src/Azure/Orleans.Persistence.Cosmos/Orleans.Persistence.Cosmos.csproj" />
     <Project Path="src/Azure/Orleans.Reminders.AzureStorage/Orleans.Reminders.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Reminders.Cosmos/Orleans.Reminders.Cosmos.csproj" />
+    <Project Path="src/Azure/Orleans.DurableJobs.AzureStorage/Orleans.DurableJobs.AzureStorage.csproj" Id="5bbb1058-9ab2-44e9-b237-49f5b6bee151" />
     <Project Path="src/Azure/Orleans.Streaming.AzureStorage/Orleans.Streaming.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Streaming.EventHubs/Orleans.Streaming.EventHubs.csproj" />
     <Project Path="src/Azure/Orleans.Transactions.AzureStorage/Orleans.Transactions.AzureStorage.csproj" />
@@ -84,7 +94,7 @@
     <Project Path="src/Cassandra/Orleans.Clustering.Cassandra/Orleans.Clustering.Cassandra.csproj" />
   </Folder>
   <Folder Name="/src/Extensions/NATS/">
-    <Project Path="src\Orleans.Streaming.NATS\Orleans.Streaming.NATS.csproj" Type="Classic C#" />
+    <Project Path="src\Orleans.Streaming.NATS\Orleans.Streaming.NATS.csproj" />
   </Folder>
   <Folder Name="/src/Extensions/Redis/">
     <Project Path="src/Redis/Orleans.Clustering.Redis/Orleans.Clustering.Redis.csproj" />
@@ -110,6 +120,10 @@
     <Project Path="test/Tester/Tester.csproj" />
     <Project Path="test/TesterInternal/TesterInternal.csproj" />
   </Folder>
+  <Folder Name="/test/Dashboard/">
+    <Project Path="test/Orleans.Dashboard.Tests/Orleans.Dashboard.TestGrains/Orleans.Dashboard.TestGrains.csproj" />
+    <Project Path="test/Orleans.Dashboard.Tests/Orleans.Dashboard.UnitTests/Orleans.Dashboard.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/test/Benchmarks/">
     <Project Path="test/Benchmarks.AdoNet/Benchmarks.AdoNet.csproj" />
     <Project Path="test/Benchmarks/Benchmarks.csproj" />
@@ -117,11 +131,11 @@
     <Project Path="test/Grains/BenchmarkGrains/BenchmarkGrains.csproj" />
   </Folder>
   <Folder Name="/test/DistributedTests/">
+    <File Path="test/DistributedTests/README.md" />
     <Project Path="test/DistributedTests/DistributedTests.Client/DistributedTests.Client.csproj" />
     <Project Path="test/DistributedTests/DistributedTests.Common/DistributedTests.Common.csproj" />
     <Project Path="test/DistributedTests/DistributedTests.Grains/DistributedTests.Grains.csproj" />
     <Project Path="test/DistributedTests/DistributedTests.Server/DistributedTests.Server.csproj" />
-    <File Path="test/DistributedTests/README.md" />
   </Folder>
   <Folder Name="/test/Extensions/">
     <Project Path="test/Extensions/AWSUtils.Tests/AWSUtils.Tests.csproj" />
@@ -133,7 +147,7 @@
     <Project Path="test/Extensions/TesterAdoNet/Tester.AdoNet.csproj" />
     <Project Path="test/Extensions/TesterAzureUtils/Tester.AzureUtils.csproj" />
     <Project Path="test/Extensions/TesterZooKeeperUtils/Tester.ZooKeeperUtils.csproj" />
-    <Project Path="test\Extensions\NATS.Tests\NATS.Tests.csproj" Type="Classic C#" />
+    <Project Path="test\Extensions\NATS.Tests\NATS.Tests.csproj" />
   </Folder>
   <Folder Name="/test/Grains/">
     <Project Path="test/Grains/TestFSharp/TestFSharp.fsproj" />

@@ -9,6 +9,7 @@
     <xUnitRunnerVersion Condition=" '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'netstandard2.1' ">2.4.5</xUnitRunnerVersion>
   </PropertyGroup>
   <ItemGroup>
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.1.3" />
     <!-- System packages -->
     <PackageVersion Include="Aspire.Azure.Storage.Queues" Version="9.0.0" />
     <PackageVersion Include="System.Diagnostics.PerformanceCounter" Version="8.0.1" />
@@ -49,7 +50,7 @@
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
     <PackageVersion Include="Azure.Data.Tables" Version="12.9.1" />
-    <PackageVersion Include="Azure.Core" Version="1.46.2" />
+    <PackageVersion Include="Azure.Core" Version="1.47.1" />
     <PackageVersion Include="Azure.Messaging.EventHubs" Version="5.12.2" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.24.1" />
     <PackageVersion Include="Azure.Storage.Queues" Version="12.22.0" />
@@ -60,6 +61,7 @@
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="9.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="9.0.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="9.0.0" />
+    <PackageVersion Include="OpenTelemetry" Version="1.9.0" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.9.0" />
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.9.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.9.0" />
@@ -79,7 +81,7 @@
     <PackageVersion Include="CassandraCSharpDriver" Version="3.20.1" />
     <PackageVersion Include="NATS.Net" Version="2.6.4" />
     <!-- Test related packages -->
-    <PackageVersion Include="coverlet.collector" Version="6.0.2" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="coverlet.msbuild" Version="6.0.0" />
     <PackageVersion Include="AwesomeAssertions" Version="8.0.2" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
@@ -99,7 +101,7 @@
     <PackageVersion Include="System.CodeDom" Version="8.0.0" />
     <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" />
     <PackageVersion Include="FSharp.Core" Version="9.0.100" />
-    <PackageVersion Include="Azure.Identity" Version="1.13.1" />
+    <PackageVersion Include="Azure.Identity" Version="1.14.2" />
     <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.5.0" />
     <PackageVersion Include="NSubstitute" Version="4.4.0" />
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.15" />

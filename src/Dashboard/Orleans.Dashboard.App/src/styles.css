@@ -1,0 +1,17 @@
+/* Import Bootstrap */
+@import 'bootstrap/dist/css/bootstrap.css';
+
+/* Import Font Awesome */
+@import '@fortawesome/fontawesome-free/css/all.css';
+
+/* Import AdminLTE core styles */
+@import 'admin-lte/dist/css/adminlte.css';
+
+/* Import custom purple skin theme */
+@import './skin-purple.css';
+
+/* Import theme system (light/dark) */
+@import './themes.css';
+
+/* Import custom Orleans Dashboard styles */
+@import './custom.css';

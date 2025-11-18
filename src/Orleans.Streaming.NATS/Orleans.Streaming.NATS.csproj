@@ -12,6 +12,7 @@
     <Nullable>enable</Nullable>
     <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
     <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,5 +22,9 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="NATS.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>

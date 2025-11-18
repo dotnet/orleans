@@ -1,0 +1,253 @@
+/* Custom styles for Orleans Dashboard layout */
+
+/* Brand logo styling */
+.brand-logo {
+  height: 45px;
+  width: auto;
+  object-fit: contain;
+  filter: brightness(0.95);
+}
+
+.brand-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 300;
+  line-height: 1.2;
+}
+
+.brand-link {
+  display: block;
+  padding: 1rem 1rem 1.5rem 1rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem;
+}
+
+.dark-mode .brand-link {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .brand-logo {
+  filter: brightness(1.1);
+}
+
+.brand-version {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #6c757d;
+}
+
+.log {
+  height: 100%;
+}
+
+.log-filter {
+  padding-left: 20px;
+  border: 0;
+  z-index: 1;
+  outline: none;
+}
+
+.error-container {
+  position: fixed;
+  z-index: 10000;
+  width: 400px;
+  top: 20px;
+  left: 100%;
+  margin-left: -420px;
+}
+
+/* Close button styling for alerts */
+.alert .close {
+  position: relative;
+  top: -2px;
+  right: -21px;
+  float: right;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #000;
+  text-shadow: 0 1px 0 #fff;
+  opacity: 0.5;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: opacity 0.15s ease-in-out;
+}
+
+.alert .close:hover,
+.alert .close:focus {
+  opacity: 0.75;
+  text-decoration: none;
+  outline: 0;
+}
+
+.alert-danger .close {
+  color: #721c24;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.dark-mode .alert .close {
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.log {
+  position: absolute;
+  top: 50px;
+  left: 230px;
+  right: 0;
+  border: 0;
+  bottom: 0;
+  margin: 0;
+}
+
+.box {
+  border-top: none;
+  margin-bottom: 20px;
+}
+
+.main-sidebar {
+  padding-top: 0 !important;
+}
+
+.content-wrapper {
+  padding-top: 0 !important;
+  padding: 1rem;
+}
+
+.content-wrapper .content {
+  padding-top: 0;
+}
+
+h1 {
+  font-weight: 100;
+}
+
+h2 {
+  font-weight: 100;
+}
+
+h3 {
+  font-weight: 100;
+}
+
+/* Fix info-box layout */
+.info-box {
+  display: flex;
+  min-height: 80px;
+  border-radius: .25rem;
+  box-shadow: 0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2);
+  margin-bottom: 1rem;
+}
+
+.info-box-icon {
+  border-radius: .25rem 0 0 .25rem;
+  width: 90px;
+  text-align: center;
+  font-size: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.info-box-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: .5rem 1rem;
+  flex: 1;
+}
+
+.info-box-text {
+  text-transform: uppercase;
+  font-size: .875rem;
+}
+
+.info-box-number {
+  font-weight: 700;
+  font-size: 1.5rem;
+}
+
+.small-box-footer {
+  display: block;
+  padding: 3px 0;
+  margin-top: 5px;
+  color: rgba(0,0,0,.5);
+  text-decoration: none;
+}
+
+.small-box-footer:hover {
+  color: rgba(0,0,0,.7);
+  text-decoration: none;
+}
+
+/* Card/Panel consistency */
+.card,
+.box {
+  border-radius: .25rem;
+  box-shadow: 0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2);
+  margin-bottom: 1.5rem;
+  height: 100%;
+}
+
+.card-header,
+.box-header {
+  padding: .75rem 1.25rem;
+}
+
+.card-body,
+.box-body {
+  padding: 1.25rem;
+}
+
+/* Ensure proper row spacing */
+.row {
+  margin-bottom: 1.5rem;
+}
+
+.row:last-child {
+  margin-bottom: 0;
+}
+
+/* Make cards in rows have equal heights */
+.row > [class*='col-'] {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+
+.row > [class*='col-'] > .card,
+.row > [class*='col-'] > .box {
+  flex: 1;
+}
+
+/* Sidebar menu spacing */
+.sidebar .nav-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.sidebar .nav-item.mt-auto {
+  margin-top: auto !important;
+}
+
+/* Ensure sidebar scrolls properly */
+.main-sidebar .sidebar {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+
+/* Fix menu items to display icon and text on same line */
+.nav-sidebar .nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-sidebar .nav-link p {
+  margin: 0;
+}
