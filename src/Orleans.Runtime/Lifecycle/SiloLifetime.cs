@@ -47,12 +47,17 @@ public interface ISiloLifecycleStage
     /// <summary>
     /// Gets a cancellation token that is triggered when this stage completes.
     /// </summary>
+    /// <remarks>Avoid registering callbacks in this token, prefer
+    /// <see cref="Register(Func{CancellationToken, Task})"/> instead.</remarks>
     CancellationToken CancellationToken { get; }
 
     /// <summary>
     /// Registers a callback to be executed during this lifecycle stage.
     /// </summary>
-    /// <param name="callback">The asynchronous operation to perform.</param>
+    /// <param name="callback">
+    /// <para>The asynchronous operation to perform.</para>
+    /// <para><strong>Never <c>await</c> <see cref="Task"/></strong> for a callback as it will result in a deadlock!</para>
+    /// </param>
     /// <remarks>
     /// Disposing the returned value removes the callback from the lifecycle stage.
     /// This is useful for components that have a shorter lifespan than the silo to prevent holding onto the reference,
@@ -194,13 +199,22 @@ internal sealed class SiloLifetime(ILogger<SiloLifetime> logger) : ISiloLifetime
                 }
             }
 
-            if (!_cts.IsCancellationRequested)
+            try
             {
                 _cts.Cancel();
+            }
+            catch (Exception ex)
+            {
+                // Should not happen if callers respect the contract to register callbacks with the proper method, but it can happen!
+                logger.LogError(ex, "An exception occurred inside a CancellationToken callback for stage = '{StageName}'", name);
+
+                // TODO: Should we add this exception to the list?!
+                // I mean callers are not support to register callbacks with the token
             }
 
             if (exceptions.Count > 0)
             {
+                // TODO: Maybe we should just log if we are shutting down!
                 _tcs.SetException(new AggregateException(exceptions));
             }
             else
