@@ -47,7 +47,7 @@ _ = Task.Run(async () =>
 
     await Task.Delay(100);
 
-    Console.WriteLine("Finished temporary operation! Dont care about the callback anymore (this should not have happened)");
+    Console.WriteLine("Finished temporary operation! Dont care about the callback anymore.");
 });
 
 _ = Task.Run(async () =>
