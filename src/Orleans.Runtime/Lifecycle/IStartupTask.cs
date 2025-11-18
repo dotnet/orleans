@@ -1,5 +1,4 @@
-﻿using System;
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime
@@ -7,7 +6,6 @@ namespace Orleans.Runtime
     /// <summary>
     /// Defines an action to be taken after silo startup.
     /// </summary>
-    [Obsolete("IStartupTask is deprecated. Use BackgroundService or IHostedService instead. See https://learn.microsoft.com/dotnet/orleans/host/configuration-guide/startup-tasks for more information.", error: false)]
     public interface IStartupTask
     {
         /// <summary>
