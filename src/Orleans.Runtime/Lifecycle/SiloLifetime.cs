@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -101,6 +102,11 @@ internal sealed class SiloLifetime(ILogger<SiloLifetime> logger) : ISiloLifetime
 
     private class SiloLifecycleStage(ILogger logger, string name) : ISiloLifecycleStage
     {
+        // We use this so that late registrations can still be executed, otherwise
+        // we'd need to rely on the TCS which means we'd need to set it *before* the callbacks
+        // have been executed, ideally we should fire the TCS only after non-late registered callbacks have completed.
+        private bool _isNotifyingOrHasCompleted;
+
         private readonly object _lock = new();
         private readonly List<Func<CancellationToken, Task>> _callbacks = [];
         private readonly CancellationTokenSource _cts = new();
@@ -115,7 +121,7 @@ internal sealed class SiloLifetime(ILogger<SiloLifetime> logger) : ISiloLifetime
 
             lock (_lock)
             {
-                if (_tcs.Task.IsCompleted)
+                if (_isNotifyingOrHasCompleted)
                 {
                     logger.LogInformation("Lifecycle stage = '{StageName}' has already completed. Executing callback immediately.", name);
 
@@ -148,10 +154,13 @@ internal sealed class SiloLifetime(ILogger<SiloLifetime> logger) : ISiloLifetime
 
         public async Task NotifyCompleted(CancellationToken cancellationToken)
         {
+            Debug.Assert(!_isNotifyingOrHasCompleted, "This should not be called twice!");
+
             List<Func<CancellationToken, Task>> snapshot;
 
             lock (_lock)
             {
+                _isNotifyingOrHasCompleted = true;
                 snapshot = [.. _callbacks];
             }
 
@@ -190,11 +199,13 @@ internal sealed class SiloLifetime(ILogger<SiloLifetime> logger) : ISiloLifetime
                 _cts.Cancel();
             }
 
-            _tcs.TrySetResult();
-
             if (exceptions.Count > 0)
             {
-                throw new AggregateException(exceptions);
+                _tcs.SetException(new AggregateException(exceptions));
+            }
+            else
+            {
+                _tcs.SetResult();
             }
         }
 
