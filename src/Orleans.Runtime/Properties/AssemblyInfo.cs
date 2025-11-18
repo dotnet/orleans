@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("Orleans.Streaming")]
 [assembly: InternalsVisibleTo("Orleans.Reminders")]
+[assembly: InternalsVisibleTo("Orleans.DurableJobs")]
 [assembly: InternalsVisibleTo("Orleans.Journaling")]
 [assembly: InternalsVisibleTo("Orleans.TestingHost")]
 

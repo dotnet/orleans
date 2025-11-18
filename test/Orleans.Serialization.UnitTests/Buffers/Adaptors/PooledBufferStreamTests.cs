@@ -294,6 +294,32 @@ public class PooledBufferStreamTests
     }
 
     /// <summary>
+    /// Verifies that calling Reset resets the Position property to zero.
+    /// This is important when recycling streams from the pool to ensure the position
+    /// doesn't carry over from previous usage.
+    /// </summary>
+    /// <param name="initialPosition">The initial position to set before calling Reset.</param>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(10)]
+    [InlineData(100)]
+    [InlineData(1024)]
+    public void Reset_WithPosition_ResetsPositionToZero(int initialPosition)
+    {
+        // Arrange
+        using var stream = new PooledBufferStream();
+        stream.SetLength(2000); // Set length large enough to accommodate position
+        stream.Position = initialPosition;
+
+        // Act
+        stream.Reset();
+
+        // Assert
+        Assert.Equal(0, stream.Position);
+        Assert.Equal(0, stream.Length);
+    }
+
+    /// <summary>
     /// Verifies that RentReadOnlySequence returns a correct ReadOnlySequence for various data lengths.
     /// When no data has been written, an empty sequence is returned; otherwise, the sequence matches the written data.
     /// </summary>

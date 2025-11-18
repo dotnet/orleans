@@ -112,14 +112,16 @@ namespace Tester
             // Client configured with multiple gateway ports for load balancing/failover
             var clientHost = new HostBuilder().UseOrleansClient((ctx, clientBuilder) =>
             {
-                clientBuilder.UseLocalhostClustering(new[] {baseGatewayPort, baseGatewayPort + 1});
+                clientBuilder.UseLocalhostClustering([baseGatewayPort, baseGatewayPort + 1]);
             }).Build();
 
             var client = clientHost.Services.GetRequiredService<IClusterClient>();
 
             try
             {
-                await Task.WhenAll(silo1.StartAsync(), silo2.StartAsync(), clientHost.StartAsync());
+                await silo1.StartAsync();
+                await silo2.StartAsync();
+                await clientHost.StartAsync();
 
                 var grain = client.GetGrain<IEchoGrain>(Guid.NewGuid());
                 var result = await grain.Echo("test");
@@ -129,12 +131,12 @@ namespace Tester
             {
                 using var cancelled = new CancellationTokenSource();
                 cancelled.Cancel();
-                await Utils.SafeExecuteAsync(silo1.StopAsync(cancelled.Token));
-                await Utils.SafeExecuteAsync(silo2.StopAsync(cancelled.Token));
                 await Utils.SafeExecuteAsync(clientHost.StopAsync(cancelled.Token));
-                Utils.SafeExecute(() => silo1.Dispose());
-                Utils.SafeExecute(() => silo2.Dispose());
+                await Utils.SafeExecuteAsync(silo2.StopAsync(cancelled.Token));
+                await Utils.SafeExecuteAsync(silo1.StopAsync(cancelled.Token));
                 Utils.SafeExecute(() => clientHost.Dispose());
+                Utils.SafeExecute(() => silo2.Dispose());
+                Utils.SafeExecute(() => silo1.Dispose());
             }
         }
     }

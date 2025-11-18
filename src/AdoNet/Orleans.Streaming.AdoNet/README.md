@@ -14,7 +14,7 @@ You will also need to install the appropriate ADO.NET provider for your database
 
 ```shell
 # For SQL Server
-dotnet add package System.Data.SqlClient
+dotnet add package Microsoft.Data.SqlClient
 
 # For MySQL
 dotnet add package MySql.Data
@@ -39,7 +39,7 @@ var builder = Host.CreateApplicationBuilder(args)
                 name: "AdoNetStreamProvider",
                 configureOptions: options =>
                 {
-                    options.Invariant = "System.Data.SqlClient";  // For SQL Server
+                    options.Invariant = "Microsoft.Data.SqlClient";  // For SQL Server
                     options.ConnectionString = "Server=localhost;Database=OrleansStreaming;User ID=orleans;******;";
                 });
     });
@@ -60,7 +60,7 @@ public class ProducerGrain : Grain, IProducerGrain
         // Get a reference to a stream
         var streamProvider = GetStreamProvider("AdoNetStreamProvider");
         _stream = streamProvider.GetStream<string>(Guid.NewGuid(), "MyStreamNamespace");
-        
+
         return base.OnActivateAsync(cancellationToken);
     }
 
@@ -81,10 +81,10 @@ public class ConsumerGrain : Grain, IConsumerGrain, IAsyncObserver<string>
         // Get a reference to a stream
         var streamProvider = GetStreamProvider("AdoNetStreamProvider");
         var stream = streamProvider.GetStream<string>(this.GetPrimaryKey(), "MyStreamNamespace");
-        
+
         // Subscribe to the stream
         _subscription = await stream.SubscribeAsync(this);
-        
+
         await base.OnActivateAsync(cancellationToken);
     }
 

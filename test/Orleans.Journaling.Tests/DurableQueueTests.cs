@@ -187,8 +187,8 @@ public class DurableQueueTests : StateMachineTestBase
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
         var queue = new DurableQueue<string>("emptyQueue", manager, codec, SessionPool);
-        await manager.WriteStateAsync(CancellationToken.None);
         await sut.Lifecycle.OnStart();
+        await manager.WriteStateAsync(CancellationToken.None);
         
         // Assert
         Assert.Empty(queue);

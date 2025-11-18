@@ -415,7 +415,6 @@ namespace Orleans.Hosting
             services.AddSingleton<SharedMemoryPool>();
 
             // Activation migration
-            services.AddSingleton<MigrationContext.SerializationHooks>();
             services.AddSingleton<ActivationMigrationManager>();
             services.AddFromExisting<IActivationMigrationManager, ActivationMigrationManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationMigrationManager>();

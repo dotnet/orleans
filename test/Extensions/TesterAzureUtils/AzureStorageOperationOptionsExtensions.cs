@@ -1,6 +1,7 @@
 using Azure.Core.Diagnostics;
 using Azure.Data.Tables;
 using Azure.Identity;
+using Azure.Storage.Blobs;
 using TestExtensions;
 
 namespace Tester.AzureUtils
@@ -45,6 +46,20 @@ namespace Tester.AzureUtils
         }
 
         public static Orleans.Configuration.AzureBlobStorageOptions ConfigureTestDefaults(this Orleans.Configuration.AzureBlobStorageOptions options)
+        {
+            if (TestDefaultConfiguration.UseAadAuthentication)
+            {
+                options.BlobServiceClient = new(TestDefaultConfiguration.DataBlobUri, TestDefaultConfiguration.TokenCredential);
+            }
+            else
+            {
+                options.BlobServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+            }
+
+            return options;
+        }
+
+        public static AzureStorageJobShardOptions ConfigureTestDefaults(this AzureStorageJobShardOptions options)
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {

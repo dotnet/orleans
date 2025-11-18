@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>Orleans Dashboard</title>
+    <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport" />
+    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon" />
+    <link rel="icon" href="favicon.ico" type="image/x-icon" />
+</head>
+<body class="layout-fixed sidebar-expand-lg sidebar-mini" id="body">
+    <div id="error-message-content" class="error-container"></div>
+    <div class="app-wrapper">
+        <!-- Main Sidebar Container -->
+        <aside class="app-sidebar elevation-4">
+            <div id="brand-header"></div>
+
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <nav>
+                    <div id="menu"></div>
+                </nav>
+            </div>
+            <!-- /.sidebar -->
+        </aside>
+
+        <!-- Content Wrapper. Contains page content -->
+        <main class="app-main" id="content">
+            <div class="app-content">
+                <span style="padding-top: 25px;">
+                    <span><i class="fa fa-spinner fa-pulse fa-fw"></i> Loading...</span>
+                </span>
+            </div>
+        </main>
+        <!-- /.app-main -->
+    </div>
+
+    <!-- Vite will inject the bundled JS here -->
+    <script type="module" src="/src/index.tsx"></script>
+</body>
+</html>

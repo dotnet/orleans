@@ -32,14 +32,10 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_ClassWithImplicitFieldIds : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.ClassWithImplicitFieldIds>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.ClassWithImplicitFieldIds>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.ClassWithImplicitFieldIds);
-        private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.ClassWithImplicitFieldIds> _activator;
         private readonly global::System.Type _type0 = typeof(global::TestProject.MyCustomEnum);
         private readonly OrleansCodeGen.TestProject.Codec_MyCustomEnum _codec0;
-        private static readonly global::System.Action<global::TestProject.ClassWithImplicitFieldIds, global::TestProject.MyCustomEnum> setField0 = (global::System.Action<global::TestProject.ClassWithImplicitFieldIds, global::TestProject.MyCustomEnum>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.ClassWithImplicitFieldIds), "<EnumValue>k__BackingField");
-        private static readonly global::System.Action<global::TestProject.ClassWithImplicitFieldIds, string> setField1 = (global::System.Action<global::TestProject.ClassWithImplicitFieldIds, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.ClassWithImplicitFieldIds), "<StringValue>k__BackingField");
-        public Codec_ClassWithImplicitFieldIds(global::Orleans.Serialization.Activators.IActivator<global::TestProject.ClassWithImplicitFieldIds> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
+        public Codec_ClassWithImplicitFieldIds(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
-            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
             _codec0 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Codec_MyCustomEnum>(this, codecProvider);
         }
 
@@ -64,7 +60,7 @@ namespace OrleansCodeGen.TestProject
                 id += header.FieldIdDelta;
                 if (id == 19816600U)
                 {
-                    setField0(instance, _codec0.ReadValue(ref reader, header));
+                    instance.EnumValue = _codec0.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                     if (header.IsEndBaseOrEndObject)
                         break;
@@ -73,7 +69,7 @@ namespace OrleansCodeGen.TestProject
 
                 if (id == 1794034997U)
                 {
-                    setField1(instance, global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header));
+                    instance.StringValue = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                     if (header.IsEndBaseOrEndObject)
                         break;
@@ -109,7 +105,7 @@ namespace OrleansCodeGen.TestProject
             global::System.Type valueType = field.FieldType;
             if (valueType is null || valueType == _codecFieldType)
             {
-                var result = _activator.Create();
+                var result = new global::TestProject.ClassWithImplicitFieldIds();
                 ReferenceCodec.RecordObject(reader.Session, result);
                 Deserialize(ref reader, result);
                 return result;
@@ -122,8 +118,6 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "9.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_ClassWithImplicitFieldIds : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.ClassWithImplicitFieldIds>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.ClassWithImplicitFieldIds>
     {
-        private static readonly global::System.Action<global::TestProject.ClassWithImplicitFieldIds, global::TestProject.MyCustomEnum> setField0 = (global::System.Action<global::TestProject.ClassWithImplicitFieldIds, global::TestProject.MyCustomEnum>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.ClassWithImplicitFieldIds), "<EnumValue>k__BackingField");
-        private static readonly global::System.Action<global::TestProject.ClassWithImplicitFieldIds, string> setField1 = (global::System.Action<global::TestProject.ClassWithImplicitFieldIds, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.ClassWithImplicitFieldIds), "<StringValue>k__BackingField");
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.ClassWithImplicitFieldIds DeepCopy(global::TestProject.ClassWithImplicitFieldIds original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -133,9 +127,15 @@ namespace OrleansCodeGen.TestProject
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void DeepCopy(global::TestProject.ClassWithImplicitFieldIds input, global::TestProject.ClassWithImplicitFieldIds output, global::Orleans.Serialization.Cloning.CopyContext context)
         {
-            setField0(output, input.EnumValue);
-            setField1(output, input.StringValue);
+            output.EnumValue = input.EnumValue;
+            output.StringValue = input.StringValue;
         }
+    }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "9.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Activator_ClassWithImplicitFieldIds : global::Orleans.Serialization.Activators.IActivator<global::TestProject.ClassWithImplicitFieldIds>
+    {
+        public global::TestProject.ClassWithImplicitFieldIds Create() => new global::TestProject.ClassWithImplicitFieldIds();
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "9.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -146,6 +146,7 @@ namespace OrleansCodeGen.TestProject
             config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_MyCustomEnum));
             config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_ClassWithImplicitFieldIds));
             config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_ClassWithImplicitFieldIds));
+            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_ClassWithImplicitFieldIds));
         }
     }
 }

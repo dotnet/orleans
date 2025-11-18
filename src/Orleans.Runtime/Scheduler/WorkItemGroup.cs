@@ -13,7 +13,7 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.Scheduler;
 
-[DebuggerDisplay("WorkItemGroup Context={GrainContext} State={state}")]
+[DebuggerDisplay("WorkItemGroup Context={GrainContext} State={_state}")]
 internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
 {
     private enum WorkGroupStatus : byte
