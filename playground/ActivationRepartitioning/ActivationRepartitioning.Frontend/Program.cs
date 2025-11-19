@@ -1,22 +1,32 @@
-using DashboardToy.Frontend.Data;
+using ActivationRepartitioning.Frontend.Data;
 using Microsoft.AspNetCore.Mvc;
 using Orleans.Configuration;
 using Orleans.Placement.Repartitioning;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddKeyedRedisClient("orleans-redis");
-#pragma warning disable ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 builder.UseOrleans(orleans =>
 {
-    orleans.AddActivationRepartitioner<HardLimitRule>();
+#pragma warning disable ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+    orleans.AddActivationRepartitioner();
     orleans.Configure<ActivationRepartitionerOptions>(o =>
     {
         o.MinRoundPeriod = TimeSpan.FromSeconds(5);
         o.MaxRoundPeriod = TimeSpan.FromSeconds(15);
-        o.RecoveryPeriod = TimeSpan.FromSeconds(2);
+        o.RecoveryPeriod = TimeSpan.FromSeconds(5);
+        o.AnchoringFilterEnabled = false;
     });
-});
 #pragma warning restore ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+#pragma warning disable ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+    orleans.AddActivationRebalancer();
+    orleans.Configure<ActivationRebalancerOptions>(o =>
+    {
+        o.RebalancerDueTime = TimeSpan.FromSeconds(10);
+        o.SessionCyclePeriod = TimeSpan.FromSeconds(5);
+        o.CycleNumberWeight = 0.7;
+    });
+#pragma warning restore ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+});
 
 // Add services to the container.
 builder.Services.AddSingleton<ClusterDiagnosticsService>();
@@ -52,9 +62,15 @@ app.UseRouting();
 await app.StartAsync();
 
 var loadGrain = app.Services.GetRequiredService<IGrainFactory>().GetGrain<ILoaderGrain>("root");
-await loadGrain.AddForest();
-await loadGrain.AddForest();
-await loadGrain.AddForest();
+for (var i = 0; i < 5; i++)
+{
+    for (var j = 0; j < 3; j++)
+    {
+        await loadGrain.AddForest();
+    }
+
+    await Task.Delay(TimeSpan.FromSeconds(2));
+}
 
 await app.WaitForShutdownAsync();
 
@@ -134,9 +150,4 @@ public class FanOutGrain : Grain, IFanOutGrain
             await task;
         }
     }
-}
-
-internal sealed class HardLimitRule : IImbalanceToleranceRule
-{
-    public bool IsSatisfiedBy(uint imbalance) => imbalance <= 30;
 }

@@ -3,7 +3,7 @@
     <RootNamespace>UnitTests.GrainInterfaces</RootNamespace>
     <AssemblyName>TestInternalGrainInterfaces</AssemblyName>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <TargetFramework>$(MinTestTargetFramework)</TargetFramework>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>

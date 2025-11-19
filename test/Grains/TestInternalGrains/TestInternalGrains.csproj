@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>UnitTests.Grains</RootNamespace>
-    <TargetFramework>$(MinTestTargetFramework)</TargetFramework>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <NoWarn>$(NoWarn);1591;1591;618</NoWarn>
   </PropertyGroup>
