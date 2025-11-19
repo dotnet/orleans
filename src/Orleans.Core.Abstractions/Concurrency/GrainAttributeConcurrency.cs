@@ -40,9 +40,13 @@ namespace Orleans.Concurrency
     }
 
     /// <summary>
-    /// The Unordered attribute is used to mark grain interface in which the delivery order of
+    /// The Unordered attribute is used to mark grain interfaces in which the delivery order of
     /// messages is not significant.
     /// </summary>
+    /// <remarks>
+    /// This attribute is obsolete because Orleans does not guarantee message delivery order
+    /// regardless of whether this attribute is applied.
+    /// </remarks>
     [Obsolete("Message delivery order is not guaranteed in Orleans, regardless of whether this attribute is used.", error: false)]
     [AttributeUsage(AttributeTargets.Interface)]
     public sealed class UnorderedAttribute : Attribute
