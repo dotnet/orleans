@@ -1446,6 +1446,7 @@ namespace Orleans.Concurrency
         public override void Populate(System.IServiceProvider services, System.Type grainClass, Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) { }
     }
 
+    [System.Obsolete("Message delivery order is not guaranteed in Orleans, regardless of whether this attribute is used.", false)]
     [System.AttributeUsage(System.AttributeTargets.Interface)]
     public sealed partial class UnorderedAttribute : System.Attribute
     {
