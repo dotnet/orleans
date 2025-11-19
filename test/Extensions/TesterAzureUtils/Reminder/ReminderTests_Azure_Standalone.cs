@@ -36,8 +36,6 @@ namespace Tester.AzureUtils.TimerTests
             this.log = this.loggerFactory.CreateLogger<ReminderTests_Azure_Standalone>();
 
             this.serviceId = Guid.NewGuid().ToString();
-
-            TestUtils.ConfigureClientThreadPoolSettingsForStorageTests(1000);
         }
 
         [SkippableFact, TestCategory("Reminders"), TestCategory("Performance")]
