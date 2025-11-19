@@ -93,7 +93,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<OverloadDetector>();
 
             services.AddSingleton<SystemTargetShared>();
-            services.AddSingleton<LifecycleSchedulingSystemTarget>();
 
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
 
