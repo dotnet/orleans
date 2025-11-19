@@ -20,15 +20,12 @@ var siloLifetime = host.Services.GetRequiredService<ISiloLifetime>();
 
 Console.WriteLine("Registering lifecycle hooks");
 
-try
-{
-    siloLifetime.Started.Register(async _ => await Task.Delay(100));
-    Console.WriteLine("Started.Register should have thrown exception!");
-}
-catch (NotSupportedException)
-{
-    Console.WriteLine("Started.Register correctly threw NotSupportedException.");
-}
+siloLifetime.Started.Register(async (s, ct) => Console.WriteLine($"Started! My state is: {s}"), "Awesome");
+
+// Uncomment to test out termination.
+
+// siloLifetime.Started.Register(async (s, ct) => throw new Exception("Poke silo!"), terminateOnError: false);
+// siloLifetime.Started.Register(async (s, ct) => throw new Exception("Kill silo!"), terminateOnError: true);
 
 _ = Task.Run(async () =>
 {
@@ -38,7 +35,7 @@ _ = Task.Run(async () =>
 
 _ = Task.Run(async () =>
 {
-    using var callback = siloLifetime.Stopping.Register(async _ =>
+    using var callback = siloLifetime.Stopping.Register(async (s, ct) =>
     {
         Console.WriteLine("Callback should have not executed, it was disposed!");
     });
@@ -53,7 +50,7 @@ _ = Task.Run(async () =>
 _ = Task.Run(async () =>
 {
     Console.WriteLine("Background worker started. Running until 'Stopping' token triggers.");
-    var token = siloLifetime.Stopping.CancellationToken;
+    var token = siloLifetime.Stopping.Token;
 
     while (!token.IsCancellationRequested)
     {
@@ -63,7 +60,7 @@ _ = Task.Run(async () =>
     Console.WriteLine("Background worker detected 'Stopping' signal and exited.");
 });
 
-siloLifetime.Stopping.Register(async ct =>
+siloLifetime.Stopping.Register(async (s, ct) =>
 {
     Console.WriteLine("Silo 'Stopping' triggered. Executing 2-second cleanup.");
     try
@@ -77,7 +74,7 @@ siloLifetime.Stopping.Register(async ct =>
     }
 });
 
-siloLifetime.Stopped.Register(async ct =>
+siloLifetime.Stopped.Register(async (s, ct) =>
 {
     Console.WriteLine("Silo 'Stopped' triggered.");
     await Task.Delay(100, ct);
@@ -96,7 +93,7 @@ await host.StopAsync();
 Console.WriteLine("Host has fully stopped. Testing late registration now.");
 
 var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-siloLifetime.Stopping.Register(async _ =>
+siloLifetime.Stopping.Register(async (s, ct) =>
 {
     Console.WriteLine("Late registered 'Stopping' callback executed.");
     tcs.SetResult();

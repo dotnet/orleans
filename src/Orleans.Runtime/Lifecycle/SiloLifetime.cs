@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime;
@@ -18,9 +17,6 @@ public interface ISiloLifetime
     /// <summary>
     /// Triggered when the silo has fully started and is ready to accept traffic.
     /// </summary>
-    /// <remarks>
-    /// Calling <see cref="ISiloLifecycleStage.Register"/> in this stage will throw a <see cref="NotSupportedException"/>.
-    /// </remarks>
     ISiloLifecycleStage Started { get; }
 
     /// <summary>
@@ -48,8 +44,8 @@ public interface ISiloLifecycleStage
     /// Gets a cancellation token that is triggered when this stage completes.
     /// </summary>
     /// <remarks>Avoid registering callbacks in this token, prefer
-    /// <see cref="Register(Func{CancellationToken, Task})"/> instead.</remarks>
-    CancellationToken CancellationToken { get; }
+    /// <see cref="Register(Func{object?, CancellationToken, Task}, object?, bool)"/> instead.</remarks>
+    CancellationToken Token { get; }
 
     /// <summary>
     /// Registers a callback to be executed during this lifecycle stage.
@@ -58,19 +54,24 @@ public interface ISiloLifecycleStage
     /// <para>The asynchronous operation to perform.</para>
     /// <para><strong>Never <c>await</c> <see cref="Task"/></strong> inside a callback, as it will result in a deadlock!</para>
     /// </param>
+    /// <param name="terminateOnError">
+    /// If <c>true</c>, the silo will shut down if there is a failure;
+    /// otherwise an error will be logged and the silo will continue to the next stage.
+    /// </param>
+    /// <param name="state">An optional state to pass.</param>
     /// <remarks>
     /// Disposing the returned value removes the callback from the lifecycle stage.
     /// This is useful for components that have a shorter lifespan than the silo to prevent holding onto the reference,
     /// and ensure that cleanup logic is not executed for components that are no longer active.
     /// </remarks>
-    IDisposable Register(Func<CancellationToken, Task> callback);
+    IDisposable Register(Func<object?, CancellationToken, Task> callback, object? state = null, bool terminateOnError = true);
 }
 
 internal sealed class SiloLifetime(ILogger<SiloLifetime> logger) : ISiloLifetime, ILifecycleParticipant<ISiloLifecycle>
 {
-    private readonly SiloLifecycleStage _started = new ReadOnlySiloLifecycleStage(logger, "Started");
-    private readonly SiloLifecycleStage _stopping = new SiloLifecycleStage(logger, "Stopping");
-    private readonly SiloLifecycleStage _stopped = new SiloLifecycleStage(logger, "Stopped");
+    private readonly SiloLifecycleStage _started = new(logger, "Started");
+    private readonly SiloLifecycleStage _stopping = new(logger, "Stopping");
+    private readonly SiloLifecycleStage _stopped = new(logger, "Stopped");
 
     public ISiloLifecycleStage Started => _started;
     public ISiloLifecycleStage Stopping => _stopping;
@@ -97,14 +98,6 @@ internal sealed class SiloLifetime(ILogger<SiloLifetime> logger) : ISiloLifetime
             onStop: _stopped.NotifyCompleted);
     }
 
-    private class ReadOnlySiloLifecycleStage(ILogger logger, string name) : SiloLifecycleStage(logger, name)
-    {
-        private readonly string _name = name;
-
-        public override IDisposable Register(Func<CancellationToken, Task> callback) =>
-            throw new NotSupportedException($"Registering callbacks for '{_name}' is not allowed. This event is for observation purposes only.");
-    }
-
     private class SiloLifecycleStage(ILogger logger, string name) : ISiloLifecycleStage
     {
         // We use this so that late registrations can still be executed, otherwise
@@ -113,16 +106,18 @@ internal sealed class SiloLifetime(ILogger<SiloLifetime> logger) : ISiloLifetime
         private bool _isNotifyingOrHasCompleted;
 
         private readonly object _lock = new();
-        private readonly List<Func<CancellationToken, Task>> _callbacks = [];
+        private readonly List<StageParticipant> _participants = [];
         private readonly CancellationTokenSource _cts = new();
         private readonly TaskCompletionSource _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Task Task => _tcs.Task;
-        public CancellationToken CancellationToken => _cts.Token;
+        public CancellationToken Token => _cts.Token;
 
-        public virtual IDisposable Register(Func<CancellationToken, Task> callback)
+        public IDisposable Register(Func<object?, CancellationToken, Task> callback, object? state, bool terminateOnError)
         {
             ArgumentNullException.ThrowIfNull(callback);
+
+            var participant = new StageParticipant(this, callback, state, terminateOnError);
 
             lock (_lock)
             {
@@ -130,25 +125,25 @@ internal sealed class SiloLifetime(ILogger<SiloLifetime> logger) : ISiloLifetime
                 {
                     logger.LogInformation("Lifecycle stage = '{StageName}' has already completed. Executing callback immediately.", name);
 
-                    // TODO: Maybe we should just throw?!
-                    _ = Task.Run(() => ExecuteLateCallback(callback));
+                    _ = Task.Run(() => ExecuteLateCallback(participant)); 
 
-                    return new DisposableCallback(this, callback);
+                    return participant;
                 }
 
-                _callbacks.Add(callback);
+                _participants.Add(participant);
             }
 
-            return new DisposableCallback(this, callback);
+            return participant;
 
-            async Task ExecuteLateCallback(Func<CancellationToken, Task> callback)
+            async Task ExecuteLateCallback(StageParticipant participant)
             {
                 try
                 {
                     // The original token passed to NotifyCompleted (typically related to the silo startup/shutdown) must be "gone" by now.
-                    // Since the stage has already completed, there is no impending timeout for this late registration, so we pass None to the callback.
+                    // Since the stage has already completed, there is no impending timeout for this late registration, so we pass CancellationToken.None.
+                    // For late participants we do not check for termination!
 
-                    await callback(CancellationToken.None).ConfigureAwait(false);
+                    await participant.Execute(CancellationToken.None).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -161,12 +156,12 @@ internal sealed class SiloLifetime(ILogger<SiloLifetime> logger) : ISiloLifetime
         {
             Debug.Assert(!_isNotifyingOrHasCompleted, "This should not be called twice!");
 
-            List<Func<CancellationToken, Task>> snapshot;
+            List<StageParticipant> snapshot;
 
             lock (_lock)
             {
                 _isNotifyingOrHasCompleted = true;
-                snapshot = [.. _callbacks];
+                snapshot = [.. _participants];
             }
 
             // If we took the snapshot, no further registrations will be account for the sequential invocations.
@@ -174,7 +169,7 @@ internal sealed class SiloLifetime(ILogger<SiloLifetime> logger) : ISiloLifetime
 
             var exceptions = new List<Exception>();
 
-            foreach (var callback in snapshot)
+            foreach (var participant in snapshot)
             {
                 if (cancellationToken.IsCancellationRequested)
                 {
@@ -186,7 +181,7 @@ internal sealed class SiloLifetime(ILogger<SiloLifetime> logger) : ISiloLifetime
                     // TODO: Not sure if we should WaitAsync in case the users ignore the token we pass.
                     // Or if we should wait indefinatly until the callback executes?!
 
-                    await callback(cancellationToken).WaitAsync(cancellationToken).ConfigureAwait(false);
+                    await participant.Execute(cancellationToken).WaitAsync(cancellationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -195,26 +190,28 @@ internal sealed class SiloLifetime(ILogger<SiloLifetime> logger) : ISiloLifetime
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "Error executing callback for silo lifecycle = '{StageName}'", name);
+
                     exceptions.Add(ex);
+
+                    if (participant.TerminateOnError)
+                    { 
+                        // We signal cancellation so any BG-running participants that observe the stage can stop.
+                        CancelStage();
+
+                        // In case there was a previous error but the participant chose to not terminate, we include that error aswell.
+                        var aggException = new AggregateException(exceptions);
+
+                        _tcs.SetException(aggException);
+
+                        throw aggException;
+                    }
                 }
             }
 
-            try
-            {
-                _cts.Cancel();
-            }
-            catch (Exception ex)
-            {
-                // Should not happen if callers respect the contract to register callbacks with the proper method, but it can happen!
-                logger.LogError(ex, "An exception occurred inside a CancellationToken callback for stage = '{StageName}'", name);
-
-                // TODO: Should we add this exception to the list?!
-                // I mean callers are not support to register callbacks with the token
-            }
+            CancelStage();
 
             if (exceptions.Count > 0)
             {
-                // TODO: Maybe we should just log if we are shutting down!
                 _tcs.SetException(new AggregateException(exceptions));
             }
             else
@@ -223,17 +220,32 @@ internal sealed class SiloLifetime(ILogger<SiloLifetime> logger) : ISiloLifetime
             }
         }
 
-        private void Unregister(Func<CancellationToken, Task> callback)
+        private void CancelStage()
         {
-            lock (_lock)
+            try
             {
-                _callbacks.Remove(callback);
+                _cts.Cancel();
+            }
+            catch (Exception ex)
+            {
+                // Should not happen if callers respect the contract to register callbacks with the proper method, but it can happen!
+                logger.LogError(ex, "An exception occurred inside a CancellationToken callback for stage = '{StageName}'", name);
             }
         }
 
-        private class DisposableCallback(SiloLifecycleStage stage, Func<CancellationToken, Task> callback) : IDisposable
+        private void Unregister(StageParticipant participant)
         {
-            public void Dispose() => stage.Unregister(callback);
+            lock (_lock)
+            {
+                _participants.Remove(participant);
+            }
+        }
+
+        private record StageParticipant(SiloLifecycleStage Stage,
+            Func<object?, CancellationToken, Task> Callback, object? State, bool TerminateOnError) : IDisposable
+        {
+            public Task Execute(CancellationToken cancellationToken) => Callback(State, cancellationToken);
+            void IDisposable.Dispose() => Stage.Unregister(this);
         }
     }
 }
