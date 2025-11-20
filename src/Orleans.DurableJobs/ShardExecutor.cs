@@ -106,9 +106,7 @@ internal sealed partial class ShardExecutor
         {
             LogExecutingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.Job.TargetGrainId, jobContext.Job.DueTime);
 
-            var target = _grainFactory
-                .GetGrain(jobContext.Job.TargetGrainId)
-                .AsReference<IDurableJobReceiverExtension>();
+            var target = _grainFactory.GetGrain<IDurableJobReceiverExtension>(jobContext.Job.TargetGrainId);
 
             await target.DeliverDurableJobAsync(jobContext, cancellationToken);
             await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
