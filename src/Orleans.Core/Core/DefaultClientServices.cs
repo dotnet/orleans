@@ -162,6 +162,7 @@ namespace Orleans
             services.AddSingleton<IGrainPropertiesProvider, ImplementedInterfaceProvider>();
 
             services.AddSingleton<IGrainCallCancellationManager, ExternalClientGrainCallCancellationManager>();
+            services.AddSingleton<ILocalActivationStatusChecker, ClientLocalActivationStatusChecker>();
 
             ApplyConfiguration(builder);
         }
