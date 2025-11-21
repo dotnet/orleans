@@ -380,8 +380,8 @@ public class ShardExecutorTests
         var factory = Substitute.For<IInternalGrainFactory>();
         
         var extension = Substitute.For<IDurableJobReceiverExtension>();
-        extension.DeliverDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask);
+        extension.DeliverDurableJobAsync(Arg.Any<IDurableJobContext>(), Arg.Any<CancellationToken>())
+            .Returns(DurableJobRunResult.Completed());
         
         factory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
         
@@ -393,15 +393,15 @@ public class ShardExecutorTests
         List<string> completedJobs)
     {
         var extension = Substitute.For<IDurableJobReceiverExtension>();
-        extension.DeliverDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+        extension.DeliverDurableJobAsync(Arg.Any<IDurableJobContext>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                var context = callInfo.ArgAt<IJobRunContext>(0);
+                var context = callInfo.ArgAt<IDurableJobContext>(0);
                 lock (completedJobs)
                 {
                     completedJobs.Add(context.Job.Id);
                 }
-                return Task.CompletedTask;
+                return Task.FromResult(DurableJobRunResult.Completed());
             });
         
         factory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
@@ -412,8 +412,12 @@ public class ShardExecutorTests
         Func<Task> executionAction)
     {
         var extension = Substitute.For<IDurableJobReceiverExtension>();
-        extension.DeliverDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
-            .Returns(callInfo => executionAction());
+        extension.DeliverDurableJobAsync(Arg.Any<IDurableJobContext>(), Arg.Any<CancellationToken>())
+            .Returns(async callInfo =>
+            {
+                await executionAction();
+                return DurableJobRunResult.Completed();
+            });
         
         factory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
     }
@@ -427,10 +431,10 @@ public class ShardExecutorTests
         var executionCount = jobExecutionCount;
         
         var extension = Substitute.For<IDurableJobReceiverExtension>();
-        extension.DeliverDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+        extension.DeliverDurableJobAsync(Arg.Any<IDurableJobContext>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                var context = callInfo.ArgAt<IJobRunContext>(0);
+                var context = callInfo.ArgAt<IDurableJobContext>(0);
                 var currentExecution = Interlocked.Increment(ref executionCount);
                 
                 // First job fails
@@ -440,7 +444,8 @@ public class ShardExecutorTests
                     {
                         failedJobs.Add(context.Job.Id);
                     }
-                    throw new InvalidOperationException("Simulated job failure");
+                    var exception = new InvalidOperationException("Simulated job failure");
+                    return Task.FromResult(DurableJobRunResult.Failed(exception));
                 }
                 
                 // Other jobs succeed
@@ -448,7 +453,7 @@ public class ShardExecutorTests
                 {
                     completedJobs.Add(context.Job.Id);
                 }
-                return Task.CompletedTask;
+                return Task.FromResult(DurableJobRunResult.Completed());
             });
         
         factory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
