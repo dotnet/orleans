@@ -53,16 +53,6 @@ namespace Tester
             }
         }
 
-        public static void CheckForDynamoDB()
-        {
-            if (string.IsNullOrWhiteSpace(DynamoDbAccessKey) ||
-                string.IsNullOrWhiteSpace(DynamoDbSecretKey) ||
-                string.IsNullOrWhiteSpace(DynamoDbService))
-            {
-                throw new SkipException($"No DynamoDB credentials found. Skipping");
-            }
-        }
-
         public static double CalibrateTimings()
         {
             const int NumLoops = 10000;
