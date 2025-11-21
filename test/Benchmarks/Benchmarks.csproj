@@ -2,7 +2,7 @@
   <PropertyGroup>
     <RootNamespace>Benchmarks</RootNamespace>
     <AssemblyName>Benchmarks</AssemblyName>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>net10.0;net8.0</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <DebugSymbols>true</DebugSymbols>
     <ServerGarbageCollection>true</ServerGarbageCollection>
@@ -21,7 +21,7 @@
     <PackageReference Include="Microsoft.CodeAnalysis" />
     <!-- Temporarily kept to resolve a conflict between Microsoft.Azure.DocumentDB.Core's dependencies -->
     <PackageReference Include="System.CodeDom" />
-    <PackageReference Include="System.Data.SqlClient" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
     <PackageReference Include="MessagePack" />
     <PackageReference Include="ZeroFormatter" />
     <PackageReference Include="Utf8Json" />
@@ -52,6 +52,13 @@
 
   <ItemGroup>
     <Protobuf Include="Serialization\Models\ProtoIntClass.proto" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="coverlet.collector">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
 </Project>

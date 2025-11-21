@@ -10,14 +10,14 @@ namespace UnitTests.General
 {
     /// <summary>
     /// Tests for distributed tracing and activity propagation across Orleans grain calls.
-    /// 
+    ///
     /// Orleans supports distributed tracing through .NET's Activity API, which is compatible with OpenTelemetry.
     /// These tests verify that:
     /// - Activity context (trace ID, span ID, trace state) is properly propagated from client to grain
     /// - Both W3C and Hierarchical activity ID formats are supported
     /// - Baggage items (key-value pairs) are correctly transmitted across grain boundaries
     /// - Activity propagation works correctly both from external clients and between grains
-    /// 
+    ///
     /// The ActivityPropagationGrainCallFilter is responsible for creating child activities for grain calls
     /// and ensuring proper context propagation throughout the distributed system.
     /// </summary>
@@ -41,7 +41,7 @@ namespace UnitTests.General
                 // Accessing TraceId during sampling is important to ensure the Activity system
                 // properly initializes the trace context. This reproduces a specific scenario
                 // where SetParentId might not work correctly if TraceId isn't accessed.
-                var _ = options.TraceId; 
+                var _ = options.TraceId;
                 return ActivitySamplingResult.PropagationData;
             };
 
@@ -86,13 +86,13 @@ namespace UnitTests.General
             }
         }
 
-        private readonly ActivityIdFormat defaultIdFormat;
-        private readonly Fixture fixture;
+        private readonly ActivityIdFormat _defaultIdFormat;
+        private readonly Fixture _fixture;
 
         public ActivityPropagationTests(Fixture fixture)
         {
-            defaultIdFormat = Activity.DefaultIdFormat;
-            this.fixture = fixture;
+            _defaultIdFormat = Activity.DefaultIdFormat;
+            this._fixture = fixture;
             ActivitySource.AddActivityListener(Listener);
         }
 
@@ -109,8 +109,8 @@ namespace UnitTests.General
         {
             Activity.DefaultIdFormat = idFormat;
 
-            await Test(fixture.GrainFactory);
-            await Test(fixture.Client);
+            await Test(_fixture.GrainFactory);
+            await Test(_fixture.Client);
 
             static async Task Test(IGrainFactory grainFactory)
             {
@@ -138,15 +138,23 @@ namespace UnitTests.General
         {
             Activity.DefaultIdFormat = ActivityIdFormat.W3C;
 
-            var activity = new Activity("SomeName");
-            activity.TraceStateString = "traceState";
+            var activity = new Activity("SomeName")
+            {
+#if NET10_0_OR_GREATER
+                // In .NET 10+, the W3C propagator enforces strict W3C trace state format (key=value)
+                TraceStateString = "vendor=value"
+#else
+                // Pre-.NET 10 legacy propagator accepts any string format
+                TraceStateString = "traceState"
+#endif
+            };
             activity.AddBaggage("foo", "bar");
             activity.Start();
 
             try
             {
-                await Test(fixture.GrainFactory);
-                await Test(fixture.Client);
+                await Test(_fixture.GrainFactory);
+                await Test(_fixture.Client);
             }
             finally
             {
@@ -173,6 +181,8 @@ namespace UnitTests.General
         /// - The grain's activity ID is a child of the parent activity (starts with parent ID)
         /// - Baggage items are correctly propagated
         /// Note: Hierarchical format doesn't support trace state like W3C format does.
+        /// In .NET 10+, the default W3C propagator doesn't support Hierarchical format,
+        /// so the test expectations are adjusted accordingly.
         /// </summary>
         [Fact]
         [TestCategory("BVT")]
@@ -186,8 +196,8 @@ namespace UnitTests.General
 
             try
             {
-                await Test(fixture.GrainFactory);
-                await Test(fixture.Client);
+                await Test(_fixture.GrainFactory);
+                await Test(_fixture.Client);
             }
             finally
             {
@@ -202,8 +212,15 @@ namespace UnitTests.General
 
                 Assert.NotNull(result);
                 Assert.NotNull(result.Id);
+#if NET10_0_OR_GREATER
+                // In .NET 10+, the default W3C propagator doesn't support Hierarchical format.
+                // It cannot inject Hierarchical activities, so the grain creates a new root activity.
+                // Neither ID hierarchy nor baggage is propagated with Hierarchical format.
+#else
+                // Pre-.NET 10: Legacy propagator supports Hierarchical format
                 Assert.StartsWith(activity.Id, result.Id);
                 Assert.Equal(activity.Baggage, result.Baggage);
+#endif
             }
         }
     }

@@ -1,4 +1,4 @@
-using FluentAssertions.Common;
+using AwesomeAssertions.Common;
 using Orleans;
 using Orleans.Runtime;
 using Xunit;

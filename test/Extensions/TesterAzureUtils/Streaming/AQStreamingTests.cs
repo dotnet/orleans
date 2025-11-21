@@ -51,7 +51,7 @@ namespace Tester.AzureUtils.Streaming
                     ConfigureStreaming("ProviderType", "AzureQueueStorage");
                     if (TestDefaultConfiguration.UseAadAuthentication)
                     {
-                        cb.AddKeyedAzureQueueClient(AzureQueueStreamProviderName, settings =>
+                        cb.AddKeyedAzureQueueServiceClient(AzureQueueStreamProviderName, settings =>
                         {
                             settings.ServiceUri = TestDefaultConfiguration.DataQueueUri;
                             settings.Credential = TestDefaultConfiguration.TokenCredential;
