@@ -104,7 +104,9 @@ namespace Orleans
     /// <summary>
     /// Membership table interface for system target based implementation.
     /// </summary>
+#pragma warning disable CS0618 // Type or member is obsolete
     [Unordered]
+#pragma warning restore CS0618 // Type or member is obsolete
     public interface IMembershipTableSystemTarget : IMembershipTable, ISystemTarget
     {
     }
