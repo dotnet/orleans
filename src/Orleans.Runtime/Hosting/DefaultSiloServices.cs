@@ -91,6 +91,7 @@ namespace Orleans.Hosting
 #pragma warning restore 618
 
             services.TryAddSingleton<OverloadDetector>();
+            services.TryAddFromExisting<IOverloadDetector, OverloadDetector>();
 
             services.AddSingleton<SystemTargetShared>();
 

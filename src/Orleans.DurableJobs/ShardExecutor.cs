@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.DurableJobs;
 
@@ -19,22 +20,26 @@ internal sealed partial class ShardExecutor
     private readonly ILogger<ShardExecutor> _logger;
     private readonly DurableJobsOptions _options;
     private readonly SemaphoreSlim _jobConcurrencyLimiter;
+    private readonly IOverloadDetector _overloadDetector;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ShardExecutor"/> class.
     /// </summary>
     /// <param name="grainFactory">The grain factory for creating grain references.</param>
     /// <param name="options">The durable jobs configuration options.</param>
+    /// <param name="overloadDetector">The overload detector for throttling job execution.</param>
     /// <param name="logger">The logger instance.</param>
     public ShardExecutor(
         IInternalGrainFactory grainFactory,
         IOptions<DurableJobsOptions> options,
+        IOverloadDetector overloadDetector,
         ILogger<ShardExecutor> logger)
     {
         _grainFactory = grainFactory;
         _logger = logger;
         _options = options.Value;
         _jobConcurrencyLimiter = new SemaphoreSlim(_options.MaxConcurrentJobsPerSilo);
+        _overloadDetector = overloadDetector;
     }
 
     /// <summary>
@@ -63,6 +68,17 @@ internal sealed partial class ShardExecutor
             // Process all jobs in the shard
             await foreach (var jobContext in shard.ConsumeDurableJobsAsync().WithCancellation(cancellationToken))
             {
+                // Check for overload and pause batch processing if needed
+                if (_overloadDetector.IsOverloaded)
+                {
+                    LogOverloadDetected(_logger, shard.Id);
+                    while (_overloadDetector.IsOverloaded)
+                    {
+                        await Task.Delay(_options.OverloadBackoffDelay, cancellationToken);
+                    }
+                    LogOverloadCleared(_logger, shard.Id);
+                }
+
                 // Wait for concurrency slot
                 await _jobConcurrencyLimiter.WaitAsync(cancellationToken);
                 // Start processing the job. RunJobAsync will release the semaphore when done and remove itself from the tasks dictionary
@@ -95,9 +111,7 @@ internal sealed partial class ShardExecutor
         {
             LogExecutingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.Job.TargetGrainId, jobContext.Job.DueTime);
 
-            var target = _grainFactory
-                .GetGrain(jobContext.Job.TargetGrainId)
-                .AsReference<IDurableJobReceiverExtension>();
+            var target = _grainFactory.GetGrain<IDurableJobReceiverExtension>(jobContext.Job.TargetGrainId);
 
             await target.DeliverDurableJobAsync(jobContext, cancellationToken);
             await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
