@@ -538,9 +538,14 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             var grain = this.testCluster.GrainFactory.GetGrain<INonReentrantTimerCallGrain>(GetRandomGrainId());
 
-            // Schedule a timer to fire at the 30s mark which will not extend the grain's lifetime.
+            // Schedule a timer to fire after 4s which will not extend the grain's lifetime.
+            // With keepAlive: false, the timer should not prevent the grain from being collected.
             await grain.StartTimer(testName, TimeSpan.FromSeconds(4), keepAlive: false);
-            await Task.Delay(TimeSpan.FromSeconds(7));
+            
+            // Wait long enough to ensure the grain is deactivated even if the timer fires.
+            // Timeline: StartTimer (t=0) -> Timer fires (t=4) -> Idle timeout starts (t=4) -> Collection (t=9-10)
+            // We wait 12 seconds to be safe: 4s (timer delay) + 5s (idle timeout) + 1s (collection quantum) + 2s (buffer)
+            await Task.Delay(TimeSpan.FromSeconds(12));
 
             var tickCount = await grain.GetTickCount();
 
