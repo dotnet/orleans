@@ -43,6 +43,18 @@ internal sealed partial class ShardExecutor
     private static partial void LogRetryingJob(ILogger logger, string jobId, string jobName, DateTimeOffset retryTime, int dequeueCount);
 
     [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Polling job {JobId} (Name: '{JobName}') - will check status again in {PollDelay}"
+    )]
+    private static partial void LogPollingJob(ILogger logger, string jobId, string jobName, TimeSpan pollDelay);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Job {JobId} (Name: '{JobName}') returned Failed status"
+    )]
+    private static partial void LogJobFailedWithResult(ILogger logger, string jobId, string jobName);
+
+    [LoggerMessage(
         Level = LogLevel.Error,
         Message = "Job {JobId} (Name: '{JobName}') failed after {DequeueCount} attempts and will not be retried"
     )]
