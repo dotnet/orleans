@@ -69,9 +69,14 @@ internal sealed partial class ShardExecutor
             await foreach (var jobContext in shard.ConsumeDurableJobsAsync().WithCancellation(cancellationToken))
             {
                 // Check for overload and pause batch processing if needed
-                while (_overloadDetector.IsOverloaded)
+                if (_overloadDetector.IsOverloaded)
                 {
-                    await Task.Delay(_options.OverloadBackoffDelay, cancellationToken);
+                    LogOverloadDetected(_logger, shard.Id);
+                    while (_overloadDetector.IsOverloaded)
+                    {
+                        await Task.Delay(_options.OverloadBackoffDelay, cancellationToken);
+                    }
+                    LogOverloadCleared(_logger, shard.Id);
                 }
 
                 // Wait for concurrency slot
