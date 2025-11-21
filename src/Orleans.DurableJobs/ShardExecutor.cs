@@ -107,33 +107,61 @@ internal sealed partial class ShardExecutor
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
 
+        Exception? failureException = null;
+
         try
         {
             LogExecutingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.Job.TargetGrainId, jobContext.Job.DueTime);
 
             var target = _grainFactory.GetGrain<IDurableJobReceiverExtension>(jobContext.Job.TargetGrainId);
 
-            await target.DeliverDurableJobAsync(jobContext, cancellationToken);
-            await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
+            var result = await target.DeliverDurableJobAsync(jobContext, cancellationToken);
 
-            LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
+            // Handle the result based on status
+            while (result.Status == DurableJobRunStatus.PollAfter)
+            {
+                // Enter polling loop
+                LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay!.Value);
+                
+                await Task.Delay(result.PollAfterDelay.Value, cancellationToken);
+                
+                result = await target.CheckJobStatusAsync(jobContext, cancellationToken);
+            }
+
+            if (result.Status == DurableJobRunStatus.Completed)
+            {
+                await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
+                LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
+            }
+            else if (result.Status == DurableJobRunStatus.Failed)
+            {
+                // Handle failed result through retry policy
+                LogJobFailedWithResult(_logger, jobContext.Job.Id, jobContext.Job.Name);
+                failureException = result.Exception ?? new Exception("Job failed without exception");
+            }
         }
         catch (Exception ex) when (ex is not TaskCanceledException)
         {
             LogErrorExecutingJob(_logger, ex, jobContext.Job.Id);
-            var retryTime = _options.ShouldRetry(jobContext, ex);
-            if (retryTime is not null)
-            {
-                LogRetryingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, retryTime.Value, jobContext.DequeueCount);
-                await shard.RetryJobLaterAsync(jobContext, retryTime.Value, cancellationToken);
-            }
-            else
-            {
-                LogJobFailedNoRetry(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.DequeueCount);
-            }
+            failureException = ex;
         }
         finally
         {
+            // Handle failures and retries in common path
+            if (failureException is not null)
+            {
+                var retryTime = _options.ShouldRetry(jobContext, failureException);
+                if (retryTime is not null)
+                {
+                    LogRetryingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, retryTime.Value, jobContext.DequeueCount);
+                    await shard.RetryJobLaterAsync(jobContext, retryTime.Value, cancellationToken);
+                }
+                else
+                {
+                    LogJobFailedNoRetry(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.DequeueCount);
+                }
+            }
+
             _jobConcurrencyLimiter.Release();
             runningTasks.TryRemove(jobContext.Job.Id, out _);
         }
