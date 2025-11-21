@@ -1,19 +1,18 @@
-namespace Benchmarks.Models
+namespace Benchmarks.Serialization.Models;
+
+[Serializable]
+[GenerateSerializer]
+public struct SimpleStruct
 {
-    [Serializable]
-    [GenerateSerializer]
-    public struct SimpleStruct
-    {
-        [Id(0)]
-        public int Int { get; set; }
+    [Id(0)]
+    public int Int { get; set; }
 
-        [Id(1)]
-        public bool Bool { get; set; }
+    [Id(1)]
+    public bool Bool { get; set; }
 
-        [Id(3)]
-        public object AlwaysNull { get; set; }
+    [Id(3)]
+    public object AlwaysNull { get; set; }
 
-        [Id(4)]
-        public Guid Guid { get; set; }
-    }
+    [Id(4)]
+    public Guid Guid { get; set; }
 }

@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using System.Collections;
 using Xunit;
 using Xunit.Abstractions;

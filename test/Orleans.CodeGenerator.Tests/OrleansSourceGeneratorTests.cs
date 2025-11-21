@@ -1058,7 +1058,17 @@ public class DemoClass
     /// </summary>
     private static async Task<CSharpCompilation> CreateCompilation(string sourceCode, string assemblyName = "TestProject")
     {
+#if NET10_0_OR_GREATER
+        // Manually construct .NET 10.0 reference assemblies
+        var net10References = new ReferenceAssemblies(
+            "net10.0",
+            new PackageIdentity("Microsoft.NETCore.App.Ref", "10.0.0"),
+            Path.Combine("ref", "net10.0"));
+        
+        var references = await net10References.ResolveAsync(LanguageNames.CSharp, default);
+#else
         var references = await ReferenceAssemblies.Net.Net80.ResolveAsync(LanguageNames.CSharp, default);
+#endif
 
         // Add the Orleans Orleans.Core.Abstractions assembly
         references = references.AddRange(

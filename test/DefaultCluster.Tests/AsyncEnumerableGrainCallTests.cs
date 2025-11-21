@@ -57,6 +57,64 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
     }
 
     /// <summary>
+    /// Tests preemptive cancellation of async enumerable streams before any values are yielded.
+    /// Verifies that when a CancellationToken is cancelled before the enumeration starts yielding values,
+    /// the operation properly throws OperationCanceledException and no values are returned.
+    /// This test ensures Orleans handles early cancellation gracefully in distributed streaming scenarios.
+    /// </summary>
+    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    public async Task ObservableGrain_AsyncEnumerable_CancelBeforeYield()
+    {
+        var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
+
+        // Set up cancellation tokens - one for test timeout, one for the grain call
+        using var testCts = new CancellationTokenSource(TimeSpan.FromSeconds(35));
+        using var callCts = new CancellationTokenSource();
+        var callId = Guid.NewGuid();
+
+        // Task to cancel the enumeration after it starts but before it yields
+        var enumerationStartedTask = Task.Run(async () =>
+        {
+            await grain.WaitForCall(callId); // Wait for enumeration to begin
+            callCts.Cancel(); // Cancel before any values are yielded
+        });
+
+        try
+        {
+            // Start enumeration with a slow grain method and un-cancelled token
+            await foreach (var entry in grain.SleepyEnumerable(callId, TimeSpan.FromSeconds(25), callCts.Token))
+            {
+                Assert.Fail("Should have thrown due to cancellation before yielding any values.");
+            }
+
+            Assert.Fail("Enumeration should not have completed without an exception.");
+        }
+        catch (OperationCanceledException)
+        {
+            // Verify the cancellation token was indeed cancelled
+            Assert.True(callCts.Token.IsCancellationRequested);
+        }
+
+        await enumerationStartedTask;
+
+        // Wait for the grain to record the cancellation
+        while (true)
+        {
+            var canceledCalls = await grain.GetCanceledCalls();
+            if (canceledCalls.Contains(callId))
+            {
+                break;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(10));
+            if (testCts.IsCancellationRequested)
+            {
+                Assert.Fail("Test timed out waiting for cancellation to be recorded.");
+            }
+        }
+    }
+
+    /// <summary>
     /// Tests error handling in async enumerable streams when an exception is thrown during enumeration.
     /// Verifies that exceptions are properly propagated to the client and resources are cleaned up.
     /// The errorIndex parameter determines when the error occurs, testing both immediate and delayed errors.
