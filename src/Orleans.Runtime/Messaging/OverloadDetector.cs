@@ -8,7 +8,18 @@ namespace Orleans.Runtime.Messaging
     /// <summary>
     /// Determines whether or not the process is overloaded.
     /// </summary>
-    internal class OverloadDetector
+    public interface IOverloadDetector
+    {
+        /// <summary>
+        /// Returns <see langword="true"/> if this process is overloaded, <see langword="false"/> otherwise.
+        /// </summary>
+        bool IsOverloaded { get; }
+    }
+
+    /// <summary>
+    /// Determines whether or not the process is overloaded.
+    /// </summary>
+    internal class OverloadDetector : IOverloadDetector
     {
         private const int RefreshIntervalMilliseconds = 1_000;
         private readonly IEnvironmentStatisticsProvider _environmentStatisticsProvider;
