@@ -1,4 +1,4 @@
-﻿using Orleans.Transactions.TestKit.xUnit;
+using Orleans.Transactions.TestKit.xUnit;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -7,7 +7,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
     /// <summary>
     /// Tests for transaction golden path scenarios with skewed clocks using DynamoDB.
     /// </summary>
-    [TestCategory("DynamoDB"), TestCategory("Transactions"), TestCategory("Functional")]
+    [TestCategory("DynamoDB"), TestCategory("Transactions")]
     public class SkewedClockGoldenPathTransactionTests : GoldenPathTransactionTestRunnerxUnit, IClassFixture<SkewedClockTestFixture>
     {
         public SkewedClockGoldenPathTransactionTests(SkewedClockTestFixture fixture, ITestOutputHelper output)
@@ -15,6 +15,5 @@ namespace Orleans.Transactions.DynamoDB.Tests
         {
             fixture.EnsurePreconditionsMet();
         }
-
     }
 }

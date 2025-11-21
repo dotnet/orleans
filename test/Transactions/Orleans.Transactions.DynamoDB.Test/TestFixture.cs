@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization;
 using Orleans.Storage;
+using Xunit;
 
 namespace Orleans.Transactions.DynamoDB.Tests
 {
@@ -18,7 +19,10 @@ namespace Orleans.Transactions.DynamoDB.Tests
         protected override void CheckPreconditionsOrThrow()
         {
             base.CheckPreconditionsOrThrow();
-            TestUtils.CheckForDynamoDB();
+            if (!AWSTestConstants.IsDynamoDbAvailable)
+            {
+                throw new SkipException("DynamoDB is not configured");
+            }
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -61,7 +65,10 @@ namespace Orleans.Transactions.DynamoDB.Tests
         protected override void CheckPreconditionsOrThrow()
         {
             base.CheckPreconditionsOrThrow();
-            TestUtils.CheckForDynamoDB();
+            if (!AWSTestConstants.IsDynamoDbAvailable)
+            {
+                throw new SkipException("DynamoDB is not configured");
+            }
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
