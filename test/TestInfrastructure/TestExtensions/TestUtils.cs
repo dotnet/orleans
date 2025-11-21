@@ -51,7 +51,6 @@ namespace Tester
             {
                 throw new SkipException("No connection string found. Skipping");
             }
-            ForceTlsVersion();
         }
 
         public static void CheckForDynamoDB()
@@ -62,12 +61,6 @@ namespace Tester
             {
                 throw new SkipException($"No DynamoDB credentials found. Skipping");
             }
-        }
-
-        private static void ForceTlsVersion()
-        {
-            // Force TLS 1.2
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
         }
 
         public static double CalibrateTimings()
