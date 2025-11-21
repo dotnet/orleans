@@ -21,11 +21,11 @@ public class LocalActivationStatusCheckerTests(DefaultClusterFixture fixture) : 
     [Fact, TestCategory("BVT")]
     public async Task ShouldReturnTrueForLocallyActivatedGrain()
     {
-        // Arrange: Get a grain reference and activate it by calling a method
+        // Get a grain reference and activate it by calling a method
         var grain = GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.NextInt64());
         await grain.SetA(42);
 
-        // Act & Assert: The grain should be locally activated on exactly one silo
+        // The grain should be locally activated on exactly one silo
         var grainId = grain.GetGrainId();
         Assert.Single(HostedCluster.Silos, silo => IsLocallyActivated(silo, grainId));
 
@@ -43,17 +43,14 @@ public class LocalActivationStatusCheckerTests(DefaultClusterFixture fixture) : 
     /// considered locally activated.
     /// </summary>
     [Fact, TestCategory("BVT")]
-    public async Task ShouldReturnFalseForNonActivatedGrain()
+    public void ShouldReturnFalseForNonActivatedGrain()
     {
-        // Arrange: Get a grain reference but don't activate it
+        // Get a grain reference but don't activate it
         var grain = GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.NextInt64());
 
-        // Act & Assert: The grain should not be locally activated on any silo
+        // The grain should not be locally activated on any silo
         var grainId = grain.GetGrainId();
         Assert.DoesNotContain(HostedCluster.Silos, silo => IsLocallyActivated(silo, grainId));
-
-        // Clean up by ensuring we don't leave state behind
-        await Task.CompletedTask;
 
         static bool IsLocallyActivated(SiloHandle silo, GrainId grainId)
         {
@@ -70,14 +67,14 @@ public class LocalActivationStatusCheckerTests(DefaultClusterFixture fixture) : 
     [Fact, TestCategory("BVT")]
     public async Task ShouldReturnFalseForDifferentGrainIdentity()
     {
-        // Arrange: Activate one grain
+        // Activate one grain
         var grain1 = GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.NextInt64());
         await grain1.SetA(42);
 
         // Get a different grain reference (different identity)
         var grain2 = GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.NextInt64());
 
-        // Act & Assert: The second grain should not be locally activated on any silo
+        // The second grain should not be locally activated on any silo
         var grainId2 = grain2.GetGrainId();
         Assert.DoesNotContain(HostedCluster.Silos, silo => IsLocallyActivated(silo, grainId2));
 
@@ -97,15 +94,15 @@ public class LocalActivationStatusCheckerTests(DefaultClusterFixture fixture) : 
     [Fact, TestCategory("BVT")]
     public async Task ClientShouldAlwaysReturnFalseForIsLocallyActivated()
     {
-        // Arrange: Get a grain reference and activate it
+        // Get a grain reference and activate it
         var grain = GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.NextInt64());
         await grain.SetA(42);
 
-        // Act: Get the client-side activation checker
+        // Get the client-side activation checker
         var clientChecker = Client.ServiceProvider.GetRequiredService<ILocalActivationStatusChecker>();
         var isLocalOnClient = clientChecker.IsLocallyActivated(grain.GetGrainId());
 
-        // Assert: Client should always return false
+        // Client should always return false
         Assert.False(isLocalOnClient, "Client should always return false for IsLocallyActivated");
     }
 
@@ -116,14 +113,14 @@ public class LocalActivationStatusCheckerTests(DefaultClusterFixture fixture) : 
     [Fact, TestCategory("BVT")]
     public void ClientShouldReturnFalseForNonActivatedGrain()
     {
-        // Arrange: Get a grain reference without activating it
+        // Get a grain reference without activating it
         var grain = GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.NextInt64());
 
-        // Act: Get the client-side activation checker
+        // Get the client-side activation checker
         var clientChecker = Client.ServiceProvider.GetRequiredService<ILocalActivationStatusChecker>();
         var isLocalOnClient = clientChecker.IsLocallyActivated(grain.GetGrainId());
 
-        // Assert: Client should return false
+        // Client should return false
         Assert.False(isLocalOnClient, "Client should return false for non-activated grain");
     }
 }
