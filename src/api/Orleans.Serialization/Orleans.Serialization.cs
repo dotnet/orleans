@@ -1413,6 +1413,19 @@ namespace Orleans.Serialization.Codecs
     }
 
     [RegisterSerializer]
+    public sealed partial class BigIntegerCodec : IFieldCodec<System.Numerics.BigInteger>, IFieldCodec
+    {
+        System.Numerics.BigInteger IFieldCodec<System.Numerics.BigInteger>.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+
+        void IFieldCodec<System.Numerics.BigInteger>.WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, System.Numerics.BigInteger value) { }
+
+        public static System.Numerics.BigInteger ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+
+        public static void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Numerics.BigInteger value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [RegisterSerializer]
     public sealed partial class BitArrayCodec : IFieldCodec<System.Collections.BitArray>, IFieldCodec
     {
         System.Collections.BitArray IFieldCodec<System.Collections.BitArray>.ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }

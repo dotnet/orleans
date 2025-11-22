@@ -611,8 +611,6 @@ namespace Orleans.TestingHost.Utils
     {
         public static void ConfigureDefaultLoggingBuilder(Microsoft.Extensions.Logging.ILoggingBuilder builder, string filePath) { }
 
-        public static void ConfigureThreadPoolSettingsForStorageTests(int numDotNetPoolThreads = 200) { }
-
         public static Microsoft.Extensions.Logging.ILoggerFactory CreateDefaultLoggerFactory(string filePath, Microsoft.Extensions.Logging.LoggerFilterOptions filters) { throw null; }
 
         public static Microsoft.Extensions.Logging.ILoggerFactory CreateDefaultLoggerFactory(string filePath) { throw null; }

@@ -569,10 +569,10 @@ namespace Orleans.Transactions.TestKit
 
     public abstract partial class TransactionalStateStorageTestRunner<TState> : TransactionTestRunnerBase where TState : class, new()
     {
-        protected System.Func<FluentAssertions.Equivalency.EquivalencyOptions<TState>, FluentAssertions.Equivalency.EquivalencyOptions<TState>> assertConfig;
+        protected System.Func<AwesomeAssertions.Equivalency.EquivalencyOptions<TState>, AwesomeAssertions.Equivalency.EquivalencyOptions<TState>> assertConfig;
         protected System.Func<int, TState> stateFactory;
         protected System.Func<System.Threading.Tasks.Task<Abstractions.ITransactionalStateStorage<TState>>> stateStorageFactory;
-        protected TransactionalStateStorageTestRunner(System.Func<System.Threading.Tasks.Task<Abstractions.ITransactionalStateStorage<TState>>> stateStorageFactory, System.Func<int, TState> stateFactory, IGrainFactory grainFactory, System.Action<string> testOutput, System.Func<FluentAssertions.Equivalency.EquivalencyOptions<TState>, FluentAssertions.Equivalency.EquivalencyOptions<TState>> assertConfig = null) : base(default!, default!) { }
+        protected TransactionalStateStorageTestRunner(System.Func<System.Threading.Tasks.Task<Abstractions.ITransactionalStateStorage<TState>>> stateStorageFactory, System.Func<int, TState> stateFactory, IGrainFactory grainFactory, System.Action<string> testOutput, System.Func<AwesomeAssertions.Equivalency.EquivalencyOptions<TState>, AwesomeAssertions.Equivalency.EquivalencyOptions<TState>> assertConfig = null) : base(default!, default!) { }
 
         public virtual System.Threading.Tasks.Task CancelMany(int count) { throw null; }
 

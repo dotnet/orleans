@@ -702,7 +702,7 @@ namespace Orleans.Runtime
 
         System.Collections.Generic.IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates { get; }
 
-        System.Threading.Tasks.ValueTask Refresh(MembershipVersion minimumVersion = default);
+        System.Threading.Tasks.ValueTask Refresh(MembershipVersion minimumVersion = default, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task<bool> TryKill(SiloAddress siloAddress);
     }
 
@@ -1047,6 +1047,14 @@ namespace Orleans.Runtime.MembershipService.SiloMetadata
         public static Orleans.Hosting.ISiloBuilder UseSiloMetadata(this Orleans.Hosting.ISiloBuilder builder, System.Collections.Generic.Dictionary<string, string> metadata) { throw null; }
 
         public static Orleans.Hosting.ISiloBuilder UseSiloMetadata(this Orleans.Hosting.ISiloBuilder builder) { throw null; }
+    }
+}
+
+namespace Orleans.Runtime.Messaging
+{
+    public partial interface IOverloadDetector
+    {
+        bool IsOverloaded { get; }
     }
 }
 
