@@ -88,7 +88,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
                     continue;
 
                 // upon recovery, local non-committed transactions are considered aborted
-                if (kvp.Value.TransactionManager.Length == 0)
+                if (kvp.Value.TransactionManager is null or { Length: 0 })
                     break;
 
                 ParticipantId tm = this.ConvertFromStorageFormat<ParticipantId>(kvp.Value.TransactionManager);
@@ -132,7 +132,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
             if ((!string.IsNullOrWhiteSpace(keyETag) || !string.IsNullOrWhiteSpace(expectedETag)) &&
                 keyETag != expectedETag)
             {
-                throw new ArgumentException(nameof(expectedETag), "Etag does not match");
+                throw new ArgumentException("Etag does not match", nameof(expectedETag));
             }
 
             // assemble all storage operations into a single batch
@@ -356,7 +356,7 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
         }
         catch (Exception ex)
         {
-            this.logger.LogError($"Read transactional states failed {ex}.");
+            this.logger.LogError(ex, "Read transactional states failed.");
             throw;
         }
     }

@@ -44,7 +44,7 @@ internal class KeyEntity
 
     public long CommittedSequenceId { get; set; }
 
-    public byte[] Metadata { get; set; }
+    public byte[] Metadata { get; set; } = [];
 
     public DateTimeOffset Timestamp { get; set; }
 
@@ -59,7 +59,7 @@ internal class KeyEntity
             { COMITTED_SEQUENCE_ID_PROPERTY_NAME, new AttributeValue { N = this.CommittedSequenceId.ToString() } },
         };
 
-        if (this.Metadata.Length > 0)
+        if (this.Metadata is { Length: > 0 })
         {
             item[METADATA_PROPERTY_NAME] = new AttributeValue { B = new MemoryStream(this.Metadata) };
         }
