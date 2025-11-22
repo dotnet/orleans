@@ -1,13 +1,14 @@
 using AWSUtils.Tests.StorageTests;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.TestingHost;
-using Orleans.Transactions.TestKit;
-using TestExtensions;
-using Tester;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 using Orleans.Serialization;
 using Orleans.Storage;
+using Orleans.TestingHost;
+using Orleans.Transactions.TestKit;
+using Tester;
+using TestExtensions;
 using Xunit;
 
 namespace Orleans.Transactions.DynamoDB.Tests

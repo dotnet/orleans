@@ -15,7 +15,7 @@ internal class StateEntity
     public const string ROW_KEY_PREFIX = "state_";
     public const string ROW_KEY_MIN = ROW_KEY_PREFIX;
     public const string ROW_KEY_MAX = ROW_KEY_PREFIX + "~";
-    public const string TRANSCATION_ID_PROPERTY_NAME = nameof(TransactionId);
+    public const string TRANSACTION_ID_PROPERTY_NAME = nameof(TransactionId);
     public const string TRANSACTION_TIMESTAMP_PROPERTY_NAME = nameof(TransactionTimestamp);
     public const string TRANSACTION_MANAGER_PROPERTY_NAME = nameof(TransactionManager);
 
@@ -31,7 +31,7 @@ internal class StateEntity
         if (fields.TryGetValue(DynamoDBTransactionalStateConstants.ROW_KEY_PROPERTY_NAME, out var rowKey))
             this.RowKey = rowKey.S;
 
-        if (fields.TryGetValue(TRANSCATION_ID_PROPERTY_NAME, out var transactionId))
+        if (fields.TryGetValue(TRANSACTION_ID_PROPERTY_NAME, out var transactionId))
             this.TransactionId = transactionId.S;
 
         if (fields.TryGetValue(TRANSACTION_TIMESTAMP_PROPERTY_NAME, out var timestamp))
@@ -81,7 +81,7 @@ internal class StateEntity
 
     public DateTime TransactionTimestamp { get; set; }
 
-    public byte[] TransactionManager { get; set; }
+    public byte[] TransactionManager { get; set; } = [];
 
     public byte[] State { get; set; }
 
@@ -100,16 +100,16 @@ internal class StateEntity
             { DynamoDBTransactionalStateConstants.ROW_KEY_PROPERTY_NAME, new AttributeValue { S = this.RowKey } },
         };
 
-        if (this.State != null)
+        if (this.State is { Length: > 0 })
             item[DynamoDBTransactionalStateConstants.BINARY_STATE_PROPERTY_NAME] = new AttributeValue { B = new MemoryStream(this.State) };
 
         if (!string.IsNullOrEmpty(this.TransactionId))
-            item[TRANSCATION_ID_PROPERTY_NAME] = new AttributeValue { S = this.TransactionId };
+            item[TRANSACTION_ID_PROPERTY_NAME] = new AttributeValue { S = this.TransactionId };
 
         if (this.TransactionTimestamp != default)
             item[TRANSACTION_TIMESTAMP_PROPERTY_NAME] = new AttributeValue { S = this.TransactionTimestamp.ToUniversalTime().ToString("o") };
 
-        if (this.TransactionManager.Length > 0)
+        if (this.TransactionManager is { Length: > 0 })
             item[TRANSACTION_MANAGER_PROPERTY_NAME] = new AttributeValue { B = new MemoryStream(this.TransactionManager) };
 
         if (this.ETag.HasValue)
