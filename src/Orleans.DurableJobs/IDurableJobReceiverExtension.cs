@@ -47,7 +47,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
             try
             {
                 await handler.ExecuteJobAsync(context, cancellationToken);
-                return DurableJobRunResult.Completed();
+                return DurableJobRunResult.Completed;
             }
             catch (Exception ex)
             {
@@ -66,7 +66,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
     {
         // TODO: Need to properly check job status and return appropriate result (Completed, PollAfter, or Failed)
         // For now, always return Completed
-        return Task.FromResult(DurableJobRunResult.Completed());
+        return Task.FromResult(DurableJobRunResult.Completed);
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Error executing durable job {JobId} on grain {GrainId}")]
