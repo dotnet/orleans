@@ -240,7 +240,7 @@ namespace Orleans.Storage
 
             try
             {
-                LogInformationInitializing(this.options);
+                LogDebugInitializing(this.name, this.options.ContainerName);
                 if (options.CreateClient is not { } createClient)
                 {
                     throw new OrleansConfigurationException($"No credentials specified. Use the {options.GetType().Name}.{nameof(AzureBlobStorageOptions.ConfigureBlobServiceClient)} method to configure the Azure Blob Service client.");
@@ -365,11 +365,11 @@ namespace Orleans.Storage
         private partial void LogTraceContainerNotFound(string grainType, GrainId grainId, string? eTag, string blobName, string containerName);
 
         [LoggerMessage(
-            Level = LogLevel.Information,
+            Level = LogLevel.Debug,
             EventId = (int)AzureProviderErrorCode.AzureTableProvider_InitProvider,
-            Message = "AzureBlobGrainStorage initializing: {Options}"
+            Message = "AzureBlobGrainStorage {Name} is initializing: ContainerName={ContainerName}"
         )]
-        private partial void LogInformationInitializing(AzureBlobStorageOptions options);
+        private partial void LogDebugInitializing(string name, string containerName);
 
         [LoggerMessage(
             Level = LogLevel.Information,
