@@ -975,8 +975,7 @@ internal sealed partial class ActivationData :
                             if (!compatibilityDirector.IsCompatible(message.InterfaceVersion, currentVersion))
                             {
                                 // Add this activation to cache invalidation headers.
-                                message.CacheInvalidationHeader ??= new List<GrainAddressCacheUpdate>();
-                                message.CacheInvalidationHeader.Add(new GrainAddressCacheUpdate(Address, validAddress: null));
+                                message.AddToCacheInvalidationHeader(Address, validAddress: null);
 
                                 var reason = new DeactivationReason(
                                     DeactivationReasonCode.IncompatibleRequest,
