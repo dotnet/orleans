@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "artifacts-npm-credprovider && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint ."
   },

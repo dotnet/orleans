@@ -31,11 +31,11 @@
   <!-- Build the frontend -->
   <Target Name="BuildNpmApp" BeforeTargets="AssignTargetPaths;BeforeTargets;Compile" Inputs="@(NpmAppSources)" Outputs="$(NpmAppBuildMarker)">
     <Exec
-      Command="npm install"
+      Command="npm ci --prefer-offline --no-audit"
       WorkingDirectory="$(NpmAppRootDirectory)"
       ConsoleToMsBuild="true" />
     <Exec
-      Command="npm run build" 
+      Command="npm run build"
       WorkingDirectory="$(NpmAppRootDirectory)"
       ConsoleToMsBuild="true" />
     <!-- Create marker file to track successful build -->
