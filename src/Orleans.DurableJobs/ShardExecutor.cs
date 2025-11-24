@@ -118,10 +118,10 @@ internal sealed partial class ShardExecutor
             var result = await target.DeliverDurableJobAsync(jobContext, cancellationToken);
 
             // Handle the result based on status
-            while (result.Status == DurableJobRunStatus.PollAfter)
+            while (result.IsPending)
             {
                 // Enter polling loop
-                LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay!.Value);
+                LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);
                 
                 await Task.Delay(result.PollAfterDelay.Value, cancellationToken);
                 
@@ -133,11 +133,11 @@ internal sealed partial class ShardExecutor
                 await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
                 LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
             }
-            else if (result.Status == DurableJobRunStatus.Failed)
+            else if (result.IsFailed)
             {
                 // Handle failed result through retry policy
                 LogJobFailedWithResult(_logger, jobContext.Job.Id, jobContext.Job.Name);
-                failureException = result.Exception ?? new Exception("Job failed without exception");
+                failureException = result.Exception;
             }
         }
         catch (Exception ex) when (ex is not TaskCanceledException)
