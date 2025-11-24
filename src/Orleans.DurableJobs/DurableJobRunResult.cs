@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.DurableJobs;
 
@@ -8,6 +9,12 @@ namespace Orleans.DurableJobs;
 [GenerateSerializer]
 public sealed class DurableJobRunResult
 {
+    [MemberNotNullWhen(true, nameof(Exception))]
+    public bool IsFailed => Status == DurableJobRunStatus.Failed;
+
+    [MemberNotNullWhen(true, nameof(PollAfterDelay))]
+    public bool IsPending => Status == DurableJobRunStatus.PollAfter;
+
     private DurableJobRunResult(DurableJobRunStatus status, TimeSpan? pollAfter, Exception? exception)
     {
         Status = status;
@@ -60,12 +67,12 @@ public sealed class DurableJobRunResult
     /// <summary>
     /// Creates a result indicating the job failed.
     /// </summary>
-    /// <param name="exception">Optional exception that caused the failure. This will be passed to the retry policy.</param>
+    /// <param name="exception">The exception that caused the failure. This will be passed to the retry policy.</param>
     /// <returns>A failed job result.</returns>
     /// <remarks>
     /// The exception will be passed to the retry callback to determine if the job should be retried.
     /// </remarks>
-    public static DurableJobRunResult Failed(Exception? exception = null) => new(DurableJobRunStatus.Failed, null, exception);
+    public static DurableJobRunResult Failed(Exception exception) => new(DurableJobRunStatus.Failed, null, exception);
 }
 
 /// <summary>
