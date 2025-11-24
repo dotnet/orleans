@@ -100,7 +100,7 @@ internal sealed partial class ShardExecutor
     }
 
     private async Task RunJobAsync(
-        IDurableJobRun jobContext,
+        IJobRunContext jobContext,
         IJobShard shard,
         ConcurrentDictionary<string, Task> runningTasks,
         CancellationToken cancellationToken)
