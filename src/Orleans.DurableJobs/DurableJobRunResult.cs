@@ -33,11 +33,12 @@ public sealed class DurableJobRunResult
     [Id(2)]
     public Exception? Exception { get; }
 
+    private static readonly DurableJobRunResult CompletedInstance = new(DurableJobRunStatus.Completed, null, null);
+
     /// <summary>
-    /// Creates a result indicating the job completed successfully.
+    /// Gets a result indicating the job completed successfully.
     /// </summary>
-    /// <returns>A completed job result.</returns>
-    public static DurableJobRunResult Completed() => new(DurableJobRunStatus.Completed, null, null);
+    public static DurableJobRunResult Completed => CompletedInstance;
 
     /// <summary>
     /// Creates a result indicating the job should be polled again after the specified delay.
