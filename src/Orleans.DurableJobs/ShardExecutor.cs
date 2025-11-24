@@ -140,7 +140,7 @@ internal sealed partial class ShardExecutor
                 failureException = result.Exception;
             }
         }
-        catch (Exception ex) when (ex is not TaskCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogErrorExecutingJob(_logger, ex, jobContext.Job.Id);
             failureException = ex;
