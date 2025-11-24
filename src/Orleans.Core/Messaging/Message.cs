@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace Orleans.Runtime
 {
@@ -280,7 +281,19 @@ namespace Orleans.Runtime
             var grainAddressCacheUpdate = new GrainAddressCacheUpdate(invalidAddress, validAddress);
             if (_cacheInvalidationHeader is null)
             {
-                CacheInvalidationHeader = [grainAddressCacheUpdate];
+                var newList = new List<GrainAddressCacheUpdate> { grainAddressCacheUpdate };
+                if (Interlocked.CompareExchange(ref _cacheInvalidationHeader, newList, null) is not null)
+                {
+                    // Another thread initialized it, add to the existing list
+                    lock (_cacheInvalidationHeader)
+                    {
+                        _cacheInvalidationHeader.Add(grainAddressCacheUpdate);
+                    }
+                }
+                else
+                {
+                    _headers.SetFlag(MessageFlags.HasCacheInvalidationHeader, true);
+                }
             }
             else
             {
