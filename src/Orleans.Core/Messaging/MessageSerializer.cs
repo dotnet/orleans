@@ -25,9 +25,9 @@ namespace Orleans.Runtime.Messaging
     {
         private const int FramingLength = Message.LENGTH_HEADER_SIZE;
         private const int MessageSizeHint = 4096;
-        private readonly Dictionary<Type, ResponseCodec> _rawResponseCodecs = new();
+        private readonly Dictionary<Type, ResponseCodec> _rawResponseCodecs = [];
         private readonly CodecProvider _codecProvider;
-        private readonly IFieldCodec<GrainAddressCacheUpdate> _activationAddressCodec;
+        private readonly IFieldCodec<GrainAddressCacheUpdate> _grainAddressCacheUpdateCodec;
         private readonly CachingSiloAddressCodec _readerSiloAddressCodec = new();
         private readonly CachingSiloAddressCodec _writerSiloAddressCodec = new();
         private readonly CachingIdSpanCodec _idSpanCodec = new();
@@ -49,7 +49,7 @@ namespace Orleans.Runtime.Messaging
             _maxBodyLength = options.MaxMessageBodySize;
             _codecProvider = sessionPool.CodecProvider;
             _requestContextCodec = OrleansGeneratedCodeHelper.GetService<DictionaryCodec<string, object>>(this, sessionPool.CodecProvider);
-            _activationAddressCodec = OrleansGeneratedCodeHelper.GetService<IFieldCodec<GrainAddressCacheUpdate>>(this, sessionPool.CodecProvider);
+            _grainAddressCacheUpdateCodec = OrleansGeneratedCodeHelper.GetService<IFieldCodec<GrainAddressCacheUpdate>>(this, sessionPool.CodecProvider);
             _bufferWriter = new(FramingLength, MessageSizeHint, memoryPool.Pool);
         }
 
@@ -248,13 +248,13 @@ namespace Orleans.Runtime.Messaging
 
             if (headers.HasFlag(MessageFlags.HasCacheInvalidationHeader))
             {
-                WriteCacheInvalidationHeaders(ref writer, value.CacheInvalidationHeader);
+                WriteCacheInvalidationHeaders(ref writer, value);
             }
 
             // Always write RequestContext last
             if (headers.HasFlag(MessageFlags.HasRequestContextData))
             {
-                WriteRequestContext(ref writer, value.RequestContextData);
+                WriteRequestContext(ref writer, value.RequestContextData!);
             }
         }
 
@@ -308,21 +308,34 @@ namespace Orleans.Runtime.Messaging
                 var list = new List<GrainAddressCacheUpdate>(n);
                 for (int i = 0; i < n; i++)
                 {
-                    list.Add(_activationAddressCodec.ReadValue(ref reader, reader.ReadFieldHeader()));
+                    list.Add(_grainAddressCacheUpdateCodec.ReadValue(ref reader, reader.ReadFieldHeader()));
                 }
 
                 return list;
             }
 
-            return new List<GrainAddressCacheUpdate>();
+            return [];
         }
 
-        internal void WriteCacheInvalidationHeaders<TBufferWriter>(ref Writer<TBufferWriter> writer, List<GrainAddressCacheUpdate> value) where TBufferWriter : IBufferWriter<byte>
+        internal void WriteCacheInvalidationHeaders<TBufferWriter>(ref Writer<TBufferWriter> writer, Message message) where TBufferWriter : IBufferWriter<byte>
         {
-            writer.WriteVarUInt32((uint)value.Count);
-            foreach (var entry in value)
+            // Lock during enumeration to avoid concurrent modifications.
+            // The list can be modified by other threads after the message is queued for sending.
+            var cacheUpdates = message.CacheInvalidationHeader;
+            if (cacheUpdates is null)
             {
-                _activationAddressCodec.WriteField(ref writer, 0, typeof(GrainAddressCacheUpdate), entry);
+                writer.WriteVarUInt32(0u);
+            }
+            else
+            {
+                lock (cacheUpdates)
+                {
+                    writer.WriteVarUInt32((uint)cacheUpdates.Count);
+                    foreach (var entry in cacheUpdates)
+                    {
+                        _grainAddressCacheUpdateCodec.WriteField(ref writer, 0, typeof(GrainAddressCacheUpdate), entry);
+                    }
+                }
             }
         }
 

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -16,23 +17,23 @@ namespace Orleans.Runtime
 
         public CoarseStopwatch _timeToExpiry;
 
-        public object BodyObject { get; set; }
+        public object? BodyObject { get; set; }
 
         public PackedHeaders _headers;
         public CorrelationId _id;
 
-        public Dictionary<string, object> _requestContextData;
+        public Dictionary<string, object>? _requestContextData;
 
-        public SiloAddress _targetSilo;
+        public SiloAddress? _targetSilo;
         public GrainId _targetGrain;
 
-        public SiloAddress _sendingSilo;
+        public SiloAddress? _sendingSilo;
         public GrainId _sendingGrain;
 
         public ushort _interfaceVersion;
         public GrainInterfaceType _interfaceType;
 
-        public List<GrainAddressCacheUpdate> _cacheInvalidationHeader;
+        public List<GrainAddressCacheUpdate>? _cacheInvalidationHeader;
 
         public PackedHeaders Headers { get => _headers; set => _headers = value; }
 
@@ -153,7 +154,7 @@ namespace Orleans.Runtime
             set => _headers.ForwardCount = value;
         }
 
-        public SiloAddress TargetSilo
+        public SiloAddress? TargetSilo
         {
             get => _targetSilo;
             set
@@ -171,7 +172,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public SiloAddress SendingSilo
+        public SiloAddress? SendingSilo
         {
             get => _sendingSilo;
             set
@@ -235,7 +236,7 @@ namespace Orleans.Runtime
             _timeToExpiry = default;
         }
 
-        public List<GrainAddressCacheUpdate> CacheInvalidationHeader
+        public List<GrainAddressCacheUpdate>? CacheInvalidationHeader
         {
             get => _cacheInvalidationHeader;
             set
@@ -245,7 +246,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public Dictionary<string, object> RequestContextData
+        public Dictionary<string, object>? RequestContextData
         {
             get => _requestContextData;
             set
@@ -274,18 +275,27 @@ namespace Orleans.Runtime
             return Direction != Directions.OneWay && !id.IsSystemTarget();
         }
 
-        internal void AddToCacheInvalidationHeader(GrainAddress invalidAddress, GrainAddress validAddress)
+        internal void AddToCacheInvalidationHeader(GrainAddress invalidAddress, GrainAddress? validAddress)
         {
-            CacheInvalidationHeader ??= [];
             var grainAddressCacheUpdate = new GrainAddressCacheUpdate(invalidAddress, validAddress);
-            CacheInvalidationHeader.Add(grainAddressCacheUpdate);
+            if (_cacheInvalidationHeader is null)
+            {
+                CacheInvalidationHeader = [grainAddressCacheUpdate];
+            }
+            else
+            {
+                lock (_cacheInvalidationHeader)
+                {
+                    _cacheInvalidationHeader.Add(grainAddressCacheUpdate);
+                }
+            }
         }
 
         public override string ToString() => $"{this}";
 
-        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
-        bool ISpanFormattable.TryFormat(Span<char> dst, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+        bool ISpanFormattable.TryFormat(Span<char> dst, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
         {
             ref var origin = ref MemoryMarshal.GetReference(dst);
             int len;

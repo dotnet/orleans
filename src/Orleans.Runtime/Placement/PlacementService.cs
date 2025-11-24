@@ -176,11 +176,15 @@ namespace Orleans.Runtime.Placement
         private bool CachedAddressIsValid(Message message, GrainAddress cachedAddress)
         {
             // Verify that the result from the cache has not been invalidated by the message being addressed.
-            return message.CacheInvalidationHeader switch
+            if (message.CacheInvalidationHeader is { } cacheUpdates)
             {
-                { Count: > 0 } cacheUpdates => CachedAddressIsValidCore(message, cachedAddress, cacheUpdates),
-                _ => true
-            };
+                lock (cacheUpdates)
+                {
+                    return CachedAddressIsValidCore(message, cachedAddress, cacheUpdates);
+                }
+            }
+
+            return true;
 
             [MethodImpl(MethodImplOptions.NoInlining)]
             bool CachedAddressIsValidCore(Message message, GrainAddress cachedAddress, List<GrainAddressCacheUpdate> cacheUpdates)
