@@ -21,7 +21,7 @@ namespace Orleans.Threading
             this.spinCondition = this.TryGet;
         }
 
-        private static int ThreadId => localThreadId != 0 ? localThreadId : localThreadId = Thread.CurrentThread.ManagedThreadId;
+        private static int ThreadId => localThreadId != 0 ? localThreadId : localThreadId = Environment.CurrentManagedThreadId;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGet()
