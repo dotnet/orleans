@@ -50,18 +50,6 @@ namespace UnitTests.GrainInterfaces
         Task SetSelf(IMayInterleaveInstancedPredicateGrain self);
     }
 
-#pragma warning disable CS0618 // UnorderedAttribute is obsolete
-    [Unordered]
-#pragma warning restore CS0618
-    public interface IUnorderedNonReentrantGrain : IGrainWithIntegerKey
-    {
-        Task<string> One();
-
-        Task<string> Two();
-
-        Task SetSelf(IUnorderedNonReentrantGrain self);
-    }
-
     public interface IReentrantSelfManagedGrain : IGrainWithIntegerKey
     {
         Task<int> GetCounter();

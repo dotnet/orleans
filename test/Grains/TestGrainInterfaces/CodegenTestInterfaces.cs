@@ -42,15 +42,6 @@ namespace UnitTests.GrainInterfaces
         Task Do(Outsider o);
     }
 
-#pragma warning disable CS0618 // UnorderedAttribute is obsolete
-    [Unordered]
-#pragma warning restore CS0618
-    public interface ISomeGrainWithInvocationOptions : IGrainWithIntegerKey
-    {
-        [AlwaysInterleave]
-        Task AlwaysInterleave();
-    }
-
     public interface ISerializationGenerationGrain : IGrainWithIntegerKey
     {
         Task<object> RoundTripObject(object input);
