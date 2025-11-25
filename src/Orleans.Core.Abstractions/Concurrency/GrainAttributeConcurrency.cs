@@ -47,7 +47,7 @@ namespace Orleans.Concurrency
     /// This attribute has no effect and it may be removed in a future release.
     /// </remarks>
     [AttributeUsage(AttributeTargets.Interface)]
-    [Obsolete("This attribute is obsolete and may be removed in a future release. This attribute has no effect.")]
+    [Obsolete("Message ordering is not guaranteed regardless of whether this attribute is used. This attribute has no effect.")]
     public sealed class UnorderedAttribute : Attribute
     {
     }
