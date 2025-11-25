@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -13,6 +14,9 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Placement.Filtering;
 using Orleans.Runtime.Versions;
+using Polly;
+using Polly.DependencyInjection;
+using Polly.Registry;
 
 namespace Orleans.Runtime.Placement
 {
@@ -33,6 +37,7 @@ namespace Orleans.Runtime.Placement
         private readonly PlacementWorker[] _workers;
         private readonly PlacementFilterStrategyResolver _filterStrategyResolver;
         private readonly PlacementFilterDirectorResolver _placementFilterDirectoryResolver;
+        private readonly ResiliencePipeline _resiliencePipeline;
 
         /// <summary>
         /// Create a <see cref="PlacementService"/> instance.
@@ -48,7 +53,8 @@ namespace Orleans.Runtime.Placement
             PlacementDirectorResolver directorResolver,
             PlacementStrategyResolver strategyResolver,
             PlacementFilterStrategyResolver filterStrategyResolver,
-            PlacementFilterDirectorResolver placementFilterDirectoryResolver)
+            PlacementFilterDirectorResolver placementFilterDirectoryResolver,
+            ResiliencePipelineProvider<string> resiliencePipelineProvider)
         {
             LocalSilo = localSiloDetails.SiloAddress;
             _strategyResolver = strategyResolver;
@@ -61,6 +67,7 @@ namespace Orleans.Runtime.Placement
             _versionSelectorManager = versionSelectorManager;
             _siloStatusOracle = siloStatusOracle;
             _assumeHomogeneousSilosForTesting = siloMessagingOptions.CurrentValue.AssumeHomogenousSilosForTesting;
+            _resiliencePipeline = resiliencePipelineProvider.GetPipeline(OrleansRuntimeResiliencePolicies.PlacementResiliencePipelineKey);
             _workers = new PlacementWorker[PlacementWorkerCount];
             for (var i = 0; i < PlacementWorkerCount; i++)
             {
@@ -227,7 +234,7 @@ namespace Orleans.Runtime.Placement
             return director.OnAddActivation(placementStrategy, target, this);
         }
 
-        private class PlacementWorker
+        private partial class PlacementWorker
         {
             private readonly Dictionary<GrainId, GrainPlacementWorkItem> _inProgress = new();
             private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
@@ -237,12 +244,14 @@ namespace Orleans.Runtime.Placement
 #pragma warning restore IDE0052 // Remove unread private members
             private readonly object _lockObj = new();
             private readonly PlacementService _placementService;
+            private readonly Func<PlacementContext, CancellationToken, ValueTask<SiloAddress>> _executePlacementDelegate;
             private List<(Message Message, TaskCompletionSource Completion)> _messages = new();
 
             public PlacementWorker(PlacementService placementService)
             {
                 _logger = placementService._logger;
                 _placementService = placementService;
+                _executePlacementDelegate = ExecutePlacementAsync;
 
                 using var _ = new ExecutionContextSuppressor();
                 _processLoopTask = Task.Run(ProcessLoop);
@@ -367,13 +376,43 @@ namespace Orleans.Runtime.Placement
             private async Task<SiloAddress> GetOrPlaceActivationAsync(Message firstMessage)
             {
                 await Task.Yield();
+
+                // Bail early if the message has already expired
+                if (firstMessage.IsExpired)
+                {
+                    LogMessageExpiredDuringPlacement(_logger, firstMessage.TargetGrain);
+                    throw new TimeoutException($"Message expired before placement could complete for grain {firstMessage.TargetGrain}.");
+                }
+
                 var target = new PlacementTarget(
                     firstMessage.TargetGrain,
                     firstMessage.RequestContextData,
                     firstMessage.InterfaceType,
                     firstMessage.InterfaceVersion);
 
+                var context = new PlacementContext(firstMessage, target);
+
+                return await _placementService._resiliencePipeline.ExecuteAsync(
+                    _executePlacementDelegate,
+                    context,
+                    CancellationToken.None);
+            }
+
+            private async ValueTask<SiloAddress> ExecutePlacementAsync(PlacementContext context, CancellationToken cancellationToken)
+            {
+                var firstMessage = context.FirstMessage;
+                var target = context.Target;
                 var targetGrain = target.GrainIdentity;
+
+                // Check message expiration before each attempt
+                if (firstMessage.IsExpired)
+                {
+                    LogMessageExpiredDuringPlacement(_logger, targetGrain);
+                    throw new TimeoutException($"Message expired before placement could complete for grain {targetGrain}.");
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+
                 var result = await _placementService._grainLocator.Lookup(targetGrain);
                 if (result is not null)
                 {
@@ -393,6 +432,21 @@ namespace Orleans.Runtime.Placement
                 _placementService._grainLocator.InvalidateCache(targetGrain);
                 _placementService._grainLocator.UpdateCache(targetGrain, siloAddress);
                 return siloAddress;
+            }
+
+            [LoggerMessage(
+                Level = LogLevel.Debug,
+                Message = "Message expired during placement for grain {GrainId}."
+            )]
+            private static partial void LogMessageExpiredDuringPlacement(ILogger logger, GrainId grainId);
+
+            /// <summary>
+            /// Context passed to the resilience pipeline to avoid allocations.
+            /// </summary>
+            private readonly struct PlacementContext(Message firstMessage, PlacementTarget target)
+            {
+                public Message FirstMessage { get; } = firstMessage;
+                public PlacementTarget Target { get; } = target;
             }
 
             private class GrainPlacementWorkItem
