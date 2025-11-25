@@ -4,7 +4,7 @@
     <!-- Frontend paths -->
     <NpmAppRootDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Orleans.Dashboard.App'))</NpmAppRootDirectory>
     <NpmBuildOutput>$([System.IO.Path]::GetFullPath('$(NpmAppRootDirectory)\dist\'))</NpmBuildOutput>
-    <AzureDevOpsNpmrcFile>$([System.IO.Path]::GetFullPath('$(NpmAppRootDirectory)\.npmrc.azdo'))</AzureDevOpsNpmrcFile>
+    <AzureDevOpsNpmrcFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\.azdo\.npmrc'))</AzureDevOpsNpmrcFile>
   </PropertyGroup>
 
   <!-- Collect frontend source files for incremental build tracking -->
