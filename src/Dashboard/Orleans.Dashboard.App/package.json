@@ -7,7 +7,6 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:azdo": "artifacts-npm-credprovider && vite build",
     "preview": "vite preview",
     "lint": "eslint ."
   },

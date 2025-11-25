@@ -34,8 +34,7 @@
     <!-- Use Azure DevOps npmrc and build command if running in CI, otherwise use defaults -->
     <PropertyGroup>
       <NpmConfigArg Condition="'$(TF_BUILD)' == 'true'">--userconfig &quot;$(AzureDevOpsNpmrcFile)&quot;</NpmConfigArg>
-      <NpmBuildCommand Condition="'$(TF_BUILD)' == 'true'">build:azdo</NpmBuildCommand>
-      <NpmBuildCommand Condition="'$(TF_BUILD)' != 'true'">build</NpmBuildCommand>
+      <NpmBuildCommand>build</NpmBuildCommand>
     </PropertyGroup>
     <Exec
       Command="npm ci --prefer-offline --no-audit $(NpmConfigArg)"
