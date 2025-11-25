@@ -286,7 +286,8 @@ namespace UnitTests.Runtime
                 directorResolver: null!,
                 strategyResolver: null!,
                 filterStrategyResolver,
-                placementFilterDirectorResolver);
+                placementFilterDirectorResolver,
+                serviceProvider.GetRequiredService<Polly.Registry.ResiliencePipelineProvider<string>>());
         }
 
         private static SiloAddress[] CreateSilos(int count)
@@ -367,6 +368,9 @@ namespace UnitTests.Runtime
         private static ServiceProvider CreateServiceProvider(TestPlacementFilterDirector? filterDirector = null)
         {
             IServiceCollection services = new ServiceCollection();
+            services.AddOptions<SiloMessagingOptions>();
+            services.AddLogging();
+            OrleansRuntimeResiliencePolicies.AddOrleansRuntimeResiliencePolicies(services);
             if (filterDirector is not null)
             {
                 services.Add(ServiceDescriptor.DescribeKeyed(
