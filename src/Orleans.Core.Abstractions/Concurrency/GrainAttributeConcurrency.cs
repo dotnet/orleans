@@ -44,6 +44,7 @@ namespace Orleans.Concurrency
     /// messages is not significant.
     /// </summary>
     [AttributeUsage(AttributeTargets.Interface)]
+    [Obsolete("Message ordering is not guaranteed regardless of whether this attribute is used. This attribute has no effect.")]
     public sealed class UnorderedAttribute : Attribute
     {
     }

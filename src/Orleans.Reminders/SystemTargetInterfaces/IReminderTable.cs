@@ -87,7 +87,6 @@ namespace Orleans
     /// <summary>
     /// Reminder table interface for grain based implementation.
     /// </summary>
-    [Unordered]
     internal interface IReminderTableGrain : IGrainWithIntegerKey
     {
         Task<ReminderTableData> ReadRows(GrainId grainId);
