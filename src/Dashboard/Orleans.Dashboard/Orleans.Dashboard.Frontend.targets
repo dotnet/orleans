@@ -4,6 +4,7 @@
     <!-- Frontend paths -->
     <NpmAppRootDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Orleans.Dashboard.App'))</NpmAppRootDirectory>
     <NpmBuildOutput>$([System.IO.Path]::GetFullPath('$(NpmAppRootDirectory)\dist\'))</NpmBuildOutput>
+    <AzureDevOpsNpmrcFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\.azdo\.npmrc'))</AzureDevOpsNpmrcFile>
   </PropertyGroup>
 
   <!-- Collect frontend source files for incremental build tracking -->
@@ -30,12 +31,17 @@
 
   <!-- Build the frontend -->
   <Target Name="BuildNpmApp" BeforeTargets="AssignTargetPaths;BeforeTargets;Compile" Inputs="@(NpmAppSources)" Outputs="$(NpmAppBuildMarker)">
+    <!-- Use Azure DevOps npmrc and build command if running in CI, otherwise use defaults -->
+    <PropertyGroup>
+      <NpmConfigArg Condition="'$(TF_BUILD)' == 'true'">--userconfig &quot;$(AzureDevOpsNpmrcFile)&quot;</NpmConfigArg>
+      <NpmBuildCommand>build</NpmBuildCommand>
+    </PropertyGroup>
     <Exec
-      Command="npm install"
+      Command="npm ci --prefer-offline --no-audit $(NpmConfigArg)"
       WorkingDirectory="$(NpmAppRootDirectory)"
       ConsoleToMsBuild="true" />
     <Exec
-      Command="npm run build" 
+      Command="npm run $(NpmBuildCommand)"
       WorkingDirectory="$(NpmAppRootDirectory)"
       ConsoleToMsBuild="true" />
     <!-- Create marker file to track successful build -->
