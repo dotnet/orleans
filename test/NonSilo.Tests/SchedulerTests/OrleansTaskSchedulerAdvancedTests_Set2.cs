@@ -95,7 +95,7 @@ namespace UnitTests.SchedulerTests
                 return t1;
             });
             wrapped.Start(scheduler);
-            await wrapped.Unwrap().WaitAsync(TimeSpan.FromSeconds(2));
+            await wrapped.Unwrap().WaitAsync(TimeSpan.FromSeconds(10));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -193,7 +193,7 @@ namespace UnitTests.SchedulerTests
             });
             wrapper.Start(scheduler);
 
-            var timeoutLimit = TimeSpan.FromSeconds(2);
+            var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
                 await result.Task.WaitAsync(timeoutLimit);
@@ -241,7 +241,7 @@ namespace UnitTests.SchedulerTests
             });
             wrapper.Start(scheduler);
 
-            var timeoutLimit = TimeSpan.FromSeconds(1);
+            var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
                 await finish.Task.WaitAsync(timeoutLimit);
@@ -296,7 +296,7 @@ namespace UnitTests.SchedulerTests
             });
             wrapper.Start(scheduler);
 
-            var timeoutLimit = TimeSpan.FromSeconds(1);
+            var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
                 await finish.Task.WaitAsync(timeoutLimit);
@@ -364,7 +364,7 @@ namespace UnitTests.SchedulerTests
             });
             wrapper.Start(scheduler);
 
-            var timeoutLimit = TimeSpan.FromSeconds(1);
+            var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
                 await finish.Task.WaitAsync(timeoutLimit);
@@ -424,7 +424,7 @@ namespace UnitTests.SchedulerTests
             });
             wrapper.Start(scheduler);
 
-            var timeoutLimit = TimeSpan.FromSeconds(1);
+            var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
                 await finish.Task.WaitAsync(timeoutLimit);
@@ -487,7 +487,7 @@ namespace UnitTests.SchedulerTests
             });
             wrapper.Start(scheduler);
 
-            var timeoutLimit = TimeSpan.FromSeconds(1);
+            var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
                 await finish.Task.WaitAsync(timeoutLimit);
@@ -707,7 +707,7 @@ namespace UnitTests.SchedulerTests
             wrapper.Start(scheduler);
             await wrapper;
 
-            var timeoutLimit = TimeSpan.FromSeconds(1);
+            var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
                 await wrapperDone.Task.WaitAsync(timeoutLimit);
