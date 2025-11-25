@@ -22,10 +22,10 @@ namespace UnitTests.GrainInterfaces
 
     public interface ICallChainReentrancyGrain : IGrainWithStringKey
     {
-        Task CallChain(ICallChainObserver observer, List<(string TargetGrain, ReentrancyCallType CallType)> callChain, int callIndex);
+        Task CallChain(ICallChainObserver observer, List<(string TargetGrain, ReentrancyCallType CallType)> callChain, int callIndex, CancellationToken cancellationToken = default);
 
         [AlwaysInterleave]
-        Task UnblockWaiters();
+        Task UnblockWaiters(CancellationToken cancellationToken = default);
     }
 
     [GenerateSerializer]
