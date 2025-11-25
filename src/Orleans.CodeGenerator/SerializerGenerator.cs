@@ -1273,12 +1273,12 @@ namespace Orleans.CodeGenerator
             /// <summary>
             /// Gets a value indicating whether or not this member represents an accessible field.
             /// </summary>
-            private bool IsGettableField => Field is { } field && _codeGenerator.Compilation.IsSymbolAccessibleWithin(field, Compilation.Assembly) && !IsObsolete;
+            private bool IsGettableField => Field is { } fieldInfo && _codeGenerator.Compilation.IsSymbolAccessibleWithin(fieldInfo, Compilation.Assembly) && !IsObsolete;
 
             /// <summary>
             /// Gets a value indicating whether or not this member represents an accessible, mutable field.
             /// </summary>
-            private bool IsSettableField => Field is { } field && IsGettableField && !field.IsReadOnly;
+            private bool IsSettableField => Field is { } fieldInfo && IsGettableField && !fieldInfo.IsReadOnly;
 
             /// <summary>
             /// Gets a value indicating whether or not this member represents a property with an accessible, non-obsolete getter.

@@ -18,14 +18,27 @@
     <PrivateRepositoryUrl>$(RepositoryUrl)</PrivateRepositoryUrl>
     <RepositoryUrl>$(RepositoryUrl)</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <LangVersion>12</LangVersion>
+    <LangVersion>preview</LangVersion>
     <Features>strict</Features>
+    <WarningLevel>3</WarningLevel>
+    <AnalysisLevel>preview</AnalysisLevel>
+    <!-- TODO: Uncomment this and fix errors -->
+    <!-- <AnalysisMode>All</AnalysisMode> -->
+    <!-- TODO: Uncomment this and fix errors -->
+    <!-- <Nullable>enable</Nullable> -->
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <DebugType>embedded</DebugType>
     <IncludePackageReferencesDuringMarkupCompilation>true</IncludePackageReferencesDuringMarkupCompilation>
     <IncludeSymbols>false</IncludeSymbols>
     <IncludeSource>false</IncludeSource>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!--<NoWarn>$(NoWarn);2003</NoWarn>-->
+    <!-- TODO: Disable and ensure all public members are documented: https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-messages/cs1591 -->
+    <NoWarn>$(NoWarn);1591</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(TF_BUILD)' == 'true' or '$(GITHUB_ACTIONS)' == 'true'">
@@ -36,12 +49,6 @@
     <None Include="$(SourceRoot)assets/logo_128.png" Pack="true" Visible="false" PackagePath="/" />
   </ItemGroup>
 
-  <!-- Common compile parameters -->
-  <PropertyGroup>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <NoWarn>$(NoWarn);1591;2003</NoWarn>
-  </PropertyGroup>
-
   <!-- FSharp SDK overrides -->
   <PropertyGroup>
     <DisableImplicitSystemValueTupleReference>true</DisableImplicitSystemValueTupleReference>
@@ -50,8 +57,8 @@
 
   <!-- Versioning properties -->
   <PropertyGroup>
-    <AssemblyVersion>9.0.0.0</AssemblyVersion>
-    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">9.1.0</VersionPrefix>
+    <AssemblyVersion>10.0.0.0</AssemblyVersion>
+    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">10.0.0</VersionPrefix>
   </PropertyGroup>
 
   <!-- For Debug builds generated a date/time dependent version suffix -->

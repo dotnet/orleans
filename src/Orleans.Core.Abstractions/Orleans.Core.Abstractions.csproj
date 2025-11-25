@@ -13,6 +13,24 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="buildMultiTargeting\Microsoft.Orleans.Core.Abstractions.targets">
+      <PackagePath>%(Identity)</PackagePath>
+      <Visible>true</Visible>
+      <Pack>true</Pack>
+    </Content>
+    <Content Include="buildTransitive\Microsoft.Orleans.Core.Abstractions.targets">
+      <PackagePath>%(Identity)</PackagePath>
+      <Visible>true</Visible>
+      <Pack>true</Pack>
+    </Content>
+    <Content Include="build\Microsoft.Orleans.Core.Abstractions.targets">
+      <PackagePath>%(Identity)</PackagePath>
+      <Visible>true</Visible>
+      <Pack>true</Pack>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Logging" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
