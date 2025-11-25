@@ -156,7 +156,8 @@ namespace Orleans.CodeGenerator
                     GenerateSetArgumentMethod(method, fieldDescriptions),
                     GenerateInvokeInnerMethod(method, fieldDescriptions, targetField),
                     GenerateGetCancellationTokenMethod(method, fieldDescriptions),
-                    GenerateTryCancelMethod(method, fieldDescriptions));
+                    GenerateTryCancelMethod(method, fieldDescriptions),
+                    GenerateIsCancellableProperty(method));
 
             if (method.AllTypeParameters.Count > 0)
             {
@@ -345,6 +346,22 @@ namespace Orleans.CodeGenerator
                 .WithExpressionBody(ArrowExpressionClause(cancellationTokenField.FieldName.ToIdentifierName()))
                 .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
+            return member;
+        }
+
+        private MemberDeclarationSyntax GenerateIsCancellableProperty(InvokableMethodDescription method)
+        {
+            if (!method.IsCancellable)
+            {
+                return null;
+            }
+
+            // Property to indicate if the invokable is cancellable
+            // C#: public override bool IsCancellable => true;
+            var member = PropertyDeclaration(PredefinedType(Token(SyntaxKind.BoolKeyword)), "IsCancellable")
+                .WithExpressionBody(ArrowExpressionClause(LiteralExpression(SyntaxKind.TrueLiteralExpression)))
+                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
+                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword));
             return member;
         }
 
