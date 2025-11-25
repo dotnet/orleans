@@ -4,6 +4,7 @@
     <!-- Frontend paths -->
     <NpmAppRootDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Orleans.Dashboard.App'))</NpmAppRootDirectory>
     <NpmBuildOutput>$([System.IO.Path]::GetFullPath('$(NpmAppRootDirectory)\dist\'))</NpmBuildOutput>
+    <AzureDevOpsNpmrcFile>$([System.IO.Path]::GetFullPath('$(NpmAppRootDirectory)\.npmrc.azdo'))</AzureDevOpsNpmrcFile>
   </PropertyGroup>
 
   <!-- Collect frontend source files for incremental build tracking -->
@@ -30,14 +31,12 @@
 
   <!-- Build the frontend -->
   <Target Name="BuildNpmApp" BeforeTargets="AssignTargetPaths;BeforeTargets;Compile" Inputs="@(NpmAppSources)" Outputs="$(NpmAppBuildMarker)">
-    <!-- Install Azure Artifacts credential provider if not already present -->
+    <!-- Use Azure DevOps npmrc if running in CI, otherwise use default -->
+    <PropertyGroup>
+      <NpmConfigArg Condition="'$(TF_BUILD)' == 'true'">--userconfig &quot;$(AzureDevOpsNpmrcFile)&quot;</NpmConfigArg>
+    </PropertyGroup>
     <Exec
-      Command="npm list --global @microsoft/artifacts-npm-credprovider || npm install --global @microsoft/artifacts-npm-credprovider --registry https://pkgs.dev.azure.com/artifacts-public/PublicTools/_packaging/AzureArtifacts/npm/registry/"
-      WorkingDirectory="$(NpmAppRootDirectory)"
-      ConsoleToMsBuild="true"
-      IgnoreExitCode="true" />
-    <Exec
-      Command="npm ci --prefer-offline --no-audit"
+      Command="npm ci --prefer-offline --no-audit $(NpmConfigArg)"
       WorkingDirectory="$(NpmAppRootDirectory)"
       ConsoleToMsBuild="true" />
     <Exec
