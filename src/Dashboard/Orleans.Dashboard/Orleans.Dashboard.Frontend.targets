@@ -29,8 +29,9 @@
     <Delete Files="$(NpmAppBuildMarker)" />
   </Target>
 
-  <!-- Build the frontend -->
-  <Target Name="BuildNpmApp" BeforeTargets="AssignTargetPaths;BeforeTargets;Compile" Inputs="@(NpmAppSources)" Outputs="$(NpmAppBuildMarker)">
+  <!-- Build the frontend (runs once regardless of target frameworks)
+       See: https://learn.microsoft.com/visualstudio/msbuild/run-target-exactly-once -->
+  <Target Name="BuildNpmApp" Inputs="@(NpmAppSources)" Outputs="$(NpmAppBuildMarker)">
     <!-- Use Azure DevOps npmrc and build command if running in CI, otherwise use defaults -->
     <PropertyGroup>
       <NpmConfigArg Condition="'$(TF_BUILD)' == 'true'">--userconfig &quot;$(AzureDevOpsNpmrcFile)&quot;</NpmConfigArg>
@@ -46,6 +47,23 @@
       ConsoleToMsBuild="true" />
     <!-- Create marker file to track successful build -->
     <Touch Files="$(NpmAppBuildMarker)" AlwaysCreate="true" />
+  </Target>
+
+  <!-- Hook BuildNpmApp to run once before DispatchToInnerBuilds for multi-targeted builds -->
+  <Target
+    Name="BuildNpmAppBeforeOuterBuild"
+    DependsOnTargets="BuildNpmApp"
+    BeforeTargets="DispatchToInnerBuilds"
+    />
+
+  <!-- Hook BuildNpmApp to run once before inner build targets (invokes outer build) -->
+  <Target
+    Name="BuildNpmAppBeforeInnerBuild"
+    BeforeTargets="AssignTargetPaths;BeforeBuild;Compile">
+    <MSBuild
+      Projects="$(MSBuildProjectFullPath)"
+      Targets="BuildNpmApp"
+      RemoveProperties="TargetFramework" />
   </Target>
 
   <!-- Include frontend assets as embedded resources -->
