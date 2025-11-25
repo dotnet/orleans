@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Threading.Channels;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -183,7 +184,7 @@ namespace UnitTests.General
         public class CallChainObserver : ICallChainObserver
         {
             private readonly Channel<(CallChainOperation Operation, string Grain, int CallIndex)> _operations = Channel.CreateUnbounded<(CallChainOperation Operation, string Grain, int CallIndex)>();
-            private readonly List<(CallChainOperation Operation, string Grain, int CallIndex)> _allOperations = new();
+            private readonly ConcurrentBag<(CallChainOperation Operation, string Grain, int CallIndex)> _allOperations = new();
 
             public async Task OnEnter(string grain, int callIndex)
             {
