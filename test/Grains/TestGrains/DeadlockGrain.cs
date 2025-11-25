@@ -78,11 +78,11 @@ namespace UnitTests.Grains
 
     public class CallChainReentrancyGrain : Grain, ICallChainReentrancyGrain
     {
-        private TaskCompletionSource _unblocker = new();
+        private TaskCompletionSource _unblocker = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         private string Id => this.GetPrimaryKeyString();
 
-        public async Task CallChain(ICallChainObserver observer, List<(string TargetGrain, ReentrancyCallType CallType)> callChain, int callIndex)
+        public async Task CallChain(ICallChainObserver observer, List<(string TargetGrain, ReentrancyCallType CallType)> callChain, int callIndex, CancellationToken cancellationToken = default)
         {
             await observer.OnEnter(Id, callIndex);
             try
@@ -99,19 +99,19 @@ namespace UnitTests.Grains
                 switch (op.CallType)
                 {
                     case ReentrancyCallType.Regular:
-                        await Task.WhenAny(_unblocker.Task, target.CallChain(observer, newChain, nextCallIndex));
+                        await Task.WhenAny(_unblocker.Task, target.CallChain(observer, newChain, nextCallIndex, cancellationToken));
                         break;
                     case ReentrancyCallType.AllowCallChainReentrancy:
                         {
                             using var _ = RequestContext.AllowCallChainReentrancy();
-                            await Task.WhenAny(_unblocker.Task, target.CallChain(observer, newChain, nextCallIndex));
+                            await Task.WhenAny(_unblocker.Task, target.CallChain(observer, newChain, nextCallIndex, cancellationToken));
                             break;
                         }
 
                     case ReentrancyCallType.SuppressCallChainReentrancy:
                         {
                             using var _ = RequestContext.SuppressCallChainReentrancy();
-                            await Task.WhenAny(_unblocker.Task, target.CallChain(observer, newChain, nextCallIndex));
+                            await Task.WhenAny(_unblocker.Task, target.CallChain(observer, newChain, nextCallIndex, cancellationToken));
                             break;
                         }
                 }
@@ -122,10 +122,10 @@ namespace UnitTests.Grains
             }
         }
 
-        public Task UnblockWaiters()
+        public Task UnblockWaiters(CancellationToken cancellationToken = default)
         {
             _unblocker?.SetResult();
-            _unblocker = new();
+            _unblocker = new(TaskCreationOptions.RunContinuationsAsynchronously);
             return Task.CompletedTask;
         }
     }
