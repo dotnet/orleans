@@ -84,6 +84,7 @@ namespace UnitTests.Grains
 
         public async Task CallChain(ICallChainObserver observer, List<(string TargetGrain, ReentrancyCallType CallType)> callChain, int callIndex, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await observer.OnEnter(Id, callIndex);
             try
             {
@@ -124,6 +125,7 @@ namespace UnitTests.Grains
 
         public Task UnblockWaiters(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             _unblocker?.SetResult();
             _unblocker = new(TaskCreationOptions.RunContinuationsAsynchronously);
             return Task.CompletedTask;
