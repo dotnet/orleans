@@ -30,6 +30,12 @@
 
   <!-- Build the frontend -->
   <Target Name="BuildNpmApp" BeforeTargets="AssignTargetPaths;BeforeTargets;Compile" Inputs="@(NpmAppSources)" Outputs="$(NpmAppBuildMarker)">
+    <!-- Install Azure Artifacts credential provider if not already present -->
+    <Exec
+      Command="npm list --global @microsoft/artifacts-npm-credprovider || npm install --global @microsoft/artifacts-npm-credprovider --registry https://pkgs.dev.azure.com/artifacts-public/PublicTools/_packaging/AzureArtifacts/npm/registry/"
+      WorkingDirectory="$(NpmAppRootDirectory)"
+      ConsoleToMsBuild="true"
+      IgnoreExitCode="true" />
     <Exec
       Command="npm ci --prefer-offline --no-audit"
       WorkingDirectory="$(NpmAppRootDirectory)"
