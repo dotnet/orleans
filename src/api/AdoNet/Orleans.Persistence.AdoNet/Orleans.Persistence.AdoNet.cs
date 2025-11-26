@@ -10,7 +10,7 @@ namespace Orleans.Configuration
 {
     public partial class AdoNetGrainStorageOptions : Storage.IStorageProviderSerializerOptions
     {
-        public const string DEFAULT_ADONET_INVARIANT = "System.Data.SqlClient";
+        public const string DEFAULT_ADONET_INVARIANT = "Microsoft.Data.SqlClient";
         public const int DEFAULT_INIT_STAGE = 10000;
         [Redact]
         public string ConnectionString { get { throw null; } set { } }
