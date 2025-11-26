@@ -153,6 +153,14 @@ namespace Orleans
         public IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType)
             => _runtimeClient.InternalGrainFactory.GetGrain(grainId, interfaceType);
 
+        /// <inheritdoc />
+        public IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string grainClassNamePrefix)
+            => _runtimeClient.InternalGrainFactory.GetGrain(interfaceType, grainKey, grainClassNamePrefix);
+
+        /// <inheritdoc />
+        public IAddressable GetGrain(Type interfaceType, IdSpan grainKey)
+            => _runtimeClient.InternalGrainFactory.GetGrain(interfaceType, grainKey);
+
         [LoggerMessage(
             Level = LogLevel.Information,
             Message = "Client shutting down."
@@ -164,5 +172,6 @@ namespace Orleans
             Message = "Client shutdown completed."
         )]
         private static partial void LogClientShutdownCompleted(ILogger logger);
+      
     }
 }
