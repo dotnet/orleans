@@ -29,7 +29,25 @@ siloLifetime.Started.Register(async (s, ct) => Console.WriteLine($"Started! My s
 
 _ = Task.Run(async () =>
 {
-    await siloLifetime.Started.Task;
+    var cts = new CancellationTokenSource();
+
+    cts.CancelAfter(TimeSpan.FromSeconds(1));
+
+    try
+    {
+        await siloLifetime.Started.WaitAsync(cts.Token);
+
+        Console.WriteLine("I should not be printed!");
+    }
+    catch (OperationCanceledException)
+    {
+        Console.WriteLine("WaitAsync was cancelled correctly.");
+    }
+});
+
+_ = Task.Run(async () =>
+{
+    await siloLifetime.Started.WaitAsync();
     Console.WriteLine("Silo 'Started' task completed.");
 });
 
