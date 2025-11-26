@@ -109,6 +109,7 @@
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Analyzers.Tests/Analyzers.Tests.csproj" />
+    <Project Path="test/ConsoleApp2/ConsoleApp2.csproj" Id="d888b594-2531-4ccb-b5de-d4bb0f15e6e3" />
     <Project Path="test/DefaultCluster.Tests/DefaultCluster.Tests.csproj" />
     <Project Path="test/DependencyInjection.Tests/DependencyInjection.Tests.csproj" />
     <Project Path="test/NonSilo.Tests/NonSilo.Tests.csproj" />
