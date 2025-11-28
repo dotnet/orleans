@@ -5,7 +5,7 @@
     <PackageId>Microsoft.Orleans.DurableJobs.Redis</PackageId>
     <Title>Microsoft Orleans Redis Durable Jobs Provider</Title>
     <Description>Microsoft Orleans durable jobs provider backed by Redis</Description>
-    <PackageTags>$(PackageTags) Azure Storage</PackageTags>
+    <PackageTags>$(PackageTags) Redis</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.DurableJobs.Redis</AssemblyName>
     <RootNamespace>Orleans.DurableJobs.Redis</RootNamespace>
@@ -24,10 +24,6 @@
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Hosting\" />
   </ItemGroup>
 
 </Project>

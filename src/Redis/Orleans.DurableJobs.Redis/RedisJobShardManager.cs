@@ -3,21 +3,24 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using StackExchange.Redis;
 
 namespace Orleans.DurableJobs.Redis;
 
+/// <summary>
+/// Redis-based implementation of <see cref="JobShardManager"/> that stores job shards in Redis.
+/// </summary>
 public sealed partial class RedisJobShardManager : JobShardManager
 {
     private readonly ILocalSiloDetails _localSiloDetails;
     private readonly IClusterMembershipService _clusterMembership;
-    private readonly RedisJobShardManagerOptions _options;
+    private readonly RedisJobShardOptions _options;
     private readonly ILogger<RedisJobShardManager> _logger;
     private readonly ILoggerFactory _loggerFactory;
 
@@ -82,9 +85,16 @@ public sealed partial class RedisJobShardManager : JobShardManager
             return 0
         ";
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RedisJobShardManager"/> class.
+    /// </summary>
+    /// <param name="localSiloDetails">The local silo details.</param>
+    /// <param name="options">The Redis job shard options.</param>
+    /// <param name="clusterMembership">The cluster membership service.</param>
+    /// <param name="loggerFactory">The logger factory.</param>
     public RedisJobShardManager(
         ILocalSiloDetails localSiloDetails,
-        IOptions<RedisJobShardManagerOptions> options,
+        IOptions<RedisJobShardOptions> options,
         IClusterMembershipService clusterMembership,
         ILoggerFactory loggerFactory)
         : base(localSiloDetails.SiloAddress)
@@ -210,7 +220,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
             var minDue = ParseDateTimeOffset(metadata, "MinDueTime", DateTimeOffset.MinValue);
             var maxDue = ParseDateTimeOffset(metadata, "MaxDueTime", DateTimeOffset.MaxValue);
 
-            var shard = new RedisJobShard(shardId, minDue, maxDue, _multiplexer!, _options.ShardOptions ?? new RedisJobShardOptions(), _loggerFactory.CreateLogger<RedisJobShard>());
+            var shard = new RedisJobShard(shardId, minDue, maxDue, _multiplexer!, _options, _loggerFactory.CreateLogger<RedisJobShard>());
             try
             {
                 await shard.InitializeAsync(cancellationToken).ConfigureAwait(false);
@@ -284,7 +294,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
                     continue;
                 }
 
-                var shard = new RedisJobShard(shardId, minDueTime, maxDueTime, _multiplexer!, _options.ShardOptions ?? new RedisJobShardOptions(), _loggerFactory.CreateLogger<RedisJobShard>());
+                var shard = new RedisJobShard(shardId, minDueTime, maxDueTime, _multiplexer!, _options, _loggerFactory.CreateLogger<RedisJobShard>());
                 await shard.InitializeAsync(cancellationToken).ConfigureAwait(false);
                 _jobShardCache[shardId] = shard;
                 _logger.LogInformation("Shard {ShardId} registered and assigned to this silo", shardId);
@@ -366,12 +376,4 @@ public sealed partial class RedisJobShardManager : JobShardManager
         if (meta.TryGetValue(key, out var s) && DateTimeOffset.TryParse(s, null, DateTimeStyles.RoundtripKind, out var dt)) return dt;
         return @default;
     }
-}
-
-public sealed class RedisJobShardManagerOptions
-{
-    public string ShardPrefix { get; set; } = "shard";
-    public Func<CancellationToken, Task<IConnectionMultiplexer>> CreateMultiplexer { get; set; } = ct => throw new InvalidOperationException("Provide CreateMultiplexer");
-    public int MaxShardCreationRetries { get; set; } = 5;
-    public RedisJobShardOptions? ShardOptions { get; set; }
 }

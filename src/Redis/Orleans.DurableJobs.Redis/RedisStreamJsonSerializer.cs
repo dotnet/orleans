@@ -23,8 +23,8 @@ internal static class RedisStreamJsonSerializer<T>
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            // Find the field named "data" (case-sensitive)
-            var dataField = streamEntry.Values.FirstOrDefault(v => v.Name == "data");
+            // Find the field named "payload" (case-sensitive) - matches the Lua script in RedisJobShard
+            var dataField = streamEntry.Values.FirstOrDefault(v => v.Name == "payload");
 
             if (dataField.Equals(default) || dataField.Value.IsNull)
             {
