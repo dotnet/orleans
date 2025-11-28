@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -26,8 +25,11 @@ internal sealed class RedisJobShardManagerTestFixture : IJobShardManagerTestFixt
     public RedisJobShardManagerTestFixture()
     {
         _shardPrefix = $"test-{Guid.NewGuid():N}";
+
+        // Create a custom CreateMultiplexer that caches the multiplexer for cleanup
         _options = Options.Create(new RedisJobShardOptions
         {
+            ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString),
             CreateMultiplexer = CreateMultiplexerAsync,
             ShardPrefix = _shardPrefix,
             MaxShardCreationRetries = 5,
@@ -37,13 +39,9 @@ internal sealed class RedisJobShardManagerTestFixture : IJobShardManagerTestFixt
         });
     }
 
-    private async Task<IConnectionMultiplexer> CreateMultiplexerAsync(CancellationToken cancellationToken)
+    private async Task<IConnectionMultiplexer> CreateMultiplexerAsync(RedisJobShardOptions options)
     {
-        if (_multiplexer is null)
-        {
-            var connectionString = TestDefaultConfiguration.RedisConnectionString;
-            _multiplexer = await ConnectionMultiplexer.ConnectAsync(connectionString);
-        }
+        _multiplexer ??= await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!);
         return _multiplexer;
     }
 

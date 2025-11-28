@@ -111,7 +111,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
         if (_db != null) return;
 
         _logger.LogInformation("Initializing RedisJobShardManager (shardPrefix={Prefix})", _options.ShardPrefix);
-        _multiplexer = await _options.CreateMultiplexer(cancellationToken).ConfigureAwait(false);
+        _multiplexer = await _options.CreateMultiplexer(_options).ConfigureAwait(false);
         _db = _multiplexer.GetDatabase();
         _logger.LogInformation("RedisJobShardManager initialized");
     }
