@@ -1,14 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using StackExchange.Redis;
 
@@ -24,22 +23,12 @@ internal sealed partial class RedisJobShard : JobShard
     private readonly RedisJobShardOptions _options;
     private readonly ILogger<RedisJobShard> _logger;
 
-
-    //private readonly RedisJobShardOptions _options;
-    //private readonly ILogger<RedisJobShard> _logger;
-
     private readonly string _streamKey;
     private readonly string _metaKey;
     private readonly string _leaseKey;
 
     internal new IDictionary<string, string>? Metadata { get; private set; }
     internal long MetadataVersion { get; private set; }
-
-    // Keep the original simple ctor for tests/compat if needed.
-    //public RedisJobShard(string id, DateTimeOffset startTime, DateTimeOffset endTime)
-    //    : base(id, startTime, endTime)
-    //{
-    //}
 
     // Lua scripts
     private const string MultiXAddLua = @"
@@ -75,7 +64,15 @@ internal sealed partial class RedisJobShard : JobShard
             end
         ";
 
-    // Preferred ctor to use in manager: fornece DB, prefix e logger.
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RedisJobShard"/> class.
+    /// </summary>
+    /// <param name="shardId">The unique identifier for this shard.</param>
+    /// <param name="startTime">The start time of the shard's time range.</param>
+    /// <param name="endTime">The end time of the shard's time range.</param>
+    /// <param name="redis">The Redis connection multiplexer.</param>
+    /// <param name="options">The Redis job shard options.</param>
+    /// <param name="logger">The logger.</param>
     public RedisJobShard(string shardId,
             DateTimeOffset startTime,
             DateTimeOffset endTime,
@@ -86,7 +83,7 @@ internal sealed partial class RedisJobShard : JobShard
     {
         _redis = redis ?? throw new ArgumentNullException(nameof(redis));
         _db = _redis.GetDatabase();
-        _options = options ?? new RedisJobShardOptions();
+        _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         _streamKey = $"durablejobs:shard:{Id}:stream";
@@ -400,11 +397,4 @@ internal sealed class StorageOperation
             ExpectedVersion = expectedVersion
         };
     }
-}
-
-public sealed class RedisJobShardOptions
-{
-    public int MaxBatchSize { get; set; } = 128;
-    public int MinBatchSize { get; set; } = 1;
-    public TimeSpan BatchFlushInterval { get; set; } = TimeSpan.FromMilliseconds(100);
 }

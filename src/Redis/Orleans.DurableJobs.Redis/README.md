@@ -1,7 +1,7 @@
 # Microsoft Orleans Durable Jobs for Redis
 
 ## Introduction
-Microsoft Orleans Durable Jobs for Redis provides persistent storage for Orleans Durable Jobs using Azure Blob Storage. This allows your Orleans applications to schedule jobs that survive silo restarts, grain deactivation, and cluster reconfigurations. Jobs are stored in append blobs, providing efficient storage and retrieval for time-based job scheduling.
+Microsoft Orleans Durable Jobs for Redis provides persistent storage for Orleans Durable Jobs using Redis Streams. This allows your Orleans applications to schedule jobs that survive silo restarts, grain deactivation, and cluster reconfigurations. Jobs are stored in Redis Streams, providing efficient storage and retrieval for time-based job scheduling.
 
 ## Getting Started
 
@@ -12,6 +12,28 @@ To use this package, install it via NuGet along with the core package:
 dotnet add package Microsoft.Orleans.DurableJobs
 dotnet add package Microsoft.Orleans.DurableJobs.Redis
 ```
+
+### Configuration
+Configure the Redis durable jobs provider in your silo configuration:
+
+```csharp
+siloBuilder.UseRedisDurableJobs(options =>
+{
+    options.CreateMultiplexer = async _ => await ConnectionMultiplexer.ConnectAsync("localhost:6379");
+    options.ShardPrefix = "my-app"; // Optional: prefix for shard keys
+});
+```
+
+### Configuration Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `CreateMultiplexer` | Delegate to create the Redis connection multiplexer | Required |
+| `ShardPrefix` | Prefix for shard identifiers in Redis | `"shard"` |
+| `MaxShardCreationRetries` | Maximum retries when creating a shard | `5` |
+| `MaxBatchSize` | Maximum operations per batch write | `128` |
+| `MinBatchSize` | Minimum operations before flush | `1` |
+| `BatchFlushInterval` | Time to wait for more operations | `100ms` |
 
 ## Documentation
 For more comprehensive documentation, please refer to:
