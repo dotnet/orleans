@@ -38,7 +38,7 @@ public class RedisDurableJobsTests : TestClusterPerTest
             hostBuilder
                 .UseRedisDurableJobs(options =>
                 {
-                    options.CreateMultiplexer = async _ => await ConnectionMultiplexer.ConnectAsync(connectionString);
+                    options.ConfigurationOptions = ConfigurationOptions.Parse(connectionString);
                     options.ShardPrefix = "test-shard";
                 })
                 .AddMemoryGrainStorageAsDefault();

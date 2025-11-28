@@ -19,7 +19,7 @@ Configure the Redis durable jobs provider in your silo configuration:
 ```csharp
 siloBuilder.UseRedisDurableJobs(options =>
 {
-    options.CreateMultiplexer = async _ => await ConnectionMultiplexer.ConnectAsync("localhost:6379");
+    options.ConfigurationOptions = ConfigurationOptions.Parse("localhost:6379");
     options.ShardPrefix = "my-app"; // Optional: prefix for shard keys
 });
 ```
@@ -28,7 +28,8 @@ siloBuilder.UseRedisDurableJobs(options =>
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `CreateMultiplexer` | Delegate to create the Redis connection multiplexer | Required |
+| `ConfigurationOptions` | Redis client configuration options (from StackExchange.Redis) | Required |
+| `CreateMultiplexer` | Optional delegate for custom connection logic (advanced scenarios) | Uses `ConfigurationOptions` |
 | `ShardPrefix` | Prefix for shard identifiers in Redis | `"shard"` |
 | `MaxShardCreationRetries` | Maximum retries when creating a shard | `5` |
 | `MaxBatchSize` | Maximum operations per batch write | `128` |
