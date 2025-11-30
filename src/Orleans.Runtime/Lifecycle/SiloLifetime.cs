@@ -191,22 +191,30 @@ internal sealed partial class SiloLifetime(ILogger<SiloLifetime> logger) : ISilo
             }
             catch (Exception ex)
             {
+                // Note that awaiting WhenAll returns only the first exception, and we want to show all if there are multiple.
                 if (allTasks.Exception is { } aggEx)
                 {
                     var flattened = aggEx.Flatten();
+
                     if (flattened.InnerExceptions.Count == 1)
                     {
-                        _tcs.SetException(flattened.InnerExceptions[0]); // Just for cleaner reporting!
+                        // For cleaner reporting in case one callback throws.
+                        _tcs.SetException(flattened.InnerExceptions[0]);
                     }
                     else
                     {
+                        // Otherwise we let the user see all failures.
                         _tcs.SetException(flattened);
                     }
                 }
                 else
                 {
+                    // Unlikely but hey!
                     _tcs.SetException(ex);
                 }
+
+                // We throw here regardles, because its the callback participant who controls wether to TerminateOnError or not.
+                throw;
             }
         }
 
@@ -247,6 +255,7 @@ internal sealed partial class SiloLifetime(ILogger<SiloLifetime> logger) : ISilo
                 if (participant.TerminateOnError)
                 {
                     // This will cause WhenAll to fault, eventually triggering _tcs.SetException above.
+                    // NotifyCompleted relies on us to throw in case TerminateOnError is set to true.
                     throw;
                 }
             }
