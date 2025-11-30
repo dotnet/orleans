@@ -27,7 +27,6 @@ internal sealed partial class RedisJobShard : JobShard
     private readonly string _metaKey;
     private readonly string _leaseKey;
 
-    internal new IDictionary<string, string>? Metadata { get; private set; }
     internal long MetadataVersion { get; private set; }
 
     // Lua scripts
