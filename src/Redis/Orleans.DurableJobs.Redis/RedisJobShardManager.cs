@@ -320,18 +320,43 @@ public sealed partial class RedisJobShardManager : JobShardManager
         var shardId = redisShard.Id;
         _logger.LogInformation("Unregistering shard {ShardId}", shardId);
 
-        // remove from cache and try to release ownership
+        // Stop the background storage processor to ensure no more changes can happen
+        await redisShard.StopProcessorAsync(cancellationToken).ConfigureAwait(false);
+
+        // Now we can safely get a consistent view of the state
+        var count = await shard.GetJobCountAsync().ConfigureAwait(false);
+
+        // Remove from cache
         _jobShardCache.TryRemove(shardId, out _);
 
-        try
+        if (count > 0)
         {
-            await ReleaseOwnershipAsync(shardId, cancellationToken).ConfigureAwait(false);
+            // There are still jobs in the shard, just release ownership
+            try
+            {
+                await ReleaseOwnershipAsync(shardId, cancellationToken).ConfigureAwait(false);
+                _logger.LogInformation("Released ownership of shard {ShardId} with {Count} remaining jobs", shardId, count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to release ownership for shard {ShardId}", shardId);
+            }
         }
-        catch (Exception ex)
+        else
         {
-            _logger.LogWarning(ex, "Failed to release ownership for shard {ShardId}", shardId);
+            // No jobs left, delete the shard data entirely
+            try
+            {
+                await DeleteShardAsync(shardId, cancellationToken).ConfigureAwait(false);
+                _logger.LogInformation("Deleted shard {ShardId} (no remaining jobs)", shardId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete shard {ShardId}", shardId);
+            }
         }
 
+        // Dispose the shard's resources
         try
         {
             await redisShard.DisposeAsync().ConfigureAwait(false);
@@ -340,6 +365,21 @@ public sealed partial class RedisJobShardManager : JobShardManager
         {
             _logger.LogWarning(ex, "Error disposing shard {ShardId}", shardId);
         }
+    }
+
+    private async Task DeleteShardAsync(string shardId, CancellationToken cancellationToken)
+    {
+        await InitializeIfNeeded(cancellationToken).ConfigureAwait(false);
+
+        var streamKey = $"durablejobs:shard:{shardId}:stream";
+        var metaKey = $"durablejobs:shard:{shardId}:meta";
+        var leaseKey = $"durablejobs:shard:{shardId}:lease";
+
+        // Delete all shard-related keys
+        await _db!.KeyDeleteAsync(new RedisKey[] { streamKey, metaKey, leaseKey }).ConfigureAwait(false);
+
+        // Remove from the shard set
+        await _db.SetRemoveAsync(ShardSetKey, shardId).ConfigureAwait(false);
     }
 
     private async Task<bool> TryTakeOwnershipAsync(string shardId, string expectedVersion, SiloAddress newOwner, MembershipVersion membershipVersion, CancellationToken cancellationToken)
