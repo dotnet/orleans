@@ -24,8 +24,8 @@ siloLifetime.Started.Register(async (s, ct) => Console.WriteLine($"Started! My s
 
 // Uncomment to test out termination.
 
-// siloLifetime.Started.Register(async (s, ct) => throw new Exception("Poke silo!"), terminateOnError: false);
-// siloLifetime.Started.Register(async (s, ct) => throw new Exception("Kill silo!"), terminateOnError: true);
+//siloLifetime.Started.Register(async (s, ct) => throw new Exception("Poke silo!"), terminateOnError: false);
+siloLifetime.Started.Register(async (s, ct) => throw new Exception("Kill silo!"), terminateOnError: true);
 
 _ = Task.Run(async () =>
 {
