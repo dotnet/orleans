@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.DurableJobs;
 using Orleans.DurableJobs.Redis;
