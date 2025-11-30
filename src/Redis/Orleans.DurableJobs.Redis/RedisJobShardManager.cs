@@ -220,7 +220,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
             var minDue = ParseDateTimeOffset(metadata, "MinDueTime", DateTimeOffset.MinValue);
             var maxDue = ParseDateTimeOffset(metadata, "MaxDueTime", DateTimeOffset.MaxValue);
 
-            var shard = new RedisJobShard(shardId, minDue, maxDue, _multiplexer!, _options, _loggerFactory.CreateLogger<RedisJobShard>());
+            var shard = new RedisJobShard(shardId, minDue, maxDue, _multiplexer!, metadata, _options, _loggerFactory.CreateLogger<RedisJobShard>());
             try
             {
                 await shard.InitializeAsync(cancellationToken).ConfigureAwait(false);
@@ -294,7 +294,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
                     continue;
                 }
 
-                var shard = new RedisJobShard(shardId, minDueTime, maxDueTime, _multiplexer!, _options, _loggerFactory.CreateLogger<RedisJobShard>());
+                var shard = new RedisJobShard(shardId, minDueTime, maxDueTime, _multiplexer!, metadataInfo, _options, _loggerFactory.CreateLogger<RedisJobShard>());
                 await shard.InitializeAsync(cancellationToken).ConfigureAwait(false);
                 _jobShardCache[shardId] = shard;
                 _logger.LogInformation("Shard {ShardId} registered and assigned to this silo", shardId);
