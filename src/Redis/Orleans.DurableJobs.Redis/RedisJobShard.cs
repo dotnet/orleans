@@ -112,7 +112,8 @@ internal sealed partial class RedisJobShard : JobShard
         var jobRetryCounters = new Dictionary<string, (int dequeueCount, DateTimeOffset? newDueTime)>();
 
         // StreamRange with "-" .. "+" returns all entries. If stream does not exist, returns empty.
-        var streamEntries = _db.StreamRange(_streamKey, "-", "+", 0);
+        // Note: count parameter is omitted to return all entries (passing 0 would throw an error)
+        var streamEntries = _db.StreamRange(_streamKey, "-", "+");
 
         await foreach (var operation in RedisStreamJsonSerializer<JobOperation>.DecodeAsync(streamEntries, JobOperationJsonContext.Default.JobOperation, cancellationToken))
         {
