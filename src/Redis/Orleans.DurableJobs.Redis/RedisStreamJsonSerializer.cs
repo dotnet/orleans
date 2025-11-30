@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using System.Threading;
@@ -46,5 +45,19 @@ internal static class RedisStreamJsonSerializer<T>
             await Task.Yield();
             yield return item;
         }
+    }
+
+    /// <summary>
+    /// Serializes a collection of items to JSON strings using the provided JsonTypeInfo for source-generated serialization.
+    /// </summary>
+    /// <param name="items">The items to serialize.</param>
+    /// <param name="jsonTypeInfo">The JSON type info for source-generated serialization.</param>
+    /// <returns>An array of JSON strings.</returns>
+    public static string[] Encode(IEnumerable<T> items, JsonTypeInfo<T> jsonTypeInfo)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(jsonTypeInfo);
+
+        return items.Select(item => JsonSerializer.Serialize(item, jsonTypeInfo)).ToArray();
     }
 }

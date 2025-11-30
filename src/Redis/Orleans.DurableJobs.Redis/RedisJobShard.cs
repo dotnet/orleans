@@ -310,7 +310,8 @@ internal sealed partial class RedisJobShard : JobShard
     {
         var sw = Stopwatch.StartNew();
 
-        var payloads = operations.Select(op => JsonSerializer.Serialize(op.JobOperation!.Value)).ToArray();
+        var jobOperations = operations.Select(op => op.JobOperation!.Value);
+        var payloads = RedisStreamJsonSerializer<JobOperation>.Encode(jobOperations, JobOperationJsonContext.Default.JobOperation);
         var args = new RedisValue[1 + payloads.Length];
         args[0] = payloads.Length;
         for (int i = 0; i < payloads.Length; i++) args[i + 1] = payloads[i];
