@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -36,23 +37,16 @@ public sealed partial class RedisJobShardManager : JobShardManager
     private const string CreateShardLua = @"
             -- KEYS[1] = metaKey
             -- KEYS[2] = shardsSetKey
-            -- ARGV[1] = owner
-            -- ARGV[2] = creator
-            -- ARGV[3] = minDueIso
-            -- ARGV[4] = maxDueIso
-            -- ARGV[5] = membershipVersion
-            -- ARGV[6] = shardId
+            -- ARGV[1] = shardId
+            -- ARGV[2] = metadataJson (JSON object with all metadata fields)
             if redis.call('EXISTS', KEYS[1]) == 1 then
                 return 0
             end
-            redis.call('HSET', KEYS[1],
-                'Owner', ARGV[1],
-                'Creator', ARGV[2],
-                'MinDueTime', ARGV[3],
-                'MaxDueTime', ARGV[4],
-                'MembershipVersion', ARGV[5],
-                'version', '1')
-            redis.call('SADD', KEYS[2], ARGV[6])
+            local metadata = cjson.decode(ARGV[2])
+            for k, v in pairs(metadata) do
+                redis.call('HSET', KEYS[1], k, v)
+            end
+            redis.call('SADD', KEYS[2], ARGV[1])
             return 1
         ";
 
@@ -276,15 +270,12 @@ public sealed partial class RedisJobShardManager : JobShardManager
 
             try
             {
+                var metadataJson = JsonSerializer.Serialize(metadataInfo);
                 var res = (int)await _db!.ScriptEvaluateAsync(CreateShardLua,
                     new RedisKey[] { metaKey, ShardSetKey },
                     new RedisValue[] {
-                        metadataInfo["Owner"],
-                        metadataInfo["Creator"],
-                        metadataInfo["MinDueTime"],
-                        metadataInfo["MaxDueTime"],
-                        metadataInfo["MembershipVersion"],
-                        shardId
+                        shardId,
+                        metadataJson
                     }).ConfigureAwait(false);
 
                 if (res == 0)
