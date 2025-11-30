@@ -19,7 +19,7 @@ namespace Tester.Redis.DurableJobs;
 internal sealed class RedisJobShardManagerTestFixture : IJobShardManagerTestFixture
 {
     private readonly IOptions<RedisJobShardOptions> _options;
-    private IConnectionMultiplexer? _multiplexer;
+    private IConnectionMultiplexer _multiplexer;
     private readonly string _shardPrefix;
 
     public RedisJobShardManagerTestFixture()
@@ -41,7 +41,10 @@ internal sealed class RedisJobShardManagerTestFixture : IJobShardManagerTestFixt
 
     private async Task<IConnectionMultiplexer> CreateMultiplexerAsync(RedisJobShardOptions options)
     {
-        _multiplexer ??= await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!);
+        if (_multiplexer == null)
+        {
+            _multiplexer = await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions);
+        }
         return _multiplexer;
     }
 
@@ -56,7 +59,7 @@ internal sealed class RedisJobShardManagerTestFixture : IJobShardManagerTestFixt
 
     public async ValueTask DisposeAsync()
     {
-        if (_multiplexer is not null)
+        if (_multiplexer != null)
         {
             // Clean up test data from Redis
             var db = _multiplexer.GetDatabase();
