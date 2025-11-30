@@ -71,12 +71,14 @@ internal sealed partial class RedisJobShard : JobShard
     /// <param name="startTime">The start time of the shard's time range.</param>
     /// <param name="endTime">The end time of the shard's time range.</param>
     /// <param name="redis">The Redis connection multiplexer.</param>
+    /// <param name="metadata">The shard metadata.</param>
     /// <param name="options">The Redis job shard options.</param>
     /// <param name="logger">The logger.</param>
     public RedisJobShard(string shardId,
             DateTimeOffset startTime,
             DateTimeOffset endTime,
             IConnectionMultiplexer redis,
+            IDictionary<string, string> metadata,
             RedisJobShardOptions options,
             ILogger<RedisJobShard> logger)
             : base(shardId, startTime, endTime)
@@ -85,6 +87,7 @@ internal sealed partial class RedisJobShard : JobShard
         _db = _redis.GetDatabase();
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        Metadata = metadata;
 
         _streamKey = $"durablejobs:shard:{Id}:stream";
         _metaKey = $"durablejobs:shard:{Id}:meta";
