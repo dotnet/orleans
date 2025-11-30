@@ -191,7 +191,7 @@ internal sealed partial class SiloLifetime(ILogger<SiloLifetime> logger) : ISilo
             }
             catch (Exception ex)
             {
-                // Note that awaiting WhenAll returns only the first exception, and we want to show all if there are multiple.
+                // Note that awaiting WhenAll returns only the first exception, and we want to show all, if there are multiple.
                 if (allTasks.Exception is { } aggEx)
                 {
                     var flattened = aggEx.Flatten();

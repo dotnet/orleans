@@ -11,16 +11,13 @@ namespace NonSilo.Tests;
 [TestCategory("BVT"), TestCategory("Lifetime")]
 public class SiloLifetimeTests
 {
-    private readonly ITestOutputHelper _output;
     private readonly SiloLifetime _lifetime;
     private readonly CancelableSiloLifecycleSubject _subject;
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
     public SiloLifetimeTests(ITestOutputHelper output)
     {
-        _output = output;
-
-        var factory = new LoggerFactory([new XunitLoggerProvider(_output)]);
+        var factory = new LoggerFactory([new XunitLoggerProvider(output)]);
 
         _subject = new CancelableSiloLifecycleSubject(factory.CreateLogger<SiloLifecycleSubject>());
         _lifetime = new SiloLifetime(factory.CreateLogger<SiloLifetime>());
@@ -43,9 +40,10 @@ public class SiloLifetimeTests
             }
             catch (Exception ex)
             {
-                // We set the exception on the TCS so the test can inspect the specific failure of this callback
+                // We set the exception on the TCS so the test can inspect the specific failure of this callback.
                 tcs.TrySetException(ex);
-                // We rethrow so the LifecycleSubject behaves according to terminateOnError logic
+
+                // We rethrow so the LifecycleSubject behaves according to TerminateOnError.
                 throw;
             }
             return Task.CompletedTask;
@@ -91,21 +89,16 @@ public class SiloLifetimeTests
 
         _lifetime.Started.Register((_, _) => tcs.Task);
 
-        // This should hit the dummy callback above, and hang there.
         var startTask = _subject.OnStart();
-
-        // Since the stage is blocked by our callback, this task will be pending.
         var waitTask = _lifetime.Started.WaitAsync(cts.Token);
 
         Assert.False(waitTask.IsCompleted, "WaitAsync should be paused waiting for the stage to complete");
 
         await cts.CancelAsync();
-
-        // Now we check that WaitAsync threw.
         await Assert.ThrowsAsync<TaskCanceledException>(() => waitTask);
 
-        // Lastly we unblock the stage so the background startTask can finish/
         tcs.SetResult();
+
         await startTask;
     }
 
