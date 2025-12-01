@@ -104,10 +104,10 @@ public sealed partial class RedisJobShardManager : JobShardManager
     {
         if (_db != null) return;
 
-        _logger.LogInformation("Initializing RedisJobShardManager (shardPrefix={Prefix})", _options.ShardPrefix);
+        LogInitializing(_logger, _options.ShardPrefix);
         _multiplexer = await _options.CreateMultiplexer(_options).ConfigureAwait(false);
         _db = _multiplexer.GetDatabase();
-        _logger.LogInformation("RedisJobShardManager initialized");
+        LogInitialized(_logger);
     }
 
     private string ShardSetKey => $"durablejobs:shards:{_options.ShardPrefix}";
@@ -116,7 +116,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
     public override async Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxShardStartTime, CancellationToken cancellationToken)
     {
         await InitializeIfNeeded(cancellationToken).ConfigureAwait(false);
-        _logger.LogInformation("Assigning shards up to {MaxShardStartTime} (prefix={Prefix})", maxShardStartTime, _options.ShardPrefix);
+        LogAssigningShards(_logger, maxShardStartTime, _options.ShardPrefix);
 
         var result = new List<IJobShard>();
 
@@ -152,7 +152,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
             {
                 if (shardStartTime > maxShardStartTime)
                 {
-                    _logger.LogDebug("Shard {ShardId} is too new (start {Start}) > max {Max}, skipping", shardId, shardStartTime, maxShardStartTime);
+                    LogShardTooNew(_logger, shardId, shardStartTime, maxShardStartTime);
                     continue;
                 }
             }
@@ -162,20 +162,20 @@ public sealed partial class RedisJobShardManager : JobShardManager
             {
                 if (_jobShardCache.TryGetValue(shardId, out var cached))
                 {
-                    _logger.LogDebug("Shard {ShardId} is owned by this silo and in cache", shardId);
+                    LogShardOwnedByThisSilo(_logger, shardId);
                     result.Add(cached);
                     continue;
                 }
                 else
                 {
-                    _logger.LogWarning("Shard {ShardId} metadata says owned by this silo but not in cache; releasing ownership", shardId);
+                    LogShardOwnedButNotInCache(_logger, shardId);
                     try
                     {
                         await ReleaseOwnershipAsync(shardId, cancellationToken).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Failed to release ownership of shard {ShardId}", shardId);
+                        LogFailedToReleaseOwnership(_logger, ex, shardId);
                     }
                     continue;
                 }
@@ -190,7 +190,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
                     var ownerStatus = _clusterMembership.CurrentSnapshot.GetSiloStatus(ownerAddr);
                     if (ownerStatus is not SiloStatus.Dead and not SiloStatus.None)
                     {
-                        _logger.LogDebug("Shard {ShardId} owned by active silo {Owner}, skipping", shardId, ownerStr);
+                        LogShardOwnedByActiveSilo(_logger, shardId, ownerStr);
                         continue;
                     }
                 }
@@ -201,12 +201,12 @@ public sealed partial class RedisJobShardManager : JobShardManager
             }
 
             // Try to claim orphaned shard
-            _logger.LogInformation("Claiming orphaned shard {ShardId} (old owner: {Owner})", shardId, ownerStr);
+            LogClaimingOrphanedShard(_logger, shardId, ownerStr);
             var expectedVersion = metadata.TryGetValue("version", out var v) ? v : "0";
             var took = await TryTakeOwnershipAsync(shardId, expectedVersion, _localSiloDetails.SiloAddress, _clusterMembership.CurrentSnapshot.Version, cancellationToken).ConfigureAwait(false);
             if (!took)
             {
-                _logger.LogInformation("Failed to take ownership: another silo likely took shard {ShardId}", shardId);
+                LogFailedToTakeOwnership(_logger, shardId);
                 continue;
             }
 
@@ -222,33 +222,33 @@ public sealed partial class RedisJobShardManager : JobShardManager
                 await shard.MarkAsCompleteAsync(cancellationToken).ConfigureAwait(false);
 
                 _jobShardCache[shardId] = shard;
-                _logger.LogInformation("Shard {ShardId} assigned to this silo", shardId);
+                LogShardAssigned(_logger, shardId);
                 result.Add(shard);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed initializing shard {ShardId} after taking ownership; releasing", shardId);
+                LogFailedInitializingShard(_logger, ex, shardId);
                 try
                 {
                     await ReleaseOwnershipAsync(shardId, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception releaseEx)
                 {
-                    _logger.LogWarning(releaseEx, "Failed to release shard {ShardId} after failed init", shardId);
+                    LogFailedToReleaseShardAfterFailedInit(_logger, releaseEx, shardId);
                 }
 
                 await shard.DisposeAsync();
             }
         }
 
-        _logger.LogInformation("AssignJobShardsAsync completed, returning {Count} shards", result.Count);
+        LogAssignmentCompleted(_logger, result.Count);
         return result;
     }
 
     public override async Task<IJobShard> CreateShardAsync(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, CancellationToken cancellationToken)
     {
         await InitializeIfNeeded(cancellationToken).ConfigureAwait(false);
-        _logger.LogInformation("Registering new shard (min={Min}, max={Max})", minDueTime, maxDueTime);
+        LogRegisteringShard(_logger, minDueTime, maxDueTime);
 
         var i = 0;
         while (true)
@@ -280,7 +280,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
 
                 if (res == 0)
                 {
-                    _logger.LogWarning("Shard id collision for {ShardId}, retrying (attempt {Attempt})", shardId, i);
+                    LogShardIdCollision(_logger, shardId, i);
                     if (i >= _options.MaxShardCreationRetries) throw new InvalidOperationException($"Failed to create shard '{shardId}' after {i} attempts");
                     continue;
                 }
@@ -288,12 +288,12 @@ public sealed partial class RedisJobShardManager : JobShardManager
                 var shard = new RedisJobShard(shardId, minDueTime, maxDueTime, _multiplexer!, metadataInfo, _options, _loggerFactory.CreateLogger<RedisJobShard>());
                 await shard.InitializeAsync(cancellationToken).ConfigureAwait(false);
                 _jobShardCache[shardId] = shard;
-                _logger.LogInformation("Shard {ShardId} registered and assigned to this silo", shardId);
+                LogShardRegistered(_logger, shardId);
                 return shard;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Error creating shard {ShardId} attempt {Attempt}", shardId, i);
+                LogErrorCreatingShard(_logger, ex, shardId, i);
                 if (i >= _options.MaxShardCreationRetries) throw new InvalidOperationException($"Failed to create shard '{shardId}' after {i} attempts", ex);
             }
         }
@@ -303,13 +303,13 @@ public sealed partial class RedisJobShardManager : JobShardManager
     {
         if (shard is not RedisJobShard redisShard)
         {
-            _logger.LogWarning("UnregisterShardAsync called with non-RedisJobShard instance; disposing generically");
+            LogUnregisterNonRedisJobShard(_logger);
             await shard.DisposeAsync();
             return;
         }
 
         var shardId = redisShard.Id;
-        _logger.LogInformation("Unregistering shard {ShardId}", shardId);
+        LogUnregisteringShard(_logger, shardId);
 
         // Stop the background storage processor to ensure no more changes can happen
         await redisShard.StopProcessorAsync(cancellationToken).ConfigureAwait(false);
@@ -326,11 +326,11 @@ public sealed partial class RedisJobShardManager : JobShardManager
             try
             {
                 await ReleaseOwnershipAsync(shardId, cancellationToken).ConfigureAwait(false);
-                _logger.LogInformation("Released ownership of shard {ShardId} with {Count} remaining jobs", shardId, count);
+                LogShardOwnershipReleased(_logger, shardId, count);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to release ownership for shard {ShardId}", shardId);
+                LogFailedToReleaseOwnershipForShard(_logger, ex, shardId);
             }
         }
         else
@@ -339,11 +339,11 @@ public sealed partial class RedisJobShardManager : JobShardManager
             try
             {
                 await DeleteShardAsync(shardId, cancellationToken).ConfigureAwait(false);
-                _logger.LogInformation("Deleted shard {ShardId} (no remaining jobs)", shardId);
+                LogShardDeleted(_logger, shardId);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to delete shard {ShardId}", shardId);
+                LogFailedToDeleteShard(_logger, ex, shardId);
             }
         }
 
@@ -354,7 +354,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Error disposing shard {ShardId}", shardId);
+            LogErrorDisposingShard(_logger, ex, shardId);
         }
     }
 
