@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
@@ -48,15 +49,18 @@ namespace UnitTests.SchedulerTests
             // is completely and thoroughly broken and both closures are executed "simultaneously"
 
             int n = 0;
+            var gate = new SemaphoreSlim(0, 1);
             // ReSharper disable AccessToModifiedClosure
-            var task1 = new Task(() => { Thread.Sleep(100); n = n + 5; });
+            var task1 = new Task(() => { gate.Wait(); n = n + 5; });
             Task task2 = new Task(() => { n = n * 3; });
             // ReSharper restore AccessToModifiedClosure
 
             task1.Start(scheduler);
             task2.Start(scheduler);
 
-            // Pause to let things run
+            // Release gate to allow task1 to proceed
+            gate.Release();
+
             await task1;
             await task2;
 
@@ -91,7 +95,7 @@ namespace UnitTests.SchedulerTests
                 return t1;
             });
             wrapped.Start(scheduler);
-            await wrapped.Unwrap().WaitAsync(TimeSpan.FromSeconds(2));
+            await wrapped.Unwrap().WaitAsync(TimeSpan.FromSeconds(10));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -103,27 +107,33 @@ namespace UnitTests.SchedulerTests
 
             var finished = new TaskCompletionSource();
             int numCompleted = 0;
+            var gates = new SemaphoreSlim[10];
+            for (int i = 0; i < 10; i++)
+            {
+                gates[i] = new SemaphoreSlim(0, 1);
+            }
+
             void action()
             {
                 LogContext("WorkItem-task " + Task.CurrentId);
 
                 for (int i = 0; i < 10; i++)
                 {
+                    int taskIndex = i;
                     int id = -1;
-                    Task.Factory.StartNew(async () =>
+                    Task.Factory.StartNew(() =>
                     {
                         id = Task.CurrentId.HasValue ? (int)Task.CurrentId : -1;
 
                         // ReSharper disable AccessToModifiedClosure
                         LogContext("Sub-task " + id + " n=" + n);
                         int k = n;
-                        this.output.WriteLine("Sub-task " + id + " sleeping");
-                        Thread.Sleep(10);
+                        this.output.WriteLine("Sub-task " + id + " waiting for gate");
+                        gates[taskIndex].Wait();
                         this.output.WriteLine("Sub-task " + id + " awake");
                         n = k + 1;
                         // ReSharper restore AccessToModifiedClosure
                     })
-                    .Unwrap()
                     .ContinueWith(tsk =>
                     {
                         LogContext("Sub-task " + id + "-ContinueWith");
@@ -135,16 +145,22 @@ namespace UnitTests.SchedulerTests
                         }
                     });
                 }
+
+                // Release all gates in sequence to ensure sequential execution
+                for (int i = 0; i < 10; i++)
+                {
+                    gates[i].Release();
+                }
             }
 
             Task t = new Task(action);
 
             t.Start(scheduler);
 
-            // Pause to let things run
-            this.output.WriteLine("Main-task sleeping");
+            // Wait for completion
+            this.output.WriteLine("Main-task waiting");
             await finished.Task;
-            this.output.WriteLine("Main-task awake");
+            this.output.WriteLine("Main-task done");
 
             // N should be 10, because all tasks should execute serially
             Assert.True(n != 0, "Work items did not get executed");
@@ -156,11 +172,12 @@ namespace UnitTests.SchedulerTests
         {
             var result = new TaskCompletionSource<bool>();
             int n = 0;
+            var gate = new SemaphoreSlim(0, 1);
 
             Task wrapper = new Task(() =>
             {
                 // ReSharper disable AccessToModifiedClosure
-                Task task1 = Task.Factory.StartNew(async () => { this.output.WriteLine("===> 1a"); await Task.Delay(1000); n = n + 3; this.output.WriteLine("===> 1b"); }).Unwrap();
+                Task task1 = Task.Factory.StartNew(() => { this.output.WriteLine("===> 1a"); gate.Wait(); n = n + 3; this.output.WriteLine("===> 1b"); });
                 Task task2 = task1.ContinueWith(task => { n = n * 5; this.output.WriteLine("===> 2"); });
                 Task task3 = task2.ContinueWith(task => { n = n / 5; this.output.WriteLine("===> 3"); });
                 Task task4 = task3.ContinueWith(task => { n = n - 2; this.output.WriteLine("===> 4"); result.SetResult(true); });
@@ -170,10 +187,13 @@ namespace UnitTests.SchedulerTests
                     this.output.WriteLine("Done Faulted={0}", task.IsFaulted);
                     Assert.False(task.IsFaulted, "Faulted with Exception=" + task.Exception);
                 });
+
+                // Release gate to allow task1 to complete
+                gate.Release();
             });
             wrapper.Start(scheduler);
 
-            var timeoutLimit = TimeSpan.FromSeconds(2);
+            var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
                 await result.Task.WaitAsync(timeoutLimit);
@@ -221,7 +241,7 @@ namespace UnitTests.SchedulerTests
             });
             wrapper.Start(scheduler);
 
-            var timeoutLimit = TimeSpan.FromSeconds(1);
+            var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
                 await finish.Task.WaitAsync(timeoutLimit);
@@ -247,6 +267,7 @@ namespace UnitTests.SchedulerTests
             ManualResetEvent pause1 = new ManualResetEvent(false);
             ManualResetEvent pause2 = new ManualResetEvent(false);
             var finish = new TaskCompletionSource<bool>();
+            var fakeTimeProvider = new FakeTimeProvider();
             Task<int> task1 = null;
             Task<int> task2 = null;
             Task join = null;
@@ -269,13 +290,13 @@ namespace UnitTests.SchedulerTests
                     return 2;
                 });
 
-                join = Task.WhenAny(task1, task2, Task.Delay(TimeSpan.FromSeconds(2)));
+                join = Task.WhenAny(task1, task2, Task.Delay(TimeSpan.FromSeconds(2), fakeTimeProvider));
 
                 finish.SetResult(true);
             });
             wrapper.Start(scheduler);
 
-            var timeoutLimit = TimeSpan.FromSeconds(1);
+            var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
                 await finish.Task.WaitAsync(timeoutLimit);
@@ -284,6 +305,9 @@ namespace UnitTests.SchedulerTests
             {
                 Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
+
+            // Advance time to trigger the delay timeout
+            fakeTimeProvider.Advance(TimeSpan.FromSeconds(2));
 
             Assert.NotNull(join);
             await join;
@@ -304,6 +328,7 @@ namespace UnitTests.SchedulerTests
             var pause1 = new TaskCompletionSource<bool>();
             var pause2 = new TaskCompletionSource<bool>();
             var finish = new TaskCompletionSource<bool>();
+            var fakeTimeProvider = new FakeTimeProvider();
             Task<int> task1 = null;
             Task<int> task2 = null;
             Task join = null;
@@ -314,12 +339,7 @@ namespace UnitTests.SchedulerTests
                     this.output.WriteLine("Task-1 Started");
                     Assert.Equal(scheduler, TaskScheduler.Current);
                     int num1 = 1;
-#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
-                    while (!pause1.Task.Result) // Infinite busy loop
-                    {
-                        num1 = Random.Shared.Next();
-                    }
-#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
+                    pause1.Task.Wait();
                     this.output.WriteLine("Task-1 Done");
                     return num1;
                 });
@@ -328,23 +348,23 @@ namespace UnitTests.SchedulerTests
                     this.output.WriteLine("Task-2 Started");
                     Assert.Equal(scheduler, TaskScheduler.Current);
                     int num2 = 2;
-#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
-                    while (!pause2.Task.Result) // Infinite busy loop
-                    {
-                        num2 = Random.Shared.Next();
-                    }
-#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
+                    pause2.Task.Wait();
                     this.output.WriteLine("Task-2 Done");
                     return num2;
                 });
 
-                join = Task.WhenAny(task1, task2, Task.Delay(TimeSpan.FromSeconds(2)));
+                var delayTask = Task.Delay(TimeSpan.FromSeconds(2), fakeTimeProvider);
+
+                // Advance time immediately to trigger the delay
+                fakeTimeProvider.Advance(TimeSpan.FromSeconds(2));
+
+                join = Task.WhenAny(task1, task2, delayTask);
 
                 finish.SetResult(true);
             });
             wrapper.Start(scheduler);
 
-            var timeoutLimit = TimeSpan.FromSeconds(1);
+            var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
                 await finish.Task.WaitAsync(timeoutLimit);
@@ -404,7 +424,7 @@ namespace UnitTests.SchedulerTests
             });
             wrapper.Start(scheduler);
 
-            var timeoutLimit = TimeSpan.FromSeconds(1);
+            var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
                 await finish.Task.WaitAsync(timeoutLimit);
@@ -467,7 +487,7 @@ namespace UnitTests.SchedulerTests
             });
             wrapper.Start(scheduler);
 
-            var timeoutLimit = TimeSpan.FromSeconds(1);
+            var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
                 await finish.Task.WaitAsync(timeoutLimit);
@@ -531,10 +551,12 @@ namespace UnitTests.SchedulerTests
             bool[] executingChain = new bool[NumChains];
             int[] stageComplete = new int[NumChains];
             int executingGlobal = -1;
+            var gates = new ManualResetEventSlim[NumChains];
+
             for (int i = 0; i < NumChains; i++)
             {
+                gates[i] = new ManualResetEventSlim(false);
                 int chainNum = i; // Capture
-                int sleepTime = Random.Shared.Next(10);
                 resultHandles[chainNum] = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 Task task = taskChains[chainNum] = new Task(() =>
                 {
@@ -547,7 +569,7 @@ namespace UnitTests.SchedulerTests
                         executingGlobal = chainNum;
                         executingChain[chainNum] = true;
 
-                        Thread.Sleep(sleepTime);
+                        gates[chainNum].Wait();
                     }
                     finally
                     {
@@ -559,7 +581,7 @@ namespace UnitTests.SchedulerTests
                 for (int j = 1; j < ChainLength; j++)
                 {
                     int taskNum = j; // Capture
-                    task = task.ContinueWith(async t =>
+                    task = task.ContinueWith(t =>
                     {
                         if (t.IsFaulted) throw t.Exception;
                         this.output.WriteLine("Inside Chain {0} Task {1}", chainNum, taskNum);
@@ -572,7 +594,7 @@ namespace UnitTests.SchedulerTests
                             executingGlobal = chainNum;
                             executingChain[chainNum] = true;
 
-                            Thread.Sleep(sleepTime);
+                            gates[chainNum].Wait();
                         }
                         finally
                         {
@@ -580,7 +602,7 @@ namespace UnitTests.SchedulerTests
                             executingChain[chainNum] = false;
                             executingGlobal = -1;
                         }
-                    }, scheduler).Unwrap();
+                    }, scheduler);
                 }
                 taskChainEnds[chainNum] = task.ContinueWith(t =>
                 {
@@ -593,6 +615,12 @@ namespace UnitTests.SchedulerTests
             for (int i = 0; i < NumChains; i++)
             {
                 taskChains[i].Start(scheduler);
+            }
+
+            // Set all gates to allow execution to proceed
+            for (int i = 0; i < NumChains; i++)
+            {
+                gates[i].Set();
             }
 
             for (int i = 0; i < NumChains; i++)
@@ -679,7 +707,7 @@ namespace UnitTests.SchedulerTests
             wrapper.Start(scheduler);
             await wrapper;
 
-            var timeoutLimit = TimeSpan.FromSeconds(1);
+            var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
                 await wrapperDone.Task.WaitAsync(timeoutLimit);

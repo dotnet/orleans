@@ -94,7 +94,7 @@ namespace Orleans.Runtime.Scheduler
             turnsExecutedStatistic.Increment();
 #endif
 #if DEBUG
-            LogTraceTryExecuteTaskInlineYes(myId, task.Id, Thread.CurrentThread.ManagedThreadId);
+            LogTraceTryExecuteTaskInlineYes(myId, task.Id, System.Environment.CurrentManagedThreadId);
 #endif
             // Try to run the task.
             bool done = TryExecuteTask(task);
@@ -104,7 +104,7 @@ namespace Orleans.Runtime.Scheduler
                 LogWarnTryExecuteTaskNotDone(task.Id, task.Status);
             }
 
-            LogTraceTryExecuteTaskInlineCompleted(myId, task.Id, Thread.CurrentThread.ManagedThreadId, done);
+            LogTraceTryExecuteTaskInlineCompleted(myId, task.Id, System.Environment.CurrentManagedThreadId, done);
 #endif
             return done;
         }

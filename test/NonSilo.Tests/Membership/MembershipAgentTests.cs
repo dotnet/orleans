@@ -280,7 +280,7 @@ namespace NonSilo.Tests.Membership
                 this.localSiloDetails);
             var started = this.lifecycle.OnStart();
 
-            await Until(() => remoteSiloProber.ReceivedCalls().Count() < otherSilos.Length);
+            await Until(() => remoteSiloProber.ReceivedCalls().Count() >= otherSilos.Length);
 
 
             await Until(() => started.IsCompleted);
@@ -333,7 +333,7 @@ namespace NonSilo.Tests.Membership
                 this.localSiloDetails);
             var started = this.lifecycle.OnStart();
 
-            await Until(() => this.remoteSiloProber.ReceivedCalls().Count() < otherSilos.Length);
+            await Until(() => this.remoteSiloProber.ReceivedCalls().Count() >= otherSilos.Length);
             await Until(() => started.IsCompleted);
 
             // Startup should have faulted.

@@ -4,7 +4,7 @@
     <PackageId>Microsoft.Orleans.Dashboard</PackageId>
     <Title>Microsoft Orleans Dashboard</Title>
     <Description>Real-time monitoring and visualization dashboard for Microsoft Orleans showing grain statistics, performance metrics, and cluster health.</Description>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RootNamespace>Orleans.Dashboard</RootNamespace>

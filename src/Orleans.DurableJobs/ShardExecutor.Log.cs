@@ -59,4 +59,16 @@ internal sealed partial class ShardExecutor
         Message = "Shard {ShardId} processing cancelled"
     )]
     private static partial void LogShardCancelled(ILogger logger, string shardId);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Overload detected for shard {ShardId}, pausing job processing"
+    )]
+    private static partial void LogOverloadDetected(ILogger logger, string shardId);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Overload cleared for shard {ShardId}, resuming job processing"
+    )]
+    private static partial void LogOverloadCleared(ILogger logger, string shardId);
 }

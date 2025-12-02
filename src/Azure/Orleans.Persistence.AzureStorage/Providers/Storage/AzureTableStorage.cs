@@ -490,7 +490,7 @@ namespace Orleans.Storage
             var stopWatch = Stopwatch.StartNew();
             try
             {
-                LogInfoStorageInitializing(name, this.options);
+                LogDebugStorageInitializing(name, this.options.TableName);
                 this.tableDataManager = new GrainStateTableDataManager(this.options, this.logger);
                 await this.tableDataManager.InitTableAsync();
                 stopWatch.Stop();
@@ -566,10 +566,10 @@ namespace Orleans.Storage
 
         [LoggerMessage(
             EventId = (int)AzureProviderErrorCode.AzureTableProvider_InitProvider,
-            Level = LogLevel.Information,
-            Message = "AzureTableGrainStorage {ProviderName} initializing: {Options}"
+            Level = LogLevel.Debug,
+            Message = "AzureTableGrainStorage {ProviderName} is initializing: TableName={TableName}"
         )]
-        private partial void LogInfoStorageInitializing(string providerName, AzureTableStorageOptions options);
+        private partial void LogDebugStorageInitializing(string providerName, string tableName);
 
         [LoggerMessage(
             EventId = (int)AzureProviderErrorCode.AzureTableProvider_InitProvider,

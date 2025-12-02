@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Threading.Channels;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -136,6 +137,8 @@ namespace UnitTests.General
         /// </summary>
         public async Task CallChainReentrancy_WithSuppression()
         {
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+
             var aId = $"A-{Random.Shared.Next()}";
             var bId = $"B-{Random.Shared.Next()}";
             var a = Fixture.GrainFactory.GetGrain<ICallChainReentrancyGrain>(aId);
@@ -158,18 +161,18 @@ namespace UnitTests.General
             var observer = new CallChainObserver();
             var observerRef = Fixture.GrainFactory.CreateObjectReference<ICallChainObserver>(observer);
 
-            var aTask = a.CallChain(observerRef, chain, 0);
+            var aTask = a.CallChain(observerRef, chain, 0, cts.Token);
 
             // Wait for 'a' to receive the call from 'b'
-            await observer.WaitForOperationAsync(CallChainOperation.Enter, aId, 3);
+            await observer.WaitForOperationAsync(CallChainOperation.Enter, aId, 3, cts.Token);
 
             // Tell 'a' to stop waiting for 'b to return, allowing the final call (step 4) to enter 'b' and complete the call chain.
-            await a.UnblockWaiters();
+            await a.UnblockWaiters(cts.Token);
 
             await aTask;
 
             // Wait for 'b' to complete its final call
-            await observer.WaitForOperationAsync(CallChainOperation.Exit, bId, 4);
+            await observer.WaitForOperationAsync(CallChainOperation.Exit, bId, 4, cts.Token);
         }
 
         public enum CallChainOperation
@@ -180,39 +183,47 @@ namespace UnitTests.General
 
         public class CallChainObserver : ICallChainObserver
         {
-            public Channel<(CallChainOperation Operation, string Grain, int CallIndex)> Operations { get; } = Channel.CreateUnbounded<(CallChainOperation Operation, string Grain, int CallIndex)>();
+            private readonly Channel<(CallChainOperation Operation, string Grain, int CallIndex)> _operations = Channel.CreateUnbounded<(CallChainOperation Operation, string Grain, int CallIndex)>();
+            private readonly ConcurrentBag<(CallChainOperation Operation, string Grain, int CallIndex)> _allOperations = new();
 
             public async Task OnEnter(string grain, int callIndex)
             {
-                await Operations.Writer.WriteAsync((CallChainOperation.Enter, grain, callIndex));
+                await _operations.Writer.WriteAsync((CallChainOperation.Enter, grain, callIndex));
             }
 
             public async Task OnExit(string grain, int callIndex)
             {
-                await Operations.Writer.WriteAsync((CallChainOperation.Exit, grain, callIndex));
+                await _operations.Writer.WriteAsync((CallChainOperation.Exit, grain, callIndex));
             }
 
-            public async Task WaitForOperationAsync(CallChainOperation operationType, string grain, int callIndex)
+            public async Task WaitForOperationAsync(CallChainOperation operationType, string grain, int callIndex, CancellationToken cancellationToken = default)
             {
-                List<(CallChainOperation Operation, string Grain, int CallIndex)> ops = new();
-                var operations = Operations.Reader;
-                while (await operations.WaitToReadAsync())
+                // First check if we've already seen this operation
+                if (_allOperations.Any(op => op.Operation == operationType && op.Grain.Equals(grain) && op.CallIndex == callIndex))
+                {
+                    return;
+                }
+
+                var operations = _operations.Reader;
+                while (await operations.WaitToReadAsync(cancellationToken))
                 {
                     Assert.True(operations.TryRead(out var operation));
-                    ops.Add(operation);
+                    _allOperations.Add(operation);
 
                     if (operation.Operation == operationType && operation.Grain.Equals(grain) && operation.CallIndex == callIndex)
                     {
                         return;
                     }
+
+                    // Check if we've passed the expected call index
                     if (operation.CallIndex > callIndex)
                     {
                         break;
                     }
                 }
 
-                Assert.Fail($"Expected to find operation ({operationType}, {grain}, {callIndex}) in {string.Join(", ", ops.Select(op => $"({op.Operation}, {op.Grain}, {op.CallIndex})"))}");
+                Assert.Fail($"Expected to find operation ({operationType}, {grain}, {callIndex}) in {string.Join(", ", _allOperations.Select(op => $"({op.Operation}, {op.Grain}, {op.CallIndex})"))}");
             }
         }
     }
-} 
+}

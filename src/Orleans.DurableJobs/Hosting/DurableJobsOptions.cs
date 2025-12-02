@@ -33,6 +33,13 @@ public sealed class DurableJobsOptions
     public int MaxConcurrentJobsPerSilo { get; set; } = 10_000 * Environment.ProcessorCount;
 
     /// <summary>
+    /// Gets or sets the delay between overload checks when the host is overloaded.
+    /// Job batch processing will pause for this duration before rechecking the overload status.
+    /// Default: 5 second.
+    /// </summary>
+    public TimeSpan OverloadBackoffDelay { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
     /// Gets or sets the function that determines whether a failed job should be retried and when.
     /// The function receives the job context and the exception that caused the failure, and returns
     /// the time when the job should be retried, or <see langword="null"/> if the job should not be retried.

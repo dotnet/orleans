@@ -197,7 +197,8 @@ namespace UnitTests.Serialization
                 using var writer1Session = _serializerSessionPool.GetSession();
                 var writer = Writer.CreatePooled(writer1Session);
                 var fromNew = newUpdates.ToList();
-                messageSerializer.WriteCacheInvalidationHeaders(ref writer, fromNew);
+                var message = new Message { CacheInvalidationHeader = fromNew };
+                messageSerializer.WriteCacheInvalidationHeaders(ref writer, message);
                 writer.Commit();
 
                 using var reader1Session = _serializerSessionPool.GetSession();
@@ -220,7 +221,8 @@ namespace UnitTests.Serialization
                 using var writer1Session = _serializerSessionPool.GetSession();
                 var writer = Writer.CreatePooled(writer1Session);
                 var fromNew = newUpdates.ToList();
-                messageSerializer.WriteCacheInvalidationHeaders(ref writer, fromNew);
+                var message = new Message { CacheInvalidationHeader = fromNew };
+                messageSerializer.WriteCacheInvalidationHeaders(ref writer, message);
                 writer.Commit();
 
                 using var reader1Session = _serializerSessionPool.GetSession();

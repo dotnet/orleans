@@ -269,9 +269,9 @@ internal abstract partial class GrainTimer : IGrainTimer
 
         public int GetArgumentCount() => 0;
 
-        public object? GetArgument(int index) => throw new IndexOutOfRangeException();
+        public object? GetArgument(int index) => throw new InvalidOperationException();
 
-        public void SetArgument(int index, object value) => throw new IndexOutOfRangeException();
+        public void SetArgument(int index, object? value) => throw new InvalidOperationException();
 
         public string GetMethodName() => nameof(IGrainTimerInvoker.InvokeCallbackAsync);
 

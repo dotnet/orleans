@@ -8,6 +8,23 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+  <ItemGroup>
+    <Content Include="buildMultiTargeting\Microsoft.Orleans.Core.targets">
+      <PackagePath>%(Identity)</PackagePath>
+      <Visible>true</Visible>
+      <Pack>true</Pack>
+    </Content>
+    <Content Include="buildTransitive\Microsoft.Orleans.Core.targets">
+      <PackagePath>%(Identity)</PackagePath>
+      <Visible>true</Visible>
+      <Pack>true</Pack>
+    </Content>
+    <Content Include="build\Microsoft.Orleans.Core.targets">
+      <PackagePath>%(Identity)</PackagePath>
+      <Visible>true</Visible>
+      <Pack>true</Pack>
+    </Content>
+  </ItemGroup>
 
   <ItemGroup>
     <Content Update="Configuration\OrleansConfiguration.xsd">

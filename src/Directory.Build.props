@@ -6,9 +6,6 @@
   <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
 
   <PropertyGroup>
-    <WarningLevel>3</WarningLevel>
-    <AnalysisLevel>preview</AnalysisLevel>
-    <Features>strict</Features>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -21,7 +18,9 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <ReadMePath>$(MSBuildProjectDirectory)\README.md</ReadMePath>
+    <ReadMeExists Condition="Exists('$(ReadMePath)')">true</ReadMeExists>
+    <PackageReadmeFile Condition="'$(PackageReadmeFile)' == '' And '$(ReadMeExists)' == 'true'">README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <PropertyGroup>

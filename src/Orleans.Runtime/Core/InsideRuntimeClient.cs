@@ -211,11 +211,14 @@ namespace Orleans.Runtime
         {
             try
             {
-                if (message.CacheInvalidationHeader != null)
+                if (message.CacheInvalidationHeader is { } cacheUpdates)
                 {
-                    foreach (var update in message.CacheInvalidationHeader)
+                    lock (cacheUpdates)
                     {
-                        GrainLocator.UpdateCache(update);
+                        foreach (var update in cacheUpdates)
+                        {
+                            GrainLocator.UpdateCache(update);
+                        }
                     }
                 }
 
