@@ -1,8 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.DurableJobs.Redis;
@@ -62,18 +58,6 @@ internal sealed partial class RedisJobShard
         Message = "Metadata updated for shard '{ShardId}'"
     )]
     private static partial void LogMetadataUpdated(ILogger logger, string shardId);
-
-    [LoggerMessage(
-        Level = LogLevel.Warning,
-        Message = "Shard '{ShardId}' has {CommittedBlockCount} committed blocks, approaching Azure Blob append limit of 50,000"
-    )]
-    private static partial void LogApproachingBlockLimit(ILogger logger, string shardId, int committedBlockCount);
-
-    [LoggerMessage(
-        Level = LogLevel.Warning,
-        Message = "Large batch detected for shard '{ShardId}': {OperationCount} operations (max configured: {MaxBatchSize})"
-    )]
-    private static partial void LogLargeBatch(ILogger logger, string shardId, int operationCount, int maxBatchSize);
 
     [LoggerMessage(
         Level = LogLevel.Error,
