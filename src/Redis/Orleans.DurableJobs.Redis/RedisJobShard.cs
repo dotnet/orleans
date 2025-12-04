@@ -329,7 +329,7 @@ internal sealed partial class RedisJobShard : JobShard
 
     private async Task<bool> ExecuteUpdateMetadataAsync(IDictionary<string, string> metadata, long expectedVersion)
     {
-        var newVersion = (MetadataVersion + 1).ToString();
+        var newVersion = (expectedVersion + 1).ToString();
         var fieldsJson = JsonSerializer.Serialize(metadata);
         var res = await _db.ScriptEvaluateAsync(UpdateMetaLua, new RedisKey[] { _metaKey }, new RedisValue[] { expectedVersion.ToString(), newVersion, fieldsJson });
         var ok = (int)res == 1;
