@@ -88,6 +88,12 @@ internal sealed partial class RedisJobShard : JobShard
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         Metadata = metadata;
 
+        // Initialize metadata version from metadata dictionary
+        if (metadata.TryGetValue("version", out var versionStr) && long.TryParse(versionStr, out var version))
+        {
+            MetadataVersion = version;
+        }
+
         _streamKey = $"durablejobs:shard:{Id}:stream";
         _metaKey = $"durablejobs:shard:{Id}:meta";
         _leaseKey = $"durablejobs:shard:{Id}:lease";
@@ -208,7 +214,7 @@ internal sealed partial class RedisJobShard : JobShard
 
     private async Task ProcessStorageOperationsAsync()
     {
-        await Task.CompletedTask.ConfigureAwait(false);
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
         var cancellationToken = _shutdownCts.Token;
         var batchOperations = new List<StorageOperation>(_options.MaxBatchSize);
 
@@ -232,7 +238,7 @@ internal sealed partial class RedisJobShard : JobShard
                             throw new InvalidOperationException("Metadata CAS failed - version mismatch.");
                         }
                         LogMetadataUpdated(_logger, Id);
-                        firstOperation.CompletionSource.TrySetResult(new object());
+                        firstOperation.CompletionSource.TrySetResult();
                     }
                     catch (Exception ex)
                     {
@@ -245,37 +251,16 @@ internal sealed partial class RedisJobShard : JobShard
                 // collect job ops for batch
                 batchOperations.Add(firstOperation);
 
-                // try gather more ops
-                while (batchOperations.Count < _options.MaxBatchSize && _storageOperationChannel.Reader.TryRead(out var nextOp))
+                // Try to collect more operations up to the maximum batch size
+                if (TryCollectJobOperationsForBatch(batchOperations))
                 {
-                    if (nextOp.Type == StorageOperationType.UpdateMetadata)
+                    // Not enough operations to meet the minimum batch size, wait for more or timeout
+                    if (batchOperations.Count < _options.MinBatchSize)
                     {
-                        // push metadata back to channel (best-effort)
-                        _storageOperationChannel.Writer.TryWrite(nextOp);
-                        break;
+                        LogWaitingForBatch(_logger, batchOperations.Count, _options.MinBatchSize, Id);
                     }
-                    batchOperations.Add(nextOp);
-                }
-
-                // if batch is smaller than min, wait for flush interval
-                if (batchOperations.Count < _options.MinBatchSize)
-                {
-                    LogWaitingForBatch(_logger, batchOperations.Count, _options.MinBatchSize, Id);
-                    try
-                    {
-                        await Task.Delay(_options.BatchFlushInterval, cancellationToken);
-                    }
-                    catch (OperationCanceledException) { }
-                    // try to take more after delay
-                    while (batchOperations.Count < _options.MaxBatchSize && _storageOperationChannel.Reader.TryRead(out var next2))
-                    {
-                        if (next2.Type == StorageOperationType.UpdateMetadata)
-                        {
-                            _storageOperationChannel.Writer.TryWrite(next2);
-                            break;
-                        }
-                        batchOperations.Add(next2);
-                    }
+                    await Task.Delay(_options.BatchFlushInterval, cancellationToken);
+                    TryCollectJobOperationsForBatch(batchOperations);
                 }
 
                 if (batchOperations.Count > 0)
@@ -284,7 +269,7 @@ internal sealed partial class RedisJobShard : JobShard
                     {
                         LogFlushingBatch(_logger, batchOperations.Count, Id);
                         await AppendJobOperationBatchAsync(batchOperations, cancellationToken);
-                        foreach (var op in batchOperations) op.CompletionSource.TrySetResult(new object());
+                        foreach (var op in batchOperations) op.CompletionSource.TrySetResult();
                     }
                     catch (Exception ex)
                     {
@@ -305,6 +290,24 @@ internal sealed partial class RedisJobShard : JobShard
             {
                 op.CompletionSource?.TrySetCanceled(cancellationToken);
             }
+        }
+
+        // Local function to collect job operations for batching. Returns true if more operations can be collected.
+        bool TryCollectJobOperationsForBatch(List<StorageOperation> batchOperations)
+        {
+            // Collect more jobs, up to a maximum batch size
+            while (batchOperations.Count < _options.MaxBatchSize && _storageOperationChannel.Reader.TryPeek(out var nextOperation))
+            {
+                if (nextOperation.Type is StorageOperationType.UpdateMetadata)
+                {
+                    // Stop batching if we encounter a metadata operation
+                    return false;
+                }
+                _storageOperationChannel.Reader.TryRead(out var operation);
+                Debug.Assert(operation != null);
+                batchOperations.Add(operation!);
+            }
+            return batchOperations.Count != _options.MaxBatchSize;
         }
     }
 
@@ -380,7 +383,7 @@ internal sealed class StorageOperation
     public JobOperation? JobOperation { get; init; }
     public IDictionary<string, string>? Metadata { get; init; }
     public long ExpectedVersion { get; init; }
-    public TaskCompletionSource<object?> CompletionSource { get; init; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource CompletionSource { get; init; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public static StorageOperation CreateAppendOperation(JobOperation jobOperation)
     {
