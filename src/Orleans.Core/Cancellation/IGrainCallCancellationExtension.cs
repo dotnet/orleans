@@ -1,6 +1,5 @@
 #nullable enable
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Internal;
 
@@ -35,7 +34,7 @@ internal interface IGrainCallCancellationManager
     void SignalCancellation(SiloAddress? targetSilo, GrainId targetGrainId, GrainId sendingGrainId, CorrelationId messageId);
 }
 
-internal sealed partial class ExternalClientGrainCallCancellationManager(IInternalGrainFactory grainFactory) : IGrainCallCancellationManager
+internal sealed class ExternalClientGrainCallCancellationManager(IInternalGrainFactory grainFactory) : IGrainCallCancellationManager
 {
     public void SignalCancellation(SiloAddress? targetSilo, GrainId targetGrainId, GrainId sendingGrainId, CorrelationId messageId)
     {

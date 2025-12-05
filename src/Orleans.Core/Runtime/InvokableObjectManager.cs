@@ -51,30 +51,12 @@ namespace Orleans
 
         public bool TryRegister(IAddressable obj, ObserverGrainId objectId)
         {
-            var result = this.localObjects.TryAdd(objectId, new LocalObjectData(obj, objectId, this));
-            if (result)
-            {
-                LogObserverRegistered(logger, objectId, obj.GetType());
-            }
-            else
-            {
-                LogObserverRegistrationFailed(logger, objectId, obj.GetType());
-            }
-            return result;
+            return this.localObjects.TryAdd(objectId, new LocalObjectData(obj, objectId, this));
         }
 
         public bool TryDeregister(ObserverGrainId objectId)
         {
-            var result = this.localObjects.TryRemove(objectId, out _);
-            if (result)
-            {
-                LogObserverDeregistered(logger, objectId);
-            }
-            else
-            {
-                LogObserverDeregistrationFailed(logger, objectId);
-            }
-            return result;
+            return this.localObjects.TryRemove(objectId, out _);
         }
 
         public void Dispatch(Message message)
@@ -106,7 +88,8 @@ namespace Orleans
         {
             private static readonly Func<object?, Task> HandleFunc = self => ((LocalObjectData)self!).LocalObjectMessagePumpAsync();
             private readonly InvokableObjectManager _manager;
-            private readonly HashSet<Message> _runningRequests = [];
+            private readonly Dictionary<Message, Task?> _runningRequests = [];
+            private Task? _messagePumpTask;
 
             internal LocalObjectData(IAddressable obj, ObserverGrainId observerId, InvokableObjectManager manager)
             {
@@ -187,19 +170,19 @@ namespace Orleans
                     // Track the running request so it can be cancelled.
                     lock (Messages)
                     {
-                        _runningRequests.Add(message);
+                        var task = Task.Factory.StartNew(
+                            static state =>
+                            {
+                                var (self, msg) = ((LocalObjectData, Message))state!;
+                                return self.ProcessMessageAsync(msg);
+                            },
+                            (this, message),
+                            CancellationToken.None,
+                            TaskCreationOptions.DenyChildAttach,
+                            TaskScheduler.Default);
+                        _runningRequests.Add(message, task);
                     }
 
-                    Task.Factory.StartNew(
-                        static state =>
-                        {
-                            var (self, msg) = ((LocalObjectData, Message))state!;
-                            return self.ProcessMessageAsync(msg);
-                        },
-                        (this, message),
-                        CancellationToken.None,
-                        TaskCreationOptions.DenyChildAttach,
-                        TaskScheduler.Default).Ignore();
                     return;
                 }
 
@@ -234,12 +217,12 @@ namespace Orleans
                     // return Task.StartNew(() => ..., new CancellationToken());
                     // We pass these options to Task.Factory.StartNew as they make the call identical
                     // to Task.Run. See: https://blogs.msdn.microsoft.com/pfxteam/2011/10/24/task-run-vs-task-factory-startnew/
-                    Task.Factory.StartNew(
+                    _messagePumpTask = Task.Factory.StartNew(
                             HandleFunc,
                             this,
                             CancellationToken.None,
                             TaskCreationOptions.DenyChildAttach,
-                            TaskScheduler.Default).Ignore();
+                            TaskScheduler.Default);
                 }
             }
 
@@ -261,7 +244,7 @@ namespace Orleans
                         }
                         else
                         {
-                            _runningRequests.Add(message!);
+                            _runningRequests.Add(message!, _messagePumpTask);
                         }
 
                         return result;
@@ -341,7 +324,7 @@ namespace Orleans
                 }
                 catch (Exception outerException)
                 {
-                    // ignore, keep looping.
+                    // Ignore and keep looping.
                     LogErrorInMessagePumpLoop(_manager.logger, outerException);
                 }
             }
@@ -454,7 +437,7 @@ namespace Orleans
                         var runningRequestCount = _runningRequests.Count;
 
                         // Check the running requests.
-                        foreach (var runningRequest in _runningRequests)
+                        foreach (var runningRequest in _runningRequests.Keys)
                         {
                             if (runningRequest.Id == messageId && runningRequest.SendingGrain == senderGrainId)
                             {
@@ -602,41 +585,5 @@ namespace Orleans
             Message = "Exception in LocalObjectMessagePumpAsync."
         )]
         private static partial void LogErrorInMessagePumpLoop(ILogger logger, Exception exception);
-
-        [LoggerMessage(
-            Level = LogLevel.Debug,
-            Message = "Registered observer '{ObserverId}' of type '{ObjectType}'."
-        )]
-        private static partial void LogObserverRegistered(ILogger logger, ObserverGrainId observerId, Type objectType);
-
-        [LoggerMessage(
-            Level = LogLevel.Warning,
-            Message = "Failed to register observer '{ObserverId}' of type '{ObjectType}' - already registered."
-        )]
-        private static partial void LogObserverRegistrationFailed(ILogger logger, ObserverGrainId observerId, Type objectType);
-
-        [LoggerMessage(
-            Level = LogLevel.Debug,
-            Message = "Deregistration initiated for observer '{ObserverId}'. Actual removal will occur after grace period."
-        )]
-        private static partial void LogObserverDeregistrationInitiated(ILogger logger, ObserverGrainId observerId);
-
-        [LoggerMessage(
-            Level = LogLevel.Debug,
-            Message = "Deregistered observer '{ObserverId}'."
-        )]
-        private static partial void LogObserverDeregistered(ILogger logger, ObserverGrainId observerId);
-
-        [LoggerMessage(
-            Level = LogLevel.Debug,
-            Message = "Failed to deregister observer '{ObserverId}' - not found."
-        )]
-        private static partial void LogObserverDeregistrationFailed(ILogger logger, ObserverGrainId observerId);
-
-        [LoggerMessage(
-            Level = LogLevel.Debug,
-            Message = "Observer '{ObserverId}' is deregistered, rejecting new message: '{Message}'."
-        )]
-        private static partial void LogObserverDeregisteredRejectingMessage(ILogger logger, ObserverGrainId observerId, Message message);
     }
 }
