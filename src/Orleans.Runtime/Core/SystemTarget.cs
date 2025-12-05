@@ -1,10 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+#nullable enable
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
 
@@ -15,14 +12,13 @@ namespace Orleans.Runtime
     /// Made public for GrainService to inherit from it.
     /// Can be turned to internal after a refactoring that would remove the inheritance relation.
     /// </summary>
-    public abstract partial class SystemTarget : ISystemTarget, ISystemTargetBase, IGrainContext, IGrainExtensionBinder, ISpanFormattable, IDisposable, IGrainTimerRegistry
+    public abstract partial class SystemTarget : ISystemTarget, ISystemTargetBase, IGrainContext, IGrainExtensionBinder, ISpanFormattable, IDisposable, IGrainTimerRegistry, IGrainCallCancellationExtension
     {
+        private readonly Func<object?, Task> _handleRequest;
         private readonly SystemTargetGrainId _id;
         private readonly SystemTargetShared _shared;
         private readonly HashSet<IGrainTimer> _timers = [];
-        private GrainReference _selfReference;
-        private Message _running;
-        private Dictionary<Type, object> _components = new Dictionary<Type, object>();
+        private readonly Dictionary<Message, Task> _runningRequests = [];
 
         /// <summary>Silo address of the system target.</summary>
         public SiloAddress Silo => _shared.SiloAddress;
@@ -34,7 +30,7 @@ namespace Orleans.Runtime
         internal InsideRuntimeClient RuntimeClient => _shared.RuntimeClient;
 
         /// <inheritdoc/>
-        public GrainReference GrainReference => _selfReference ??= _shared.GrainReferenceActivator.CreateReference(_id.GrainId, default);
+        public GrainReference GrainReference { get => field ??= _shared.GrainReferenceActivator.CreateReference(_id.GrainId, default); private set; }
 
         /// <inheritdoc/>
         public GrainId GrainId => _id.GrainId;
@@ -51,9 +47,9 @@ namespace Orleans.Runtime
         private RuntimeMessagingTrace MessagingTrace => _shared.MessagingTrace;
 
         /// <summary>Only needed to make Reflection happy.</summary>
-        protected SystemTarget()
-        {
-        }
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        [Obsolete("Do not call the empty constructor.")]
+        protected SystemTarget() => throw new NotSupportedException();
 
         internal SystemTarget(GrainType grainType, SystemTargetShared shared)
             : this(SystemTargetGrainId.Create(grainType, shared.SiloAddress), shared)
@@ -64,6 +60,7 @@ namespace Orleans.Runtime
         {
             _id = grainId;
             _shared = shared;
+            _handleRequest = state => this.HandleNewRequest((Message)state!);
             ActivationId = ActivationId.GetDeterministic(grainId.GrainId);
             ActivationAddress = GrainAddress.GetAddress(Silo, _id.GrainId, ActivationId);
             _logger = shared.LoggerFactory.CreateLogger(GetType());
@@ -90,14 +87,14 @@ namespace Orleans.Runtime
         /// </summary>
         /// <typeparam name="TComponent">The component type.</typeparam>
         /// <returns>The component with the specified type.</returns>
-        public TComponent GetComponent<TComponent>()
+        public TComponent? GetComponent<TComponent>()
         {
-            TComponent result;
+            TComponent? result;
             if (this is TComponent instanceResult)
             {
                 result = instanceResult;
             }
-            else if (_components.TryGetValue(typeof(TComponent), out var resultObj))
+            else if (Components.TryGetValue(typeof(TComponent), out var resultObj))
             {
                 result = (TComponent)resultObj;
             }
@@ -114,7 +111,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public void SetComponent<TComponent>(TComponent instance) where TComponent : class
+        public void SetComponent<TComponent>(TComponent? instance) where TComponent : class
         {
             if (this is TComponent)
             {
@@ -123,23 +120,35 @@ namespace Orleans.Runtime
 
             if (instance == null)
             {
-                _components?.Remove(typeof(TComponent));
+                Components?.Remove(typeof(TComponent));
                 return;
             }
 
-            if (_components is null) _components = new Dictionary<Type, object>();
-            _components[typeof(TComponent)] = instance;
+            if (Components is null) Components = new Dictionary<Type, object>();
+            Components[typeof(TComponent)] = instance;
         }
 
-        internal void HandleNewRequest(Message request)
+        internal async Task HandleNewRequest(Message request)
         {
-            _running = request;
-            RuntimeClient.Invoke(this, request).Ignore();
+            try
+            {
+                await RuntimeClient.Invoke(this, request);
+            }
+            catch
+            {
+                // Ignore.
+            }
+            finally
+            {
+                lock (_runningRequests)
+                {
+                    _runningRequests.Remove(request);
+                }
+            }
         }
 
         internal void HandleResponse(Message response)
         {
-            _running = response;
             RuntimeClient.ReceiveResponse(response);
         }
 
@@ -160,7 +169,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// An <see cref="IDisposable"/> object which will cancel the timer upon disposal.
         /// </returns>
-        public IGrainTimer RegisterTimer(Func<object, Task> callback, object state, TimeSpan dueTime, TimeSpan period)
+        public IGrainTimer RegisterTimer(Func<object?, Task> callback, object? state, TimeSpan dueTime, TimeSpan period)
         {
             ArgumentNullException.ThrowIfNull(callback);
             var timer = _shared.TimerRegistry
@@ -223,16 +232,22 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public sealed override string ToString() => $"{this}";
 
-        string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
+        string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
-        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => destination.TryWrite($"[SystemTarget: {Silo}/{_id}{ActivationId}]", out charsWritten);
 
         /// <summary>Adds details about message currently being processed</summary>
-        internal string ToDetailedString() => $"{this} CurrentlyExecuting={_running}{(_running != null ? null : "null")}";
+        internal string ToDetailedString()
+        {
+            lock (_runningRequests)
+            {
+                return $"{this} CurrentlyExecuting={_runningRequests}{(_runningRequests != null ? null : "null")}";
+            }
+        }
 
         /// <inheritdoc/>
-        bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
+        bool IEquatable<IGrainContext>.Equals(IGrainContext? other) => ReferenceEquals(this, other);
 
         /// <inheritdoc/>
         public (TExtension, TExtensionInterface) GetOrSetExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
@@ -262,7 +277,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        TComponent ITargetHolder.GetComponent<TComponent>()
+        TComponent? ITargetHolder.GetComponent<TComponent>() where TComponent : class
         {
             var result = GetComponent<TComponent>();
             if (result is null && typeof(IGrainExtension).IsAssignableFrom(typeof(TComponent)))
@@ -309,8 +324,14 @@ namespace Orleans.Runtime
                 case Message.Directions.OneWay:
                     {
                         MessagingTrace.OnEnqueueMessageOnActivation(msg, this);
-                        var workItem = new RequestWorkItem(this, msg);
-                        WorkItemGroup.QueueWorkItem(workItem);
+                        using var suppressExecutionContext = new ExecutionContextSuppressor();
+                        var task = new Task<Task>(_handleRequest, msg);
+                        lock (_runningRequests)
+                        {
+                            _runningRequests[msg] = task;
+                        }
+
+                        task.Start(WorkItemGroup.TaskScheduler);
                         break;
                     }
 
@@ -324,13 +345,15 @@ namespace Orleans.Runtime
         public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)(object)this;
 
         /// <inheritdoc/>
-        public void Activate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) { }
+        public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) { }
 
         /// <inheritdoc/>
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) { }
 
         /// <inheritdoc/>
         public Task Deactivated => Task.CompletedTask;
+
+        public Dictionary<Type, object> Components { get; set; } = [];
 
         public void Dispose()
         {
@@ -348,7 +371,7 @@ namespace Orleans.Runtime
             (context as IDisposable)?.Dispose();
         }
 
-        public void Migrate(Dictionary<string, object> requestContext, CancellationToken cancellationToken)
+        public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
         {
             // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
         }
@@ -360,7 +383,7 @@ namespace Orleans.Runtime
             List<IGrainTimer> timers;
             lock (_timers)
             {
-                timers = _timers.ToList();
+                timers = [.. _timers];
                 _timers.Clear();
             }
 
@@ -382,7 +405,7 @@ namespace Orleans.Runtime
             if (!ReferenceEquals(context, this))
             {
                 ThrowAccessViolation(context);
-                void ThrowAccessViolation(IGrainContext currentContext) => throw new InvalidOperationException($"Access violation: attempt to access context '{this}' from different context, '{currentContext}'.");
+                void ThrowAccessViolation(IGrainContext? currentContext) => throw new InvalidOperationException($"Access violation: attempt to access context '{this}' from different context, '{currentContext}'.");
             }
         }
 
@@ -392,5 +415,86 @@ namespace Orleans.Runtime
             Message = "Invalid message: {Message}"
         )]
         private static partial void LogInvalidMessage(ILogger logger, Message Message);
+
+        ValueTask IGrainCallCancellationExtension.CancelRequestAsync(GrainId senderGrainId, CorrelationId messageId)
+            => this.RunOrQueueTask(static state => state.self.CancelRequestAsyncCore(state.senderGrainId, state.messageId), (self: this, senderGrainId, messageId));
+
+        private ValueTask CancelRequestAsyncCore(GrainId senderGrainId, CorrelationId messageId)
+        {
+            if (!TryCancelRequest())
+            {
+                // The message being canceled may not have arrived yet, so retry a few times.
+                return RetryCancellationAfterDelay();
+            }
+
+            return ValueTask.CompletedTask;
+
+            async ValueTask RetryCancellationAfterDelay()
+            {
+                var attemptsRemaining = 3;
+                do
+                {
+                    await Task.Delay(1_000);
+
+                    if (TryCancelRequest())
+                    {
+                        return;
+                    }
+                } while (--attemptsRemaining > 0);
+            }
+
+            bool TryCancelRequest()
+            {
+                Message? message = null;
+
+                lock (_runningRequests)
+                {
+                    // Check the running requests.
+                    foreach (var runningRequest in _runningRequests.Keys)
+                    {
+                        if (runningRequest.Id == messageId && runningRequest.SendingGrain == senderGrainId)
+                        {
+                            message = runningRequest;
+                            break;
+                        }
+                    }
+                }
+
+                var didCancel = false;
+                if (message is not null)
+                {
+                    if (message.BodyObject is IInvokable invokableRequest)
+                    {
+                        didCancel = TryCancelInvokable(invokableRequest) || !invokableRequest.IsCancellable;
+                    }
+                    else
+                    {
+                        // Assume the request is not cancellable.
+                        didCancel = true;
+                    }
+                }
+
+                return didCancel;
+            }
+
+            bool TryCancelInvokable(IInvokable request)
+            {
+                try
+                {
+                    return request.TryCancel();
+                }
+                catch (Exception exception)
+                {
+                    LogErrorCancellationCallbackFailed(_logger, exception);
+                    return true;
+                }
+            }
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "One or more cancellation callbacks failed."
+        )]
+        private static partial void LogErrorCancellationCallbackFailed(ILogger logger, Exception exception);
     }
 }
