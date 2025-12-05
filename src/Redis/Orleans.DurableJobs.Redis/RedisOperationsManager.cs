@@ -194,6 +194,7 @@ internal sealed class RedisOperationsManager
 
     /// <summary>
     /// Reads a range of entries from a Redis stream.
+    /// Note: This method is synchronous because StackExchange.Redis's StreamRange is synchronous.
     /// </summary>
     /// <param name="streamKey">The key of the stream.</param>
     /// <param name="minId">The minimum stream entry ID (use "-" for start).</param>
