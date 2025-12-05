@@ -161,8 +161,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
                 metaKey,
                 expectedVersion,
                 _localSiloDetails.SiloAddress.ToParsableString(),
-                _clusterMembership.CurrentSnapshot.Version.Value.ToString(),
-                cancellationToken).ConfigureAwait(false);
+                _clusterMembership.CurrentSnapshot.Version.Value.ToString()).ConfigureAwait(false);
             if (!took)
             {
                 LogFailedToTakeOwnership(_logger, shardId);
