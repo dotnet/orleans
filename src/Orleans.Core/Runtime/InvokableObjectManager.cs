@@ -325,7 +325,7 @@ namespace Orleans
                 catch (Exception outerException)
                 {
                     // Ignore and keep looping.
-                    LogErrorInMessagePumpLoop(_manager.logger, outerException);
+                    LogErrorProcessingMessage(_manager.logger, outerException, message);
                 }
             }
 
@@ -576,14 +576,14 @@ namespace Orleans
 
         [LoggerMessage(
             Level = LogLevel.Warning,
-            Message = "Exception during message body deserialization in LocalObjectMessagePumpAsync for message: '{Message}'."
+            Message = "Exception during message body deserialization for message: '{Message}'."
         )]
         private static partial void LogErrorDeserializingMessageBody(ILogger logger, Exception exception, Message message);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
-            Message = "Exception in LocalObjectMessagePumpAsync."
+            Message = "Exception processing message '{Message}'."
         )]
-        private static partial void LogErrorInMessagePumpLoop(ILogger logger, Exception exception);
+        private static partial void LogErrorProcessingMessage(ILogger logger, Exception exception, Message message);
     }
 }
