@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -16,7 +15,7 @@ namespace Orleans.DurableJobs.Redis;
 internal sealed partial class RedisJobShard : JobShard
 {
     private readonly IConnectionMultiplexer _redis;
-    private readonly IDatabase _db;
+    private readonly RedisOperationsManager _redisOps;
     private readonly Channel<StorageOperation> _storageOperationChannel;
     private readonly Task _storageProcessorTask;
     private readonly CancellationTokenSource _shutdownCts = new();
@@ -28,40 +27,6 @@ internal sealed partial class RedisJobShard : JobShard
     private readonly string _leaseKey;
 
     internal long MetadataVersion { get; private set; }
-
-    // Lua scripts
-    private const string MultiXAddLua = @"
-            local streamKey = KEYS[1]
-            local n = tonumber(ARGV[1])
-            local ids = {}
-            local idx = 2
-            for i=1,n do
-                local payload = ARGV[idx]
-                idx = idx + 1
-                local id = redis.call('XADD', streamKey, '*', 'payload', payload)
-                table.insert(ids, id)
-            end
-            return ids
-        ";
-
-    private const string UpdateMetaLua = @"
-            local metaKey = KEYS[1]
-            local expectedVersion = ARGV[1]
-            local newVersion = ARGV[2]
-            local fieldsJson = ARGV[3]
-            local curr = redis.call('HGET', metaKey, 'version')
-            if curr == false then curr = '' end
-            if curr == expectedVersion then
-                local obj = cjson.decode(fieldsJson)
-                for k,v in pairs(obj) do
-                    redis.call('HSET', metaKey, k, v)
-                end
-                redis.call('HSET', metaKey, 'version', newVersion)
-                return 1
-            else
-                return 0
-            end
-        ";
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RedisJobShard"/> class.
@@ -83,7 +48,8 @@ internal sealed partial class RedisJobShard : JobShard
             : base(shardId, startTime, endTime)
     {
         _redis = redis ?? throw new ArgumentNullException(nameof(redis));
-        _db = _redis.GetDatabase();
+        var db = _redis.GetDatabase();
+        _redisOps = new RedisOperationsManager(db);
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         Metadata = metadata;
@@ -120,7 +86,7 @@ internal sealed partial class RedisJobShard : JobShard
         var jobRetryCounters = new Dictionary<string, (int dequeueCount, DateTimeOffset? newDueTime)>();
 
         // StreamRange with "-" .. "+" returns all entries. If stream does not exist, returns empty.
-        var streamEntries = _db.StreamRange(_streamKey, "-", "+");
+        var streamEntries = _redisOps.StreamRange(_streamKey, "-", "+");
 
         await foreach (var operation in RedisStreamJsonSerializer<JobOperation>.DecodeAsync(streamEntries, JobOperationJsonContext.Default.JobOperation, cancellationToken))
         {
@@ -232,11 +198,18 @@ internal sealed partial class RedisJobShard : JobShard
                 {
                     try
                     {
-                        var success = await ExecuteUpdateMetadataAsync(firstOperation.Metadata!, firstOperation.ExpectedVersion);
+                        var success = await _redisOps.UpdateMetadataAsync(_metaKey, firstOperation.Metadata!, firstOperation.ExpectedVersion).ConfigureAwait(false);
                         if (!success)
                         {
                             throw new InvalidOperationException("Metadata CAS failed - version mismatch.");
                         }
+
+                        // Update local metadata tracking
+                        Metadata = new Dictionary<string, string>(firstOperation.Metadata!);
+                        var newVersion = (firstOperation.ExpectedVersion + 1).ToString();
+                        Metadata["version"] = newVersion;
+                        MetadataVersion = long.Parse(newVersion);
+
                         LogMetadataUpdated(_logger, Id);
                         firstOperation.CompletionSource.TrySetResult();
                     }
@@ -317,30 +290,11 @@ internal sealed partial class RedisJobShard : JobShard
 
         var jobOperations = operations.Select(op => op.JobOperation!.Value);
         var payloads = RedisStreamJsonSerializer<JobOperation>.Encode(jobOperations, JobOperationJsonContext.Default.JobOperation);
-        var args = new RedisValue[1 + payloads.Length];
-        args[0] = payloads.Length;
-        for (int i = 0; i < payloads.Length; i++) args[i + 1] = payloads[i];
 
-        var result = await _db.ScriptEvaluateAsync(MultiXAddLua, new RedisKey[] { _streamKey }, args);
+        var result = await _redisOps.AppendJobOperationBatchAsync(_streamKey, payloads).ConfigureAwait(false);
         // result is array of ids, but we don't use them for now
         sw.Stop();
         LogBatchWritten(_logger, operations.Count, Id, sw.ElapsedMilliseconds, -1);
-    }
-
-    private async Task<bool> ExecuteUpdateMetadataAsync(IDictionary<string, string> metadata, long expectedVersion)
-    {
-        var newVersion = (expectedVersion + 1).ToString();
-        var fieldsJson = JsonSerializer.Serialize(metadata);
-        var res = await _db.ScriptEvaluateAsync(UpdateMetaLua, new RedisKey[] { _metaKey }, new RedisValue[] { expectedVersion.ToString(), newVersion, fieldsJson });
-        var ok = (int)res == 1;
-        if (ok)
-        {
-            // update local view
-            Metadata = new Dictionary<string, string>(metadata);
-            Metadata["version"] = newVersion;
-            MetadataVersion = long.Parse(newVersion);
-        }
-        return ok;
     }
 
     internal async Task StopProcessorAsync(CancellationToken cancellationToken)

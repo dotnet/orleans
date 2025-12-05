@@ -2,8 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -26,58 +24,12 @@ public sealed partial class RedisJobShardManager : JobShardManager
     private readonly ILoggerFactory _loggerFactory;
 
     private IConnectionMultiplexer? _multiplexer;
-    private IDatabase? _db;
+    private RedisOperationsManager? _redisOps;
 
     // in-memory cache of owned shards
     private readonly ConcurrentDictionary<string, RedisJobShard> _jobShardCache = new();
 
     private long _shardCounter = 0;
-
-    // scripts
-    private const string CreateShardLua = @"
-            -- KEYS[1] = metaKey
-            -- KEYS[2] = shardsSetKey
-            -- ARGV[1] = shardId
-            -- ARGV[2] = metadataJson (JSON object with all metadata fields)
-            if redis.call('EXISTS', KEYS[1]) == 1 then
-                return 0
-            end
-            local metadata = cjson.decode(ARGV[2])
-            for k, v in pairs(metadata) do
-                redis.call('HSET', KEYS[1], k, v)
-            end
-            redis.call('SADD', KEYS[2], ARGV[1])
-            return 1
-        ";
-
-    private const string TryTakeOwnershipLua = @"
-            -- KEYS[1] = metaKey
-            -- ARGV[1] = expectedVersion
-            -- ARGV[2] = newOwner
-            -- ARGV[3] = newMembershipVersion
-            local curr = redis.call('HGET', KEYS[1], 'version')
-            if curr == false then curr = '0' end
-            if curr == ARGV[1] then
-                local next = tostring(tonumber(curr) + 1)
-                redis.call('HSET', KEYS[1], 'Owner', ARGV[2], 'MembershipVersion', ARGV[3], 'version', next)
-                return 1
-            end
-            return 0
-        ";
-
-    private const string ReleaseOwnershipLua = @"
-            -- KEYS[1] = metaKey
-            -- ARGV[1] = expectedVersion
-            local curr = redis.call('HGET', KEYS[1], 'version')
-            if curr == false then curr = '0' end
-            if curr == ARGV[1] then
-                local next = tostring(tonumber(curr) + 1)
-                redis.call('HDEL', KEYS[1], 'Owner')
-                redis.call('HSET', KEYS[1], 'version', next)
-                return 1
-            end
-            return 0
-        ";
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RedisJobShardManager"/> class.
@@ -102,11 +54,15 @@ public sealed partial class RedisJobShardManager : JobShardManager
 
     private async ValueTask InitializeIfNeeded(CancellationToken cancellationToken = default)
     {
-        if (_db != null) return;
+        if (_redisOps is not null)
+        {
+            return;
+        }
 
         LogInitializing(_logger, _options.ShardPrefix);
         _multiplexer = await _options.CreateMultiplexer(_options).ConfigureAwait(false);
-        _db = _multiplexer.GetDatabase();
+        var db = _multiplexer.GetDatabase();
+        _redisOps = new RedisOperationsManager(db);
         LogInitialized(_logger);
     }
 
@@ -121,16 +77,14 @@ public sealed partial class RedisJobShardManager : JobShardManager
         var result = new List<IJobShard>();
 
         // get all shard ids
-        var members = await _db!.SetMembersAsync(ShardSetKey).ConfigureAwait(false);
-        var shardIds = members.Select(rv => rv.ToString()).ToArray();
+        var shardIds = await _redisOps!.GetSetMembersAsync(ShardSetKey).ConfigureAwait(false);
 
         foreach (var shardId in shardIds)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             var metaKey = MetaKeyForShard(shardId);
-            var entries = await _db.HashGetAllAsync(metaKey).ConfigureAwait(false);
-            var metadata = HashEntriesToDictionary(entries);
+            var metadata = await _redisOps.GetHashAllAsync(metaKey).ConfigureAwait(false);
 
             // parse values
             metadata.TryGetValue("Owner", out var ownerStr);
@@ -203,7 +157,12 @@ public sealed partial class RedisJobShardManager : JobShardManager
             // Try to claim orphaned shard
             LogClaimingOrphanedShard(_logger, shardId, ownerStr);
             var expectedVersion = metadata.TryGetValue("version", out var v) ? v : "0";
-            var took = await TryTakeOwnershipAsync(shardId, expectedVersion, _localSiloDetails.SiloAddress, _clusterMembership.CurrentSnapshot.Version, cancellationToken).ConfigureAwait(false);
+            var took = await _redisOps!.TryTakeOwnershipAsync(
+                metaKey,
+                expectedVersion,
+                _localSiloDetails.SiloAddress.ToParsableString(),
+                _clusterMembership.CurrentSnapshot.Version.Value.ToString(),
+                cancellationToken).ConfigureAwait(false);
             if (!took)
             {
                 LogFailedToTakeOwnership(_logger, shardId);
@@ -270,18 +229,15 @@ public sealed partial class RedisJobShardManager : JobShardManager
 
             try
             {
-                var metadataJson = JsonSerializer.Serialize(metadataInfo);
-                var res = (int)await _db!.ScriptEvaluateAsync(CreateShardLua,
-                    new RedisKey[] { metaKey, ShardSetKey },
-                    new RedisValue[] {
-                        shardId,
-                        metadataJson
-                    }).ConfigureAwait(false);
+                var created = await _redisOps!.CreateShardAsync(metaKey, ShardSetKey, shardId, metadataInfo).ConfigureAwait(false);
 
-                if (res == 0)
+                if (!created)
                 {
                     LogShardIdCollision(_logger, shardId, i);
-                    if (i >= _options.MaxShardCreationRetries) throw new InvalidOperationException($"Failed to create shard '{shardId}' after {i} attempts");
+                    if (i >= _options.MaxShardCreationRetries)
+                    {
+                        throw new InvalidOperationException($"Failed to create shard '{shardId}' after {i} attempts");
+                    }
                     continue;
                 }
 
@@ -294,7 +250,10 @@ public sealed partial class RedisJobShardManager : JobShardManager
             catch (Exception ex)
             {
                 LogErrorCreatingShard(_logger, ex, shardId, i);
-                if (i >= _options.MaxShardCreationRetries) throw new InvalidOperationException($"Failed to create shard '{shardId}' after {i} attempts", ex);
+                if (i >= _options.MaxShardCreationRetries)
+                {
+                    throw new InvalidOperationException($"Failed to create shard '{shardId}' after {i} attempts", ex);
+                }
             }
         }
     }
@@ -367,44 +326,28 @@ public sealed partial class RedisJobShardManager : JobShardManager
         var leaseKey = $"durablejobs:shard:{shardId}:lease";
 
         // Delete all shard-related keys
-        await _db!.KeyDeleteAsync(new RedisKey[] { streamKey, metaKey, leaseKey }).ConfigureAwait(false);
+        await _redisOps!.DeleteKeysAsync(new RedisKey[] { streamKey, metaKey, leaseKey }).ConfigureAwait(false);
 
         // Remove from the shard set
-        await _db.SetRemoveAsync(ShardSetKey, shardId).ConfigureAwait(false);
-    }
-
-    private async Task<bool> TryTakeOwnershipAsync(string shardId, string expectedVersion, SiloAddress newOwner, MembershipVersion membershipVersion, CancellationToken cancellationToken)
-    {
-        await InitializeIfNeeded(cancellationToken).ConfigureAwait(false);
-        var metaKey = MetaKeyForShard(shardId);
-        var res = (int)await _db!.ScriptEvaluateAsync(TryTakeOwnershipLua,
-            new RedisKey[] { metaKey },
-            new RedisValue[] { expectedVersion ?? "0", newOwner.ToParsableString(), membershipVersion.Value.ToString() }).ConfigureAwait(false);
-        return res == 1;
+        await _redisOps.SetRemoveAsync(ShardSetKey, shardId).ConfigureAwait(false);
     }
 
     private async Task<bool> ReleaseOwnershipAsync(string shardId, CancellationToken cancellationToken)
     {
         await InitializeIfNeeded(cancellationToken).ConfigureAwait(false);
         var metaKey = MetaKeyForShard(shardId);
-        var entries = await _db!.HashGetAllAsync(metaKey).ConfigureAwait(false);
-        var metadata = HashEntriesToDictionary(entries);
+        var metadata = await _redisOps!.GetHashAllAsync(metaKey).ConfigureAwait(false);
         var version = metadata.TryGetValue("version", out var v) ? v : "0";
 
-        var res = (int)await _db.ScriptEvaluateAsync(ReleaseOwnershipLua, new RedisKey[] { metaKey }, new RedisValue[] { version }).ConfigureAwait(false);
-        return res == 1;
-    }
-
-    private static IDictionary<string, string> HashEntriesToDictionary(HashEntry[] entries)
-    {
-        var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var e in entries) dict[e.Name.ToString()] = e.Value.ToString();
-        return dict;
+        return await _redisOps.ReleaseOwnershipAsync(metaKey, version).ConfigureAwait(false);
     }
 
     private static DateTimeOffset ParseDateTimeOffset(IDictionary<string, string> meta, string key, DateTimeOffset @default)
     {
-        if (meta.TryGetValue(key, out var s) && DateTimeOffset.TryParse(s, null, DateTimeStyles.RoundtripKind, out var dt)) return dt;
+        if (meta.TryGetValue(key, out var s) && DateTimeOffset.TryParse(s, null, DateTimeStyles.RoundtripKind, out var dt))
+        {
+            return dt;
+        }
         return @default;
     }
 }
