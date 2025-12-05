@@ -23,7 +23,7 @@ namespace Orleans.Runtime.ReminderService
         private static readonly TimeSpan InitialReadRetryPeriod = TimeSpan.FromSeconds(30);
         private readonly ILogger logger;
         private readonly ReminderOptions reminderOptions;
-        private readonly Dictionary<ReminderIdentity, LocalReminderData> localReminders = new();
+        private readonly IDictionary<ReminderIdentity, LocalReminderData> localReminders = new ConcurrentDictionary<ReminderIdentity, LocalReminderData>();
         private readonly IReminderTable reminderTable;
         private readonly TaskCompletionSource<bool> startedTask;
         private readonly IAsyncTimerFactory asyncTimerFactory;
