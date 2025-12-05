@@ -204,7 +204,9 @@ internal sealed partial class RedisJobShard : JobShard
                             throw new InvalidOperationException("Metadata CAS failed - version mismatch.");
                         }
 
-                        // Update local metadata tracking
+                        // Update local metadata tracking to keep in-memory state synchronized with Redis.
+                        // This is necessary because RedisJobShard maintains stateful metadata (Metadata, MetadataVersion)
+                        // while RedisOperationsManager is stateless and only performs Redis operations.
                         Metadata = new Dictionary<string, string>(firstOperation.Metadata!);
                         var newVersion = (firstOperation.ExpectedVersion + 1).ToString();
                         Metadata["version"] = newVersion;
