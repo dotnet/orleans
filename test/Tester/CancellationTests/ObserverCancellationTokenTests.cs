@@ -410,7 +410,7 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
     /// <summary>
     /// Client-side observer implementation for testing long-running operations with cancellation.
     /// </summary>
-    private sealed class LongRunningObserver(ILogger logger) : ILongRunningObserver
+    private sealed class LongRunningObserver : ILongRunningObserver
     {
         private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _callStartedTcs = new();
         private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _callCancelledTcs = new();
@@ -418,46 +418,33 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
         /// <inheritdoc />
         public async Task LongWait(TimeSpan delay, Guid callId, CancellationToken cancellationToken)
         {
-            logger.LogDebug("[Observer] LongWait BEGIN - CallId: {CallId}, Delay: {Delay}, IsCancellationRequested: {IsCancellationRequested}", callId, delay, cancellationToken.IsCancellationRequested);
-
             var startedTcs = _callStartedTcs.GetOrAdd(callId, _ => new TaskCompletionSource());
             var cancelledTcs = _callCancelledTcs.GetOrAdd(callId, _ => new TaskCompletionSource());
 
             startedTcs.TrySetResult();
-            logger.LogDebug("[Observer] LongWait signaled start - CallId: {CallId}. IsCancellationRequested? {IsCancellationRequested}", callId, cancellationToken.IsCancellationRequested);
 
             try
             {
                 await Task.Delay(delay, cancellationToken);
-                logger.LogDebug("[Observer] LongWait completed normally - CallId: {CallId}. IsCancellationRequested? {IsCancellationRequested}", callId, cancellationToken.IsCancellationRequested);
             }
             catch (OperationCanceledException)
             {
-                logger.LogDebug("[Observer] LongWait caught OperationCanceledException - CallId: {CallId}", callId);
                 cancelledTcs.TrySetResult();
                 throw;
-            }
-            finally
-            {
-                logger.LogDebug("[Observer] LongWait END - CallId: {CallId}. IsCancellationRequested? {IsCancellationRequested}", callId, cancellationToken.IsCancellationRequested);
             }
         }
 
         /// <inheritdoc />
         public Task<bool> CancellationTokenCallbackResolve(Guid callId, CancellationToken cancellationToken)
         {
-            logger.LogDebug("[Observer] CancellationTokenCallbackResolve BEGIN - CallId: {CallId}, IsCancellationRequested: {IsCancellationRequested}", callId, cancellationToken.IsCancellationRequested);
-
             var startedTcs = _callStartedTcs.GetOrAdd(callId, _ => new TaskCompletionSource());
             var cancelledTcs = _callCancelledTcs.GetOrAdd(callId, _ => new TaskCompletionSource());
             var resultTcs = new TaskCompletionSource<bool>();
 
             startedTcs.TrySetResult();
-            logger.LogDebug("[Observer] CancellationTokenCallbackResolve signaled start - CallId: {CallId}", callId);
 
             cancellationToken.Register(() =>
             {
-                logger.LogDebug("[Observer] CancellationTokenCallbackResolve token callback fired - CallId: {CallId}", callId);
                 cancelledTcs.TrySetResult();
                 resultTcs.TrySetResult(true);
             });
@@ -468,28 +455,19 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
         /// <inheritdoc />
         public async Task InterleavingLongWait(TimeSpan delay, Guid callId, CancellationToken cancellationToken)
         {
-            logger.LogDebug("[Observer] InterleavingLongWait BEGIN - CallId: {CallId}, Delay: {Delay}, IsCancellationRequested: {IsCancellationRequested}", callId, delay, cancellationToken.IsCancellationRequested);
-
             var startedTcs = _callStartedTcs.GetOrAdd(callId, _ => new TaskCompletionSource());
             var cancelledTcs = _callCancelledTcs.GetOrAdd(callId, _ => new TaskCompletionSource());
 
             startedTcs.TrySetResult();
-            logger.LogDebug("[Observer] InterleavingLongWait signaled start - CallId: {CallId}, IsCancellationRequested: {IsCancellationRequested}", callId, cancellationToken.IsCancellationRequested);
 
             try
             {
                 await Task.Delay(delay, cancellationToken);
-                logger.LogDebug("[Observer] InterleavingLongWait completed normally - CallId: {CallId}, IsCancellationRequested: {IsCancellationRequested}", callId, cancellationToken.IsCancellationRequested);
             }
             catch (OperationCanceledException)
             {
-                logger.LogDebug("[Observer] InterleavingLongWait caught OperationCanceledException - CallId: {CallId}, IsCancellationRequested: {IsCancellationRequested}", callId, cancellationToken.IsCancellationRequested);
                 cancelledTcs.TrySetResult();
                 throw;
-            }
-            finally
-            {
-                logger.LogDebug("[Observer] InterleavingLongWait END - CallId: {CallId}, IsCancellationRequested: {IsCancellationRequested}", callId, cancellationToken.IsCancellationRequested);
             }
         }
 
@@ -498,7 +476,6 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
         /// </summary>
         public Task WaitForCallToStart(Guid callId)
         {
-            logger.LogDebug("[Observer] WaitForCallToStart - CallId: {CallId}", callId);
             var tcs = _callStartedTcs.GetOrAdd(callId, _ => new TaskCompletionSource());
             return tcs.Task.WaitAsync(TimeSpan.FromSeconds(30));
         }
@@ -508,7 +485,6 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
         /// </summary>
         public Task WaitForCancellation(Guid callId)
         {
-            logger.LogDebug("[Observer] WaitForCancellation - CallId: {CallId}", callId);
             var tcs = _callCancelledTcs.GetOrAdd(callId, _ => new TaskCompletionSource());
             return tcs.Task.WaitAsync(TimeSpan.FromSeconds(30));
         }

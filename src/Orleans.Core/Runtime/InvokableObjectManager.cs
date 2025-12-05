@@ -368,7 +368,7 @@ namespace Orleans
                         try
                         {
                             // we're expected to notify the caller if the deep copy failed.
-                            deepCopy = (Exception)_manager.deepCopier.Copy(exception);
+                            deepCopy = _manager.deepCopier.Copy(exception);
                         }
                         catch (Exception ex2)
                         {
