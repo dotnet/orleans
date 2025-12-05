@@ -1,6 +1,5 @@
 #nullable enable
 using System.Collections.Concurrent;
-using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -64,74 +63,6 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
                 });
             });
         }
-
-        /// <summary>
-        /// Logs a message to all loggers (client and all silos) in the test cluster.
-        /// </summary>
-        public void LogToAll(LogLevel level, string message)
-        {
-            var clientLogger = HostedCluster.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("TestMarker");
-            clientLogger.Log(level, message);
-
-            foreach (var silo in HostedCluster.Silos)
-            {
-                var siloLogger = silo.SiloHost.Services.GetRequiredService<ILoggerFactory>().CreateLogger("TestMarker");
-                siloLogger.Log(level, message);
-            }
-        }
-
-        /// <summary>
-        /// Logs the start of a test to all loggers in the test cluster.
-        /// </summary>
-        public void LogTestStart(string testName)
-        {
-            LogToAll(LogLevel.Information, $"===== TEST START: {testName} =====");
-        }
-
-        /// <summary>
-        /// Logs the end of a test to all loggers in the test cluster.
-        /// </summary>
-        public void LogTestEnd(string testName)
-        {
-            LogToAll(LogLevel.Information, $"===== TEST END: {testName} =====");
-        }
-
-        /// <summary>
-        /// Logs an exception that occurred during a test to all loggers in the test cluster.
-        /// </summary>
-        public void LogTestException(string testName, Exception exception)
-        {
-            LogToAll(LogLevel.Error, $"===== TEST EXCEPTION: {testName} =====\n{exception}");
-        }
-
-        /// <summary>
-        /// Gets a logger from the client for use in observer implementations.
-        /// </summary>
-        public ILogger GetObserverLogger()
-        {
-            return HostedCluster.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("LongRunningObserver");
-        }
-    }
-
-    /// <summary>
-    /// Helper to run a test with logging at start and end.
-    /// </summary>
-    private async Task RunTestAsync(Func<Task> testBody, [CallerMemberName] string testName = "")
-    {
-        fixture.LogTestStart(testName);
-        try
-        {
-            await testBody();
-        }
-        catch (Exception ex)
-        {
-            fixture.LogTestException(testName, ex);
-            throw;
-        }
-        finally
-        {
-            fixture.LogTestEnd(testName);
-        }
     }
 
     /// <summary>
@@ -140,10 +71,10 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
     [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
     [InlineData(true)]
     [InlineData(false)]
-    public Task ObserverTaskCancellation(bool cancelImmediately) => RunTestAsync(async () =>
+    public async Task ObserverTaskCancellation(bool cancelImmediately)
     {
         var grain = fixture.GrainFactory.GetGrain<IObserverWithCancellationGrain>(Guid.NewGuid());
-        var observer = new LongRunningObserver(fixture.GetObserverLogger());
+        var observer = new LongRunningObserver();
         var reference = fixture.GrainFactory.CreateObjectReference<ILongRunningObserver>(observer);
         await grain.Subscribe(reference);
 
@@ -169,16 +100,16 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
 
         await grain.Unsubscribe(reference);
         fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
-    });
+    }
 
     /// <summary>
     /// Tests that a pre-cancelled token is properly handled when calling an observer.
     /// </summary>
     [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
-    public Task PreCancelledTokenPassing() => RunTestAsync(async () =>
+    public async Task PreCancelledTokenPassing()
     {
         var grain = fixture.GrainFactory.GetGrain<IObserverWithCancellationGrain>(Guid.NewGuid());
-        var observer = new LongRunningObserver(fixture.GetObserverLogger());
+        var observer = new LongRunningObserver();
         var reference = fixture.GrainFactory.CreateObjectReference<ILongRunningObserver>(observer);
         await grain.Subscribe(reference);
 
@@ -191,16 +122,16 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
 
         await grain.Unsubscribe(reference);
         fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
-    });
+    }
 
     /// <summary>
     /// Tests that passing a CancellationToken without cancellation does not throw.
     /// </summary>
     [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
-    public Task TokenPassingWithoutCancellation_NoExceptionShouldBeThrown() => RunTestAsync(async () =>
+    public async Task TokenPassingWithoutCancellation_NoExceptionShouldBeThrown()
     {
         var grain = fixture.GrainFactory.GetGrain<IObserverWithCancellationGrain>(Guid.NewGuid());
-        var observer = new LongRunningObserver(fixture.GetObserverLogger());
+        var observer = new LongRunningObserver();
         var reference = fixture.GrainFactory.CreateObjectReference<ILongRunningObserver>(observer);
         await grain.Subscribe(reference);
 
@@ -216,16 +147,16 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
 
         await grain.Unsubscribe(reference);
         fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
-    });
+    }
 
     /// <summary>
     /// Tests that cancellation token callbacks execute in the correct execution context for observers.
     /// </summary>
     [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
-    public Task CancellationTokenCallbacksExecutionContext() => RunTestAsync(async () =>
+    public async Task CancellationTokenCallbacksExecutionContext()
     {
         var grain = fixture.GrainFactory.GetGrain<IObserverWithCancellationGrain>(Guid.NewGuid());
-        var observer = new LongRunningObserver(fixture.GetObserverLogger());
+        var observer = new LongRunningObserver();
         var reference = fixture.GrainFactory.CreateObjectReference<ILongRunningObserver>(observer);
         await grain.Subscribe(reference);
 
@@ -249,7 +180,7 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
         await observer.WaitForCancellation(callId);
         await grain.Unsubscribe(reference);
         fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
-    });
+    }
 
     /// <summary>
     /// Tests cancellation when multiple observers are subscribed and all receive cancellation.
@@ -257,7 +188,7 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
     [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
     [InlineData(true)]
     [InlineData(false)]
-    public Task MultipleObserversCancellation(bool cancelImmediately) => RunTestAsync(async () =>
+    public async Task MultipleObserversCancellation(bool cancelImmediately)
     {
         // Create multiple grains each with an observer
         using var cts = new CancellationTokenSource();
@@ -266,7 +197,7 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
         for (int i = 0; i < 5; i++)
         {
             var grain = fixture.GrainFactory.GetGrain<IObserverWithCancellationGrain>(Guid.NewGuid());
-            var observer = new LongRunningObserver(fixture.GetObserverLogger());
+            var observer = new LongRunningObserver();
             var reference = fixture.GrainFactory.CreateObjectReference<ILongRunningObserver>(observer);
             await grain.Subscribe(reference);
             grains.Add((grain, observer, reference, Guid.NewGuid()));
@@ -307,16 +238,16 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
         {
             fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(g.Reference);
         }
-    });
+    }
 
     /// <summary>
     /// Tests that cancellation of a waiting (queued) request in an observer is handled correctly.
     /// </summary>
     [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
-    public Task CancelWaitingRequest() => RunTestAsync(async () =>
+    public async Task CancelWaitingRequest()
     {
         var grain = fixture.GrainFactory.GetGrain<IObserverWithCancellationGrain>(Guid.NewGuid());
-        var observer = new LongRunningObserver(fixture.GetObserverLogger());
+        var observer = new LongRunningObserver();
         var reference = fixture.GrainFactory.CreateObjectReference<ILongRunningObserver>(observer);
         await grain.Subscribe(reference);
 
@@ -346,7 +277,7 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
 
         await grain.Unsubscribe(reference);
         fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
-    });
+    }
 
     /// <summary>
     /// Tests that a running interleaving observer operation can be cancelled via CancellationToken.
@@ -355,10 +286,10 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
     [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
     [InlineData(true)]
     [InlineData(false)]
-    public Task InterleavingObserverTaskCancellation(bool cancelImmediately) => RunTestAsync(async () =>
+    public async Task InterleavingObserverTaskCancellation(bool cancelImmediately)
     {
         var grain = fixture.GrainFactory.GetGrain<IObserverWithCancellationGrain>(Guid.NewGuid());
-        var observer = new LongRunningObserver(fixture.GetObserverLogger());
+        var observer = new LongRunningObserver();
         var reference = fixture.GrainFactory.CreateObjectReference<ILongRunningObserver>(observer);
         await grain.Subscribe(reference);
 
@@ -384,16 +315,16 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
 
         await grain.Unsubscribe(reference);
         fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
-    });
+    }
 
     /// <summary>
     /// Tests that multiple concurrent interleaving requests can each be cancelled independently.
     /// </summary>
     [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
-    public Task MultipleInterleavingRequestsCancellation() => RunTestAsync(async () =>
+    public async Task MultipleInterleavingRequestsCancellation()
     {
         var grain = fixture.GrainFactory.GetGrain<IObserverWithCancellationGrain>(Guid.NewGuid());
-        var observer = new LongRunningObserver(fixture.GetObserverLogger());
+        var observer = new LongRunningObserver();
         var reference = fixture.GrainFactory.CreateObjectReference<ILongRunningObserver>(observer);
         await grain.Subscribe(reference);
 
@@ -433,16 +364,16 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
 
         await grain.Unsubscribe(reference);
         fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
-    });
+    }
 
     /// <summary>
     /// Tests that an interleaving request can be cancelled while a regular request is also running.
     /// </summary>
     [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
-    public Task CancelInterleavingWhileRegularRequestRunning() => RunTestAsync(async () =>
+    public async Task CancelInterleavingWhileRegularRequestRunning()
     {
         var grain = fixture.GrainFactory.GetGrain<IObserverWithCancellationGrain>(Guid.NewGuid());
-        var observer = new LongRunningObserver(fixture.GetObserverLogger());
+        var observer = new LongRunningObserver();
         var reference = fixture.GrainFactory.CreateObjectReference<ILongRunningObserver>(observer);
         await grain.Subscribe(reference);
 
@@ -474,7 +405,7 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
 
         await grain.Unsubscribe(reference);
         fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
-    });
+    }
 
     /// <summary>
     /// Client-side observer implementation for testing long-running operations with cancellation.

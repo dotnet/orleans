@@ -35,19 +35,11 @@ internal interface IGrainCallCancellationManager
     void SignalCancellation(SiloAddress? targetSilo, GrainId targetGrainId, GrainId sendingGrainId, CorrelationId messageId);
 }
 
-internal sealed partial class ExternalClientGrainCallCancellationManager(IInternalGrainFactory grainFactory, ILogger<ExternalClientGrainCallCancellationManager> logger) : IGrainCallCancellationManager
+internal sealed partial class ExternalClientGrainCallCancellationManager(IInternalGrainFactory grainFactory) : IGrainCallCancellationManager
 {
     public void SignalCancellation(SiloAddress? targetSilo, GrainId targetGrainId, GrainId sendingGrainId, CorrelationId messageId)
     {
-        LogDebugSignallingCancellation(logger, messageId, sendingGrainId, targetGrainId, targetSilo);
-
         var targetGrain = grainFactory.GetGrain<IGrainCallCancellationExtension>(targetGrainId);
         targetGrain.CancelRequestAsync(sendingGrainId, messageId).Ignore();
     }
-
-    [LoggerMessage(
-        Level = LogLevel.Debug,
-        Message = "Signalling cancellation for message {MessageId} from {SendingGrainId} to target grain {TargetGrainId} on silo {TargetSilo}"
-    )]
-    private static partial void LogDebugSignallingCancellation(ILogger logger, CorrelationId messageId, GrainId sendingGrainId, GrainId targetGrainId, SiloAddress? targetSilo);
 }

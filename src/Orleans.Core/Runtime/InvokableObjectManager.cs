@@ -423,11 +423,9 @@ namespace Orleans
                 if (!TryCancelRequest())
                 {
                     // The message being canceled may not have arrived yet, so retry a few times.
-                    LogRequestNotFoundRetrying(_manager.logger, messageId, senderGrainId, ObserverId);
                     return RetryCancellationAfterDelay();
                 }
 
-                LogRequestCancelledSuccessfully(_manager.logger, messageId, senderGrainId, ObserverId);
                 return ValueTask.CompletedTask;
 
                 async ValueTask RetryCancellationAfterDelay()
@@ -440,28 +438,20 @@ namespace Orleans
 
                         if (TryCancelRequest())
                         {
-                            LogRequestCancelledAfterRetry(_manager.logger, messageId, senderGrainId, ObserverId, attemptNumber);
                             return;
                         }
 
-                        LogCancellationRetryAttemptFailed(_manager.logger, messageId, senderGrainId, ObserverId, attemptNumber, attemptsRemaining);
                         attemptNumber++;
                     } while (--attemptsRemaining > 0);
-
-                    LogCancellationFailedAllRetriesExhausted(_manager.logger, messageId, senderGrainId, ObserverId);
                 }
 
                 bool TryCancelRequest()
                 {
                     Message? message = null;
                     var wasWaiting = false;
-                    var initialQueueCount = 0;
-                    var finalQueueCount = 0;
-                    var runningRequestCount = 0;
                     lock (Messages)
                     {
-                        runningRequestCount = _runningRequests.Count;
-                        initialQueueCount = Messages.Count;
+                        var runningRequestCount = _runningRequests.Count;
 
                         // Check the running requests.
                         foreach (var runningRequest in _runningRequests)
@@ -485,7 +475,8 @@ namespace Orleans
                                     wasWaiting = true;
 
                                     // Remove the message, since it will be rejected immediately (outside the lock) without being executed.
-                                    for (var i = 0; i < initialQueueCount; i++)
+                                    var initialCount = Messages.Count;
+                                    for (var i = 0; i < initialCount; i++)
                                     {
                                         var current = Messages.Dequeue();
                                         if (!ReferenceEquals(current, message))
@@ -494,7 +485,6 @@ namespace Orleans
                                         }
                                     }
 
-                                    finalQueueCount = Messages.Count;
                                     break;
                                 }
                             }
@@ -508,26 +498,18 @@ namespace Orleans
                         // If the message did begin executing, wait for it to observe the cancellation token and respond itself.
                         if (wasWaiting)
                         {
-                            LogCancellingWaitingRequest(_manager.logger, messageId, senderGrainId, ObserverId, initialQueueCount, finalQueueCount);
                             _manager.runtimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
                             didCancel = true;
                         }
                         else if (message.BodyObject is IInvokable invokableRequest)
                         {
                             didCancel = TryCancelInvokable(invokableRequest) || !invokableRequest.IsCancellable;
-                            LogCancellingRequestWithInvokable(_manager.logger, messageId, senderGrainId, ObserverId, wasWaiting);
                         }
                         else
                         {
-                            LogCancellingRequestWithoutInvokable(_manager.logger, messageId, senderGrainId, ObserverId, wasWaiting);
-
                             // Assume the request is not cancellable.
-                            return true;
+                            didCancel = true;
                         }
-                    }
-                    else
-                    {
-                        LogRequestNotFoundInCancelAttempt(_manager.logger, messageId, senderGrainId, ObserverId, runningRequestCount, initialQueueCount);
                     }
 
                     return didCancel;
@@ -552,60 +534,6 @@ namespace Orleans
                 Message = "One or more cancellation callbacks failed."
             )]
             private static partial void LogErrorCancellationCallbackFailed(ILogger logger, Exception exception);
-
-            [LoggerMessage(
-                Level = LogLevel.Debug,
-                Message = "Request '{MessageId}' from '{SenderGrainId}' not found in observer '{ObserverId}'. Will retry cancellation."
-            )]
-            private static partial void LogRequestNotFoundRetrying(ILogger logger, CorrelationId messageId, GrainId senderGrainId, ObserverGrainId observerId);
-
-            [LoggerMessage(
-                Level = LogLevel.Debug,
-                Message = "Successfully cancelled request '{MessageId}' from '{SenderGrainId}' in observer '{ObserverId}'."
-            )]
-            private static partial void LogRequestCancelledSuccessfully(ILogger logger, CorrelationId messageId, GrainId senderGrainId, ObserverGrainId observerId);
-
-            [LoggerMessage(
-                Level = LogLevel.Debug,
-                Message = "Successfully cancelled request '{MessageId}' from '{SenderGrainId}' in observer '{ObserverId}' after {AttemptNumber} retry attempt(s)."
-            )]
-            private static partial void LogRequestCancelledAfterRetry(ILogger logger, CorrelationId messageId, GrainId senderGrainId, ObserverGrainId observerId, int attemptNumber);
-
-            [LoggerMessage(
-                Level = LogLevel.Debug,
-                Message = "Cancellation retry attempt {AttemptNumber} failed for request '{MessageId}' from '{SenderGrainId}' in observer '{ObserverId}'. {AttemptsRemaining} attempt(s) remaining."
-            )]
-            private static partial void LogCancellationRetryAttemptFailed(ILogger logger, CorrelationId messageId, GrainId senderGrainId, ObserverGrainId observerId, int attemptNumber, int attemptsRemaining);
-
-            [LoggerMessage(
-                Level = LogLevel.Warning,
-                Message = "Failed to cancel request '{MessageId}' from '{SenderGrainId}' in observer '{ObserverId}' after exhausting all retry attempts. The request may have already completed or never arrived."
-            )]
-            private static partial void LogCancellationFailedAllRetriesExhausted(ILogger logger, CorrelationId messageId, GrainId senderGrainId, ObserverGrainId observerId);
-
-            [LoggerMessage(
-                Level = LogLevel.Debug,
-                Message = "Cancelling request '{MessageId}' from '{SenderGrainId}' in observer '{ObserverId}'. Request has IInvokable body: calling TryCancel. WasWaiting: {WasWaiting}."
-            )]
-            private static partial void LogCancellingRequestWithInvokable(ILogger logger, CorrelationId messageId, GrainId senderGrainId, ObserverGrainId observerId, bool wasWaiting);
-
-            [LoggerMessage(
-                Level = LogLevel.Debug,
-                Message = "Cancelling request '{MessageId}' from '{SenderGrainId}' in observer '{ObserverId}'. Request does not have IInvokable body. WasWaiting: {WasWaiting}."
-            )]
-            private static partial void LogCancellingRequestWithoutInvokable(ILogger logger, CorrelationId messageId, GrainId senderGrainId, ObserverGrainId observerId, bool wasWaiting);
-
-            [LoggerMessage(
-                Level = LogLevel.Debug,
-                Message = "Cancelling waiting request '{MessageId}' from '{SenderGrainId}' in observer '{ObserverId}'. Removed from queue (initial count: {InitialQueueCount}, final count: {FinalQueueCount}). Sending OperationCanceledException response."
-            )]
-            private static partial void LogCancellingWaitingRequest(ILogger logger, CorrelationId messageId, GrainId senderGrainId, ObserverGrainId observerId, int initialQueueCount, int finalQueueCount);
-
-            [LoggerMessage(
-                Level = LogLevel.Debug,
-                Message = "Request '{MessageId}' from '{SenderGrainId}' not found in observer '{ObserverId}' during cancel attempt. Running requests: {RunningRequestCount}, waiting requests: {WaitingRequestCount}."
-            )]
-            private static partial void LogRequestNotFoundInCancelAttempt(ILogger logger, CorrelationId messageId, GrainId senderGrainId, ObserverGrainId observerId, int runningRequestCount, int waitingRequestCount);
 
             public Task Deactivated => Task.CompletedTask;
         }

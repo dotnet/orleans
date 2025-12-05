@@ -1897,12 +1897,9 @@ internal sealed partial class ActivationData :
 
     ValueTask IGrainCallCancellationExtension.CancelRequestAsync(GrainId senderGrainId, CorrelationId messageId)
     {
-        LogDebugCancelRequestReceived(_shared.Logger, messageId, senderGrainId, GrainId);
-
         if (!TryCancelRequest())
         {
             // The message being canceled may not have arrived yet, so retry a few times.
-            LogDebugCancelRequestNotFoundRetrying(_shared.Logger, messageId, senderGrainId, GrainId);
             return RetryCancellationAfterDelay();
         }
 
@@ -1915,11 +1912,6 @@ internal sealed partial class ActivationData :
             {
                 await Task.Delay(1_000);
             } while (!TryCancelRequest() && --attemptsRemaining > 0);
-
-            if (attemptsRemaining <= 0)
-            {
-                LogDebugCancelRequestNotFoundAfterRetries(_shared.Logger, messageId, senderGrainId, GrainId);
-            }
         }
 
         bool TryCancelRequest()
@@ -1960,8 +1952,6 @@ internal sealed partial class ActivationData :
             {
                 if (wasWaiting)
                 {
-                    LogDebugCancellingWaitingRequest(_shared.Logger, messageId, senderGrainId, GrainId);
-
                     // If the request was waiting, then we necessarily did manage to cancel it, so send the response now.
                     _shared.InternalRuntime.RuntimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
                     didCancel = true;
@@ -1969,18 +1959,13 @@ internal sealed partial class ActivationData :
                 else if (TaskScheduler.Current != _workItemGroup.TaskScheduler)
                 {
                     // Ensure that cancellation callbacks are performed on the grain's scheduler.
-                    _workItemGroup.TaskScheduler.QueueAction(() =>
-                    {
-                        LogDebugCancellingRunningRequest(_shared.Logger, messageId, senderGrainId, GrainId);
-                        TryCancelInvokable(request);
-                    });
+                    _workItemGroup.TaskScheduler.QueueAction(() => TryCancelInvokable(request));
 
                     // Assume this worked.
                     didCancel = true;
                 }
                 else
                 {
-                    LogDebugCancellingRunningRequest(_shared.Logger, messageId, senderGrainId, GrainId);
                     didCancel = TryCancelInvokable(request) || !request.IsCancellable;
                 }
             }
@@ -1992,9 +1977,7 @@ internal sealed partial class ActivationData :
         {
             try
             {
-                var result = request.TryCancel();
-                LogDebugCancelRequestCompleted(_shared.Logger, messageId, senderGrainId, GrainId);
-                return result;
+                return request.TryCancel();
             }
             catch (Exception exception)
             {
@@ -2003,42 +1986,6 @@ internal sealed partial class ActivationData :
             }
         }
     }
-
-    [LoggerMessage(
-        Level = LogLevel.Debug,
-        Message = "Received cancellation request for message {MessageId} from {SenderGrainId} on grain {TargetGrainId}"
-    )]
-    private static partial void LogDebugCancelRequestReceived(ILogger logger, CorrelationId messageId, GrainId senderGrainId, GrainId targetGrainId);
-
-    [LoggerMessage(
-        Level = LogLevel.Debug,
-        Message = "Cancellation request for message {MessageId} from {SenderGrainId} on grain {TargetGrainId} not found, will retry"
-    )]
-    private static partial void LogDebugCancelRequestNotFoundRetrying(ILogger logger, CorrelationId messageId, GrainId senderGrainId, GrainId targetGrainId);
-
-    [LoggerMessage(
-        Level = LogLevel.Debug,
-        Message = "Cancellation request for message {MessageId} from {SenderGrainId} on grain {TargetGrainId} not found after retries"
-    )]
-    private static partial void LogDebugCancelRequestNotFoundAfterRetries(ILogger logger, CorrelationId messageId, GrainId senderGrainId, GrainId targetGrainId);
-
-    [LoggerMessage(
-        Level = LogLevel.Debug,
-        Message = "Cancelling waiting request for message {MessageId} from {SenderGrainId} on grain {TargetGrainId}"
-    )]
-    private static partial void LogDebugCancellingWaitingRequest(ILogger logger, CorrelationId messageId, GrainId senderGrainId, GrainId targetGrainId);
-
-    [LoggerMessage(
-        Level = LogLevel.Debug,
-        Message = "Cancelling running request for message {MessageId} from {SenderGrainId} on grain {TargetGrainId}"
-    )]
-    private static partial void LogDebugCancellingRunningRequest(ILogger logger, CorrelationId messageId, GrainId senderGrainId, GrainId targetGrainId);
-
-    [LoggerMessage(
-        Level = LogLevel.Debug,
-        Message = "Cancellation completed for message {MessageId} from {SenderGrainId} on grain {TargetGrainId}"
-    )]
-    private static partial void LogDebugCancelRequestCompleted(ILogger logger, CorrelationId messageId, GrainId senderGrainId, GrainId targetGrainId);
 
     [LoggerMessage(
         Level = LogLevel.Warning,
