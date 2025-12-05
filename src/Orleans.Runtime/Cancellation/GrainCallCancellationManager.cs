@@ -88,16 +88,20 @@ internal partial class GrainCallCancellationManager : SystemTarget, IGrainCallCa
 
     public ValueTask CancelCallsAsync(List<GrainCallCancellationRequest> cancellationRequests)
     {
+        LogDebugProcessingCancellationRequests(_logger, cancellationRequests.Count);
+
         foreach (var request in cancellationRequests)
         {
             // Try to directly call the cancellation method locally
             if (_activationDirectory.FindTarget(request.TargetGrainId) is IGrainCallCancellationExtension extension)
             {
+                LogDebugCancellingRequestLocally(_logger, request.MessageId, request.SourceGrainId, request.TargetGrainId);
                 extension.CancelRequestAsync(request.SourceGrainId, request.MessageId).Ignore();
             }
             else
             {
                 // Fall back to a regular grain call.
+                LogDebugCancellingRequestViaGrainCall(_logger, request.MessageId, request.SourceGrainId, request.TargetGrainId);
                 GrainFactory.GetGrain<IGrainCallCancellationExtension>(request.TargetGrainId).CancelRequestAsync(request.SourceGrainId, request.MessageId).Ignore();
             }
         }
@@ -110,9 +114,11 @@ internal partial class GrainCallCancellationManager : SystemTarget, IGrainCallCa
         if (targetSilo is not null
             && GetOrCreateWorker(targetSilo).Writer.TryWrite(new GrainCallCancellationRequest(targetGrainId, sourceGrainId, messageId)))
         {
+            LogDebugSignallingCancellationBatched(_logger, messageId, sourceGrainId, targetGrainId, targetSilo);
             return;
         }
 
+        LogDebugSignallingCancellationDirect(_logger, messageId, sourceGrainId, targetGrainId, targetSilo);
         var request = GrainFactory.GetGrain<IGrainCallCancellationExtension>(targetGrainId).CancelRequestAsync(sourceGrainId, messageId);
         request.Ignore();
     }
@@ -349,4 +355,34 @@ internal partial class GrainCallCancellationManager : SystemTarget, IGrainCallCa
         Message = "Error processing cluster membership updates"
     )]
     private static partial void LogErrorProcessingClusterMembershipUpdates(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Signalling cancellation for message {MessageId} from {SourceGrainId} to target grain {TargetGrainId} on silo {TargetSilo} (batched)"
+    )]
+    private static partial void LogDebugSignallingCancellationBatched(ILogger logger, CorrelationId messageId, GrainId sourceGrainId, GrainId targetGrainId, SiloAddress targetSilo);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Signalling cancellation for message {MessageId} from {SourceGrainId} to target grain {TargetGrainId} on silo {TargetSilo} (direct)"
+    )]
+    private static partial void LogDebugSignallingCancellationDirect(ILogger logger, CorrelationId messageId, GrainId sourceGrainId, GrainId targetGrainId, SiloAddress? targetSilo);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Processing {Count} cancellation requests"
+    )]
+    private static partial void LogDebugProcessingCancellationRequests(ILogger logger, int count);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Cancelling request {MessageId} from {SourceGrainId} to {TargetGrainId} locally"
+    )]
+    private static partial void LogDebugCancellingRequestLocally(ILogger logger, CorrelationId messageId, GrainId sourceGrainId, GrainId targetGrainId);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Cancelling request {MessageId} from {SourceGrainId} to {TargetGrainId} via grain call"
+    )]
+    private static partial void LogDebugCancellingRequestViaGrainCall(ILogger logger, CorrelationId messageId, GrainId sourceGrainId, GrainId targetGrainId);
 }

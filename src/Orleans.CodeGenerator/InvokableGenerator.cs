@@ -376,18 +376,29 @@ namespace Orleans.CodeGenerator
             // C#:
             // TryCancel()
             // {
-            //   _cts?.Cancel(false);
-            //   return true;
+            //   if (_cts is { } cts)
+            //   {
+            //     cts.Cancel(false);
+            //     return true;
+            //   }
+            //   return false;
             // }
             var cancellationTokenField = fields.First(f => f is CancellationTokenSourceFieldDescription);
             var member = MethodDeclaration(PredefinedType(Token(SyntaxKind.BoolKeyword)), "TryCancel")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword))
                 .WithBody(Block(
-                    ExpressionStatement(ConditionalAccessExpression(
-                        IdentifierName(cancellationTokenField.FieldName),
-                        InvocationExpression(MemberBindingExpression(IdentifierName("Cancel")))
-                            .WithArgumentList(ArgumentList(SeparatedList([Argument(LiteralExpression(SyntaxKind.FalseLiteralExpression))]))))),
-                    ReturnStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression))));
+                    IfStatement(
+                        IsPatternExpression(
+                            IdentifierName(cancellationTokenField.FieldName),
+                            RecursivePattern()
+                                .WithPropertyPatternClause(PropertyPatternClause())
+                                .WithDesignation(SingleVariableDesignation(Identifier("cts")))),
+                        Block(
+                            ExpressionStatement(InvocationExpression(
+                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("cts"), IdentifierName("Cancel")))
+                                .WithArgumentList(ArgumentList(SeparatedList([Argument(LiteralExpression(SyntaxKind.FalseLiteralExpression))])))),
+                            ReturnStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression)))),
+                    ReturnStatement(LiteralExpression(SyntaxKind.FalseLiteralExpression))));
             return member;
         }
 
