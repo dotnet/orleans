@@ -234,12 +234,18 @@ internal sealed partial class RedisJobShard : JobShard
                     {
                         LogFlushingBatch(_logger, batchOperations.Count, Id);
                         await AppendJobOperationBatchAsync(batchOperations, cancellationToken);
-                        foreach (var op in batchOperations) op.CompletionSource.TrySetResult();
+                        foreach (var op in batchOperations)
+                        {
+                            op.CompletionSource.TrySetResult();
+                        }
                     }
                     catch (Exception ex)
                     {
                         LogErrorWritingBatch(_logger, ex, batchOperations.Count, Id);
-                        foreach (var op in batchOperations) op.CompletionSource.TrySetException(ex);
+                        foreach (var op in batchOperations)
+                        {
+                            op.CompletionSource.TrySetException(ex);
+                        }
                     }
                     finally
                     {
@@ -248,7 +254,9 @@ internal sealed partial class RedisJobShard : JobShard
                 }
             }
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        {
+        }
         finally
         {
             while (_storageOperationChannel.Reader.TryRead(out var op))
