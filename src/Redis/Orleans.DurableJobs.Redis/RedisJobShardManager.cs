@@ -1,13 +1,7 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Hosting;
-using Orleans.Runtime;
 using StackExchange.Redis;
 
 namespace Orleans.DurableJobs.Redis;
@@ -29,7 +23,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
     // in-memory cache of owned shards
     private readonly ConcurrentDictionary<string, RedisJobShard> _jobShardCache = new();
 
-    private long _shardCounter = 0;
+    private long _shardCounter;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RedisJobShardManager"/> class.
@@ -52,7 +46,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
         _logger = loggerFactory.CreateLogger<RedisJobShardManager>();
     }
 
-    private async ValueTask InitializeIfNeeded(CancellationToken cancellationToken = default)
+    private async ValueTask InitializeIfNeeded()
     {
         if (_redisOps is not null)
         {
@@ -69,10 +63,10 @@ public sealed partial class RedisJobShardManager : JobShardManager
     private string ShardSetKey => $"durablejobs:shards:{_options.ShardPrefix}";
     private static string MetaKeyForShard(string shardId) => $"durablejobs:shard:{shardId}:meta";
 
-    public override async Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxShardStartTime, CancellationToken cancellationToken)
+    public override async Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, CancellationToken cancellationToken)
     {
-        await InitializeIfNeeded(cancellationToken).ConfigureAwait(false);
-        LogAssigningShards(_logger, maxShardStartTime, _options.ShardPrefix);
+        await InitializeIfNeeded().ConfigureAwait(false);
+        LogAssigningShards(_logger, maxDueTime, _options.ShardPrefix);
 
         var result = new List<IJobShard>();
 
@@ -90,7 +84,6 @@ public sealed partial class RedisJobShardManager : JobShardManager
             metadata.TryGetValue("Owner", out var ownerStr);
             metadata.TryGetValue("MembershipVersion", out var membershipVersionStr);
             metadata.TryGetValue("MinDueTime", out var minDueStr);
-            metadata.TryGetValue("MaxDueTime", out var maxDueStr);
 
             // refresh membership if remote higher
             if (!string.IsNullOrEmpty(membershipVersionStr) && long.TryParse(membershipVersionStr, out var memVer))
@@ -104,9 +97,9 @@ public sealed partial class RedisJobShardManager : JobShardManager
 
             if (!string.IsNullOrEmpty(minDueStr) && DateTimeOffset.TryParse(minDueStr, null, DateTimeStyles.RoundtripKind, out var shardStartTime))
             {
-                if (shardStartTime > maxShardStartTime)
+                if (shardStartTime > maxDueTime)
                 {
-                    LogShardTooNew(_logger, shardId, shardStartTime, maxShardStartTime);
+                    LogShardTooNew(_logger, shardId, shardStartTime, maxDueTime);
                     continue;
                 }
             }
@@ -125,7 +118,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
                     LogShardOwnedButNotInCache(_logger, shardId);
                     try
                     {
-                        await ReleaseOwnershipAsync(shardId, cancellationToken).ConfigureAwait(false);
+                        await ReleaseOwnershipAsync(shardId).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
@@ -188,7 +181,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
                 LogFailedInitializingShard(_logger, ex, shardId);
                 try
                 {
-                    await ReleaseOwnershipAsync(shardId, cancellationToken).ConfigureAwait(false);
+                    await ReleaseOwnershipAsync(shardId).ConfigureAwait(false);
                 }
                 catch (Exception releaseEx)
                 {
@@ -205,7 +198,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
 
     public override async Task<IJobShard> CreateShardAsync(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, CancellationToken cancellationToken)
     {
-        await InitializeIfNeeded(cancellationToken).ConfigureAwait(false);
+        await InitializeIfNeeded().ConfigureAwait(false);
         LogRegisteringShard(_logger, minDueTime, maxDueTime);
 
         var i = 0;
@@ -283,7 +276,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
             // There are still jobs in the shard, just release ownership
             try
             {
-                await ReleaseOwnershipAsync(shardId, cancellationToken).ConfigureAwait(false);
+                await ReleaseOwnershipAsync(shardId).ConfigureAwait(false);
                 LogShardOwnershipReleased(_logger, shardId, count);
             }
             catch (Exception ex)
@@ -296,7 +289,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
             // No jobs left, delete the shard data entirely
             try
             {
-                await DeleteShardAsync(shardId, cancellationToken).ConfigureAwait(false);
+                await DeleteShardAsync(shardId).ConfigureAwait(false);
                 LogShardDeleted(_logger, shardId);
             }
             catch (Exception ex)
@@ -316,24 +309,23 @@ public sealed partial class RedisJobShardManager : JobShardManager
         }
     }
 
-    private async Task DeleteShardAsync(string shardId, CancellationToken cancellationToken)
+    private async Task DeleteShardAsync(string shardId)
     {
-        await InitializeIfNeeded(cancellationToken).ConfigureAwait(false);
+        await InitializeIfNeeded().ConfigureAwait(false);
 
         var streamKey = $"durablejobs:shard:{shardId}:stream";
         var metaKey = $"durablejobs:shard:{shardId}:meta";
-        var leaseKey = $"durablejobs:shard:{shardId}:lease";
 
         // Delete all shard-related keys
-        await _redisOps!.DeleteKeysAsync(new RedisKey[] { streamKey, metaKey, leaseKey }).ConfigureAwait(false);
+        await _redisOps!.DeleteKeysAsync([streamKey, metaKey]).ConfigureAwait(false);
 
         // Remove from the shard set
         await _redisOps.SetRemoveAsync(ShardSetKey, shardId).ConfigureAwait(false);
     }
 
-    private async Task<bool> ReleaseOwnershipAsync(string shardId, CancellationToken cancellationToken)
+    private async Task<bool> ReleaseOwnershipAsync(string shardId)
     {
-        await InitializeIfNeeded(cancellationToken).ConfigureAwait(false);
+        await InitializeIfNeeded().ConfigureAwait(false);
         var metaKey = MetaKeyForShard(shardId);
         var metadata = await _redisOps!.GetHashAllAsync(metaKey).ConfigureAwait(false);
         var version = metadata.TryGetValue("version", out var v) ? v : "0";
@@ -341,12 +333,5 @@ public sealed partial class RedisJobShardManager : JobShardManager
         return await _redisOps.ReleaseOwnershipAsync(metaKey, version).ConfigureAwait(false);
     }
 
-    private static DateTimeOffset ParseDateTimeOffset(IDictionary<string, string> meta, string key, DateTimeOffset @default)
-    {
-        if (meta.TryGetValue(key, out var s) && DateTimeOffset.TryParse(s, null, DateTimeStyles.RoundtripKind, out var dt))
-        {
-            return dt;
-        }
-        return @default;
-    }
+    private static DateTimeOffset ParseDateTimeOffset(IDictionary<string, string> meta, string key, DateTimeOffset @default) => meta.TryGetValue(key, out var s) && DateTimeOffset.TryParse(s, null, DateTimeStyles.RoundtripKind, out var dt) ? dt : @default;
 }

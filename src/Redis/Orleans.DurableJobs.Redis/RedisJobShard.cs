@@ -1,13 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading;
 using System.Threading.Channels;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Hosting;
-using Orleans.Runtime;
 using StackExchange.Redis;
 
 namespace Orleans.DurableJobs.Redis;
@@ -24,7 +17,6 @@ internal sealed partial class RedisJobShard : JobShard
 
     private readonly string _streamKey;
     private readonly string _metaKey;
-    private readonly string _leaseKey;
 
     internal long MetadataVersion { get; private set; }
 
@@ -62,7 +54,6 @@ internal sealed partial class RedisJobShard : JobShard
 
         _streamKey = $"durablejobs:shard:{Id}:stream";
         _metaKey = $"durablejobs:shard:{Id}:meta";
-        _leaseKey = $"durablejobs:shard:{Id}:lease";
 
         _storageOperationChannel = Channel.CreateUnbounded<StorageOperation>(new UnboundedChannelOptions
         {
@@ -73,8 +64,7 @@ internal sealed partial class RedisJobShard : JobShard
         _storageProcessorTask = ProcessStorageOperationsAsync();
     }
 
-    // Initialize: replay the Redis stream and rebuild in-memory queue (same logic as Azure)
-    // TODO: Reviewed
+    // Initialize: replay the Redis stream and rebuild in-memory queue (same logic as Azure)    
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
         LogInitializingShard(_logger, Id, _streamKey);
@@ -112,8 +102,8 @@ internal sealed partial class RedisJobShard : JobShard
                         }
                         else
                         {
-                            var entry2 = jobRetryCounters[operation.Id];
-                            jobRetryCounters[operation.Id] = (entry2.dequeueCount + 1, operation.DueTime);
+                            var (dequeueCount, _) = jobRetryCounters[operation.Id];
+                            jobRetryCounters[operation.Id] = (dequeueCount + 1, operation.DueTime);
                         }
                     }
                     break;

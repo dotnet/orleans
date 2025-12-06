@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json;
-using System.Threading.Tasks;
 using StackExchange.Redis;
 
 namespace Orleans.DurableJobs.Redis;
@@ -10,9 +6,13 @@ namespace Orleans.DurableJobs.Redis;
 /// <summary>
 /// Centralizes Redis operations for DurableJobs Redis implementation.
 /// </summary>
-internal sealed class RedisOperationsManager
+/// <remarks>
+/// Initializes a new instance of the <see cref="RedisOperationsManager"/> class.
+/// </remarks>
+/// <param name="db">The Redis database instance.</param>
+internal sealed class RedisOperationsManager(IDatabase db)
 {
-    private readonly IDatabase _db;
+    private readonly IDatabase _db = db ?? throw new ArgumentNullException(nameof(db));
 
     // Lua scripts
     private const string CreateShardLua = @"
@@ -94,15 +94,6 @@ internal sealed class RedisOperationsManager
         ";
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="RedisOperationsManager"/> class.
-    /// </summary>
-    /// <param name="db">The Redis database instance.</param>
-    public RedisOperationsManager(IDatabase db)
-    {
-        _db = db ?? throw new ArgumentNullException(nameof(db));
-    }
-
-    /// <summary>
     /// Gets all member values from a Redis set.
     /// </summary>
     /// <param name="setKey">The key of the set.</param>
@@ -110,7 +101,7 @@ internal sealed class RedisOperationsManager
     public async Task<string[]> GetSetMembersAsync(RedisKey setKey)
     {
         var members = await _db.SetMembersAsync(setKey).ConfigureAwait(false);
-        return members.Select(rv => rv.ToString()).ToArray();
+        return [.. members.Select(rv => rv.ToString())];
     }
 
     /// <summary>
@@ -136,8 +127,8 @@ internal sealed class RedisOperationsManager
     {
         var metadataJson = JsonSerializer.Serialize(metadata);
         var res = (int)await _db.ScriptEvaluateAsync(CreateShardLua,
-            new RedisKey[] { metaKey, shardsSetKey },
-            new RedisValue[] { shardId, metadataJson }).ConfigureAwait(false);
+            [metaKey, shardsSetKey],
+            [shardId, metadataJson]).ConfigureAwait(false);
         return res == 1;
     }
 
@@ -152,8 +143,8 @@ internal sealed class RedisOperationsManager
     public async Task<bool> TryTakeOwnershipAsync(RedisKey metaKey, string expectedVersion, string newOwner, string newMembershipVersion)
     {
         var res = (int)await _db.ScriptEvaluateAsync(TryTakeOwnershipLua,
-            new RedisKey[] { metaKey },
-            new RedisValue[] { expectedVersion ?? "0", newOwner, newMembershipVersion }).ConfigureAwait(false);
+            [metaKey],
+            [expectedVersion ?? "0", newOwner, newMembershipVersion]).ConfigureAwait(false);
         return res == 1;
     }
 
@@ -166,8 +157,8 @@ internal sealed class RedisOperationsManager
     public async Task<bool> ReleaseOwnershipAsync(RedisKey metaKey, string expectedVersion)
     {
         var res = (int)await _db.ScriptEvaluateAsync(ReleaseOwnershipLua,
-            new RedisKey[] { metaKey },
-            new RedisValue[] { expectedVersion }).ConfigureAwait(false);
+            [metaKey],
+            [expectedVersion]).ConfigureAwait(false);
         return res == 1;
     }
 
@@ -176,10 +167,7 @@ internal sealed class RedisOperationsManager
     /// </summary>
     /// <param name="keys">The keys to delete.</param>
     /// <returns>The number of keys that were deleted.</returns>
-    public async Task<long> DeleteKeysAsync(RedisKey[] keys)
-    {
-        return await _db.KeyDeleteAsync(keys).ConfigureAwait(false);
-    }
+    public async Task<long> DeleteKeysAsync(RedisKey[] keys) => await _db.KeyDeleteAsync(keys).ConfigureAwait(false);
 
     /// <summary>
     /// Removes a value from a Redis set.
@@ -187,10 +175,7 @@ internal sealed class RedisOperationsManager
     /// <param name="setKey">The key of the set.</param>
     /// <param name="value">The value to remove.</param>
     /// <returns>True if the value was removed, false if it didn't exist.</returns>
-    public async Task<bool> SetRemoveAsync(RedisKey setKey, RedisValue value)
-    {
-        return await _db.SetRemoveAsync(setKey, value).ConfigureAwait(false);
-    }
+    public async Task<bool> SetRemoveAsync(RedisKey setKey, RedisValue value) => await _db.SetRemoveAsync(setKey, value).ConfigureAwait(false);
 
     /// <summary>
     /// Reads a range of entries from a Redis stream.
@@ -200,10 +185,7 @@ internal sealed class RedisOperationsManager
     /// <param name="minId">The minimum stream entry ID (use "-" for start).</param>
     /// <param name="maxId">The maximum stream entry ID (use "+" for end).</param>
     /// <returns>An array of stream entries.</returns>
-    public StreamEntry[] StreamRange(RedisKey streamKey, RedisValue minId = default, RedisValue maxId = default)
-    {
-        return _db.StreamRange(streamKey, minId, maxId);
-    }
+    public StreamEntry[] StreamRange(RedisKey streamKey, RedisValue minId = default, RedisValue maxId = default) => _db.StreamRange(streamKey, minId, maxId);
 
     /// <summary>
     /// Appends multiple job operations to a Redis stream in a single batch.
@@ -215,12 +197,12 @@ internal sealed class RedisOperationsManager
     {
         var args = new RedisValue[1 + payloads.Length];
         args[0] = payloads.Length;
-        for (int i = 0; i < payloads.Length; i++)
+        for (var i = 0; i < payloads.Length; i++)
         {
             args[i + 1] = payloads[i];
         }
 
-        return await _db.ScriptEvaluateAsync(MultiXAddLua, new RedisKey[] { streamKey }, args).ConfigureAwait(false);
+        return await _db.ScriptEvaluateAsync(MultiXAddLua, [streamKey], args).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -235,8 +217,8 @@ internal sealed class RedisOperationsManager
         var newVersion = (expectedVersion + 1).ToString();
         var fieldsJson = JsonSerializer.Serialize(metadata);
         var res = await _db.ScriptEvaluateAsync(UpdateMetaLua,
-            new RedisKey[] { metaKey },
-            new RedisValue[] { expectedVersion.ToString(), newVersion, fieldsJson }).ConfigureAwait(false);
+            [metaKey],
+            [expectedVersion.ToString(), newVersion, fieldsJson]).ConfigureAwait(false);
         return (int)res == 1;
     }
 
