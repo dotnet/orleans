@@ -27,6 +27,10 @@ public class RedisJobShardOptionsValidator : IConfigurationValidator
             throw new OrleansConfigurationException($"Invalid configuration for {nameof(RedisJobShardOptions)} with name '{_name}'. {nameof(_options.ConfigurationOptions)} is required.");
         }
 
+        if (_options.CreateMultiplexer is null)
+        {
+            throw new OrleansConfigurationException($"Invalid configuration for {nameof(RedisJobShardOptions)} with name '{_name}'. {nameof(_options.CreateMultiplexer)} is required.");
+        }
         if (string.IsNullOrWhiteSpace(_options.ShardPrefix))
         {
             throw new OrleansConfigurationException($"Invalid configuration for {nameof(RedisJobShardOptions)} with name '{_name}'. {nameof(_options.ShardPrefix)} is required.");
