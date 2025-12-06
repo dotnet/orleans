@@ -1,15 +1,11 @@
-using System;
-using System.Collections.Generic;
-using System.Text.Json;
 using System.Text.Json.Serialization;
-using Orleans.Runtime;
 
 namespace Orleans.DurableJobs.Redis;
 
 /// <summary>
 /// Represents an operation to be performed on a durable job.
 /// </summary>
-internal struct JobOperation
+internal readonly struct JobOperation
 {
     /// <summary>
     /// The type of operation to perform.
