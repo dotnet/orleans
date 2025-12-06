@@ -48,16 +48,16 @@ internal static class RedisStreamJsonSerializer<T>
     }
 
     /// <summary>
-    /// Serializes a collection of items to JSON strings using the provided JsonTypeInfo for source-generated serialization.
+    /// Serializes a collection of items to JSON strings as RedisValue array using the provided JsonTypeInfo for source-generated serialization.
     /// </summary>
     /// <param name="items">The items to serialize.</param>
     /// <param name="jsonTypeInfo">The JSON type info for source-generated serialization.</param>
-    /// <returns>An array of JSON strings.</returns>
-    public static string[] Encode(IEnumerable<T> items, JsonTypeInfo<T> jsonTypeInfo)
+    /// <returns>An array of RedisValue containing JSON strings.</returns>
+    public static RedisValue[] Encode(IEnumerable<T> items, JsonTypeInfo<T> jsonTypeInfo)
     {
         ArgumentNullException.ThrowIfNull(items);
         ArgumentNullException.ThrowIfNull(jsonTypeInfo);
 
-        return items.Select(item => JsonSerializer.Serialize(item, jsonTypeInfo)).ToArray();
+        return items.Select(item => (RedisValue)JsonSerializer.Serialize(item, jsonTypeInfo)).ToArray();
     }
 }
