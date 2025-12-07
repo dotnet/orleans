@@ -43,14 +43,7 @@ public static class RedisDurableJobsExtensions
     /// <param name="configure">The delegate used to configure the durable jobs storage.</param>
     /// <returns>The provided <see cref="IServiceCollection"/>, for chaining.</returns>
     public static IServiceCollection UseRedisDurableJobs(this IServiceCollection services, Action<RedisJobShardOptions> configure)
-    {
-        services.AddDurableJobs();
-        services.AddSingleton<RedisJobShardManager>();
-        services.AddFromExisting<JobShardManager, RedisJobShardManager>();
-        services.Configure(configure);
-        services.ConfigureFormatter<RedisJobShardOptions>();
-        return services;
-    }
+            => services.UseRedisDurableJobs(builder => builder.Configure(configure));
 
     /// <summary>
     /// Adds durable jobs storage backed by Redis.
