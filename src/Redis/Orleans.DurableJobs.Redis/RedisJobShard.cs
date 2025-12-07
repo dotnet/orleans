@@ -218,7 +218,7 @@ internal sealed partial class RedisJobShard : JobShard
                 batchOperations.Add(firstOperation);
 
                 // Try to collect more operations up to the maximum batch size
-                if (TryCollectJobOperationsForBatch(batchOperations))
+                if (TryCollectJobOperationsForBatch(batchOperations) && batchOperations.Count < _options.MaxBatchSize)
                 {
                     // Not enough operations to meet the minimum batch size, wait for more or timeout
                     if (batchOperations.Count < _options.MinBatchSize)

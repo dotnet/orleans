@@ -34,7 +34,7 @@ public class RedisJobShardManagerTests : IAsyncLifetime, IAsyncDisposable
     /// Tests basic shard creation and assignment workflow.
     /// </summary>
     [SkippableFact]
-    public Task RedisJobShardManager_Creation_Assignation()
+    public Task RedisJobShardManager_Creation_Assignment()
         => _runner.ShardCreationAndAssignment();
 
     /// <summary>

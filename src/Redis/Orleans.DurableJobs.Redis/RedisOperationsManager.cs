@@ -144,7 +144,7 @@ internal sealed class RedisOperationsManager(IDatabase db)
     {
         var res = (int)await _db.ScriptEvaluateAsync(TryTakeOwnershipLua,
             [metaKey],
-            [expectedVersion ?? "0", newOwner, newMembershipVersion]).ConfigureAwait(false);
+            [expectedVersion, newOwner, newMembershipVersion]).ConfigureAwait(false);
         return res == 1;
     }
 
