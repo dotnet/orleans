@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using StackExchange.Redis;
 
 namespace Orleans.DurableJobs.Redis;
@@ -14,8 +16,10 @@ public sealed partial class RedisJobShardManager : JobShardManager
     private readonly ILocalSiloDetails _localSiloDetails;
     private readonly IClusterMembershipService _clusterMembership;
     private readonly RedisJobShardOptions _options;
+    private readonly ClusterOptions _clusterOptions;
     private readonly ILogger<RedisJobShardManager> _logger;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly RedisKey _keyPrefix;
 
     private IConnectionMultiplexer? _multiplexer;
     private RedisOperationsManager? _redisOps;
@@ -30,20 +34,26 @@ public sealed partial class RedisJobShardManager : JobShardManager
     /// </summary>
     /// <param name="localSiloDetails">The local silo details.</param>
     /// <param name="options">The Redis job shard options.</param>
+    /// <param name="clusterOptions">The cluster options.</param>
     /// <param name="clusterMembership">The cluster membership service.</param>
     /// <param name="loggerFactory">The logger factory.</param>
     public RedisJobShardManager(
         ILocalSiloDetails localSiloDetails,
         IOptions<RedisJobShardOptions> options,
+        IOptions<ClusterOptions> clusterOptions,
         IClusterMembershipService clusterMembership,
         ILoggerFactory loggerFactory)
         : base(localSiloDetails.SiloAddress)
     {
         _localSiloDetails = localSiloDetails ?? throw new ArgumentNullException(nameof(localSiloDetails));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        _clusterOptions = clusterOptions?.Value ?? throw new ArgumentNullException(nameof(clusterOptions));
         _clusterMembership = clusterMembership ?? throw new ArgumentNullException(nameof(clusterMembership));
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
         _logger = loggerFactory.CreateLogger<RedisJobShardManager>();
+
+        _keyPrefix = Encoding.UTF8.GetBytes(
+            _options.KeyPrefix ?? $"{_clusterOptions.ServiceId}/durablejobs");
     }
 
     private async ValueTask InitializeIfNeeded()
@@ -60,8 +70,8 @@ public sealed partial class RedisJobShardManager : JobShardManager
         LogInitialized(_logger);
     }
 
-    private string ShardSetKey => $"durablejobs:shards:{_options.ShardPrefix}";
-    private static string MetaKeyForShard(string shardId) => $"durablejobs:shard:{shardId}:meta";
+    private string ShardSetKey => $"{_keyPrefix}:shards:{_options.ShardPrefix}";
+    private string MetaKeyForShard(string shardId) => $"{_keyPrefix}:shard:{shardId}:meta";
 
     public override async Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, CancellationToken cancellationToken)
     {
@@ -165,7 +175,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
             var minDue = ParseDateTimeOffset(metadata, "MinDueTime", DateTimeOffset.MinValue);
             var maxDue = ParseDateTimeOffset(metadata, "MaxDueTime", DateTimeOffset.MaxValue);
 
-            var shard = new RedisJobShard(shardId, minDue, maxDue, _multiplexer!, metadata, _options, _loggerFactory.CreateLogger<RedisJobShard>());
+            var shard = new RedisJobShard(shardId, minDue, maxDue, _multiplexer!, metadata, _keyPrefix.ToString(), _options, _loggerFactory.CreateLogger<RedisJobShard>());
             try
             {
                 await shard.InitializeAsync(cancellationToken).ConfigureAwait(false);
@@ -233,7 +243,7 @@ public sealed partial class RedisJobShardManager : JobShardManager
                     continue;
                 }
 
-                var shard = new RedisJobShard(shardId, minDueTime, maxDueTime, _multiplexer!, metadataInfo, _options, _loggerFactory.CreateLogger<RedisJobShard>());
+                var shard = new RedisJobShard(shardId, minDueTime, maxDueTime, _multiplexer!, metadataInfo, _keyPrefix.ToString(), _options, _loggerFactory.CreateLogger<RedisJobShard>());
                 await shard.InitializeAsync(cancellationToken).ConfigureAwait(false);
                 _jobShardCache[shardId] = shard;
                 LogShardRegistered(_logger, shardId);
@@ -313,8 +323,8 @@ public sealed partial class RedisJobShardManager : JobShardManager
     {
         await InitializeIfNeeded().ConfigureAwait(false);
 
-        var streamKey = $"durablejobs:shard:{shardId}:stream";
-        var metaKey = $"durablejobs:shard:{shardId}:meta";
+        var streamKey = $"{_keyPrefix}:shard:{shardId}:stream";
+        var metaKey = $"{_keyPrefix}:shard:{shardId}:meta";
 
         // Delete all shard-related keys
         await _redisOps!.DeleteKeysAsync([streamKey, metaKey]).ConfigureAwait(false);
