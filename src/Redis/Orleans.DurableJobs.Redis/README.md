@@ -39,7 +39,7 @@ siloBuilder.UseRedisDurableJobs(options =>
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Orleans Durable Jobs Core Package](../../../Orleans.DurableJobs/README.md)
+- [Orleans Durable Jobs Core Package](../../Orleans.DurableJobs/README.md)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

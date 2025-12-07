@@ -135,6 +135,7 @@ internal sealed partial class RedisJobShard : JobShard
         sw.Stop();
         LogShardInitialized(_logger, Id, addedJobs.Count, sw.ElapsedMilliseconds);
     }
+
     protected override async Task PersistAddJobAsync(string jobId, string jobName, DateTimeOffset dueTime, GrainId target, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)
     {
         LogAddingJob(_logger, jobId, jobName, Id, dueTime);
