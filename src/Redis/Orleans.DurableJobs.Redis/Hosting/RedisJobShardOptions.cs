@@ -22,6 +22,15 @@ public class RedisJobShardOptions
     public Func<RedisJobShardOptions, Task<IConnectionMultiplexer>> CreateMultiplexer { get; set; } = DefaultCreateMultiplexer;
 
     /// <summary>
+    /// Gets or sets the prefix for Redis keys used by the durable jobs provider.
+    /// </summary>
+    /// <remarks>
+    /// This prefix is combined with the service ID to create the final key prefix.
+    /// If not set, defaults to null and the standard pattern is used: "{ServiceId}/durablejobs".
+    /// </remarks>
+    public string? KeyPrefix { get; set; }
+
+    /// <summary>
     /// Gets or sets the prefix for shard identifiers.
     /// </summary>
     /// <remarks>

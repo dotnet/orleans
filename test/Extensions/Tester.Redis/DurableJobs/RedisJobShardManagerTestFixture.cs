@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.DurableJobs;
 using Orleans.DurableJobs.Redis;
 using StackExchange.Redis;
@@ -15,6 +16,7 @@ namespace Tester.Redis.DurableJobs;
 internal sealed class RedisJobShardManagerTestFixture : IJobShardManagerTestFixture
 {
     private readonly IOptions<RedisJobShardOptions> _options;
+    private readonly IOptions<ClusterOptions> _clusterOptions;
     private ConnectionMultiplexer _multiplexer;
     private readonly string _shardPrefix;
 
@@ -33,6 +35,12 @@ internal sealed class RedisJobShardManagerTestFixture : IJobShardManagerTestFixt
             MinBatchSize = 1,
             BatchFlushInterval = TimeSpan.FromMilliseconds(100)
         });
+
+        _clusterOptions = Options.Create(new ClusterOptions
+        {
+            ServiceId = "test-service",
+            ClusterId = "test-cluster"
+        });
     }
 
     private async Task<IConnectionMultiplexer> CreateMultiplexerAsync(RedisJobShardOptions options)
@@ -46,6 +54,7 @@ internal sealed class RedisJobShardManagerTestFixture : IJobShardManagerTestFixt
         return new RedisJobShardManager(
             localSiloDetails,
             _options,
+            _clusterOptions,
             membershipService,
             NullLoggerFactory.Instance);
     }
@@ -58,14 +67,15 @@ internal sealed class RedisJobShardManagerTestFixture : IJobShardManagerTestFixt
             var db = _multiplexer.GetDatabase();
             var server = _multiplexer.GetServer(_multiplexer.GetEndPoints()[0]);
 
-            // Delete all keys with our test prefix
-            await foreach (var key in server.KeysAsync(pattern: $"durablejobs:shard:{_shardPrefix}*"))
+            // Delete all keys with our test prefix (using the default key prefix pattern)
+            var keyPrefix = _options.Value.KeyPrefix ?? $"{_clusterOptions.Value.ServiceId}/durablejobs";
+            await foreach (var key in server.KeysAsync(pattern: $"{keyPrefix}:shard:{_shardPrefix}*"))
             {
                 await db.KeyDeleteAsync(key);
             }
 
             // Delete the shard set key
-            await db.KeyDeleteAsync($"durablejobs:shards:{_shardPrefix}");
+            await db.KeyDeleteAsync($"{keyPrefix}:shards:{_shardPrefix}");
 
             await _multiplexer.CloseAsync();
             _multiplexer.Dispose();

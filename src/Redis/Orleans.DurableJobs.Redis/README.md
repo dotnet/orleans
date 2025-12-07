@@ -24,12 +24,28 @@ siloBuilder.UseRedisDurableJobs(options =>
 });
 ```
 
+### Advanced Configuration - Custom Key Prefix
+
+By default, Redis keys are prefixed with `{ServiceId}/durablejobs` (e.g., `my-service/durablejobs:shards:shard`). You can customize this prefix:
+
+```csharp
+siloBuilder.UseRedisDurableJobs(options =>
+{
+    options.ConfigurationOptions = ConfigurationOptions.Parse("localhost:6379");
+    options.KeyPrefix = "custom-prefix"; // Custom Redis key prefix
+    options.ShardPrefix = "my-app";
+});
+```
+
+This will result in Redis keys like `custom-prefix:shards:my-app` instead of the default pattern.
+
 ### Configuration Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `ConfigurationOptions` | Redis client configuration options (from StackExchange.Redis) | Required |
 | `CreateMultiplexer` | Optional delegate for custom connection logic (advanced scenarios) | Uses `ConfigurationOptions` |
+| `KeyPrefix` | Custom prefix for all Redis keys. If not set, defaults to `{ServiceId}/durablejobs` | `null` |
 | `ShardPrefix` | Prefix for shard identifiers in Redis | `"shard"` |
 | `MaxShardCreationRetries` | Maximum retries when creating a shard | `5` |
 | `MaxBatchSize` | Maximum operations per batch write | `128` |

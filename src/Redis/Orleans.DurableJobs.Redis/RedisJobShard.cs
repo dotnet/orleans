@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using StackExchange.Redis;
 
 namespace Orleans.DurableJobs.Redis;
@@ -28,6 +30,7 @@ internal sealed partial class RedisJobShard : JobShard
     /// <param name="endTime">The end time of the shard's time range.</param>
     /// <param name="redis">The Redis connection multiplexer.</param>
     /// <param name="metadata">The shard metadata.</param>
+    /// <param name="keyPrefix">The Redis key prefix to use.</param>
     /// <param name="options">The Redis job shard options.</param>
     /// <param name="logger">The logger.</param>
     public RedisJobShard(string shardId,
@@ -35,6 +38,7 @@ internal sealed partial class RedisJobShard : JobShard
             DateTimeOffset endTime,
             IConnectionMultiplexer redis,
             IDictionary<string, string> metadata,
+            string keyPrefix,
             RedisJobShardOptions options,
             ILogger<RedisJobShard> logger)
             : base(shardId, startTime, endTime)
@@ -52,8 +56,8 @@ internal sealed partial class RedisJobShard : JobShard
             MetadataVersion = version;
         }
 
-        _streamKey = $"durablejobs:shard:{Id}:stream";
-        _metaKey = $"durablejobs:shard:{Id}:meta";
+        _streamKey = $"{keyPrefix}:shard:{Id}:stream";
+        _metaKey = $"{keyPrefix}:shard:{Id}:meta";
 
         _storageOperationChannel = Channel.CreateUnbounded<StorageOperation>(new UnboundedChannelOptions
         {
