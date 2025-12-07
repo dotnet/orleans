@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using Tester.DurableJobs;
 using Xunit;
 

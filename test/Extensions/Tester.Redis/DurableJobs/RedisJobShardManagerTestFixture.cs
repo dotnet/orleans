@@ -1,9 +1,5 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Orleans.Hosting;
-using Orleans.Runtime;
 using Orleans.DurableJobs;
 using Orleans.DurableJobs.Redis;
 using StackExchange.Redis;
@@ -19,7 +15,7 @@ namespace Tester.Redis.DurableJobs;
 internal sealed class RedisJobShardManagerTestFixture : IJobShardManagerTestFixture
 {
     private readonly IOptions<RedisJobShardOptions> _options;
-    private IConnectionMultiplexer _multiplexer;
+    private ConnectionMultiplexer _multiplexer;
     private readonly string _shardPrefix;
 
     public RedisJobShardManagerTestFixture()
@@ -41,10 +37,7 @@ internal sealed class RedisJobShardManagerTestFixture : IJobShardManagerTestFixt
 
     private async Task<IConnectionMultiplexer> CreateMultiplexerAsync(RedisJobShardOptions options)
     {
-        if (_multiplexer is null)
-        {
-            _multiplexer = await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!);
-        }
+        _multiplexer ??= await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions!);
         return _multiplexer;
     }
 
