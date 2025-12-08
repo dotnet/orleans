@@ -89,5 +89,10 @@ namespace Orleans.Serialization.Invocation
         /// <remarks>This is only valid after <see cref="SetTarget(ITargetHolder)"/> has been called, and only has an effect for requests which support cancellation.</remarks>
         /// <returns><see langword="true"/> if cancellation was requested, otherwise <see langword="false"/>.</returns>
         bool TryCancel() => false;
+
+        /// <summary>
+        /// <see langword="true"/> if this request supports cancellation; <see langword="false"/> otherwise.
+        /// </summary>
+        bool IsCancellable => false;
     }
 }

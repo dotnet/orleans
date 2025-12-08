@@ -31,7 +31,7 @@ namespace Orleans.Configuration
         public TimeSpan ResponseTimeoutWithDebugger { get; set; } = TimeSpan.FromMinutes(30);
 
         /// <summary>
-        /// Gets or sets a value indicating whether messages should be dropped once they expire, that is if it was not delivered 
+        /// Gets or sets a value indicating whether messages should be dropped once they expire, that is if it was not delivered
         /// to the destination before it has timed out on the sender.
         /// </summary>
         /// <value>Messages are dropped once they expire, by default.</value>
