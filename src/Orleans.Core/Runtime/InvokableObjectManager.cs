@@ -179,7 +179,7 @@ namespace Orleans
                             (this, message),
                             CancellationToken.None,
                             TaskCreationOptions.DenyChildAttach,
-                            TaskScheduler.Default);
+                            TaskScheduler.Default).Unwrap();
                         _runningRequests.Add(message, task);
                     }
 
@@ -414,7 +414,6 @@ namespace Orleans
                 async ValueTask RetryCancellationAfterDelay()
                 {
                     var attemptsRemaining = 3;
-                    var attemptNumber = 1;
                     do
                     {
                         await Task.Delay(1_000);
@@ -424,7 +423,6 @@ namespace Orleans
                             return;
                         }
 
-                        attemptNumber++;
                     } while (--attemptsRemaining > 0);
                 }
 
@@ -434,8 +432,6 @@ namespace Orleans
                     var wasWaiting = false;
                     lock (Messages)
                     {
-                        var runningRequestCount = _runningRequests.Count;
-
                         // Check the running requests.
                         foreach (var runningRequest in _runningRequests.Keys)
                         {
