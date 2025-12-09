@@ -46,7 +46,17 @@ namespace Orleans.Runtime
 
         private RuntimeMessagingTrace MessagingTrace => _shared.MessagingTrace;
 
-        /// <summary>Only needed to make Reflection happy.</summary>
+        /// <summary>
+        /// Obsolete parameterless constructor for <see cref="SystemTarget"/>.
+        /// <para>
+        /// <b>Breaking change:</b> This constructor is obsolete and will throw a <see cref="NotSupportedException"/> if called.
+        /// It is present only to satisfy certain reflection-based scenarios and should not be used in application code.
+        /// </para>
+        /// <para>
+        /// If you are using reflection or serialization frameworks that require a parameterless constructor,
+        /// update your code to use the constructor with parameters: <see cref="SystemTarget(SystemTargetGrainId, SystemTargetShared)"/>.
+        /// </para>
+        /// </summary>
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         [Obsolete("Do not call the empty constructor.")]
         protected SystemTarget() => throw new NotSupportedException();
