@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Azure\Orleans.Persistence.Cosmos\Orleans.Persistence.Cosmos.csproj" />
+    <ProjectReference Include="..\..\..\src\Azure\Orleans.Streaming.AzureStorage.Migration\Orleans.Streaming.AzureStorage.Migration.csproj" />
     <ProjectReference Include="..\..\Grains\TestGrainsNet8\TestGrainsNet8.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Persistence.Migration\Orleans.Persistence.Migration.csproj" />
     <ProjectReference Include="..\..\..\src\Azure\Orleans.Persistence.AzureStorage.Migration\Orleans.Persistence.AzureStorage.Migration.csproj" />
