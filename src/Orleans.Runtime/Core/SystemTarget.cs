@@ -363,7 +363,7 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public Task Deactivated => Task.CompletedTask;
 
-        public Dictionary<Type, object> Components { get; set; } = [];
+        private Dictionary<Type, object> Components { get; set; } = [];
 
         public void Dispose()
         {
