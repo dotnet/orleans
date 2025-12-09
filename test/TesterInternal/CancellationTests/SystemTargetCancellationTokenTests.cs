@@ -526,12 +526,22 @@ internal sealed class CancellationTestSystemTarget : SystemTarget, ICancellation
         }
     }
 
+    private readonly object _cancelledCallsLock = new();
+
     private void RecordCancellation(Guid callId, Exception? error)
     {
         var entry = _cancelledCalls.GetOrAdd(callId, _ => (new TaskCompletionSource<bool>(), error));
-        if (error is not null && entry.Error is null)
+        if (error is not null)
         {
-            _cancelledCalls[callId] = (entry.Tcs, error);
+            lock (_cancelledCallsLock)
+            {
+                // Re-check inside the lock to ensure atomicity
+                var currentEntry = _cancelledCalls.GetOrAdd(callId, _ => (entry.Tcs, error));
+                if (currentEntry.Error is null)
+                {
+                    _cancelledCalls[callId] = (entry.Tcs, error);
+                }
+            }
         }
 
         entry.Tcs.TrySetResult(true);
