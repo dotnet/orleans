@@ -19,6 +19,8 @@ namespace Orleans.Runtime
         private readonly SystemTargetShared _shared;
         private readonly HashSet<IGrainTimer> _timers = [];
         private readonly Dictionary<Message, Task> _runningRequests = [];
+        private readonly Dictionary<Type, object> _components = [];
+
 
         /// <summary>Silo address of the system target.</summary>
         public SiloAddress Silo => _shared.SiloAddress;
@@ -104,7 +106,7 @@ namespace Orleans.Runtime
             {
                 result = instanceResult;
             }
-            else if (Components.TryGetValue(typeof(TComponent), out var resultObj))
+            else if (_components.TryGetValue(typeof(TComponent), out var resultObj))
             {
                 result = (TComponent)resultObj;
             }
@@ -130,12 +132,11 @@ namespace Orleans.Runtime
 
             if (instance == null)
             {
-                Components?.Remove(typeof(TComponent));
+                _components.Remove(typeof(TComponent));
                 return;
             }
 
-            if (Components is null) Components = new Dictionary<Type, object>();
-            Components[typeof(TComponent)] = instance;
+            _components[typeof(TComponent)] = instance;
         }
 
         internal async Task HandleNewRequest(Message request)
@@ -362,8 +363,6 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public Task Deactivated => Task.CompletedTask;
-
-        private Dictionary<Type, object> Components { get; set; } = [];
 
         public void Dispose()
         {
