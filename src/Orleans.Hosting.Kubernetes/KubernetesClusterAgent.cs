@@ -215,19 +215,11 @@ namespace Orleans.Hosting.Kubernetes
                         break;
                     }
 
-#if NETSTANDARD2_0
-                    var pods = await _client.ListNamespacedPodWithHttpMessagesAsync(
-                        namespaceParameter: _podNamespace,
-                        labelSelector: _podLabelSelector,
-                        watch: true,
-                        cancellationToken: _shutdownToken.Token);
-#else
                     var pods = await _client.CoreV1.ListNamespacedPodWithHttpMessagesAsync(
                         namespaceParameter: _podNamespace,
                         labelSelector: _podLabelSelector,
                         watch: true,
                         cancellationToken: _shutdownToken.Token);
-#endif
 
                     await foreach (var (eventType, pod) in pods.WatchAsync<V1PodList, V1Pod>(_shutdownToken.Token))
                     {
