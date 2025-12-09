@@ -352,4 +352,99 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
 
         Assert.Fail("Did not encounter the expected call id");
     }
+
+    /// <summary>
+    /// Tests that a running interleaving grain operation can be cancelled via CancellationToken.
+    /// Interleaving requests run concurrently without queueing and should also be cancellable.
+    /// </summary>
+    [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
+    [InlineData(0)]
+    [InlineData(10)]
+    [InlineData(300)]
+    public async Task InterleavingGrainTaskCancellation(int delay)
+    {
+        var grain = fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
+        using var cts = new CancellationTokenSource();
+        var callId = Guid.NewGuid();
+        var grainTask = grain.LongWaitInterleaving(cts.Token, TimeSpan.FromSeconds(10), callId);
+        cts.CancelAfter(delay);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => grainTask);
+        if (delay > 0)
+        {
+            await WaitForCallCancellation(grain, callId);
+        }
+    }
+
+    /// <summary>
+    /// Tests that an interleaving request can be cancelled while a regular request is also running.
+    /// </summary>
+    [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
+    public async Task CancelInterleavingWhileRegularGrainRequestRunning()
+    {
+        var grain = fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
+
+        // Start a regular (non-interleaving) long-running request
+        using var regularCts = new CancellationTokenSource();
+        var regularCallId = Guid.NewGuid();
+        var regularTask = grain.LongWait(regularCts.Token, TimeSpan.FromSeconds(30), regularCallId);
+
+        // Wait for the regular request to start
+        await Task.Delay(100);
+
+        // Start an interleaving request (this should run concurrently)
+        using var interleavingCts = new CancellationTokenSource();
+        var interleavingCallId = Guid.NewGuid();
+        var interleavingTask = grain.LongWaitInterleaving(interleavingCts.Token, TimeSpan.FromSeconds(10), interleavingCallId);
+
+        // Wait a bit for the interleaving request to start
+        await Task.Delay(100);
+
+        // Cancel the interleaving request
+        await interleavingCts.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => interleavingTask);
+        await WaitForCallCancellation(grain, interleavingCallId);
+
+        // Clean up - cancel the regular request
+        await regularCts.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => regularTask);
+    }
+
+    /// <summary>
+    /// Tests that multiple concurrent interleaving requests can each be cancelled independently.
+    /// </summary>
+    [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
+    public async Task MultipleInterleavingGrainRequestsCancellation()
+    {
+        var grain = fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
+
+        // Start multiple interleaving requests concurrently
+        using var cts1 = new CancellationTokenSource();
+        using var cts2 = new CancellationTokenSource();
+        using var cts3 = new CancellationTokenSource();
+
+        var callId1 = Guid.NewGuid();
+        var callId2 = Guid.NewGuid();
+        var callId3 = Guid.NewGuid();
+
+        var task1 = grain.LongWaitInterleaving(cts1.Token, TimeSpan.FromSeconds(10), callId1);
+        var task2 = grain.LongWaitInterleaving(cts2.Token, TimeSpan.FromSeconds(10), callId2);
+        var task3 = grain.LongWaitInterleaving(cts3.Token, TimeSpan.FromSeconds(10), callId3);
+
+        // Wait for all to be running
+        await Task.Delay(100);
+
+        // Cancel only the second request
+        await cts2.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task2);
+        await WaitForCallCancellation(grain, callId2);
+
+        // First and third should still be running, cancel them
+        await cts1.CancelAsync();
+        await cts3.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task1);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task3);
+
+        await WaitForCallCancellation(grain, [callId1, callId3]);
+    }
 }
