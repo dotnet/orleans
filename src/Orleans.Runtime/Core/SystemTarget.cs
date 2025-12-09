@@ -252,7 +252,7 @@ namespace Orleans.Runtime
         {
             lock (_runningRequests)
             {
-                return $"{this} CurrentlyExecuting={_runningRequests}{(_runningRequests != null ? null : "null")}";
+                return $"{this} CurrentlyExecuting={_runningRequests}";
             }
         }
 
