@@ -50,18 +50,20 @@ namespace Orleans.Runtime
 
         /// <summary>
         /// Obsolete parameterless constructor for <see cref="SystemTarget"/>.
-        /// <para>
-        /// <b>Breaking change:</b> This constructor is obsolete and will throw a <see cref="NotSupportedException"/> if called.
-        /// It is present only to satisfy certain reflection-based scenarios and should not be used in application code.
-        /// </para>
-        /// <para>
-        /// If you are using reflection or serialization frameworks that require a parameterless constructor,
-        /// update your code to use the constructor with parameters: <see cref="SystemTarget(SystemTargetGrainId, SystemTargetShared)"/>.
-        /// </para>
         /// </summary>
+        /// <remarks>
+        /// Do not call this constructor. It was originally added to satisfy the requirements of some serializers.
+        /// </remarks>
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         [Obsolete("Do not call the empty constructor.")]
-        protected SystemTarget() => throw new NotSupportedException();
+        protected SystemTarget()
+        {
+            _handleRequest = null!;
+            _shared = null!;
+            ActivationAddress = null!;
+            _logger = null!;
+            WorkItemGroup = null!;
+        }
 
         internal SystemTarget(GrainType grainType, SystemTargetShared shared)
             : this(SystemTargetGrainId.Create(grainType, shared.SiloAddress), shared)
