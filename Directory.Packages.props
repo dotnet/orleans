@@ -33,6 +33,7 @@
     <PackageVersion Include="Grpc.Tools" Version="2.72.0" />
     <PackageVersion Include="Hyperion" Version="0.12.2" />
     <PackageVersion Include="KubernetesClient" Version="18.0.5" />
+    <PackageVersion Include="MemoryPack" Version="1.21.4" />
     <PackageVersion Include="MessagePack" Version="3.1.4" />
     <PackageVersion Include="Microsoft.AspNetCore.Connections.Abstractions" Version="8.0.11" />
     <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.54.1" />
