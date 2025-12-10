@@ -1896,6 +1896,9 @@ internal sealed partial class ActivationData :
     }
 
     ValueTask IGrainCallCancellationExtension.CancelRequestAsync(GrainId senderGrainId, CorrelationId messageId)
+        => this.RunOrQueueTask(static state => state.self.CancelRequestAsyncCore(state.senderGrainId, state.messageId), (self: this, senderGrainId, messageId));
+
+    private ValueTask CancelRequestAsyncCore(GrainId senderGrainId, CorrelationId messageId)
     {
         if (!TryCancelRequest())
         {
@@ -1954,14 +1957,6 @@ internal sealed partial class ActivationData :
                 {
                     // If the request was waiting, then we necessarily did manage to cancel it, so send the response now.
                     _shared.InternalRuntime.RuntimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
-                    didCancel = true;
-                }
-                else if (TaskScheduler.Current != _workItemGroup.TaskScheduler)
-                {
-                    // Ensure that cancellation callbacks are performed on the grain's scheduler.
-                    _workItemGroup.TaskScheduler.QueueAction(() => TryCancelInvokable(request));
-
-                    // Assume this worked.
                     didCancel = true;
                 }
                 else
