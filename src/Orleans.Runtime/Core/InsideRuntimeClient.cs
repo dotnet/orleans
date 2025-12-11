@@ -95,7 +95,7 @@ namespace Orleans.Runtime
                 callbackDataLogger,
                 this.messagingOptions.SystemResponseTimeout,
                 cancelOnTimeout: false,
-                waitForCancellationAcknowledgement: false,
+                waitForCancellationAcknowledgement: this.messagingOptions.WaitForCancellationAcknowledgement,
                 cancellationManager: null);
         }
 
@@ -527,6 +527,7 @@ namespace Orleans.Runtime
         {
             _cancellationManager = this.ServiceProvider.GetRequiredService<IGrainCallCancellationManager>();
             sharedCallbackData.CancellationManager = _cancellationManager;
+            systemSharedCallbackData.CancellationManager = _cancellationManager;
             lifecycle.Subscribe<InsideRuntimeClient>(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
         }
 
