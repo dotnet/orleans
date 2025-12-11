@@ -46,5 +46,25 @@ namespace Orleans.Runtime.Scheduler
             targetContext.Scheduler.QueueWorkItem(workItem);
             return workItem.Task;
         }
+
+        internal static ValueTask RunOrQueueTask<TState>(this IGrainContext targetContext, Func<TState, ValueTask> taskFunc, TState state)
+        {
+            var currentContext = RuntimeContext.Current;
+            if (currentContext != null && currentContext.Equals(targetContext))
+            {
+                try
+                {
+                    return taskFunc(state);
+                }
+                catch (Exception exc)
+                {
+                    return new(Task.FromException(exc));
+                }
+            }
+
+            var workItem = new StatefulAsyncClosureWorkItem<TState>(taskFunc, state, targetContext);
+            targetContext.Scheduler.QueueWorkItem(workItem);
+            return new(workItem.Task);
+        }
     }
 }
