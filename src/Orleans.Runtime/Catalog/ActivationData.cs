@@ -1895,6 +1895,9 @@ internal sealed partial class ActivationData :
     }
 
     ValueTask IGrainCallCancellationExtension.CancelRequestAsync(GrainId senderGrainId, CorrelationId messageId)
+        => this.RunOrQueueTask(static state => state.self.CancelRequestAsyncCore(state.senderGrainId, state.messageId), (self: this, senderGrainId, messageId));
+
+    private ValueTask CancelRequestAsyncCore(GrainId senderGrainId, CorrelationId messageId)
     {
         if (!TryCancelRequest())
         {
@@ -1946,38 +1949,34 @@ internal sealed partial class ActivationData :
                 }
             }
 
+            var didCancel = false;
             if (message is not null && message.BodyObject is IInvokable request)
             {
-                if (TaskScheduler.Current != _workItemGroup.TaskScheduler)
+                if (wasWaiting)
                 {
-                    // Ensure that cancellation callbacks are performed on the grain's scheduler.
-                    _workItemGroup.TaskScheduler.QueueAction(() => CancelRequest(request));
+                    // If the request was waiting, then we necessarily did manage to cancel it, so send the response now.
+                    _shared.InternalRuntime.RuntimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
+                    didCancel = true;
                 }
                 else
                 {
-                    CancelRequest(request);
+                    didCancel = TryCancelInvokable(request) || !request.IsCancellable;
                 }
-
-                if (wasWaiting)
-                {
-                    _shared.InternalRuntime.RuntimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
-                }
-
-                return true;
             }
 
-            return false;
+            return didCancel;
         }
 
-        void CancelRequest(IInvokable request)
+        bool TryCancelInvokable(IInvokable request)
         {
             try
             {
-                request.TryCancel();
+                return request.TryCancel();
             }
             catch (Exception exception)
             {
                 LogErrorCancellationCallbackFailed(Shared.Logger, exception);
+                return true;
             }
         }
     }

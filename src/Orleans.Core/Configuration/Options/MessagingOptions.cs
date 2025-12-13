@@ -31,7 +31,7 @@ namespace Orleans.Configuration
         public TimeSpan ResponseTimeoutWithDebugger { get; set; } = TimeSpan.FromMinutes(30);
 
         /// <summary>
-        /// Gets or sets a value indicating whether messages should be dropped once they expire, that is if it was not delivered 
+        /// Gets or sets a value indicating whether messages should be dropped once they expire, that is if it was not delivered
         /// to the destination before it has timed out on the sender.
         /// </summary>
         /// <value>Messages are dropped once they expire, by default.</value>
@@ -66,9 +66,9 @@ namespace Orleans.Configuration
         /// </summary>
         /// <remarks>
         /// Request cancellation may involve sending a cancellation message to the silo which hosts the target grain.
-        /// Defaults to <see langword="true"/>.
+        /// Defaults to <see langword="false"/>.
         /// </remarks>
-        public bool CancelRequestOnTimeout { get; set; } = true;
+        public bool CancelRequestOnTimeout { get; set; }
 
         /// <summary>
         /// Whether local calls should be cancelled immediately when cancellation is signaled (<see langword="false"/>)
@@ -78,5 +78,16 @@ namespace Orleans.Configuration
         /// Defaults to <see langword="false"/>.
         /// </remarks>
         public bool WaitForCancellationAcknowledgement { get; set; }
+
+        /// <summary>
+        /// Whether request cancellation should be attempted when a status update is received for an unknown request.
+        /// </summary>
+        /// <remarks>
+        /// A status update for an unknown request likely indicates that the request previously timed out and was subsequently dropped.
+        /// Request cancellation may involve sending a cancellation message to the silo which hosts the target grain.
+        /// If the remote callee does not support cancellation, this setting has no effect.
+        /// Defaults to <see langword="false"/>.
+        /// </remarks>
+        public bool CancelUnknownRequestOnStatusUpdate { get; set; }
     }
 }

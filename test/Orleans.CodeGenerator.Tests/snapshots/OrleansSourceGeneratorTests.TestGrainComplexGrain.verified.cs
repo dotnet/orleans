@@ -89,9 +89,16 @@ namespace OrleansCodeGen.TestProject
         public override global::System.Threading.CancellationToken GetCancellationToken() => arg3;
         public override bool TryCancel()
         {
-            _cts?.Cancel(false);
-            return true;
+            if (_cts is { } cts)
+            {
+                cts.Cancel(false);
+                return true;
+            }
+
+            return false;
         }
+
+        public override bool IsCancellable => true;
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]

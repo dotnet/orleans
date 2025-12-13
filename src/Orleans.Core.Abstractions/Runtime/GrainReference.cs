@@ -600,6 +600,8 @@ namespace Orleans.Runtime
         public virtual bool TryCancel() => false;
 
         public virtual CancellationToken GetCancellationToken() => default;
+
+        public virtual bool IsCancellable => false;
     }
 
     /// <summary>
