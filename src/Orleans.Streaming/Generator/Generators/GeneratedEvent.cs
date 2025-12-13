@@ -1,5 +1,6 @@
 using System;
 
+#nullable disable
 namespace Orleans.Providers.Streams.Generator
 {
     /// <summary>

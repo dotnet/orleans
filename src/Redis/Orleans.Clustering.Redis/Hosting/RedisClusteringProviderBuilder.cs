@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading.Tasks;
 
+#nullable disable
 [assembly: RegisterProvider("Redis", "Clustering", "Silo", typeof(RedisClusteringProviderBuilder))]
 [assembly: RegisterProvider("AzureRedisCache", "Clustering", "Silo", typeof(RedisClusteringProviderBuilder))]
 

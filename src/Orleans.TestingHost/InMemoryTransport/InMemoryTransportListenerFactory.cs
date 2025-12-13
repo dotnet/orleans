@@ -12,6 +12,7 @@ using Orleans.Hosting;
 using Orleans.Networking.Shared;
 using Orleans.Runtime.Messaging;
 
+#nullable disable
 namespace Orleans.TestingHost.InMemoryTransport;
 
 internal static class InMemoryTransportExtensions

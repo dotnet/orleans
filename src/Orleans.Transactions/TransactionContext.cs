@@ -1,5 +1,6 @@
 using System.Threading;
 
+#nullable disable
 namespace Orleans.Transactions
 {
     public static class TransactionContext

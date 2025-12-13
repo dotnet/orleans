@@ -4,6 +4,7 @@ using Orleans.Providers;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 
+#nullable disable
 namespace Orleans.Runtime.Versions
 {
     internal interface IVersionStoreGrain : IGrainWithStringKey

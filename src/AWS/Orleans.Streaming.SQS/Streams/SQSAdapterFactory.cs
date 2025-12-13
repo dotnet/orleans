@@ -10,6 +10,7 @@ using Orleans;
 using Orleans.Configuration.Overrides;
 using Orleans.Serialization;
 
+#nullable disable
 namespace OrleansAWSUtils.Streams
 {
     /// <summary> Factory class for Azure Queue based stream provider.</summary>

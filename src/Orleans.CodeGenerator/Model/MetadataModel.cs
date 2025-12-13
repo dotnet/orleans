@@ -5,6 +5,7 @@ using System.Collections.Generic;
 
 namespace Orleans.CodeGenerator
 {
+#nullable disable
     internal class MetadataModel
     {
         public List<ISerializableTypeDescription> SerializableTypes { get; } = new(1024);

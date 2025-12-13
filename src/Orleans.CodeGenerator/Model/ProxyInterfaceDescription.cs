@@ -6,6 +6,7 @@ using Orleans.CodeGenerator.Diagnostics;
 using System.Linq;
 using System.Diagnostics;
 
+#nullable disable
 namespace Orleans.CodeGenerator
 {
     [DebuggerDisplay("{InterfaceType} (proxy base {ProxyBaseType})")]

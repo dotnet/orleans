@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.Configuration;
 
+#nullable disable
 namespace Orleans.Configuration
 {
     internal partial class EndpointOptionsProvider : IPostConfigureOptions<EndpointOptions>

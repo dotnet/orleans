@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Storage;
 
+#nullable disable
 namespace Orleans.EventSourcing
 {
     /// <summary>

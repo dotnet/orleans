@@ -16,6 +16,7 @@ using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using static Orleans.Internal.StandardExtensions;
 
+#nullable disable
 namespace Orleans
 {
     internal partial class OutsideRuntimeClient : IRuntimeClient, IDisposable, IClusterConnectionStatusListener

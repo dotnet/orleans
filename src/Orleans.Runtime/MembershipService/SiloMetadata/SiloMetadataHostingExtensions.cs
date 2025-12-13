@@ -6,7 +6,6 @@ using Orleans.Hosting;
 using Orleans.Placement;
 using Orleans.Runtime.Placement.Filtering;
 
-#nullable enable
 namespace Orleans.Runtime.MembershipService.SiloMetadata;
 
 public static class SiloMetadataHostingExtensions

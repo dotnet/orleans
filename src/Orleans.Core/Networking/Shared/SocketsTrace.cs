@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.Logging;
 
+#nullable disable
 namespace Orleans.Networking.Shared
 {
     internal partial class SocketsTrace : ISocketsTrace

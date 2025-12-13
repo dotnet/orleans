@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+#nullable disable
 namespace Orleans.Dashboard;
 
 internal sealed class TimeSpanConverter : JsonConverter<TimeSpan>

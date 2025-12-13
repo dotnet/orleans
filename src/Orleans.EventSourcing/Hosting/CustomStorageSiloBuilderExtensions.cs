@@ -7,6 +7,7 @@ using Orleans.Runtime;
 using Orleans.EventSourcing.CustomStorage;
 using Orleans.Configuration;
 
+#nullable disable
 namespace Orleans.Hosting
 {
     public static class CustomStorageSiloBuilderExtensions

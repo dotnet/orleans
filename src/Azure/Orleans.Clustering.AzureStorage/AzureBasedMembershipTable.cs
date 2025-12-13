@@ -13,6 +13,7 @@ using Orleans.Clustering.AzureStorage.Utilities;
 using Orleans.Configuration;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
+#nullable disable
 namespace Orleans.Runtime.MembershipService
 {
     internal partial class AzureBasedMembershipTable : IMembershipTable

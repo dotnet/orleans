@@ -12,6 +12,7 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 
+#nullable disable
 namespace Orleans
 {
     internal sealed partial class InvokableObjectManager : IDisposable

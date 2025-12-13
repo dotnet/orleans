@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Internal;
 
+#nullable disable
 namespace Orleans.Runtime.Utilities
 {
     internal static class AsyncEnumerable

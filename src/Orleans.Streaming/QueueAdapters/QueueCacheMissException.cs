@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.Runtime.Serialization;
 
+#nullable disable
 namespace Orleans.Streams
 {
     /// <summary>

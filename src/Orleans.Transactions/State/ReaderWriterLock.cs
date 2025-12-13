@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Transactions.Abstractions;
 
+#nullable disable
 namespace Orleans.Transactions.State
 {
     internal partial class ReadWriteLock<TState>

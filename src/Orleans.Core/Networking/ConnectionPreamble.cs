@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Orleans.Serialization;
 
+#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     [GenerateSerializer, Immutable]

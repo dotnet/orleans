@@ -13,6 +13,7 @@ using Orleans.Streaming.EventHubs.Testing;
 using Azure.Messaging.EventHubs;
 using Orleans.Statistics;
 
+#nullable disable
 namespace Orleans.Streaming.EventHubs
 {
     /// <summary>

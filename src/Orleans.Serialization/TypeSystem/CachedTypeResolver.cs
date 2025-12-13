@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Reflection;
 
+#nullable disable
 namespace Orleans.Serialization.TypeSystem
 {
     /// <summary>

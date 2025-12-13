@@ -14,6 +14,7 @@ using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using static Orleans.CodeGenerator.SyntaxGeneration.SymbolExtensions;
 
+#nullable disable
 namespace Orleans.CodeGenerator
 {
     public class CodeGeneratorOptions

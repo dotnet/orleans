@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans.Metadata
 {
     /// <summary>

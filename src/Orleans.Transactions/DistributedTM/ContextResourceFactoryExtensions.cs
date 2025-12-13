@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans.Transactions
 {
     internal class ResourceFactoryRegistry<T> : Dictionary<string, Func<T>> { };

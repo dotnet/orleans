@@ -13,6 +13,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Dashboard.Core;
 
+#nullable disable
 namespace Orleans.Dashboard.Metrics;
 
 internal sealed class GrainProfiler(

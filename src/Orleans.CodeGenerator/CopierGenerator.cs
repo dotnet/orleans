@@ -8,6 +8,7 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using static Orleans.CodeGenerator.InvokableGenerator;
 using static Orleans.CodeGenerator.SerializerGenerator;
 
+#nullable disable
 namespace Orleans.CodeGenerator
 {
     internal class CopierGenerator

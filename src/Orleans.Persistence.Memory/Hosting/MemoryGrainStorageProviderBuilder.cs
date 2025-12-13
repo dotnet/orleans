@@ -9,6 +9,7 @@ using Orleans.Providers;
 using Orleans.Runtime.Hosting.ProviderConfiguration;
 using Orleans.Storage;
 
+#nullable disable
 [assembly: RegisterProvider("Memory", "GrainStorage", "Silo", typeof(MemoryGrainStorageProviderBuilder))]
 
 namespace Orleans.Runtime.Hosting.ProviderConfiguration;

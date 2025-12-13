@@ -4,6 +4,7 @@ using Orleans.Serialization.Serializers;
 
 namespace Orleans.Serialization.Codecs
 {
+#nullable disable
     /// <summary>
     /// Serializer for <see cref="ArrayList"/>.
     /// </summary>

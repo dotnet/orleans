@@ -6,6 +6,7 @@ using Microsoft.Extensions.ObjectPool;
 
 namespace Orleans.Serialization.Buffers.Adaptors
 {
+#nullable disable
     /// <summary>
     /// A <see cref="IBufferWriter{T}"/> implementation which boxes another buffer writer.
     /// </summary>

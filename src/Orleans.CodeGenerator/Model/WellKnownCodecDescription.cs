@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 
+#nullable disable
 namespace Orleans.CodeGenerator
 {
     internal sealed class WellKnownCodecDescription

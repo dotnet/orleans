@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
 
+#nullable disable
 namespace Orleans.Runtime.Host
 {
     internal class MembershipSerializerSettings : JsonSerializerSettings

@@ -4,6 +4,7 @@ using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 
+#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>

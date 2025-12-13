@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
+#nullable disable
 namespace Orleans.Serialization.TypeSystem;
 
 /// <summary>

@@ -3,6 +3,7 @@ using System.Net;
 using Orleans.Configuration;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans.TestingHost
 {
     /// <summary>

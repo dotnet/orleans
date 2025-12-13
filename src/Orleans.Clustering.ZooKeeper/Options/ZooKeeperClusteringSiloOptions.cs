@@ -1,4 +1,5 @@
-﻿namespace Orleans.Configuration
+#nullable disable
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Option to configure ZooKeeperMembership

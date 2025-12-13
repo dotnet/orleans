@@ -6,6 +6,7 @@ using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Utilities.Internal;
 using System;
 
+#nullable disable
 namespace Orleans.Serialization;
 
 /// <summary>

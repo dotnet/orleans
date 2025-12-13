@@ -5,6 +5,7 @@ using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 
+#nullable disable
 namespace Orleans.TestingHost.UnixSocketTransport;
 
 public static class UnixSocketConnectionExtensions

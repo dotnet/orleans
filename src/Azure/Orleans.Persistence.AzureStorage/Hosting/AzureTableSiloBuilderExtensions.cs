@@ -8,6 +8,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Hosting;
 using Orleans.Storage;
 
+#nullable disable
 namespace Orleans.Hosting
 {
     public static class AzureTableSiloBuilderExtensions

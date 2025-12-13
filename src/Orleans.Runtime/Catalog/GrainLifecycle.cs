@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 
+#nullable disable
 namespace Orleans.Runtime
 {
     internal class GrainLifecycle(ILogger logger) : LifecycleSubject(logger), IGrainLifecycle

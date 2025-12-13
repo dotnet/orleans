@@ -6,6 +6,7 @@ using System.Threading;
 using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
 
+#nullable disable
 namespace Orleans.Transactions
 {
     [GenerateSerializer]

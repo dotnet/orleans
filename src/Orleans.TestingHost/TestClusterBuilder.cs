@@ -10,6 +10,7 @@ using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans.TestingHost
 {
     /// <summary>Configuration builder for starting a <see cref="TestCluster"/>.</summary>

@@ -9,6 +9,7 @@ using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Orleans.Transactions.TestKit.Correctnesss;
 
+#nullable disable
 namespace Orleans.Transactions.TestKit
 {
     public class TransactionRecoveryTestsRunner : TransactionTestRunnerBase

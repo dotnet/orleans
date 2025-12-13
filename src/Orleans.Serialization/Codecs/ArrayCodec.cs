@@ -8,6 +8,7 @@ using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs
 {
+#nullable disable
     /// <summary>
     /// Serializer for arrays of rank 1.
     /// </summary>

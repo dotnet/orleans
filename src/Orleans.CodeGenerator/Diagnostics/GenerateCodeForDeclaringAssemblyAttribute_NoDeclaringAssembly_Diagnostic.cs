@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Orleans.CodeGenerator.Diagnostics;
 
+#nullable disable
 public static class GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembly_Diagnostic
 {
     public const string DiagnosticId = DiagnosticRuleId.GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembly;

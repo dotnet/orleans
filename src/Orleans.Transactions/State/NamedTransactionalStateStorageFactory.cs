@@ -4,6 +4,7 @@ using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 using Orleans.Storage;
 
+#nullable disable
 namespace Orleans.Transactions
 {
     public class NamedTransactionalStateStorageFactory : INamedTransactionalStateStorageFactory

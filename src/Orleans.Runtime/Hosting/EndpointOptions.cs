@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.Extensions.Configuration;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans.Configuration
 {
     /// <summary>

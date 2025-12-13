@@ -2,6 +2,7 @@ using System;
 using System.Runtime.Serialization;
 using MessagePack;
 
+#nullable disable
 namespace Orleans.Serialization;
 
 /// <summary>

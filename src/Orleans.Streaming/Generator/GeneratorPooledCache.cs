@@ -7,6 +7,7 @@ using System.Linq;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans.Providers.Streams.Generator
 {
     /// <summary>

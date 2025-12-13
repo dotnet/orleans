@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 
+#nullable disable
 namespace Orleans.Dashboard.Metrics;
 
 /// <summary>

@@ -5,6 +5,7 @@ using AwesomeAssertions;
 using AwesomeAssertions.Equivalency;
 using Orleans.Transactions.Abstractions;
 
+#nullable disable
 namespace Orleans.Transactions.TestKit
 {
     public abstract class TransactionalStateStorageTestRunner<TState> : TransactionTestRunnerBase

@@ -2,6 +2,7 @@
 using System;
 using System.Runtime.InteropServices;
 
+#nullable disable
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>

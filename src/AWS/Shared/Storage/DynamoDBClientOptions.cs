@@ -1,3 +1,4 @@
+#nullable disable
 #if CLUSTERING_DYNAMODB
 namespace Orleans.Clustering.DynamoDB
 #elif PERSISTENCE_DYNAMODB
