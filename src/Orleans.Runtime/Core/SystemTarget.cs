@@ -1,11 +1,9 @@
-#nullable enable
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
 
-#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
