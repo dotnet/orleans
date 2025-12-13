@@ -12,6 +12,7 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 
+// when this nullable disable is removed, ensure that the nullable enable below is also removed
 #nullable disable
 namespace Orleans
 {
@@ -523,6 +524,8 @@ namespace Orleans
             public override string ToString() => observerId.ToString();
         }
 
+// temporary to address CI build error. Remove nullable enable once the nullable disable issues are addressed above
+#nullable enable
         [LoggerMessage(
             EventId = (int)ErrorCode.ProxyClient_OGC_TargetNotFound_2,
             Level = LogLevel.Error,
@@ -581,6 +584,7 @@ namespace Orleans
             Level = LogLevel.Warning,
             Message = "Exception processing message '{Message}'."
         )]
-        private static partial void LogErrorProcessingMessage(ILogger logger, Exception exception, Message message);
+        private static partial void LogErrorInMessagePumpLoop(ILogger logger, Exception exception);
+#nullable restore
     }
 }
