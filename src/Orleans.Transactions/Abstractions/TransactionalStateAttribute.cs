@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 
+#nullable disable
 namespace Orleans.Transactions.Abstractions
 {
     [AttributeUsage(AttributeTargets.Parameter)]

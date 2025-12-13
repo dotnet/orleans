@@ -8,7 +8,6 @@ using Orleans.Runtime;
 
 namespace Orleans.Statistics;
 
-#nullable enable
 internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProvider, IDisposable
 {
     private const float OneKiloByte = 1024f;

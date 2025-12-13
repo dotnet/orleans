@@ -11,6 +11,7 @@ using static Orleans.CodeGenerator.CopierGenerator;
 using static Orleans.CodeGenerator.InvokableGenerator;
 using static Orleans.CodeGenerator.SerializerGenerator;
 
+#nullable disable
 namespace Orleans.CodeGenerator
 {
     /// <summary>

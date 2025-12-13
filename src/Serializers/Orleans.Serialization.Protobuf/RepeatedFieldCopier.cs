@@ -1,6 +1,7 @@
 using Google.Protobuf.Collections;
 using Orleans.Serialization.Cloning;
 
+#nullable disable
 namespace Orleans.Serialization;
 
 /// <summary>

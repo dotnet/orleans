@@ -5,6 +5,7 @@ using System.Text;
 using Consul;
 using Newtonsoft.Json;
 
+#nullable disable
 namespace Orleans.Runtime.Host
 {
     /// <summary>

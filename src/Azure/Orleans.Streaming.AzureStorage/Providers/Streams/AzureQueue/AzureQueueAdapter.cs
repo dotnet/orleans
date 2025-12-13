@@ -8,6 +8,7 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Streams;
 
+#nullable disable
 namespace Orleans.Providers.Streams.AzureQueue
 {
     internal sealed class AzureQueueAdapter : IQueueAdapter

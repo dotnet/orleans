@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 
+#nullable disable
 namespace Orleans.Runtime
 {
     internal sealed class RuntimeMessagingTrace : MessagingTrace

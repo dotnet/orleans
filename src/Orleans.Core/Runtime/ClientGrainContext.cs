@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans
 {
     internal class ClientGrainContext : IGrainContext, IGrainExtensionBinder, IGrainContextAccessor

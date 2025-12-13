@@ -10,6 +10,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Security;
 
+#nullable disable
 namespace Orleans.Serialization
 {
     /// <summary>

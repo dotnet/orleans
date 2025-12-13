@@ -10,6 +10,7 @@ using Azure.Storage.Blobs.Specialized;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
+#nullable disable
 namespace Orleans.LeaseProviders
 {
     public class AzureBlobLeaseProvider : ILeaseProvider

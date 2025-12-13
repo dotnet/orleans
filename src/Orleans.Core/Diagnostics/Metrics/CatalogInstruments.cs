@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 
+#nullable disable
 namespace Orleans.Runtime;
 
 internal static class CatalogInstruments

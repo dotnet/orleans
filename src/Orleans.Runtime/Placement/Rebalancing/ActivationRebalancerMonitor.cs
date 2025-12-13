@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Threading;
 using Orleans.Runtime.Scheduler;
 
-#nullable enable
 
 namespace Orleans.Runtime.Placement.Rebalancing;
 

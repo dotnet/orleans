@@ -1,4 +1,3 @@
-#nullable enable
 namespace Orleans.Serialization.Invocation;
 
 /// <summary>

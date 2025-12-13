@@ -7,6 +7,7 @@ using Orleans.Internal;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 
+#nullable disable
 namespace Orleans.Runtime
 {
     internal class GrainCancellationTokenRuntime : IGrainCancellationTokenRuntime

@@ -12,6 +12,7 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.Analyzers;
 
+#nullable disable
 [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(GenerateAliasAttributesCodeFix)), Shared]
 public class AliasClashAttributeCodeFix : CodeFixProvider
 {
