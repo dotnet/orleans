@@ -26,8 +26,10 @@ public class ServiceLifetimeTests
     }
 
     private static (Task<object?> Task, IDisposable Registration) RegisterCallback(
-        IServiceLifetimeStage stage, Action<object?, CancellationToken>? action = null,
-    object? state = null, bool terminateOnError = true)
+        IServiceLifetimeStage stage,
+        Action<object?, CancellationToken>? action = null,
+        object? state = null,
+        bool terminateOnError = true)
     {
         var tcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
     
