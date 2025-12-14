@@ -34,7 +34,7 @@ public interface IServiceLifetimeStage
     /// </summary>
     /// <param name="callback">
     /// <para>The asynchronous operation to perform.</para>
-    /// <para><strong>Never <c>await</c> <see cref="Task"/></strong> inside a callback, as it will result in a deadlock!</para>
+    /// <para><strong>Never call <see cref="WaitAsync(CancellationToken)"/></strong> inside a callback, as it will result in a deadlock!</para>
     /// </param>
     /// <param name="terminateOnError">
     /// If <c>true</c>, the client / silo will shut down if there is a failure;
