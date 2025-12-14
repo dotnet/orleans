@@ -161,7 +161,7 @@ internal sealed partial class ServiceLifetimeStage(ILogger logger, string name) 
                 _tcs.SetException(ex);
             }
 
-            // We throw here regardles, because its the callback participant who controls wether to TerminateOnError or not.
+            // We throw here regardless, because it's the callback participant who controls whether to TerminateOnError or not.
             throw;
         }
     }
