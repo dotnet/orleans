@@ -26,7 +26,7 @@ public interface IServiceLifetime
     IServiceLifetimeStage Stopped { get; }
 }
 
-internal sealed class ServiceLifetime<TLifecycleObservable>(ILogger logger) :
+internal sealed class ServiceLifetime<TLifecycleObservable>(ILogger<ServiceLifetime<TLifecycleObservable>> logger) :
     IServiceLifetime, ILifecycleParticipant<TLifecycleObservable>
         where TLifecycleObservable : ILifecycleObservable
 {
