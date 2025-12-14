@@ -187,7 +187,7 @@ public class ServiceLifetimeTests
             // Ignore
         }
 
-        // Now we ait for both TCS signals to complete (rather 'fail') before asserting.
+        // Now we wait for both TCS signals to complete (rather 'fail') before asserting.
         // This prevents racing between the OnStart exception propagation and the TCS setting.
 
         try { await task1.WaitAsync(Timeout); } catch { }
