@@ -9,28 +9,28 @@ using Xunit.Abstractions;
 namespace NonSilo.Tests;
 
 [TestCategory("BVT"), TestCategory("Lifetime")]
-public class SiloLifetimeTests
+public class ServiceLifetimeTests
 {
-    private readonly SiloLifetime _lifetime;
+    private readonly ServiceLifetime<ISiloLifecycle> _lifetime;
     private readonly CancelableSiloLifecycleSubject _subject;
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
-    public SiloLifetimeTests(ITestOutputHelper output)
+    public ServiceLifetimeTests(ITestOutputHelper output)
     {
         var factory = new LoggerFactory([new XunitLoggerProvider(output)]);
 
         _subject = new CancelableSiloLifecycleSubject(factory.CreateLogger<SiloLifecycleSubject>());
-        _lifetime = new SiloLifetime(factory.CreateLogger<SiloLifetime>());
+        _lifetime = new ServiceLifetime<ISiloLifecycle>(factory.CreateLogger<ServiceLifetime<ISiloLifecycle>>());
 
         _lifetime.Participate(_subject);
     }
 
     private static (Task<object?> Task, IDisposable Registration) RegisterCallback(
-    ISiloLifecycleStage stage, Action<object?, CancellationToken>? action = null,
+        IServiceLifetimeStage stage, Action<object?, CancellationToken>? action = null,
     object? state = null, bool terminateOnError = true)
     {
         var tcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
-
+    
         var registration = stage.Register((s, ct) =>
         {
             try
@@ -42,13 +42,13 @@ public class SiloLifetimeTests
             {
                 // We set the exception on the TCS so the test can inspect the specific failure of this callback.
                 tcs.TrySetException(ex);
-
+    
                 // We rethrow so the LifecycleSubject behaves according to TerminateOnError.
                 throw;
             }
             return Task.CompletedTask;
         }, state, terminateOnError);
-
+    
         return (tcs.Task, registration);
     }
 
