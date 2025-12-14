@@ -317,8 +317,8 @@ public class ServiceLifetimeTests
     }
 
     /// <summary>
-      /// A simple cancelable version of the real subject to test for cancellations.
-      /// </summary>
+    /// A simple cancelable version of the real subject to test for cancellations.
+    /// </summary>
     public class CancelableSiloLifecycleSubject(ILogger<SiloLifecycleSubject> logger) : SiloLifecycleSubject(logger)
     {
         private readonly CancellationTokenSource _cts = new();
