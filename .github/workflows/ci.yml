@@ -330,7 +330,7 @@ jobs:
         global-json-file: global.json
     - name: Test
       run: dotnet test
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional|Category=Streaming)"
         --framework ${{ matrix.framework }}
         --blame-hang-timeout 10m
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
