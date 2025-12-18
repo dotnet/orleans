@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
+#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>

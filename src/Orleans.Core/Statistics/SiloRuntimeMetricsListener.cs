@@ -5,6 +5,7 @@ using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Threading;
 
+#nullable disable
 namespace Orleans.Runtime;
 
 // Can not use MetricsEventSource because it only supports single listener.

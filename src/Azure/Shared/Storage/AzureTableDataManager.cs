@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -14,6 +14,7 @@ using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 // Number of #ifs can be reduced (or removed), once we separate test projects by feature/area, otherwise we are ending up with ambigous types and build errors.
 //
 
+#nullable disable
 #if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.AzureStorage
 #elif ORLEANS_PERSISTENCE

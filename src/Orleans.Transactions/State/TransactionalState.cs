@@ -11,6 +11,7 @@ using Orleans.Transactions.State;
 using Orleans.Configuration;
 using Orleans.Timers.Internal;
 
+#nullable disable
 namespace Orleans.Transactions
 {
     /// <summary>

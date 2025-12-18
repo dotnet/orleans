@@ -9,6 +9,7 @@ using System.Text;
 
 namespace Orleans.Analyzers;
 
+#nullable disable
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 {

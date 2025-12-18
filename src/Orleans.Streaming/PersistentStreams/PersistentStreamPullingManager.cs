@@ -13,6 +13,7 @@ using Orleans.Streams.Filtering;
 using Orleans.Runtime.Scheduler;
 using System.Diagnostics.Metrics;
 
+#nullable disable
 namespace Orleans.Streams
 {
     internal sealed partial class PersistentStreamPullingManager : SystemTarget, IPersistentStreamPullingManager, IStreamQueueBalanceListener

@@ -10,6 +10,7 @@ using Orleans.Dashboard.Metrics;
 using Orleans.Dashboard.Model;
 using Orleans.Dashboard.Core;
 
+#nullable disable
 namespace Orleans.Dashboard.Implementation;
 
 internal sealed class SiloGrainService : GrainService, ISiloGrainService

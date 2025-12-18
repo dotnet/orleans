@@ -9,6 +9,7 @@ using Orleans.CodeGenerator.Diagnostics;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using System.Linq.Expressions;
 
+#nullable disable
 namespace Orleans.CodeGenerator
 {
     /// <summary>

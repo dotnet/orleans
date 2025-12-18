@@ -1,6 +1,7 @@
 using System.Threading;
 using Microsoft.Extensions.Hosting;
 
+#nullable disable
 namespace Orleans.Streaming.AdoNet;
 
 internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory

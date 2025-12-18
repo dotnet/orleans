@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using System.Threading;
 using System.Collections.Immutable;
 
+#nullable disable
 namespace Orleans.Runtime.MembershipService
 {
     internal partial class SiloStatusOracle : ISiloStatusOracle

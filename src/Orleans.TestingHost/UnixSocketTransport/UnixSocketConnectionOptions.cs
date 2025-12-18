@@ -5,6 +5,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using Orleans.Networking.Shared;
 
+#nullable disable
 namespace Orleans.TestingHost.UnixSocketTransport;
 
 public partial class UnixSocketConnectionOptions

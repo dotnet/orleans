@@ -1,4 +1,3 @@
-#nullable enable
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration;

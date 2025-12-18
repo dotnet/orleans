@@ -1,5 +1,6 @@
-﻿using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Options;
 
+#nullable disable
 namespace Orleans.Configuration
 {
     internal class SiloMessagingOptionsValidator : IValidateOptions<SiloMessagingOptions>

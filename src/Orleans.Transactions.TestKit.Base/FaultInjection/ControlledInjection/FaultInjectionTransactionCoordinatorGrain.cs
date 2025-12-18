@@ -1,7 +1,8 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
+#nullable disable
 namespace Orleans.Transactions.TestKit
 {
     public interface IFaultInjectionTransactionCoordinatorGrain : IGrainWithGuidKey

@@ -3,7 +3,6 @@ using System.Buffers.Text;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
-#nullable enable
 namespace Orleans.BroadcastChannel
 {
     /// <summary>

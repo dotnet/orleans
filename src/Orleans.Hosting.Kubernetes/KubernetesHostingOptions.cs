@@ -1,6 +1,7 @@
 using k8s;
 using System;
 
+#nullable disable
 namespace Orleans.Hosting.Kubernetes
 {
     /// <summary>

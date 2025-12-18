@@ -12,7 +12,6 @@ using Orleans.Configuration;
 using Orleans.Placement;
 using Orleans.Placement.Rebalancing;
 
-#nullable enable
 
 namespace Orleans.Runtime.Placement.Rebalancing;
 

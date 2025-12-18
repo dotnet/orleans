@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 
+#nullable disable
 namespace Orleans.Providers
 {
     internal partial class MemoryAdapterReceiver<TSerializer> : IQueueAdapterReceiver

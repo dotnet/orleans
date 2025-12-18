@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
+#nullable disable
 namespace Orleans.Transactions.TestKit.Consistency
 {
     [Reentrant]

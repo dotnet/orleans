@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using System.Threading.Tasks;
 
+#nullable disable
 [assembly: RegisterProvider("Redis", "Reminders", "Silo", typeof(RedisRemindersProviderBuilder))]
 [assembly: RegisterProvider("AzureRedisCache", "Reminders", "Silo", typeof(RedisRemindersProviderBuilder))]
 

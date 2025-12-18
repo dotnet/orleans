@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using Orleans.Messaging;
 
+#nullable disable
 namespace Orleans.Runtime;
 
 internal static class NetworkingInstruments

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 
+#nullable disable
 namespace Orleans.Runtime
 {
     internal static class Constants

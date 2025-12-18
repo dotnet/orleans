@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SQSMessage = Amazon.SQS.Model.Message;
 
+#nullable disable
 namespace OrleansAWSUtils.Streams
 {
     [Serializable]

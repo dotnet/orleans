@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams.Core;
 
+#nullable disable
 namespace Orleans.Streams
 {
     internal interface IStreamSubscriptionHandle

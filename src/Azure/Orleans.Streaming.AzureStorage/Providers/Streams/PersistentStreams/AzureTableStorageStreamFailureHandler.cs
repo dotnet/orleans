@@ -6,6 +6,7 @@ using Orleans.Serialization;
 using Orleans.Streaming.AzureStorage;
 using Orleans.Streams;
 
+#nullable disable
 namespace Orleans.Providers.Streams.PersistentStreams
 {
     /// <summary>
