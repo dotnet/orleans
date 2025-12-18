@@ -292,6 +292,69 @@ jobs:
         path: |
           **/TestResults/*
           **/logs/*
+  test-azure-eventhubs:
+    name: Azure Event Hubs provider tests
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      matrix:
+        framework: ["net8.0", "net10.0"]
+        provider: ["EventHub"]
+    services:
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite:latest
+        ports:
+          - 10000:10000
+          - 10001:10001
+          - 10002:10002
+    steps:
+    - uses: actions/checkout@v4
+    - name: Start Event Hubs emulator
+      run: |
+        docker run -d --name eventhubs-emulator \
+          -v ${{ github.workspace }}/.github/eventhubs-emulator/Config.json:/Eventhubs_Emulator/ConfigFiles/Config.json \
+          -p 5672:5672 \
+          -e BLOB_SERVER=host.docker.internal \
+          -e METADATA_SERVER=host.docker.internal \
+          -e ACCEPT_EULA=Y \
+          --add-host=host.docker.internal:host-gateway \
+          mcr.microsoft.com/azure-messaging/eventhubs-emulator:latest
+    - name: Wait for Event Hubs emulator
+      run: |
+        echo "Waiting for Event Hubs emulator to be ready..."
+        timeout 60 bash -c 'until nc -z localhost 5672; do sleep 1; done'
+        echo "Event Hubs emulator is ready"
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        global-json-file: global.json
+    - name: Test
+      run: dotnet test
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional|Category=Streaming)"
+        --framework ${{ matrix.framework }}
+        --blame-hang-timeout 10m
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
+        --
+        -parallel none -noshadow
+      env:
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+# [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
+# [SuppressMessage("Microsoft.Security", "CSCAN0220:DefaultPasswordContexts", Justification="Not a secret")]
+        ORLEANSEVENTHUBCONNECTIONSTRING: "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+        ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+    - name: Clean up Event Hubs emulator
+      if: always()
+      run: docker rm -f eventhubs-emulator
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
+        retention-days: 1
+        path: |
+          **/TestResults/*
+          **/logs/*
   test-azure-cosmosdb:
     if: ${{ false }}
     name: Azure Cosmos DB provider tests
