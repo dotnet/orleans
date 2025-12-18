@@ -68,7 +68,7 @@ public class PersistenceStateTests_AzureBlobStore_CustomContainerFactory : Base_
                 hostBuilder.AddAzureBlobGrainStorage("GrainStorageForTest", (AzureBlobStorageOptions options) =>
                 {
                     options.ConfigureTestDefaults();
-                    options.DeleteStateOnClear = false;
+                    options.DeleteStateOnClear = true;
                     options.BuildContainerFactory = (_, _) => new TestBlobContainerFactory();
                 });
             }
