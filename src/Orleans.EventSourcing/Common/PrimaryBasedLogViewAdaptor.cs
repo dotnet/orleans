@@ -68,7 +68,7 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// Whether this cluster supports submitting updates
         /// </summary>
-        protected virtual bool SupportSubmissions {  get { return true;  } }
+        protected virtual bool SupportSubmissions { get { return true; } }
 
         /// <summary>
         /// Handle protocol messages.
@@ -84,12 +84,18 @@ namespace Orleans.EventSourcing.Common
             throw new NotSupportedException();
         }
 
+        /// <inheritdoc/>
+        public virtual Task ClearLogAsync(CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
         /// <summary>
         /// Handle notification messages. Override this to handle notification subtypes.
         /// </summary>
         protected virtual void OnNotificationReceived(INotificationMessage payload)
-        {        
-            var msg = payload as VersionNotificationMessage; 
+        {
+            var msg = payload as VersionNotificationMessage;
             if (msg != null)
             {
                 if (msg.Version > lastVersionNotified)
@@ -150,12 +156,15 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// Construct an instance, for the given parameters.
         /// </summary>
-        protected PrimaryBasedLogViewAdaptor(ILogViewAdaptorHost<TLogView, TLogEntry> host, 
-            TLogView initialstate, ILogConsistencyProtocolServices services)
+        protected PrimaryBasedLogViewAdaptor(
+            ILogViewAdaptorHost<TLogView, TLogEntry> host,
+            TLogView initialstate,
+            ILogConsistencyProtocolServices services)
         {
             Debug.Assert(host != null && services != null && initialstate != null);
             this.Host = host;
             this.Services = services;
+            this.initialstate = Services.DeepCopy(initialstate);
             InitializeConfirmedView(initialstate);
             worker = new BatchWorkerFromDelegate(Work);
         }
@@ -245,8 +254,10 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         private readonly BatchWorker worker;
 
-
-
+        /// <summary>
+        /// Cached version of initial state used during initialization. And for resetting.
+        /// </summary>
+        protected TLogView initialstate { init; get => Services.DeepCopy(field); }
 
         /// statistics gathering. Is null unless stats collection is turned on.
         protected LogConsistencyStatistics stats = null;
@@ -512,6 +523,16 @@ namespace Orleans.EventSourcing.Common
                 }
         }
 
+        /// <summary>
+        /// Clears the pending operations and resets the tentative state.
+        /// </summary>
+        internal void ResetTentativeState()
+        {
+            this.pending.Clear();
+
+            CalculateTentativeState();
+        }
+
 
         /// <summary>
         /// batch worker performs reads from and writes to global state.
@@ -631,7 +652,7 @@ namespace Orleans.EventSourcing.Common
                 }
             }
         }
-        
+
 
         private void NotifyViewChanges(ref int version, int numWritten = 0)
         {
@@ -659,7 +680,7 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         protected RecordedConnectionIssue LastPrimaryIssue;
 
-     
+
 
         /// <inheritdoc />
         public async Task Synchronize()
@@ -753,19 +774,19 @@ namespace Orleans.EventSourcing.Common
     /// </summary>
     /// <typeparam name="TLogEntry">The type of entry for this submission</typeparam>
     public class SubmissionEntry<TLogEntry>
-    {
-        /// <summary> The log entry that is submitted. </summary>
-        public TLogEntry Entry;
+{
+    /// <summary> The log entry that is submitted. </summary>
+    public TLogEntry Entry;
 
-        /// <summary> A timestamp for this submission. </summary>
-        public DateTime SubmissionTime;
+    /// <summary> A timestamp for this submission. </summary>
+    public DateTime SubmissionTime;
 
-        /// <summary> For conditional updates, a promise that resolves once it is known whether the update was successful or not.</summary>
-        public TaskCompletionSource<bool> ResultPromise;
+    /// <summary> For conditional updates, a promise that resolves once it is known whether the update was successful or not.</summary>
+    public TaskCompletionSource<bool> ResultPromise;
 
-        /// <summary> For conditional updates, the log position at which this update is supposed to be applied. </summary>
-        public int ConditionalPosition;
-    }
+    /// <summary> For conditional updates, the log position at which this update is supposed to be applied. </summary>
+    public int ConditionalPosition;
+}
 
 
 }
