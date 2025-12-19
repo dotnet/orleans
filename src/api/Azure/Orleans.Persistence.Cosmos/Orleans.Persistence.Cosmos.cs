@@ -158,7 +158,7 @@ namespace Orleans.Persistence.Cosmos
 
 namespace OrleansCodeGen.Orleans.Persistence.Cosmos
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_CosmosConditionNotSatisfiedException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Persistence.Cosmos.CosmosConditionNotSatisfiedException>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Persistence.Cosmos.CosmosConditionNotSatisfiedException>, global::Orleans.Serialization.Serializers.IBaseCodec
@@ -176,7 +176,7 @@ namespace OrleansCodeGen.Orleans.Persistence.Cosmos
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_CosmosConditionNotSatisfiedException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Persistence.Cosmos.CosmosConditionNotSatisfiedException, global::Orleans.Storage.InconsistentStateException>
