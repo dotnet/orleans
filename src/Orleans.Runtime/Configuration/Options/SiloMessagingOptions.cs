@@ -172,5 +172,42 @@ namespace Orleans.Configuration
         /// The default value for <see cref="WaitForMessageToBeQueuedForOutboundTime"/>.
         /// </summary>
         public static readonly TimeSpan DEFAULT_WAIT_FOR_MESSAGE_TO_BE_QUEUED_FOR_OUTBOUND_TIME = TimeSpan.Zero;
+
+        /// <summary>
+        /// Gets or sets the maximum time allowed for grain placement operations to complete.
+        /// </summary>
+        /// <remarks>
+        /// This timeout applies to the entire placement operation including retries.
+        /// If the timeout is exceeded, the placement operation will fail with a <see cref="TimeoutException"/>.
+        /// </remarks>
+        public TimeSpan PlacementTimeout { get; set; } = DEFAULT_PLACEMENT_TIMEOUT;
+
+        /// <summary>
+        /// The default value for <see cref="PlacementTimeout"/>.
+        /// </summary>
+        public static readonly TimeSpan DEFAULT_PLACEMENT_TIMEOUT = TimeSpan.FromSeconds(30);
+
+        /// <summary>
+        /// Gets or sets the maximum number of retry attempts for grain placement operations.
+        /// </summary>
+        public int PlacementMaxRetries { get; set; } = DEFAULT_PLACEMENT_MAX_RETRIES;
+
+        /// <summary>
+        /// The default value for <see cref="PlacementMaxRetries"/>.
+        /// </summary>
+        public const int DEFAULT_PLACEMENT_MAX_RETRIES = 3;
+
+        /// <summary>
+        /// Gets or sets the initial delay between placement retry attempts.
+        /// </summary>
+        /// <remarks>
+        /// Subsequent retries use exponential backoff with this as the base delay.
+        /// </remarks>
+        public TimeSpan PlacementRetryBaseDelay { get; set; } = DEFAULT_PLACEMENT_RETRY_BASE_DELAY;
+
+        /// <summary>
+        /// The default value for <see cref="PlacementRetryBaseDelay"/>.
+        /// </summary>
+        public static readonly TimeSpan DEFAULT_PLACEMENT_RETRY_BASE_DELAY = TimeSpan.FromMilliseconds(100);
     }
 }

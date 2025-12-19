@@ -204,6 +204,9 @@ namespace Orleans.Hosting
             services.AddSingleton<PlacementDirectorResolver>();
             services.AddSingleton<IPlacementStrategyResolver, ClientObserverPlacementStrategyResolver>();
 
+            // Resilience policies
+            OrleansRuntimeResiliencePolicies.AddOrleansRuntimeResiliencePolicies(services);
+
             // Configure the default placement strategy.
             services.TryAddSingleton<PlacementStrategy, ResourceOptimizedPlacement>();
 
