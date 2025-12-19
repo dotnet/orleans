@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Streaming;
 using Orleans.Streams;
 using Xunit;
 
@@ -333,6 +334,48 @@ namespace UnitTests.OrleansRuntime.Streams
 
             // Should throw since we missed the second message destined for stream
             Assert.Throws<QueueCacheMissException>(() => cache.TryGetNextMessage(cursor, out _));
+
+            long EnqueueMessage(Guid streamId)
+            {
+                var now = DateTime.UtcNow;
+                var msg = new TestQueueMessage
+                {
+                    StreamId = StreamId.Create(TestStreamNamespace, streamId),
+                    SequenceNumber = seqNumber,
+                };
+                cache.Add(new List<CachedMessage>() { converter.ToCachedMessage(msg, now) }, now);
+                seqNumber++;
+                return msg.SequenceNumber;
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void GetCursorAtOldestEntry()
+        {
+            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null, TimeSpan.FromSeconds(10));
+            var evictionStrategy = new ChronologicalEvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)), null, null);
+            evictionStrategy.PurgeObservable = cache;
+            var converter = new CachedMessageConverter(bufferPool, evictionStrategy);
+
+            var seqNumber = 123;
+            var streamKey = Guid.NewGuid();
+            var stream = StreamId.Create(TestStreamNamespace, streamKey);
+
+            // Start by enqueuing messages for stream
+            EnqueueMessage(streamKey);
+            EnqueueMessage(streamKey);
+
+            // Get a cursor at the oldest entry
+            var cursor = cache.GetCursor(stream, OldestInStreamToken.Instance);
+
+            // Should have a cursor able to walk the two messages
+            Assert.NotNull(cursor);
+
+            Assert.True(cache.TryGetNextMessage(cursor, out var _));
+            Assert.True(cache.TryGetNextMessage(cursor, out var _));
+            Assert.False(cache.TryGetNextMessage(cursor, out var _));
 
             long EnqueueMessage(Guid streamId)
             {

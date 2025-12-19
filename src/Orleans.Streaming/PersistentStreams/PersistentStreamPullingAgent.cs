@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,6 +9,7 @@ using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
+using Orleans.Streaming;
 using Orleans.Streams.Filtering;
 
 namespace Orleans.Streams
@@ -543,7 +543,7 @@ namespace Orleans.Streams
                     {
                         exceptionOccured = exc;
                         consumerData.SafeDisposeCursor(logger);
-                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, null);
+                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, OldestInStreamToken.Instance);
                     }
 
                     if (batch != null)
