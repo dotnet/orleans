@@ -6,17 +6,11 @@ using System.Threading;
 
 namespace Orleans.Runtime;
 
-internal class HistogramBucketAggregator
+internal class HistogramBucketAggregator(KeyValuePair<string, object>[] tags, long bound, KeyValuePair<string, object> label)
 {
     private long _value = 0;
-    private readonly KeyValuePair<string, object>[] _tags;
-    public long Bound { get; }
-
-    public HistogramBucketAggregator(KeyValuePair<string, object>[] tags, long bound, KeyValuePair<string, object> label)
-    {
-        _tags = tags.Concat(new[] { label }).ToArray();
-        Bound = bound;
-    }
+    private readonly KeyValuePair<string, object>[] _tags = tags.Concat(new[] { label }).ToArray();
+    public long Bound { get; } = bound;
 
     public ReadOnlySpan<KeyValuePair<string, object>> Tags => _tags;
 

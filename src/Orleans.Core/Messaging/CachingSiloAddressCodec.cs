@@ -25,10 +25,7 @@ namespace Orleans.Runtime.Messaging
         private readonly Dictionary<int, (byte[] Encoded, SiloAddress Value, long LastSeen)> _cache = new();
         private long _lastGarbageCollectionTimestamp;
 
-        public CachingSiloAddressCodec()
-        {
-            _lastGarbageCollectionTimestamp = Environment.TickCount64;
-        }
+        public CachingSiloAddressCodec() => _lastGarbageCollectionTimestamp = Environment.TickCount64;
 
         public SiloAddress ReadRaw<TInput>(ref Reader<TInput> reader)
         {

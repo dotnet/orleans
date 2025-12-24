@@ -24,10 +24,7 @@ namespace Orleans.Runtime.Messaging
         private readonly Dictionary<int, (byte[] Value, long LastSeen)> _cache = new();
         private long _lastGarbageCollectionTimestamp;
 
-        public CachingIdSpanCodec()
-        {
-            _lastGarbageCollectionTimestamp = Environment.TickCount64;
-        }
+        public CachingIdSpanCodec() => _lastGarbageCollectionTimestamp = Environment.TickCount64;
 
         public IdSpan ReadRaw<TInput>(ref Reader<TInput> reader)
         {

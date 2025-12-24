@@ -9,10 +9,7 @@ internal sealed class CounterAggregator
 {
     private readonly KeyValuePair<string, object>[] _tags;
     private long _value = 0;
-    public CounterAggregator()
-    {
-        _tags = Array.Empty<KeyValuePair<string, object>>();
-    }
+    public CounterAggregator() => _tags = Array.Empty<KeyValuePair<string, object>>();
 
     public CounterAggregator(in TagList tagList)
     {

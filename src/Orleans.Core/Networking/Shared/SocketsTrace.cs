@@ -3,16 +3,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Networking.Shared
 {
-    internal partial class SocketsTrace : ISocketsTrace
+    internal partial class SocketsTrace(ILogger logger) : ISocketsTrace
     {
-        // ConnectionRead: Reserved: 3
-        private readonly ILogger _logger;
-
-        public SocketsTrace(ILogger logger)
-        {
-            _logger = logger;
-        }
-
         public void ConnectionRead(string connectionId, int count)
         {
             // Don't log for now since this could be *too* verbose.
@@ -73,11 +65,11 @@ namespace Orleans.Networking.Shared
         )]
         public partial void ConnectionResume(string connectionId);
 
-        public IDisposable BeginScope<TState>(TState state) => _logger.BeginScope(state);
+        public IDisposable BeginScope<TState>(TState state) => logger.BeginScope(state);
 
-        public bool IsEnabled(LogLevel logLevel) => _logger.IsEnabled(logLevel);
+        public bool IsEnabled(LogLevel logLevel) => logger.IsEnabled(logLevel);
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
-            => _logger.Log(logLevel, eventId, state, exception, formatter);
+            => logger.Log(logLevel, eventId, state, exception, formatter);
     }
 }

@@ -5,14 +5,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class NetworkingTrace : DiagnosticListener, ILogger
+    internal sealed class NetworkingTrace(ILoggerFactory loggerFactory) : DiagnosticListener(typeof(NetworkingTrace).FullName), ILogger
     {
-        private readonly ILogger log;
-
-        public NetworkingTrace(ILoggerFactory loggerFactory) : base(typeof(NetworkingTrace).FullName)
-        {
-            this.log = loggerFactory.CreateLogger(typeof(NetworkingTrace).FullName);
-        }
+        private readonly ILogger log = loggerFactory.CreateLogger(typeof(NetworkingTrace).FullName);
 
         public IDisposable BeginScope<TState>(TState state)
         {

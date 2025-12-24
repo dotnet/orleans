@@ -7,17 +7,11 @@ using System.Text;
 namespace Orleans.Runtime
 {
     [GenerateSerializer, Immutable]
-    internal sealed class MembershipTableSnapshot
+    internal sealed class MembershipTableSnapshot(
+        MembershipVersion version,
+        ImmutableDictionary<SiloAddress, MembershipEntry> entries)
     {
         private static readonly MembershipTableSnapshot InitialValue = new(MembershipVersion.MinValue, ImmutableDictionary<SiloAddress, MembershipEntry>.Empty);
-
-        public MembershipTableSnapshot(
-            MembershipVersion version,
-            ImmutableDictionary<SiloAddress, MembershipEntry> entries)
-        {
-            this.Version = version;
-            this.Entries = entries;
-        }
 
         public static MembershipTableSnapshot Create(MembershipTableData table) => Update(InitialValue, table);
 
@@ -68,10 +62,10 @@ namespace Orleans.Runtime
         }
 
         [Id(0)]
-        public MembershipVersion Version { get; }
-        
+        public MembershipVersion Version { get; } = version;
+
         [Id(1)]
-        public ImmutableDictionary<SiloAddress, MembershipEntry> Entries { get; }
+        public ImmutableDictionary<SiloAddress, MembershipEntry> Entries { get; } = entries;
 
         public int ActiveNodeCount
         {

@@ -12,28 +12,23 @@ namespace Orleans.Metadata
     /// <remarks>
     /// Bindings are a way to declaratively connect grains with other resources.
     /// </remarks>
-    public class GrainBindings
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="GrainBindings"/> class.
+    /// </remarks>
+    /// <param name="grainType">The grain type.</param>
+    /// <param name="bindings">The bindings for the specified grain type.</param>
+    public class GrainBindings(GrainType grainType, ImmutableArray<ImmutableDictionary<string, string>> bindings)
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="GrainBindings"/> class.
-        /// </summary>
-        /// <param name="grainType">The grain type.</param>
-        /// <param name="bindings">The bindings for the specified grain type.</param>
-        public GrainBindings(GrainType grainType, ImmutableArray<ImmutableDictionary<string, string>> bindings)
-        {
-            this.GrainType = grainType;
-            this.Bindings = bindings;
-        }
 
         /// <summary>
         /// Gets the grain type.
         /// </summary>
-        public GrainType GrainType { get; }
+        public GrainType GrainType { get; } = grainType;
 
         /// <summary>
         /// Gets the bindings for the specified grain type.
         /// </summary>
-        public ImmutableArray<ImmutableDictionary<string, string>> Bindings { get; }
+        public ImmutableArray<ImmutableDictionary<string, string>> Bindings { get; } = bindings;
     }
 
     /// <summary>

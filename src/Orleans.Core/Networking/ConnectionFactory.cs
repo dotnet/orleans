@@ -7,23 +7,14 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal abstract class ConnectionFactory
+    internal abstract class ConnectionFactory(
+        IConnectionFactory connectionFactory,
+        IServiceProvider serviceProvider,
+        IOptions<ConnectionOptions> connectionOptions)
     {
-        private readonly IConnectionFactory connectionFactory;
-        private readonly IServiceProvider serviceProvider;
         private ConnectionDelegate connectionDelegate;
 
-        protected ConnectionFactory(
-            IConnectionFactory connectionFactory,
-            IServiceProvider serviceProvider,
-            IOptions<ConnectionOptions> connectionOptions)
-        {
-            this.connectionFactory = connectionFactory;
-            this.serviceProvider = serviceProvider;
-            this.ConnectionOptions = connectionOptions.Value;
-        }
-
-        protected ConnectionOptions ConnectionOptions { get; }
+        protected ConnectionOptions ConnectionOptions { get; } = connectionOptions.Value;
 
         protected ConnectionDelegate ConnectionDelegate
         {
@@ -36,7 +27,7 @@ namespace Orleans.Runtime.Messaging
                     if (this.connectionDelegate != null) return this.connectionDelegate;
 
                     // Configure the connection builder using the user-defined options.
-                    var connectionBuilder = new ConnectionBuilder(this.serviceProvider);
+                    var connectionBuilder = new ConnectionBuilder(serviceProvider);
                     connectionBuilder.Use(next =>
                     {
                         return context =>
@@ -58,7 +49,7 @@ namespace Orleans.Runtime.Messaging
 
         public virtual async ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
         {
-            var connectionContext = await this.connectionFactory.ConnectAsync(address.Endpoint, cancellationToken);
+            var connectionContext = await connectionFactory.ConnectAsync(address.Endpoint, cancellationToken);
             var connection = this.CreateConnection(address, connectionContext);
             return connection;
         }

@@ -8,18 +8,10 @@ using System.Threading.Tasks;
 
 namespace Orleans.Networking.Shared
 {
-    internal class SocketAwaitableEventArgs : SocketAsyncEventArgs, ICriticalNotifyCompletion
+    internal class SocketAwaitableEventArgs(PipeScheduler ioScheduler) : SocketAsyncEventArgs, ICriticalNotifyCompletion
     {
         private static readonly Action _callbackCompleted = () => { };
-
-        private readonly PipeScheduler _ioScheduler;
-
         private Action _callback;
-
-        public SocketAwaitableEventArgs(PipeScheduler ioScheduler)
-        {
-            _ioScheduler = ioScheduler;
-        }
 
         public SocketAwaitableEventArgs GetAwaiter() => this;
         public bool IsCompleted => ReferenceEquals(_callback, _callbackCompleted);
@@ -68,7 +60,7 @@ namespace Orleans.Networking.Shared
 
             if (continuation != null)
             {
-                _ioScheduler.Schedule(state => ((Action)state)(), continuation);
+                ioScheduler.Schedule(state => ((Action)state)(), continuation);
             }
         }
     }

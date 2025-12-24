@@ -7,18 +7,12 @@ namespace Orleans.Serialization
     /// <summary>
     /// Implementation of <see cref="ISerializationBinder"/> which resolves types using a <see cref="TypeResolver"/>.
     /// </summary>
-    public class OrleansJsonSerializationBinder : DefaultSerializationBinder
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="OrleansJsonSerializationBinder"/> class.
+    /// </remarks>
+    /// <param name="typeResolver">The type resolver.</param>
+    public class OrleansJsonSerializationBinder(TypeResolver typeResolver) : DefaultSerializationBinder
     {
-        private readonly TypeResolver typeResolver;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="OrleansJsonSerializationBinder"/> class.
-        /// </summary>
-        /// <param name="typeResolver">The type resolver.</param>
-        public OrleansJsonSerializationBinder(TypeResolver typeResolver)
-        {
-            this.typeResolver = typeResolver;
-        }
 
         /// <inheritdoc />
         public override Type BindToType(string assemblyName, string typeName)

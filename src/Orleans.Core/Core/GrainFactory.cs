@@ -9,7 +9,11 @@ namespace Orleans
     /// <summary>
     /// Factory for accessing grains.
     /// </summary>
-    internal class GrainFactory : IInternalGrainFactory
+    internal class GrainFactory(
+        IRuntimeClient runtimeClient,
+        GrainReferenceActivator referenceActivator,
+        GrainInterfaceTypeResolver interfaceTypeResolver,
+        GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver) : IInternalGrainFactory
     {
         private GrainReferenceRuntime grainReferenceRuntime;
 
@@ -18,24 +22,7 @@ namespace Orleans
         /// </summary>
         private readonly Dictionary<(GrainId, Type), ISystemTarget> typedSystemTargetReferenceCache = new Dictionary<(GrainId, Type), ISystemTarget>();
 
-        private readonly GrainReferenceActivator referenceActivator;
-        private readonly GrainInterfaceTypeResolver interfaceTypeResolver;
-        private readonly GrainInterfaceTypeToGrainTypeResolver interfaceTypeToGrainTypeResolver;
-        private readonly IRuntimeClient runtimeClient;
-
-        public GrainFactory(
-            IRuntimeClient runtimeClient,
-            GrainReferenceActivator referenceActivator,
-            GrainInterfaceTypeResolver interfaceTypeResolver,
-            GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver)
-        {
-            this.runtimeClient = runtimeClient;
-            this.referenceActivator = referenceActivator;
-            this.interfaceTypeResolver = interfaceTypeResolver;
-            this.interfaceTypeToGrainTypeResolver = interfaceToTypeResolver;
-        }
-
-        private GrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime ??= (GrainReferenceRuntime)this.runtimeClient.GrainReferenceRuntime;
+        private GrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime ??= (GrainReferenceRuntime)runtimeClient.GrainReferenceRuntime;
 
         /// <inheritdoc />
         public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidKey
@@ -92,7 +79,7 @@ namespace Orleans
         public void DeleteObjectReference<TGrainObserverInterface>(
             IGrainObserver obj) where TGrainObserverInterface : IGrainObserver
         {
-            this.runtimeClient.DeleteObjectReference(obj);
+            runtimeClient.DeleteObjectReference(obj);
         }
 
         /// <inheritdoc />
@@ -146,7 +133,7 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public IAddressable GetGrain(GrainId grainId) => this.referenceActivator.CreateReference(grainId, default);
+        public IAddressable GetGrain(GrainId grainId) => referenceActivator.CreateReference(grainId, default);
 
         /// <inheritdoc />
         public IGrain GetGrain(Type grainInterfaceType, Guid key)
@@ -187,7 +174,7 @@ namespace Orleans
         /// <inheritdoc />
         public IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType)
         {
-            return this.referenceActivator.CreateReference(grainId, interfaceType);
+            return referenceActivator.CreateReference(grainId, interfaceType);
         }
 
         /// <summary>
@@ -203,20 +190,20 @@ namespace Orleans
         /// <returns>A grain reference which implements the provided interface.</returns>
         private IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string grainClassNamePrefix)
         {
-            var grainInterfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(interfaceType);
+            var grainInterfaceType = interfaceTypeResolver.GetGrainInterfaceType(interfaceType);
 
             GrainType grainType;
             if (!string.IsNullOrWhiteSpace(grainClassNamePrefix))
             {
-                grainType = this.interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType, grainClassNamePrefix);
+                grainType = interfaceToTypeResolver.GetGrainType(grainInterfaceType, grainClassNamePrefix);
             }
             else
             {
-                grainType = this.interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType);
+                grainType = interfaceToTypeResolver.GetGrainType(grainInterfaceType);
             }
 
             var grainId = GrainId.Create(grainType, grainKey);
-            var grain = this.referenceActivator.CreateReference(grainId, grainInterfaceType);
+            var grain = referenceActivator.CreateReference(grainId, grainInterfaceType);
             return grain;
         }
 
@@ -228,8 +215,8 @@ namespace Orleans
         /// <returns>A grain reference.</returns>
         private object CreateGrainReference(Type interfaceType, GrainId grainId)
         {
-            var grainInterfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(interfaceType);
-            return this.referenceActivator.CreateReference(grainId, grainInterfaceType);
+            var grainInterfaceType = interfaceTypeResolver.GetGrainInterfaceType(interfaceType);
+            return referenceActivator.CreateReference(grainId, grainInterfaceType);
         }
 
         /// <summary>
@@ -251,7 +238,7 @@ namespace Orleans
                 throw new ArgumentException($"The provided object must implement '{interfaceType.FullName}'.", nameof(obj));
             }
 
-            return this.Cast(this.runtimeClient.CreateObjectReference(obj), interfaceType);
+            return this.Cast(runtimeClient.CreateObjectReference(obj), interfaceType);
         }
 
         /// <summary>
