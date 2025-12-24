@@ -31,24 +31,14 @@ namespace Orleans.Serialization
         /// </remarks>
         public bool AllowAllTypes { get; set; }
 
-        public OrleansJsonSerializerOptions()
-        {
-            JsonSerializerSettings = OrleansJsonSerializerSettings.GetDefaultSerializerSettings();
-        }
+        public OrleansJsonSerializerOptions() => JsonSerializerSettings = OrleansJsonSerializerSettings.GetDefaultSerializerSettings();
     }
 
-    public class ConfigureOrleansJsonSerializerOptions : IPostConfigureOptions<OrleansJsonSerializerOptions>
+    public class ConfigureOrleansJsonSerializerOptions(IServiceProvider serviceProvider) : IPostConfigureOptions<OrleansJsonSerializerOptions>
     {
-        private readonly IServiceProvider _serviceProvider;
-
-        public ConfigureOrleansJsonSerializerOptions(IServiceProvider serviceProvider)
-        {
-            _serviceProvider = serviceProvider;
-        }
-
         public void PostConfigure(string? name, OrleansJsonSerializerOptions options)
         {
-            OrleansJsonSerializerSettings.Configure(_serviceProvider, options.JsonSerializerSettings, options.AllowAllTypes);
+            OrleansJsonSerializerSettings.Configure(serviceProvider, options.JsonSerializerSettings, options.AllowAllTypes);
         }
     }
 }

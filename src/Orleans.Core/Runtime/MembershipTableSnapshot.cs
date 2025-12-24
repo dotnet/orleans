@@ -9,23 +9,17 @@ namespace Orleans.Runtime
     /// <summary>
     /// Represents an immutable snapshot of cluster membership state.
     /// </summary>
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="MembershipTableSnapshot"/> class.
+    /// </remarks>
+    /// <param name="version">The membership version represented by this snapshot.</param>
+    /// <param name="entries">The membership entries contained in this snapshot.</param>
     [GenerateSerializer, Immutable]
-    internal sealed class MembershipTableSnapshot : ISpanFormattable
+    internal sealed class MembershipTableSnapshot(
+        MembershipVersion version,
+        ImmutableDictionary<SiloAddress, MembershipEntry> entries) : ISpanFormattable
     {
         private static readonly MembershipTableSnapshot InitialValue = new(MembershipVersion.MinValue, ImmutableDictionary<SiloAddress, MembershipEntry>.Empty);
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="MembershipTableSnapshot"/> class.
-        /// </summary>
-        /// <param name="version">The membership version represented by this snapshot.</param>
-        /// <param name="entries">The membership entries contained in this snapshot.</param>
-        public MembershipTableSnapshot(
-            MembershipVersion version,
-            ImmutableDictionary<SiloAddress, MembershipEntry> entries)
-        {
-            this.Version = version;
-            this.Entries = entries;
-        }
 
         /// <summary>
         /// Creates an initial snapshot from membership table data.
@@ -96,13 +90,13 @@ namespace Orleans.Runtime
         /// Gets the membership version represented by this snapshot.
         /// </summary>
         [Id(0)]
-        public MembershipVersion Version { get; }
-        
+        public MembershipVersion Version { get; } = version;
+
         /// <summary>
         /// Gets the membership entries contained in this snapshot.
         /// </summary>
         [Id(1)]
-        public ImmutableDictionary<SiloAddress, MembershipEntry> Entries { get; }
+        public ImmutableDictionary<SiloAddress, MembershipEntry> Entries { get; } = entries;
 
         /// <summary>
         /// Gets the number of active silos in this snapshot.

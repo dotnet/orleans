@@ -7,13 +7,18 @@ using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class ClientOutboundConnectionFactory : ConnectionFactory
+    internal sealed class ClientOutboundConnectionFactory(
+        IOptions<ConnectionOptions> connectionOptions,
+        IOptions<ClientConnectionOptions> clientConnectionOptions,
+        IOptions<ClusterOptions> clusterOptions,
+        ConnectionCommon connectionShared,
+        ConnectionPreambleHelper connectionPreambleHelper)
+        : ConnectionFactory(connectionShared.ServiceProvider.GetRequiredKeyedService<IConnectionFactory>(ServicesKey),
+            connectionShared.ServiceProvider, connectionOptions)
     {
         internal static readonly object ServicesKey = new object();
-        private readonly ConnectionCommon connectionShared;
-        private readonly ClientConnectionOptions clientConnectionOptions;
-        private readonly ClusterOptions clusterOptions;
-        private readonly ConnectionPreambleHelper connectionPreambleHelper;
+        private readonly ClientConnectionOptions clientConnectionOptions = clientConnectionOptions.Value;
+        private readonly ClusterOptions clusterOptions = clusterOptions.Value;
 #if NET9_0_OR_GREATER
         private readonly Lock initializationLock = new();
 #else
@@ -22,20 +27,6 @@ namespace Orleans.Runtime.Messaging
         private volatile bool isInitialized;
         private ClientMessageCenter messageCenter = null!;
         private ConnectionManager connectionManager = null!;
-
-        public ClientOutboundConnectionFactory(
-            IOptions<ConnectionOptions> connectionOptions,
-            IOptions<ClientConnectionOptions> clientConnectionOptions,
-            IOptions<ClusterOptions> clusterOptions,
-            ConnectionCommon connectionShared,
-            ConnectionPreambleHelper connectionPreambleHelper)
-            : base(connectionShared.ServiceProvider.GetRequiredKeyedService<IConnectionFactory>(ServicesKey), connectionShared.ServiceProvider, connectionOptions)
-        {
-            this.connectionShared = connectionShared;
-            this.clientConnectionOptions = clientConnectionOptions.Value;
-            this.clusterOptions = clusterOptions.Value;
-            this.connectionPreambleHelper = connectionPreambleHelper;
-        }
 
         protected override Connection CreateConnection(SiloAddress address, ConnectionContext context)
         {
@@ -48,8 +39,8 @@ namespace Orleans.Runtime.Messaging
                 this.messageCenter,
                 this.connectionManager,
                 this.ConnectionOptions,
-                this.connectionShared,
-                this.connectionPreambleHelper,
+                connectionShared,
+                connectionPreambleHelper,
                 this.clusterOptions);
         }
 
@@ -67,8 +58,8 @@ namespace Orleans.Runtime.Messaging
                 {
                     if (!isInitialized)
                     {
-                        this.messageCenter = this.connectionShared.ServiceProvider.GetRequiredService<ClientMessageCenter>();
-                        this.connectionManager = this.connectionShared.ServiceProvider.GetRequiredService<ConnectionManager>();
+                        this.messageCenter = connectionShared.ServiceProvider.GetRequiredService<ClientMessageCenter>();
+                        this.connectionManager = connectionShared.ServiceProvider.GetRequiredService<ConnectionManager>();
                         this.isInitialized = true;
                     }
                 }

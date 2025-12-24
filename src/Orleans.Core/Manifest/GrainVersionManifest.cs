@@ -10,7 +10,11 @@ namespace Orleans.Runtime.Versions
     /// <summary>
     /// Functionality for querying the declared version of grain interfaces.
     /// </summary>
-    internal class GrainVersionManifest
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="GrainVersionManifest"/> class.
+    /// </remarks>
+    /// <param name="clusterManifestProvider">The cluster manifest provider.</param>
+    internal class GrainVersionManifest(IClusterManifestProvider clusterManifestProvider)
     {
 #if NET9_0_OR_GREATER
         private readonly Lock _lockObj = new();
@@ -19,25 +23,13 @@ namespace Orleans.Runtime.Versions
 #endif
         private readonly ConcurrentDictionary<GrainInterfaceType, GrainInterfaceType> _genericInterfaceMapping = new ConcurrentDictionary<GrainInterfaceType, GrainInterfaceType>();
         private readonly ConcurrentDictionary<GrainType, GrainType> _genericGrainTypeMapping = new ConcurrentDictionary<GrainType, GrainType>();
-        private readonly IClusterManifestProvider _clusterManifestProvider;
-        private readonly Dictionary<GrainInterfaceType, ushort> _localVersions;
-        private Cache _cache;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="GrainVersionManifest"/> class.
-        /// </summary>
-        /// <param name="clusterManifestProvider">The cluster manifest provider.</param>
-        public GrainVersionManifest(IClusterManifestProvider clusterManifestProvider)
-        {
-            _clusterManifestProvider = clusterManifestProvider;
-            _cache = BuildCache(clusterManifestProvider.Current);
-            _localVersions = BuildLocalVersionMap(clusterManifestProvider.LocalGrainManifest);
-        }
+        private readonly Dictionary<GrainInterfaceType, ushort> _localVersions = BuildLocalVersionMap(clusterManifestProvider.LocalGrainManifest);
+        private Cache _cache = BuildCache(clusterManifestProvider.Current);
 
         /// <summary>
         /// Gets the current cluster manifest version.
         /// </summary>
-        public MajorMinorVersion LatestVersion => _clusterManifestProvider.Current.Version;
+        public MajorMinorVersion LatestVersion => clusterManifestProvider.Current.Version;
 
         /// <summary>
         /// Gets the local version for a specified grain interface type.
@@ -196,7 +188,7 @@ namespace Orleans.Runtime.Versions
         private Cache GetCache()
         {
             var cache = _cache;
-            var manifest = _clusterManifestProvider.Current;
+            var manifest = clusterManifestProvider.Current;
             if (manifest.Version == cache.Version)
             {
                 return cache;
@@ -205,7 +197,7 @@ namespace Orleans.Runtime.Versions
             lock (_lockObj)
             {
                 cache = _cache;
-                manifest = _clusterManifestProvider.Current;
+                manifest = clusterManifestProvider.Current;
                 if (manifest.Version == cache.Version)
                 {
                     return cache;
