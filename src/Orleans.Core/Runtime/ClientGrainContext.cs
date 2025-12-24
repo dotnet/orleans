@@ -8,30 +8,24 @@ using Orleans.Runtime;
 
 namespace Orleans
 {
-    internal class ClientGrainContext : IGrainContext, IGrainExtensionBinder, IGrainContextAccessor
+    internal class ClientGrainContext(OutsideRuntimeClient runtimeClient) : IGrainContext, IGrainExtensionBinder, IGrainContextAccessor
     {
         private readonly object _lockObj = new object();
         private readonly ConcurrentDictionary<Type, (object Implementation, IAddressable Reference)> _extensions = new();
         private readonly ConcurrentDictionary<Type, object> _components = new();
-        private readonly OutsideRuntimeClient _runtimeClient;
         private GrainReference _grainReference;
 
-        public ClientGrainContext(OutsideRuntimeClient runtimeClient)
-        {
-            _runtimeClient = runtimeClient;
-        }
+        public GrainReference GrainReference => _grainReference ??= (GrainReference)runtimeClient.InternalGrainFactory.GetGrain(this.GrainId);
 
-        public GrainReference GrainReference => _grainReference ??= (GrainReference)_runtimeClient.InternalGrainFactory.GetGrain(this.GrainId);
-
-        public GrainId GrainId => _runtimeClient.CurrentActivationAddress.GrainId;
+        public GrainId GrainId => runtimeClient.CurrentActivationAddress.GrainId;
 
         public object GrainInstance => null;
 
-        public ActivationId ActivationId => _runtimeClient.CurrentActivationAddress.ActivationId;
+        public ActivationId ActivationId => runtimeClient.CurrentActivationAddress.ActivationId;
 
-        public GrainAddress Address => _runtimeClient.CurrentActivationAddress;
+        public GrainAddress Address => runtimeClient.CurrentActivationAddress;
 
-        public IServiceProvider ActivationServices => _runtimeClient.ServiceProvider;
+        public IServiceProvider ActivationServices => runtimeClient.ServiceProvider;
 
         public IGrainLifecycle ObservableLifecycle => null;
 
@@ -111,7 +105,7 @@ namespace Orleans
                 }
 
                 var implementation = newExtensionFunc();
-                var reference = _runtimeClient.InternalGrainFactory.CreateObjectReference<TExtensionInterface>(implementation);
+                var reference = runtimeClient.InternalGrainFactory.CreateObjectReference<TExtensionInterface>(implementation);
                 _extensions[typeof(TExtensionInterface)] = (implementation, reference);
                 result = (implementation, reference);
                 return result;

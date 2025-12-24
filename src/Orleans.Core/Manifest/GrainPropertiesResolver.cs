@@ -7,20 +7,14 @@ namespace Orleans.Metadata
     /// <summary>
     /// Responsible for resolving <see cref="GrainProperties"/> for <see cref="GrainType"/> values.
     /// </summary>
-    public class GrainPropertiesResolver
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="GrainPropertiesResolver"/> class.
+    /// </remarks>
+    /// <param name="clusterManifestProvider">
+    /// The cluster manifest provider.
+    /// </param>
+    public class GrainPropertiesResolver(IClusterManifestProvider clusterManifestProvider)
     {
-        private readonly IClusterManifestProvider _clusterManifestProvider;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="GrainPropertiesResolver"/> class.
-        /// </summary>
-        /// <param name="clusterManifestProvider">
-        /// The cluster manifest provider.
-        /// </param>
-        public GrainPropertiesResolver(IClusterManifestProvider clusterManifestProvider)
-        {
-            _clusterManifestProvider = clusterManifestProvider;
-        }
 
         /// <summary>
         /// Gets the grain properties for the provided type.
@@ -56,7 +50,7 @@ namespace Orleans.Metadata
         /// </returns>
         public bool TryGetGrainProperties(GrainType grainType, [NotNullWhen(true)] out GrainProperties properties)
         {
-            var clusterManifest = _clusterManifestProvider.Current;
+            var clusterManifest = clusterManifestProvider.Current;
             if (clusterManifest is null)
             {
                 properties = default;

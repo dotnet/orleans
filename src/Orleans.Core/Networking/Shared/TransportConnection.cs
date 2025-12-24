@@ -13,10 +13,7 @@ namespace Orleans.Networking.Shared
         private IDictionary<object, object> _items;
         private string _connectionId;
 
-        public TransportConnection()
-        {
-            FastReset();
-        }
+        public TransportConnection() => FastReset();
 
         public override EndPoint LocalEndPoint { get; set; }
         public override EndPoint RemoteEndPoint { get; set; }

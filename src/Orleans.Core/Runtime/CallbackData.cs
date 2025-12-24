@@ -7,27 +7,17 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
-    internal sealed partial class CallbackData
+    internal sealed partial class CallbackData(
+        SharedCallbackData shared,
+        IResponseCompletionSource ctx,
+        Message msg)
     {
-        private readonly SharedCallbackData shared;
-        private readonly IResponseCompletionSource context;
         private int completed;
         private StatusResponse? lastKnownStatus;
-        private ValueStopwatch stopwatch;
+        private ValueStopwatch stopwatch = ValueStopwatch.StartNew();
         private CancellationTokenRegistration _cancellationTokenRegistration;
 
-        public CallbackData(
-            SharedCallbackData shared,
-            IResponseCompletionSource ctx,
-            Message msg)
-        {
-            this.shared = shared;
-            this.context = ctx;
-            this.Message = msg;
-            this.stopwatch = ValueStopwatch.StartNew();
-        }
-
-        public Message Message { get; } // might hold metadata used by response pipeline
+        public Message Message { get; } = msg;
 
         public bool IsCompleted => this.completed == 1;
 
@@ -104,7 +94,7 @@ namespace Orleans.Runtime
             ApplicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
             ApplicationRequestInstruments.OnAppRequestsTimedOut();
             OrleansCallBackDataEvent.Log.OnCanceled(Message);
-            context.Complete(Response.FromException(new OperationCanceledException(_cancellationTokenRegistration.Token)));
+            ctx.Complete(Response.FromException(new OperationCanceledException(_cancellationTokenRegistration.Token)));
             _cancellationTokenRegistration.Dispose();
         }
 
@@ -121,7 +111,7 @@ namespace Orleans.Runtime
                 SignalCancellation();
             }
 
-            this.shared.Unregister(this.Message);
+            shared.Unregister(this.Message);
             _cancellationTokenRegistration.Dispose();
             ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
             ApplicationRequestInstruments.OnAppRequestsTimedOut();
@@ -132,10 +122,10 @@ namespace Orleans.Runtime
 
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
             var timeout = GetResponseTimeout();
-            LogTimeout(this.shared.Logger, timeout, msg, statusMessage);
+            LogTimeout(shared.Logger, timeout, msg, statusMessage);
 
             var exception = new TimeoutException($"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}");
-            context.Complete(Response.FromException(exception));
+            ctx.Complete(Response.FromException(exception));
         }
 
         public void OnTargetSiloFail()
@@ -146,16 +136,16 @@ namespace Orleans.Runtime
             }
 
             this.stopwatch.Stop();
-            this.shared.Unregister(this.Message);
+            shared.Unregister(this.Message);
             _cancellationTokenRegistration.Dispose();
             ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             OrleansCallBackDataEvent.Log.OnTargetSiloFail(this.Message);
             var msg = this.Message;
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
-            LogTargetSiloFail(this.shared.Logger, msg, statusMessage, Constants.TroubleshootingHelpLink);
+            LogTargetSiloFail(shared.Logger, msg, statusMessage, Constants.TroubleshootingHelpLink);
             var exception = new SiloUnavailableException($"The target silo became unavailable for message: {msg}. {statusMessage}See {Constants.TroubleshootingHelpLink} for troubleshooting help.");
-            this.context.Complete(Response.FromException(exception));
+            ctx.Complete(Response.FromException(exception));
         }
 
         public void DoCallback(Message response)
@@ -172,7 +162,7 @@ namespace Orleans.Runtime
             ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
-            ResponseCallback(response, this.context);
+            ResponseCallback(response, ctx);
         }
 
         private static void ResponseCallback(Message message, IResponseCompletionSource context)

@@ -22,10 +22,7 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
     internal readonly SerializerSessionPool _sessionPool;
 
     [GeneratedActivatorConstructor]
-    public MigrationContext(SerializerSessionPool sessionPool)
-    {
-        _sessionPool = sessionPool;
-    }
+    public MigrationContext(SerializerSessionPool sessionPool) => _sessionPool = sessionPool;
 
     [Id(0), Immutable]
     private Dictionary<string, (int Offset, int Length)> _indices = new(StringComparer.Ordinal);
