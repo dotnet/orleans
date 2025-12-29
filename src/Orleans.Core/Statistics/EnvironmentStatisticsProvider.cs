@@ -26,7 +26,6 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
 
     private readonly DualModeKalmanFilter _cpuUsageFilter = new();
     private readonly DualModeKalmanFilter _memoryUsageFilter = new();
-    private readonly DualModeKalmanFilter _availableMemoryFilter = new();
 
     public EnvironmentStatisticsProvider()
     {
@@ -47,7 +46,7 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
         var availableMemory = maximumAvailableMemoryBytes - memoryUsage;
         var filteredCpuUsage = _cpuUsageFilter.Filter(cpuUsage);
         var filteredMemoryUsage = (long)_memoryUsageFilter.Filter(memoryUsage);
-        var filteredAvailableMemory = (long)_availableMemoryFilter.Filter(availableMemory);
+        var filteredAvailableMemory = maximumAvailableMemoryBytes - filteredMemoryUsage;
 
         var result = new EnvironmentStatistics(
             cpuUsagePercentage: filteredCpuUsage,
