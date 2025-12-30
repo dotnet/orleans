@@ -110,7 +110,7 @@
        providing a final check that the resources will be compiled into the assembly. -->
   <Target Name="ValidateFrontendEmbeddedResources" AfterTargets="CreateManifestResourceNames">
     <ItemGroup>
-      <_FrontendEmbeddedResources Include="@(EmbeddedResource)" Condition="$([System.String]::Copy('%(Link)').StartsWith('wwwroot'))" />
+      <_FrontendEmbeddedResources Include="@(EmbeddedResource)" Condition="'%(Link)' != '' and $([System.String]::Copy('%(Link)').StartsWith('wwwroot'))" />
     </ItemGroup>
 
     <Error 
@@ -119,4 +119,5 @@
   </Target>
 
 </Project>
+
 
