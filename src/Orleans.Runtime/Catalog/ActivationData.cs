@@ -66,6 +66,11 @@ internal sealed partial class ActivationData :
     private Task? _messageLoopTask;
 #pragma warning restore IDE0052 // Remove unread private members
 
+    private Activity? _activationActivity;
+
+    // Note: This must be static, since the activity source is used to trace across process boundaries, and thus it cannot be tied to the lifetime of an individual activation.
+    private static readonly ActivitySource DirectoryActivitySource = new("Microsoft.Orleans.Runtime.Directory", "1.0.0");
+
     public ActivationData(
         GrainAddress grainAddress,
         Func<IGrainContext, WorkItemGroup> createWorkItemGroup,
@@ -84,6 +89,11 @@ internal sealed partial class ActivationData :
         Debug.Assert(_workItemGroup != null, "_workItemGroup must not be null.");
     }
 
+    internal void SetActivationActivity(Activity activity)
+    {
+        _activationActivity = activity;
+    }
+
     public void Start(IGrainActivator grainActivator)
     {
         Debug.Assert(Equals(ActivationTaskScheduler, TaskScheduler.Current));
@@ -93,9 +103,15 @@ internal sealed partial class ActivationData :
             {
                 var instance = grainActivator.CreateInstance(this);
                 SetGrainInstance(instance);
+                _activationActivity?.AddEvent(new ActivityEvent("instance-created"));
             }
             catch (Exception exception)
             {
+                if (_activationActivity is not null)
+                {
+                    _activationActivity.SetStatus(ActivityStatusCode.Error);
+                    _activationActivity.AddEvent(new ActivityEvent("instance-create-failed"));
+                }
                 Deactivate(new(DeactivationReasonCode.ActivationFailed, exception, "Error constructing grain instance."), CancellationToken.None);
             }
 
@@ -1469,14 +1485,16 @@ internal sealed partial class ActivationData :
             return;
         }
 
-        // A chain of promises that will have to complete in order to complete the activation
-        // Register with the grain directory and call the Activate method on the new activation.
+        _activationActivity?.AddEvent(new ActivityEvent("activation-start"));
         try
         {
-            // Currently, the only grain type that is not registered in the Grain Directory is StatelessWorker.
-            // Among those that are registered in the directory, we currently do not have any multi activations.
             if (IsUsingGrainDirectory)
             {
+                Activity? registerSpan = DirectoryActivitySource.StartActivity("orleans.directory.register", ActivityKind.Client);
+                registerSpan?.SetTag("orleans.grain.id", GrainId.ToString());
+                registerSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
+                registerSpan?.SetTag("orleans.activation.id", ActivationId.ToString());
+                registerSpan?.SetTag("orleans.directory.previousRegistration.present", PreviousRegistration is not null);
                 Exception? registrationException;
                 var previousRegistration = PreviousRegistration;
                 bool success;
@@ -1491,21 +1509,20 @@ internal sealed partial class ActivationData :
                         {
                             Address = result;
                             success = true;
+                            _activationActivity?.AddEvent(new ActivityEvent("directory-register-success"));
+                            registerSpan?.AddEvent(new ActivityEvent("success"));
+                            registerSpan?.SetTag("orleans.directory.registered.address", result.ToFullString());
                         }
                         else if (result?.SiloAddress is { } registeredSilo && registeredSilo.Equals(Address.SiloAddress))
                         {
-                            // Attempt to register this activation again, using the registration of the previous instance of this grain,
-                            // which is registered to this silo. That activation must be a defunct predecessor of this activation,
-                            // since the catalog only allows one activation of a given grain at a time.
-                            // This could occur if the previous activation failed to unregister itself from the grain directory.
                             previousRegistration = result;
                             LogAttemptToRegisterWithPreviousActivation(_shared.Logger, GrainId, result);
+                            _activationActivity?.AddEvent(new ActivityEvent("directory-register-retry-previous"));
+                            registerSpan?.AddEvent(new ActivityEvent("retry-previous"));
                             continue;
                         }
                         else
                         {
-                            // Set the forwarding address so that messages enqueued on this activation can be forwarded to
-                            // the existing activation.
                             ForwardingAddress = result?.SiloAddress;
                             if (ForwardingAddress is { } address)
                             {
@@ -1514,8 +1531,6 @@ internal sealed partial class ActivationData :
 
                             success = false;
                             CatalogInstruments.ActivationConcurrentRegistrationAttempts.Add(1);
-                            // If this was a duplicate, it's not an error, just a race.
-                            // Forward on all of the pending messages, and then forget about this activation.
                             LogDuplicateActivation(
                                 _shared.Logger,
                                 Address,
@@ -1523,8 +1538,13 @@ internal sealed partial class ActivationData :
                                 GrainInstance?.GetType(),
                                 new(Address),
                                 WaitingCount);
+                            _activationActivity?.AddEvent(new ActivityEvent("duplicate-activation"));
+                            registerSpan?.AddEvent(new ActivityEvent("duplicate"));
+                            if (ForwardingAddress is { } fwd)
+                            {
+                                registerSpan?.SetTag("orleans.directory.forwarding.address", fwd.ToString());
+                            }
                         }
-
                         break;
                     }
 
@@ -1539,25 +1559,33 @@ internal sealed partial class ActivationData :
                     }
 
                     success = false;
+                    _activationActivity?.AddEvent(new ActivityEvent("directory-register-failed"));
+                    registerSpan?.SetStatus(ActivityStatusCode.Error);
+                    registerSpan?.AddEvent(new ActivityEvent("failed"));
+                    registerSpan?.SetTag("exception.type", exception.GetType().FullName);
+                    registerSpan?.SetTag("exception.message", exception.Message);
                 }
 
-                if (!success)
-                {
-                    Deactivate(new(DeactivationReasonCode.DirectoryFailure, registrationException, "Failed to register activation in grain directory."));
+                registerSpan?.Stop();
+                 if (!success)
+                 {
+                     Deactivate(new(DeactivationReasonCode.DirectoryFailure, registrationException, "Failed to register activation in grain directory."));
 
-                    // Activation failed.
-                    return;
-                }
+                     // Activation failed.
+                     _activationActivity?.SetStatus(ActivityStatusCode.Error);
+                     _activationActivity?.AddEvent(new ActivityEvent("activation-aborted"));
+                     return;
+                 }
             }
 
             lock (this)
             {
                 SetState(ActivationState.Activating);
             }
+            _activationActivity?.AddEvent(new ActivityEvent("state-activating"));
 
             LogActivatingGrain(_shared.Logger, this);
 
-            // Start grain lifecycle within try-catch wrapper to safely capture any exceptions thrown from called function
             try
             {
                 RequestContextExtensions.Import(requestContextData);
@@ -1565,12 +1593,15 @@ internal sealed partial class ActivationData :
                 {
                     if (_lifecycle is { } lifecycle)
                     {
+                        _activationActivity?.AddEvent(new ActivityEvent("lifecycle-start"));
                         await lifecycle.OnStart(cancellationToken).WaitAsync(cancellationToken);
+                        _activationActivity?.AddEvent(new ActivityEvent("lifecycle-started"));
                     }
                 }
                 catch (Exception exception)
                 {
                     LogErrorStartingLifecycle(_shared.Logger, exception, this);
+                    _activationActivity?.AddEvent(new ActivityEvent("lifecycle-start-failed"));
                     throw;
                 }
 
@@ -1578,48 +1609,44 @@ internal sealed partial class ActivationData :
                 {
                     try
                     {
+                        _activationActivity?.AddEvent(new ActivityEvent("on-activate-start"));
                         await grainBase.OnActivateAsync(cancellationToken).WaitAsync(cancellationToken);
+                        _activationActivity?.AddEvent(new ActivityEvent("on-activate-complete"));
                     }
                     catch (Exception exception)
                     {
                         LogErrorInGrainMethod(_shared.Logger, exception, nameof(IGrainBase.OnActivateAsync), this);
+                        _activationActivity?.AddEvent(new ActivityEvent("on-activate-failed"));
                         throw;
                     }
                 }
 
-                lock (this)
+            lock (this)
+            {
+                if (State is ActivationState.Activating)
                 {
-                    if (State is ActivationState.Activating)
-                    {
-                        SetState(ActivationState.Valid); // Activate calls on this activation are finished
-                        _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
-                    }
+                    SetState(ActivationState.Valid);
+                    _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
                 }
+            }
+            _activationActivity?.AddEvent(new ActivityEvent("state-valid"));
+            _activationActivity?.Stop();
 
-                LogFinishedActivatingGrain(_shared.Logger, this);
+            LogFinishedActivatingGrain(_shared.Logger, this);
             }
             catch (Exception exception)
             {
                 CatalogInstruments.ActivationFailedToActivate.Add(1);
-
-                // Capture the exception so that it can be propagated to rejection messages
                 var sourceException = (exception as OrleansLifecycleCanceledException)?.InnerException ?? exception;
                 LogErrorActivatingGrain(_shared.Logger, sourceException, this);
-
-                // Unregister this as a message target after some period of time.
-                // This is delayed so that consistently failing activation, perhaps due to an application bug or network
-                // issue, does not cause a flood of doomed activations.
-                // If the cancellation token was canceled, there is no need to wait an additional time, since the activation
-                // has already waited some significant amount of time.
                 if (!cancellationToken.IsCancellationRequested)
                 {
                     ScheduleOperation(new Command.Delay(TimeSpan.FromSeconds(5)));
                 }
-
-                // Perform the required deactivation steps.
                 Deactivate(new(DeactivationReasonCode.ActivationFailed, sourceException, "Failed to activate grain."));
-
-                // Activation failed.
+                _activationActivity?.SetStatus(ActivityStatusCode.Error);
+                _activationActivity?.AddEvent(new ActivityEvent("activation-failed"));
+                _activationActivity?.Stop();
                 return;
             }
         }
@@ -1627,6 +1654,9 @@ internal sealed partial class ActivationData :
         {
             LogActivationFailed(_shared.Logger, exception, this);
             Deactivate(new(DeactivationReasonCode.ApplicationError, exception, "Failed to activate grain."));
+            _activationActivity?.SetStatus(ActivityStatusCode.Error);
+            _activationActivity?.AddEvent(new ActivityEvent("activation-error"));
+            _activationActivity?.Stop();
         }
         finally
         {
@@ -2362,11 +2392,6 @@ internal sealed partial class ActivationData :
     private static partial void LogErrorActivatingGrain(ILogger logger, Exception exception, ActivationData grain);
 
     [LoggerMessage(
-        Level = LogLevel.Error,
-        Message = "Activation of grain {Grain} failed")]
-    private static partial void LogActivationFailed(ILogger logger, Exception exception, ActivationData grain);
-
-    [LoggerMessage(
         Level = LogLevel.Trace,
         Message = "Completing deactivation of '{Activation}'")]
     private static partial void LogCompletingDeactivation(ILogger logger, ActivationData activation);
@@ -2432,4 +2457,9 @@ internal sealed partial class ActivationData :
         Level = LogLevel.Debug,
         Message = "Rerouting {NumMessages} messages from invalid grain activation {Grain}")]
     private static partial void LogReroutingMessagesNoForwarding(ILogger logger, int numMessages, ActivationData grain);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Activation of grain {Grain} failed")]
+    private static partial void LogActivationFailed(ILogger logger, Exception exception, ActivationData grain);
 }
