@@ -178,6 +178,86 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<DiagnosticL
     }
 
     /// <summary>
+    /// Waits until the deactivation count for a specific grain type reaches or exceeds the expected count.
+    /// </summary>
+    /// <param name="grainTypeName">The grain type name to filter by.</param>
+    /// <param name="expectedCount">The minimum number of deactivations to wait for.</param>
+    /// <param name="timeout">Maximum time to wait. Defaults to 60 seconds.</param>
+    /// <returns>A task that completes when the expected count is reached.</returns>
+    /// <exception cref="TimeoutException">Thrown if the expected count is not reached within the timeout.</exception>
+    public async Task WaitForDeactivationCountAsync(string grainTypeName, int expectedCount, TimeSpan? timeout = null)
+    {
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(60);
+        using var cts = new CancellationTokenSource(effectiveTimeout);
+
+        while (!cts.Token.IsCancellationRequested)
+        {
+            var currentCount = GetDeactivationCount(grainTypeName);
+            if (currentCount >= expectedCount)
+            {
+                return;
+            }
+
+            try
+            {
+                await Task.Delay(50, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+        }
+
+        var finalCount = GetDeactivationCount(grainTypeName);
+        if (finalCount >= expectedCount)
+        {
+            return;
+        }
+
+        throw new TimeoutException($"Timed out waiting for {expectedCount} deactivations of grain type '{grainTypeName}'. Current count: {finalCount} after {effectiveTimeout}");
+    }
+
+    /// <summary>
+    /// Waits until the activation count for a specific grain type reaches or exceeds the expected count.
+    /// </summary>
+    /// <param name="grainTypeName">The grain type name to filter by.</param>
+    /// <param name="expectedCount">The minimum number of activations to wait for.</param>
+    /// <param name="timeout">Maximum time to wait. Defaults to 60 seconds.</param>
+    /// <returns>A task that completes when the expected count is reached.</returns>
+    /// <exception cref="TimeoutException">Thrown if the expected count is not reached within the timeout.</exception>
+    public async Task WaitForActivationCountAsync(string grainTypeName, int expectedCount, TimeSpan? timeout = null)
+    {
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(60);
+        using var cts = new CancellationTokenSource(effectiveTimeout);
+
+        while (!cts.Token.IsCancellationRequested)
+        {
+            var currentCount = GetActivationCount(grainTypeName);
+            if (currentCount >= expectedCount)
+            {
+                return;
+            }
+
+            try
+            {
+                await Task.Delay(50, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+        }
+
+        var finalCount = GetActivationCount(grainTypeName);
+        if (finalCount >= expectedCount)
+        {
+            return;
+        }
+
+        throw new TimeoutException($"Timed out waiting for {expectedCount} activations of grain type '{grainTypeName}'. Current count: {finalCount} after {effectiveTimeout}");
+    }
+
+    /// <summary>
     /// Clears all captured events.
     /// </summary>
     public void Clear()

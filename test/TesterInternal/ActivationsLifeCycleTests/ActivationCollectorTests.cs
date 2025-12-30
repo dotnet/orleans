@@ -21,14 +21,23 @@ namespace UnitTests.ActivationsLifeCycleTests
     {
         private static readonly TimeSpan DEFAULT_COLLECTION_QUANTUM = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan DEFAULT_IDLE_TIMEOUT = DEFAULT_COLLECTION_QUANTUM + TimeSpan.FromSeconds(1);
-        private static readonly TimeSpan WAIT_TIME = DEFAULT_IDLE_TIMEOUT.Multiply(3.0);
+        /// <summary>
+        /// Maximum time to wait for deactivations. This is a safety timeout for event-driven waiting.
+        /// Tests should complete faster when using diagnostic events.
+        /// </summary>
+        private static readonly TimeSpan MAX_WAIT_TIME = TimeSpan.FromSeconds(60);
 
         private TestCluster testCluster;
 
         private ILogger logger;
+        private GrainDiagnosticObserver _diagnosticObserver;
 
         private async Task Initialize(TimeSpan collectionAgeLimit, TimeSpan quantum)
         {
+            // Initialize the diagnostic observer before deploying the cluster
+            // so it can capture all grain lifecycle events from the start
+            _diagnosticObserver = GrainDiagnosticObserver.Create();
+
             var builder = new TestClusterBuilder(1);
             builder.Properties["CollectionQuantum"] = quantum.ToString();
             builder.Properties["DefaultCollectionAgeLimit"] = collectionAgeLimit.ToString();
@@ -74,6 +83,8 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         public async Task DisposeAsync()
         {
+            _diagnosticObserver?.Dispose();
+
             if (testCluster is null) return;
 
             try
@@ -125,7 +136,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain1));
 
             List<Task> tasks = new List<Task>();
-            logger.LogInformation("IdleActivationCollectorShouldCollectIdleActivations: activating {Count} grains.", grainCount);
+            logger.LogInformation("ActivationCollectorShouldCollectIdleActivations: activating {Count} grains.", grainCount);
             for (var i = 0; i < grainCount; ++i)
             {
                 IIdleActivationGcTestGrain1 g = this.testCluster.GrainFactory.GetGrain<IIdleActivationGcTestGrain1>(Guid.NewGuid());
@@ -137,10 +148,12 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(grainCount, activationsCreated);
 
             logger.LogInformation(
-                "IdleActivationCollectorShouldCollectIdleActivations: grains activated; waiting {WaitSeconds} sec (activation GC idle timeout is {DefaultIdleTime} sec).",
-                WAIT_TIME.TotalSeconds,
+                "ActivationCollectorShouldCollectIdleActivations: grains activated; waiting for {Count} deactivations (activation GC idle timeout is {DefaultIdleTime} sec).",
+                grainCount,
                 DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-            await Task.Delay(WAIT_TIME);
+
+            // Wait for all grains to be deactivated using event-driven approach
+            await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain1", grainCount, MAX_WAIT_TIME);
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
@@ -193,10 +206,12 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(idleGrainCount + busyGrainCount, activationsCreated);
 
             logger.LogInformation(
-                "ActivationCollectorShouldNotCollectBusyActivations: grains activated; waiting {WaitSeconds} sec (activation GC idle timeout is {DefaultIdleTime} sec).",
-                WAIT_TIME.TotalSeconds,
+                "ActivationCollectorShouldNotCollectBusyActivations: grains activated; waiting for {Count} idle grain deactivations (activation GC idle timeout is {DefaultIdleTime} sec).",
+                idleGrainCount,
                 DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-            await Task.Delay(WAIT_TIME);
+
+            // Wait for all idle grains to be deactivated using event-driven approach
+            await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain1", idleGrainCount, MAX_WAIT_TIME);
 
             // we should have only collected grains from the idle category (IdleActivationGcTestGrain1).
             int idleActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, idleGrainTypeName);
@@ -255,9 +270,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(idleGrainCount + busyGrainCount, activationsCreated);
 
             logger.LogInformation(
-                "ManualCollectionShouldNotCollectBusyActivations: grains activated; waiting {TotalSeconds} sec (activation GC idle timeout is {DefaultIdleTime} sec).",
-                shortIdleTimeout.TotalSeconds,
-                DEFAULT_IDLE_TIMEOUT.TotalSeconds);
+                "ManualCollectionShouldNotCollectBusyActivations: grains activated; waiting {TotalSeconds} sec before triggering manual collection.",
+                shortIdleTimeout.TotalSeconds);
             await Task.Delay(shortIdleTimeout);
 
             TimeSpan everything = TimeSpan.FromMinutes(10);
@@ -265,12 +279,13 @@ namespace UnitTests.ActivationsLifeCycleTests
             IManagementGrain mgmtGrain = this.testCluster.GrainFactory.GetGrain<IManagementGrain>(0);
             await mgmtGrain.ForceActivationCollection(everything);
 
-
             logger.LogInformation(
-                "ManualCollectionShouldNotCollectBusyActivations: waiting {WaitSeconds} sec (activation GC idle timeout is {DefaultIdleTime} sec).",
-                WAIT_TIME.TotalSeconds,
+                "ManualCollectionShouldNotCollectBusyActivations: waiting for {Count} idle grain deactivations (activation GC idle timeout is {DefaultIdleTime} sec).",
+                idleGrainCount,
                 DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-            await Task.Delay(WAIT_TIME);
+
+            // Wait for all idle grains to be deactivated using event-driven approach
+            await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain1", idleGrainCount, MAX_WAIT_TIME);
 
             // we should have only collected grains from the idle category (IdleActivationGcTestGrain).
             int idleActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, idleGrainTypeName);
@@ -285,7 +300,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         public async Task ActivationCollectorShouldCollectIdleActivationsSpecifiedInPerTypeConfiguration()
         {
             //make sure default value won't cause activation collection during wait time
-            var defaultCollectionAgeLimit = WAIT_TIME.Multiply(2);
+            var defaultCollectionAgeLimit = MAX_WAIT_TIME.Multiply(2);
             await Initialize(defaultCollectionAgeLimit);
 
             const int grainCount = 1000;
@@ -304,10 +319,12 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(grainCount, activationsCreated);
 
             logger.LogInformation(
-                "ActivationCollectorShouldCollectIdleActivationsSpecifiedInPerTypeConfiguration: grains activated; waiting {WaitSeconds} sec (activation GC idle timeout is {DefaultIdleTime} sec).",
-                WAIT_TIME.TotalSeconds,
+                "ActivationCollectorShouldCollectIdleActivationsSpecifiedInPerTypeConfiguration: grains activated; waiting for {Count} deactivations (activation GC idle timeout is {DefaultIdleTime} sec).",
+                grainCount,
                 DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-            await Task.Delay(WAIT_TIME);
+
+            // Wait for all grains to be deactivated using event-driven approach
+            await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain2", grainCount, MAX_WAIT_TIME);
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
@@ -317,7 +334,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         public async Task ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration()
         {
             //make sure default value won't cause activation collection during wait time
-            var defaultCollectionAgeLimit = WAIT_TIME.Multiply(2);
+            var defaultCollectionAgeLimit = MAX_WAIT_TIME.Multiply(2);
             await Initialize(defaultCollectionAgeLimit);
 
             const int idleGrainCount = 500;
@@ -362,10 +379,12 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(idleGrainCount + busyGrainCount, activationsCreated);
 
             logger.LogInformation(
-                "IdleActivationCollectorShouldNotCollectBusyActivations: grains activated; waiting {WaitSeconds} sec (activation GC idle timeout is {DefaultIdleTime} sec).",
-                WAIT_TIME.TotalSeconds,
+                "ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration: grains activated; waiting for {Count} idle grain deactivations (activation GC idle timeout is {DefaultIdleTime} sec).",
+                idleGrainCount,
                 DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-            await Task.Delay(WAIT_TIME);
+
+            // Wait for all idle grains to be deactivated using event-driven approach
+            await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain2", idleGrainCount, MAX_WAIT_TIME);
 
             // we should have only collected grains from the idle category (IdleActivationGcTestGrain2).
             int idleActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, idleGrainTypeName);
@@ -446,6 +465,9 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             for (int i = 0; i < 2; ++i)
             {
+                // Clear deactivation events from previous iteration
+                _diagnosticObserver.Clear();
+
                 // 2. activate a set of grains... 
                 this.logger.LogInformation("ActivationCollectorShouldNotCollectBusyStatelessWorkers: activating {Count} stateless worker grains (run #{RunNumber}).", grainCount, i);
                 foreach (var g in grains)
@@ -463,16 +485,22 @@ namespace UnitTests.ActivationsLifeCycleTests
                 int activationsCreated = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, grainTypeName);
                 Assert.True(activationsCreated > grainCount, $"more than {grainCount} activations should have been created; got {activationsCreated} instead");
 
+                // Calculate how many deactivations we expect (all but one per grain)
+                int expectedDeactivations = activationsCreated - grainCount;
+
                 // 4. periodically send a message to each grain...
                 this.logger.LogInformation("ActivationCollectorShouldNotCollectBusyStatelessWorkers: grains activated; sending heartbeat to {Count} stateless worker grains.", grainCount);
                 Task workerTask = Task.Run(workerFunc);
 
                 // 5. wait long enough for idle activations to be collected.
                 this.logger.LogInformation(
-                    "ActivationCollectorShouldNotCollectBusyStatelessWorkers: grains activated; waiting {WaitSeconds} sec (activation GC idle timeout is {DefaultIdleTimeout} sec).",
-                    WAIT_TIME.TotalSeconds,
+                    "ActivationCollectorShouldNotCollectBusyStatelessWorkers: waiting for {ExpectedDeactivations} deactivations (activation GC idle timeout is {DefaultIdleTimeout} sec).",
+                    expectedDeactivations,
                     DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-                await Task.Delay(WAIT_TIME);
+
+                // Wait for idle activations to be deactivated using event-driven approach
+                // We expect all but one activation per grain to be collected
+                await _diagnosticObserver.WaitForDeactivationCountAsync("StatelessWorkerActivationCollectorTestGrain1", expectedDeactivations, MAX_WAIT_TIME);
 
                 // 6. verify that only one activation is still active per grain.
                 int busyActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, grainTypeName);
@@ -495,8 +523,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldCollectByCollectionSpecificAgeLimitForTwelveSeconds()
         {
-            var waitTime = TimeSpan.FromSeconds(30);
-            var defaultCollectionAge = waitTime.Multiply(2);
+            var defaultCollectionAge = MAX_WAIT_TIME.Multiply(2);
             //make sure defaultCollectionAge value won't cause activation collection in wait time
             await Initialize(defaultCollectionAge);
 
@@ -518,12 +545,12 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(grainCount, activationsCreated);
 
             logger.LogInformation(
-                "ActivationCollectorShouldCollectByCollectionSpecificAgeLimit: grains activated; waiting {WaitSeconds} sec (activation GC idle timeout is {DefaultIdleTimeout} sec).",
-                WAIT_TIME.TotalSeconds,
+                "ActivationCollectorShouldCollectByCollectionSpecificAgeLimit: grains activated; waiting for {Count} deactivations (activation GC idle timeout is {DefaultIdleTimeout} sec).",
+                grainCount,
                 DEFAULT_IDLE_TIMEOUT.TotalSeconds);
             
-            // Some time is required for GC to collect all of the Grains)
-            await Task.Delay(waitTime);
+            // Wait for all grains to be deactivated using event-driven approach
+            await _diagnosticObserver.WaitForDeactivationCountAsync("CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain", grainCount, MAX_WAIT_TIME);
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
@@ -542,7 +569,10 @@ namespace UnitTests.ActivationsLifeCycleTests
             // Since the collection age is 5 seconds and keepAlive is false, the grain should be
             // collected before the timer fires.
             await grain.StartTimer(testName, TimeSpan.FromSeconds(10), keepAlive: false);
-            await Task.Delay(TimeSpan.FromSeconds(7));
+
+            // Wait for the grain to be deactivated using event-driven approach
+            logger.LogInformation("NonReentrantGrainTimer_NoKeepAlive_Test: waiting for grain deactivation.");
+            await _diagnosticObserver.WaitForDeactivationCountAsync("NonReentrantTimerCallGrain", 1, TimeSpan.FromSeconds(30));
 
             var tickCount = await grain.GetTickCount();
 
