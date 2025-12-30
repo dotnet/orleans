@@ -12,9 +12,10 @@ namespace UnitTests.StuckGrainTests
     /// <summary>
     /// Summary description for PersistenceTest
     /// </summary>
-    public class StuckGrainTests : OrleansTestingBase, IClassFixture<StuckGrainTests.Fixture>
+    public class StuckGrainTests : OrleansTestingBase, IClassFixture<StuckGrainTests.Fixture>, IDisposable
     {
         private readonly Fixture fixture;
+        private readonly GrainDiagnosticObserver _grainObserver;
 
         public class Fixture : BaseTestClusterFixture
         {
@@ -48,6 +49,12 @@ namespace UnitTests.StuckGrainTests
         public StuckGrainTests(Fixture fixture)
         {
             this.fixture = fixture;
+            _grainObserver = GrainDiagnosticObserver.Create();
+        }
+
+        public void Dispose()
+        {
+            _grainObserver?.Dispose();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivationCollection")]
@@ -66,8 +73,9 @@ namespace UnitTests.StuckGrainTests
             // Should complete now
             await task.WaitAsync(TimeSpan.FromSeconds(1));
 
-            // wait for activation collection
-            await Task.Delay(TimeSpan.FromSeconds(6));
+            // Wait for the grain to be deactivated by activation collection
+            // instead of using arbitrary Task.Delay(6000)
+            await _grainObserver.WaitForGrainDeactivatedAsync(stuckGrain.GetGrainId(), TimeSpan.FromSeconds(30));
 
             Assert.False(await cleaner.IsActivated(id), "Grain activation is supposed be garbage collected, but it is still running.");
         }
