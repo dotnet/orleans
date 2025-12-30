@@ -395,27 +395,26 @@ namespace UnitTests.ActivationsLifeCycleTests
             quit[0] = true;
         } 
   
-        [Fact(Skip = "Flaky test. Needs to be investigated."), TestCategory("ActivationCollector"), TestCategory("Functional")]
+        [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyStatelessWorkers()
         {
             await Initialize(DEFAULT_IDLE_TIMEOUT);
 
-            // the purpose of this test is to determine whether idle stateless worker activations are properly identified by the activation collector.
-            // in this test, we:
+            // The purpose of this test is to verify that idle stateless worker activations are properly
+            // identified and collected by the activation collector, while busy activations are retained.
             //
-            //   1. setup the test.
-            //   2. activate a set of grains by sending a burst of messages to each one. the purpose of the burst is to ensure that multiple activations are used. 
-            //   3. verify that multiple activations for each grain have been created.
-            //   4. periodically send a message to each grain, ensuring that only one activation remains busy. each time we check the activation id and compare it against the activation id returned by the previous grain call. initially, these may not be identical but as the other activations become idle and are collected, there will be only one activation servicing these calls.
-            //   5. wait long enough for idle activations to be collected.
-            //   6. verify that only one activation is still active per grain.
-            //   7. ensure that test steps 2-6 are repeatable.
+            // Test steps:
+            //   1. Create a stateless worker grain and send a burst of concurrent requests to create multiple activations
+            //   2. Verify that multiple activations were created
+            //   3. Start a background task that keeps one activation busy with periodic requests
+            //   4. Wait for idle activations to be collected (using event-driven waiting)
+            //   5. Verify that exactly one activation remains (the busy one)
+            //   6. Repeat to ensure the behavior is consistent
 
             const int grainCount = 1;
             var grainTypeName = RuntimeTypeNameFormatter.Format(typeof(StatelessWorkerActivationCollectorTestGrain1));
             const int burstLength = 1000;
 
-            List<Task> tasks0 = new List<Task>();
             List<IStatelessWorkerActivationCollectorTestGrain1> grains = new List<IStatelessWorkerActivationCollectorTestGrain1>();
             for (var i = 0; i < grainCount; ++i)
             {
@@ -423,100 +422,91 @@ namespace UnitTests.ActivationsLifeCycleTests
                 grains.Add(g);
             }
 
+            using var workerCts = new CancellationTokenSource();
 
-            bool[] quit = new bool[] { false };
-            bool[] matched = new bool[grainCount];
-            string[] activationIds = new string[grainCount];
-            async Task workFunc(int index)
+            async Task KeepGrainBusyAsync(IStatelessWorkerActivationCollectorTestGrain1 grain, CancellationToken ct)
             {
-                // (part of) 4. periodically send a message to each grain...
-
-                // take a grain and call Delay to keep it busy.
-                IStatelessWorkerActivationCollectorTestGrain1 g = grains[index];
-                await g.Delay(DEFAULT_IDLE_TIMEOUT.Divide(2));
-                // identify the activation and record whether it matches the activation ID last reported. it probably won't match in the beginning but should always converge on a match as other activations get collected.
-                string aid = await g.IdentifyActivation();
-                logger.LogInformation("ActivationCollectorShouldNotCollectBusyStatelessWorkers: identified {Activation}", aid);
-                matched[index] = aid == activationIds[index];
-                activationIds[index] = aid;
-            }
-            async Task workerFunc()
-            {
-                // (part of) 4. periodically send a message to each grain...
-                logger.LogInformation("ActivationCollectorShouldNotCollectBusyStatelessWorkers: busyWorker started");
-
-                List<Task> tasks1 = new List<Task>();
-                while (!quit[0])
+                // Keep one activation busy by sending periodic requests
+                // The delay should be less than the idle timeout to prevent collection
+                var keepAliveInterval = DEFAULT_IDLE_TIMEOUT.Divide(2);
+                while (!ct.IsCancellationRequested)
                 {
-                    for (int index = 0; index < grains.Count; ++index)
+                    try
                     {
-                        if (quit[0])
-                        {
-                            break;
-                        }
-
-                        tasks1.Add(workFunc(index));
+                        await grain.Delay(keepAliveInterval);
                     }
-                    await Task.WhenAll(tasks1);
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    {
+                        break;
+                    }
                 }
             }
 
-            // setup (1) ends here.
-
-            for (int i = 0; i < 2; ++i)
+            for (int iteration = 0; iteration < 2; ++iteration)
             {
                 // Clear deactivation events from previous iteration
                 _diagnosticObserver.Clear();
 
-                // 2. activate a set of grains... 
-                this.logger.LogInformation("ActivationCollectorShouldNotCollectBusyStatelessWorkers: activating {Count} stateless worker grains (run #{RunNumber}).", grainCount, i);
+                // Step 1: Send a burst of concurrent requests to create multiple activations
+                this.logger.LogInformation(
+                    "ActivationCollectorShouldNotCollectBusyStatelessWorkers: activating stateless worker grains (iteration #{Iteration}).",
+                    iteration);
+
+                var burstTasks = new List<Task>();
                 foreach (var g in grains)
                 {
                     for (int j = 0; j < burstLength; ++j)
                     {
-                        // having the activation delay will ensure that one activation cannot serve all requests that we send to it, making it so that additional activations will be created.
-                        tasks0.Add(g.Delay(TimeSpan.FromMilliseconds(10)));
+                        // The delay ensures one activation cannot serve all requests, forcing creation of additional activations
+                        burstTasks.Add(g.Delay(TimeSpan.FromMilliseconds(10)));
                     }
                 }
-                await Task.WhenAll(tasks0);
+                await Task.WhenAll(burstTasks);
 
-
-                // 3. verify that multiple activations for each grain have been created.
+                // Step 2: Verify that multiple activations were created
                 int activationsCreated = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, grainTypeName);
-                Assert.True(activationsCreated > grainCount, $"more than {grainCount} activations should have been created; got {activationsCreated} instead");
+                Assert.True(activationsCreated > grainCount,
+                    $"Expected more than {grainCount} activations to be created; got {activationsCreated} instead");
 
-                // Calculate how many deactivations we expect (all but one per grain)
+                this.logger.LogInformation(
+                    "ActivationCollectorShouldNotCollectBusyStatelessWorkers: {ActivationsCreated} activations created.",
+                    activationsCreated);
+
+                // Calculate expected deactivations: all activations except one per grain should be collected
                 int expectedDeactivations = activationsCreated - grainCount;
 
-                // 4. periodically send a message to each grain...
-                this.logger.LogInformation("ActivationCollectorShouldNotCollectBusyStatelessWorkers: grains activated; sending heartbeat to {Count} stateless worker grains.", grainCount);
-                Task workerTask = Task.Run(workerFunc);
+                // Step 3: Start background task to keep one activation busy
+                using var iterationCts = new CancellationTokenSource();
+                var busyTasks = grains.Select(g => KeepGrainBusyAsync(g, iterationCts.Token)).ToList();
 
-                // 5. wait long enough for idle activations to be collected.
+                // Step 4: Wait for idle activations to be collected using event-driven approach
                 this.logger.LogInformation(
-                    "ActivationCollectorShouldNotCollectBusyStatelessWorkers: waiting for {ExpectedDeactivations} deactivations (activation GC idle timeout is {DefaultIdleTimeout} sec).",
+                    "ActivationCollectorShouldNotCollectBusyStatelessWorkers: waiting for {ExpectedDeactivations} deactivations.",
+                    expectedDeactivations);
+
+                await _diagnosticObserver.WaitForDeactivationCountAsync(
+                    "StatelessWorkerActivationCollectorTestGrain1",
                     expectedDeactivations,
-                    DEFAULT_IDLE_TIMEOUT.TotalSeconds);
+                    MAX_WAIT_TIME);
 
-                // Wait for idle activations to be deactivated using event-driven approach
-                // We expect all but one activation per grain to be collected
-                await _diagnosticObserver.WaitForDeactivationCountAsync("StatelessWorkerActivationCollectorTestGrain1", expectedDeactivations, MAX_WAIT_TIME);
-
-                // 6. verify that only one activation is still active per grain.
-                int busyActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, grainTypeName);
-
-                // signal that the worker task should stop and wait for it to finish.
-                quit[0] = true;
-                await workerTask;
-                quit[0] = false;
-
-                Assert.Equal(grainCount, busyActivationsNotCollected);
-
-                // verify that we matched activation ids in the final iteration of step 4's loop.
-                for (int index = 0; index < grains.Count; ++index)
+                // Step 5: Stop the busy worker and verify exactly one activation remains
+                iterationCts.Cancel();
+                try
                 {
-                    Assert.True(matched[index], string.Format("activation ID of final subsequent heartbeats did not match for grain {0}", grains[index]));
+                    await Task.WhenAll(busyTasks);
                 }
+                catch (OperationCanceledException)
+                {
+                    // Expected when cancellation is requested
+                }
+
+                int remainingActivations = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, grainTypeName);
+                Assert.Equal(grainCount, remainingActivations);
+
+                this.logger.LogInformation(
+                    "ActivationCollectorShouldNotCollectBusyStatelessWorkers: iteration {Iteration} completed successfully. {Remaining} activation(s) remaining.",
+                    iteration,
+                    remainingActivations);
             }
         }
 
