@@ -107,8 +107,9 @@
 
   <!-- Validate that frontend assets were actually included as embedded resources.
        This runs after CreateManifestResourceNames has processed all EmbeddedResource items,
-       providing a final check that the resources will be compiled into the assembly. -->
-  <Target Name="ValidateFrontendEmbeddedResources" AfterTargets="CreateManifestResourceNames">
+       providing a final check that the resources will be compiled into the assembly.
+       Only runs during build (not during pack) by checking that IncludeFrontendAssets ran. -->
+  <Target Name="ValidateFrontendEmbeddedResources" AfterTargets="CreateManifestResourceNames" Condition="'@(_DistFiles)' != ''">
     <ItemGroup>
       <_FrontendEmbeddedResources Include="@(EmbeddedResource)" Condition="'%(Link)' != '' and $([System.String]::Copy('%(Link)').StartsWith('wwwroot'))" />
     </ItemGroup>
@@ -119,3 +120,4 @@
   </Target>
 
 </Project>
+
