@@ -19,8 +19,15 @@
 
   <!-- Use a marker file for incremental build tracking -->
   <PropertyGroup>
-    <NpmAppBuildMarker>$(BaseIntermediateOutputPath)\frontend.build.marker</NpmAppBuildMarker>
+    <NpmAppBuildMarker>$(BaseIntermediateOutputPath)frontend.build.marker</NpmAppBuildMarker>
   </PropertyGroup>
+
+  <!-- Include all frontend dist files as embedded resources using a simple glob.
+       The glob is evaluated at project load time. If dist doesn't exist yet, it matches nothing.
+       The BuildNpmApp target creates the files before compilation needs them. -->
+  <ItemGroup>
+    <EmbeddedResource Include="$(NpmBuildOutput)**\*" Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
 
   <Target
     Name="DeleteNpmBuildMarker"
@@ -29,61 +36,81 @@
     <Delete Files="$(NpmAppBuildMarker)" />
   </Target>
 
-  <!-- Build the frontend (runs once regardless of target frameworks)
+  <!-- Build the frontend application.
+       This target runs once regardless of how many target frameworks are being built.
        See: https://learn.microsoft.com/visualstudio/msbuild/run-target-exactly-once -->
   <Target Name="BuildNpmApp" Inputs="@(NpmAppSources)" Outputs="$(NpmAppBuildMarker)">
-    <!-- Use Azure DevOps npmrc and build command if running in CI, otherwise use defaults -->
+    <Exec Command="node --version" ConsoleToMsBuild="true" StandardOutputImportance="Low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="NodeVersion" />
+    </Exec>
+    <Message Importance="High" Text="Building Orleans Dashboard frontend with Node.js $(NodeVersion)" />
+
+    <!-- Use Azure DevOps npmrc if running in CI -->
     <PropertyGroup>
-      <NpmConfigArg Condition="'$(TF_BUILD)' == 'true'">--userconfig &quot;$(AzureDevOpsNpmrcFile)&quot;</NpmConfigArg>
-      <NpmBuildCommand>build</NpmBuildCommand>
+      <NpmConfigArg Condition="'$(TF_BUILD)' == 'true'">--userconfig "$(AzureDevOpsNpmrcFile)"</NpmConfigArg>
     </PropertyGroup>
+
+    <!-- Install dependencies -->
     <Exec
       Command="npm ci --prefer-offline --no-audit $(NpmConfigArg)"
       WorkingDirectory="$(NpmAppRootDirectory)"
       ConsoleToMsBuild="true" />
+
+    <!-- Build the frontend -->
     <Exec
-      Command="npm run $(NpmBuildCommand)"
+      Command="npm run build"
       WorkingDirectory="$(NpmAppRootDirectory)"
       ConsoleToMsBuild="true" />
+
     <!-- Create marker file to track successful build -->
     <Touch Files="$(NpmAppBuildMarker)" AlwaysCreate="true" />
   </Target>
 
-  <!-- Hook BuildNpmApp to run once before DispatchToInnerBuilds for multi-targeted builds -->
+  <!-- Hook BuildNpmApp to run once before DispatchToInnerBuilds for multi-targeted builds.
+       DispatchToInnerBuilds only runs once during multi-targeted builds, so attaching here
+       ensures the npm build runs exactly once before all inner framework builds. -->
   <Target
     Name="BuildNpmAppBeforeOuterBuild"
     DependsOnTargets="BuildNpmApp"
     BeforeTargets="DispatchToInnerBuilds"
     />
 
-  <!-- Hook BuildNpmApp to run once before inner build targets (invokes outer build) -->
+  <!-- Hook BuildNpmApp to run once before inner build targets.
+       For single-targeted builds (or when invoked directly with a TargetFramework),
+       this target calls BuildNpmApp via MSBuild with TargetFramework removed,
+       which invokes the outer build and ensures BuildNpmApp runs exactly once. -->
   <Target
     Name="BuildNpmAppBeforeInnerBuild"
-    BeforeTargets="AssignTargetPaths;BeforeBuild;Compile">
+    BeforeTargets="BeforeBuild">
     <MSBuild
       Projects="$(MSBuildProjectFullPath)"
       Targets="BuildNpmApp"
       RemoveProperties="TargetFramework" />
   </Target>
 
-  <!-- Include frontend assets as embedded resources -->
-  <ItemGroup>
-    <EmbeddedResource
-      Include="$(NpmBuildOutput)\**\*"
-      Condition="Exists('$(NpmBuildOutput)')"
-      Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)"
-      />
-  </ItemGroup>
+  <!-- Verify required frontend assets are present and will be embedded.
+       This target fails the build if required assets are missing. -->
+  <Target Name="ValidateFrontendAssets" BeforeTargets="CoreCompile" DependsOnTargets="BuildNpmAppBeforeInnerBuild">
+    <!-- Check that required files exist on disk -->
+    <Error 
+      Condition="!Exists('$(NpmBuildOutput)index.html')" 
+      Text="Required frontend asset is missing: $(NpmBuildOutput)index.html. The frontend build may have failed. Ensure Node.js is installed." />
+    <Error 
+      Condition="!Exists('$(NpmBuildOutput)index.min.js')" 
+      Text="Required frontend asset is missing: $(NpmBuildOutput)index.min.js. The frontend build may have failed. Ensure Node.js is installed." />
+    <Error 
+      Condition="!Exists('$(NpmBuildOutput)index.css')" 
+      Text="Required frontend asset is missing: $(NpmBuildOutput)index.css. The frontend build may have failed. Ensure Node.js is installed." />
 
-  <!-- Verify required frontend assets are present -->
-  <Target Name="ValidateFrontendAssets" BeforeTargets="CoreCompile" DependsOnTargets="BuildNpmApp">
+    <!-- Count embedded resources from frontend -->
     <ItemGroup>
-      <RequiredAsset Include="$(NpmBuildOutput)\index.html" />
-      <RequiredAsset Include="$(NpmBuildOutput)\index.min.js" />
-      <MissingAsset Include="@(RequiredAsset)" Condition="!Exists('%(Identity)')" />
+      <_FrontendEmbeddedResource Include="@(EmbeddedResource)" Condition="$([System.String]::Copy('%(Identity)').StartsWith('$(NpmBuildOutput)'))" />
     </ItemGroup>
-
-    <Error Condition="'@(MissingAsset)' != ''" Text="Required frontend assets are missing: @(MissingAsset, ', '). Frontend build may have failed." />
+    <Error 
+      Condition="'@(_FrontendEmbeddedResource)' == ''" 
+      Text="No frontend assets were added as embedded resources. The frontend build output at '$(NpmBuildOutput)' may not exist or the build order may be incorrect." />
+    
+    <Message Importance="High" Text="Frontend assets validated: @(_FrontendEmbeddedResource->Count()) files will be embedded" />
   </Target>
 
 </Project>
