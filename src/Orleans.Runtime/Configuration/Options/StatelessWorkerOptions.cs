@@ -33,10 +33,10 @@ public class StatelessWorkerOptions
     /// <summary>
     /// The minumun, consecutive number of idle cycles any given worker must exibit before it is deemed enough to remove the worker.
     /// </summary>
-    public int MinIdleCyclesBeforeRemoval { get; set; }
+    public int MinIdleCyclesBeforeRemoval { get; set; } = DEFAULT_MIN_IDLE_CYCLES_BEFORE_REMOVAL;
 
     /// <summary>
     /// The default value for <see cref="MinIdleCyclesBeforeRemoval"/>.
     /// </summary>
-    public const int DEFAULT_MIN_IDLE_CYCLES_BEFORE_REMOVAL = 3;
+    public const int DEFAULT_MIN_IDLE_CYCLES_BEFORE_REMOVAL = 1;
 }
