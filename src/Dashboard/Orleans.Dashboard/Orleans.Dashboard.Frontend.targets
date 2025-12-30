@@ -101,7 +101,8 @@
       <EmbeddedResource Include="@(_DistFiles)" Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)" />
     </ItemGroup>
 
-    <Message Importance="High" Text="Frontend assets: @(_DistFiles->Count()) files will be embedded" />
+    <!-- Fail the build if no assets were found -->
+    <Error Condition="'@(_DistFiles)' == ''" Text="No frontend assets found in $(NpmBuildOutput). The frontend build may have failed." />
   </Target>
 
 </Project>
