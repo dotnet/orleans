@@ -105,4 +105,18 @@
     <Error Condition="'@(_DistFiles)' == ''" Text="No frontend assets found in $(NpmBuildOutput). The frontend build may have failed." />
   </Target>
 
+  <!-- Validate that frontend assets were actually included as embedded resources.
+       This runs after CreateManifestResourceNames has processed all EmbeddedResource items,
+       providing a final check that the resources will be compiled into the assembly. -->
+  <Target Name="ValidateFrontendEmbeddedResources" AfterTargets="CreateManifestResourceNames">
+    <ItemGroup>
+      <_FrontendEmbeddedResources Include="@(EmbeddedResource)" Condition="$([System.String]::Copy('%(Link)').StartsWith('wwwroot'))" />
+    </ItemGroup>
+
+    <Error 
+      Condition="'@(_FrontendEmbeddedResources)' == ''" 
+      Text="No frontend assets found in EmbeddedResource items. The frontend assets were not properly included." />
+  </Target>
+
 </Project>
+
