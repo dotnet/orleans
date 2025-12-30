@@ -22,13 +22,6 @@
     <NpmAppBuildMarker>$(BaseIntermediateOutputPath)frontend.build.marker</NpmAppBuildMarker>
   </PropertyGroup>
 
-  <!-- Include all frontend dist files as embedded resources using a simple glob.
-       The glob is evaluated at project load time. If dist doesn't exist yet, it matches nothing.
-       The BuildNpmApp target creates the files before compilation needs them. -->
-  <ItemGroup>
-    <EmbeddedResource Include="$(NpmBuildOutput)**\*" Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)" />
-  </ItemGroup>
-
   <Target
     Name="DeleteNpmBuildMarker"
     AfterTargets="Clean"
@@ -88,10 +81,12 @@
       RemoveProperties="TargetFramework" />
   </Target>
 
-  <!-- Verify required frontend assets are present and will be embedded.
-       This target fails the build if required assets are missing. -->
-  <Target Name="ValidateFrontendAssets" BeforeTargets="CoreCompile" DependsOnTargets="BuildNpmAppBeforeInnerBuild">
-    <!-- Check that required files exist on disk -->
+  <!-- Include frontend assets as embedded resources.
+       This must run after BuildNpmApp creates the dist folder and before CoreCompile.
+       We use CreateItem to dynamically discover files at target execution time,
+       rather than relying on static globs which are evaluated at project load time. -->
+  <Target Name="IncludeFrontendAssets" BeforeTargets="CoreCompile" DependsOnTargets="BuildNpmAppBeforeInnerBuild">
+    <!-- Validate required files exist -->
     <Error 
       Condition="!Exists('$(NpmBuildOutput)index.html')" 
       Text="Required frontend asset is missing: $(NpmBuildOutput)index.html. The frontend build may have failed. Ensure Node.js is installed." />
@@ -102,15 +97,13 @@
       Condition="!Exists('$(NpmBuildOutput)index.css')" 
       Text="Required frontend asset is missing: $(NpmBuildOutput)index.css. The frontend build may have failed. Ensure Node.js is installed." />
 
-    <!-- Count embedded resources from frontend -->
+    <!-- Dynamically discover and add all dist files as embedded resources -->
     <ItemGroup>
-      <_FrontendEmbeddedResource Include="@(EmbeddedResource)" Condition="$([System.String]::Copy('%(Identity)').StartsWith('$(NpmBuildOutput)'))" />
+      <_DistFiles Include="$(NpmBuildOutput)**\*" />
+      <EmbeddedResource Include="@(_DistFiles)" Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)" />
     </ItemGroup>
-    <Error 
-      Condition="'@(_FrontendEmbeddedResource)' == ''" 
-      Text="No frontend assets were added as embedded resources. The frontend build output at '$(NpmBuildOutput)' may not exist or the build order may be incorrect." />
-    
-    <Message Importance="High" Text="Frontend assets validated: @(_FrontendEmbeddedResource->Count()) files will be embedded" />
+
+    <Message Importance="High" Text="Frontend assets: @(_DistFiles->Count()) files will be embedded" />
   </Target>
 
 </Project>
