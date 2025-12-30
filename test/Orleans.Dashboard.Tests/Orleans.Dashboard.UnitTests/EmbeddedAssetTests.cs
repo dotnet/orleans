@@ -167,10 +167,21 @@ namespace UnitTests
         {
             var provider = new EmbeddedAssetProvider();
             var httpContext = new DefaultHttpContext();
+            var assembly = typeof(EmbeddedAssetProvider).GetTypeInfo().Assembly;
+            var fontResourceName = assembly
+                .GetManifestResourceNames()
+                .FirstOrDefault(name =>
+                    name.EndsWith(".woff2", StringComparison.Ordinal) ||
+                    name.EndsWith(".woff", StringComparison.Ordinal));
 
-            // Test serving a font file with the path format used by the route handler
-            var result = provider.ServeAsset("fonts.fa-solid-900.woff2", httpContext);
+            Assert.NotNull(fontResourceName);
 
+            var resourcePrefix = typeof(EmbeddedAssetProvider).Namespace + ".";
+            var assetName = fontResourceName.StartsWith(resourcePrefix, StringComparison.Ordinal)
+                ? fontResourceName.Substring(resourcePrefix.Length)
+                : fontResourceName;
+
+            var result = provider.ServeAsset(assetName, httpContext);
             Assert.IsNotType<NotFound>(result);
         }
 
