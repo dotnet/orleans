@@ -31,7 +31,7 @@ public class StatelessWorkerOptions
     public static readonly TimeSpan DEFAULT_IDLE_WORKERS_INSPECTION_PERIOD = TimeSpan.FromMilliseconds(500);
 
     /// <summary>
-    /// The minumun, consecutive number of idle cycles any given worker must exibit before it is deemed enough to remove the worker.
+    /// The minimum, consecutive number of idle cycles any given worker must exhibit before it is deemed enough to remove the worker.
     /// </summary>
     public int MinIdleCyclesBeforeRemoval { get; set; } = DEFAULT_MIN_IDLE_CYCLES_BEFORE_REMOVAL;
 
