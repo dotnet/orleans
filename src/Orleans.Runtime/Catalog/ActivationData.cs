@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Core.Internal;
+using Orleans.Diagnostics;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
 using Orleans.Runtime.Placement;
@@ -40,6 +41,8 @@ internal sealed partial class ActivationData :
     IAsyncDisposable,
     IDisposable
 {
+    private static readonly DiagnosticListener DiagnosticListener = new(OrleansGrainDiagnostics.ListenerName);
+
     private const string GrainAddressMigrationContextKey = "sys.addr";
     private readonly GrainTypeSharedContext _shared;
     private readonly IServiceScope _serviceScope;
@@ -354,6 +357,18 @@ internal sealed partial class ActivationData :
             {
                 participant.Participate(ObservableLifecycle);
             }
+
+            // Emit diagnostic event for grain creation
+            if (DiagnosticListener.IsEnabled(OrleansGrainDiagnostics.EventNames.Created))
+            {
+                DiagnosticListener.Write(
+                    OrleansGrainDiagnostics.EventNames.Created,
+                    new GrainCreatedEvent(
+                        GrainId,
+                        ActivationId,
+                        GetGrainTypeName(),
+                        Address.SiloAddress));
+            }
         }
     }
 
@@ -563,6 +578,21 @@ internal sealed partial class ActivationData :
 
                 _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
                 SetState(ActivationState.Deactivating);
+
+                // Emit diagnostic event for grain deactivating
+                if (DiagnosticListener.IsEnabled(OrleansGrainDiagnostics.EventNames.Deactivating))
+                {
+                    DiagnosticListener.Write(
+                        OrleansGrainDiagnostics.EventNames.Deactivating,
+                        new GrainDeactivatingEvent(
+                            GrainId,
+                            ActivationId,
+                            GetGrainTypeName(),
+                            Address.SiloAddress,
+                            reason.ReasonCode,
+                            reason.Description));
+                }
+
                 var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
                 ScheduleOperation(new Command.Deactivate(cts, state));
@@ -748,12 +778,17 @@ internal sealed partial class ActivationData :
     private string GetActivationInfoString()
     {
         var placement = PlacementStrategy?.GetType().Name;
-        var grainTypeName = _shared.GrainTypeName ?? GrainInstance switch
+        var grainTypeName = GetGrainTypeName();
+        return grainTypeName is null ? $"#Placement={placement}" : $"#GrainType={grainTypeName} Placement={placement}";
+    }
+
+    private string GetGrainTypeName()
+    {
+        return _shared.GrainTypeName ?? GrainInstance switch
         {
             { } grainInstance => RuntimeTypeNameFormatter.Format(grainInstance.GetType()),
-            _ => null
+            _ => GrainId.Type.ToString() ?? "Unknown"
         };
-        return grainTypeName is null ? $"#Placement={placement}" : $"#GrainType={grainTypeName} Placement={placement}";
     }
 
     public void Dispose() => DisposeAsync().AsTask().Wait();
@@ -1462,6 +1497,8 @@ internal sealed partial class ActivationData :
             return;
         }
 
+        var activationStartTime = CoarseStopwatch.StartNew();
+
         // A chain of promises that will have to complete in order to complete the activation
         // Register with the grain directory and call the Activate method on the new activation.
         try
@@ -1586,6 +1623,19 @@ internal sealed partial class ActivationData :
                     {
                         SetState(ActivationState.Valid); // Activate calls on this activation are finished
                         _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
+
+                        // Emit diagnostic event for grain activation completed
+                        if (DiagnosticListener.IsEnabled(OrleansGrainDiagnostics.EventNames.Activated))
+                        {
+                            DiagnosticListener.Write(
+                                OrleansGrainDiagnostics.EventNames.Activated,
+                                new GrainActivatedEvent(
+                                    GrainId,
+                                    ActivationId,
+                                    GetGrainTypeName(),
+                                    Address.SiloAddress,
+                                    activationStartTime.Elapsed));
+                        }
                     }
                 }
 
@@ -1635,6 +1685,7 @@ internal sealed partial class ActivationData :
     /// </summary>
     private async Task FinishDeactivating(ActivationState previousState, CancellationToken cancellationToken)
     {
+        var deactivationStartTime = CoarseStopwatch.StartNew();
         var migrating = false;
         var encounteredError = false;
         try
@@ -1749,6 +1800,19 @@ internal sealed partial class ActivationData :
         catch (Exception exception)
         {
             LogExceptionDisposing(_shared.Logger, exception, this);
+        }
+
+        // Emit diagnostic event for grain deactivation completed
+        if (DiagnosticListener.IsEnabled(OrleansGrainDiagnostics.EventNames.Deactivated))
+        {
+            DiagnosticListener.Write(
+                OrleansGrainDiagnostics.EventNames.Deactivated,
+                new GrainDeactivatedEvent(
+                    GrainId,
+                    ActivationId,
+                    GetGrainTypeName(),
+                    Address.SiloAddress,
+                    deactivationStartTime.Elapsed));
         }
 
         // Signal deactivation

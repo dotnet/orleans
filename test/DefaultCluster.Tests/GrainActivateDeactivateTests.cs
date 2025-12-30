@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -14,16 +15,19 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
     public class GrainActivateDeactivateTests : HostedTestClusterEnsureDefaultStarted, IDisposable
     {
         private readonly IActivateDeactivateWatcherGrain watcher;
+        private readonly GrainDiagnosticObserver _diagnosticObserver;
 
         public GrainActivateDeactivateTests(DefaultClusterFixture fixture) : base(fixture)
         {
             watcher = this.GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
             watcher.Clear().Wait();
+            _diagnosticObserver = GrainDiagnosticObserver.Create();
         }
 
         public virtual void Dispose()
         {
             watcher.Clear().Wait();
+            _diagnosticObserver.Dispose();
         }
 
         /// <summary>
@@ -66,9 +70,9 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             // Activate
             string activation = await grain.DoSomething();
 
-            // Deactivate
+            // Deactivate and wait for completion using diagnostic events
             await grain.DoDeactivate();
-            Thread.Sleep(TimeSpan.FromSeconds(2)); // Allow some time for deactivate to happen
+            await _diagnosticObserver.WaitForDeactivatedAsync(grain, TimeSpan.FromSeconds(10));
 
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
         }
@@ -86,9 +90,9 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 
             // Activate
             string activation = await grain.DoSomething();
-            // Deactivate
+            // Deactivate and wait for completion using diagnostic events
             await grain.DoDeactivate();
-            Thread.Sleep(TimeSpan.FromSeconds(2)); // Allow some time for deactivate to happen
+            await _diagnosticObserver.WaitForDeactivatedAsync(grain, TimeSpan.FromSeconds(10));
 
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
 
@@ -127,9 +131,9 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             // Activate
             string activation = await grain.DoSomething();
 
-            // Deactivate
+            // Deactivate and wait for completion using diagnostic events
             await grain.DoDeactivate();
-            Thread.Sleep(TimeSpan.FromSeconds(2)); // Allow some time for deactivate to happen
+            await _diagnosticObserver.WaitForDeactivatedAsync(grain, TimeSpan.FromSeconds(10));
 
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
         }
@@ -146,9 +150,9 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 
             // Activate
             string activation = await grain.DoSomething();
-            // Deactivate
+            // Deactivate and wait for completion using diagnostic events
             await grain.DoDeactivate();
-            Thread.Sleep(TimeSpan.FromSeconds(2)); // Allow some time for deactivate to happen
+            await _diagnosticObserver.WaitForDeactivatedAsync(grain, TimeSpan.FromSeconds(10));
 
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
 
@@ -175,9 +179,9 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 
             await CheckNumActivateDeactivateCalls(1, 0, activation, "Before deactivation");
 
-            // Deactivate
+            // Deactivate and wait for completion using diagnostic events
             await grain.DoDeactivate();
-            Thread.Sleep(TimeSpan.FromSeconds(2)); // Allow some time for deactivate to happen
+            await _diagnosticObserver.WaitForDeactivatedAsync(grain, TimeSpan.FromSeconds(10));
 
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
 
@@ -312,9 +316,9 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             // Activate
             string activation = await grain.DoSomething();
 
-            // Deactivate
+            // Deactivate and wait for completion using diagnostic events
             await grain.DoDeactivate();
-            Thread.Sleep(TimeSpan.FromSeconds(2)); // Allow some time for deactivate to happen
+            await _diagnosticObserver.WaitForDeactivatedAsync(grain, TimeSpan.FromSeconds(10));
 
             await CheckNumActivateDeactivateCalls(1, 1, activation.ToString());
         }

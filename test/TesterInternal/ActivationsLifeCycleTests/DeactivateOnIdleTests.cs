@@ -21,6 +21,7 @@ namespace UnitTests.ActivationsLifeCycleTests
     {
         private readonly ITestOutputHelper output;
         private TestCluster testCluster;
+        private GrainDiagnosticObserver _diagnosticObserver;
 
         public DeactivateOnIdleTests(ITestOutputHelper output)
         {
@@ -36,12 +37,14 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             testCluster = builder.Build();
             testCluster.Deploy();
+            _diagnosticObserver = GrainDiagnosticObserver.Create();
         }
         
         public void Dispose()
         {
             try
             {
+                _diagnosticObserver?.Dispose();
                 testCluster?.StopAllSilos();
             }
             finally
@@ -61,7 +64,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             await a.SetOther(b);
             await a.GetOtherAge(); // prime a's routing cache
             await b.DeactivateSelf();
-            Thread.Sleep(5000);
+            // Wait for deactivation to complete using diagnostic events instead of Thread.Sleep
+            await _diagnosticObserver.WaitForDeactivatedAsync(b, TimeSpan.FromSeconds(10));
             var age = await a.GetOtherAge().WaitAsync(TimeSpan.FromMilliseconds(2000));
             Assert.True(age.TotalMilliseconds < 2000, "Should be newly activated grain");
         }
@@ -227,7 +231,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             output.WriteLine(age.ToString());
 
             await grain.DeactivateSelf();
-            await Task.Delay(3000);
+            // Wait for deactivation to complete using diagnostic events instead of Task.Delay
+            await _diagnosticObserver.WaitForDeactivatedAsync(grain, TimeSpan.FromSeconds(10));
 
             var thrownException = await Record.ExceptionAsync(() => grain.GetAge());
             Assert.Null(thrownException);
