@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using Orleans;
@@ -278,14 +279,6 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<DiagnosticL
 /// </summary>
 public static class GrainDiagnosticExtensions
 {
-    /// <summary>
-    /// Gets the GrainId from a grain reference.
-    /// </summary>
-    public static GrainId GetGrainId(this IAddressable grain)
-    {
-        return ((GrainReference)grain).GrainId;
-    }
-
     /// <summary>
     /// Waits for a grain to be deactivated.
     /// </summary>

@@ -1,4 +1,6 @@
+#nullable enable
 using System;
+using Orleans.Runtime;
 
 namespace Orleans.Diagnostics;
 

@@ -174,7 +174,7 @@ namespace Orleans.Runtime.ReminderService
                 {
                     DiagnosticListener.Write(
                         OrleansRemindersDiagnostics.EventNames.Registered,
-                        new ReminderRegisteredEvent(grainId, reminderName, dueTime, period, SiloAddress));
+                        new ReminderRegisteredEvent(grainId, reminderName, dueTime, period, Silo));
                 }
 
                 return new ReminderData(grainId, reminderName, newEtag);
@@ -223,7 +223,7 @@ namespace Orleans.Runtime.ReminderService
                 {
                     DiagnosticListener.Write(
                         OrleansRemindersDiagnostics.EventNames.Unregistered,
-                        new ReminderUnregisteredEvent(grainId, reminderName, SiloAddress));
+                        new ReminderUnregisteredEvent(grainId, reminderName, Silo));
                 }
             }
             else
@@ -585,7 +585,7 @@ namespace Orleans.Runtime.ReminderService
                 ETag = entry.ETag;
                 LocalSequenceNumber = -1;
                 logger = reminderService.logger;
-                siloAddress = reminderService.SiloAddress;
+                siloAddress = reminderService.Silo;
                 this.timer = reminderService.asyncTimerFactory.Create(period, "");
             }
 
