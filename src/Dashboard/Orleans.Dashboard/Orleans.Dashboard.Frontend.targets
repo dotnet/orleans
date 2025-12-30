@@ -68,24 +68,22 @@
     BeforeTargets="DispatchToInnerBuilds"
     />
 
-  <!-- Hook BuildNpmApp to run once before inner build targets.
-       For single-targeted builds (or when invoked directly with a TargetFramework),
-       this target calls BuildNpmApp via MSBuild with TargetFramework removed,
-       which invokes the outer build and ensures BuildNpmApp runs exactly once. -->
-  <Target
-    Name="BuildNpmAppBeforeInnerBuild"
-    BeforeTargets="BeforeBuild">
+  <!-- Include frontend assets as embedded resources.
+       This target:
+       1. Calls BuildNpmApp to ensure the dist folder exists (via MSBuild task for outer build)
+       2. Validates required files exist
+       3. Dynamically discovers and adds all dist files as embedded resources
+       
+       BeforeTargets="BeforeBuild" ensures items are added early enough to be processed by the compiler.
+       We use ItemGroup inside the target to dynamically discover files at target execution time,
+       rather than relying on static globs which are evaluated at project load time. -->
+  <Target Name="IncludeFrontendAssets" BeforeTargets="BeforeBuild">
+    <!-- Call BuildNpmApp once via the outer build (without TargetFramework) -->
     <MSBuild
       Projects="$(MSBuildProjectFullPath)"
       Targets="BuildNpmApp"
       RemoveProperties="TargetFramework" />
-  </Target>
 
-  <!-- Include frontend assets as embedded resources.
-       This must run after BuildNpmApp creates the dist folder and before CoreCompile.
-       We use CreateItem to dynamically discover files at target execution time,
-       rather than relying on static globs which are evaluated at project load time. -->
-  <Target Name="IncludeFrontendAssets" BeforeTargets="CoreCompile" DependsOnTargets="BuildNpmAppBeforeInnerBuild">
     <!-- Validate required files exist -->
     <Error 
       Condition="!Exists('$(NpmBuildOutput)index.html')" 
