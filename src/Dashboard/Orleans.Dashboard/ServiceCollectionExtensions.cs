@@ -37,7 +37,7 @@ public static class ServiceCollectionExtensions
     /// <returns>The silo builder for method chaining.</returns>
     public static ISiloBuilder AddDashboard(this ISiloBuilder siloBuilder, Action<DashboardOptions>? configureOptions = null)
     {
-        siloBuilder.Services.AddOrleansDashboardForSiloCore();
+        siloBuilder.Services.AddOrleansDashboardForSiloCore(configureOptions);
         return siloBuilder;
     }
 
@@ -100,7 +100,7 @@ public static class ServiceCollectionExtensions
         // Create static assets provider
         var assets = endpoints.ServiceProvider.GetService<EmbeddedAssetProvider>()
             ?? throw new InvalidOperationException("Orleans Dashboard services have not been registered. " +
-                "Please call AddServicesForSelfHostedDashboard or AddOrleansDashboard on the IServiceCollection.");
+                "Please call AddDashboard on ISiloBuilder or AddOrleansDashboard on IClientBuilder.");
 
         // Create a route group for all dashboard endpoints
         var group = endpoints.MapGroup(routePrefix ?? "");
@@ -341,6 +341,7 @@ public static class ServiceCollectionExtensions
     /// <returns>The service collection for method chaining.</returns>
     public static IClientBuilder AddOrleansDashboard(this IClientBuilder clientBuilder, Action<DashboardOptions>? configureOptions = null)
     {
+        clientBuilder.Services.Configure(configureOptions ?? (x => { }));
         clientBuilder.Services.AddSingleton<DashboardLogger>();
         clientBuilder.Services.AddFromExisting<ILoggerProvider, DashboardLogger>();
         clientBuilder.Services.AddSingleton<IDashboardClient, DashboardClient>();
