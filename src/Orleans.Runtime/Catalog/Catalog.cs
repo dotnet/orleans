@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -7,11 +8,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.GrainDirectory;
+using System.Diagnostics;
 
 namespace Orleans.Runtime
 {
     internal sealed partial class Catalog : SystemTarget, ICatalog, ILifecycleParticipant<ISiloLifecycle>
     {
+        private static readonly ActivitySource ActivationActivitySource = new("Microsoft.Orleans.Runtime.Activation", "1.0.0");
         private readonly SiloAddress _siloAddress;
         private readonly ActivationCollector activationCollector;
         private readonly GrainDirectoryResolver grainDirectoryResolver;
@@ -19,7 +22,7 @@ namespace Orleans.Runtime
         private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
         private readonly GrainContextActivator grainActivator;
-        private ISiloStatusOracle _siloStatusOracle;
+        private ISiloStatusOracle? _siloStatusOracle;
 
         // Lock striping is used for activation creation to reduce contention
         private const int LockCount = 32; // Must be a power of 2
@@ -123,10 +126,10 @@ namespace Orleans.Runtime
         /// <param name="requestContextData">Optional request context data.</param>
         /// <param name="rehydrationContext">Optional rehydration context.</param>
         /// <returns></returns>
-        public IGrainContext GetOrCreateActivation(
+        public IGrainContext? GetOrCreateActivation(
             in GrainId grainId,
-            Dictionary<string, object> requestContextData,
-            MigrationContext rehydrationContext)
+            Dictionary<string, object>? requestContextData,
+            MigrationContext? rehydrationContext)
         {
             if (TryGetGrainContext(grainId, out var result))
             {
@@ -147,7 +150,7 @@ namespace Orleans.Runtime
                     return result;
                 }
 
-                if (_siloStatusOracle.CurrentStatus == SiloStatus.Active)
+                if (_siloStatusOracle!.CurrentStatus == SiloStatus.Active)
                 {
                     var address = new GrainAddress
                     {
@@ -168,6 +171,22 @@ namespace Orleans.Runtime
                 return UnableToCreateActivation(this, grainId);
             }
 
+            // Start activation span and attach to ActivationData for lifecycle events
+            Activity? activationActivity = ActivationActivitySource.StartActivity("orleans.activation", ActivityKind.Internal);
+            if (activationActivity is not null)
+            {
+                activationActivity.SetTag("orleans.grain.id", grainId.ToString());
+                activationActivity.SetTag("orleans.grain.type", grainId.Type.ToString());
+                activationActivity.SetTag("orleans.silo.id", Silo.ToString());
+                activationActivity.SetTag("orleans.activation.cause", rehydrationContext is null ? "new" : "rehydrate");
+                if (result is ActivationData act)
+                {
+                    activationActivity.SetTag("orleans.activation.id", act.ActivationId.ToString());
+                    act.SetActivationActivity(activationActivity);
+                    activationActivity.AddEvent(new ActivityEvent("creating"));
+                }
+            }
+
             CatalogInstruments.ActivationsCreated.Add(1);
 
             // Rehydration occurs before activation.
@@ -181,10 +200,10 @@ namespace Orleans.Runtime
             return result;
 
             [MethodImpl(MethodImplOptions.NoInlining)]
-            static IGrainContext UnableToCreateActivation(Catalog self, GrainId grainId)
+            static IGrainContext? UnableToCreateActivation(Catalog self, GrainId grainId)
             {
                 // Did not find and did not start placing new
-                var status = self._siloStatusOracle.CurrentStatus;
+                var status = self._siloStatusOracle!.CurrentStatus;
                 var isTerminating = status.IsTerminating();
                 if (status is not SiloStatus.Active)
                 {
@@ -232,7 +251,7 @@ namespace Orleans.Runtime
         /// </summary>
         private bool TryGetGrainContext(GrainId grainId, out IGrainContext data)
         {
-            data = activations.FindTarget(grainId);
+            data = activations.FindTarget(grainId)!;
             return data != null;
         }
 
