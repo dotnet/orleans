@@ -40,7 +40,8 @@ namespace Tester.StreamingTests
 
             await stream.OnNextAsync(interestingData);
 
-            await Task.Delay(1_000);
+            // Wait for the grain to receive the first event
+            await grain.WaitForEventCount(1, TimeSpan.FromSeconds(30));
 
             // Wait for the stream to become inactive
             await Task.Delay(StreamInactivityPeriod.Multiply(3));
@@ -63,7 +64,8 @@ namespace Tester.StreamingTests
 
             await stream.OnNextAsync(interestingData);
 
-            await Task.Delay(2_000);
+            // Wait for the grain to receive the second event
+            await grain.WaitForEventCount(2, TimeSpan.FromSeconds(30));
 
             Assert.Equal(0, await grain.GetErrorCounter());
             Assert.Equal(2, await grain.GetEventCounter());
@@ -84,7 +86,8 @@ namespace Tester.StreamingTests
 
             await stream.OnNextAsync(interestingData);
 
-            await Task.Delay(1_000);
+            // Wait for the grain to receive the first event
+            await grain.WaitForEventCount(1, TimeSpan.FromSeconds(30));
 
             // Wait for the stream to become inactive
             await Task.Delay(StreamInactivityPeriod.Multiply(3));
@@ -92,7 +95,8 @@ namespace Tester.StreamingTests
 
             await stream.OnNextAsync(interestingData);
 
-            await Task.Delay(2_000);
+            // Wait for the grain to receive the second event
+            await grain.WaitForEventCount(2, TimeSpan.FromSeconds(30));
 
             Assert.Equal(0, await grain.GetErrorCounter());
             Assert.Equal(2, await grain.GetEventCounter());
@@ -120,7 +124,8 @@ namespace Tester.StreamingTests
             await otherStream.OnNextAsync(interestingData);
             await stream.OnNextAsync(interestingData);
 
-            await Task.Delay(1_000);
+            // Wait for the grain to receive the first 2 events on its stream
+            await grain.WaitForEventCount(2, TimeSpan.FromSeconds(30));
 
             // Wait for the stream to become inactive
             await Task.Delay(StreamInactivityPeriod.Multiply(3));
@@ -128,7 +133,8 @@ namespace Tester.StreamingTests
 
             await stream.OnNextAsync(interestingData);
 
-            await Task.Delay(2_000);
+            // Wait for the grain to receive the third event
+            await grain.WaitForEventCount(3, TimeSpan.FromSeconds(30));
 
             Assert.Equal(0, await grain.GetErrorCounter());
             Assert.Equal(3, await grain.GetEventCounter());
@@ -145,11 +151,13 @@ namespace Tester.StreamingTests
             var slowGrain = this.Client.GetGrain<ISlowImplicitSubscriptionCounterGrain>(key);
 
             await stream.OnNextAsync([1]);
-            await Task.Delay(500);
+            // Wait for the fast grain to receive the event instead of using a fixed delay
+            await fastGrain.WaitForEventCount(1, TimeSpan.FromSeconds(30));
             Assert.Equal(1, await fastGrain.GetEventCounter());
 
             await stream.OnNextAsync([2]);
-            await Task.Delay(500);
+            // Wait for the fast grain to receive the second event
+            await fastGrain.WaitForEventCount(2, TimeSpan.FromSeconds(30));
             Assert.Equal(2, await fastGrain.GetEventCounter());
         }
     }
