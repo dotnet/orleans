@@ -110,10 +110,10 @@ public static class ServiceCollectionExtensions
         // This ensures relative asset paths (like index.min.js) resolve correctly.
         group.MapGet("/", (HttpContext ctx) =>
         {
-            if (!string.IsNullOrEmpty(routePrefix) && !ctx.Request.Path.Value?.EndsWith('/') == true)
+            if (!string.IsNullOrEmpty(routePrefix) && ctx.Request.Path.Value?.EndsWith('/') == false)
             {
-                // Redirect to the same path with a trailing slash
-                var redirectUrl = $"{ctx.Request.PathBase}{ctx.Request.Path}/";
+                // Redirect to the same path with a trailing slash, preserving the query string
+                var redirectUrl = $"{ctx.Request.PathBase}{ctx.Request.Path}/{ctx.Request.QueryString}";
                 return Results.Redirect(redirectUrl, permanent: true);
             }
             return assets.ServeAsset("index.html", ctx);
