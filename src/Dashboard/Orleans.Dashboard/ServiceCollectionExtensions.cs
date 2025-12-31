@@ -106,7 +106,18 @@ public static class ServiceCollectionExtensions
         var group = endpoints.MapGroup(routePrefix ?? "");
 
         // Static assets - these match the paths referenced in the built CSS/HTML
-        group.MapGet("/", (HttpContext ctx) => assets.ServeAsset("index.html", ctx));
+        // When a routePrefix is specified, redirect requests without trailing slash to include it.
+        // This ensures relative asset paths (like index.min.js) resolve correctly.
+        group.MapGet("/", (HttpContext ctx) =>
+        {
+            if (!string.IsNullOrEmpty(routePrefix) && ctx.Request.Path.Value?.EndsWith('/') == false)
+            {
+                // Redirect to the same path with a trailing slash, preserving the query string
+                var redirectUrl = $"{ctx.Request.PathBase}{ctx.Request.Path}/{ctx.Request.QueryString}";
+                return Results.Redirect(redirectUrl, permanent: true);
+            }
+            return assets.ServeAsset("index.html", ctx);
+        });
         group.MapGet("/index.html", (HttpContext ctx) => assets.ServeAsset("index.html", ctx));
         group.MapGet("/favicon.ico", (HttpContext ctx) => assets.ServeAsset("favicon.ico", ctx));
         group.MapGet("/index.min.js", (HttpContext ctx) => assets.ServeAsset("index.min.js", ctx));
