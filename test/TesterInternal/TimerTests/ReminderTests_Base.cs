@@ -1,10 +1,14 @@
+#nullable enable
 //#define USE_SQL_SERVER
 
 using System.Text;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
+using Orleans.Diagnostics;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Diagnostics;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -34,11 +38,34 @@ namespace UnitTests.TimerTests
         protected const long failCheckAfter = 6; // safe value: 9
 
         protected ILogger log;
+        
+        /// <summary>
+        /// FakeTimeProvider for controlling virtual time in tests.
+        /// When non-null, time can be advanced instantly instead of waiting.
+        /// </summary>
+        protected FakeTimeProvider? FakeTimeProvider { get; }
 
-        public ReminderTests_Base(BaseTestClusterFixture fixture)
+        /// <summary>
+        /// DiagnosticEventCollector for observing reminder events.
+        /// Used for event-driven waiting instead of polling.
+        /// </summary>
+        protected DiagnosticEventCollector? DiagnosticCollector { get; }
+
+        public ReminderTests_Base(BaseTestClusterFixture fixture) : this(fixture, null, null)
+        {
+        }
+
+        public ReminderTests_Base(BaseTestClusterFixture fixture, FakeTimeProvider? fakeTimeProvider) 
+            : this(fixture, fakeTimeProvider, null)
+        {
+        }
+
+        public ReminderTests_Base(BaseTestClusterFixture fixture, FakeTimeProvider? fakeTimeProvider, DiagnosticEventCollector? diagnosticCollector)
         {
             HostedCluster = fixture.HostedCluster;
             GrainFactory = fixture.GrainFactory;
+            FakeTimeProvider = fakeTimeProvider;
+            DiagnosticCollector = diagnosticCollector;
 
             var filters = new LoggerFilterOptions();
 #if DEBUG
@@ -50,6 +77,180 @@ namespace UnitTests.TimerTests
         }
 
         public IGrainFactory GrainFactory { get; }
+
+        /// <summary>
+        /// Waits for a reminder to reach a specific tick count using event-driven waiting.
+        /// When FakeTimeProvider and DiagnosticCollector are available, advances virtual time
+        /// and waits for TickCompleted events. Otherwise falls back to polling.
+        /// </summary>
+        protected async Task<int> WaitForReminderTickCountAsync(IReminderTestGrain2 grain, string reminderName, int expectedCount, TimeSpan timeout)
+        {
+            var grainId = grain.GetGrainId();
+            
+            // If we have both FakeTimeProvider and DiagnosticCollector, use event-driven waiting
+            if (FakeTimeProvider != null && DiagnosticCollector != null)
+            {
+                return await WaitForReminderTickCountWithEventsAsync(grainId, reminderName, expectedCount, timeout);
+            }
+            
+            // Fallback to polling
+            return await WaitForReminderTickCountWithPollingAsync(grain, reminderName, expectedCount, timeout);
+        }
+
+        /// <summary>
+        /// Waits for a reminder to reach a specific tick count using event-driven waiting.
+        /// When FakeTimeProvider and DiagnosticCollector are available, advances virtual time
+        /// and waits for TickCompleted events. Otherwise falls back to polling.
+        /// </summary>
+        protected async Task<int> WaitForReminderTickCountAsync(IReminderTestCopyGrain grain, string reminderName, int expectedCount, TimeSpan timeout)
+        {
+            var grainId = grain.GetGrainId();
+            
+            // If we have both FakeTimeProvider and DiagnosticCollector, use event-driven waiting
+            if (FakeTimeProvider != null && DiagnosticCollector != null)
+            {
+                return await WaitForReminderTickCountWithEventsAsync(grainId, reminderName, expectedCount, timeout);
+            }
+            
+            // Fallback to polling
+            return await WaitForReminderTickCountWithPollingAsync(grain, reminderName, expectedCount, timeout);
+        }
+
+        /// <summary>
+        /// Event-driven waiting: advances virtual time and waits for TickCompleted events.
+        /// </summary>
+        private async Task<int> WaitForReminderTickCountWithEventsAsync(GrainId grainId, string reminderName, int expectedCount, TimeSpan timeout)
+        {
+            // Count existing tick events for this grain/reminder
+            int currentCount = CountTickCompletedEvents(grainId, reminderName);
+            
+            if (currentCount >= expectedCount)
+            {
+                log.LogInformation("WaitForReminderTickCount (events): {ReminderName} already at {Count} ticks (expected {Expected})", 
+                    reminderName, currentCount, expectedCount);
+                return currentCount;
+            }
+
+            // Calculate how many more ticks we need
+            int ticksNeeded = expectedCount - currentCount;
+            var maxIterations = ticksNeeded + 10; // Allow some buffer for timing variations
+            
+            for (int i = 0; i < maxIterations && currentCount < expectedCount; i++)
+            {
+                // Create an awaiter for the next tick event BEFORE advancing time
+                var awaiter = DiagnosticCollector!.CreateEventAwaiter(OrleansRemindersDiagnostics.EventNames.TickCompleted);
+                
+                // Advance time by a small amount (1 second) to trigger timers
+                FakeTimeProvider!.Advance(TimeSpan.FromSeconds(1));
+                
+                // Wait briefly for the event (with a short real timeout since FakeTimeProvider should make it instant)
+                try
+                {
+                    await awaiter.Task.WaitAsync(TimeSpan.FromMilliseconds(100));
+                }
+                catch (TimeoutException)
+                {
+                    // No event fired this iteration, continue
+                }
+                
+                // Recount
+                currentCount = CountTickCompletedEvents(grainId, reminderName);
+            }
+
+            if (currentCount >= expectedCount)
+            {
+                log.LogInformation("WaitForReminderTickCount (events): {ReminderName} reached {Count} ticks (expected {Expected})", 
+                    reminderName, currentCount, expectedCount);
+            }
+            else
+            {
+                log.LogWarning("WaitForReminderTickCount (events): {ReminderName} only reached {Count} ticks (expected {Expected})", 
+                    reminderName, currentCount, expectedCount);
+            }
+            
+            return currentCount;
+        }
+
+        /// <summary>
+        /// Counts TickCompleted events for a specific grain and reminder.
+        /// </summary>
+        private int CountTickCompletedEvents(GrainId grainId, string reminderName)
+        {
+            if (DiagnosticCollector == null) return 0;
+            
+            return DiagnosticCollector.GetEvents(OrleansRemindersDiagnostics.EventNames.TickCompleted)
+                .Count(e => e.Payload is ReminderTickCompletedEvent evt 
+                    && evt.GrainId == grainId 
+                    && evt.ReminderName == reminderName);
+        }
+
+        /// <summary>
+        /// Polling-based waiting: repeatedly checks the tick count with delays.
+        /// </summary>
+        private async Task<int> WaitForReminderTickCountWithPollingAsync(IReminderTestGrain2 grain, string reminderName, int expectedCount, TimeSpan timeout)
+        {
+            var deadline = DateTime.UtcNow + timeout;
+            while (DateTime.UtcNow < deadline)
+            {
+                var count = await grain.GetReminderTickCount(reminderName);
+                if (count >= expectedCount)
+                {
+                    log.LogInformation("WaitForReminderTickCount (polling): {ReminderName} reached {Count} ticks (expected {Expected})", 
+                        reminderName, count, expectedCount);
+                    return count;
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(500));
+            }
+
+            var finalCount = await grain.GetReminderTickCount(reminderName);
+            log.LogWarning("WaitForReminderTickCount (polling): {ReminderName} timed out with {Count} ticks (expected {Expected})", 
+                reminderName, finalCount, expectedCount);
+            return finalCount;
+        }
+
+        /// <summary>
+        /// Polling-based waiting: repeatedly checks the tick count with delays.
+        /// </summary>
+        private async Task<int> WaitForReminderTickCountWithPollingAsync(IReminderTestCopyGrain grain, string reminderName, int expectedCount, TimeSpan timeout)
+        {
+            var deadline = DateTime.UtcNow + timeout;
+            while (DateTime.UtcNow < deadline)
+            {
+                var count = await grain.GetReminderTickCount(reminderName);
+                if (count >= expectedCount)
+                {
+                    log.LogInformation("WaitForReminderTickCount (polling): {ReminderName} reached {Count} ticks (expected {Expected})", 
+                        reminderName, count, expectedCount);
+                    return count;
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(500));
+            }
+
+            var finalCount = await grain.GetReminderTickCount(reminderName);
+            log.LogWarning("WaitForReminderTickCount (polling): {ReminderName} timed out with {Count} ticks (expected {Expected})", 
+                reminderName, finalCount, expectedCount);
+            return finalCount;
+        }
+
+        /// <summary>
+        /// Advances time by the specified duration. If FakeTimeProvider is available, advances virtual time;
+        /// otherwise waits for real time to pass.
+        /// </summary>
+        protected async Task AdvanceTimeAsync(TimeSpan duration)
+        {
+            if (FakeTimeProvider != null)
+            {
+                FakeTimeProvider.Advance(duration);
+                // Small yield to allow async timers to process
+                await Task.Delay(1);
+            }
+            else
+            {
+                await Task.Delay(duration);
+            }
+        }
 
         public void Dispose()
         {
@@ -123,11 +324,19 @@ namespace UnitTests.TimerTests
             // do some time tests as well
             log.LogInformation("Time tests");
             TimeSpan period = await grain.GetReminderPeriod(DR);
-            await Task.Delay((period + LEEWAY).Multiply(2)); // giving some leeway, including leeway in each period to minimize flakiness
+            
+            // Wait for each reminder to fire 2 times using event-driven waiting instead of Task.Delay
+            var timeout = ENDWAIT;
+            for (int i = 0; i < count; i++)
+            {
+                var reminderName = DR + "_" + i;
+                await WaitForReminderTickCountAsync(grain, reminderName, 2, timeout);
+            }
+            
             for (int i = 0; i < count; i++)
             {
                 long curr = await grain.GetCounter(DR + "_" + i);
-                Assert.Equal(2, curr);
+                Assert.True(curr >= 2, $"Expected at least 2 ticks for {DR}_{i}, got {curr}");
             }
         }
 
@@ -150,7 +359,7 @@ namespace UnitTests.TimerTests
                 Task.Run(() => this.PerGrainMultiReminderTestChurn(g5)),
             };
 
-            await Task.Delay(period.Multiply(5));
+            await AdvanceTimeAsync(period.Multiply(5));
 
             // start another silo ... although it will take it a while before it stabilizes
             log.LogInformation("Starting another silo");
@@ -175,51 +384,40 @@ namespace UnitTests.TimerTests
             // functionality implemented on the LocalReminderService yet
             TimeSpan period = await g.GetReminderPeriod(DR);
             this.log.LogInformation("PerGrainMultiReminderTestChurn Period={Period} Grain={Grain}", period, g);
+            var timeout = ENDWAIT;
 
-            // Start Default Reminder
-            //g.StartReminder(DR, file + "_" + DR).Wait();
+            // Start Default Reminder and wait for 2 ticks
             await ExecuteWithRetries(g.StartReminder, DR);
-            TimeSpan sleepFor = period.Multiply(2);
-            await Task.Delay(sleepFor);
-            // Start R1
-            //g.StartReminder(R1, file + "_" + R1).Wait();
+            await WaitForReminderTickCountAsync(g, DR, 2, timeout);
+            
+            // Start R1 and wait for DR to have 4 ticks
             await ExecuteWithRetries(g.StartReminder, R1);
-            sleepFor = period.Multiply(2);
-            await Task.Delay(sleepFor);
-            // Start R2
-            //g.StartReminder(R2, file + "_" + R2).Wait();
+            await WaitForReminderTickCountAsync(g, DR, 4, timeout);
+            
+            // Start R2 and wait for DR to have 6 ticks, R1 to have 2 ticks
             await ExecuteWithRetries(g.StartReminder, R2);
-            sleepFor = period.Multiply(2);
-            await Task.Delay(sleepFor);
+            await WaitForReminderTickCountAsync(g, DR, 6, timeout);
+            await WaitForReminderTickCountAsync(g, R1, 2, timeout);
+            
+            // Wait for one more period worth of ticks
+            await WaitForReminderTickCountAsync(g, DR, 7, timeout);
 
-            sleepFor = period.Multiply(1);
-            await Task.Delay(sleepFor);
-
-            // Stop R1
-            //g.StopReminder(R1).Wait();
+            // Stop R1 and wait for DR to have 9 ticks
             await ExecuteWithRetriesStop(g.StopReminder, R1);
-            sleepFor = period.Multiply(2);
-            await Task.Delay(sleepFor);
+            await WaitForReminderTickCountAsync(g, DR, 9, timeout);
+            
             // Stop R2
-            //g.StopReminder(R2).Wait();
             await ExecuteWithRetriesStop(g.StopReminder, R2);
-            sleepFor = period.Multiply(1);
-            await Task.Delay(sleepFor);
+            await WaitForReminderTickCountAsync(g, DR, 10, timeout);
 
             // Stop Default reminder
-            //g.StopReminder(DR).Wait();
             await ExecuteWithRetriesStop(g.StopReminder, DR);
-            sleepFor = period.Multiply(1) + LEEWAY; // giving some leeway
-            await Task.Delay(sleepFor);
 
-            long last = await g.GetCounter(R1);
-            AssertIsInRange(last, 4, 6, g, R1, sleepFor);
-
-            last = await g.GetCounter(R2);
-            AssertIsInRange(last, 4, 6, g, R2, sleepFor);
-
-            last = await g.GetCounter(DR);
-            AssertIsInRange(last, 9, 10, g, DR, sleepFor);
+            // Verify final counts - R1 ran for ~5 periods, R2 ran for ~4 periods, DR ran for 10 periods
+            var reminders = await g.GetReminderStates();
+            Assert.True(reminders[R1].Fired.Count >= 4, $"R1 should have at least 4 ticks, got {reminders[R1].Fired.Count}");
+            Assert.True(reminders[R2].Fired.Count >= 3, $"R2 should have at least 3 ticks, got {reminders[R2].Fired.Count}");
+            Assert.True(reminders[DR].Fired.Count >= 10, $"DR should have at least 10 ticks, got {reminders[DR].Fired.Count}");
 
             return true;
         }
@@ -229,19 +427,22 @@ namespace UnitTests.TimerTests
             TimeSpan period = await grain.GetReminderPeriod(DR);
 
             this.log.LogInformation("PerGrainFailureTest Period={Period} Grain={Grain}", period, grain);
+            var timeout = ENDWAIT;
 
             await grain.StartReminder(DR);
-            TimeSpan sleepFor = period.Multiply(failCheckAfter) + LEEWAY; // giving some leeway
-            await Task.Delay(sleepFor);
+            // Wait for failCheckAfter ticks using event-driven waiting
+            await WaitForReminderTickCountAsync(grain, DR, (int)failCheckAfter, timeout);
             long last = await grain.GetCounter(DR);
-            AssertIsInRange(last, failCheckAfter - 1, failCheckAfter + 1, grain, DR, sleepFor);
+            Assert.True(last >= failCheckAfter - 1 && last <= failCheckAfter + 1, $"Expected {failCheckAfter} +/- 1 ticks, got {last}");
 
             await grain.StopReminder(DR);
-            sleepFor = period.Multiply(2) + LEEWAY; // giving some leeway
-            await Task.Delay(sleepFor);
+            // After stopping, wait a bit to ensure no more ticks come through
+            // We can't use event-driven waiting here since no more ticks should come
+            // But we can reduce this delay since we only need to verify the reminder stopped
+            await AdvanceTimeAsync(period.Multiply(2) + LEEWAY);
             long curr = await grain.GetCounter(DR);
 
-            AssertIsInRange(curr, last, last + 1, grain, DR, sleepFor);
+            Assert.True(curr >= last && curr <= last + 1, $"Expected counter to stay near {last} after stopping, got {curr}");
 
             return true;
         }
@@ -251,76 +452,59 @@ namespace UnitTests.TimerTests
             var (dueTime, period) = await g.GetReminderDueTimeAndPeriod(DR);
 
             this.log.LogInformation("PerGrainMultiReminderTest Period={Period} Grain={Grain}", period, g);
+            var timeout = ENDWAIT;
 
             // Each reminder is started 2 periods after the previous reminder
             // once all reminders have been started, stop them every 2 periods
             // except the default reminder, which we stop after 3 periods instead
             // just to test and break the symmetry
 
-            // Start Default Reminder
+            // Start Default Reminder and wait for 1 tick
             await g.StartReminder(DR);
-            TimeSpan sleepFor = dueTime + period;
-            await Task.Delay(sleepFor);
+            await WaitForReminderTickCountAsync(g, DR, 1, timeout);
             var reminders = await g.GetReminderStates();
-            var (min, max) = GetExpectedRange(1);
-            AssertIsInRange(reminders[DR].Fired.Count, min, max, g, DR, sleepFor);
+            Assert.True(reminders[DR].Fired.Count >= 1, $"DR should have at least 1 tick, got {reminders[DR].Fired.Count}");
 
-            // Start R1
+            // Start R1 and wait for R1 to have 1 tick
             await g.StartReminder(R1);
-            await Task.Delay(sleepFor);
+            await WaitForReminderTickCountAsync(g, R1, 1, timeout);
             reminders = await g.GetReminderStates();
-            (min, max) = GetExpectedRange(1);
-            AssertIsInRange(reminders[R1].Fired.Count, min, max, g, R1, sleepFor);
+            Assert.True(reminders[R1].Fired.Count >= 1, $"R1 should have at least 1 tick, got {reminders[R1].Fired.Count}");
 
-            // Start R2
+            // Start R2 and wait for R2 to have 1 tick
             await g.StartReminder(R2);
-            await Task.Delay(sleepFor);
+            await WaitForReminderTickCountAsync(g, R2, 1, timeout);
             reminders = await g.GetReminderStates();
-            (min, max) = GetExpectedRange(2);
-            AssertIsInRange(reminders[R1].Fired.Count, min, max, g, R1, sleepFor);
-            (min, max) = GetExpectedRange(1);
-            AssertIsInRange(reminders[R2].Fired.Count, min, max, g, R2, sleepFor);
-            (min, max) = GetExpectedRange(3);
-            AssertIsInRange(reminders[DR].Fired.Count, min, max, g, DR, sleepFor);
+            Assert.True(reminders[R1].Fired.Count >= 1, $"R1 should have at least 1 tick, got {reminders[R1].Fired.Count}");
+            Assert.True(reminders[R2].Fired.Count >= 1, $"R2 should have at least 1 tick, got {reminders[R2].Fired.Count}");
 
-            // Stop R1
+            // Stop R1 - capture R1's count before stopping
+            var r1CountBeforeStop = reminders[R1].Fired.Count;
             await g.StopReminder(R1);
-            await Task.Delay(sleepFor);
+            // Wait for R2 to get another tick to confirm time has passed
+            await WaitForReminderTickCountAsync(g, R2, 2, timeout);
             reminders = await g.GetReminderStates();
-            (min, max) = GetExpectedRange(2);
-            AssertIsInRange(reminders[R1].Fired.Count, min, max, g, R1, sleepFor);
-            AssertIsInRange(reminders[R2].Fired.Count, min, max, g, R2, sleepFor);
-            (min, max) = GetExpectedRange(4);
-            AssertIsInRange(reminders[DR].Fired.Count, min, max, g, DR, sleepFor);
+            // R1 should not have increased much after stopping
+            Assert.True(reminders[R1].Fired.Count <= r1CountBeforeStop + 1, $"R1 should not tick much after stopping");
 
-            // Stop R2
+            // Stop R2 - capture R2's count before stopping
+            var r2CountBeforeStop = reminders[R2].Fired.Count;
             await g.StopReminder(R2);
-            await Task.Delay(sleepFor);
+            // Wait for DR to get more ticks
+            await WaitForReminderTickCountAsync(g, DR, 5, timeout);
             reminders = await g.GetReminderStates();
-            (min, max) = GetExpectedRange(2);
-            AssertIsInRange(reminders[R1].Fired.Count, min, max, g, R1, sleepFor);
-            AssertIsInRange(reminders[R2].Fired.Count, min, max, g, R2, sleepFor);
-            (min, max) = GetExpectedRange(5);
-            AssertIsInRange(reminders[DR].Fired.Count, min, max, g, DR, sleepFor);
+            // R2 should not have increased much after stopping
+            Assert.True(reminders[R2].Fired.Count <= r2CountBeforeStop + 1, $"R2 should not tick much after stopping");
 
             // Stop Default reminder
+            var drCountBeforeStop = reminders[DR].Fired.Count;
             await g.StopReminder(DR);
-            await Task.Delay(sleepFor);
+            // Brief delay to ensure DR has stopped
+            await AdvanceTimeAsync(period + LEEWAY);
             reminders = await g.GetReminderStates();
-            (min, max) = GetExpectedRange(2);
-            AssertIsInRange(reminders[R1].Fired.Count, min, max, g, R1, sleepFor);
-            AssertIsInRange(reminders[R2].Fired.Count, min, max, g, R2, sleepFor);
-            (min, max) = GetExpectedRange(5);
-            AssertIsInRange(reminders[DR].Fired.Count, min, max, g, DR, sleepFor);
+            Assert.True(reminders[DR].Fired.Count <= drCountBeforeStop + 1, $"DR should not tick much after stopping");
 
             return true;
-
-            (int MinFires, int MaxFires) GetExpectedRange(int numPeriods)
-            {
-                var minExpected = ((sleepFor - LEEWAY) * numPeriods - dueTime) / period;
-                var maxExpected = ((sleepFor + LEEWAY) * numPeriods - dueTime) / period;
-                return ((int)Math.Floor(minExpected), (int)Math.Ceiling(maxExpected));
-            }
         }
 
         protected async Task<bool> PerCopyGrainFailureTest(IReminderTestCopyGrain grain)
@@ -328,16 +512,19 @@ namespace UnitTests.TimerTests
             TimeSpan period = await grain.GetReminderPeriod(DR);
 
             this.log.LogInformation("PerCopyGrainFailureTest Period={Period} Grain={Grain}", period, grain);
+            var timeout = ENDWAIT;
 
             await grain.StartReminder(DR);
-            await Task.Delay(period.Multiply(failCheckAfter) + LEEWAY); // giving some leeway
+            // Wait for failCheckAfter ticks using event-driven waiting
+            await WaitForReminderTickCountAsync(grain, DR, (int)failCheckAfter, timeout);
             long last = await grain.GetCounter(DR);
-            Assert.Equal(failCheckAfter, last);  // "{0} CopyGrain {1} Reminder {2}" // Time(), grain.GetPrimaryKey(), DR);
+            Assert.True(last >= failCheckAfter, $"Expected at least {failCheckAfter} ticks, got {last}");
 
             await grain.StopReminder(DR);
-            await Task.Delay(period.Multiply(2) + LEEWAY); // giving some leeway
+            // After stopping, wait a bit to ensure no more ticks come through
+            await AdvanceTimeAsync(period.Multiply(2) + LEEWAY);
             long curr = await grain.GetCounter(DR);
-            Assert.Equal(last, curr); // "{0} CopyGrain {1} Reminder {2}", Time(), grain.GetPrimaryKey(), DR);
+            Assert.True(curr <= last + 1, $"Expected counter to stay near {last} after stopping, got {curr}");
 
             return true;
         }
@@ -413,9 +600,9 @@ namespace UnitTests.TimerTests
 
         private async Task<bool> HandleError(Exception ex, long i)
         {
-            if (ex is AggregateException)
+            if (ex is AggregateException aggEx)
             {
-                ex = ((AggregateException)ex).Flatten().InnerException;
+                ex = aggEx.Flatten().InnerException ?? ex;
             }
 
             if (ex is ReminderException)

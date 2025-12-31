@@ -33,6 +33,7 @@ namespace Orleans.Runtime.ReminderService
         private readonly IAsyncTimer listRefreshTimer; // timer that refreshes our list of reminders to reflect global reminder table
         private readonly GrainReferenceActivator _referenceActivator;
         private readonly GrainInterfaceType _grainInterfaceType;
+        private readonly TimeProvider _timeProvider;
         private long localTableSequence;
         private uint initialReadCallCount = 0;
         private Task runTask;
@@ -44,6 +45,7 @@ namespace Orleans.Runtime.ReminderService
             IAsyncTimerFactory asyncTimerFactory,
             IOptions<ReminderOptions> reminderOptions,
             IConsistentRingProvider ringProvider,
+            TimeProvider timeProvider,
             SystemTargetShared shared)
             : base(
                   SystemTargetGrainId.CreateGrainServiceGrainId(GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)), null, shared.SiloAddress),
@@ -55,6 +57,7 @@ namespace Orleans.Runtime.ReminderService
             this.reminderOptions = reminderOptions.Value;
             this.reminderTable = reminderTable;
             this.asyncTimerFactory = asyncTimerFactory;
+            _timeProvider = timeProvider;
             ReminderInstruments.RegisterActiveRemindersObserve(() => localReminders.Count);
             startedTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.logger = shared.LoggerFactory.CreateLogger<LocalReminderService>();
@@ -155,7 +158,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 GrainId = grainId,
                 ReminderName = reminderName,
-                StartAt = DateTime.UtcNow.Add(dueTime),
+                StartAt = _timeProvider.GetUtcNow().UtcDateTime.Add(dueTime),
                 Period = period,
             };
 
@@ -572,6 +575,7 @@ namespace Orleans.Runtime.ReminderService
             private readonly ILogger logger;
             private readonly IAsyncTimer timer;
             private readonly SiloAddress siloAddress;
+            private readonly TimeProvider timeProvider;
 
             private ValueStopwatch stopwatch;
             private Task runTask;
@@ -586,6 +590,7 @@ namespace Orleans.Runtime.ReminderService
                 LocalSequenceNumber = -1;
                 logger = reminderService.logger;
                 siloAddress = reminderService.Silo;
+                timeProvider = reminderService._timeProvider;
                 this.timer = reminderService.asyncTimerFactory.Create(period, "");
             }
 
@@ -643,7 +648,7 @@ namespace Orleans.Runtime.ReminderService
             private TimeSpan CalculateDueTime()
             {
                 TimeSpan dueTimeSpan;
-                var now = DateTime.UtcNow;
+                var now = timeProvider.GetUtcNow().UtcDateTime;
                 if (now < firstTickTime) // if the time for first tick hasn't passed yet
                 {
                     dueTimeSpan = firstTickTime.Subtract(now); // then duetime is duration between now and the first tick time
@@ -677,7 +682,7 @@ namespace Orleans.Runtime.ReminderService
 
             public async Task OnTimerTick()
             {
-                var before = DateTime.UtcNow;
+                var before = timeProvider.GetUtcNow().UtcDateTime;
                 var status = new TickStatus(firstTickTime, period, before);
 
                 LogTraceTriggeringTick(logger, this, status, before);
@@ -702,7 +707,7 @@ namespace Orleans.Runtime.ReminderService
 
                     stopwatch.Restart();
 
-                    var after = DateTime.UtcNow;
+                    var after = timeProvider.GetUtcNow().UtcDateTime;
                     var elapsed = after - before;
                     LogTraceTickTriggered(logger, this, elapsed.TotalSeconds, after + period);
 
@@ -715,7 +720,7 @@ namespace Orleans.Runtime.ReminderService
                 }
                 catch (Exception exc)
                 {
-                    var after = DateTime.UtcNow;
+                    var after = timeProvider.GetUtcNow().UtcDateTime;
                     var elapsed = after - before;
                     LogErrorDeliveringReminderTick(logger, this, after + period, exc);
 

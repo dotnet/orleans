@@ -1,3 +1,4 @@
+#nullable enable
 using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 using Orleans.Streams.Core;
@@ -21,7 +22,7 @@ namespace UnitTests.Grains
             [Id(1)]
             public int ErrorCounter { get; set; }
             [Id(2)]
-            public StreamSequenceToken Token { get; set; }
+            public StreamSequenceToken? Token { get; set; }
         }
 
         public ImplicitSubscriptionCounterGrain(ILoggerFactory loggerFactory)
@@ -58,8 +59,10 @@ namespace UnitTests.Grains
             _eventCountWaiter = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             using var cts = new CancellationTokenSource(timeout);
+            // Note: Cannot access this.State in the callback as it runs on a timer thread without grain context.
+            // Only capture the expectedCount which is a local variable.
             using var registration = cts.Token.Register(() =>
-                _eventCountWaiter?.TrySetException(new TimeoutException($"Timed out waiting for event count {expectedCount}. Current count: {this.State.EventCounter}")));
+                _eventCountWaiter?.TrySetException(new TimeoutException($"Timed out waiting for event count {expectedCount}.")));
 
             try
             {

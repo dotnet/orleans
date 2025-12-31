@@ -27,6 +27,13 @@ namespace UnitTests.GrainInterfaces
         Task EraseReminderTable();
 
         Task<Dictionary<string, ReminderState>> GetReminderStates();
+
+        /// <summary>
+        /// Gets the current tick count for the specified reminder.
+        /// </summary>
+        /// <param name="reminderName">The name of the reminder.</param>
+        /// <returns>The current tick count, or 0 if the reminder doesn't exist.</returns>
+        Task<int> GetReminderTickCount(string reminderName);
     }
 
     // to test reminders for different grain types
@@ -37,6 +44,13 @@ namespace UnitTests.GrainInterfaces
 
         Task<TimeSpan> GetReminderPeriod(string reminderName);
         Task<long> GetCounter(string name);
+
+        /// <summary>
+        /// Gets the current tick count for the specified reminder.
+        /// </summary>
+        /// <param name="reminderName">The name of the reminder.</param>
+        /// <returns>The current tick count, or 0 if the reminder doesn't exist.</returns>
+        Task<int> GetReminderTickCount(string reminderName);
     }
 
     public interface IReminderGrainWrong : IGrainWithIntegerKey
