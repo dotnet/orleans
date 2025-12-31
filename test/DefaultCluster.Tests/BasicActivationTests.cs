@@ -302,8 +302,10 @@ namespace DefaultCluster.Tests.General
                     this.Logger.LogInformation("Done with stress iteration.");
                 }
 
-                // wait a bit to make sure expired msgs in the silo is trigered.
-                Thread.Sleep(TimeSpan.FromSeconds(10));
+                // The messages have already expired since the timeout (1s) has passed
+                // and Task.WhenAll has returned. A small delay ensures the silo has
+                // processed the expirations before we send the next request.
+                await Task.Delay(TimeSpan.FromSeconds(1));
 
                 // set the regular response time back, expect msgs ot succeed.
                 this.SetResponseTimeout(prevTimeout);
