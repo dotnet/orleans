@@ -725,13 +725,18 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("ActivateDeactivate")]
         public async Task Generic_ScheduleDelayedPingAndDeactivate()
         {
+            using var timerObserver = TimerDiagnosticObserver.Create();
+
             var id = Guid.NewGuid();
             var targetId = Guid.NewGuid();
             var grain = this.GrainFactory.GetGrain<IGenericPingSelf<string>>(id);
             var target = this.GrainFactory.GetGrain<IGenericPingSelf<string>>(targetId);
             var s1 = Guid.NewGuid().ToString();
             await grain.ScheduleDelayedPingToSelfAndDeactivate(target, s1, TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromSeconds(6));
+
+            // Wait for the timer tick on the target grain instead of a fixed delay
+            await timerObserver.WaitForTimerTickAsync(target.GetGrainId(), TimeSpan.FromSeconds(30));
+
             var s2 = await grain.GetLastValue();
             Assert.Equal(s1, s2);
         }

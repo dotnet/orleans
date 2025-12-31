@@ -167,18 +167,20 @@ namespace DefaultCluster.Tests.TimerTests
         {
             const string testName = "AsyncTimerTest_GrainCall";
             TimeSpan delay = TimeSpan.FromSeconds(5);
-            TimeSpan wait = delay.Multiply(2);
 
             ITimerCallGrain grain = null;
 
             Exception error = null;
             try
             {
+                using var timerObserver = TimerDiagnosticObserver.Create();
+
                 grain = GrainFactory.GetGrain<ITimerCallGrain>(GetRandomGrainId());
 
                 await grain.StartTimer(testName, delay);
 
-                await Task.Delay(wait);
+                // Wait for the timer tick instead of a fixed delay
+                await timerObserver.WaitForTimerTickAsync(grain.GetGrainId(), TimeSpan.FromSeconds(30));
 
                 int tickCount = await grain.GetTickCount();
                 Assert.Equal(1, tickCount);
@@ -264,7 +266,8 @@ namespace DefaultCluster.Tests.TimerTests
         {
             const string testName = "NonReentrantGrainTimer_Test";
             var delay = TimeSpan.FromSeconds(5);
-            var wait = delay.Multiply(2);
+
+            using var timerObserver = TimerDiagnosticObserver.Create();
 
             var grain = GrainFactory.GetGrain<INonReentrantTimerCallGrain>(GetRandomGrainId());
 
@@ -273,10 +276,13 @@ namespace DefaultCluster.Tests.TimerTests
             await grain.StartTimer($"{testName}_1", delay);
             await grain.StartTimer($"{testName}_2", delay);
 
+            // Wait for all 3 timers to tick instead of a fixed delay
+            await timerObserver.WaitForTickCountAsync(grain.GetGrainId(), 3, TimeSpan.FromSeconds(30));
+
             // Invoke some non-interleaving methods.
             var externalTicks = 0;
-            var stopwatch = Stopwatch.StartNew();
-            while (stopwatch.Elapsed < wait)
+            // Now do a few external ticks to verify they also serialize correctly
+            for (int i = 0; i < 3; i++)
             {
                 await grain.ExternalTick("external");
                 externalTicks++;
@@ -504,18 +510,20 @@ namespace DefaultCluster.Tests.TimerTests
         {
             const string testName = "AsyncTimerTest_GrainCall";
             TimeSpan delay = TimeSpan.FromSeconds(5);
-            TimeSpan wait = delay.Multiply(2);
 
             IPocoTimerCallGrain grain = null;
 
             Exception error = null;
             try
             {
+                using var timerObserver = TimerDiagnosticObserver.Create();
+
                 grain = GrainFactory.GetGrain<IPocoTimerCallGrain>(GetRandomGrainId());
 
                 await grain.StartTimer(testName, delay);
 
-                await Task.Delay(wait);
+                // Wait for the timer tick instead of a fixed delay
+                await timerObserver.WaitForTimerTickAsync(grain.GetGrainId(), TimeSpan.FromSeconds(30));
 
                 int tickCount = await grain.GetTickCount();
                 Assert.Equal(1, tickCount);
@@ -583,7 +591,8 @@ namespace DefaultCluster.Tests.TimerTests
         {
             const string testName = "NonReentrantGrainTimer_Test";
             var delay = TimeSpan.FromSeconds(5);
-            var wait = delay.Multiply(2);
+
+            using var timerObserver = TimerDiagnosticObserver.Create();
 
             var grain = GrainFactory.GetGrain<IPocoNonReentrantTimerCallGrain>(GetRandomGrainId());
 
@@ -592,10 +601,13 @@ namespace DefaultCluster.Tests.TimerTests
             await grain.StartTimer($"{testName}_1", delay);
             await grain.StartTimer($"{testName}_2", delay);
 
+            // Wait for all 3 timers to tick instead of a fixed delay
+            await timerObserver.WaitForTickCountAsync(grain.GetGrainId(), 3, TimeSpan.FromSeconds(30));
+
             // Invoke some non-interleaving methods.
             var externalTicks = 0;
-            var stopwatch = Stopwatch.StartNew();
-            while (stopwatch.Elapsed < wait)
+            // Now do a few external ticks to verify they also serialize correctly
+            for (int i = 0; i < 3; i++)
             {
                 await grain.ExternalTick("external");
                 externalTicks++;
