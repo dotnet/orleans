@@ -14,6 +14,21 @@ namespace Tester.StreamingTests
 
         protected const string StreamProviderName = "StreamingCacheMissTests";
 
+        /// <summary>
+        /// Polls the grain's event counter until it reaches the expected count.
+        /// This is needed for tests where the grain deactivates between events,
+        /// which prevents WaitForEventCount from working reliably.
+        /// </summary>
+        protected static async Task PollForEventCount(IImplicitSubscriptionCounterGrain grain, int expectedCount, TimeSpan timeout)
+        {
+            using var cts = new CancellationTokenSource(timeout);
+            while (await grain.GetEventCounter() < expectedCount)
+            {
+                cts.Token.ThrowIfCancellationRequested();
+                await Task.Delay(100, cts.Token);
+            }
+        }
+
         [SkippableFact]
         public virtual async Task ResumeAfterInactivity()
         {
@@ -124,8 +139,10 @@ namespace Tester.StreamingTests
             await otherStream.OnNextAsync(interestingData);
             await stream.OnNextAsync(interestingData);
 
-            // Wait for the grain to receive the first 2 events on its stream
-            await grain.WaitForEventCount(2, TimeSpan.FromSeconds(30));
+            // Wait for the grain to receive the first 2 events on its stream.
+            // Use polling because the grain deactivates after each event,
+            // which prevents WaitForEventCount from working reliably.
+            await PollForEventCount(grain, 2, TimeSpan.FromSeconds(30));
 
             // Wait for the stream to become inactive
             await Task.Delay(StreamInactivityPeriod.Multiply(3));
@@ -134,7 +151,7 @@ namespace Tester.StreamingTests
             await stream.OnNextAsync(interestingData);
 
             // Wait for the grain to receive the third event
-            await grain.WaitForEventCount(3, TimeSpan.FromSeconds(30));
+            await PollForEventCount(grain, 3, TimeSpan.FromSeconds(30));
 
             Assert.Equal(0, await grain.GetErrorCounter());
             Assert.Equal(3, await grain.GetEventCounter());
