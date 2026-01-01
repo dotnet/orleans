@@ -54,7 +54,7 @@ namespace ServiceBus.Tests
             this.fixture = fixture;
         }
 
-        [Fact(Skip = "LeaseBasedQueueBalancerForTest has broken DI registration (issue #4317 closed but not fixed)"), TestCategory("BVT")]
+        [Fact(Skip = "EventDataGeneratorStreamConfigurator still validates EventHubOptions connection even though it uses generated data"), TestCategory("BVT")]
         public Task PluggableQueueBalancerTest_ShouldUseInjectedQueueBalancerAndBalanceCorrectly()
         {
             return base.ShouldUseInjectedQueueBalancerAndBalanceCorrectly(this.fixture, StreamProviderName, SiloCount, TotalQueueCount);

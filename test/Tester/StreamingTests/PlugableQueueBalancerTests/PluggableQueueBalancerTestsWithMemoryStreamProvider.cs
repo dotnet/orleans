@@ -61,7 +61,7 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
             this.fixture = fixture;
         }
 
-        [Fact(Skip = "LeaseBasedQueueBalancerForTest has broken DI registration (issue #4317 closed but not fixed)"), TestCategory("BVT")]
+        [Fact, TestCategory("BVT")]
         public Task PluggableQueueBalancerTest_ShouldUseInjectedQueueBalancerAndBalanceCorrectly()
         {
             return base.ShouldUseInjectedQueueBalancerAndBalanceCorrectly(this.fixture, StreamProviderName, siloCount, totalQueueCount);

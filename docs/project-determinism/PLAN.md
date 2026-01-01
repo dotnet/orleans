@@ -1019,6 +1019,50 @@ The ReentrancyTests skipped tests are actually testing *known failure scenarios*
 
 These should remain skipped as they document known edge cases/limitations rather than bugs to fix.
 
+#### Phase 7: Fix PluggableQueueBalancer Test - SUCCESS
+
+Fixed the `PluggableQueueBalancerTest_ShouldUseInjectedQueueBalancerAndBalanceCorrectly` test that had been skipped for years due to flakiness (issue #4317).
+
+**Root Cause Analysis:**
+
+The test used a simple `LeaseBasedQueueBalancerForTest` class that only acquired queues once at startup and never re-balanced. This caused a race condition:
+
+1. Silo 1 starts, initializes its balancer, but silo 2 might not be visible yet
+2. `GetLeaseResposibility()` sees only 1 silo → returns `6/1 = 6` queues
+3. Silo 1 acquires all 6 queues
+4. Silo 2 starts, sees 2 silos → tries to get `6/2 = 3` queues
+5. All queues already taken → test fails with `Expected: 3, Actual: 6`
+
+**Solution:**
+
+Rewrote `LeaseBasedQueueBalancerForTest` to properly extend `QueueBalancerBase` (like the real `LeaseBasedQueueBalancer` does), which provides:
+- Cluster membership change notifications via `OnClusterMembershipChange`
+- Proper re-balancing when silos join or leave the cluster
+
+Key changes to `LeaseBasedQueueBalancer.cs`:
+- Inherit from `QueueBalancerBase` instead of implementing `IStreamQueueBalancer` directly
+- Implement `OnClusterMembershipChange` to trigger re-balancing
+- Add proper locking for thread-safe queue list access
+- Release excess queues when silos join (responsibility decreases)
+
+**Files Modified:**
+
+| File | Change |
+|------|--------|
+| `test/Tester/StreamingTests/PlugableQueueBalancerTests/LeaseBasedQueueBalancer.cs` | Complete rewrite to extend QueueBalancerBase with proper cluster membership handling |
+| `test/Tester/StreamingTests/PlugableQueueBalancerTests/PluggableQueueBalancerTestsWithMemoryStreamProvider.cs` | Removed Skip attribute |
+| `test/Extensions/ServiceBus.Tests/PluggableQueueBalancerTests.cs` | Updated skip reason (EventHub test still requires connection config) |
+
+**Test Results:**
+
+The memory stream provider test now passes consistently:
+- Ran 5+ consecutive times with no failures
+- Test completes in ~1-2 seconds (was timing out before)
+
+**EventHub Test Status:**
+
+The EventHub version (`PluggableQueueBalancerTestsWithEHStreamProvider`) remains skipped because `EventDataGeneratorStreamConfigurator` still validates `EventHubOptions` connection even though it uses generated data. This is a separate design issue that would require changes to the EventHub stream configuration infrastructure.
+
 ## References
 
 - [Aspire DiagnosticListener pattern](https://github.com/dotnet/aspire/blob/main/src/Aspire.Hosting/DistributedApplicationBuilder.cs)
