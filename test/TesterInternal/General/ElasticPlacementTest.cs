@@ -132,26 +132,30 @@ namespace UnitTests.General
         /// <summary>
         /// Do not place activation in case all silos are at 100 CPU utilization.
         /// </summary>
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task ElasticityTest_AllSilosCPUTooHigh()
         {
             var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
             var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.SecondarySilos.First().SiloAddress);
 
-            await taintedGrainPrimary.EnableOverloadDetection(false);
-            await taintedGrainSecondary.EnableOverloadDetection(false);
-
             await taintedGrainPrimary.LatchCpuUsage(100.0f);
             await taintedGrainSecondary.LatchCpuUsage(100.0f);
 
-            await Assert.ThrowsAsync<OrleansException>(() =>
+            // Allow time for stats to propagate to all silos' placement directors
+            // (OverloadDetector has a 1-second refresh interval)
+            await Task.Delay(TimeSpan.FromSeconds(1));
+
+            // OrleansException or GatewayTooBusyException (depending on which silo is the gateway)
+            var exception = await Assert.ThrowsAnyAsync<Exception>(() =>
                 this.AddTestGrains(1));
+
+            Assert.True(exception is OrleansException || exception is GatewayTooBusyException);
         }
 
         /// <summary>
         /// Do not place activation in case all silos are at 100 CPU utilization or have overloaded flag set.
         /// </summary>
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task ElasticityTest_AllSilosOverloaded()
         {
             var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
@@ -159,6 +163,9 @@ namespace UnitTests.General
 
             await taintedGrainPrimary.LatchCpuUsage(100.0f);
             await taintedGrainSecondary.LatchOverloaded();
+
+            // Allow time for stats to propagate to all silos' placement directors
+            await Task.Delay(TimeSpan.FromSeconds(1));
 
             // OrleansException or GateWayTooBusyException
             var exception = await Assert.ThrowsAnyAsync<Exception>(() =>
