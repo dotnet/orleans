@@ -926,7 +926,7 @@ Un-skipped tests in extension projects (Azure, EventHub, Cosmos) where GitHub is
 - `test/Extensions/ServiceBus.Tests/Streaming/EHClientStreamTests.cs`
 - `test/Extensions/ServiceBus.Tests/StatisticMonitorTests/EHStatisticMonitorTests.cs`
 
-**Note:** These tests require external services (Azure Storage, EventHub, Cosmos DB) and cannot be run locally without credentials. We un-skipped them based on closed issue status.
+**Note:** These tests were un-skipped based on closed issue status. EventHub tests were subsequently verified locally using Docker emulators (see Phase 5).
 
 **Tests Left Skipped (Open Issues or Known Issues):**
 
@@ -936,6 +936,62 @@ Un-skipped tests in extension projects (Azure, EventHub, Cosmos) where GitHub is
 | `LeaseBalancedQueueBalancer_SupportUnexpectedNodeFailureScenerio` | `LeaseBasedQueueBalancerTests.cs` | #9559 | OPEN |
 | `AQ_Standalone_4` | `AzureQueueDataManagerTests.cs` | #9552 | OPEN |
 | 8 generic grain tests | `GenericGrainTests.cs` | N/A | "Currently unsupported" |
+
+#### Phase 5: EventHub Test Verification - SUCCESS
+
+Verified EventHub tests locally using Docker emulators and fixed flakiness issues.
+
+**Local Testing Infrastructure:**
+
+Set up EventHubs emulator environment for testing:
+```powershell
+# Azurite (Azure Storage emulator)
+docker run -d --name azurite -p 10000:10000 -p 10001:10001 -p 10002:10002 mcr.microsoft.com/azure-storage/azurite:latest azurite --skipApiVersionCheck --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+
+# EventHubs emulator  
+docker run -d --name eventhubs-emulator -v "C:\dev\orleans\.github\eventhubs-emulator\Config.json:/Eventhubs_Emulator/ConfigFiles/Config.json" -p 5672:5672 -e BLOB_SERVER=host.docker.internal -e METADATA_SERVER=host.docker.internal -e ACCEPT_EULA=Y --add-host=host.docker.internal:host-gateway mcr.microsoft.com/azure-messaging/eventhubs-emulator:latest
+```
+
+**Connection Strings (OrleansTestSecrets.json):**
+```json
+{
+  "EventHubConnectionString": "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;",
+  "DataConnectionString": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+}
+```
+
+**Verified Tests (7 passing):**
+
+| Test | Duration | Notes |
+|------|----------|-------|
+| `EHStatistics_MonitorCalledAccordingly` | ~20s | Fixed flakiness (timeout 5s→10s) |
+| `EHStreamProducerOnDroppedClientTest` | ~1m 7s | Passes consistently |
+| `EHStreamConsumerOnDroppedClientTest` | ~2m 39s | Passes consistently |
+| `Recoverable100EventStreamsWithTransientErrorsTest` | ~9s | Passes consistently |
+| `Recoverable100EventStreamsWith1NonTransientErrorTest` | ~1m 29s | Passes consistently |
+| `ReloadFromCheckpointTest` | ~15s | Passes consistently |
+| `RestartSiloAfterCheckpointTest` | ~11s | Passes consistently |
+
+**Flakiness Fix:**
+
+`EHStatistics_MonitorCalledAccordingly` was flaky - passed on first run, failed on second.
+
+- **Root Cause:** 5-second timeout was too short for monitor counters to be populated
+- **Fix:** Increased timeout from 5s to 10s in `EHStatisticMonitorTests.cs`
+- **Commit:** `82a9caca74` - "Fix flaky EHStatistics_MonitorCalledAccordingly test"
+
+**Skip Reasons Clarified:**
+
+| Test | Old Skip Reason | New Skip Reason |
+|------|-----------------|-----------------|
+| `PluggableQueueBalancerTest_ShouldUseInjectedQueueBalancerAndBalanceCorrectly` (EH) | GitHub URL only | "LeaseBasedQueueBalancerForTest has broken DI registration (issue #4317 closed but not fixed)" |
+| `ElasticityTest_CatchingUp` | GitHub URL only | "Issue #4008 closed but test still fails - timing-dependent activation counting" |
+| `ElasticityTest_StoppingSilos` | GitHub URL only | "Issue #4008 closed but test still fails - timing-dependent activation counting" |
+| `CallThatShouldHaveBeenDroppedNotExecutedTest` | "issue #3995 - Test relies on timing..." | "Issue #3995 closed - Test relies on timing that cannot be reliably controlled" |
+
+**Important Notes:**
+- Emulators must be restarted between test runs to avoid state pollution
+- EventHub emulator can get into bad states after tests, causing "service was unable to process the request" errors
 
 ## References
 

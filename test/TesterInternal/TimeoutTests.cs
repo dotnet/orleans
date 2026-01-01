@@ -135,7 +135,7 @@ namespace UnitTests
         /// provide. The DropExpiredMessages feature works correctly, but the test cannot
         /// reliably verify it without introducing races.
         /// </summary>
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/3995 - Test relies on timing that cannot be reliably controlled"), TestCategory("SlowBVT")]
+        [SkippableFact(Skip = "Issue #3995 closed - Test relies on timing that cannot be reliably controlled"), TestCategory("SlowBVT")]
         public async Task CallThatShouldHaveBeenDroppedNotExecutedTest()
         {
             var responseTimeout = TimeSpan.FromSeconds(2);

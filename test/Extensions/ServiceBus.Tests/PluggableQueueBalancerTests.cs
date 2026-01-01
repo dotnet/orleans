@@ -54,7 +54,7 @@ namespace ServiceBus.Tests
             this.fixture = fixture;
         }
 
-        [Fact(Skip = "https://github.com/dotnet/orleans/issues/4317"), TestCategory("BVT")]
+        [Fact(Skip = "LeaseBasedQueueBalancerForTest has broken DI registration (issue #4317 closed but not fixed)"), TestCategory("BVT")]
         public Task PluggableQueueBalancerTest_ShouldUseInjectedQueueBalancerAndBalanceCorrectly()
         {
             return base.ShouldUseInjectedQueueBalancerAndBalanceCorrectly(this.fixture, StreamProviderName, SiloCount, TotalQueueCount);
