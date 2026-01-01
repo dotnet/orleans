@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Internal;
@@ -111,10 +110,9 @@ namespace DefaultCluster.Tests
         /// Verifies that:
         /// - Tasks for long-running operations don't complete prematurely
         /// - The Task eventually completes successfully
-        /// - Timing assertions ensure proper async behavior
         /// This establishes baseline behavior for comparison with timeout scenarios.
         /// </summary>
-        [Fact(Skip = "https://github.com/dotnet/orleans/issues/9558"), TestCategory("BVT"), TestCategory("ErrorHandling")]
+        [Fact, TestCategory("BVT"), TestCategory("ErrorHandling")]
         public async Task ErrorHandlingTimedMethod()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
@@ -122,15 +120,9 @@ namespace DefaultCluster.Tests
 
             Task promise = grain.LongMethod(2000);
 
-            // there is a race in the test here. If run in debugger, the invocation can actually finish OK
-            Stopwatch stopwatch = Stopwatch.StartNew();
-
+            // Wait 1 second - the task should not have completed yet since it takes 2 seconds
             await Task.Delay(1000);
             Assert.False(promise.IsCompleted, "The task shouldn't have completed yet.");
-
-            // these asserts depend on timing issues and will be wrong for the sync version of OrleansTask
-            Assert.True(stopwatch.ElapsedMilliseconds >= 900, $"Waited less than 900ms: ({stopwatch.ElapsedMilliseconds}ms)"); // check that we waited at least 0.9 second
-            Assert.True(stopwatch.ElapsedMilliseconds <= 1300, $"Waited longer than 1300ms: ({stopwatch.ElapsedMilliseconds}ms)");
 
             await promise; // just wait for the server side grain invocation to finish
             
