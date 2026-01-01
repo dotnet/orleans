@@ -871,6 +871,72 @@ Systematically reviewed and fixed or clarified skipped tests across the codebase
 - `test/Tester/StreamingTests/PlugableQueueBalancerTests/PluggableQueueBalancerTestsWithMemoryStreamProvider.cs` - Updated skip reason
 - `test/TesterInternal/General/ElasticPlacementTest.cs` - Fixed 2 tests, investigated 2 others
 
+#### Phase 4: Extension Tests Cleanup - SUCCESS
+
+Un-skipped tests in extension projects (Azure, EventHub, Cosmos) where GitHub issues were closed.
+
+**Azure Queue Tests:**
+
+| Test | File | Issue |
+|------|------|-------|
+| `AQ_07_ManyDifferent_ManyProducerClientsManyConsumerGrains` | `AQStreamingTests.cs` | #5648 (CLOSED) |
+| `AQStreamProducerOnDroppedClientTest` | `AQClientStreamTests.cs` | #5639 (CLOSED) |
+
+**Reminder Tests:**
+
+| Test | File | Issue |
+|------|------|-------|
+| `Rem_Azure_GT_1F1J_MultiGrain` | `ReminderTests_AzureTable.cs` | #4319 (CLOSED) |
+| `Rem_Azure_GT_1F1J_MultiGrain` | `ReminderTests_Cosmos.cs` | #4319 (CLOSED) |
+
+**EventHub Checkpoint Tests:**
+
+| Test | File | Issue |
+|------|------|-------|
+| `ReloadFromCheckpointTest` | `EHStreamProviderCheckpointTests.cs` | #5356 (CLOSED) |
+| `RestartSiloAfterCheckpointTest` | `EHStreamProviderCheckpointTests.cs` | #5356 (CLOSED) |
+
+**EventHub Recovery Tests:**
+
+| Test | File | Issue |
+|------|------|-------|
+| `Recoverable100EventStreamsWithTransientErrorsTest` | `EHImplicitSubscriptionStreamRecoveryTests.cs` | #5633 (CLOSED) |
+| `Recoverable100EventStreamsWith1NonTransientErrorTest` | `EHImplicitSubscriptionStreamRecoveryTests.cs` | #5638 (CLOSED) |
+
+**EventHub Client Stream Tests:**
+
+| Test | File | Issue |
+|------|------|-------|
+| `EHStreamProducerOnDroppedClientTest` | `EHClientStreamTests.cs` | #5657 (CLOSED) |
+| `EHStreamConsumerOnDroppedClientTest` | `EHClientStreamTests.cs` | #5634 (CLOSED) |
+
+**EventHub Statistics Tests:**
+
+| Test | File | Issue |
+|------|------|-------|
+| `EHStatistics_MonitorCalledAccordingly` | `EHStatisticMonitorTests.cs` | #4594 (CLOSED) |
+
+**Files Modified:**
+- `test/Extensions/TesterAzureUtils/Streaming/AQStreamingTests.cs`
+- `test/Extensions/TesterAzureUtils/Streaming/AQClientStreamTests.cs`
+- `test/Extensions/TesterAzureUtils/Reminder/ReminderTests_AzureTable.cs`
+- `test/Extensions/Tester.Cosmos/ReminderTests_Cosmos.cs`
+- `test/Extensions/ServiceBus.Tests/Streaming/EHStreamProviderCheckpointTests.cs`
+- `test/Extensions/ServiceBus.Tests/Streaming/EHImplicitSubscriptionStreamRecoveryTests.cs`
+- `test/Extensions/ServiceBus.Tests/Streaming/EHClientStreamTests.cs`
+- `test/Extensions/ServiceBus.Tests/StatisticMonitorTests/EHStatisticMonitorTests.cs`
+
+**Note:** These tests require external services (Azure Storage, EventHub, Cosmos DB) and cannot be run locally without credentials. We un-skipped them based on closed issue status.
+
+**Tests Left Skipped (Open Issues or Known Issues):**
+
+| Test | File | Issue | Status |
+|------|------|-------|--------|
+| Multiple reminder tests | `ReminderTests_AzureTable.cs` | #9337, #9344, #9557 | OPEN |
+| `LeaseBalancedQueueBalancer_SupportUnexpectedNodeFailureScenerio` | `LeaseBasedQueueBalancerTests.cs` | #9559 | OPEN |
+| `AQ_Standalone_4` | `AzureQueueDataManagerTests.cs` | #9552 | OPEN |
+| 8 generic grain tests | `GenericGrainTests.cs` | N/A | "Currently unsupported" |
+
 ## References
 
 - [Aspire DiagnosticListener pattern](https://github.com/dotnet/aspire/blob/main/src/Aspire.Hosting/DistributedApplicationBuilder.cs)
