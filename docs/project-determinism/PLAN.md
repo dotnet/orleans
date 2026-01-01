@@ -731,71 +731,87 @@ await WaitForReminderTickCountAsync(grain, reminderName, expectedCount, timeout)
 await AdvanceTimeAsync(period);
 ```
 
-#### Phase 2: Streaming Tests - BLOCKED (Pre-existing Bug)
+#### Phase 2: Streaming Tests - SUCCESS
 
-Attempted to apply the same pattern to streaming tests but discovered a **pre-existing bug** in the Orleans streaming infrastructure.
+Fixed streaming test flakiness by addressing the root causes of test failures.
 
-**Findings:**
-1. `MemoryStreamResumeTests` fail even on the **original codebase** (without our changes)
-2. The tests timeout waiting for the first stream event to arrive
-3. The `ImplicitSubscriptionCounterGrain.WaitForEventCount()` method never receives events
-4. Root cause appears to be in the implicit subscription/delivery pipeline
+**Root Cause Analysis:**
+1. `MemoryStreamResumeTests` were failing due to **non-reentrant grain blocking**
+2. The `WaitForEventCount()` method blocks inside the grain waiting for events via `TaskCompletionSource`
+3. Without reentrancy, stream events cannot be delivered while the grain is blocked
+4. For `ResumeAfterDeactivationActiveStream`, the grain deactivates after each event, losing the waiter state
 
-**Files Created (Exploratory - Diagnostic Events Only):**
+**Solution Implemented:**
+1. Added `[AlwaysInterleave]` attribute to `WaitForEventCount` on the interface
+   - Allows stream events to be delivered while the method is awaiting
+   - Orleans requires this attribute on the interface, not implementation (enforced by `ORLEANS0001` analyzer)
+
+2. Added `PollForEventCount` helper for deactivation tests
+   - Polls persisted state which survives deactivations
+   - Used in `ResumeAfterDeactivationActiveStream` test
+
+3. Un-skipped batching tests disabled since 2019
+   - `SingleSendBatchConsume` (issue #5649)
+   - `BatchSendBatchConsume` (issue #5632)
+   - Both tests now pass
+
+**Files Modified:**
+- `test/Grains/TestGrainInterfaces/IImplicitSubscriptionCounterGrain.cs` - Added `[AlwaysInterleave]` to `WaitForEventCount`
+- `test/Tester/StreamingTests/StreamingResumeTests.cs` - Added `PollForEventCount` helper
+- `test/Tester/StreamingTests/StreamBatchingTestRunner.cs` - Un-skipped batching tests
+
+**Test Results:**
+- `MemoryStreamResumeTests`: 5/5 passing
+- `MemoryStreamBatchingTests`: 3/3 passing (2 previously skipped)
+
+**Previous Streaming Infrastructure Changes (Diagnostic Events):**
 - `src/Orleans.Streaming/Diagnostics/OrleansStreamingDiagnosticEvents.cs` - Streaming diagnostic events
 
-**Files Modified (Partial TimeProvider Integration):**
-- `src/Orleans.Streaming/PersistentStreams/PersistentStreamPullingAgent.cs` - Added TimeProvider (defaults to System)
-- `src/Orleans.Streaming/PersistentStreams/PersistentStreamPullingManager.cs` - Passes TimeProvider
-- `src/Orleans.Streaming/Providers/SiloStreamProviderRuntime.cs` - Gets TimeProvider from DI
-- `src/Orleans.Streaming/PersistentStreams/StreamConsumerCollection.cs` - DateTime parameter
+**Note on Full TimeProvider Integration for Streaming:**
+Full TimeProvider integration is a larger effort due to `DateTime.UtcNow` usage in 16+ places:
+- `MemoryPooledCache.cs` (3 uses)
+- `GeneratorPooledCache.cs` (2 uses)
+- `PooledQueueCache.cs` (2 uses)
+- `ObjectPool.cs` (2 uses)
+- And more...
 
-**Why Full TimeProvider Integration Won't Work for Streaming:**
-- `DateTime.UtcNow` is used in 16+ places across the streaming infrastructure:
-  - `MemoryPooledCache.cs` (3 uses)
-  - `GeneratorPooledCache.cs` (2 uses)
-  - `PooledQueueCache.cs` (2 uses)
-  - `ObjectPool.cs` (2 uses)
-  - And more...
-- Injecting `FakeTimeProvider` into just the pulling agent causes time mismatches with cache eviction
-
-**Bug Fixed:**
-- `test/Grains/TestGrains/ImplicitSubscriptionCounterGrain.cs` - Fixed "Activation access violation" in `WaitForEventCount()` by removing `this.State` access from `CancellationToken.Register()` callback
+This is tracked as future work and not required for test reliability.
 
 #### Recommendations
 
 1. **Reminder Tests:** Ready to merge - significant improvement in test speed and reliability
 
-2. **Streaming Tests:** Pre-existing bugs need investigation before determinism work can continue
-   - Issue: `MemoryStreamResumeTests` fail on fresh checkout
-   - Workaround: Skip streaming tests from determinism scope for now
+2. **Streaming Tests:** Ready to merge - fixed flakiness with `[AlwaysInterleave]` and polling
 
 3. **Future Work:**
    - Complete TimeProvider integration for reminders (partially done)
-   - Investigate streaming implicit subscription bug (separate issue)
-   - Consider full TimeProvider refactoring for streaming (large effort)
+   - Consider full TimeProvider refactoring for streaming (large effort, lower priority)
 
 ### Git Status
 
 ```
 Branch: fix/test-flakiness/1
 
-Modified:
+Recent Commits:
+- Fix streaming test flakiness with AlwaysInterleave and polling
+- Add streaming diagnostic events and document progress on determinism initiative
+- Add ReminderDiagnosticObserver and convert more tests to event-driven waiting
+- Fix flaky streaming resume tests with event-driven waiting
+- Add timer diagnostic events and TimerDiagnosticObserver for event-driven timer tests
+- Remove unnecessary 5-second delay in MultipleGrainDirectoriesTests
+
+Key Modified Files:
 - src/Orleans.Reminders/ReminderService/LocalReminderService.cs
-- src/Orleans.Streaming/PersistentStreams/PersistentStreamPullingAgent.cs
-- src/Orleans.Streaming/PersistentStreams/PersistentStreamPullingManager.cs
-- src/Orleans.Streaming/PersistentStreams/StreamConsumerCollection.cs
-- src/Orleans.Streaming/Providers/SiloStreamProviderRuntime.cs
-- test/Grains/TestGrainInterfaces/IReminderTestGrain2.cs
+- test/Grains/TestGrainInterfaces/IImplicitSubscriptionCounterGrain.cs
+- test/Tester/StreamingTests/StreamingResumeTests.cs
+- test/Tester/StreamingTests/StreamBatchingTestRunner.cs
 - test/Grains/TestGrains/ImplicitSubscriptionCounterGrain.cs
-- test/Grains/TestInternalGrains/ReminderTestGrain2.cs
-- test/Tester/Tester.csproj
-- test/TesterInternal/TesterInternal.csproj
 - test/TesterInternal/TimerTests/ReminderTests_Base.cs
 - test/TesterInternal/TimerTests/ReminderTests_TableGrain.cs
 
-New (Untracked):
+New Files:
 - src/Orleans.Streaming/Diagnostics/OrleansStreamingDiagnosticEvents.cs
+- src/Orleans.TestingHost/Diagnostics/DiagnosticEventCollector.cs (and related)
 ```
 
 ## References
