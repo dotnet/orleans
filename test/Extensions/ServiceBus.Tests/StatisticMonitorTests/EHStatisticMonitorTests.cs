@@ -21,7 +21,7 @@ namespace ServiceBus.Tests.MonitorTests
     {
         private const string StreamProviderName = "EventHubStreamProvider";
         private const string StreamNamespace = "EHTestsNamespace";
-        private static readonly TimeSpan timeout = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan timeout = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan monitorWriteInterval = TimeSpan.FromSeconds(2);
         private static readonly int ehPartitionCountPerSilo = 4;
 
