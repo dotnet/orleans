@@ -993,6 +993,29 @@ docker run -d --name eventhubs-emulator -v "C:\dev\orleans\.github\eventhubs-emu
 - Emulators must be restarted between test runs to avoid state pollution
 - EventHub emulator can get into bad states after tests, causing "service was unable to process the request" errors
 
+#### Phase 6: Skip Reason Cleanup - IN PROGRESS
+
+Improved vague skip reasons (like `Skip="Ignore"`) with descriptive explanations to help future developers understand why tests are skipped.
+
+**Files Updated:**
+
+| File | Test | Old Skip Reason | New Skip Reason |
+|------|------|-----------------|-----------------|
+| `ReentrancyTests.cs` | `Reentrancy_Deadlock_2` | "Ignore" | "Expected deadlock scenario: two non-reentrant grains calling each other will deadlock" |
+| `ReentrancyTests.cs` | `FanOut_Task_NonReentrant_Chain` | "Ignore" | "Non-reentrant grain chain calls cause deadlock/timeout" |
+| `ReentrancyTests.cs` | `FanOut_AC_NonReentrant_Chain` | "Ignore" | "Non-reentrant grain chain calls cause deadlock/timeout" |
+| `StreamReliabilityTests.cs` | `SMS_AddMany_Consumers` | "Ignore" | "Flaky: Adding many consumers concurrently can cause message count verification failures" |
+| `StreamReliabilityTests.cs` | `AQ_AddMany_Consumers` | "Ignore" | "Flaky: Adding many consumers concurrently can cause message count verification failures" |
+| `EHStreamPerPartitionTests.cs` | `EH100StreamsTo4PartitionStreamsTest` | Long unclear message | "Test purpose unclear; fails if EventHub has leftover messages from previous tests" |
+
+**Analysis Notes:**
+
+The ReentrancyTests skipped tests are actually testing *known failure scenarios* (marked with `TestCategory("Failures")` or `TestCategory("MultithreadingFailures")`):
+- `Reentrancy_Deadlock_2`: Intentionally tests that two non-reentrant grains calling each other will deadlock
+- `FanOut_*_NonReentrant_Chain`: Tests non-reentrant grain chain calls which are expected to timeout
+
+These should remain skipped as they document known edge cases/limitations rather than bugs to fix.
+
 ## References
 
 - [Aspire DiagnosticListener pattern](https://github.com/dotnet/aspire/blob/main/src/Aspire.Hosting/DistributedApplicationBuilder.cs)

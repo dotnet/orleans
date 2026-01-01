@@ -164,7 +164,7 @@ namespace UnitTests
         }
 
         // TODO: [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        [Fact(Skip = "Ignore"), TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact(Skip = "Expected deadlock scenario: two non-reentrant grains calling each other will deadlock"), TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task Reentrancy_Deadlock_2()
         {
             List<Task> done = new List<Task>();
@@ -212,7 +212,7 @@ namespace UnitTests
         }
 
         // TODO: [Fact, TestCategory("BVT"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        [Fact(Skip ="Ignore"), TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact(Skip = "Non-reentrant grain chain calls cause deadlock/timeout"), TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_Task_NonReentrant_Chain()
         {
             await Do_FanOut_Task_Join(0, true, true);
@@ -238,7 +238,7 @@ namespace UnitTests
 
         [TestCategory("MultithreadingFailures")]
         // TODO: [TestCategory("Functional")]
-        [Fact(Skip ="Ignore"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact(Skip = "Non-reentrant grain chain calls cause deadlock/timeout"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_AC_NonReentrant_Chain()
         {
             await Do_FanOut_AC_Join(0, true, true);

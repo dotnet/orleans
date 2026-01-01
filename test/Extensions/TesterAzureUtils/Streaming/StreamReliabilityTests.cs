@@ -212,14 +212,14 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, logger);
         }
 
-        [SkippableFact(Skip ="Ignore"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [SkippableFact(Skip = "Flaky: Adding many consumers concurrently can cause message count verification failures"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_AddMany_Consumers()
         {
             const string testName = "SMS_AddMany_Consumers";
             await Test_AddMany_Consumers(testName, SMS_STREAM_PROVIDER_NAME);
         }
 
-        [SkippableFact(Skip = "Ignore"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("AzureStorage")]
+        [SkippableFact(Skip = "Flaky: Adding many consumers concurrently can cause message count verification failures"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("AzureStorage")]
         public async Task AQ_AddMany_Consumers()
         {
             const string testName = "AQ_AddMany_Consumers";
