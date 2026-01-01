@@ -49,7 +49,7 @@ namespace Tester.AzureUtils.TimerTests
             await Test_Reminders_Basic_StopByRef();
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9337"), TestCategory("Functional")]
+        [SkippableFact(Skip = "Flaky: reminder tick count assertion fails intermittently (issue #9337)"), TestCategory("Functional")]
         public async Task Rem_Azure_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
@@ -69,7 +69,7 @@ namespace Tester.AzureUtils.TimerTests
             await Test_Reminders_ReminderNotFound();
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9344"), TestCategory("Functional")]
+        [SkippableFact(Skip = "Flaky: reminder tick count assertion fails intermittently (issue #9344)"), TestCategory("Functional")]
         public async Task Rem_Azure_Basic()
         {
             // start up a test grain and get the period that it's programmed to use.
@@ -90,7 +90,7 @@ namespace Tester.AzureUtils.TimerTests
             Assert.Equal(last, curr);
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9557"), TestCategory("Functional")]
+        [SkippableFact(Skip = "Flaky: reminder restart tick count assertion fails intermittently (issue #9557)"), TestCategory("Functional")]
         public async Task Rem_Azure_Basic_Restart()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());

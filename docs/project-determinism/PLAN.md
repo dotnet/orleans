@@ -993,9 +993,9 @@ docker run -d --name eventhubs-emulator -v "C:\dev\orleans\.github\eventhubs-emu
 - Emulators must be restarted between test runs to avoid state pollution
 - EventHub emulator can get into bad states after tests, causing "service was unable to process the request" errors
 
-#### Phase 6: Skip Reason Cleanup - IN PROGRESS
+#### Phase 6: Skip Reason Cleanup - COMPLETE
 
-Improved vague skip reasons (like `Skip="Ignore"`) with descriptive explanations to help future developers understand why tests are skipped.
+Improved vague skip reasons (like `Skip="Ignore"` or raw GitHub URLs) with descriptive explanations to help future developers understand why tests are skipped.
 
 **Files Updated:**
 
@@ -1007,6 +1007,9 @@ Improved vague skip reasons (like `Skip="Ignore"`) with descriptive explanations
 | `StreamReliabilityTests.cs` | `SMS_AddMany_Consumers` | "Ignore" | "Flaky: Adding many consumers concurrently can cause message count verification failures" |
 | `StreamReliabilityTests.cs` | `AQ_AddMany_Consumers` | "Ignore" | "Flaky: Adding many consumers concurrently can cause message count verification failures" |
 | `EHStreamPerPartitionTests.cs` | `EH100StreamsTo4PartitionStreamsTest` | Long unclear message | "Test purpose unclear; fails if EventHub has leftover messages from previous tests" |
+| `ReminderTests_AzureTable.cs` | `Rem_Azure_Basic_ListOps` | Raw GitHub URL | "Flaky: reminder tick count assertion fails intermittently (issue #9337)" |
+| `ReminderTests_AzureTable.cs` | `Rem_Azure_Basic` | Raw GitHub URL | "Flaky: reminder tick count assertion fails intermittently (issue #9344)" |
+| `ReminderTests_AzureTable.cs` | `Rem_Azure_Basic_Restart` | Raw GitHub URL | "Flaky: reminder restart tick count assertion fails intermittently (issue #9557)" |
 
 **Analysis Notes:**
 
