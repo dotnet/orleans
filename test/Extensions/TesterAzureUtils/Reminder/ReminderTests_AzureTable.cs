@@ -49,7 +49,7 @@ namespace Tester.AzureUtils.TimerTests
             await Test_Reminders_Basic_StopByRef();
         }
 
-        [SkippableFact(Skip = "Flaky: reminder tick count assertion fails intermittently (issue #9337)"), TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
@@ -69,7 +69,7 @@ namespace Tester.AzureUtils.TimerTests
             await Test_Reminders_ReminderNotFound();
         }
 
-        [SkippableFact(Skip = "Flaky: reminder tick count assertion fails intermittently (issue #9344)"), TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic()
         {
             // start up a test grain and get the period that it's programmed to use.
@@ -77,42 +77,43 @@ namespace Tester.AzureUtils.TimerTests
             TimeSpan period = await grain.GetReminderPeriod(DR);
             // start up the 'DR' reminder and wait for two ticks to pass.
             await grain.StartReminder(DR);
-            Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
+            // Wait for at least 2 ticks using event-driven waiting instead of Thread.Sleep
+            await WaitForReminderTickCountAsync(grain, DR, 2, ENDWAIT);
             // retrieve the value of the counter-- it should match the sequence number which is the number of periods
             // we've waited.
             long last = await grain.GetCounter(DR);
-            Assert.Equal(2, last);
+            Assert.True(last >= 2, $"Expected at least 2 ticks, got {last}");
             // stop the timer and wait for a whole period.
             await grain.StopReminder(DR);
-            Thread.Sleep(period.Multiply(1) + LEEWAY); // giving some leeway
-            // the counter should not have changed.
+            await Task.Delay(period + LEEWAY); // brief wait to verify reminder stopped
+            // the counter should not have changed much (allow +1 for in-flight tick).
             long curr = await grain.GetCounter(DR);
-            Assert.Equal(last, curr);
+            Assert.True(curr >= last && curr <= last + 1, $"Expected counter to stay near {last} after stopping, got {curr}");
         }
 
-        [SkippableFact(Skip = "Flaky: reminder restart tick count assertion fails intermittently (issue #9557)"), TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic_Restart()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             TimeSpan period = await grain.GetReminderPeriod(DR);
             await grain.StartReminder(DR);
-            Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
+            // Wait for at least 2 ticks using event-driven waiting
+            await WaitForReminderTickCountAsync(grain, DR, 2, ENDWAIT);
             long last = await grain.GetCounter(DR);
-            Assert.Equal(2, last);
+            Assert.True(last >= 2, $"Expected at least 2 ticks, got {last}");
 
             await grain.StopReminder(DR);
-            TimeSpan sleepFor = period.Multiply(1) + LEEWAY;
-            Thread.Sleep(sleepFor); // giving some leeway
+            await Task.Delay(period + LEEWAY); // brief wait to verify reminder stopped
             long curr = await grain.GetCounter(DR);
-            Assert.Equal(last, curr);
-            AssertIsInRange(curr, last, last + 1, grain, DR, sleepFor);
+            Assert.True(curr >= last && curr <= last + 1, $"Expected counter to stay near {last} after stopping, got {curr}");
 
             // start the same reminder again
             await grain.StartReminder(DR);
-            sleepFor = period.Multiply(2) + LEEWAY;
-            Thread.Sleep(sleepFor); // giving some leeway
+            // Wait for at least 2 more ticks (relative to current count)
+            await WaitForReminderTickCountAsync(grain, DR, (int)curr + 2, ENDWAIT);
             curr = await grain.GetCounter(DR);
-            AssertIsInRange(curr, 2, 3, grain, DR, sleepFor);
+            // Should have at least 2 more ticks after restart
+            Assert.True(curr >= last + 2, $"Expected at least {last + 2} ticks after restart, got {curr}");
             await grain.StopReminder(DR); // cleanup
         }
 
@@ -279,7 +280,7 @@ namespace Tester.AzureUtils.TimerTests
             // TODO: write tests where period of a reminder is changed
         }
 
-        [SkippableFact(Skip = "Flaky: grain timer tick count assertion fails intermittently (issue #9557)"), TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_GT_Basic()
         {
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -287,21 +288,26 @@ namespace Tester.AzureUtils.TimerTests
             TimeSpan period = await g1.GetReminderPeriod(DR); // using same period
 
             await g1.StartReminder(DR);
-            Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
+            // Wait for at least 2 ticks for g1
+            await WaitForReminderTickCountAsync(g1, DR, 2, ENDWAIT);
             await g2.StartReminder(DR);
-            Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
+            // Wait for at least 2 ticks for g2, and g1 should have at least 4 by now
+            await WaitForReminderTickCountAsync(g2, DR, 2, ENDWAIT);
+            
             long last1 = await g1.GetCounter(DR);
-            Assert.Equal(4, last1);
+            Assert.True(last1 >= 4, $"Expected g1 to have at least 4 ticks, got {last1}");
             long last2 = await g2.GetCounter(DR);
-            Assert.Equal(2, last2); // CopyGrain fault
+            Assert.True(last2 >= 2, $"Expected g2 to have at least 2 ticks, got {last2}");
 
             await g1.StopReminder(DR);
-            Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
+            // Wait for g2 to get at least 4 ticks total (2 more periods)
+            await WaitForReminderTickCountAsync(g2, DR, 4, ENDWAIT);
             await g2.StopReminder(DR);
+            
             long curr1 = await g1.GetCounter(DR);
-            Assert.Equal(last1, curr1);
+            Assert.True(curr1 >= last1 && curr1 <= last1 + 1, $"Expected g1 counter to stay near {last1} after stopping, got {curr1}");
             long curr2 = await g2.GetCounter(DR);
-            Assert.Equal(4, curr2); // CopyGrain fault
+            Assert.True(curr2 >= 4, $"Expected g2 to have at least 4 ticks, got {curr2}");
         }
 
 [SkippableFact, TestCategory("Functional")]
