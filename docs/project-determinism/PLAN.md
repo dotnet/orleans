@@ -1517,6 +1517,36 @@ stats = await MgmtGrain.GetDetailedGrainStatistics();
 - `test/TesterInternal/ActivationRebalancingTests/ControlRebalancerTests.cs` - Fixed nullable struct handling for `RebalancingReport`
 - `test/TesterInternal/ActivationsLifeCycleTests/ActivationCollectorTests.cs` - Fixed nullable reference type annotations
 
+### Work Item 10: StatePreservationRebalancingTests Event-Driven Waiting
+
+**Status**: ✅ COMPLETED (Phase 17 continuation)
+
+**Problem**:
+`StatePreservationRebalancingTests.Should_Migrate_And_Preserve_State_When_Hosting_Silo_Dies` used `Task.Delay(SessionCyclePeriod)` in a loop waiting for 6 rebalancing cycles while stopping a silo mid-test.
+
+**Solution**:
+Converted to use `RebalancerObserver.WaitForCycleCountAsync()` (same infrastructure created for StaticRebalancingTests and DynamicRebalancingTests).
+
+**Files Modified**:
+- `test/TesterInternal/ActivationRebalancingTests/StatePreservationRebalancingTests.cs`:
+  - Replaced `while (index < 6) { await Task.Delay(SessionCyclePeriod); ... }` loop
+  - Now uses `await RebalancerObserver.WaitForCycleCountAsync(3, ...)` before stopping silo
+  - Then `await RebalancerObserver.WaitForCycleCountAsync(6, ...)` for remaining cycles
+
+**Test Results**:
+- Test passes on both .NET 8 and .NET 10
+- All 13 rebalancing tests pass consistently
+
+### Summary: All Rebalancing Tests Now Event-Driven
+
+| Test Class | Tests | Status |
+|------------|-------|--------|
+| `ControlRebalancerTests` | 1 | ✅ Uses AsyncListener for status changes |
+| `StaticRebalancingTests` | 1 | ✅ Uses WaitForCycleCountAsync |
+| `DynamicRebalancingTests` | 1 | ✅ Uses WaitForCycleCountAsync |
+| `StatePreservationRebalancingTests` | 1 | ✅ Uses WaitForCycleCountAsync |
+| `RebalancingOptionsTests` | 9 | ✅ Unit tests (no timing) |
+
 ## References
 
 - [Aspire DiagnosticListener pattern](https://github.com/dotnet/aspire/blob/main/src/Aspire.Hosting/DistributedApplicationBuilder.cs)
