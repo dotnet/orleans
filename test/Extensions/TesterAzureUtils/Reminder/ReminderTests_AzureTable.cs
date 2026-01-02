@@ -279,7 +279,7 @@ namespace Tester.AzureUtils.TimerTests
             // TODO: write tests where period of a reminder is changed
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9557"), TestCategory("Functional")]
+        [SkippableFact(Skip = "Flaky: grain timer tick count assertion fails intermittently (issue #9557)"), TestCategory("Functional")]
         public async Task Rem_Azure_GT_Basic()
         {
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
