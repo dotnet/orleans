@@ -614,6 +614,32 @@ namespace UnitTests.TimerTests
 
             return false;
         }
+
+        /// <summary>
+        /// Waits for all specified grains to have received at least the specified number of reminder ticks.
+        /// Uses event-driven waiting via ReminderDiagnosticObserver instead of Thread.Sleep.
+        /// </summary>
+        /// <param name="observer">The reminder diagnostic observer to use.</param>
+        /// <param name="grains">The grains to wait for.</param>
+        /// <param name="reminderName">The reminder name to check.</param>
+        /// <param name="minTickCount">The minimum number of ticks each grain should have received.</param>
+        /// <param name="timeout">The maximum time to wait.</param>
+        protected async Task WaitForGrainsToReceiveTicksAsync(
+            ReminderDiagnosticObserver observer,
+            IEnumerable<IAddressable> grains,
+            string reminderName,
+            int minTickCount,
+            TimeSpan timeout)
+        {
+            var grainList = grains.ToList();
+            var tasks = grainList.Select(grain => 
+                observer.WaitForTickCountAsync(grain, minTickCount, reminderName, timeout));
+            await Task.WhenAll(tasks);
+            
+            log.LogInformation(
+                "All {Count} grains have received at least {MinTicks} ticks for reminder {ReminderName}",
+                grainList.Count, minTickCount, reminderName);
+        }
     }
 }
 // ReSharper restore InconsistentNaming

@@ -182,11 +182,13 @@ public class ReminderTests_Cosmos : ReminderTests_Base, IClassFixture<ReminderTe
     {
         IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
-        TimeSpan period = await g1.GetReminderPeriod(DR);
+        using var observer = ReminderDiagnosticObserver.Create();
 
         Task<bool> test = Task.Run(async () => { await PerGrainFailureTest(g1); return true; });
 
-        Thread.Sleep(period.Multiply(failAfter));
+        // Wait for the grain to receive at least failAfter ticks before injecting failure
+        await WaitForGrainsToReceiveTicksAsync(observer, [g1], DR, (int)failAfter, ENDWAIT);
+
         // stop the secondary silo
         log.LogInformation("Stopping secondary silo");
         await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First());
@@ -205,7 +207,7 @@ public class ReminderTests_Cosmos : ReminderTests_Base, IClassFixture<ReminderTe
         IReminderTestGrain2 g4 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         IReminderTestGrain2 g5 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
-        TimeSpan period = await g1.GetReminderPeriod(DR);
+        using var observer = ReminderDiagnosticObserver.Create();
 
         Task[] tasks =
         {
@@ -216,7 +218,8 @@ public class ReminderTests_Cosmos : ReminderTests_Base, IClassFixture<ReminderTe
                 Task.Run(() => PerGrainFailureTest(g5)),
             };
 
-        Thread.Sleep(period.Multiply(failAfter));
+        // Wait for all grains to receive at least failAfter ticks before injecting failure
+        await WaitForGrainsToReceiveTicksAsync(observer, [g1, g2, g3, g4, g5], DR, (int)failAfter, ENDWAIT);
 
         // stop a couple of silos
         log.LogInformation("Stopping 2 silos");
@@ -240,7 +243,7 @@ public class ReminderTests_Cosmos : ReminderTests_Base, IClassFixture<ReminderTe
         IReminderTestGrain2 g4 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         IReminderTestGrain2 g5 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
-        TimeSpan period = await g1.GetReminderPeriod(DR);
+        using var observer = ReminderDiagnosticObserver.Create();
 
         Task[] tasks =
         {
@@ -251,7 +254,8 @@ public class ReminderTests_Cosmos : ReminderTests_Base, IClassFixture<ReminderTe
                 Task.Run(() => PerGrainFailureTest(g5)),
             };
 
-        Thread.Sleep(period.Multiply(failAfter));
+        // Wait for all grains to receive at least failAfter ticks before injecting failure
+        await WaitForGrainsToReceiveTicksAsync(observer, [g1, g2, g3, g4, g5], DR, (int)failAfter, ENDWAIT);
 
         var siloToKill = silos[Random.Shared.Next(silos.Count)];
         // stop a silo and join a new one in parallel
@@ -320,7 +324,7 @@ public class ReminderTests_Cosmos : ReminderTests_Base, IClassFixture<ReminderTe
         IReminderTestCopyGrain g3 = GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
         IReminderTestCopyGrain g4 = GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
 
-        TimeSpan period = await g1.GetReminderPeriod(DR);
+        using var observer = ReminderDiagnosticObserver.Create();
 
         Task[] tasks =
         {
@@ -330,7 +334,8 @@ public class ReminderTests_Cosmos : ReminderTests_Base, IClassFixture<ReminderTe
                 Task.Run(() => PerCopyGrainFailureTest(g4)),
             };
 
-        Thread.Sleep(period.Multiply(failAfter));
+        // Wait for all grains to receive at least failAfter ticks before injecting failure
+        await WaitForGrainsToReceiveTicksAsync(observer, [g1, g2, g3, g4], DR, (int)failAfter, ENDWAIT);
 
         var siloToKill = silos[Random.Shared.Next(silos.Count)];
         // stop a silo and join a new one in parallel

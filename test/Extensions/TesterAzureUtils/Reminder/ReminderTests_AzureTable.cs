@@ -5,6 +5,7 @@ using Xunit;
 using Microsoft.Extensions.Logging;
 using UnitTests.TimerTests;
 using Orleans.Internal;
+using TestExtensions;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -183,11 +184,13 @@ namespace Tester.AzureUtils.TimerTests
         {
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
-            TimeSpan period = await g1.GetReminderPeriod(DR);
+            using var observer = ReminderDiagnosticObserver.Create();
 
             Task<bool> test = Task.Run(async () => { await PerGrainFailureTest(g1); return true; });
 
-            Thread.Sleep(period.Multiply(failAfter));
+            // Wait for the grain to receive at least failAfter ticks before injecting failure
+            await WaitForGrainsToReceiveTicksAsync(observer, [g1], DR, (int)failAfter, ENDWAIT);
+
             // stop the secondary silo
             log.LogInformation("Stopping secondary silo");
             await this.HostedCluster.StopSiloAsync(this.HostedCluster.SecondarySilos.First());
@@ -206,7 +209,7 @@ namespace Tester.AzureUtils.TimerTests
             IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
-            TimeSpan period = await g1.GetReminderPeriod(DR);
+            using var observer = ReminderDiagnosticObserver.Create();
 
             Task[] tasks =
             {
@@ -217,7 +220,8 @@ namespace Tester.AzureUtils.TimerTests
                 Task.Run(() => PerGrainFailureTest(g5)),
             };
 
-            Thread.Sleep(period.Multiply(failAfter));
+            // Wait for all grains to receive at least failAfter ticks before injecting failure
+            await WaitForGrainsToReceiveTicksAsync(observer, [g1, g2, g3, g4, g5], DR, (int)failAfter, ENDWAIT);
 
             // stop a couple of silos
             log.LogInformation("Stopping 2 silos");
@@ -241,7 +245,7 @@ namespace Tester.AzureUtils.TimerTests
             IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
-            TimeSpan period = await g1.GetReminderPeriod(DR);
+            using var observer = ReminderDiagnosticObserver.Create();
 
             Task[] tasks =
             {
@@ -252,7 +256,8 @@ namespace Tester.AzureUtils.TimerTests
                 Task.Run(() => PerGrainFailureTest(g5)),
             };
 
-            Thread.Sleep(period.Multiply(failAfter));
+            // Wait for all grains to receive at least failAfter ticks before injecting failure
+            await WaitForGrainsToReceiveTicksAsync(observer, [g1, g2, g3, g4, g5], DR, (int)failAfter, ENDWAIT);
 
             var siloToKill = silos[Random.Shared.Next(silos.Count)];
             // stop a silo and join a new one in parallel
@@ -321,7 +326,7 @@ namespace Tester.AzureUtils.TimerTests
             IReminderTestCopyGrain g3 = this.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
             IReminderTestCopyGrain g4 = this.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
 
-            TimeSpan period = await g1.GetReminderPeriod(DR);
+            using var observer = ReminderDiagnosticObserver.Create();
 
             Task[] tasks =
             {
@@ -331,7 +336,8 @@ namespace Tester.AzureUtils.TimerTests
                 Task.Run(() => PerCopyGrainFailureTest(g4)),
             };
 
-            Thread.Sleep(period.Multiply(failAfter));
+            // Wait for all grains to receive at least failAfter ticks before injecting failure
+            await WaitForGrainsToReceiveTicksAsync(observer, [g1, g2, g3, g4], DR, (int)failAfter, ENDWAIT);
 
             var siloToKill = silos[Random.Shared.Next(silos.Count)];
             // stop a silo and join a new one in parallel
