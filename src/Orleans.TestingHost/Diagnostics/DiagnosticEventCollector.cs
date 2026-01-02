@@ -226,6 +226,64 @@ public sealed class DiagnosticEventCollector : IDisposable, IObserver<Diagnostic
         return tcs;
     }
 
+    /// <summary>
+    /// Waits until at least the specified number of events with the given name have been captured.
+    /// </summary>
+    /// <param name="eventName">The name of the event to count.</param>
+    /// <param name="expectedCount">The minimum number of events expected.</param>
+    /// <param name="timeout">The maximum time to wait.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>All captured events with the specified name.</returns>
+    /// <exception cref="TimeoutException">Thrown if the expected count is not reached within the timeout.</exception>
+    public async Task<IReadOnlyList<DiagnosticEvent>> WaitForEventCountAsync(
+        string eventName,
+        int expectedCount,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(expectedCount, 1);
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(timeout);
+
+        while (!cts.Token.IsCancellationRequested)
+        {
+            var currentCount = GetEventCount(eventName);
+            if (currentCount >= expectedCount)
+            {
+                return GetEvents(eventName).ToList();
+            }
+
+            // Wait for the next event
+            var tcs = new TaskCompletionSource<DiagnosticEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var waiters = _waiters.GetOrAdd(eventName, _ => new List<TaskCompletionSource<DiagnosticEvent>>());
+            lock (waiters)
+            {
+                waiters.Add(tcs);
+            }
+
+            try
+            {
+                using var registration = cts.Token.Register(() => tcs.TrySetCanceled(cts.Token));
+                await tcs.Task.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cts.Token.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            {
+                throw new TimeoutException($"Timed out waiting for {expectedCount} '{eventName}' events after {timeout}. Got {GetEventCount(eventName)} events.");
+            }
+            finally
+            {
+                lock (waiters)
+                {
+                    waiters.Remove(tcs);
+                }
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        throw new TimeoutException($"Timed out waiting for {expectedCount} '{eventName}' events after {timeout}. Got {GetEventCount(eventName)} events.");
+    }
+
     void IObserver<DiagnosticListener>.OnNext(DiagnosticListener listener)
     {
         // Subscribe to all listeners if no prefixes specified, or to matching ones

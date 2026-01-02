@@ -1080,77 +1080,78 @@ Continued improving skip reasons by replacing remaining raw GitHub URLs and vagu
 
 ### Work Item 1: ElasticPlacement Test Determinism
 
-**Status**: Investigated, requires infrastructure changes
+**Status**: Partially implemented - 2 tests fixed, 4 tests require deeper changes
 
 **Tests Affected**:
-- `ElasticityTest_CatchingUp` - Tests new silos catching up on activation distribution
-- `ElasticityTest_StoppingSilos` - Tests activation rebalancing when silos stop
+- ✅ `LoadAwareGrainShouldNotAttemptToCreateActivationsOnOverloadedSilo` - PASSING
+- ✅ `LoadAwareGrainShouldNotAttemptToCreateActivationsOnBusySilos` - PASSING  
+- ⏭️ `ElasticityTest_CatchingUp` - Skipped (timing-sensitive)
+- ⏭️ `ElasticityTest_StoppingSilos` - Skipped (timing-sensitive)
+- ⏭️ `ElasticityTest_AllSilosCPUTooHigh` - Skipped (dual cache timing issue)
+- ⏭️ `ElasticityTest_AllSilosOverloaded` - Skipped (dual cache timing issue)
 
-**Root Cause Analysis**:
+**Implementation Completed (Phase 9)**:
 
-The ElasticPlacement tests are timing-dependent due to how activation statistics are propagated:
+1. **Diagnostic Infrastructure Added**:
+   - `src/Orleans.Core.Abstractions/Diagnostics/OrleansPlacementDiagnosticEvents.cs` - Event definitions
+   - Modified `DeploymentLoadPublisher` to emit diagnostic events for statistics propagation
+   - Added `WaitForEventCountAsync` to `DiagnosticEventCollector`
 
-1. **Statistics Propagation Delay**: `DeploymentLoadPublisher` broadcasts silo statistics every 1 second (configurable via `DeploymentLoadPublisherOptions.DeploymentLoadPublisherRefreshTime`)
+2. **TimeProvider Integration**:
+   - `OverloadDetector` now uses `TimeProvider` instead of `CoarseStopwatch`
+   - Enables deterministic testing of overload detection timing
 
-2. **Random Timer Offset**: On startup, the publish timer uses `RandomTimeSpan.Next()` for initial offset to avoid thundering herd:
-   ```csharp
-   var randomTimerOffset = RandomTimeSpan.Next(_statisticsRefreshTime);
-   _publishTimer = RegisterTimer(PublishStatistics, randomTimerOffset, _statisticsRefreshTime);
-   ```
+**Root Cause Analysis (Detailed)**:
 
-3. **Eventual Consistency**: Placement decisions use cached statistics that can be up to 1 second stale
+The "AllSilos" tests (CPU too high, Overloaded) fail because there are **two independent caching mechanisms**:
 
-4. **Assertion Timing**: Tests assert activation counts immediately after creating grains, but placement director may have used stale statistics
+1. **Gateway OverloadDetector Cache** (`OverloadDetector.cs:66`):
+   - Caches `_isOverloaded` value for 1 second
+   - NOT invalidated by `LatchCpuUsage()` or `ForceRuntimeStatisticsCollection`
+   - Only refreshes when the 1-second interval expires
+   - Used to reject client requests at gateway with `GatewayTooBusyException`
+
+2. **Placement Director Cache** (`ActivationCountPlacementDirector._localCache`):
+   - Updated via `SiloStatisticsChangeNotification()` from `DeploymentLoadPublisher`
+   - `ForceRuntimeStatisticsCollection` triggers update, but timing is asynchronous
+   - If all silos are overloaded, `SelectSiloPowerOfK()` throws `SiloUnavailableException`
+   - BUT: If `_localCache.IsEmpty`, placement falls back to local silo (line 108-110)
+
+**Verified Behavior**:
+- Debug output confirmed `SiloRuntimeStatistics.IsOverloaded=True` for all silos
+- Despite this, placement succeeded because:
+  - Gateway `OverloadDetector` cache wasn't invalidated
+  - And/or `_localCache` wasn't populated in time for placement decision
+
+**Why "LoadAware" Tests Pass**:
+- These tests add a 3rd silo and taint only that silo
+- At least 2 silos remain un-overloaded
+- Placement succeeds on un-overloaded silos
+- Test asserts the tainted silo is NOT used (passes)
+
+**Remaining Work**:
+
+To fully fix the "AllSilos" tests, we need:
+
+1. **Invalidate OverloadDetector Cache**: Add `ForceRefresh()` call when `LatchCpuUsage()` is invoked
+   - Requires exposing `OverloadDetector.ForceRefresh()` via test hooks (it's currently `internal`)
+   - Or add a new `ITestHooksSystemTarget.InvalidateOverloadDetectorCache()` method
+
+2. **Ensure _localCache Population**: Verify that `SiloStatisticsChangeNotification` is called synchronously
+   - Or wait for a diagnostic event confirming cache update
+
+**Files Modified (Phase 9)**:
+- `src/Orleans.Core.Abstractions/Diagnostics/OrleansPlacementDiagnosticEvents.cs` (NEW)
+- `src/Orleans.Runtime/Placement/DeploymentLoadPublisher.cs`
+- `src/Orleans.Runtime/Messaging/OverloadDetector.cs`
+- `src/Orleans.TestingHost/Diagnostics/DiagnosticEventCollector.cs`
+- `test/TesterInternal/General/ElasticPlacementTest.cs`
 
 **Key Files**:
 - `src/Orleans.Runtime/Placement/DeploymentLoadPublisher.cs` - Statistics collection and broadcast
 - `src/Orleans.Runtime/Placement/ActivationCountPlacementDirector.cs` - "Power of Two Choices" algorithm
+- `src/Orleans.Runtime/Messaging/OverloadDetector.cs` - Gateway overload detection with 1-second cache
 - `src/Orleans.Runtime/Configuration/Options/DeploymentLoadPublisherOptions.cs` - Timing configuration
-
-**Proposed Solution: DiagnosticListener-based Observability**
-
-Add `DiagnosticListener` events to `DeploymentLoadPublisher` for:
-- `StatisticsPublished` - When local statistics are broadcast to cluster
-- `StatisticsReceived` - When statistics are received from another silo
-- `StatisticsRefreshed` - When cluster statistics refresh completes
-
-This would allow tests to:
-1. Wait for statistics propagation before asserting
-2. Verify exact activation counts per silo without timing assumptions
-3. Use `DiagnosticEventCollector` (already exists in `Orleans.TestingHost`) to capture events
-
-**Implementation Outline**:
-
-```csharp
-// New file: src/Orleans.Core.Abstractions/Diagnostics/OrleansPlacementDiagnostics.cs
-public static class OrleansPlacementDiagnostics
-{
-    public const string ListenerName = "Orleans.Placement";
-    
-    public static class EventNames
-    {
-        public const string StatisticsPublished = "StatisticsPublished";
-        public const string StatisticsReceived = "StatisticsReceived";
-    }
-}
-
-public record StatisticsPublishedEvent(
-    SiloAddress SiloAddress,
-    int ActivationCount,
-    int RecentlyUsedCount,
-    DateTime Timestamp);
-
-public record StatisticsReceivedEvent(
-    SiloAddress FromSilo,
-    SiloAddress LocalSilo,
-    int ActivationCount,
-    DateTime Timestamp);
-```
-
-**Alternative Approaches**:
-1. **Force Refresh API**: Expose `RefreshClusterStatistics()` publicly for tests
-2. **Shorter Refresh Time**: Configure tests with 100ms refresh time (but still timing-dependent)
-3. **TimeProvider Integration**: Make timers use `TimeProvider` for deterministic control (larger change)
 
 ### Work Item 2: Azure Reminder/Timer Test Determinism
 
