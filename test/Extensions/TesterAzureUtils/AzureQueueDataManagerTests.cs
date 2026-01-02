@@ -127,7 +127,7 @@ namespace Tester.AzureUtils
             await Task.WhenAll(promises);
         }
 
-        [SkippableFact(Skip = "Flaky: Azure Queue visibility timeout timing issues (issue #9552)"), TestCategory("Functional")]
+        [SkippableFact, TestCategory("Functional")]
         public async Task AQ_Standalone_4()
         {
             TimeSpan visibilityTimeout = TimeSpan.FromSeconds(2);
@@ -144,7 +144,9 @@ namespace Tester.AzureUtils
             logger.LogInformation("GetQueueMessage: {Message}", PrintQueueMessage(outMessage));
             Assert.Equal(inMessage, outMessage.MessageText);
 
-            await Task.Delay(visibilityTimeout);
+            // Wait longer than visibility timeout to ensure message becomes visible again.
+            // Adding 500ms buffer to account for clock skew and network latency.
+            await Task.Delay(visibilityTimeout + TimeSpan.FromMilliseconds(500));
 
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 

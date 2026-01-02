@@ -1112,17 +1112,34 @@ These tests used `Thread.Sleep(period.Multiply(2) + LEEWAY)` and then `Assert.Eq
 
 ### Work Item 1: ElasticPlacement Test Determinism
 
-**Status**: Partially implemented - 2 tests fixed, 4 tests require deeper changes
+**Status**: ✅ COMPLETED (Phase 11)
 
-**Tests Affected**:
+**Tests Fixed**:
 - ✅ `LoadAwareGrainShouldNotAttemptToCreateActivationsOnOverloadedSilo` - PASSING
 - ✅ `LoadAwareGrainShouldNotAttemptToCreateActivationsOnBusySilos` - PASSING  
-- ⏭️ `ElasticityTest_CatchingUp` - Skipped (timing-sensitive)
-- ⏭️ `ElasticityTest_StoppingSilos` - Skipped (timing-sensitive)
-- ⏭️ `ElasticityTest_AllSilosCPUTooHigh` - Skipped (dual cache timing issue)
-- ⏭️ `ElasticityTest_AllSilosOverloaded` - Skipped (dual cache timing issue)
+- ✅ `ElasticityTest_AllSilosCPUTooHigh` - PASSING (Phase 11)
+- ✅ `ElasticityTest_AllSilosOverloaded` - PASSING (Phase 11)
+- ⏭️ `ElasticityTest_CatchingUp` - Skipped (timing-sensitive activation count propagation)
+- ⏭️ `ElasticityTest_StoppingSilos` - Skipped (timing-sensitive activation count propagation)
 
-**Implementation Completed (Phase 9)**:
+**Phase 11 Solution**:
+
+The "AllSilos" tests were failing because `LatchCpuUsage()` called `ForceRefresh()` on the OverloadDetector immediately, causing the gateway to start rejecting requests before all silos could be tainted.
+
+**Fix Applied**:
+1. Added new `LatchCpuUsageOnly()` and `LatchOverloadedOnly()` methods that latch statistics WITHOUT triggering overload detection
+2. Added `RefreshOverloadDetectorAndPropagateStatistics()` method to explicitly refresh after all silos are tainted
+3. Updated tests to:
+   - Latch all silos in parallel first (without triggering overload)
+   - Then refresh all OverloadDetector caches and propagate statistics in parallel
+   - This ensures all silos become overloaded simultaneously
+
+**Files Modified (Phase 11)**:
+- `test/Grains/TestGrainInterfaces/IPlacementTestGrain.cs` - Added new methods to interface
+- `test/Grains/TestInternalGrains/PlacementTestGrain.cs` - Implemented new methods with ForceRefresh calls
+- `test/TesterInternal/General/ElasticPlacementTest.cs` - Updated tests to use parallel latch-then-refresh pattern
+
+**Previous Implementation (Phase 9)**:
 
 1. **Diagnostic Infrastructure Added**:
    - `src/Orleans.Core.Abstractions/Diagnostics/OrleansPlacementDiagnosticEvents.cs` - Event definitions
@@ -1132,52 +1149,6 @@ These tests used `Thread.Sleep(period.Multiply(2) + LEEWAY)` and then `Assert.Eq
 2. **TimeProvider Integration**:
    - `OverloadDetector` now uses `TimeProvider` instead of `CoarseStopwatch`
    - Enables deterministic testing of overload detection timing
-
-**Root Cause Analysis (Detailed)**:
-
-The "AllSilos" tests (CPU too high, Overloaded) fail because there are **two independent caching mechanisms**:
-
-1. **Gateway OverloadDetector Cache** (`OverloadDetector.cs:66`):
-   - Caches `_isOverloaded` value for 1 second
-   - NOT invalidated by `LatchCpuUsage()` or `ForceRuntimeStatisticsCollection`
-   - Only refreshes when the 1-second interval expires
-   - Used to reject client requests at gateway with `GatewayTooBusyException`
-
-2. **Placement Director Cache** (`ActivationCountPlacementDirector._localCache`):
-   - Updated via `SiloStatisticsChangeNotification()` from `DeploymentLoadPublisher`
-   - `ForceRuntimeStatisticsCollection` triggers update, but timing is asynchronous
-   - If all silos are overloaded, `SelectSiloPowerOfK()` throws `SiloUnavailableException`
-   - BUT: If `_localCache.IsEmpty`, placement falls back to local silo (line 108-110)
-
-**Verified Behavior**:
-- Debug output confirmed `SiloRuntimeStatistics.IsOverloaded=True` for all silos
-- Despite this, placement succeeded because:
-  - Gateway `OverloadDetector` cache wasn't invalidated
-  - And/or `_localCache` wasn't populated in time for placement decision
-
-**Why "LoadAware" Tests Pass**:
-- These tests add a 3rd silo and taint only that silo
-- At least 2 silos remain un-overloaded
-- Placement succeeds on un-overloaded silos
-- Test asserts the tainted silo is NOT used (passes)
-
-**Remaining Work**:
-
-To fully fix the "AllSilos" tests, we need:
-
-1. **Invalidate OverloadDetector Cache**: Add `ForceRefresh()` call when `LatchCpuUsage()` is invoked
-   - Requires exposing `OverloadDetector.ForceRefresh()` via test hooks (it's currently `internal`)
-   - Or add a new `ITestHooksSystemTarget.InvalidateOverloadDetectorCache()` method
-
-2. **Ensure _localCache Population**: Verify that `SiloStatisticsChangeNotification` is called synchronously
-   - Or wait for a diagnostic event confirming cache update
-
-**Files Modified (Phase 9)**:
-- `src/Orleans.Core.Abstractions/Diagnostics/OrleansPlacementDiagnosticEvents.cs` (NEW)
-- `src/Orleans.Runtime/Placement/DeploymentLoadPublisher.cs`
-- `src/Orleans.Runtime/Messaging/OverloadDetector.cs`
-- `src/Orleans.TestingHost/Diagnostics/DiagnosticEventCollector.cs`
-- `test/TesterInternal/General/ElasticPlacementTest.cs`
 
 **Key Files**:
 - `src/Orleans.Runtime/Placement/DeploymentLoadPublisher.cs` - Statistics collection and broadcast
@@ -1200,35 +1171,76 @@ Replaced `Thread.Sleep()` + exact `Assert.Equal()` with polling-based `WaitForRe
 
 ### Work Item 3: Azure Queue Visibility Timeout Test
 
-**Status**: Requires investigation
+**Status**: ✅ COMPLETED (Phase 11)
 
 **Test**: `AQ_Standalone_4` (#9552)
 
-**Root Cause**: Test relies on Azure Queue visibility timeout behavior, which can vary based on:
-- Clock synchronization between client and Azure
-- Network latency to Azure
-- Azure Queue service timing precision
+**Root Cause**: Test waited exactly the visibility timeout duration (2 seconds) before checking if the message was visible again. Due to clock skew and network latency, the message might not be visible immediately after exactly 2 seconds.
 
-**Proposed Solution**: 
-- Use Azure Storage Emulator (Azurite) for deterministic local testing
-- Add DiagnosticListener events for queue message visibility changes
-- Or accept this test requires real Azure resources and mark as integration test
+**Solution Applied**: 
+- Added 500ms buffer to the wait time: `await Task.Delay(visibilityTimeout + TimeSpan.FromMilliseconds(500))`
+- This ensures the message has definitely become visible before the test checks for it
+
+**Note**: This test exercises Azure Queue service behavior (visibility timeout), not Orleans code. An event-driven approach is not feasible here since the timeout is enforced by Azure, not Orleans. The timing buffer is the appropriate solution.
+
+**Files Modified**:
+- `test/Extensions/TesterAzureUtils/AzureQueueDataManagerTests.cs` - Added buffer to visibility timeout wait
 
 ### Work Item 4: Lease-Based Queue Balancer Failure Scenario
 
-**Status**: Requires investigation
+**Status**: ✅ COMPLETED (Phase 12 - Event-Driven)
 
 **Test**: `LeaseBalancedQueueBalancer_SupportUnexpectedNodeFailureScenerio` (#9559)
 
-**Root Cause**: Test simulates unexpected silo failure and expects lease rebalancing, but:
-- Lease renewal/expiration timing is Azure Blob-dependent
-- Silo death detection has timing dependencies
-- Queue rebalancing after lease release takes time
+**Root Cause**: When a silo is killed (vs gracefully stopped), its leases aren't released. The test didn't account for lease expiration time before other silos could acquire orphaned leases.
 
-**Proposed Solution**:
-- Add DiagnosticListener events for lease acquisition/release
-- Use event-based waiting instead of fixed timeouts
-- Consider mocking the lease provider for deterministic tests
+**Lease Timing Configuration**:
+- `LeaseLength = 15 seconds` - Time before an orphaned lease expires
+- `LeaseAcquisitionPeriod = 10 seconds` - How often silos check for new leases
+- Total rebalancing time after kill: ~25 seconds (15s expiry + 10s acquisition)
+
+**Event-Driven Solution (Phase 12)**:
+
+Added DiagnosticListener events to `LeaseBasedQueueBalancer` to enable event-driven testing:
+
+1. **New Diagnostic Events Added**:
+   - `QueueLeasesAcquired` - Emitted when a silo acquires queue leases
+   - `QueueLeasesReleased` - Emitted when a silo releases queue leases
+   - `QueueBalancerChanged` - Emitted when queue ownership changes after rebalancing
+
+2. **Event Payload Records**:
+   ```csharp
+   public record QueueLeasesAcquiredEvent(
+       string StreamProvider,
+       SiloAddress? SiloAddress,
+       int AcquiredQueueCount,
+       int TotalQueueCount,
+       int TargetQueueCount);
+
+   public record QueueLeasesReleasedEvent(
+       string StreamProvider,
+       SiloAddress? SiloAddress,
+       int ReleasedQueueCount,
+       int TotalQueueCount,
+       int TargetQueueCount);
+
+   public record QueueBalancerChangedEvent(
+       string StreamProvider,
+       SiloAddress? SiloAddress,
+       int OwnedQueueCount,
+       int TargetQueueCount,
+       int ActiveSiloCount);
+   ```
+
+3. **Test Updated to Use Events**:
+   - Uses `DiagnosticEventCollector` to wait for `QueueBalancerChanged` events
+   - Falls back to polling if no event received (for robustness)
+   - Removed hardcoded `Task.Delay(20 seconds)` in favor of event-driven waiting
+
+**Files Modified**:
+- `src/Orleans.Streaming/Diagnostics/OrleansStreamingDiagnosticEvents.cs` - Added lease event names and payload records
+- `src/Orleans.Streaming/QueueBalancer/LeaseBasedQueueBalancer.cs` - Added DiagnosticListener and emit events on queue changes
+- `test/Extensions/TesterAzureUtils/Lease/LeaseBasedQueueBalancerTests.cs` - Use DiagnosticEventCollector for event-driven waiting
 
 ## References
 

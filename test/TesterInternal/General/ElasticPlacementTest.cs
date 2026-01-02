@@ -144,25 +144,23 @@ namespace UnitTests.General
         /// <summary>
         /// Do not place activation in case all silos are at 100 CPU utilization.
         /// </summary>
-        /// <remarks>
-        /// This test is timing-sensitive. There are two independent overload mechanisms:
-        /// 1. Gateway load shedding (OverloadDetector) - has a 1-second cache that isn't invalidated by LatchCpuUsage
-        /// 2. Placement director filtering (ActivationCountPlacementDirector._localCache) - updated via ForceRuntimeStatisticsCollection
-        /// 
-        /// Even when SiloRuntimeStatistics.IsOverloaded=True for all silos (confirmed by GetRuntimeStatistics),
-        /// placement may still succeed due to timing issues with the gateway's OverloadDetector cache or
-        /// the placement director's _localCache not being populated/updated in time.
-        /// </remarks>
-        [SkippableFact(Skip = "Timing-sensitive: OverloadDetector cache and placement director cache updates are asynchronous"), TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task ElasticityTest_AllSilosCPUTooHigh()
         {
             var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
             var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.SecondarySilos.First().SiloAddress);
 
-            // LatchCpuUsage internally calls PropagateStatisticsToCluster which awaits ForceRuntimeStatisticsCollection
-            // on all silos. This updates placement director caches but NOT the gateway's OverloadDetector cache.
-            await taintedGrainPrimary.LatchCpuUsage(100.0f);
-            await taintedGrainSecondary.LatchCpuUsage(100.0f);
+            // Latch CPU on all silos and refresh overload detectors in parallel.
+            // This ensures all silos are tainted before any gateway starts rejecting requests.
+            await Task.WhenAll(
+                taintedGrainPrimary.LatchCpuUsageOnly(100.0f),
+                taintedGrainSecondary.LatchCpuUsageOnly(100.0f));
+
+            // Now refresh OverloadDetector caches and propagate statistics in parallel.
+            // After this, both silos will reject requests due to overload.
+            await Task.WhenAll(
+                taintedGrainPrimary.RefreshOverloadDetectorAndPropagateStatistics(),
+                taintedGrainSecondary.RefreshOverloadDetectorAndPropagateStatistics());
 
             // OrleansException (wrapping SiloUnavailableException) or GatewayTooBusyException
             var exception = await Assert.ThrowsAnyAsync<Exception>(() =>
@@ -174,19 +172,23 @@ namespace UnitTests.General
         /// <summary>
         /// Do not place activation in case all silos are at 100 CPU utilization or have overloaded flag set.
         /// </summary>
-        /// <remarks>
-        /// This test is timing-sensitive. See remarks on ElasticityTest_AllSilosCPUTooHigh for details.
-        /// </remarks>
-        [SkippableFact(Skip = "Timing-sensitive: OverloadDetector cache and placement director cache updates are asynchronous"), TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task ElasticityTest_AllSilosOverloaded()
         {
             var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
             var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.SecondarySilos.First().SiloAddress);
 
-            // LatchCpuUsage/LatchOverloaded internally call PropagateStatisticsToCluster which awaits
-            // ForceRuntimeStatisticsCollection on all silos.
-            await taintedGrainPrimary.LatchCpuUsage(100.0f);
-            await taintedGrainSecondary.LatchOverloaded();
+            // Latch CPU/overloaded on all silos in parallel.
+            // This ensures all silos are tainted before any gateway starts rejecting requests.
+            await Task.WhenAll(
+                taintedGrainPrimary.LatchCpuUsageOnly(100.0f),
+                taintedGrainSecondary.LatchOverloadedOnly());
+
+            // Now refresh OverloadDetector caches and propagate statistics in parallel.
+            // After this, both silos will reject requests due to overload.
+            await Task.WhenAll(
+                taintedGrainPrimary.RefreshOverloadDetectorAndPropagateStatistics(),
+                taintedGrainSecondary.RefreshOverloadDetectorAndPropagateStatistics());
 
             // OrleansException or GatewayTooBusyException
             var exception = await Assert.ThrowsAnyAsync<Exception>(() =>

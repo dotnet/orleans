@@ -46,6 +46,24 @@ public static class OrleansStreamingDiagnostics
         /// Payload: <see cref="StreamSubscriptionRemovedEvent"/>
         /// </summary>
         public const string SubscriptionRemoved = "SubscriptionRemoved";
+
+        /// <summary>
+        /// Event fired when queue leases are acquired by a silo.
+        /// Payload: <see cref="QueueLeasesAcquiredEvent"/>
+        /// </summary>
+        public const string QueueLeasesAcquired = "QueueLeasesAcquired";
+
+        /// <summary>
+        /// Event fired when queue leases are released by a silo.
+        /// Payload: <see cref="QueueLeasesReleasedEvent"/>
+        /// </summary>
+        public const string QueueLeasesReleased = "QueueLeasesReleased";
+
+        /// <summary>
+        /// Event fired when queue ownership changes (after rebalancing).
+        /// Payload: <see cref="QueueBalancerChangedEvent"/>
+        /// </summary>
+        public const string QueueBalancerChanged = "QueueBalancerChanged";
     }
 }
 
@@ -106,3 +124,48 @@ public record StreamSubscriptionRemovedEvent(
     StreamId StreamId,
     Guid SubscriptionId,
     SiloAddress? SiloAddress);
+
+/// <summary>
+/// Event payload for when queue leases are acquired by a silo.
+/// </summary>
+/// <param name="StreamProvider">The name of the stream provider.</param>
+/// <param name="SiloAddress">The address of the silo that acquired the leases.</param>
+/// <param name="AcquiredQueueCount">The number of queues newly acquired.</param>
+/// <param name="TotalQueueCount">The total number of queues now owned by this silo.</param>
+/// <param name="TargetQueueCount">The target number of queues for this silo.</param>
+public record QueueLeasesAcquiredEvent(
+    string StreamProvider,
+    SiloAddress? SiloAddress,
+    int AcquiredQueueCount,
+    int TotalQueueCount,
+    int TargetQueueCount);
+
+/// <summary>
+/// Event payload for when queue leases are released by a silo.
+/// </summary>
+/// <param name="StreamProvider">The name of the stream provider.</param>
+/// <param name="SiloAddress">The address of the silo that released the leases.</param>
+/// <param name="ReleasedQueueCount">The number of queues released.</param>
+/// <param name="TotalQueueCount">The total number of queues now owned by this silo.</param>
+/// <param name="TargetQueueCount">The target number of queues for this silo.</param>
+public record QueueLeasesReleasedEvent(
+    string StreamProvider,
+    SiloAddress? SiloAddress,
+    int ReleasedQueueCount,
+    int TotalQueueCount,
+    int TargetQueueCount);
+
+/// <summary>
+/// Event payload for when queue ownership changes (after rebalancing completes).
+/// </summary>
+/// <param name="StreamProvider">The name of the stream provider.</param>
+/// <param name="SiloAddress">The address of the silo.</param>
+/// <param name="OwnedQueueCount">The number of queues owned by this silo.</param>
+/// <param name="TargetQueueCount">The target number of queues for this silo.</param>
+/// <param name="ActiveSiloCount">The number of active silos in the cluster.</param>
+public record QueueBalancerChangedEvent(
+    string StreamProvider,
+    SiloAddress? SiloAddress,
+    int OwnedQueueCount,
+    int TargetQueueCount,
+    int ActiveSiloCount);
