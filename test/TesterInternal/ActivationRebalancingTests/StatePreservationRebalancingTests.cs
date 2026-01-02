@@ -63,30 +63,31 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
         var silo4Activations = initialSilo4Activations;
 
         var rebalancerHostNum = 0;
-        var index = 0;
 
-        while (index < 6)
-        {
-            if (index == 3)
-            {
-                (var rebalancerHost, rebalancerHostNum) = await FindRebalancerHost(Silo1);
+        // Wait for 3 cycles before stopping the silo, then wait for 3 more after
+        const int cyclesBeforeStop = 3;
+        const int totalCycles = 6;
 
-                OutputHelper.WriteLine($"Cycle {index}: Now stopping Silo{rebalancerHostNum}, which is the host of the rebalancer\n");
+        // Wait for the first 3 cycles
+        await RebalancerObserver.WaitForCycleCountAsync(cyclesBeforeStop, timeout: TimeSpan.FromSeconds(30));
 
-                Assert.NotEqual(rebalancerHost, Cluster.Silos[0].SiloAddress);
-                await Cluster.StopSiloAsync(Cluster.Silos.First(x => x.SiloAddress.Equals(rebalancerHost)));
-            }
+        // Stop the silo hosting the rebalancer
+        (var rebalancerHost, rebalancerHostNum) = await FindRebalancerHost(Silo1);
 
-            await Task.Delay(SPFixture.SessionCyclePeriod);
-            stats = await MgmtGrain.GetDetailedGrainStatistics();
+        OutputHelper.WriteLine($"Cycle {cyclesBeforeStop}: Now stopping Silo{rebalancerHostNum}, which is the host of the rebalancer\n");
 
-            silo1Activations = GetActivationCount(stats, Silo1);
-            silo2Activations = GetActivationCount(stats, Silo2);
-            silo3Activations = GetActivationCount(stats, Silo3);
-            silo4Activations = GetActivationCount(stats, Silo4);
+        Assert.NotEqual(rebalancerHost, Cluster.Silos[0].SiloAddress);
+        await Cluster.StopSiloAsync(Cluster.Silos.First(x => x.SiloAddress.Equals(rebalancerHost)));
 
-            index++;
-        }
+        // Wait for 3 more cycles (total 6)
+        await RebalancerObserver.WaitForCycleCountAsync(totalCycles, timeout: TimeSpan.FromSeconds(60));
+
+        stats = await MgmtGrain.GetDetailedGrainStatistics();
+
+        silo1Activations = GetActivationCount(stats, Silo1);
+        silo2Activations = GetActivationCount(stats, Silo2);
+        silo3Activations = GetActivationCount(stats, Silo3);
+        silo4Activations = GetActivationCount(stats, Silo4);
 
         if (rebalancerHostNum == 1)
         {
@@ -130,7 +131,7 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
         }
 
         OutputHelper.WriteLine(
-            $"Post-rebalancing activations ({index} cycles):\n" +
+            $"Post-rebalancing activations ({totalCycles} cycles):\n" +
             $"Silo1: {(rebalancerHostNum == 1 ? "DEAD" : silo1Activations)}\n" +
             $"Silo2: {(rebalancerHostNum == 2 ? "DEAD" : silo2Activations)}\n" +
             $"Silo3: {(rebalancerHostNum == 3 ? "DEAD" : silo3Activations)}\n" +
