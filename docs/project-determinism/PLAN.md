@@ -1242,6 +1242,60 @@ Added DiagnosticListener events to `LeaseBasedQueueBalancer` to enable event-dri
 - `src/Orleans.Streaming/QueueBalancer/LeaseBasedQueueBalancer.cs` - Added DiagnosticListener and emit events on queue changes
 - `test/Extensions/TesterAzureUtils/Lease/LeaseBasedQueueBalancerTests.cs` - Use DiagnosticEventCollector for event-driven waiting
 
+### Work Item 5: Timer Test Determinism
+
+**Status**: ✅ COMPLETED (Phase 13)
+
+**Tests Improved**:
+- `TimerOrleansTest_Basic` - Replaced Task.Delay polling with TimerDiagnosticObserver.WaitForTickCountAsync
+- `TimerOrleansTest_Parallel` - Replaced Task.Delay polling with event-driven waiting
+- `TimerOrleansTest_Migration` - Replaced Task.Delay polling with event-driven waiting
+- `TimerOrleansTest_Basic_Poco` - Same improvements for POCO grain version
+- `TimerOrleansTest_Parallel_Poco` - Same improvements for POCO grain version
+- `TimerOrleansTest_Migration_Poco` - Same improvements for POCO grain version
+
+**Root Cause**: 
+Timer tests used a polling pattern with `Task.Delay(period.Divide(2))` in a loop, checking if the grain counter reached a target value. This is non-deterministic because:
+- The polling interval is tied to real time
+- Under high CPU load, polling may be delayed causing test failures
+- Tests waited longer than necessary when timers fired quickly
+
+**Solution Applied**:
+1. Use existing `TimerDiagnosticObserver` infrastructure that was added in earlier phases
+2. Replace polling loops with `timerObserver.WaitForTickCountAsync(grain.GetGrainId(), 10, timeout)`
+3. This waits for timer tick events via DiagnosticListener instead of polling grain state
+4. Test assertions changed from exact bounds (`>= 10 && <= 12`) to minimum bounds (`>= 10`)
+
+**Example Transformation**:
+
+Before (non-deterministic):
+```csharp
+var stopwatch = Stopwatch.StartNew();
+var last = 0;
+while (stopwatch.Elapsed < timeout && last < 10)
+{
+    await Task.Delay(period.Divide(2));
+    last = await grain.GetCounter();
+}
+Assert.True(last >= 10 & last <= 12, last.ToString());
+```
+
+After (event-driven):
+```csharp
+using var timerObserver = TimerDiagnosticObserver.Create();
+await timerObserver.WaitForTickCountAsync(grain.GetGrainId(), 10, TimeSpan.FromSeconds(60));
+var last = await grain.GetCounter();
+Assert.True(last >= 10, $"Expected at least 10 ticks, got {last}");
+```
+
+**Files Modified**:
+- `test/DefaultCluster.Tests/TimerOrleansTest.cs` - Converted 6 tests to use event-driven waiting
+
+**Test Results**:
+- All 15 timer tests pass on both .NET 8 and .NET 10
+- Tests complete faster when timers fire quickly (no minimum polling delay)
+- Tests are more reliable under load (wait for events, not time)
+
 ## References
 
 - [Aspire DiagnosticListener pattern](https://github.com/dotnet/aspire/blob/main/src/Aspire.Hosting/DistributedApplicationBuilder.cs)
