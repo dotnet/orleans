@@ -1371,17 +1371,78 @@ await Task.Yield();
 await stuckGrain.NonBlockingCall();
 ```
 
+### Work Item 7: Activation Collector Idle Time Determinism
+
+**Status**: ✅ COMPLETED (Phase 16)
+
+**Problem**:
+`ActivationCollectorForceCollection` test used `Task.Delay(TimeSpan.FromSeconds(5))` to wait for grains to become idle before calling `ForceActivationCollection(TimeSpan.FromSeconds(4))`.
+
+**Root Cause**:
+The `ActivationData.GetIdleness()` method used `CoarseStopwatch` which depends on real wall-clock time. This made it impossible to advance idle time deterministically.
+
+**Solution**:
+1. Converted `_idleDuration` from `CoarseStopwatch` to `TimeProvider`-based timestamps (similar to Phase 15's `_busyDuration` conversion)
+2. Injected `FakeTimeProvider` into the test cluster
+3. Replaced `Task.Delay(5 seconds)` with `FakeTimeProvider.Advance(5 seconds)`
+
+**Files Modified**:
+- `src/Orleans.Runtime/Catalog/ActivationData.cs`:
+  - Changed `private CoarseStopwatch _idleDuration;` to `private long _idleStartTimestamp;`
+  - Updated `GetIdleness()` to use `TimeProvider.GetElapsedTime()`
+  - Updated `OnCompletedRequest()` to use `TimeProvider.GetTimestamp()` when resetting idle timer
+  - Updated `IsCandidateForRemoval()` to use `GetIdleness().TotalMilliseconds`
+
+- `test/TesterInternal/ActivationsLifeCycleTests/ActivationCollectorTests.cs`:
+  - Added `FakeTimeProvider` injection via `_sharedTimeProvider` static field
+  - Replaced `await Task.Delay(TimeSpan.FromSeconds(5))` with `_sharedTimeProvider.Advance(TimeSpan.FromSeconds(5))`
+
+**Test Results**:
+- All 9 ActivationCollector tests pass on .NET 8 and .NET 10
+- `ActivationCollectorForceCollection` completes in ~5-6s (similar to before, but now deterministic)
+
+### Work Item 8: Rebalancer Control Test Event-Driven Waiting
+
+**Status**: ✅ COMPLETED (Phase 16)
+
+**Problem**:
+`ControlRebalancerTests.Rebalancer_Should_Be_Controllable_And_Report_To_Listeners` had 4 polling loops with `Task.Delay(100)` waiting for rebalancer status changes.
+
+**Root Cause**:
+The test already used `IActivationRebalancerReportListener` for synchronous notifications, but needed to poll `GetRebalancingReport()` for status changes after certain operations.
+
+**Solution**:
+Created an `AsyncListener` class that implements `IActivationRebalancerReportListener` with async waiting capabilities:
+- Uses `TaskCompletionSource` to enable waiting for specific status changes
+- `WaitForStatusAsync(status, timeout)` method waits for the listener to receive a report with the expected status
+- Eliminates all polling loops in the test
+
+**Files Modified**:
+- `test/TesterInternal/ActivationRebalancingTests/ControlRebalancerTests.cs`:
+  - Added `AsyncListener` class with `WaitForStatusAsync()` method
+  - Replaced all `while/Task.Delay(100)` polling loops with `asyncListener.WaitForStatusAsync()`
+
+**Test Results**:
+- Test passes on .NET 8 and .NET 10
+- Test completes in ~5s (waiting for 5-second suspension to expire is still needed)
+- No more polling loops - pure event-driven waiting
+
 ### Summary: Remaining Task.Delay Patterns
 
-After Phase 15, the remaining `Task.Delay` patterns in `test/TesterInternal/` fall into these categories:
+After Phase 16, the remaining `Task.Delay` patterns in `test/TesterInternal/` fall into these categories:
 
 | Category | Count | Example | Notes |
 |----------|-------|---------|-------|
 | Small coordination delays (1-100ms) | ~15 | `await Task.Delay(1)`, `await Task.Delay(100)` | Allow scheduler to run, not flakiness issues |
 | Configuration-tied delays | ~5 | `Task.Delay(SessionCyclePeriod)` | Tied to test configuration, appropriate |
-| Already event-driven | ~5 | Comments mention `WaitForXxx` | Already converted |
+| Already event-driven | ~10 | Comments mention `WaitForXxx` | Already converted |
 | Timeout testing | ~3 | `TimeoutTests.cs` | Testing timeout behavior requires delays |
 | Polling in helpers | ~5 | `StreamTestUtils.cs`, `RetryHelper.cs` | Part of polling infrastructure |
+
+**Phase 16 Improvements**:
+- Converted `ActivationData._idleDuration` from `CoarseStopwatch` to `TimeProvider` timestamps for deterministic idle time tracking
+- Created `AsyncListener` pattern for event-driven waiting on rebalancer status changes
+- Both `_idleDuration` and `_busyDuration` in `ActivationData` now use `TimeProvider` for deterministic testing
 
 **Key Learnings**:
 - TimeProvider integration enables deterministic testing of time-dependent Orleans behavior

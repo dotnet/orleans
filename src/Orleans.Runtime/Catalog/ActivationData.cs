@@ -55,7 +55,7 @@ internal sealed partial class ActivationData :
     private Message? _blockingRequest;
     private bool _isInWorkingSet = true;
     private long _busyStartTimestamp;
-    private CoarseStopwatch _idleDuration;
+    private long _idleStartTimestamp;
     private GrainReference? _selfReference;
 
     // Values which are needed less frequently and do not warrant living directly on activation for object size reasons.
@@ -444,8 +444,18 @@ internal sealed partial class ActivationData :
 
     /// <summary>
     /// Returns how long this activation has been idle.
+    /// Uses TimeProvider for deterministic testing with FakeTimeProvider.
     /// </summary>
-    public TimeSpan GetIdleness() => _idleDuration.Elapsed;
+    public TimeSpan GetIdleness()
+    {
+        var startTimestamp = _idleStartTimestamp;
+        if (startTimestamp == 0)
+        {
+            return TimeSpan.Zero;
+        }
+
+        return _shared.Runtime.TimeProvider.GetElapsedTime(startTimestamp);
+    }
 
     /// <summary>
     /// Returns how long this activation has been busy processing the current blocking request.
@@ -916,10 +926,10 @@ internal sealed partial class ActivationData :
 
     bool IActivationWorkingSetMember.IsCandidateForRemoval(bool wouldRemove)
     {
-        const int IdlenessLowerBound = 10_000;
+        const int IdlenessLowerBoundMilliseconds = 10_000;
         lock (this)
         {
-            var inactive = IsInactive && _idleDuration.ElapsedMilliseconds > IdlenessLowerBound;
+            var inactive = IsInactive && GetIdleness().TotalMilliseconds > IdlenessLowerBoundMilliseconds;
 
             // This instance will remain in the working set if it is either not pending removal or if it is currently active.
             _isInWorkingSet = !wouldRemove || !inactive;
@@ -1353,7 +1363,7 @@ internal sealed partial class ActivationData :
             // is in the activation working set.
             if (message.IsKeepAlive)
             {
-                _idleDuration = CoarseStopwatch.StartNew();
+                _idleStartTimestamp = _shared.Runtime.TimeProvider.GetTimestamp();
 
                 if (!_isInWorkingSet)
                 {

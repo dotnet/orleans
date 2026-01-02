@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
@@ -16,6 +17,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 {
     /// <summary>
     /// Tests for the activation collector that manages grain activation lifecycle and garbage collection.
+    /// Uses FakeTimeProvider for deterministic testing of idle time tracking.
     /// </summary>
     public class ActivationCollectorTests : OrleansTestingBase, IAsyncLifetime
     {
@@ -27,6 +29,12 @@ namespace UnitTests.ActivationsLifeCycleTests
         /// </summary>
         private static readonly TimeSpan MAX_WAIT_TIME = TimeSpan.FromSeconds(60);
 
+        /// <summary>
+        /// Shared FakeTimeProvider instance used by all silos. This allows tests to control
+        /// virtual time for deterministic testing of idle time tracking.
+        /// </summary>
+        private static FakeTimeProvider? _sharedTimeProvider;
+
         private TestCluster testCluster;
 
         private ILogger logger;
@@ -37,6 +45,9 @@ namespace UnitTests.ActivationsLifeCycleTests
             // Initialize the diagnostic observer before deploying the cluster
             // so it can capture all grain lifecycle events from the start
             _diagnosticObserver = GrainDiagnosticObserver.Create();
+
+            // Create a FakeTimeProvider for deterministic time control
+            _sharedTimeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
 
             var builder = new TestClusterBuilder(1);
             builder.Properties["CollectionQuantum"] = quantum.ToString();
@@ -58,6 +69,13 @@ namespace UnitTests.ActivationsLifeCycleTests
                 {
                     siloBuilder
                         .ConfigureServices(services => services.Where(s => s.ServiceType == typeof(IConfigurationValidator)).ToList().ForEach(s => services.Remove(s)));
+                    
+                    // Register the shared FakeTimeProvider for deterministic idle time tracking
+                    if (_sharedTimeProvider != null)
+                    {
+                        siloBuilder.ConfigureServices(services => services.AddSingleton<TimeProvider>(_sharedTimeProvider));
+                    }
+                    
                     siloBuilder.Configure<GrainCollectionOptions>(options =>
                     {
                         options.CollectionAge = collectionAgeLimit;
@@ -115,7 +133,10 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             await Task.WhenAll(tasks);
 
-            await Task.Delay(TimeSpan.FromSeconds(5));
+            // Advance virtual time by 5 seconds so grains are considered idle for 5 seconds.
+            // ForceActivationCollection(4 seconds) will collect grains idle for 4+ seconds.
+            // Using FakeTimeProvider allows deterministic testing without real-time delays.
+            _sharedTimeProvider!.Advance(TimeSpan.FromSeconds(5));
 
             var grain = this.testCluster.GrainFactory.GetGrain<IManagementGrain>(0);
 
