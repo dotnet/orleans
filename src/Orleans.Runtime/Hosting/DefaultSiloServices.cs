@@ -137,14 +137,20 @@ namespace Orleans.Hosting
             services.TryAddSingleton<LocalGrainDirectory>();
             services.TryAddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalGrainDirectory>();
+            services.AddSingleton<IGrainLocator>(sp => DhtGrainLocator.FromLocalGrainDirectory(sp.GetService<LocalGrainDirectory>()));
             services.AddSingleton<GrainLocator>();
             services.AddSingleton<GrainLocatorResolver>();
-            services.AddSingleton<DhtGrainLocator>(sp => DhtGrainLocator.FromLocalGrainDirectory(sp.GetService<LocalGrainDirectory>()));
             services.AddSingleton<GrainDirectoryResolver>();
             services.AddSingleton<IGrainDirectoryResolver, GenericGrainDirectoryResolver>();
             services.AddSingleton<CachedGrainLocator>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, CachedGrainLocator>();
             services.AddSingleton<ClientGrainLocator>();
+
+            // Distributed Grain Directory - registered on all silos so IGrainDirectoryClient is available for recovery queries
+            // during rolling upgrades from LocalGrainDirectory to DistributedGrainDirectory
+            services.TryAddSingleton<DirectoryMembershipService>();
+            services.TryAddSingleton<DistributedGrainDirectory>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DistributedGrainDirectory>();
 
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
@@ -201,8 +207,6 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IProviderRuntime, SiloProviderRuntime>();
 
             services.TryAddSingleton<MessageFactory>();
-
-            services.TryAddSingleton(FactoryUtility.Create<LocalGrainDirectoryPartition>);
 
             // Placement
             services.AddSingleton<IConfigurationValidator, ActivationCountBasedPlacementOptionsValidator>();
