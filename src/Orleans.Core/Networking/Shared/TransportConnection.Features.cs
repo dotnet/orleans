@@ -23,10 +23,6 @@ namespace Orleans.Networking.Shared
     {
         IDictionary<object, object> Items { get; set; }
     }
-    internal interface IMemoryPoolFeature
-    {
-        MemoryPool<byte> MemoryPool { get; }
-    }
 
     internal partial class TransportConnection : IConnectionIdFeature,
                                                  IConnectionTransportFeature,
