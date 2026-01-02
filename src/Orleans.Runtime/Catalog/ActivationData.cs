@@ -54,7 +54,7 @@ internal sealed partial class ActivationData :
     private Queue<object>? _pendingOperations;
     private Message? _blockingRequest;
     private bool _isInWorkingSet = true;
-    private CoarseStopwatch _busyDuration;
+    private long _busyStartTimestamp;
     private CoarseStopwatch _idleDuration;
     private GrainReference? _selfReference;
 
@@ -448,6 +448,21 @@ internal sealed partial class ActivationData :
     public TimeSpan GetIdleness() => _idleDuration.Elapsed;
 
     /// <summary>
+    /// Returns how long this activation has been busy processing the current blocking request.
+    /// Uses TimeProvider for deterministic testing with FakeTimeProvider.
+    /// </summary>
+    private TimeSpan GetBusyDuration()
+    {
+        var startTimestamp = _busyStartTimestamp;
+        if (startTimestamp == 0)
+        {
+            return TimeSpan.Zero;
+        }
+
+        return _shared.Runtime.TimeProvider.GetElapsedTime(startTimestamp);
+    }
+
+    /// <summary>
     /// Returns whether this activation has been idle long enough to be collected.
     /// </summary>
     public bool IsStale() => GetIdleness() >= _shared.CollectionAgeLimit;
@@ -603,7 +618,8 @@ internal sealed partial class ActivationData :
     private void DeactivateStuckActivation()
     {
         IsStuckProcessingMessage = true;
-        var msg = $"Activation {this} has been processing request {_blockingRequest} since {_busyDuration} and is likely stuck.";
+        var busyDuration = GetBusyDuration();
+        var msg = $"Activation {this} has been processing request {_blockingRequest} for {busyDuration} and is likely stuck.";
         var reason = new DeactivationReason(DeactivationReasonCode.ActivationUnresponsive, msg);
 
         // Mark the grain as deactivating so that messages are forwarded instead of being invoked
@@ -682,7 +698,7 @@ internal sealed partial class ActivationData :
                     timeSinceQueued = waitTime.Elapsed;
                 }
 
-                var executionTime = _busyDuration.Elapsed;
+                var executionTime = GetBusyDuration();
                 if (executionTime >= slowRunningRequestDuration && !message.IsLocalOnly)
                 {
                     GetStatusList(ref diagnostics);
@@ -982,7 +998,7 @@ internal sealed partial class ActivationData :
 
                             if (_blockingRequest != null)
                             {
-                                var currentRequestActiveTime = _busyDuration.Elapsed;
+                                var currentRequestActiveTime = GetBusyDuration();
                                 if (currentRequestActiveTime > _shared.MaxRequestProcessingTime && !IsStuckProcessingMessage)
                                 {
                                     DeactivateStuckActivation();
@@ -1055,7 +1071,7 @@ internal sealed partial class ActivationData :
             // This logic only works for non-reentrant activations
             // Consider: Handle long request detection for reentrant activations.
             _blockingRequest = message;
-            _busyDuration = stopwatch;
+            _busyStartTimestamp = _shared.Runtime.TimeProvider.GetTimestamp();
         }
 
         void ProcessRequestsToInvalidActivation()
@@ -1350,7 +1366,7 @@ internal sealed partial class ActivationData :
             if (_blockingRequest is null || message.Equals(_blockingRequest))
             {
                 _blockingRequest = null;
-                _busyDuration = default;
+                _busyStartTimestamp = 0;
             }
         }
 

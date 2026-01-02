@@ -1298,44 +1298,82 @@ Assert.True(last >= 10, $"Expected at least 10 ticks, got {last}");
 
 ### Work Item 6: StuckGrain Test Improvements
 
-**Status**: ✅ COMPLETED (Phase 14)
+**Status**: ✅ COMPLETED (Phase 15 - TimeProvider Integration)
 
 **Tests Improved**:
 - `StuckGrainTest_Basic` - Already uses `_grainObserver.WaitForGrainDeactivatedAsync()` (event-driven)
-- `StuckGrainTest_StuckDetectionAndForward` - Documented why `Task.Delay` is required
+- `StuckGrainTest_StuckDetectionAndForward` - **Now uses FakeTimeProvider for deterministic virtual time!**
+- `StuckGrainTest_StuckDetectionOnDeactivation` - Works with FakeTimeProvider
+- `StuckGrainTest_StuckDetectionOnActivation` - Works with FakeTimeProvider
 
-**Analysis**:
-The `StuckGrainTest_StuckDetectionAndForward` test cannot be made fully event-driven due to how Orleans stuck grain detection works:
+**Phase 14 Analysis (Initial)**:
+Initially believed `StuckGrainTest_StuckDetectionAndForward` required a real `Task.Delay(3s)` because:
+1. Stuck detection is triggered when a NEW message arrives
+2. The check compares `_busyDuration.Elapsed > MaxRequestProcessingTime`
+3. The diagnostic event is emitted as PART of the stuck detection process
 
-1. Stuck detection is triggered when a NEW message arrives and the message loop checks `_busyDuration > MaxRequestProcessingTime`
-2. The diagnostic event (Deactivating) is emitted as part of the stuck detection process
-3. Since the event is triggered BY the incoming message, we cannot wait for the event BEFORE sending the message
+**Phase 15 Solution (TimeProvider Integration)**:
 
-**Why Task.Delay is necessary**:
-- The 4th `NonBlockingCall` is the trigger for stuck detection
-- We must wait for `MaxRequestProcessingTime` (3s) to pass before sending this message
-- If we send the message too early, `_busyDuration` will be < 3s and stuck detection won't trigger
-- The message will be queued behind the stuck `RunForever()` call and also time out
+After deeper analysis, discovered that stuck detection CAN be made deterministic by using `TimeProvider` instead of `CoarseStopwatch`:
 
-**Improvement made**:
-Added clear documentation explaining why this specific delay cannot be made event-driven:
+**Root Cause of Non-Determinism**:
+- `ActivationData` used `CoarseStopwatch` for `_busyDuration` tracking
+- `CoarseStopwatch` uses `Environment.TickCount64` (not controllable)
+- `TimeProvider` IS available in `ActivationData` via `_shared.Runtime.TimeProvider`
 
-```csharp
-// Wait for the stuck grain detection timeout (MaxRequestProcessingTime = 3 seconds).
-// Stuck detection only triggers when a NEW message arrives and checks that the current
-// request has been processing longer than MaxRequestProcessingTime.
-// We need to wait for this time to pass before sending the 4th message.
-// Note: This delay is tied to the MaxRequestProcessingTime configuration (3s) and cannot
-// be made event-driven because the event is triggered BY the incoming message, not before it.
-await Task.Delay(TimeSpan.FromSeconds(3));
-```
+**Solution Implemented**:
+1. Modified `ActivationData` to use `TimeProvider.GetTimestamp()` and `TimeProvider.GetElapsedTime()` for busy duration tracking
+2. Changed `_busyDuration` (CoarseStopwatch) to `_busyStartTimestamp` (long)
+3. Added helper method `GetBusyDuration()` that uses TimeProvider
+4. Updated `StuckGrainTests` to inject `FakeTimeProvider` and advance virtual time
 
 **Files Modified**:
-- `test/TesterInternal/OrleansRuntime/StuckGrainTests.cs` - Improved comments explaining stuck detection timing
+- `src/Orleans.Runtime/Catalog/ActivationData.cs`:
+  - Changed `private CoarseStopwatch _busyDuration;` to `private long _busyStartTimestamp;`
+  - Added `GetBusyDuration()` method using `_shared.Runtime.TimeProvider.GetElapsedTime()`
+  - Updated `RecordRunning()` to use `TimeProvider.GetTimestamp()`
+  - Updated `OnCompletedRequest()` to reset `_busyStartTimestamp = 0`
+  - Updated stuck detection check to use `GetBusyDuration()`
+  - Updated `AnalyzeWorkload()` to use `GetBusyDuration()`
+  - Updated `DeactivateStuckActivation()` message to use `GetBusyDuration()`
+
+- `test/TesterInternal/OrleansRuntime/StuckGrainTests.cs`:
+  - Added `FakeTimeProvider` injection via `Fixture.SharedTimeProvider`
+  - Replaced `await Task.Delay(TimeSpan.FromSeconds(3))` with `Fixture.SharedTimeProvider.Advance(TimeSpan.FromSeconds(4))`
+
+**Test Results**:
+- All 4 StuckGrainTests pass on .NET 8 and .NET 10
+- `StuckGrainTest_StuckDetectionAndForward` now completes in ~2s instead of ~5s (eliminated 3s real-time wait)
+- Tests are now deterministic - no longer depend on real wall-clock time
+
+**Example Code Change**:
+
+Before (non-deterministic):
+```csharp
+// Wait for the stuck grain detection timeout (MaxRequestProcessingTime = 3 seconds).
+await Task.Delay(TimeSpan.FromSeconds(3));
+
+// This call triggers stuck detection
+await stuckGrain.NonBlockingCall();
+```
+
+After (deterministic):
+```csharp
+// Advance virtual time past MaxRequestProcessingTime (3 seconds).
+// By advancing FakeTimeProvider, we make the runtime think 4 seconds have passed
+// without actually waiting - enabling fast, deterministic testing.
+Fixture.SharedTimeProvider.Advance(TimeSpan.FromSeconds(4));
+
+// Brief yield to allow any pending work to be scheduled
+await Task.Yield();
+
+// This call triggers stuck detection
+await stuckGrain.NonBlockingCall();
+```
 
 ### Summary: Remaining Task.Delay Patterns
 
-After Phase 14, the remaining `Task.Delay` patterns in `test/TesterInternal/` fall into these categories:
+After Phase 15, the remaining `Task.Delay` patterns in `test/TesterInternal/` fall into these categories:
 
 | Category | Count | Example | Notes |
 |----------|-------|---------|-------|
@@ -1344,12 +1382,11 @@ After Phase 14, the remaining `Task.Delay` patterns in `test/TesterInternal/` fa
 | Already event-driven | ~5 | Comments mention `WaitForXxx` | Already converted |
 | Timeout testing | ~3 | `TimeoutTests.cs` | Testing timeout behavior requires delays |
 | Polling in helpers | ~5 | `StreamTestUtils.cs`, `RetryHelper.cs` | Part of polling infrastructure |
-| Cannot be event-driven | 1 | `StuckGrainTests.cs` | Documented reason (Phase 14) |
 
 **Key Learnings**:
-- Not all `Task.Delay` patterns can be replaced with event-driven waiting
-- Some delays are fundamental to the mechanism being tested (like stuck detection)
-- Good documentation explaining WHY a delay exists is valuable even if the delay remains
+- TimeProvider integration enables deterministic testing of time-dependent Orleans behavior
+- `FakeTimeProvider.Advance()` combined with message sending allows testing stuck detection without real delays
+- Converting `CoarseStopwatch` to `TimeProvider` timestamps is straightforward but requires careful analysis of where the timestamp is created vs read
 
 ## References
 

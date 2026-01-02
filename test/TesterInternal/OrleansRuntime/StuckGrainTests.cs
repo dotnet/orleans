@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Configuration;
 using Orleans.TestingHost;
 using Orleans.Internal;
@@ -10,7 +12,8 @@ using UnitTests.Grains;
 namespace UnitTests.StuckGrainTests
 {
     /// <summary>
-    /// Summary description for PersistenceTest
+    /// Tests for stuck grain detection and handling.
+    /// Uses FakeTimeProvider for deterministic testing of time-dependent stuck detection.
     /// </summary>
     public class StuckGrainTests : OrleansTestingBase, IClassFixture<StuckGrainTests.Fixture>, IDisposable
     {
@@ -19,6 +22,19 @@ namespace UnitTests.StuckGrainTests
 
         public class Fixture : BaseTestClusterFixture
         {
+            /// <summary>
+            /// Shared FakeTimeProvider instance used by all silos and tests.
+            /// This enables virtual time control for fast, deterministic stuck detection testing.
+            /// </summary>
+            internal static FakeTimeProvider SharedTimeProvider { get; private set; } = null!;
+
+            public override async Task InitializeAsync()
+            {
+                // Create the shared FakeTimeProvider BEFORE starting the cluster
+                SharedTimeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+                await base.InitializeAsync();
+            }
+
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 1;
@@ -42,6 +58,9 @@ namespace UnitTests.StuckGrainTests
                     {
                         options.MaxRequestProcessingTime = TimeSpan.FromSeconds(3);
                     });
+
+                    // Register the shared FakeTimeProvider for deterministic stuck detection
+                    hostBuilder.Services.AddSingleton<TimeProvider>(SharedTimeProvider);
                 }
             }
         }
@@ -96,13 +115,15 @@ namespace UnitTests.StuckGrainTests
                     () => stuckGrain.NonBlockingCall().WaitAsync(TimeSpan.FromMilliseconds(500)));
             }
 
-            // Wait for the stuck grain detection timeout (MaxRequestProcessingTime = 3 seconds).
-            // Stuck detection only triggers when a NEW message arrives and checks that the current
+            // Advance virtual time past MaxRequestProcessingTime (3 seconds).
+            // Stuck detection triggers when a NEW message arrives and checks that the current
             // request has been processing longer than MaxRequestProcessingTime.
-            // We need to wait for this time to pass before sending the 4th message.
-            // Note: This delay is tied to the MaxRequestProcessingTime configuration (3s) and cannot
-            // be made event-driven because the event is triggered BY the incoming message, not before it.
-            await Task.Delay(TimeSpan.FromSeconds(3));
+            // By advancing FakeTimeProvider, we make the runtime think 4 seconds have passed
+            // without actually waiting - enabling fast, deterministic testing.
+            Fixture.SharedTimeProvider.Advance(TimeSpan.FromSeconds(4));
+
+            // Brief yield to allow any pending work to be scheduled
+            await Task.Yield();
 
             // This call triggers stuck detection, which causes the grain to be unregistered
             // and all pending requests (including this one) to be forwarded to a new activation.
