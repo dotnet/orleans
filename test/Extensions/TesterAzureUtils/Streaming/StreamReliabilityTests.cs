@@ -5,9 +5,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Diagnostics;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Diagnostics;
 using Tester;
 using Tester.AzureUtils.Streaming;
 using TestExtensions;
@@ -36,6 +38,7 @@ namespace UnitTests.Streaming.Reliability
         private Guid _streamId;
         private string _streamProviderName;
         private int _numExpectedSilos;
+        private DiagnosticEventCollector _eventCollector;
 #if DELETE_AFTER_TEST
         private HashSet<IStreamReliabilityTestGrain> _usedGrains;
 #endif
@@ -117,12 +120,15 @@ namespace UnitTests.Streaming.Reliability
 
         public override async Task InitializeAsync()
         {
+            // Start collecting diagnostic events before cluster starts
+            _eventCollector = new DiagnosticEventCollector(OrleansStreamingDiagnostics.ListenerName);
             await base.InitializeAsync();
             CheckSilosRunning("Initially", _numExpectedSilos);
         }
 
         public override async Task DisposeAsync()
         {
+            _eventCollector?.Dispose();
 #if DELETE_AFTER_TEST
             List<Task> promises = new List<Task>();
             foreach (var g in _usedGrains)
@@ -1107,18 +1113,31 @@ namespace UnitTests.Streaming.Reliability
 #endif
         {
             long pk = consumerGrain.GetPrimaryKeyLong();
+            var timeout = TimeSpan.FromSeconds(30);
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-            int receivedCount = 0;
-            for (int i = 0; i < 20; i++)
+            int receivedCount = await consumerGrain.GetReceivedCount();
+            _output.WriteLine("Initial ReceivedCount={0} for grain {1}, expecting {2}", receivedCount, pk, expectedReceivedCount);
+
+            // Use event-driven waiting: wait for MessageDelivered events until we reach the expected count
+            while (receivedCount < expectedReceivedCount && stopwatch.Elapsed < timeout)
             {
+                try
+                {
+                    // Wait for the next message delivery event (with a short timeout to allow periodic checks)
+                    await _eventCollector.WaitForEventAsync(
+                        OrleansStreamingDiagnostics.EventNames.MessageDelivered,
+                        TimeSpan.FromSeconds(2));
+                }
+                catch (TimeoutException)
+                {
+                    // Timeout is expected if no events arrive - just check the count again
+                }
+
                 receivedCount = await consumerGrain.GetReceivedCount();
-                _output.WriteLine("After {0}s ReceivedCount={1} for grain {2}", i, receivedCount, pk);
-
-                if (receivedCount == expectedReceivedCount)
-                    break;
-
-                Thread.Sleep(TimeSpan.FromSeconds(1));
+                _output.WriteLine("After {0:F1}s ReceivedCount={1} for grain {2}", stopwatch.Elapsed.TotalSeconds, receivedCount, pk);
             }
+
             StreamTestUtils.Assert_AreEqual(_output, expectedReceivedCount, receivedCount,
                 "ReceivedCount for stream {0} for grain {1} {2}", _streamId, pk, when);
 
