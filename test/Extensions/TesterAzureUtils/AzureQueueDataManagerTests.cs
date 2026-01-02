@@ -127,7 +127,7 @@ namespace Tester.AzureUtils
             await Task.WhenAll(promises);
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9552"), TestCategory("Functional")]
+        [SkippableFact(Skip = "Flaky: Azure Queue visibility timeout timing issues (issue #9552)"), TestCategory("Functional")]
         public async Task AQ_Standalone_4()
         {
             TimeSpan visibilityTimeout = TimeSpan.FromSeconds(2);

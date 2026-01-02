@@ -270,7 +270,7 @@ namespace Tester.AzureUtils.Streaming
             await fixture.Runner.StreamTest_20_ConsumerImplicitlySubscribedToProducerGrain();
         }
 
-        [SkippableFact(Skip = "Ignored"), TestCategory("Failures")]
+        [SkippableFact(Skip = "Generic consumer grain (Streaming_ImplicitlySubscribedGenericConsumerGrain) not implemented"), TestCategory("Failures")]
         public async Task AQ_21_GenericConsumerImplicitlySubscribedToProducerGrain()
         {
             // todo: currently, the Azure queue queue adaptor doesn't support namespaces, so this test will fail.
