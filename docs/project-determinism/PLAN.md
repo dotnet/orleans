@@ -1063,6 +1063,18 @@ The memory stream provider test now passes consistently:
 
 The EventHub version (`PluggableQueueBalancerTestsWithEHStreamProvider`) remains skipped because `EventDataGeneratorStreamConfigurator` still validates `EventHubOptions` connection even though it uses generated data. This is a separate design issue that would require changes to the EventHub stream configuration infrastructure.
 
+#### Phase 8: Additional Skip Reason Cleanup
+
+Continued improving skip reasons by replacing remaining raw GitHub URLs and vague messages with descriptive explanations.
+
+**Files Modified:**
+
+| File | Test | Old Skip Reason | New Skip Reason |
+|------|------|-----------------|-----------------|
+| `AQStreamingTests.cs` | `AQ_21_GenericConsumerImplicitlySubscribedToProducerGrain` | "Ignored" | "Generic consumer grain (Streaming_ImplicitlySubscribedGenericConsumerGrain) not implemented" |
+| `AzureQueueDataManagerTests.cs` | `AQ_Standalone_4` | Raw GitHub URL (#9552) | "Flaky: Azure Queue visibility timeout timing issues (issue #9552)" |
+| `LeaseBasedQueueBalancerTests.cs` | `LeaseBalancedQueueBalancer_SupportUnexpectedNodeFailureScenerio` | Raw GitHub URL (#9559) | "Flaky: lease rebalancing timing issues during silo failures (issue #9559)" |
+
 ## References
 
 - [Aspire DiagnosticListener pattern](https://github.com/dotnet/aspire/blob/main/src/Aspire.Hosting/DistributedApplicationBuilder.cs)
