@@ -1449,6 +1449,74 @@ After Phase 16, the remaining `Task.Delay` patterns in `test/TesterInternal/` fa
 - `FakeTimeProvider.Advance()` combined with message sending allows testing stuck detection without real delays
 - Converting `CoarseStopwatch` to `TimeProvider` timestamps is straightforward but requires careful analysis of where the timestamp is created vs read
 
+### Work Item 9: Rebalancing Test Event-Driven Waiting
+
+**Status**: ✅ COMPLETED (Phase 17)
+
+**Problem**:
+`StaticRebalancingTests` and `DynamicRebalancingTests` used `Task.Delay(SessionCyclePeriod)` (3 seconds) in loops waiting for rebalancing cycles. With 3-5 cycles needed, tests would wait 9-15 seconds of real time.
+
+**Solution**:
+Added `DiagnosticListener` events to `ActivationRebalancerWorker` and created `RebalancerDiagnosticObserver` for event-driven waiting.
+
+**Files Created**:
+- `src/Orleans.Core.Abstractions/Diagnostics/OrleansRebalancerDiagnosticEvents.cs` - Event definitions:
+  - `CycleStart` / `CycleStop` - For individual rebalancing cycles
+  - `SessionStart` / `SessionStop` - For rebalancing sessions
+  - Payload records: `RebalancerCycleStartEvent`, `RebalancerCycleStopEvent`, `RebalancerSessionStartEvent`, `RebalancerSessionStopEvent`
+
+- `test/TestInfrastructure/TestExtensions/RebalancerDiagnosticObserver.cs` - Test helper providing:
+  - `WaitForCycleCountAsync(count, timeout)` - Wait for N cycles to complete
+  - `WaitForCycleAsync(timeout)` - Wait for any cycle to complete
+  - `WaitForSessionStopAsync(timeout)` - Wait for session to stop
+  - `GetCycleCount()`, `GetTotalActivationsMigrated()`, `GetLatestEntropyDeviation()`
+
+**Files Modified**:
+- `src/Orleans.Runtime/Placement/Rebalancing/ActivationRebalancerWorker.cs`:
+  - Added `private static readonly DiagnosticListener s_diagnosticListener`
+  - Added cycle start/stop events in `RunRebalancingCycle()` with try/finally pattern
+  - Added session start/stop events in `StartSession()` and `StopSession()`
+
+- `test/TesterInternal/ActivationRebalancingTests/RebalancingTestBase.cs`:
+  - Added `RebalancerDiagnosticObserver` field with auto-creation
+  - Implemented `IAsyncLifetime` for proper cleanup
+  - Clear observer events in `InitializeAsync()`, dispose in `DisposeAsync()`
+
+- `test/TesterInternal/ActivationRebalancingTests/StaticRebalancingTests.cs`:
+  - Replaced `while (index < 3) { await Task.Delay(SessionCyclePeriod); ... }` with
+  - `await RebalancerObserver.WaitForCycleCountAsync(3, TimeSpan.FromSeconds(30))`
+
+- `test/TesterInternal/ActivationRebalancingTests/DynamicRebalancingTests.cs`:
+  - Replaced polling loop with event-driven cycle waiting
+  - Now adds activations after each cycle event instead of fixed time intervals
+
+**Test Results**:
+- Both tests build successfully
+- Tests complete as soon as cycles finish (event-driven) instead of waiting fixed intervals
+- Total test time reduced from 9-15 seconds to actual cycle completion time
+
+**Key Pattern**:
+```csharp
+// Before (timing-dependent):
+var index = 0;
+while (index < 3)
+{
+    await Task.Delay(RebalancerFixture.SessionCyclePeriod);
+    stats = await MgmtGrain.GetDetailedGrainStatistics();
+    // ... check stats ...
+    index++;
+}
+
+// After (event-driven):
+const int targetCycles = 3;
+await RebalancerObserver.WaitForCycleCountAsync(targetCycles, timeout: TimeSpan.FromSeconds(30));
+stats = await MgmtGrain.GetDetailedGrainStatistics();
+```
+
+**Files Also Updated (Build Fixes)**:
+- `test/TesterInternal/ActivationRebalancingTests/ControlRebalancerTests.cs` - Fixed nullable struct handling for `RebalancingReport`
+- `test/TesterInternal/ActivationsLifeCycleTests/ActivationCollectorTests.cs` - Fixed nullable reference type annotations
+
 ## References
 
 - [Aspire DiagnosticListener pattern](https://github.com/dotnet/aspire/blob/main/src/Aspire.Hosting/DistributedApplicationBuilder.cs)

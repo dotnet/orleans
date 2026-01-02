@@ -64,7 +64,18 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
         Assert.Equal(host, report.Host);
 
         // Wait for automatic resume after suspension expires
-        report = await asyncListener.WaitForStatusAsync(RebalancerStatus.Executing, duration + TimeSpan.FromSeconds(5));
+        // Note: The listener is not notified when the suspension timer expires automatically,
+        // so we must poll GetRebalancingReport for this case
+        var deadline = DateTime.UtcNow.Add(duration).AddSeconds(5);
+        while (report.Status == RebalancerStatus.Suspended && DateTime.UtcNow < deadline)
+        {
+            report = await rebalancer.GetRebalancingReport(true);
+            if (report.Status == RebalancerStatus.Suspended)
+            {
+                await Task.Delay(100);
+            }
+        }
+        Assert.Equal(RebalancerStatus.Executing, report.Status);
         Assert.False(report.SuspensionDuration.HasValue);
         Assert.Equal(host, report.Host);
 
@@ -86,26 +97,23 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
     /// <summary>
     /// An async-capable listener that allows waiting for specific status changes.
     /// This enables event-driven waiting instead of polling loops.
+    /// Uses a list to capture all reports to avoid race conditions.
     /// </summary>
     private sealed class AsyncListener : IActivationRebalancerReportListener, IDisposable
     {
         private readonly object _lock = new();
-        private RebalancingReport? _report;
-        private TaskCompletionSource<RebalancingReport>? _waiter;
+        private readonly List<RebalancingReport> _reports = [];
+        private TaskCompletionSource<RebalancingReport> _waiter;
         private RebalancerStatus? _waitingForStatus;
-        
-        public RebalancingReport? Report
-        {
-            get { lock (_lock) return _report; }
-        }
+        private int _lastCheckedIndex;
         
         public void OnReport(RebalancingReport report)
         {
-            TaskCompletionSource<RebalancingReport>? waiterToComplete = null;
+            TaskCompletionSource<RebalancingReport> waiterToComplete = null;
             
             lock (_lock)
             {
-                _report = report;
+                _reports.Add(report);
                 
                 // If someone is waiting for this specific status, complete their task
                 if (_waiter != null && _waitingForStatus.HasValue && report.Status == _waitingForStatus.Value)
@@ -128,11 +136,16 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
             
             lock (_lock)
             {
-                // If we already have the expected status, return immediately
-                if (_report.HasValue && _report.Value.Status == status)
+                // Check if we already have a report with the expected status that we haven't returned yet
+                for (int i = _lastCheckedIndex; i < _reports.Count; i++)
                 {
-                    return _report.Value;
+                    if (_reports[i].Status == status)
+                    {
+                        _lastCheckedIndex = i + 1;
+                        return _reports[i];
+                    }
                 }
+                _lastCheckedIndex = _reports.Count;
                 
                 // Create a new waiter
                 tcs = new TaskCompletionSource<RebalancingReport>(TaskCreationOptions.RunContinuationsAsynchronously);

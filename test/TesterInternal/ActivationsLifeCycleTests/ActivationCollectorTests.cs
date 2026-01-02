@@ -33,7 +33,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         /// Shared FakeTimeProvider instance used by all silos. This allows tests to control
         /// virtual time for deterministic testing of idle time tracking.
         /// </summary>
-        private static FakeTimeProvider? _sharedTimeProvider;
+        private static FakeTimeProvider _sharedTimeProvider;
 
         private TestCluster testCluster;
 
@@ -63,8 +63,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             public void Configure(IHostBuilder hostBuilder)
             {
                 var config = hostBuilder.GetConfiguration();
-                var collectionAgeLimit = TimeSpan.Parse(config["DefaultCollectionAgeLimit"]);
-                var quantum = TimeSpan.Parse(config["CollectionQuantum"]);
+                var collectionAgeLimit = TimeSpan.Parse(config["DefaultCollectionAgeLimit"]!);
+                var quantum = TimeSpan.Parse(config["CollectionQuantum"]!);
                 hostBuilder.UseOrleans((ctx, siloBuilder) =>
                 {
                     siloBuilder
@@ -82,9 +82,9 @@ namespace UnitTests.ActivationsLifeCycleTests
                         options.CollectionQuantum = quantum;
                         options.ClassSpecificCollectionAge = new Dictionary<string, TimeSpan>
                         {
-                            [typeof(IdleActivationGcTestGrain2).FullName] = DEFAULT_IDLE_TIMEOUT,
-                            [typeof(BusyActivationGcTestGrain2).FullName] = DEFAULT_IDLE_TIMEOUT,
-                            [typeof(CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain).FullName] = TimeSpan.FromSeconds(12),
+                            [typeof(IdleActivationGcTestGrain2).FullName!] = DEFAULT_IDLE_TIMEOUT,
+                            [typeof(BusyActivationGcTestGrain2).FullName!] = DEFAULT_IDLE_TIMEOUT,
+                            [typeof(CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain).FullName!] = TimeSpan.FromSeconds(12),
                         };
                     });
                 });
