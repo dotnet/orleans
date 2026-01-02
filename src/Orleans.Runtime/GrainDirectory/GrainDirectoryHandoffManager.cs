@@ -21,7 +21,6 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IInternalGrainFactory grainFactory;
         private readonly ILogger logger;
-        private readonly Factory<LocalGrainDirectoryPartition> createPartion;
         private readonly Queue<(string name, object state, Func<GrainDirectoryHandoffManager, object, Task> action)> pendingOperations = new();
         private readonly AsyncLock executorLock = new AsyncLock();
 
@@ -29,14 +28,12 @@ namespace Orleans.Runtime.GrainDirectory
             LocalGrainDirectory localDirectory,
             ISiloStatusOracle siloStatusOracle,
             IInternalGrainFactory grainFactory,
-            Factory<LocalGrainDirectoryPartition> createPartion,
             ILoggerFactory loggerFactory)
         {
             logger = loggerFactory.CreateLogger<GrainDirectoryHandoffManager>();
             this.localDirectory = localDirectory;
             this.siloStatusOracle = siloStatusOracle;
             this.grainFactory = grainFactory;
-            this.createPartion = createPartion;
         }
 
         internal void ProcessSiloAddEvent(SiloAddress addedSilo)

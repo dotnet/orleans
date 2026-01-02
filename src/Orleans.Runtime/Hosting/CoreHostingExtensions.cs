@@ -21,8 +21,6 @@ namespace Orleans.Hosting
     /// </summary>
     public static class CoreHostingExtensions
     {
-        private static readonly ServiceDescriptor DirectoryDescriptor = ServiceDescriptor.Singleton<DistributedGrainDirectory, DistributedGrainDirectory>();
-
         /// <summary>
         /// Add <see cref="Activity.Current"/> propagation through grain calls.
         /// Note: according to <see cref="ActivitySource.StartActivity(string, ActivityKind)"/> activity will be created only when any listener for activity exists <see cref="ActivitySource.HasListeners()"/> and <see cref="ActivityListener.Sample"/> returns <see cref="ActivitySamplingResult.PropagationData"/>.
@@ -162,12 +160,28 @@ namespace Orleans.Hosting
                 name = GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY;
             }
 
-            // Distributed Grain Directory
-            services.TryAddSingleton<DirectoryMembershipService>();
-            if (!services.Contains(DirectoryDescriptor))
+            services.AddGrainDirectory<DistributedGrainDirectory>(name!, (sp, name) => sp.GetRequiredService<DistributedGrainDirectory>());
+
+            if (string.Equals(name, GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, StringComparison.Ordinal))
             {
-                services.Add(DirectoryDescriptor);
-                services.AddGrainDirectory<DistributedGrainDirectory>(name, (sp, name) => sp.GetRequiredService<DistributedGrainDirectory>());
+                // Remove LocalGrainDirectory service registrations since DistributedGrainDirectory is taking over.
+                // LocalGrainDirectory is still registered in DefaultSiloServices but we remove its lifecycle participation
+                // and related services here. The LocalGrainDirectory singleton itself remains available for
+                // DistributedGrainDirectory to query during rolling upgrades.
+                TaggedServiceDescriptor.RemoveAllForImplementation<LocalGrainDirectory>(services);
+
+                // Replace the default IGrainLocator (DhtGrainLocator backed by LocalGrainDirectory)
+                // with CachedGrainLocator which uses DistributedGrainDirectory.
+                services.RemoveAll<IGrainLocator>();
+                services.AddSingleton<IGrainLocator>(sp => sp.GetRequiredService<CachedGrainLocator>());
+
+                // Register system targets to handle IRemoteGrainDirectory requests from old silos
+                // using LocalGrainDirectory during rolling upgrades. These are only needed when
+                // DistributedGrainDirectory is registered as the default directory.
+                services.AddSingleton<DelegatingDirectoryService>();
+                services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(sp => sp.GetRequiredService<DelegatingDirectoryService>());
+                services.AddSingleton<DelegatingCacheValidator>();
+                services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(sp => sp.GetRequiredService<DelegatingCacheValidator>());
             }
 
             return siloBuilder;
