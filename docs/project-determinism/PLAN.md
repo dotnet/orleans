@@ -1076,6 +1076,157 @@ Continued improving skip reasons by replacing remaining raw GitHub URLs and vagu
 | `LeaseBasedQueueBalancerTests.cs` | `LeaseBalancedQueueBalancer_SupportUnexpectedNodeFailureScenerio` | Raw GitHub URL (#9559) | "Flaky: lease rebalancing timing issues during silo failures (issue #9559)" |
 | `ReminderTests_AzureTable.cs` | `Rem_Azure_GT_Basic` | Raw GitHub URL (#9557) | "Flaky: grain timer tick count assertion fails intermittently (issue #9557)" |
 
+## Future Work Items
+
+### Work Item 1: ElasticPlacement Test Determinism
+
+**Status**: Investigated, requires infrastructure changes
+
+**Tests Affected**:
+- `ElasticityTest_CatchingUp` - Tests new silos catching up on activation distribution
+- `ElasticityTest_StoppingSilos` - Tests activation rebalancing when silos stop
+
+**Root Cause Analysis**:
+
+The ElasticPlacement tests are timing-dependent due to how activation statistics are propagated:
+
+1. **Statistics Propagation Delay**: `DeploymentLoadPublisher` broadcasts silo statistics every 1 second (configurable via `DeploymentLoadPublisherOptions.DeploymentLoadPublisherRefreshTime`)
+
+2. **Random Timer Offset**: On startup, the publish timer uses `RandomTimeSpan.Next()` for initial offset to avoid thundering herd:
+   ```csharp
+   var randomTimerOffset = RandomTimeSpan.Next(_statisticsRefreshTime);
+   _publishTimer = RegisterTimer(PublishStatistics, randomTimerOffset, _statisticsRefreshTime);
+   ```
+
+3. **Eventual Consistency**: Placement decisions use cached statistics that can be up to 1 second stale
+
+4. **Assertion Timing**: Tests assert activation counts immediately after creating grains, but placement director may have used stale statistics
+
+**Key Files**:
+- `src/Orleans.Runtime/Placement/DeploymentLoadPublisher.cs` - Statistics collection and broadcast
+- `src/Orleans.Runtime/Placement/ActivationCountPlacementDirector.cs` - "Power of Two Choices" algorithm
+- `src/Orleans.Runtime/Configuration/Options/DeploymentLoadPublisherOptions.cs` - Timing configuration
+
+**Proposed Solution: DiagnosticListener-based Observability**
+
+Add `DiagnosticListener` events to `DeploymentLoadPublisher` for:
+- `StatisticsPublished` - When local statistics are broadcast to cluster
+- `StatisticsReceived` - When statistics are received from another silo
+- `StatisticsRefreshed` - When cluster statistics refresh completes
+
+This would allow tests to:
+1. Wait for statistics propagation before asserting
+2. Verify exact activation counts per silo without timing assumptions
+3. Use `DiagnosticEventCollector` (already exists in `Orleans.TestingHost`) to capture events
+
+**Implementation Outline**:
+
+```csharp
+// New file: src/Orleans.Core.Abstractions/Diagnostics/OrleansPlacementDiagnostics.cs
+public static class OrleansPlacementDiagnostics
+{
+    public const string ListenerName = "Orleans.Placement";
+    
+    public static class EventNames
+    {
+        public const string StatisticsPublished = "StatisticsPublished";
+        public const string StatisticsReceived = "StatisticsReceived";
+    }
+}
+
+public record StatisticsPublishedEvent(
+    SiloAddress SiloAddress,
+    int ActivationCount,
+    int RecentlyUsedCount,
+    DateTime Timestamp);
+
+public record StatisticsReceivedEvent(
+    SiloAddress FromSilo,
+    SiloAddress LocalSilo,
+    int ActivationCount,
+    DateTime Timestamp);
+```
+
+**Alternative Approaches**:
+1. **Force Refresh API**: Expose `RefreshClusterStatistics()` publicly for tests
+2. **Shorter Refresh Time**: Configure tests with 100ms refresh time (but still timing-dependent)
+3. **TimeProvider Integration**: Make timers use `TimeProvider` for deterministic control (larger change)
+
+### Work Item 2: Azure Reminder/Timer Test Determinism
+
+**Status**: Requires investigation
+
+**Tests Affected**:
+- `Rem_Azure_Basic_ListOps` (#9337) - Reminder tick count assertions
+- `Rem_Azure_Basic` (#9344) - Reminder tick count assertions
+- `Rem_Azure_Basic_Restart` (#9557) - Reminder restart tick assertions
+- `Rem_Azure_GT_Basic` (#9557) - Grain timer tick assertions
+
+**Root Cause**: These tests assert specific tick counts after `Thread.Sleep()` or `Task.Delay()`, but:
+- Timer/reminder ticks can be delayed by GC, thread pool saturation, Azure Table latency
+- Tick counts depend on exact timing of silo startup and reminder registration
+- Azure Table operations have variable latency
+
+**Proposed Solution: DiagnosticListener-based Tick Counting**
+
+Orleans already has `OrleansRemindersDiagnostics` with events:
+- `TickFiring` - When a reminder tick starts
+- `TickCompleted` - When a reminder tick completes
+- `TickFailed` - When a reminder tick fails
+
+Tests should:
+1. Use `DiagnosticEventCollector` to count actual ticks rather than sleeping
+2. Wait for specific tick count using event-based synchronization
+3. Assert based on actual observed ticks, not time-based expectations
+
+**Example Pattern**:
+```csharp
+using var collector = new DiagnosticEventCollector();
+await grain.StartReminder(DR);
+
+// Wait for exactly N ticks instead of sleeping
+await collector.WaitForEventsAsync(
+    OrleansRemindersDiagnostics.ListenerName,
+    OrleansRemindersDiagnostics.EventNames.TickCompleted,
+    expectedCount: 4,
+    timeout: TimeSpan.FromSeconds(30));
+
+var actualTicks = await grain.GetCounter(DR);
+Assert.Equal(4, actualTicks);
+```
+
+### Work Item 3: Azure Queue Visibility Timeout Test
+
+**Status**: Requires investigation
+
+**Test**: `AQ_Standalone_4` (#9552)
+
+**Root Cause**: Test relies on Azure Queue visibility timeout behavior, which can vary based on:
+- Clock synchronization between client and Azure
+- Network latency to Azure
+- Azure Queue service timing precision
+
+**Proposed Solution**: 
+- Use Azure Storage Emulator (Azurite) for deterministic local testing
+- Add DiagnosticListener events for queue message visibility changes
+- Or accept this test requires real Azure resources and mark as integration test
+
+### Work Item 4: Lease-Based Queue Balancer Failure Scenario
+
+**Status**: Requires investigation
+
+**Test**: `LeaseBalancedQueueBalancer_SupportUnexpectedNodeFailureScenerio` (#9559)
+
+**Root Cause**: Test simulates unexpected silo failure and expects lease rebalancing, but:
+- Lease renewal/expiration timing is Azure Blob-dependent
+- Silo death detection has timing dependencies
+- Queue rebalancing after lease release takes time
+
+**Proposed Solution**:
+- Add DiagnosticListener events for lease acquisition/release
+- Use event-based waiting instead of fixed timeouts
+- Consider mocking the lease provider for deterministic tests
+
 ## References
 
 - [Aspire DiagnosticListener pattern](https://github.com/dotnet/aspire/blob/main/src/Aspire.Hosting/DistributedApplicationBuilder.cs)
