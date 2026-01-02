@@ -118,11 +118,11 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal int Count { get { return partitionData.Count; } }
 
-        public LocalGrainDirectoryPartition(ISiloStatusOracle siloStatusOracle, IOptions<GrainDirectoryOptions> grainDirectoryOptions, ILoggerFactory loggerFactory)
+        public LocalGrainDirectoryPartition(ISiloStatusOracle siloStatusOracle, IOptions<GrainDirectoryOptions> grainDirectoryOptions, ILogger<LocalGrainDirectoryPartition> logger)
         {
             partitionData = new Dictionary<GrainId, GrainInfo>();
             lockable = new object();
-            log = loggerFactory.CreateLogger<LocalGrainDirectoryPartition>();
+            log = logger;
             this.siloStatusOracle = siloStatusOracle;
             this.grainDirectoryOptions = grainDirectoryOptions;
         }

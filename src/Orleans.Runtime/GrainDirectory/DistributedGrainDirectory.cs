@@ -64,6 +64,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     private readonly IServiceProvider _serviceProvider;
     private readonly ImmutableArray<GrainDirectoryPartition> _partitions;
     private readonly CancellationTokenSource _stoppedCts = new();
+    private readonly ActivationDirectory _localActivations;
 
     internal CancellationToken OnStoppedToken => _stoppedCts.Token;
     internal ClusterMembershipSnapshot ClusterMembershipSnapshot => _membershipService.CurrentView.ClusterMembershipSnapshot;
@@ -77,7 +78,6 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     // for each recovery version.
     private long _recoveryMembershipVersion;
     private Task _runTask = Task.CompletedTask;
-    private ActivationDirectory _localActivations;
     private GrainDirectoryResolver? _grainDirectoryResolver;
 
     public DistributedGrainDirectory(

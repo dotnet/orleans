@@ -18,14 +18,13 @@ namespace Orleans.Runtime.GrainDirectory
         public GrainLocatorResolver(
             IServiceProvider servicesProvider,
             GrainDirectoryResolver grainDirectoryResolver,
-            CachedGrainLocator cachedGrainLocator,
-            DhtGrainLocator dhtGrainLocator)
+            CachedGrainLocator cachedGrainLocator)
         {
             this.getLocatorInternal = GetGrainLocatorInternal;
             _servicesProvider = servicesProvider;
             this.grainDirectoryResolver = grainDirectoryResolver;
             this.cachedGrainLocator = cachedGrainLocator;
-            this.dhtGrainLocator = dhtGrainLocator;
+            this.dhtGrainLocator = servicesProvider.GetService<LocalGrainDirectory>() is null ? null : servicesProvider.GetService<DhtGrainLocator>();
         }
 
         public IGrainLocator GetGrainLocator(GrainType grainType) => resolvedLocators.GetOrAdd(grainType, this.getLocatorInternal);
@@ -37,7 +36,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 result = this._clientGrainLocator ??= _servicesProvider.GetRequiredService<ClientGrainLocator>();
             }
-            else if (this.grainDirectoryResolver.IsUsingDefaultDirectory(grainType))
+            else if (this.grainDirectoryResolver.IsUsingDhtGrainDirectory(grainType) && dhtGrainLocator is not null)
             {
                 result = this.dhtGrainLocator;
             }
