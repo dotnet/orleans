@@ -117,11 +117,11 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal int Count { get { return partitionData.Count; } }
 
-        public LocalGrainDirectoryPartition(IClusterMembershipService clusterMembershipService, IOptions<GrainDirectoryOptions> grainDirectoryOptions, ILoggerFactory loggerFactory)
+        public LocalGrainDirectoryPartition(IClusterMembershipService clusterMembershipService, IOptions<GrainDirectoryOptions> grainDirectoryOptions, ILogger<LocalGrainDirectoryPartition> logger)
         {
             partitionData = new Dictionary<GrainId, GrainInfo>();
             lockable = new object();
-            log = loggerFactory.CreateLogger<LocalGrainDirectoryPartition>();
+            log = logger;
             this.clusterMembershipService = clusterMembershipService;
             this.grainDirectoryOptions = grainDirectoryOptions;
         }

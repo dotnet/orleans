@@ -67,6 +67,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     private readonly DirectoryInstruments _directoryInstruments;
     private readonly TimeSpan _deadSiloLeaseDuration;
     private readonly TimeProvider _timeProvider;
+    private readonly ActivationDirectory _localActivations;
 
     internal CancellationToken OnStoppedToken => _stoppedCts.Token;
     internal DirectoryInstruments DirectoryInstruments => _directoryInstruments;
@@ -83,7 +84,6 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     private long _recoveryMembershipVersion;
     internal long RecoveryMembershipVersion => Volatile.Read(ref _recoveryMembershipVersion);
     private Task _runTask = Task.CompletedTask;
-    private ActivationDirectory _localActivations;
     private GrainDirectoryResolver? _grainDirectoryResolver;
     private Task? _leaseCleanupTask;
 

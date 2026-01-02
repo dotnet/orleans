@@ -173,7 +173,17 @@ namespace Orleans.Hosting
             if (!services.Contains(DirectoryDescriptor))
             {
                 services.Add(DirectoryDescriptor);
-                services.AddGrainDirectory<DistributedGrainDirectory>(name, (sp, name) => sp.GetRequiredService<DistributedGrainDirectory>());
+                services.AddGrainDirectory<DistributedGrainDirectory>(name!, (sp, name) => sp.GetRequiredService<DistributedGrainDirectory>());
+            }
+
+            if (string.Equals(name, GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, StringComparison.Ordinal))
+            {
+                // Remove LocalGrainDirectory service registrations since DistributedGrainDirectory is taking over.
+                // Silos which are still using LocalGrainDirectory can continue to issue directory requests to this
+                // silo during a rolling upgrade: DistributedGrainDirectory registers system targets which implement
+                // the legacy IRemoteGrainDirectory interface on its behalf. See DistributedRemoteGrainDirectory.
+                TaggedServiceDescriptor.RemoveAllForImplementation<LocalGrainDirectory>(services);
+                services.RemoveAll<DhtGrainLocator>();
             }
 
             return siloBuilder;

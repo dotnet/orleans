@@ -106,19 +106,6 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// FOR TESTING PURPOSES ONLY!!
-        /// </summary>
-        /// <param name="grain"></param>
-        internal int UnregisterGrainForTesting(GrainId grain)
-        {
-            var activation = activations.FindTarget(grain);
-            if (activation is null) return 0;
-
-            UnregisterMessageTarget(activation);
-            return 1;
-        }
-
-        /// <summary>
         /// If activation already exists, return it.
         /// Otherwise, creates a new activation, begins rehydrating it and activating it, then returns it.
         /// </summary>

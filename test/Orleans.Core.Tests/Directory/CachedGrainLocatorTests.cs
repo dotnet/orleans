@@ -158,7 +158,7 @@ namespace UnitTests.Directory
             Factory<LocalGrainDirectoryPartition> partitionFactory = () => new LocalGrainDirectoryPartition(
                 membershipService.Target,
                 Options.Create(new GrainDirectoryOptions()),
-                this.loggerFactory);
+                this.loggerFactory.CreateLogger<LocalGrainDirectoryPartition>());
             var systemTargetShared = new SystemTargetShared(
                 runtimeClient: null!,
                 localSiloDetails: localSiloDetails,
@@ -214,7 +214,7 @@ namespace UnitTests.Directory
             Factory<LocalGrainDirectoryPartition> partitionFactory = () => new LocalGrainDirectoryPartition(
                 membershipService.Target,
                 Options.Create(new GrainDirectoryOptions()),
-                this.loggerFactory);
+                this.loggerFactory.CreateLogger<LocalGrainDirectoryPartition>());
             var systemTargetShared = new SystemTargetShared(
                 runtimeClient: null!,
                 localSiloDetails: localSiloDetails,
@@ -282,7 +282,7 @@ namespace UnitTests.Directory
             Factory<LocalGrainDirectoryPartition> partitionFactory = () => new LocalGrainDirectoryPartition(
                 membershipService.Target,
                 Options.Create(new GrainDirectoryOptions()),
-                this.loggerFactory);
+                this.loggerFactory.CreateLogger<LocalGrainDirectoryPartition>());
             var systemTargetShared = new SystemTargetShared(
                 runtimeClient: null!,
                 localSiloDetails: localSiloDetails,

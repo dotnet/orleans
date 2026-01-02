@@ -151,7 +151,7 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalGrainDirectory>();
             services.AddSingleton<GrainLocator>();
             services.AddSingleton<GrainLocatorResolver>();
-            services.AddSingleton<DhtGrainLocator>(sp => DhtGrainLocator.FromLocalGrainDirectory(sp.GetService<LocalGrainDirectory>()!));
+            services.AddSingleton<DhtGrainLocator>(sp => DhtGrainLocator.FromLocalGrainDirectory(sp.GetRequiredService<LocalGrainDirectory>()));
             services.AddSingleton<GrainDirectoryResolver>();
             services.AddSingleton<IGrainDirectoryResolver, GenericGrainDirectoryResolver>();
             services.AddSingleton<CachedGrainLocator>();

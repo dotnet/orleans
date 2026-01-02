@@ -218,7 +218,6 @@ namespace UnitTests.Grains
 
         public OneWayGrain(GrainLocator grainLocator) => this.grainLocator = grainLocator;
 
-        private ILocalGrainDirectory LocalGrainDirectory => this.ServiceProvider.GetRequiredService<ILocalGrainDirectory>();
         private ILocalSiloDetails LocalSiloDetails => this.ServiceProvider.GetRequiredService<ILocalSiloDetails>();
 
         public Task Notify()
@@ -326,7 +325,12 @@ namespace UnitTests.Grains
         public Task<SiloAddress> GetPrimaryForGrain()
         {
             var grainId = (GrainId)this.GrainId;
-            var primaryForGrain = this.LocalGrainDirectory.GetPrimaryForGrain(grainId);
+            if (ServiceProvider.GetService<DistributedGrainDirectory>() is { } distributedGrainDirectory)
+            {
+                return Task.FromResult(((DistributedGrainDirectory.ITestHooks)distributedGrainDirectory).GetPrimaryForGrain(grainId)!);
+            }
+
+            var primaryForGrain = ServiceProvider.GetRequiredService<ILocalGrainDirectory>().GetPrimaryForGrain(grainId);
             return Task.FromResult(primaryForGrain!);
         }
 
