@@ -96,10 +96,16 @@ namespace UnitTests.StuckGrainTests
                     () => stuckGrain.NonBlockingCall().WaitAsync(TimeSpan.FromMilliseconds(500)));
             }
 
-            // Wait so the first task will reach with DefaultCollectionAge timeout
+            // Wait for the stuck grain detection timeout (MaxRequestProcessingTime = 3 seconds).
+            // Stuck detection only triggers when a NEW message arrives and checks that the current
+            // request has been processing longer than MaxRequestProcessingTime.
+            // We need to wait for this time to pass before sending the 4th message.
+            // Note: This delay is tied to the MaxRequestProcessingTime configuration (3s) and cannot
+            // be made event-driven because the event is triggered BY the incoming message, not before it.
             await Task.Delay(TimeSpan.FromSeconds(3));
 
-            // No issue on this one
+            // This call triggers stuck detection, which causes the grain to be unregistered
+            // and all pending requests (including this one) to be forwarded to a new activation.
             await stuckGrain.NonBlockingCall();
 
             // All 4 otherwise stuck calls should have been forwarded to a new activation

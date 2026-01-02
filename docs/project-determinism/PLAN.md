@@ -1296,6 +1296,61 @@ Assert.True(last >= 10, $"Expected at least 10 ticks, got {last}");
 - Tests complete faster when timers fire quickly (no minimum polling delay)
 - Tests are more reliable under load (wait for events, not time)
 
+### Work Item 6: StuckGrain Test Improvements
+
+**Status**: ✅ COMPLETED (Phase 14)
+
+**Tests Improved**:
+- `StuckGrainTest_Basic` - Already uses `_grainObserver.WaitForGrainDeactivatedAsync()` (event-driven)
+- `StuckGrainTest_StuckDetectionAndForward` - Documented why `Task.Delay` is required
+
+**Analysis**:
+The `StuckGrainTest_StuckDetectionAndForward` test cannot be made fully event-driven due to how Orleans stuck grain detection works:
+
+1. Stuck detection is triggered when a NEW message arrives and the message loop checks `_busyDuration > MaxRequestProcessingTime`
+2. The diagnostic event (Deactivating) is emitted as part of the stuck detection process
+3. Since the event is triggered BY the incoming message, we cannot wait for the event BEFORE sending the message
+
+**Why Task.Delay is necessary**:
+- The 4th `NonBlockingCall` is the trigger for stuck detection
+- We must wait for `MaxRequestProcessingTime` (3s) to pass before sending this message
+- If we send the message too early, `_busyDuration` will be < 3s and stuck detection won't trigger
+- The message will be queued behind the stuck `RunForever()` call and also time out
+
+**Improvement made**:
+Added clear documentation explaining why this specific delay cannot be made event-driven:
+
+```csharp
+// Wait for the stuck grain detection timeout (MaxRequestProcessingTime = 3 seconds).
+// Stuck detection only triggers when a NEW message arrives and checks that the current
+// request has been processing longer than MaxRequestProcessingTime.
+// We need to wait for this time to pass before sending the 4th message.
+// Note: This delay is tied to the MaxRequestProcessingTime configuration (3s) and cannot
+// be made event-driven because the event is triggered BY the incoming message, not before it.
+await Task.Delay(TimeSpan.FromSeconds(3));
+```
+
+**Files Modified**:
+- `test/TesterInternal/OrleansRuntime/StuckGrainTests.cs` - Improved comments explaining stuck detection timing
+
+### Summary: Remaining Task.Delay Patterns
+
+After Phase 14, the remaining `Task.Delay` patterns in `test/TesterInternal/` fall into these categories:
+
+| Category | Count | Example | Notes |
+|----------|-------|---------|-------|
+| Small coordination delays (1-100ms) | ~15 | `await Task.Delay(1)`, `await Task.Delay(100)` | Allow scheduler to run, not flakiness issues |
+| Configuration-tied delays | ~5 | `Task.Delay(SessionCyclePeriod)` | Tied to test configuration, appropriate |
+| Already event-driven | ~5 | Comments mention `WaitForXxx` | Already converted |
+| Timeout testing | ~3 | `TimeoutTests.cs` | Testing timeout behavior requires delays |
+| Polling in helpers | ~5 | `StreamTestUtils.cs`, `RetryHelper.cs` | Part of polling infrastructure |
+| Cannot be event-driven | 1 | `StuckGrainTests.cs` | Documented reason (Phase 14) |
+
+**Key Learnings**:
+- Not all `Task.Delay` patterns can be replaced with event-driven waiting
+- Some delays are fundamental to the mechanism being tested (like stuck detection)
+- Good documentation explaining WHY a delay exists is valuable even if the delay remains
+
 ## References
 
 - [Aspire DiagnosticListener pattern](https://github.com/dotnet/aspire/blob/main/src/Aspire.Hosting/DistributedApplicationBuilder.cs)
