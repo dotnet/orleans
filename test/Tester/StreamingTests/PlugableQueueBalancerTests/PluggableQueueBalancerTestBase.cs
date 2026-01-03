@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
@@ -22,7 +22,8 @@ namespace Tester.StreamingTests
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
-                hostBuilder.ConfigureServices(services => services.AddTransient<LeaseBasedQueueBalancerForTest>());
+                // LeaseBasedQueueBalancerForTest is created via ConfigurePartitionBalancing's factory delegate,
+                // not via DI container resolution. No additional service registration is needed.
             }
         }
 

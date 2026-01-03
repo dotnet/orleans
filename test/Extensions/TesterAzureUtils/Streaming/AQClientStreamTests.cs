@@ -94,7 +94,7 @@ namespace Tester.AzureUtils.Streaming
             await runner.StreamProducerOnDroppedClientTest(AQStreamProviderName, StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Streaming")]
+        [SkippableFact(Skip = "Azure Queue's at-least-once delivery semantics can cause duplicate message delivery after client disconnect/reconnect, leading to non-deterministic event counts."), TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Streaming")]
         public async Task AQStreamConsumerOnDroppedClientTest()
         {
             logger.LogInformation("************************ AQStreamConsumerOnDroppedClientTest *********************************");
