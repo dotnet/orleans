@@ -24,6 +24,12 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<DiagnosticL
     private readonly ConcurrentBag<GrainDeactivatedEvent> _deactivatedEvents = new();
     private readonly List<IDisposable> _subscriptions = new();
     private IDisposable? _listenerSubscription;
+    private int _listenerSubscriptionCount;
+
+    /// <summary>
+    /// Gets the number of Orleans.Grains listeners that have been subscribed to.
+    /// </summary>
+    public int ListenerSubscriptionCount => _listenerSubscriptionCount;
 
     /// <summary>
     /// Gets all captured grain created events.
@@ -48,6 +54,11 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<DiagnosticL
     /// <summary>
     /// Creates a new instance of the observer and starts listening for grain diagnostic events.
     /// </summary>
+    /// <remarks>
+    /// <see cref="DiagnosticListener.AllListeners"/> will call <see cref="IObserver{T}.OnNext"/> for all
+    /// existing listeners synchronously during the <see cref="IObservable{T}.Subscribe"/> call, 
+    /// then continue to call <see cref="IObserver{T}.OnNext"/> for new listeners as they're created.
+    /// </remarks>
     public static GrainDiagnosticObserver Create()
     {
         var observer = new GrainDiagnosticObserver();
@@ -309,6 +320,7 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<DiagnosticL
         {
             var subscription = listener.Subscribe(this);
             _subscriptions.Add(subscription);
+            Interlocked.Increment(ref _listenerSubscriptionCount);
         }
     }
 

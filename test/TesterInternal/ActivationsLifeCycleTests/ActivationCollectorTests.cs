@@ -173,6 +173,9 @@ namespace UnitTests.ActivationsLifeCycleTests
                 grainCount,
                 DEFAULT_IDLE_TIMEOUT.TotalSeconds);
 
+            // Advance virtual time past the collection age limit so grains become stale.
+            _sharedTimeProvider!.Advance(DEFAULT_IDLE_TIMEOUT + TimeSpan.FromSeconds(5));
+
             // Wait for all grains to be deactivated using event-driven approach
             await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain1", grainCount, MAX_WAIT_TIME);
 
@@ -230,6 +233,10 @@ namespace UnitTests.ActivationsLifeCycleTests
                 "ActivationCollectorShouldNotCollectBusyActivations: grains activated; waiting for {Count} idle grain deactivations (activation GC idle timeout is {DefaultIdleTime} sec).",
                 idleGrainCount,
                 DEFAULT_IDLE_TIMEOUT.TotalSeconds);
+
+            // Advance virtual time past the collection age limit so idle grains become stale.
+            // Busy grains will continue making real-time requests, keeping them active.
+            _sharedTimeProvider!.Advance(DEFAULT_IDLE_TIMEOUT + TimeSpan.FromSeconds(5));
 
             // Wait for all idle grains to be deactivated using event-driven approach
             await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain1", idleGrainCount, MAX_WAIT_TIME);
@@ -293,9 +300,21 @@ namespace UnitTests.ActivationsLifeCycleTests
             logger.LogInformation(
                 "ManualCollectionShouldNotCollectBusyActivations: grains activated; waiting {TotalSeconds} sec before triggering manual collection.",
                 shortIdleTimeout.TotalSeconds);
-            await Task.Delay(shortIdleTimeout);
+            
+            // Give the busyWorker time to start making requests on real time
+            // This ensures all busy grains have recent activity before we advance virtual time
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
 
             TimeSpan everything = TimeSpan.FromMinutes(10);
+            
+            // Advance virtual time so idle grains are considered idle for more than 10 minutes.
+            _sharedTimeProvider!.Advance(everything + TimeSpan.FromSeconds(5));
+            
+            // Give the busy worker time to cycle through all grains after time advancement.
+            // This ensures busy grains have their idle timestamp reset to the new (advanced) time,
+            // so they won't be collected.
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            
             logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: triggering manual collection (timespan is {TotalSeconds} sec).",  everything.TotalSeconds);
             IManagementGrain mgmtGrain = this.testCluster.GrainFactory.GetGrain<IManagementGrain>(0);
             await mgmtGrain.ForceActivationCollection(everything);
@@ -343,6 +362,9 @@ namespace UnitTests.ActivationsLifeCycleTests
                 "ActivationCollectorShouldCollectIdleActivationsSpecifiedInPerTypeConfiguration: grains activated; waiting for {Count} deactivations (activation GC idle timeout is {DefaultIdleTime} sec).",
                 grainCount,
                 DEFAULT_IDLE_TIMEOUT.TotalSeconds);
+
+            // Advance virtual time past the per-type collection age limit (DEFAULT_IDLE_TIMEOUT) so grains become stale.
+            _sharedTimeProvider!.Advance(DEFAULT_IDLE_TIMEOUT + TimeSpan.FromSeconds(5));
 
             // Wait for all grains to be deactivated using event-driven approach
             await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain2", grainCount, MAX_WAIT_TIME);
@@ -403,6 +425,10 @@ namespace UnitTests.ActivationsLifeCycleTests
                 "ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration: grains activated; waiting for {Count} idle grain deactivations (activation GC idle timeout is {DefaultIdleTime} sec).",
                 idleGrainCount,
                 DEFAULT_IDLE_TIMEOUT.TotalSeconds);
+
+            // Advance virtual time past the per-type collection age limit (DEFAULT_IDLE_TIMEOUT) so idle grains become stale.
+            // Busy grains will continue making real-time requests, keeping them active.
+            _sharedTimeProvider!.Advance(DEFAULT_IDLE_TIMEOUT + TimeSpan.FromSeconds(5));
 
             // Wait for all idle grains to be deactivated using event-driven approach
             await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain2", idleGrainCount, MAX_WAIT_TIME);
@@ -500,7 +526,12 @@ namespace UnitTests.ActivationsLifeCycleTests
                 using var iterationCts = new CancellationTokenSource();
                 var busyTasks = grains.Select(g => KeepGrainBusyAsync(g, iterationCts.Token)).ToList();
 
-                // Step 4: Wait for idle activations to be collected using event-driven approach
+                // Step 4: Advance virtual time past the collection age limit so idle activations become stale.
+                // The busy activation will continue making requests on real time, but idle activations
+                // will have their GetIdleness() return a value exceeding DEFAULT_IDLE_TIMEOUT (11 seconds).
+                _sharedTimeProvider!.Advance(DEFAULT_IDLE_TIMEOUT + TimeSpan.FromSeconds(5));
+
+                // Wait for idle activations to be collected using event-driven approach
                 this.logger.LogInformation(
                     "ActivationCollectorShouldNotCollectBusyStatelessWorkers: waiting for {ExpectedDeactivations} deactivations.",
                     expectedDeactivations);
@@ -540,7 +571,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             const int grainCount = 1000;
 
-            // CollectionAgeLimit = 12 seconds
+            // CollectionAgeLimit = 12 seconds for this grain type
             var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain));
 
             List<Task> tasks = new List<Task>();
@@ -556,10 +587,14 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(grainCount, activationsCreated);
 
             logger.LogInformation(
-                "ActivationCollectorShouldCollectByCollectionSpecificAgeLimit: grains activated; waiting for {Count} deactivations (activation GC idle timeout is {DefaultIdleTimeout} sec).",
-                grainCount,
-                DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-            
+                "ActivationCollectorShouldCollectByCollectionSpecificAgeLimit: grains activated; waiting for {Count} deactivations (collection age limit is 12 sec).",
+                grainCount);
+
+            // Advance virtual time past the collection age limit (12 seconds) so grains become stale.
+            // The activation collector timer runs on real time, but GetIdleness() uses TimeProvider.
+            // We advance by 15 seconds to ensure grains are considered idle for longer than the 12-second limit.
+            _sharedTimeProvider!.Advance(TimeSpan.FromSeconds(15));
+
             // Wait for all grains to be deactivated using event-driven approach
             await _diagnosticObserver.WaitForDeactivationCountAsync("CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain", grainCount, MAX_WAIT_TIME);
 
@@ -580,6 +615,11 @@ namespace UnitTests.ActivationsLifeCycleTests
             // Since the collection age is 5 seconds and keepAlive is false, the grain should be
             // collected before the timer fires.
             await grain.StartTimer(testName, TimeSpan.FromSeconds(10), keepAlive: false);
+
+            // Advance virtual time past the collection age (5 seconds) so the grain becomes stale.
+            // We advance by 6 seconds to ensure the grain is considered idle for longer than the 5-second limit.
+            // This should trigger collection before the timer fires (which was scheduled for 10 seconds).
+            _sharedTimeProvider!.Advance(TimeSpan.FromSeconds(6));
 
             // Wait for the grain to be deactivated using event-driven approach
             logger.LogInformation("NonReentrantGrainTimer_NoKeepAlive_Test: waiting for grain deactivation.");

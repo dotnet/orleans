@@ -1547,6 +1547,87 @@ Converted to use `RebalancerObserver.WaitForCycleCountAsync()` (same infrastruct
 | `StatePreservationRebalancingTests` | 1 | ✅ Uses WaitForCycleCountAsync |
 | `RebalancingOptionsTests` | 9 | ✅ Unit tests (no timing) |
 
+### Work Item 11: ActivationCollectorTests FakeTimeProvider Integration Fix
+
+**Status**: ✅ COMPLETED (Phase 18)
+
+**Problem**:
+After Phase 16 introduced `FakeTimeProvider` to `ActivationCollectorTests` for deterministic idle time tracking, several tests started failing with 0 deactivations received. The tests were:
+- `ActivationCollectorShouldCollectIdleActivations`
+- `ActivationCollectorShouldNotCollectBusyActivations`
+- `ManualCollectionShouldNotCollectBusyActivations`
+- `ActivationCollectorShouldCollectIdleActivationsSpecifiedInPerTypeConfiguration`
+- `ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration`
+- `ActivationCollectorShouldNotCollectBusyStatelessWorkers`
+- `ActivationCollectorShouldCollectByCollectionSpecificAgeLimitForTwelveSeconds`
+- `NonReentrantGrainTimer_NoKeepAlive_Test`
+
+**Root Cause**:
+When `FakeTimeProvider` was introduced, the `ActivationData.GetIdleness()` method was updated to use `TimeProvider.GetElapsedTime()` for deterministic testing. However, the tests were not updated to advance the `FakeTimeProvider` before waiting for deactivations.
+
+The issue manifested as:
+1. Grains are activated and become idle
+2. `GetIdleness()` returns ~0 seconds because FakeTimeProvider hasn't advanced
+3. The activation collector's `ScanStale()` method checks `activation.IsStale()` which calls `GetIdleness()`
+4. Since `GetIdleness() < CollectionAgeLimit`, grains are never considered stale
+5. Deactivations never occur
+
+**Diagnostic Investigation**:
+Added `ListenerSubscriptionCount` property to `GrainDiagnosticObserver` to verify the observer was correctly subscribed to `Orleans.Grains` listener. Enhanced timeout error message revealed:
+- `ListenerSubscriptionCount: 1` - Observer WAS correctly subscribed
+- `Total activated events: 1001` - Activation events WERE being received
+- `Total deactivated events: 0` - No deactivation events (the bug)
+
+This confirmed the `DiagnosticListener` mechanism was working correctly, and the issue was that grains never became stale due to FakeTimeProvider not advancing.
+
+**Solution**:
+Added `_sharedTimeProvider!.Advance(...)` calls to all affected tests before waiting for deactivations:
+
+```csharp
+// Before (broken - grains never become stale):
+await _diagnosticObserver.WaitForDeactivationCountAsync(...);
+
+// After (fixed - advance virtual time to make grains stale):
+_sharedTimeProvider!.Advance(DEFAULT_IDLE_TIMEOUT + TimeSpan.FromSeconds(5));
+await _diagnosticObserver.WaitForDeactivationCountAsync(...);
+```
+
+For tests with busy grains, added small real-time delays to ensure busy workers have time to refresh grain activity:
+
+```csharp
+// Give busy worker time to start
+await Task.Delay(TimeSpan.FromMilliseconds(500));
+_sharedTimeProvider!.Advance(everything + TimeSpan.FromSeconds(5));
+// Give busy worker time to cycle through grains after time advancement
+await Task.Delay(TimeSpan.FromMilliseconds(500));
+```
+
+**Files Modified**:
+- `test/TesterInternal/ActivationsLifeCycleTests/ActivationCollectorTests.cs`:
+  - `ActivationCollectorShouldCollectIdleActivations` - Added `_sharedTimeProvider.Advance(DEFAULT_IDLE_TIMEOUT + 5s)`
+  - `ActivationCollectorShouldNotCollectBusyActivations` - Added `_sharedTimeProvider.Advance(DEFAULT_IDLE_TIMEOUT + 5s)`
+  - `ManualCollectionShouldNotCollectBusyActivations` - Added `_sharedTimeProvider.Advance(10min + 5s)` with busy worker sync delays
+  - `ActivationCollectorShouldCollectIdleActivationsSpecifiedInPerTypeConfiguration` - Added `_sharedTimeProvider.Advance(DEFAULT_IDLE_TIMEOUT + 5s)`
+  - `ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration` - Added `_sharedTimeProvider.Advance(DEFAULT_IDLE_TIMEOUT + 5s)`
+  - `ActivationCollectorShouldNotCollectBusyStatelessWorkers` - Added `_sharedTimeProvider.Advance(DEFAULT_IDLE_TIMEOUT + 5s)`
+  - `ActivationCollectorShouldCollectByCollectionSpecificAgeLimitForTwelveSeconds` - Added `_sharedTimeProvider.Advance(15s)` (for 12s age limit)
+  - `NonReentrantGrainTimer_NoKeepAlive_Test` - Added `_sharedTimeProvider.Advance(6s)` (for 5s age limit)
+
+- `test/TestInfrastructure/TestExtensions/GrainDiagnosticObserver.cs`:
+  - Added `ListenerSubscriptionCount` property for debugging DiagnosticListener subscription status
+  - Added documentation about `DiagnosticListener.AllListeners` behavior
+
+**Test Results**:
+- All 9 ActivationCollectorTests pass on both .NET 8 and .NET 10
+- Tests complete in ~2.5 minutes (was timing out at 60+ seconds per test)
+
+**Key Learning**:
+When using `FakeTimeProvider` for deterministic testing of time-based features like activation collection:
+1. The collector timer runs on real time (via `PeriodicTimer`)
+2. The idle time check uses `TimeProvider` (controllable via FakeTimeProvider)
+3. Tests MUST advance the FakeTimeProvider to make grains appear idle
+4. For tests with busy grains, real-time delays are still needed to synchronize with background workers
+
 ## References
 
 - [Aspire DiagnosticListener pattern](https://github.com/dotnet/aspire/blob/main/src/Aspire.Hosting/DistributedApplicationBuilder.cs)
