@@ -1697,6 +1697,66 @@ private async Task<Dictionary<SiloHandle, int>> GetPerSiloActivationCounts()
 }
 ```
 
+### Work Item 13: Streaming Test Reliability Improvements
+
+**Status**: ✅ COMPLETED
+
+**Tests Fixed**:
+- ✅ `SMS_AddMany_Consumers` - Un-skipped, added PubSub consumer count synchronization
+- ✅ `AQ_AddMany_Consumers` - Un-skipped, added PubSub consumer count synchronization
+- ✅ `AQStreamConsumerOnDroppedClientTest` - Un-skipped, added `waitForRetryTimeouts=true`
+
+**Tests Investigated But Left Skipped**:
+- ❌ `EH100StreamsTo4PartitionStreamsTest` - Updated skip reason with root cause (shared checkpoint table)
+
+**Problem Analysis**:
+
+1. **SMS_AddMany_Consumers / AQ_AddMany_Consumers**:
+   - **Root Cause**: Messages were being sent immediately after `Task.WhenAll(AddConsumer calls)` returned, but PubSub registration is asynchronous. Some consumers might not be fully registered when messages are sent.
+   - **Fix**: Added `CheckPubSubCounts()` calls to wait for the expected consumer count before sending messages.
+
+2. **AQStreamConsumerOnDroppedClientTest**:
+   - **Root Cause**: Azure Queue has at-least-once delivery semantics. During client drop/reconnect, messages might be redelivered. The test was not waiting for stream retry policies to fail.
+   - **Fix**: Added `waitForRetryTimeouts: true` parameter (like the EventHub version), which adds a 90-second wait for retry policies to complete.
+
+3. **EH100StreamsTo4PartitionStreamsTest**:
+   - **Root Cause**: All EventHub tests share the same checkpoint table ("Checkpoint"). Checkpoints from previous test runs cause consumers to start from old positions, reading leftover messages.
+   - **Assessment**: Requires architectural change (unique checkpoint table per test) or test isolation infrastructure. Updated skip reason to document the root cause.
+
+**Files Modified**:
+- `test/Extensions/TesterAzureUtils/Streaming/StreamReliabilityTests.cs`:
+  - Removed Skip attribute from `SMS_AddMany_Consumers` and `AQ_AddMany_Consumers`
+  - Added `CheckPubSubCounts()` calls before sending messages in `Test_AddMany_Consumers`
+- `test/Extensions/TesterAzureUtils/Streaming/AQClientStreamTests.cs`:
+  - Removed Skip attribute from `AQStreamConsumerOnDroppedClientTest`
+  - Added `waitForRetryTimeouts: true` parameter
+- `test/Extensions/ServiceBus.Tests/Streaming/EHStreamPerPartitionTests.cs`:
+  - Updated skip reason with detailed root cause analysis
+
+**Key Pattern - PubSub Synchronization**:
+```csharp
+// Before sending messages, wait for all consumers to be registered in PubSub
+var grains = await Do_AddConsumerGrains(baseId, numGrains);
+
+// Wait for PubSub to acknowledge all consumers before sending messages.
+// This prevents the race condition where messages are sent before all subscriptions are registered.
+await StreamTestUtils.CheckPubSubCounts(
+    this.InternalClient, 
+    _output, 
+    "After AddConsumers", 
+    expectedProducers: 1, 
+    expectedConsumers: 1 + numGrains,  // baseline consumer + new consumers
+    _streamId, 
+    _streamProviderName, 
+    StreamTestsConstants.StreamReliabilityNamespace);
+
+// Now it's safe to send messages - all consumers are registered
+for (int i = 0; i < numLoops; i++)
+{
+    await producerGrain.SendItem(i);
+}
+```
+
 ## References
 
 - [Aspire DiagnosticListener pattern](https://github.com/dotnet/aspire/blob/main/src/Aspire.Hosting/DistributedApplicationBuilder.cs)

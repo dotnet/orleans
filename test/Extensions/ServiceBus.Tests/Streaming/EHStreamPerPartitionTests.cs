@@ -77,7 +77,7 @@ namespace ServiceBus.Tests.StreamingTests
             fixture.EnsurePreconditionsMet();
         }
 
-        [SkippableFact(Skip = "Test purpose unclear; fails if EventHub has leftover messages from previous tests")]
+        [SkippableFact(Skip = "Test isolation issue: shared checkpoint table (\"Checkpoint\") retains state from previous tests, causing message count to exceed expected. Requires unique checkpoint table per test or clearing checkpoints at startup.")]
         public async Task EH100StreamsTo4PartitionStreamsTest()
         {
             this.fixture.Logger.LogInformation("************************ EH100StreamsTo4PartitionStreamsTest *********************************");

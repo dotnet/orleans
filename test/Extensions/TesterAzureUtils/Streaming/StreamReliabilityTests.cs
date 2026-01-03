@@ -218,14 +218,14 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, logger);
         }
 
-        [SkippableFact(Skip = "Flaky: Adding many consumers concurrently can cause message count verification failures"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [SkippableFact, TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_AddMany_Consumers()
         {
             const string testName = "SMS_AddMany_Consumers";
             await Test_AddMany_Consumers(testName, SMS_STREAM_PROVIDER_NAME);
         }
 
-        [SkippableFact(Skip = "Flaky: Adding many consumers concurrently can cause message count verification failures"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("AzureStorage")]
+        [SkippableFact, TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("AzureStorage")]
         public async Task AQ_AddMany_Consumers()
         {
             const string testName = "AQ_AddMany_Consumers";
@@ -440,11 +440,17 @@ namespace UnitTests.Streaming.Reliability
             int baseId = 10000 * ++_baseConsumerId;
 
             var grains1 = await Do_AddConsumerGrains(baseId, numGrains);
+            
+            // Wait for PubSub to acknowledge all consumers before sending messages.
+            // This prevents the race condition where messages are sent before all subscriptions are registered.
+            string when1 = "After first batch AddConsumers";
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when1, 1, 1 + numGrains, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
+
             for (int i = 0; i < numLoops; i++)
             {
                 await producerGrain.SendItem(2);
             }
-            string when1 = "AddConsumers-Send-2";
+            when1 = "AddConsumers-Send-2";
             // Messages received by original consumer grain
             await CheckReceivedCounts(when1, consumerGrain, numLoops + 1, 0);
             // Messages received by new consumer grains
@@ -457,18 +463,23 @@ namespace UnitTests.Streaming.Reliability
 #endif
             }));
 
-            string when2 = "AddConsumers-Send-3";
+            string when2 = "After second batch AddConsumers";
             baseId = 10000 * ++_baseConsumerId;
             var grains2 = await Do_AddConsumerGrains(baseId, numGrains);
+            
+            // Wait for PubSub to acknowledge all consumers before sending messages.
+            await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when2, 1, 1 + numGrains * 2, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
+
             for (int i = 0; i < numLoops; i++)
             {
                 await producerGrain.SendItem(3);
             }
             ////Thread.Sleep(TimeSpan.FromSeconds(2));
+            string when3 = "AddConsumers-Send-3";
             // Messages received by original consumer grain
-            await CheckReceivedCounts(when2, consumerGrain, numLoops*2 + 1, 0);
+            await CheckReceivedCounts(when3, consumerGrain, numLoops*2 + 1, 0);
             // Messages received by new consumer grains
-            await Task.WhenAll(grains2.Select(g => CheckReceivedCounts(when2, g, numLoops, 0)));
+            await Task.WhenAll(grains2.Select(g => CheckReceivedCounts(when3, g, numLoops, 0)));
 
             StreamTestUtils.LogEndTest(testName, logger);
         }
