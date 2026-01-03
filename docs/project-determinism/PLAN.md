@@ -1112,15 +1112,15 @@ These tests used `Thread.Sleep(period.Multiply(2) + LEEWAY)` and then `Assert.Eq
 
 ### Work Item 1: ElasticPlacement Test Determinism
 
-**Status**: ✅ COMPLETED (Phase 11)
+**Status**: ✅ COMPLETED (Phase 11 + Work Item 12)
 
 **Tests Fixed**:
 - ✅ `LoadAwareGrainShouldNotAttemptToCreateActivationsOnOverloadedSilo` - PASSING
 - ✅ `LoadAwareGrainShouldNotAttemptToCreateActivationsOnBusySilos` - PASSING  
 - ✅ `ElasticityTest_AllSilosCPUTooHigh` - PASSING (Phase 11)
 - ✅ `ElasticityTest_AllSilosOverloaded` - PASSING (Phase 11)
-- ⏭️ `ElasticityTest_CatchingUp` - Skipped (timing-sensitive activation count propagation)
-- ⏭️ `ElasticityTest_StoppingSilos` - Skipped (timing-sensitive activation count propagation)
+- ✅ `ElasticityTest_CatchingUp` - PASSING (Work Item 12)
+- ✅ `ElasticityTest_StoppingSilos` - PASSING (Work Item 12)
 
 **Phase 11 Solution**:
 
@@ -1627,6 +1627,75 @@ When using `FakeTimeProvider` for deterministic testing of time-based features l
 2. The idle time check uses `TimeProvider` (controllable via FakeTimeProvider)
 3. Tests MUST advance the FakeTimeProvider to make grains appear idle
 4. For tests with busy grains, real-time delays are still needed to synchronize with background workers
+
+### Work Item 12: ElasticityTest_CatchingUp and ElasticityTest_StoppingSilos
+
+**Status**: ✅ COMPLETED
+
+**Problem**:
+Two elasticity tests had been skipped for years due to timing-sensitive activation count propagation:
+- `ElasticityTest_CatchingUp` - Tests that new silos catch up on activation counts when added
+- `ElasticityTest_StoppingSilos` - Tests that activations are redistributed when silos are stopped
+
+**Root Causes Discovered**:
+
+1. **Statistics Double-Counting Bug**: `GetSimpleGrainStatistics()` uses `GrainMetricsListener.GrainCounts` which is a **static** `ConcurrentDictionary`. In in-process test clusters where multiple silos share the same process, each silo reports the **total** activation count (cluster-wide) instead of its own activations.
+
+2. **Statistics Propagation Timing**: Even after calling `ForceRuntimeStatisticsCollection()`, activation counts created during grain batch creation are not immediately visible to the placement director on other silos.
+
+**Solution Applied**:
+
+1. **Use `GetDetailedGrainStatistics()` instead of `GetSimpleGrainStatistics()`**:
+   - `GetDetailedGrainStatistics()` iterates over the per-silo `activationDirectory` which correctly tracks activations per silo
+   - `GetSimpleGrainStatistics()` uses the shared static counter which gives incorrect results in in-process tests
+
+2. **Created `PlacementDiagnosticObserver`**:
+   - Subscribes to `Orleans.Placement` DiagnosticListener
+   - Tracks `ClusterStatisticsRefreshed` events from each silo
+   - Provides `WaitForAllSilosRefreshedAsync()` to wait for all silos to complete statistics propagation
+
+3. **Force statistics refresh between grain batches (for `ElasticityTest_StoppingSilos`)**:
+   - For the 4-silo test, statistics must be refreshed between each batch of 1000 grains
+   - Otherwise, placement directors make decisions with stale activation counts
+
+**Files Created**:
+- `test/TestInfrastructure/TestExtensions/PlacementDiagnosticObserver.cs` - Observer for placement diagnostic events
+
+**Files Modified**:
+- `test/TesterInternal/General/ElasticPlacementTest.cs`:
+  - Changed `[SkippableFact(Skip=...)]` to `[Fact]` for both tests
+  - Added `_placementObserver` field and lifecycle methods
+  - Added `ForceStatisticsRefreshOnAllSilos()` helper using the observer
+  - Changed `GetPerSiloActivationCounts()` to use `GetDetailedGrainStatistics()` instead of `GetSimpleGrainStatistics()`
+  - For `ElasticityTest_StoppingSilos`: Added `ForceStatisticsRefreshOnAllSilos()` between grain batches
+
+**Test Results**:
+- All 6 ElasticPlacementTests pass on .NET 8 and .NET 10
+- Tests complete in ~17 seconds for both elasticity tests combined
+- No more timing-dependent failures
+
+**Key Pattern**:
+```csharp
+// Force statistics refresh and wait for all silos to complete
+private async Task ForceStatisticsRefreshOnAllSilos()
+{
+    _placementObserver.Clear();
+    var siloAddresses = this.HostedCluster.GetActiveSilos()
+        .Select(s => s.SiloAddress)
+        .ToArray();
+    var mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
+    await mgmtGrain.ForceRuntimeStatisticsCollection(siloAddresses);
+    await _placementObserver.WaitForAllSilosRefreshedAsync(siloAddresses, TimeSpan.FromSeconds(30));
+}
+
+// Use GetDetailedGrainStatistics instead of GetSimpleGrainStatistics
+private async Task<Dictionary<SiloHandle, int>> GetPerSiloActivationCounts()
+{
+    IManagementGrain mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
+    DetailedGrainStatistic[] stats = await mgmtGrain.GetDetailedGrainStatistics();
+    // Group by silo and count...
+}
+```
 
 ## References
 
