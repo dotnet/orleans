@@ -162,7 +162,16 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DeploymentLoadPublisher>();
 
             services.AddSingleton<IAsyncTimerFactory, AsyncTimerFactory>();
+
+            // Register a no-op membership table as a fallback. This allows custom IMembershipManager
+            // implementations (like RapidCluster) to satisfy MembershipTableManager's dependency
+            // without providing a real IMembershipTable. The NoOpMembershipTable returns empty/minimal
+            // data and no-ops all writes, allowing MembershipTableManager to run without errors
+            // (though it won't provide meaningful membership data in this case).
+            services.TryAddSingleton<IMembershipTable, NoOpMembershipTable>();
+
             services.AddSingleton<MembershipTableManager>();
+            services.TryAddFromExisting<IMembershipManager, MembershipTableManager>();
             services.AddFromExisting<IHealthCheckParticipant, MembershipTableManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableManager>();
             services.AddSingleton<MembershipSystemTarget>();
@@ -172,9 +181,9 @@ namespace Orleans.Hosting
             services.AddSingleton<IRemoteSiloProber, RemoteSiloProber>();
             services.AddSingleton<SiloStatusOracle>();
             services.TryAddFromExisting<ISiloStatusOracle, SiloStatusOracle>();
-            services.AddSingleton<ClusterHealthMonitor>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor>();
-            services.AddFromExisting<IHealthCheckParticipant, ClusterHealthMonitor>();
+            services.TryAddSingleton<IClusterHealthMonitor, ClusterHealthMonitor>();
+            services.TryAddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IClusterHealthMonitor>();
+            services.TryAddFromExisting<IHealthCheckParticipant, IClusterHealthMonitor>();
             services.AddSingleton<ProbeRequestMonitor>();
             services.AddSingleton<LocalSiloHealthMonitor>();
             services.AddFromExisting<ILocalSiloHealthMonitor, LocalSiloHealthMonitor>();
@@ -535,7 +544,7 @@ namespace Orleans.Hosting
         {
             public bool? IsTypeNameAllowed(string typeName, string assemblyName)
             {
-                if (assemblyName is { Length: > 0} && assemblyName.Contains("Orleans"))
+                if (assemblyName is { Length: > 0 } && assemblyName.Contains("Orleans"))
                 {
                     return true;
                 }

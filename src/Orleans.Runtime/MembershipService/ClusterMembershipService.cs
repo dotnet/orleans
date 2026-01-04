@@ -13,22 +13,22 @@ namespace Orleans.Runtime
     internal partial class ClusterMembershipService : IClusterMembershipService, ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
         private readonly AsyncEnumerable<ClusterMembershipSnapshot> updates;
-        private readonly MembershipTableManager membershipTableManager;
+        private readonly IMembershipManager membershipManager;
         private readonly ILogger<ClusterMembershipService> log;
         private readonly IFatalErrorHandler fatalErrorHandler;
         private ClusterMembershipSnapshot snapshot;
 
         public ClusterMembershipService(
-            MembershipTableManager membershipTableManager,
+            IMembershipManager membershipManager,
             ILogger<ClusterMembershipService> log,
             IFatalErrorHandler fatalErrorHandler)
         {
-            this.snapshot = membershipTableManager.MembershipTableSnapshot.CreateClusterMembershipSnapshot();
+            this.snapshot = membershipManager.CurrentSnapshot.CreateClusterMembershipSnapshot();
             this.updates = new AsyncEnumerable<ClusterMembershipSnapshot>(
                 initialValue: this.snapshot,
                 updateValidator: (previous, proposed) => proposed.Version > previous.Version,
                 onPublished: update => Interlocked.Exchange(ref this.snapshot, update));
-            this.membershipTableManager = membershipTableManager;
+            this.membershipManager = membershipManager;
             this.log = log;
             this.fatalErrorHandler = fatalErrorHandler;
         }
@@ -37,7 +37,7 @@ namespace Orleans.Runtime
         {
             get
             {
-                var tableSnapshot = this.membershipTableManager.MembershipTableSnapshot;
+                var tableSnapshot = this.membershipManager.CurrentSnapshot;
                 if (this.snapshot.Version == tableSnapshot.Version)
                 {
                     return this.snapshot;
@@ -64,25 +64,25 @@ namespace Orleans.Runtime
                 do
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (!didRefresh || this.membershipTableManager.MembershipTableSnapshot.Version < v)
+                    if (!didRefresh || this.membershipManager.CurrentSnapshot.Version < v)
                     {
-                        await this.membershipTableManager.Refresh();
+                        await this.membershipManager.Refresh();
                         didRefresh = true;
                     }
 
                     await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken);
-                } while (this.snapshot.Version < v || this.snapshot.Version < this.membershipTableManager.MembershipTableSnapshot.Version);
+                } while (this.snapshot.Version < v || this.snapshot.Version < this.membershipManager.CurrentSnapshot.Version);
             }
         }
 
-        public async Task<bool> TryKill(SiloAddress siloAddress) => await this.membershipTableManager.TryKill(siloAddress);
+        public async Task<bool> TryKill(SiloAddress siloAddress) => await this.membershipManager.TryKillSilo(siloAddress);
 
         private async Task ProcessMembershipUpdates(CancellationToken ct)
         {
             try
             {
                 LogDebugStartingToProcessMembershipUpdates(log);
-                await foreach (var tableSnapshot in this.membershipTableManager.MembershipTableUpdates.WithCancellation(ct))
+                await foreach (var tableSnapshot in this.membershipManager.MembershipUpdates.WithCancellation(ct))
                 {
                     this.updates.TryPublish(tableSnapshot.CreateClusterMembershipSnapshot());
                 }

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Configuration.Validators;
+using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -22,8 +23,19 @@ namespace Orleans.Runtime.Configuration
         /// <inheritdoc />
         public void ValidateConfiguration()
         {
+            // Check for either IMembershipTable (traditional) or IMembershipManager (native integration).
+            // External membership providers like RapidCluster may register IMembershipManager directly
+            // without providing an IMembershipTable.
             var clusteringTableProvider = this.serviceProvider.GetService<IMembershipTable>();
-            if (clusteringTableProvider == null)
+            var membershipManager = this.serviceProvider.GetService<IMembershipManager>();
+
+            // If MembershipTableManager is registered, it requires IMembershipTable.
+            // But if a custom IMembershipManager is registered (not MembershipTableManager),
+            // then IMembershipTable is not required.
+            var hasMembershipTableManager = membershipManager is MembershipTableManager;
+            var hasCustomMembershipManager = membershipManager != null && !hasMembershipTableManager;
+
+            if (clusteringTableProvider == null && !hasCustomMembershipManager)
             {
                 throw new OrleansConfigurationException(ClientClusteringValidator.ClusteringNotConfigured);
             }
