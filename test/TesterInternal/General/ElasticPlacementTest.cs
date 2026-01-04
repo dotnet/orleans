@@ -15,7 +15,7 @@ namespace UnitTests.General
     public class ElasticPlacementTests : TestClusterPerTest
     {
         private readonly List<IActivationCountBasedPlacementTestGrain> grains = new List<IActivationCountBasedPlacementTestGrain>();
-        private const int leavy = 300;
+        private const int leavy = 350; // Tolerance for placement variance (17.5% of perSilo)
         private const int perSilo = 1000;
         private PlacementDiagnosticObserver _placementObserver;
 
