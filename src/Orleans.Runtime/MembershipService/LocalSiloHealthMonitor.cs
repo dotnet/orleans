@@ -10,7 +10,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
-using Orleans.Runtime.Messaging;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -43,8 +42,8 @@ namespace Orleans.Runtime.MembershipService
     /// <list type="bullet">
     ///   <item><description>Check that this silos is marked as active in membership.</description></item>
     ///   <item><description>Check that no other silo suspects this silo.</description></item>
-    ///   <item><description>Check for recently received successful ping responses.</description></item>
-    ///   <item><description>Check for recently received ping requests.</description></item>
+    ///   <item><description>Check for recently received successful ping responses (via <see cref="IProbeHealthMonitor"/>).</description></item>
+    ///   <item><description>Check for recently received ping requests (via <see cref="IProbeHealthMonitor"/>).</description></item>
     ///   <item><description>Check that the .NET Thread Pool is able to process work items within one second.</description></item>
     ///   <item><description>Check that local async timers have been firing on-time (within 3 seconds of their due time).</description></item>
     /// </list>
@@ -54,13 +53,12 @@ namespace Orleans.Runtime.MembershipService
         private const int MaxScore = 8;
         private readonly List<IHealthCheckParticipant> _healthCheckParticipants;
         private readonly MembershipTableManager _membershipTableManager;
-        private readonly ClusterHealthMonitor _clusterHealthMonitor;
+        private readonly IProbeHealthMonitor _probeHealthMonitor;
         private readonly ILocalSiloDetails _localSiloDetails;
-        private readonly ILogger<LocalSiloHealthMonitor> _lo;
+        private readonly ILogger<LocalSiloHealthMonitor> _log;
         private readonly ClusterMembershipOptions _clusterMembershipOptions;
         private readonly IAsyncTimer _degradationCheckTimer;
         private readonly ThreadPoolMonitor _threadPoolMonitor;
-        private readonly ProbeRequestMonitor _probeRequestMonitor;
         private ValueStopwatch _clusteredDuration;
         private Task? _runTask;
         private bool _isActive;
@@ -69,21 +67,18 @@ namespace Orleans.Runtime.MembershipService
         public LocalSiloHealthMonitor(
             IEnumerable<IHealthCheckParticipant> healthCheckParticipants,
             MembershipTableManager membershipTableManager,
-            ConnectionManager connectionManager,
-            ClusterHealthMonitor clusterHealthMonitor,
+            IProbeHealthMonitor probeHealthMonitor,
             ILocalSiloDetails localSiloDetails,
             ILogger<LocalSiloHealthMonitor> log,
             IOptions<ClusterMembershipOptions> clusterMembershipOptions,
             IAsyncTimerFactory timerFactory,
-            ILoggerFactory loggerFactory,
-            ProbeRequestMonitor probeRequestMonitor)
+            ILoggerFactory loggerFactory)
         {
             _healthCheckParticipants = healthCheckParticipants.ToList();
             _membershipTableManager = membershipTableManager;
-            _clusterHealthMonitor = clusterHealthMonitor;
+            _probeHealthMonitor = probeHealthMonitor;
             _localSiloDetails = localSiloDetails;
-            _lo = log;
-            _probeRequestMonitor = probeRequestMonitor;
+            _log = log;
             _clusterMembershipOptions = clusterMembershipOptions.Value;
             _degradationCheckTimer = timerFactory.Create(
                 _clusterMembershipOptions.LocalHealthDegradationMonitoringPeriod,
@@ -195,30 +190,11 @@ namespace Orleans.Runtime.MembershipService
 
         private int CheckReceivedProbeRequests(DateTime now, List<string>? complaints)
         {
-            // Have we received ping REQUESTS from other nodes?
-            var score = 0;
             var membershipSnapshot = _membershipTableManager.MembershipTableSnapshot;
-
-            // Only consider recency of the last received probe request if there is more than one other node.
-            // Otherwise, it may fail to vote another node dead in a one or two node cluster.
-            if (membershipSnapshot.ActiveNodeCount > 2)
+            var score = _probeHealthMonitor.CheckReceivedProbeRequests(now, membershipSnapshot.ActiveNodeCount, out var complaint);
+            if (complaint is not null)
             {
-                var sinceLastProbeRequest = _probeRequestMonitor.ElapsedSinceLastProbeRequest;
-                var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
-                if (!sinceLastProbeRequest.HasValue)
-                {
-                    LogNoProbeRequests();
-                    complaints?.Add("This silo has not received any probe requests");
-                    ++score;
-                }
-                else if (sinceLastProbeRequest.Value > recencyWindow)
-                {
-                    // This node has not received a successful ping response since the window began.
-                    var lastRequestTime = now - sinceLastProbeRequest.Value;
-                    LogNoRecentProbeRequest(lastRequestTime);
-                    complaints?.Add($"This silo has not received a probe request since {lastRequestTime}");
-                    ++score;
-                }
+                complaints?.Add(complaint);
             }
 
             return score;
@@ -226,37 +202,13 @@ namespace Orleans.Runtime.MembershipService
 
         private int CheckReceivedProbeResponses(DateTime now, List<string>? complaints)
         {
-            // Determine how recently the latest successful ping response was received.
-            var siloMonitors = _clusterHealthMonitor.SiloMonitors;
-            var elapsedSinceLastResponse = default(TimeSpan?);
-            foreach (var monitor in siloMonitors.Values)
+            var membershipSnapshot = _membershipTableManager.MembershipTableSnapshot;
+            // Use ActiveNodeCount - 1 as a proxy for monitored node count (we don't monitor ourselves)
+            var monitoredNodeCount = Math.Max(0, membershipSnapshot.ActiveNodeCount - 1);
+            var score = _probeHealthMonitor.CheckReceivedProbeResponses(now, monitoredNodeCount, out var complaint);
+            if (complaint is not null)
             {
-                var current = monitor.ElapsedSinceLastResponse;
-                if (current.HasValue && (!elapsedSinceLastResponse.HasValue || current.Value < elapsedSinceLastResponse.Value))
-                {
-                    elapsedSinceLastResponse = current.Value;
-                }
-            }
-
-            // Only consider recency of the last successful ping if this node is monitoring more than one other node.
-            // Otherwise, it may fail to vote another node dead in a one or two node cluster.
-            int score = 0;
-            if (siloMonitors.Count > 1)
-            {
-                var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
-                if (!elapsedSinceLastResponse.HasValue)
-                {
-                    LogNoProbeResponses();
-                    complaints?.Add("This silo has not received any successful probe responses");
-                    ++score;
-                }
-                else if (elapsedSinceLastResponse.Value > recencyWindow)
-                {
-                    // This node has not received a successful ping response since the window began.
-                    LogNoRecentProbeResponse(elapsedSinceLastResponse.Value);
-                    complaints?.Add($"This silo has not received a successful probe response since {elapsedSinceLastResponse.Value}");
-                    ++score;
-                }
+                complaints?.Add(complaint);
             }
 
             return score;
@@ -424,30 +376,6 @@ namespace Orleans.Runtime.MembershipService
             Message = "Could not find a membership entry for this silo"
         )]
         private partial void LogMembershipEntryNotFound();
-
-        [LoggerMessage(
-            Level = LogLevel.Warning,
-            Message = "This silo has not received any probe requests"
-        )]
-        private partial void LogNoProbeRequests();
-
-        [LoggerMessage(
-            Level = LogLevel.Warning,
-            Message = "This silo has not received a probe request since {LastProbeRequest}"
-        )]
-        private partial void LogNoRecentProbeRequest(DateTime lastProbeRequest);
-
-        [LoggerMessage(
-            Level = LogLevel.Warning,
-            Message = "This silo has not received any successful probe responses"
-        )]
-        private partial void LogNoProbeResponses();
-
-        [LoggerMessage(
-            Level = LogLevel.Warning,
-            Message = "This silo has not received a successful probe response since {LastSuccessfulResponse}"
-        )]
-        private partial void LogNoRecentProbeResponse(TimeSpan lastSuccessfulResponse);
 
         [LoggerMessage(
             Level = LogLevel.Warning,

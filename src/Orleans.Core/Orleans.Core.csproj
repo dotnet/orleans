@@ -8,6 +8,13 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="RapidCluster.Orleans" />
+    <InternalsVisibleTo Include="RapidCluster.Orleans.Aspire.Silo" />
+    <InternalsVisibleTo Include="RapidCluster.Orleans.EndToEnd.Silo" />
+  </ItemGroup>
+
   <ItemGroup>
     <Content Include="buildMultiTargeting\Microsoft.Orleans.Core.targets">
       <PackagePath>%(Identity)</PackagePath>
