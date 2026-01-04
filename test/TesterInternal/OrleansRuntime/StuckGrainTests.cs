@@ -92,12 +92,25 @@ namespace UnitTests.StuckGrainTests
             // Should complete now
             await task.WaitAsync(TimeSpan.FromSeconds(1));
 
-            // Advance virtual time past CollectionAge (2s) + CollectionQuantum (1s) to trigger activation collection
-            // With FakeTimeProvider, we must advance time manually for time-based operations to proceed
-            Fixture.SharedTimeProvider.Advance(TimeSpan.FromSeconds(5));
-            
-            // Brief yield to allow activation collection to run
-            await Task.Delay(100);
+            // Wait for the grain to be deactivated by activation collection.
+            // The ActivationCollector uses TimeProvider, so we need to advance FakeTimeProvider
+            // to trigger the collection loop. We advance time in a loop while waiting for the event.
+            var grainId = stuckGrain.GetGrainId();
+            var deadline = DateTime.UtcNow.AddSeconds(30);
+            while (DateTime.UtcNow < deadline)
+            {
+                // Advance virtual time past CollectionAge (2s) + CollectionQuantum (1s)
+                Fixture.SharedTimeProvider.Advance(TimeSpan.FromSeconds(1));
+                
+                // Brief yield to allow activation collection to run
+                await Task.Delay(10);
+                
+                // Check if grain was deactivated
+                if (!await cleaner.IsActivated(id))
+                {
+                    break;
+                }
+            }
 
             Assert.False(await cleaner.IsActivated(id), "Grain activation is supposed be garbage collected, but it is still running.");
         }
