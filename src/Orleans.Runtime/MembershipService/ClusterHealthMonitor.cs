@@ -17,13 +17,14 @@ namespace Orleans.Runtime.MembershipService
 {
     /// <summary>
     /// Responsible for ensuring that this silo monitors other silos in the cluster.
+    /// This is the default, probe-based implementation of <see cref="IClusterHealthMonitor"/>.
     /// </summary>
-    internal partial class ClusterHealthMonitor : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor.ITestAccessor, IDisposable, IAsyncDisposable
+    internal partial class ClusterHealthMonitor : IClusterHealthMonitor, ClusterHealthMonitor.ITestAccessor, IDisposable, IAsyncDisposable
     {
         private readonly CancellationTokenSource shutdownCancellation = new CancellationTokenSource();
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly IServiceProvider serviceProvider;
-        private readonly MembershipTableManager membershipService;
+        private readonly IMembershipManager membershipManager;
         private readonly ILogger<ClusterHealthMonitor> log;
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly IOptionsMonitor<ClusterMembershipOptions> clusterMembershipOptions;
@@ -45,7 +46,7 @@ namespace Orleans.Runtime.MembershipService
 
         public ClusterHealthMonitor(
             ILocalSiloDetails localSiloDetails,
-            MembershipTableManager membershipService,
+            IMembershipManager membershipManager,
             ILogger<ClusterHealthMonitor> log,
             IOptionsMonitor<ClusterMembershipOptions> clusterMembershipOptions,
             IFatalErrorHandler fatalErrorHandler,
@@ -53,7 +54,7 @@ namespace Orleans.Runtime.MembershipService
         {
             this.localSiloDetails = localSiloDetails;
             this.serviceProvider = serviceProvider;
-            this.membershipService = membershipService;
+            this.membershipManager = membershipManager;
             this.log = log;
             this.fatalErrorHandler = fatalErrorHandler;
             this.clusterMembershipOptions = clusterMembershipOptions;
@@ -77,7 +78,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 LogDebugStartingToProcessMembershipUpdates(log);
-                await foreach (var tableSnapshot in this.membershipService.MembershipTableUpdates.WithCancellation(this.shutdownCancellation.Token))
+                await foreach (var tableSnapshot in this.membershipManager.MembershipUpdates.WithCancellation(this.shutdownCancellation.Token))
                 {
                     var utcNow = DateTime.UtcNow;
 
@@ -130,9 +131,9 @@ namespace Orleans.Runtime.MembershipService
                     try
                     {
                         LogDebugStaleSiloFound(log);
-                        await this.membershipService.TryToSuspectOrKill(member.Key);
+                        await this.membershipManager.TrySuspectSilo(member.Key);
                     }
-                    catch(Exception exception)
+                    catch (Exception exception)
                     {
                         LogErrorTryToSuspectOrKillFailed(log, exception, member.Value.SiloAddress, member.Value.Status);
                     }
@@ -315,12 +316,12 @@ namespace Orleans.Runtime.MembershipService
             {
                 if (probeResult.Status == ProbeResultStatus.Failed && probeResult.FailedProbeCount >= this.clusterMembershipOptions.CurrentValue.NumMissedProbesLimit)
                 {
-                    await this.membershipService.TryToSuspectOrKill(monitor.TargetSiloAddress).ConfigureAwait(false);
+                    await this.membershipManager.TrySuspectSilo(monitor.TargetSiloAddress).ConfigureAwait(false);
                 }
             }
             else if (probeResult.Status == ProbeResultStatus.Failed)
             {
-                await this.membershipService.TryToSuspectOrKill(monitor.TargetSiloAddress, probeResult.Intermediary).ConfigureAwait(false);
+                await this.membershipManager.TrySuspectSilo(monitor.TargetSiloAddress, probeResult.Intermediary).ConfigureAwait(false);
             }
         }
 

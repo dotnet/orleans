@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
-using Microsoft.Extensions.Logging;
-using Orleans.Configuration;
-using System.Threading.Tasks;
-using System.Threading;
-using Microsoft.Extensions.Options;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Internal;
 
 namespace Orleans.Runtime.MembershipService
@@ -19,7 +19,7 @@ namespace Orleans.Runtime.MembershipService
         private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MAX = TimeSpan.FromMinutes(2);
         private static readonly TimeSpan EXP_BACKOFF_STEP = TimeSpan.FromMilliseconds(1000);
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
-        private readonly MembershipTableManager tableManager;
+        private readonly IMembershipManager membershipManager;
         private readonly ILocalSiloDetails localSilo;
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly ClusterMembershipOptions clusterMembershipOptions;
@@ -29,7 +29,7 @@ namespace Orleans.Runtime.MembershipService
         private Func<DateTime> getUtcDateTime = () => DateTime.UtcNow;
 
         public MembershipAgent(
-            MembershipTableManager tableManager,
+            IMembershipManager membershipManager,
             ILocalSiloDetails localSilo,
             IFatalErrorHandler fatalErrorHandler,
             IOptions<ClusterMembershipOptions> options,
@@ -37,7 +37,7 @@ namespace Orleans.Runtime.MembershipService
             IAsyncTimerFactory timerFactory,
             IRemoteSiloProber siloProber)
         {
-            this.tableManager = tableManager;
+            this.membershipManager = membershipManager;
             this.localSilo = localSilo;
             this.fatalErrorHandler = fatalErrorHandler;
             this.clusterMembershipOptions = options.Value;
@@ -66,13 +66,13 @@ namespace Orleans.Runtime.MembershipService
                 TimeSpan? overrideDelayPeriod = RandomTimeSpan.Next(this.clusterMembershipOptions.IAmAliveTablePublishTimeout);
                 var exponentialBackoff = new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP);
                 var runningFailures = 0;
-                while (await this.iAmAliveTimer.NextTick(overrideDelayPeriod) && !this.tableManager.CurrentStatus.IsTerminating())
+                while (await this.iAmAliveTimer.NextTick(overrideDelayPeriod) && !this.membershipManager.LocalSiloStatus.IsTerminating())
                 {
                     try
                     {
                         var stopwatch = ValueStopwatch.StartNew();
                         ((ITestAccessor)this).OnUpdateIAmAlive?.Invoke();
-                        await this.tableManager.UpdateIAmAlive();
+                        await this.membershipManager.UpdateIAmAlive();
                         LogTraceUpdatingIAmAliveTook(stopwatch.Elapsed);
                         overrideDelayPeriod = default;
                         runningFailures = 0;
@@ -128,7 +128,7 @@ namespace Orleans.Runtime.MembershipService
                 try
                 {
                     var activeSilos = new List<SiloAddress>();
-                    foreach (var item in this.tableManager.MembershipTableSnapshot.Entries)
+                    foreach (var item in this.membershipManager.CurrentSnapshot.Entries)
                     {
                         var entry = item.Value;
                         if (entry.Status != SiloStatus.Active) continue;
@@ -157,7 +157,7 @@ namespace Orleans.Runtime.MembershipService
 
                     // Refresh membership after some delay and retry.
                     await Task.Delay(TimeSpan.FromSeconds(5));
-                    await this.tableManager.Refresh();
+                    await this.membershipManager.Refresh();
                 }
                 catch (Exception exception) when (canContinue)
                 {
@@ -283,7 +283,7 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task UpdateStatus(SiloStatus status)
         {
-            await this.tableManager.UpdateStatus(status);
+            await this.membershipManager.UpdateLocalStatus(status);
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
