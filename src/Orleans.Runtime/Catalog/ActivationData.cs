@@ -68,9 +68,6 @@ internal sealed partial class ActivationData :
 
     private Activity? _activationActivity;
 
-    // Note: This must be static, since the activity source is used to trace across process boundaries, and thus it cannot be tied to the lifetime of an individual activation.
-    private static readonly ActivitySource DirectoryActivitySource = new("Microsoft.Orleans.Runtime.Directory", "1.0.0");
-
     public ActivationData(
         GrainAddress grainAddress,
         Func<IGrainContext, WorkItemGroup> createWorkItemGroup,
@@ -1490,7 +1487,10 @@ internal sealed partial class ActivationData :
         {
             if (IsUsingGrainDirectory)
             {
-                Activity? registerSpan = DirectoryActivitySource.StartActivity("orleans.directory.register", ActivityKind.Client);
+                // Start directory registration activity as a child of the activation activity
+                Activity? registerSpan = _activationActivity is not null
+                    ? ActivitySources.RuntimeGrainSource.StartActivity("orleans.directory.register", ActivityKind.Client, _activationActivity.Context)
+                    : ActivitySources.RuntimeGrainSource.StartActivity("orleans.directory.register", ActivityKind.Client);
                 registerSpan?.SetTag("orleans.grain.id", GrainId.ToString());
                 registerSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
                 registerSpan?.SetTag("orleans.activation.id", ActivationId.ToString());
@@ -1607,6 +1607,15 @@ internal sealed partial class ActivationData :
 
                 if (GrainInstance is IGrainBase grainBase)
                 {
+                    // Start a span for OnActivateAsync execution
+                    using var onActivateSpan = _activationActivity is not null
+                        ? ActivitySources.RuntimeGrainSource.StartActivity("orleans.activation.on-activate", ActivityKind.Internal, _activationActivity.Context)
+                        : ActivitySources.RuntimeGrainSource.StartActivity("orleans.activation.on-activate", ActivityKind.Internal);
+                    onActivateSpan?.SetTag("orleans.grain.id", GrainId.ToString());
+                    onActivateSpan?.SetTag("orleans.grain.type", _shared.GrainTypeName ?? GrainInstance.GetType().FullName);
+                    onActivateSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
+                    onActivateSpan?.SetTag("orleans.activation.id", ActivationId.ToString());
+
                     try
                     {
                         _activationActivity?.AddEvent(new ActivityEvent("on-activate-start"));
@@ -1615,6 +1624,9 @@ internal sealed partial class ActivationData :
                     }
                     catch (Exception exception)
                     {
+                        onActivateSpan?.SetStatus(ActivityStatusCode.Error);
+                        onActivateSpan?.SetTag("exception.type", exception.GetType().FullName);
+                        onActivateSpan?.SetTag("exception.message", exception.Message);
                         LogErrorInGrainMethod(_shared.Logger, exception, nameof(IGrainBase.OnActivateAsync), this);
                         _activationActivity?.AddEvent(new ActivityEvent("on-activate-failed"));
                         throw;

@@ -1,9 +1,5 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
@@ -14,7 +10,9 @@ namespace Orleans.Runtime
 {
     internal sealed partial class Catalog : SystemTarget, ICatalog, ILifecycleParticipant<ISiloLifecycle>
     {
-        private static readonly ActivitySource ActivationActivitySource = new("Microsoft.Orleans.Runtime.Activation", "1.0.0");
+        private const string TraceParentHeaderName = "traceparent";
+        private const string TraceStateHeaderName = "tracestate";
+
         private readonly SiloAddress _siloAddress;
         private readonly ActivationCollector activationCollector;
         private readonly GrainDirectoryResolver grainDirectoryResolver;
@@ -171,8 +169,11 @@ namespace Orleans.Runtime
                 return UnableToCreateActivation(this, grainId);
             }
 
-            // Start activation span and attach to ActivationData for lifecycle events
-            Activity? activationActivity = ActivationActivitySource.StartActivity("orleans.activation", ActivityKind.Internal);
+            // Start activation span with parent context from request if available
+            var parentContext = TryGetActivityContext(requestContextData);
+            Activity? activationActivity = parentContext.HasValue
+                ? ActivitySources.RuntimeGrainSource.StartActivity("orleans.activation", ActivityKind.Internal, parentContext.Value)
+                : ActivitySources.RuntimeGrainSource.StartActivity("orleans.activation", ActivityKind.Internal);
             if (activationActivity is not null)
             {
                 activationActivity.SetTag("orleans.grain.id", grainId.ToString());
@@ -450,5 +451,35 @@ namespace Orleans.Runtime
         )]
         private partial void LogFailedToUnregisterNonExistingActivation(GrainAddress address, Exception exception);
 
+        /// <summary>
+        /// Extracts an ActivityContext from request context data if present.
+        /// </summary>
+        private static ActivityContext? TryGetActivityContext(Dictionary<string, object>? requestContextData)
+        {
+            if (requestContextData is not { Count: > 0 })
+            {
+                return null;
+            }
+
+            string? traceParent = null;
+            string? traceState = null;
+
+            if (requestContextData.TryGetValue(TraceParentHeaderName, out var traceParentObj) && traceParentObj is string tp)
+            {
+                traceParent = tp;
+            }
+
+            if (requestContextData.TryGetValue(TraceStateHeaderName, out var traceStateObj) && traceStateObj is string ts)
+            {
+                traceState = ts;
+            }
+
+            if (!string.IsNullOrEmpty(traceParent) && ActivityContext.TryParse(traceParent, traceState, isRemote: true, out var parentContext))
+            {
+                return parentContext;
+            }
+
+            return null;
+        }
     }
 }

@@ -21,6 +21,8 @@ namespace Orleans.Runtime.Placement
     /// </summary>
     internal partial class PlacementService : IPlacementContext
     {
+        private const string TraceParentHeaderName = "traceparent";
+        private const string TraceStateHeaderName = "tracestate";
         private const int PlacementWorkerCount = 16;
         private readonly PlacementStrategyResolver _strategyResolver;
         private readonly PlacementDirectorResolver _directorResolver;
@@ -124,6 +126,14 @@ namespace Orleans.Runtime.Placement
                 foreach (var placementFilter in filters)
                 {
                     var director = _placementFilterDirectoryResolver.GetFilterDirector(placementFilter);
+
+                    // Create a span for each filter invocation
+                    using var filterSpan = ActivitySources.RuntimeGrainSource.StartActivity(
+                        "orleans.placement.filter",
+                        ActivityKind.Internal);
+                    filterSpan?.SetTag("orleans.placement.filter.type", placementFilter.GetType().Name);
+                    filterSpan?.SetTag("orleans.grain.type", grainType.ToString());
+
                     filteredSilos = director.Filter(placementFilter, target, filteredSilos);
                 }
 
@@ -367,6 +377,11 @@ namespace Orleans.Runtime.Placement
             private async Task<SiloAddress> GetOrPlaceActivationAsync(Message firstMessage)
             {
                 await Task.Yield();
+
+                // Restore activity context from the message's request context data
+                // This ensures directory lookups are properly traced as children of the original request
+                using var restoredActivity = TryRestoreActivityContext(firstMessage.RequestContextData, "orleans.placement");
+
                 var target = new PlacementTarget(
                     firstMessage.TargetGrain,
                     firstMessage.RequestContextData,
@@ -401,6 +416,38 @@ namespace Orleans.Runtime.Placement
 
                 public Task<SiloAddress> Result { get; set; }
             }
+        }
+
+        /// <summary>
+        /// Attempts to restore the parent activity context from request context data.
+        /// </summary>
+        private static Activity TryRestoreActivityContext(Dictionary<string, object> requestContextData, string operationName)
+        {
+            if (requestContextData is not { Count: > 0 })
+            {
+                return null;
+            }
+
+            string traceParent = null;
+            string traceState = null;
+
+            if (requestContextData.TryGetValue(TraceParentHeaderName, out var traceParentObj) && traceParentObj is string tp)
+            {
+                traceParent = tp;
+            }
+
+            if (requestContextData.TryGetValue(TraceStateHeaderName, out var traceStateObj) && traceStateObj is string ts)
+            {
+                traceState = ts;
+            }
+
+            if (!string.IsNullOrEmpty(traceParent) && ActivityContext.TryParse(traceParent, traceState, isRemote: true, out var parentContext))
+            {
+                // Start the activity from the Catalog's ActivitySource to properly associate it with activation tracing
+                return ActivitySources.RuntimeGrainSource.StartActivity(operationName, ActivityKind.Internal, parentContext);
+            }
+
+            return null;
         }
 
         [LoggerMessage(

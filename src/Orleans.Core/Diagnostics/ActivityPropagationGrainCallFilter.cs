@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
@@ -10,21 +7,13 @@ namespace Orleans.Runtime
     /// </summary>
     internal abstract class ActivityPropagationGrainCallFilter
     {
-        protected const string TraceParentHeaderName = "traceparent";
-        protected const string TraceStateHeaderName = "tracestate";
-
         internal const string RpcSystem = "orleans";
         internal const string OrleansNamespacePrefix = "Orleans";
-        internal const string ApplicationGrainActivitySourceName = "Microsoft.Orleans.Application";
-        internal const string RuntimeActivitySourceName = "Microsoft.Orleans.Runtime";
-
-        protected static readonly ActivitySource ApplicationGrainSource = new(ApplicationGrainActivitySourceName, "1.0.0");
-        protected static readonly ActivitySource RuntimeGrainSource = new(RuntimeActivitySourceName, "1.0.0");
 
         protected static ActivitySource GetActivitySource(IGrainCallContext context) =>
             context.Request.GetInterfaceType().Namespace?.StartsWith(OrleansNamespacePrefix) == true
-                ? RuntimeGrainSource
-                : ApplicationGrainSource;
+                ? ActivitySources.RuntimeGrainSource
+                : ActivitySources.ApplicationGrainSource;
 
         protected static void GetRequestContextValue(object carrier, string fieldName, out string fieldValue, out IEnumerable<string> fieldValues)
         {
@@ -80,6 +69,16 @@ namespace Orleans.Runtime
                 activity?.Stop();
             }
         }
+    }
+
+    public static class ActivitySources
+    {
+        public static string ApplicationGrainActivitySourceName = "Microsoft.Orleans.Application";
+        public static string RuntimeActivitySourceName = "Microsoft.Orleans.Runtime";
+
+        internal static readonly ActivitySource ApplicationGrainSource = new(ApplicationGrainActivitySourceName, "1.0.0");
+        internal static readonly ActivitySource RuntimeGrainSource = new(RuntimeActivitySourceName, "1.0.0");
+
     }
 
     /// <summary>

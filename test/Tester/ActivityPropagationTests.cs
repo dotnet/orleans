@@ -31,7 +31,7 @@ namespace UnitTests.General
             // This listener specifically targets activities created by Orleans for grain calls
             Listener = new()
             {
-                ShouldListenTo = p => p.Name == ActivityPropagationGrainCallFilter.ApplicationGrainActivitySourceName,
+                ShouldListenTo = p => p.Name == ActivitySources.ApplicationGrainActivitySourceName || p.Name == ActivitySources.RuntimeActivitySourceName,
                 Sample = Sample,
                 SampleUsingParentId = SampleUsingParentId,
             };
