@@ -91,6 +91,15 @@ internal sealed partial class ActivationData :
         _activationActivity = activity;
     }
 
+    /// <summary>
+    /// Gets the activity context for the activation activity, if available.
+    /// This allows child activities to be properly parented during activation lifecycle operations.
+    /// </summary>
+    internal ActivityContext? GetActivationActivityContext()
+    {
+        return _activationActivity?.Context;
+    }
+
     public void Start(IGrainActivator grainActivator)
     {
         Debug.Assert(Equals(ActivationTaskScheduler, TaskScheduler.Current));
