@@ -37,7 +37,7 @@ public static class ServiceCollectionExtensions
     /// <returns>The silo builder for method chaining.</returns>
     public static ISiloBuilder AddDashboard(this ISiloBuilder siloBuilder, Action<DashboardOptions>? configureOptions = null)
     {
-        siloBuilder.Services.AddOrleansDashboardForSiloCore();
+        siloBuilder.Services.AddOrleansDashboardForSiloCore(configureOptions);
         return siloBuilder;
     }
 
@@ -100,13 +100,24 @@ public static class ServiceCollectionExtensions
         // Create static assets provider
         var assets = endpoints.ServiceProvider.GetService<EmbeddedAssetProvider>()
             ?? throw new InvalidOperationException("Orleans Dashboard services have not been registered. " +
-                "Please call AddServicesForSelfHostedDashboard or AddOrleansDashboard on the IServiceCollection.");
+                "Please call AddDashboard on ISiloBuilder or AddOrleansDashboard on IClientBuilder.");
 
         // Create a route group for all dashboard endpoints
         var group = endpoints.MapGroup(routePrefix ?? "");
 
         // Static assets - these match the paths referenced in the built CSS/HTML
-        group.MapGet("/", (HttpContext ctx) => assets.ServeAsset("index.html", ctx));
+        // When a routePrefix is specified, redirect requests without trailing slash to include it.
+        // This ensures relative asset paths (like index.min.js) resolve correctly.
+        group.MapGet("/", (HttpContext ctx) =>
+        {
+            if (!string.IsNullOrEmpty(routePrefix) && ctx.Request.Path.Value?.EndsWith('/') == false)
+            {
+                // Redirect to the same path with a trailing slash, preserving the query string
+                var redirectUrl = $"{ctx.Request.PathBase}{ctx.Request.Path}/{ctx.Request.QueryString}";
+                return Results.Redirect(redirectUrl, permanent: true);
+            }
+            return assets.ServeAsset("index.html", ctx);
+        });
         group.MapGet("/index.html", (HttpContext ctx) => assets.ServeAsset("index.html", ctx));
         group.MapGet("/favicon.ico", (HttpContext ctx) => assets.ServeAsset("favicon.ico", ctx));
         group.MapGet("/index.min.js", (HttpContext ctx) => assets.ServeAsset("index.min.js", ctx));
@@ -341,6 +352,7 @@ public static class ServiceCollectionExtensions
     /// <returns>The service collection for method chaining.</returns>
     public static IClientBuilder AddOrleansDashboard(this IClientBuilder clientBuilder, Action<DashboardOptions>? configureOptions = null)
     {
+        clientBuilder.Services.Configure(configureOptions ?? (x => { }));
         clientBuilder.Services.AddSingleton<DashboardLogger>();
         clientBuilder.Services.AddFromExisting<ILoggerProvider, DashboardLogger>();
         clientBuilder.Services.AddSingleton<IDashboardClient, DashboardClient>();
