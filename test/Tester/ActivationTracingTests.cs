@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Placement;
+using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -141,6 +142,53 @@ namespace UnitTests.General
                 {
                     Assert.Equal(testParentTraceId, registerSpan.TraceId.ToString());
                 }
+            }
+            finally
+            {
+                parent.Stop();
+                PrintActivityDiagnostics();
+            }
+        }
+
+        [Fact]
+        [TestCategory("BVT")]
+        public async Task PersistentStateReadSpanIsCreatedDuringActivation()
+        {
+            Started.Clear();
+
+            using var parent = new Activity("test-parent-storage");
+            parent.Start();
+            try
+            {
+                var grain = _fixture.GrainFactory.GetGrain<IPersistentStateActivityGrain>(Random.Shared.Next());
+                // First call should force activation which triggers state read
+                var _ = await grain.GetActivityId();
+
+                // Expect at least one activation-related activity
+                var activationActivities = Started.Where(a => a.Source.Name == ActivationSourceName).ToList();
+                Assert.True(activationActivities.Count > 0, "Expected activation tracing activity to be created, but none were observed.");
+
+                // Verify all expected spans are present and properly parented under test-parent
+                var testParentTraceId = parent.TraceId.ToString();
+
+                // Find the activation span - should be parented to the grain call which is parented to test-parent
+                var activationSpan = Started.FirstOrDefault(a => a.OperationName == "orleans.activation" && a.Tags.First(kv => kv.Key == "orleans.grain.type").Value == "persistentstateactivity");
+                Assert.NotNull(activationSpan);
+                Assert.Equal(testParentTraceId, activationSpan.TraceId.ToString());
+
+                // Find the storage read span - should share the same trace ID as test-parent
+                var storageReadSpan = Started.FirstOrDefault(a => a.OperationName == "orleans.storage.read");
+                Assert.NotNull(storageReadSpan);
+                Assert.Equal(testParentTraceId, storageReadSpan.TraceId.ToString());
+
+                // Verify storage read span has expected tags
+                Assert.Equal("MemoryGrainStorage", storageReadSpan.Tags.FirstOrDefault(t => t.Key == "orleans.storage.provider").Value);
+                Assert.Equal("state", storageReadSpan.Tags.FirstOrDefault(t => t.Key == "orleans.storage.state.name").Value);
+                Assert.Equal("PersistentStateActivityGrainState", storageReadSpan.Tags.FirstOrDefault(t => t.Key == "orleans.storage.state.type").Value);
+
+                // Verify the grain ID tag is present
+                var grainIdTag = storageReadSpan.Tags.FirstOrDefault(t => t.Key == "orleans.grain.id").Value;
+                Assert.NotNull(grainIdTag);
             }
             finally
             {
@@ -315,6 +363,67 @@ namespace UnitTests.General
             };
 
             return Task.FromResult(result);
+        }
+    }
+
+    #endregion
+
+    #region Test Grain with Persistent State for Tracing
+
+    /// <summary>
+    /// Test grain interface with persistent state for tracing tests.
+    /// </summary>
+    public interface IPersistentStateActivityGrain : IGrainWithIntegerKey
+    {
+        Task<ActivityData> GetActivityId();
+        Task<int> GetStateValue();
+    }
+
+    /// <summary>
+    /// Test grain state for persistent state tracing tests.
+    /// </summary>
+    [GenerateSerializer]
+    public class PersistentStateActivityGrainState
+    {
+        [Id(0)]
+        public int Value { get; set; }
+    }
+
+    /// <summary>
+    /// Test grain implementation with persistent state for tracing tests.
+    /// </summary>
+    [TracingTestPlacementFilter]
+    public class PersistentStateActivityGrain : Grain, IPersistentStateActivityGrain
+    {
+        private readonly IPersistentState<PersistentStateActivityGrainState> _state;
+
+        public PersistentStateActivityGrain(
+            [PersistentState("state")] IPersistentState<PersistentStateActivityGrainState> state)
+        {
+            _state = state;
+        }
+
+        public Task<ActivityData> GetActivityId()
+        {
+            var activity = Activity.Current;
+            if (activity is null)
+            {
+                return Task.FromResult(default(ActivityData));
+            }
+
+            var result = new ActivityData()
+            {
+                Id = activity.Id,
+                TraceState = activity.TraceStateString,
+                Baggage = activity.Baggage.ToList(),
+            };
+
+            return Task.FromResult(result);
+        }
+
+        public Task<int> GetStateValue()
+        {
+            return Task.FromResult(_state.State.Value);
         }
     }
 
