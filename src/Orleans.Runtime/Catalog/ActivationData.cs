@@ -1205,11 +1205,22 @@ internal sealed partial class ActivationData :
         {
             LogRehydratingGrain(_shared.Logger, this);
 
+            // Start a span for rehydration
+            using var rehydrateSpan = _activationActivity is not null
+                ? ActivitySources.RuntimeGrainSource.StartActivity("orleans.activation.rehydrate", ActivityKind.Internal, _activationActivity.Context)
+                : ActivitySources.RuntimeGrainSource.StartActivity("orleans.activation.rehydrate", ActivityKind.Internal);
+            rehydrateSpan?.SetTag("orleans.grain.id", GrainId.ToString());
+            rehydrateSpan?.SetTag("orleans.grain.type", _shared.GrainTypeName);
+            rehydrateSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
+            rehydrateSpan?.SetTag("orleans.activation.id", ActivationId.ToString());
+
             lock (this)
             {
                 if (State != ActivationState.Creating)
                 {
                     LogIgnoringRehydrateAttempt(_shared.Logger, this, State);
+                    rehydrateSpan?.SetTag("orleans.rehydrate.ignored", true);
+                    rehydrateSpan?.SetTag("orleans.rehydrate.ignored.reason", $"State is {State}");
                     return;
                 }
 
@@ -1217,6 +1228,7 @@ internal sealed partial class ActivationData :
                 {
                     PreviousRegistration = previousRegistration;
                     LogPreviousActivationAddress(_shared.Logger, previousRegistration);
+                    rehydrateSpan?.SetTag("orleans.rehydrate.previousRegistration", previousRegistration.ToFullString());
                 }
 
                 if (_lifecycle is { } lifecycle)
@@ -1231,6 +1243,7 @@ internal sealed partial class ActivationData :
             }
 
             LogRehydratedGrain(_shared.Logger);
+            rehydrateSpan?.AddEvent(new ActivityEvent("rehydrated"));
         }
         catch (Exception exception)
         {
@@ -1241,6 +1254,22 @@ internal sealed partial class ActivationData :
     private void OnDehydrate(IDehydrationContext context)
     {
         LogDehydratingActivation(_shared.Logger);
+
+        // Get the parent activity context from the dehydration context holder (captured when migration was initiated)
+        var parentContext = DehydrationContext?.MigrationActivityContext;
+
+        // Start a span for dehydration, parented to the migration request that triggered it
+        using var dehydrateSpan = parentContext.HasValue
+            ? ActivitySources.RuntimeGrainSource.StartActivity("orleans.activation.dehydrate", ActivityKind.Internal, parentContext.Value)
+            : ActivitySources.RuntimeGrainSource.StartActivity("orleans.activation.dehydrate", ActivityKind.Internal);
+        dehydrateSpan?.SetTag("orleans.grain.id", GrainId.ToString());
+        dehydrateSpan?.SetTag("orleans.grain.type", _shared.GrainTypeName);
+        dehydrateSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
+        dehydrateSpan?.SetTag("orleans.activation.id", ActivationId.ToString());
+        if (ForwardingAddress is { } fwd)
+        {
+            dehydrateSpan?.SetTag("orleans.migration.target.silo", fwd.ToString());
+        }
 
         lock (this)
         {
@@ -1267,10 +1296,14 @@ internal sealed partial class ActivationData :
             catch (Exception exception)
             {
                 LogErrorDehydratingActivation(_shared.Logger, exception);
+                dehydrateSpan?.SetStatus(ActivityStatusCode.Error);
+                dehydrateSpan?.SetTag("exception.type", exception.GetType().FullName);
+                dehydrateSpan?.SetTag("exception.message", exception.Message);
             }
         }
 
         LogDehydratedActivation(_shared.Logger);
+        dehydrateSpan?.AddEvent(new ActivityEvent("dehydrated"));
     }
 
     /// <summary>
@@ -2230,6 +2263,12 @@ internal sealed partial class ActivationData :
     {
         public readonly MigrationContext MigrationContext = new(sessionPool);
         public readonly Dictionary<string, object>? RequestContext = requestContext;
+        
+        /// <summary>
+        /// The activity context from the grain call that initiated the migration.
+        /// This is used to parent the dehydrate span to the migration request trace.
+        /// </summary>
+        public ActivityContext? MigrationActivityContext { get; set; } = Activity.Current?.Context;
     }
 
     [LoggerMessage(
