@@ -196,52 +196,96 @@ namespace UnitTests.TimerTests
 
         /// <summary>
         /// Polling-based waiting: repeatedly checks the tick count with delays.
+        /// Handles communication exceptions gracefully (e.g., when a silo is killed during failure tests).
         /// </summary>
         private async Task<int> WaitForReminderTickCountWithPollingAsync(IReminderTestGrain2 grain, string reminderName, int expectedCount, TimeSpan timeout)
         {
             var deadline = DateTime.UtcNow + timeout;
+            int lastKnownCount = 0;
             while (DateTime.UtcNow < deadline)
             {
-                var count = await grain.GetReminderTickCount(reminderName);
-                if (count >= expectedCount)
+                try
                 {
-                    log.LogInformation("WaitForReminderTickCount (polling): {ReminderName} reached {Count} ticks (expected {Expected})", 
-                        reminderName, count, expectedCount);
-                    return count;
+                    var count = await grain.GetReminderTickCount(reminderName);
+                    lastKnownCount = count;
+                    if (count >= expectedCount)
+                    {
+                        log.LogInformation("WaitForReminderTickCount (polling): {ReminderName} reached {Count} ticks (expected {Expected})", 
+                            reminderName, count, expectedCount);
+                        return count;
+                    }
+                }
+                catch (Exception ex) when (ex is TimeoutException || ex is OrleansMessageRejectionException || ex.InnerException is TimeoutException)
+                {
+                    // During failure tests, the grain's silo might be killed. The grain will re-activate
+                    // on another silo, so we just continue polling. Log at debug level to avoid noise.
+                    log.LogDebug(ex, "WaitForReminderTickCount (polling): Communication error while checking {ReminderName}, will retry", reminderName);
                 }
 
                 await Task.Delay(TimeSpan.FromMilliseconds(500));
             }
 
-            var finalCount = await grain.GetReminderTickCount(reminderName);
-            log.LogWarning("WaitForReminderTickCount (polling): {ReminderName} timed out with {Count} ticks (expected {Expected})", 
-                reminderName, finalCount, expectedCount);
-            return finalCount;
+            // Final attempt to get count
+            try
+            {
+                var finalCount = await grain.GetReminderTickCount(reminderName);
+                log.LogWarning("WaitForReminderTickCount (polling): {ReminderName} timed out with {Count} ticks (expected {Expected})", 
+                    reminderName, finalCount, expectedCount);
+                return finalCount;
+            }
+            catch (Exception ex) when (ex is TimeoutException || ex is OrleansMessageRejectionException || ex.InnerException is TimeoutException)
+            {
+                log.LogWarning(ex, "WaitForReminderTickCount (polling): {ReminderName} timed out and final check failed. Last known count: {LastKnown} (expected {Expected})", 
+                    reminderName, lastKnownCount, expectedCount);
+                return lastKnownCount;
+            }
         }
 
         /// <summary>
         /// Polling-based waiting: repeatedly checks the tick count with delays.
+        /// Handles communication exceptions gracefully (e.g., when a silo is killed during failure tests).
         /// </summary>
         private async Task<int> WaitForReminderTickCountWithPollingAsync(IReminderTestCopyGrain grain, string reminderName, int expectedCount, TimeSpan timeout)
         {
             var deadline = DateTime.UtcNow + timeout;
+            int lastKnownCount = 0;
             while (DateTime.UtcNow < deadline)
             {
-                var count = await grain.GetReminderTickCount(reminderName);
-                if (count >= expectedCount)
+                try
                 {
-                    log.LogInformation("WaitForReminderTickCount (polling): {ReminderName} reached {Count} ticks (expected {Expected})", 
-                        reminderName, count, expectedCount);
-                    return count;
+                    var count = await grain.GetReminderTickCount(reminderName);
+                    lastKnownCount = count;
+                    if (count >= expectedCount)
+                    {
+                        log.LogInformation("WaitForReminderTickCount (polling): {ReminderName} reached {Count} ticks (expected {Expected})", 
+                            reminderName, count, expectedCount);
+                        return count;
+                    }
+                }
+                catch (Exception ex) when (ex is TimeoutException || ex is OrleansMessageRejectionException || ex.InnerException is TimeoutException)
+                {
+                    // During failure tests, the grain's silo might be killed. The grain will re-activate
+                    // on another silo, so we just continue polling. Log at debug level to avoid noise.
+                    log.LogDebug(ex, "WaitForReminderTickCount (polling): Communication error while checking {ReminderName}, will retry", reminderName);
                 }
 
                 await Task.Delay(TimeSpan.FromMilliseconds(500));
             }
 
-            var finalCount = await grain.GetReminderTickCount(reminderName);
-            log.LogWarning("WaitForReminderTickCount (polling): {ReminderName} timed out with {Count} ticks (expected {Expected})", 
-                reminderName, finalCount, expectedCount);
-            return finalCount;
+            // Final attempt to get count
+            try
+            {
+                var finalCount = await grain.GetReminderTickCount(reminderName);
+                log.LogWarning("WaitForReminderTickCount (polling): {ReminderName} timed out with {Count} ticks (expected {Expected})", 
+                    reminderName, finalCount, expectedCount);
+                return finalCount;
+            }
+            catch (Exception ex) when (ex is TimeoutException || ex is OrleansMessageRejectionException || ex.InnerException is TimeoutException)
+            {
+                log.LogWarning(ex, "WaitForReminderTickCount (polling): {ReminderName} timed out and final check failed. Last known count: {LastKnown} (expected {Expected})", 
+                    reminderName, lastKnownCount, expectedCount);
+                return lastKnownCount;
+            }
         }
 
         /// <summary>

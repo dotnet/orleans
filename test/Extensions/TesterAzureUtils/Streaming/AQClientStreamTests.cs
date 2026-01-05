@@ -76,9 +76,14 @@ namespace Tester.AzureUtils.Streaming
             try
             {
                 TestUtils.CheckForAzureStorage();
-                var serviceId = this.HostedCluster.Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
-                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(serviceId, AQStreamProviderName),
-                    new AzureQueueOptions().ConfigureTestDefaults());
+                // Guard against null client (e.g., if test failed during initialization)
+                var client = this.HostedCluster?.Client;
+                if (client != null)
+                {
+                    var serviceId = client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
+                    await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(serviceId, AQStreamProviderName),
+                        new AzureQueueOptions().ConfigureTestDefaults());
+                }
                 await TestAzureTableStorageStreamFailureHandler.DeleteAll();
             }
             catch (SkipException)
