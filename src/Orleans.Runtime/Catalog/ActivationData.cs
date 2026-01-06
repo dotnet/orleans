@@ -1201,18 +1201,26 @@ internal sealed partial class ActivationData :
 
     private void RehydrateInternal(IRehydrationContext context)
     {
+        Activity? rehydrateSpan = null;
         try
         {
             LogRehydratingGrain(_shared.Logger, this);
 
-            // Start a span for rehydration
-            using var rehydrateSpan = _activationActivity is not null
-                ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivationRehydrate, ActivityKind.Internal, _activationActivity.Context)
-                : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivationRehydrate, ActivityKind.Internal);
-            rehydrateSpan?.SetTag("orleans.grain.id", GrainId.ToString());
-            rehydrateSpan?.SetTag("orleans.grain.type", _shared.GrainTypeName);
-            rehydrateSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
-            rehydrateSpan?.SetTag("orleans.activation.id", ActivationId.ToString());
+            var grainMigrationParticipant = GrainInstance as IGrainMigrationParticipant;
+
+            if (grainMigrationParticipant is not null)
+            {
+                // Start a span for rehydration
+                rehydrateSpan = _activationActivity is not null
+                    ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivationRehydrate,
+                        ActivityKind.Internal, _activationActivity.Context)
+                    : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivationRehydrate,
+                        ActivityKind.Internal);
+                rehydrateSpan?.SetTag("orleans.grain.id", GrainId.ToString());
+                rehydrateSpan?.SetTag("orleans.grain.type", _shared.GrainTypeName);
+                rehydrateSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
+                rehydrateSpan?.SetTag("orleans.activation.id", ActivationId.ToString());
+            }
 
             lock (this)
             {
@@ -1224,11 +1232,13 @@ internal sealed partial class ActivationData :
                     return;
                 }
 
-                if (context.TryGetValue(GrainAddressMigrationContextKey, out GrainAddress? previousRegistration) && previousRegistration is not null)
+                if (context.TryGetValue(GrainAddressMigrationContextKey, out GrainAddress? previousRegistration) &&
+                    previousRegistration is not null)
                 {
                     PreviousRegistration = previousRegistration;
                     LogPreviousActivationAddress(_shared.Logger, previousRegistration);
-                    rehydrateSpan?.SetTag("orleans.rehydrate.previousRegistration", previousRegistration.ToFullString());
+                    rehydrateSpan?.SetTag("orleans.rehydrate.previousRegistration",
+                        previousRegistration.ToFullString());
                 }
 
                 if (_lifecycle is { } lifecycle)
@@ -1239,7 +1249,7 @@ internal sealed partial class ActivationData :
                     }
                 }
 
-                (GrainInstance as IGrainMigrationParticipant)?.OnRehydrate(context);
+                grainMigrationParticipant?.OnRehydrate(context);
             }
 
             LogRehydratedGrain(_shared.Logger);
@@ -1249,27 +1259,15 @@ internal sealed partial class ActivationData :
         {
             LogErrorRehydratingActivation(_shared.Logger, exception);
         }
+        finally
+        {
+            rehydrateSpan?.Dispose();
+        }
     }
 
     private void OnDehydrate(IDehydrationContext context)
     {
         LogDehydratingActivation(_shared.Logger);
-
-        // Get the parent activity context from the dehydration context holder (captured when migration was initiated)
-        var parentContext = DehydrationContext?.MigrationActivityContext;
-
-        // Start a span for dehydration, parented to the migration request that triggered it
-        using var dehydrateSpan = parentContext.HasValue
-            ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivationDehydrate, ActivityKind.Internal, parentContext.Value)
-            : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivationDehydrate, ActivityKind.Internal);
-        dehydrateSpan?.SetTag("orleans.grain.id", GrainId.ToString());
-        dehydrateSpan?.SetTag("orleans.grain.type", _shared.GrainTypeName);
-        dehydrateSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
-        dehydrateSpan?.SetTag("orleans.activation.id", ActivationId.ToString());
-        if (ForwardingAddress is { } fwd)
-        {
-            dehydrateSpan?.SetTag("orleans.migration.target.silo", fwd.ToString());
-        }
 
         lock (this)
         {
@@ -1279,11 +1277,35 @@ internal sealed partial class ActivationData :
             {
                 context.TryAddValue(GrainAddressMigrationContextKey, Address);
             }
-
+            
+            Activity? dehydrateSpan = null;
             try
             {
+                // Get the parent activity context from the dehydration context holder (captured when migration was initiated)
+                var parentContext = DehydrationContext?.MigrationActivityContext;
+
+                var grainMigrationParticipant = GrainInstance as IGrainMigrationParticipant;
+
+                if (grainMigrationParticipant is not null)
+                {
+                    // Start a span for dehydration, parented to the migration request that triggered it
+                    dehydrateSpan = parentContext.HasValue
+                        ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivationDehydrate,
+                            ActivityKind.Internal, parentContext.Value)
+                        : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivationDehydrate,
+                            ActivityKind.Internal);
+                    dehydrateSpan?.SetTag("orleans.grain.id", GrainId.ToString());
+                    dehydrateSpan?.SetTag("orleans.grain.type", _shared.GrainTypeName);
+                    dehydrateSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
+                    dehydrateSpan?.SetTag("orleans.activation.id", ActivationId.ToString());
+                    if (ForwardingAddress is { } fwd)
+                    {
+                        dehydrateSpan?.SetTag("orleans.migration.target.silo", fwd.ToString());
+                    }
+                }
+
                 // Note that these calls are in reverse order from Rehydrate, not for any particular reason other than symmetry.
-                (GrainInstance as IGrainMigrationParticipant)?.OnDehydrate(context);
+                grainMigrationParticipant?.OnDehydrate(context);
 
                 if (_lifecycle is { } lifecycle)
                 {
@@ -1300,10 +1322,13 @@ internal sealed partial class ActivationData :
                 dehydrateSpan?.SetTag("exception.type", exception.GetType().FullName);
                 dehydrateSpan?.SetTag("exception.message", exception.Message);
             }
+            finally
+            {
+                dehydrateSpan?.Dispose();
+            }
         }
 
         LogDehydratedActivation(_shared.Logger);
-        dehydrateSpan?.AddEvent(new ActivityEvent("dehydrated"));
     }
 
     /// <summary>
