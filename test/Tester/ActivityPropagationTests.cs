@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
-using Orleans.Runtime;
+using Orleans.Diagnostics;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;

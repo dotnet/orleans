@@ -1,14 +1,10 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Placement;
+using Orleans.Diagnostics;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Placement.Filtering;
@@ -128,7 +124,7 @@ namespace Orleans.Runtime.Placement
                     var director = _placementFilterDirectoryResolver.GetFilterDirector(placementFilter);
 
                     // Create a span for each filter invocation
-                    using var filterSpan = ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.FilterPlacementCandidates);
+                    using var filterSpan = ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.FilterPlacementCandidates);
                     filterSpan?.SetTag("orleans.placement.filter.type", placementFilter.GetType().Name);
                     filterSpan?.SetTag("orleans.grain.type", grainType.ToString());
 
@@ -442,7 +438,7 @@ namespace Orleans.Runtime.Placement
             if (!string.IsNullOrEmpty(traceParent) && ActivityContext.TryParse(traceParent, traceState, isRemote: true, out var parentContext))
             {
                 // Start the activity from the Catalog's ActivitySource to properly associate it with activation tracing
-                return ActivitySources.RuntimeGrainSource.StartActivity(operationName, ActivityKind.Internal, parentContext);
+                return ActivitySources.LifecycleGrainSource.StartActivity(operationName, ActivityKind.Internal, parentContext);
             }
 
             return null;

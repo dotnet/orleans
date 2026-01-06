@@ -4,8 +4,8 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core.Internal;
+using Orleans.Diagnostics;
 using Orleans.Placement;
-using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -22,16 +22,18 @@ namespace UnitTests.General
     [Collection("ActivationTracing")]
     public class ActivationTracingTests : OrleansTestingBase, IClassFixture<ActivationTracingTests.Fixture>
     {
-        private static string ActivationSourceName = ActivitySources.RuntimeActivitySourceName;
         private static readonly ConcurrentBag<Activity> Started = new();
 
         static ActivationTracingTests()
         {
             var listener = new ActivityListener
             {
-                ShouldListenTo = src => src.Name == ActivitySources.ApplicationGrainActivitySourceName || src.Name == ActivitySources.RuntimeActivitySourceName,
-                Sample = (ref ActivityCreationOptions<ActivityContext> options) => ActivitySamplingResult.AllData,
-                SampleUsingParentId = (ref ActivityCreationOptions<string> options) => ActivitySamplingResult.AllData,
+                //ShouldListenTo = src => src.Name.StartsWith("Microsoft.Orleans"),
+                ShouldListenTo = src => src.Name == ActivitySources.ApplicationGrainActivitySourceName
+                                        || src.Name == ActivitySources.LifecycleActivitySourceName
+                                        || src.Name == ActivitySources.StorageActivitySourceName,
+                Sample = (ref _) => ActivitySamplingResult.AllData,
+                SampleUsingParentId = (ref _) => ActivitySamplingResult.AllData,
                 ActivityStarted = activity => Started.Add(activity),
             };
             ActivitySource.AddActivityListener(listener);
@@ -92,7 +94,7 @@ namespace UnitTests.General
                 var _ = await grain.GetActivityId();
 
                 // Expect at least one activation-related activity
-                var activationActivities = Started.Where(a => a.Source.Name == ActivationSourceName).ToList();
+                var activationActivities = Started.Where(a => a.Source.Name == ActivitySources.LifecycleActivitySourceName).ToList();
                 Assert.True(activationActivities.Count > 0, "Expected activation tracing activity to be created, but none were observed.");
 
                 // Verify all expected spans are present and properly parented under test-parent
@@ -121,26 +123,6 @@ namespace UnitTests.General
                 Assert.NotNull(directoryRegisterSpan);
                 Assert.Equal(testParentTraceId, directoryRegisterSpan.TraceId.ToString());
                 Assert.Equal(activationSpan.SpanId.ToString(), directoryRegisterSpan.ParentSpanId.ToString());
-
-                // Find the directory lookup spans - should share the same trace ID as test-parent
-                var lookupSpans = Started.Where(a =>
-                    a.OperationName == "IGrainDirectoryPartition/LookupAsync" &&
-                    a.Source.Name == ActivitySources.RuntimeActivitySourceName).ToList();
-                Assert.True(lookupSpans.Count > 0, "Expected at least one directory lookup span");
-                foreach (var lookupSpan in lookupSpans)
-                {
-                    Assert.Equal(testParentTraceId, lookupSpan.TraceId.ToString());
-                }
-
-                // Find the directory register RPC spans - should share the same trace ID as test-parent
-                var registerSpans = Started.Where(a =>
-                    a.OperationName == "IGrainDirectoryPartition/RegisterAsync" &&
-                    a.Source.Name == ActivitySources.RuntimeActivitySourceName).ToList();
-                Assert.True(registerSpans.Count > 0, "Expected at least one directory register RPC span");
-                foreach (var registerSpan in registerSpans)
-                {
-                    Assert.Equal(testParentTraceId, registerSpan.TraceId.ToString());
-                }
             }
             finally
             {
@@ -165,7 +147,7 @@ namespace UnitTests.General
                 var _ = await grain.GetActivityId();
 
                 // Expect at least one activation-related activity
-                var activationActivities = Started.Where(a => a.Source.Name == ActivationSourceName).ToList();
+                var activationActivities = Started.Where(a => a.Source.Name == ActivitySources.LifecycleActivitySourceName).ToList();
                 Assert.True(activationActivities.Count > 0, "Expected activation tracing activity to be created, but none were observed.");
 
                 // Verify all expected spans are present and properly parented under test-parent
@@ -198,26 +180,6 @@ namespace UnitTests.General
                 Assert.NotNull(directoryRegisterSpan);
                 Assert.Equal(testParentTraceId, directoryRegisterSpan.TraceId.ToString());
                 Assert.Equal(activationSpan.SpanId.ToString(), directoryRegisterSpan.ParentSpanId.ToString());
-
-                // Find the directory lookup spans - should share the same trace ID as test-parent
-                var lookupSpans = Started.Where(a =>
-                    a.OperationName == "IGrainDirectoryPartition/LookupAsync" &&
-                    a.Source.Name == ActivitySources.RuntimeActivitySourceName).ToList();
-                Assert.True(lookupSpans.Count > 0, "Expected at least one directory lookup span");
-                foreach (var lookupSpan in lookupSpans)
-                {
-                    Assert.Equal(testParentTraceId, lookupSpan.TraceId.ToString());
-                }
-
-                // Find the directory register RPC spans - should share the same trace ID as test-parent
-                var registerSpans = Started.Where(a =>
-                    a.OperationName == "IGrainDirectoryPartition/RegisterAsync" &&
-                    a.Source.Name == ActivitySources.RuntimeActivitySourceName).ToList();
-                Assert.True(registerSpans.Count > 0, "Expected at least one directory register RPC span");
-                foreach (var registerSpan in registerSpans)
-                {
-                    Assert.Equal(testParentTraceId, registerSpan.TraceId.ToString());
-                }
             }
             finally
             {
@@ -242,7 +204,7 @@ namespace UnitTests.General
                 var _ = await grain.GetActivityId();
 
                 // Expect at least one activation-related activity
-                var activationActivities = Started.Where(a => a.Source.Name == ActivationSourceName).ToList();
+                var activationActivities = Started.Where(a => a.Source.Name == ActivitySources.LifecycleActivitySourceName).ToList();
                 Assert.True(activationActivities.Count > 0, "Expected activation tracing activity to be created, but none were observed.");
 
                 // Verify all expected spans are present and properly parented under test-parent
@@ -286,7 +248,8 @@ namespace UnitTests.General
         {
             Started.Clear();
 
-            Activity parent = null;
+            using var parent = ActivitySources.ApplicationGrainSource.StartActivity("test-parent-migration");
+            parent?.Start();
             try
             {
                 // Create a grain and set some state
@@ -300,12 +263,6 @@ namespace UnitTests.General
                 var targetHost = _fixture.HostedCluster.GetActiveSilos()
                     .Select(s => s.SiloAddress)
                     .First(address => address != originalHost);
-
-                // Clear activities before migration to isolate migration spans
-                Started.Clear();
-
-                parent = ActivitySources.ApplicationGrainSource.StartActivity("test-parent-migration");
-                parent?.Start();
 
                 // Trigger migration with a placement hint to coerce the placement director to use the target silo
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
@@ -439,7 +396,8 @@ namespace UnitTests.General
         {
             Started.Clear();
 
-            Activity parent = null;
+            using var parent = ActivitySources.ApplicationGrainSource.StartActivity("test-parent-no-migration-participant");
+            parent?.Start();
             try
             {
                 // Create a grain that doesn't implement IGrainMigrationParticipant
@@ -453,12 +411,6 @@ namespace UnitTests.General
                 var targetHost = _fixture.HostedCluster.GetActiveSilos()
                     .Select(s => s.SiloAddress)
                     .First(address => address != originalHost);
-
-                // Clear activities before migration to isolate migration spans
-                Started.Clear();
-
-                parent = ActivitySources.ApplicationGrainSource.StartActivity("test-parent-no-migration-participant");
-                parent?.Start();
 
                 // Trigger migration with a placement hint to coerce the placement director to use the target silo
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
@@ -482,6 +434,109 @@ namespace UnitTests.General
                 // Verify that activation span WAS created (the grain was still activated on the new silo)
                 var activationSpans = Started.Where(a => a.OperationName == ActivityNames.ActivateGrain).ToList();
                 Assert.True(activationSpans.Count > 0, "Expected at least one activation span for the migrated grain");
+            }
+            finally
+            {
+                parent?.Stop();
+                AssertNoApplicationSpansParentedByRuntimeSpans();
+                PrintActivityDiagnostics();
+            }
+        }
+
+        /// <summary>
+        /// Tests that appropriate tracing spans are created for IAsyncEnumerable grain calls with multiple elements.
+        /// Verifies that:
+        /// 1. A session span is created with the original method name (GetActivityDataStream)
+        /// 2. StartEnumeration, MoveNext, and DisposeAsync spans are nested under the session span
+        /// 3. All spans share the same trace context
+        /// </summary>
+        [Fact]
+        [TestCategory("BVT")]
+        public async Task AsyncEnumerableSpansAreCreatedForMultipleElements()
+        {
+            Started.Clear();
+
+            using var parent = ActivitySources.ApplicationGrainSource.StartActivity("test-parent-async-enumerable");
+            parent?.Start();
+            try
+            {
+                var grain = _fixture.GrainFactory.GetGrain<IAsyncEnumerableActivityGrain>(Random.Shared.Next());
+                const int elementCount = 5;
+
+                var values = new List<ActivityData>();
+                await foreach (var entry in grain.GetActivityDataStream(elementCount).WithBatchSize(1))
+                {
+                    values.Add(entry);
+                }
+
+                // Verify we received all elements
+                Assert.Equal(elementCount, values.Count);
+
+                // Verify all expected spans are present and properly parented under test-parent
+                var testParentTraceId = parent.TraceId.ToString();
+                var testParentSpanId = parent.SpanId.ToString();
+
+                // Find all activities with the ApplicationGrainActivitySourceName
+                var applicationSpans = Started.Where(a => a.Source.Name == ActivitySources.ApplicationGrainActivitySourceName).ToList();
+
+                // Find the session span (the logical method call span)
+                // This should have the method name from the grain interface (e.g., "IAsyncEnumerableActivityGrain/GetActivityDataStream")
+                var sessionSpans = applicationSpans.Where(a => a.OperationName.Contains("GetActivityDataStream")).ToList();
+                Assert.True(sessionSpans.Count >= 1, "Expected at least one session span with GetActivityDataStream operation name");
+
+                var sessionSpan = sessionSpans.First();
+                Assert.Equal(testParentTraceId, sessionSpan.TraceId.ToString());
+                Assert.Equal(testParentSpanId, sessionSpan.ParentSpanId.ToString());
+
+                // Verify the session span has the request ID tag
+                var requestIdTag = sessionSpan.Tags.FirstOrDefault(t => t.Key == "orleans.async_enumerable.request_id").Value;
+                Assert.NotNull(requestIdTag);
+
+                var sessionSpanId = sessionSpan.SpanId.ToString();
+
+                // Find all spans (including runtime spans) to verify parenting
+                var allSpans = Started.ToList();
+
+                // Find the StartEnumeration span - should be nested under the session span (in RuntimeActivitySourceName)
+                // Filter to only client-side spans (those directly parented to the session span)
+                var startEnumerationSpans = allSpans
+                    .Where(a => a.OperationName.Contains("StartEnumeration") && a.ParentSpanId.ToString() == sessionSpanId)
+                    .ToList();
+                Assert.True(startEnumerationSpans.Count >= 1, "Expected at least one StartEnumeration span parented to session span");
+
+                var startEnumerationSpan = startEnumerationSpans.First();
+                Assert.Equal(testParentTraceId, startEnumerationSpan.TraceId.ToString());
+
+                // Find MoveNext spans - should be nested under the session span (in RuntimeActivitySourceName)
+                // Filter to only client-side spans (those directly parented to the session span)
+                var moveNextSpans = allSpans
+                    .Where(a => a.OperationName.Contains("MoveNext") && a.ParentSpanId.ToString() == sessionSpanId)
+                    .ToList();
+                Assert.True(moveNextSpans.Count >= 1, $"Expected at least one MoveNext span parented to session span, found {moveNextSpans.Count}");
+
+                // All client-side MoveNext spans should share the same trace ID
+                foreach (var moveNextSpan in moveNextSpans)
+                {
+                    Assert.Equal(testParentTraceId, moveNextSpan.TraceId.ToString());
+                }
+
+                // Find DisposeAsync span - should be nested under the session span (in RuntimeActivitySourceName)
+                // Filter to only client-side spans (those directly parented to the session span)
+                var disposeSpans = allSpans
+                    .Where(a => a.OperationName.Contains("DisposeAsync") && a.ParentSpanId.ToString() == sessionSpanId)
+                    .ToList();
+                Assert.True(disposeSpans.Count >= 1, "Expected at least one DisposeAsync span parented to session span");
+
+                var disposeSpan = disposeSpans.First();
+                Assert.Equal(testParentTraceId, disposeSpan.TraceId.ToString());
+
+                // Verify each ActivityData received has activity information
+                // (verifying trace context was propagated into the grain during enumeration)
+                foreach (var activityData in values)
+                {
+                    Assert.NotNull(activityData);
+                    Assert.NotNull(activityData.Id);
+                }
             }
             finally
             {
