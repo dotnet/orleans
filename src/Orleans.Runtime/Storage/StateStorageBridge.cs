@@ -93,8 +93,8 @@ namespace Orleans.Core
                 }
 
                 using var activity = parentContext.HasValue
-                    ? ActivitySources.RuntimeGrainSource.StartActivity("orleans.storage.read", ActivityKind.Client, parentContext.Value)
-                    : ActivitySources.RuntimeGrainSource.StartActivity("orleans.storage.read", ActivityKind.Client);
+                    ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.StorageRead, ActivityKind.Client, parentContext.Value)
+                    : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.StorageRead, ActivityKind.Client);
                 activity?.SetTag("orleans.grain.id", _grainContext.GrainId.ToString());
                 activity?.SetTag("orleans.storage.provider", _shared.ProviderTypeName);
                 activity?.SetTag("orleans.storage.state.name", _shared.Name);
@@ -127,8 +127,8 @@ namespace Orleans.Core
                 }
 
                 using var activity = parentContext.HasValue
-                    ? ActivitySources.RuntimeGrainSource.StartActivity("orleans.storage.write", ActivityKind.Client, parentContext.Value)
-                    : ActivitySources.RuntimeGrainSource.StartActivity("orleans.storage.write", ActivityKind.Client);
+                    ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.StorageWrite, ActivityKind.Client, parentContext.Value)
+                    : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.StorageWrite, ActivityKind.Client);
                 activity?.SetTag("orleans.grain.id", _grainContext.GrainId.ToString());
                 activity?.SetTag("orleans.storage.provider", _shared.ProviderTypeName);
                 activity?.SetTag("orleans.storage.state.name", _shared.Name);
@@ -160,8 +160,8 @@ namespace Orleans.Core
                 }
 
                 using var activity = parentContext.HasValue
-                    ? ActivitySources.RuntimeGrainSource.StartActivity("orleans.storage.clear", ActivityKind.Client, parentContext.Value)
-                    : ActivitySources.RuntimeGrainSource.StartActivity("orleans.storage.clear", ActivityKind.Client);
+                    ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.StorageClear, ActivityKind.Client, parentContext.Value)
+                    : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.StorageClear, ActivityKind.Client);
                 activity?.SetTag("orleans.grain.id", _grainContext.GrainId.ToString());
                 activity?.SetTag("orleans.storage.provider", _shared.ProviderTypeName);
                 activity?.SetTag("orleans.storage.state.name", _shared.Name);
