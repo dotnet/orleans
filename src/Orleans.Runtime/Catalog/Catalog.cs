@@ -147,7 +147,7 @@ namespace Orleans.Runtime
                     return result;
                 }
 
-                if (_siloStatusOracle!.CurrentStatus == SiloStatus.Active)
+                if (_siloStatusOracle.CurrentStatus == SiloStatus.Active)
                 {
                     var address = new GrainAddress
                     {
