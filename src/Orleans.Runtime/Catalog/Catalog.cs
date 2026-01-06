@@ -10,9 +10,6 @@ namespace Orleans.Runtime
 {
     internal sealed partial class Catalog : SystemTarget, ICatalog, ILifecycleParticipant<ISiloLifecycle>
     {
-        private const string TraceParentHeaderName = "traceparent";
-        private const string TraceStateHeaderName = "tracestate";
-
         private readonly SiloAddress _siloAddress;
         private readonly ActivationCollector activationCollector;
         private readonly GrainDirectoryResolver grainDirectoryResolver;
@@ -464,12 +461,12 @@ namespace Orleans.Runtime
             string traceParent = null;
             string traceState = null;
 
-            if (requestContextData.TryGetValue(TraceParentHeaderName, out var traceParentObj) && traceParentObj is string tp)
+            if (requestContextData.TryGetValue(OpenTelemetryHeaders.TraceParent, out var traceParentObj) && traceParentObj is string tp)
             {
                 traceParent = tp;
             }
 
-            if (requestContextData.TryGetValue(TraceStateHeaderName, out var traceStateObj) && traceStateObj is string ts)
+            if (requestContextData.TryGetValue(OpenTelemetryHeaders.TraceState, out var traceStateObj) && traceStateObj is string ts)
             {
                 traceState = ts;
             }

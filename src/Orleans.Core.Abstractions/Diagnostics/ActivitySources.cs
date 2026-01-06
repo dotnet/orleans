@@ -7,23 +7,23 @@ public static class ActivitySources
     /// <summary>
     /// Spans triggered from application level code
     /// </summary>
-    public static string ApplicationGrainActivitySourceName = "Microsoft.Orleans.Application";
+    public const string ApplicationGrainActivitySourceName = "Microsoft.Orleans.Application";
     /// <summary>
     /// Spans triggered from Orleans runtime code
     /// </summary>
-    public static string RuntimeActivitySourceName = "Microsoft.Orleans.Runtime";
+    public const string RuntimeActivitySourceName = "Microsoft.Orleans.Runtime";
     /// <summary>
     /// Spans tied to lifecycle operations such as activation, migration, and deactivation.
     /// </summary>
-    public static string LifecycleActivitySourceName = "Microsoft.Orleans.Lifecycle";
+    public const string LifecycleActivitySourceName = "Microsoft.Orleans.Lifecycle";
     /// <summary>
     /// Spans tied to persistent storage operations.
     /// </summary>
-    public static string StorageActivitySourceName = "Microsoft.Orleans.Storage";
+    public const string StorageActivitySourceName = "Microsoft.Orleans.Storage";
     /// <summary>
     /// A wildcard name to match all Orleans activity sources.
     /// </summary>
-    public static string AllActivitySourceName = "Microsoft.Orleans.*";
+    public const string AllActivitySourceName = "Microsoft.Orleans.*";
 
     internal static readonly ActivitySource ApplicationGrainSource = new(ApplicationGrainActivitySourceName, "1.0.0");
     internal static readonly ActivitySource RuntimeGrainSource = new(RuntimeActivitySourceName, "1.0.0");
