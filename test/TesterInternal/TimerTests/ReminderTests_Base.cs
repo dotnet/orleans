@@ -373,13 +373,10 @@ namespace UnitTests.TimerTests
             log.LogInformation("Time tests");
             TimeSpan period = await grain.GetReminderPeriod(DR);
             
-            // Wait for each reminder to fire 2 times using event-driven waiting instead of Task.Delay
-            var timeout = ENDWAIT;
-            for (int i = 0; i < count; i++)
-            {
-                var reminderName = DR + "_" + i;
-                await WaitForReminderTickCountAsync(grain, reminderName, 2, timeout);
-            }
+            // Wait for all reminders to fire 2 times. Since all reminders were started at the same time,
+            // wait for a fixed duration that allows 2 periods to pass for all of them.
+            // Using Task.Delay ensures we wait for real time to pass (important for tests without FakeTimeProvider).
+            await Task.Delay((period + LEEWAY).Multiply(2));
             
             for (int i = 0; i < count; i++)
             {

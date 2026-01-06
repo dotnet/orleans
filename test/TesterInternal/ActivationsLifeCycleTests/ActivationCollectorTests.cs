@@ -435,8 +435,10 @@ namespace UnitTests.ActivationsLifeCycleTests
             _sharedTimeProvider!.Advance(DEFAULT_IDLE_TIMEOUT + TimeSpan.FromSeconds(5));
 
             // Wait for all idle grains to be deactivated using event-driven approach
-            // Pass the FakeTimeProvider to continue advancing time during polling
-            await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain2", idleGrainCount, MAX_WAIT_TIME, _sharedTimeProvider);
+            // NOTE: Do NOT pass _sharedTimeProvider here. Time has already been advanced past the idle timeout.
+            // If we continue advancing time, the busy grains (whose activity is tracked in virtual time) will
+            // also appear stale and get collected, even though the background task keeps them busy in real time.
+            await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain2", idleGrainCount, MAX_WAIT_TIME);
 
             // we should have only collected grains from the idle category (IdleActivationGcTestGrain2).
             int idleActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, idleGrainTypeName);
