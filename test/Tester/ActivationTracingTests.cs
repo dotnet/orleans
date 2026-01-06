@@ -405,23 +405,87 @@ namespace UnitTests.General
                 // Give some time for all activities to complete
                 await Task.Delay(500);
 
-                // Verify dehydrate span was created
+                // Verify dehydrate span was NOT created (grain doesn't implement IGrainMigrationParticipant)
                 var dehydrateSpans = Started.Where(a => a.OperationName == ActivityNames.ActivationDehydrate).ToList();
-                Assert.True(dehydrateSpans.Count > 0, "Expected at least one dehydrate span to be created during migration");
+                Assert.True(dehydrateSpans.Count == 0, $"Expected no dehydrate spans for grain without IGrainMigrationParticipant, but found {dehydrateSpans.Count}");
 
-                // Verify rehydrate span was created
+                // Verify rehydrate span was NOT created
                 var rehydrateSpans = Started.Where(a => a.OperationName == ActivityNames.ActivationRehydrate).ToList();
-                Assert.True(rehydrateSpans.Count > 0, "Expected at least one rehydrate span to be created during migration");
+                Assert.True(rehydrateSpans.Count == 0, $"Expected no rehydrate spans for grain without IGrainMigrationParticipant, but found {rehydrateSpans.Count}");
 
                 // Verify storage read span was NOT created during rehydration (state is transferred via migration context)
                 // Note: Storage read should NOT happen during migration - the state is transferred in-memory
                 var storageReadSpansAfterMigration = Started.Where(a => a.OperationName == ActivityNames.StorageRead).ToList();
                 // During migration, storage should not be read because state is transferred via dehydration context
                 // The storage read only happens on fresh activation, not on rehydration
+
+                Assert.Equal(2, storageReadSpansAfterMigration.Count);
             }
             finally
             {
                 parent.Stop();
+                AssertNoApplicationSpansParentedByRuntimeSpans();
+                PrintActivityDiagnostics();
+            }
+        }
+
+        /// <summary>
+        /// Tests that dehydrate and rehydrate spans are NOT created during migration of a grain
+        /// that does not implement IGrainMigrationParticipant.
+        /// </summary>
+        [Fact]
+        [TestCategory("BVT")]
+        public async Task DehydrateAndRehydrateSpansAreNotCreatedForGrainWithoutMigrationParticipant()
+        {
+            Started.Clear();
+
+            Activity parent = null;
+            try
+            {
+                // Create a grain that doesn't implement IGrainMigrationParticipant
+                var grain = _fixture.GrainFactory.GetGrain<ISimpleMigrationTracingTestGrain>(Random.Shared.Next());
+                var expectedState = Random.Shared.Next();
+                await grain.SetState(expectedState);
+                var originalAddress = await grain.GetGrainAddress();
+                var originalHost = originalAddress.SiloAddress;
+
+                // Find a different silo to migrate to
+                var targetHost = _fixture.HostedCluster.GetActiveSilos()
+                    .Select(s => s.SiloAddress)
+                    .First(address => address != originalHost);
+
+                // Clear activities before migration to isolate migration spans
+                Started.Clear();
+
+                parent = ActivitySources.ApplicationGrainSource.StartActivity("test-parent-no-migration-participant");
+                parent?.Start();
+
+                // Trigger migration with a placement hint to coerce the placement director to use the target silo
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
+                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+
+                // Make a call to ensure grain is activated on target silo
+                // Note: State won't be preserved since grain doesn't participate in migration
+                _ = await grain.GetState();
+
+                // Give some time for all activities to complete
+                await Task.Delay(500);
+
+                // Verify dehydrate span was NOT created (grain doesn't implement IGrainMigrationParticipant)
+                var dehydrateSpans = Started.Where(a => a.OperationName == ActivityNames.ActivationDehydrate).ToList();
+                Assert.True(dehydrateSpans.Count == 0, $"Expected no dehydrate spans for grain without IGrainMigrationParticipant, but found {dehydrateSpans.Count}");
+
+                // Verify rehydrate span was NOT created
+                var rehydrateSpans = Started.Where(a => a.OperationName == ActivityNames.ActivationRehydrate).ToList();
+                Assert.True(rehydrateSpans.Count == 0, $"Expected no rehydrate spans for grain without IGrainMigrationParticipant, but found {rehydrateSpans.Count}");
+
+                // Verify that activation span WAS created (the grain was still activated on the new silo)
+                var activationSpans = Started.Where(a => a.OperationName == ActivityNames.ActivateGrain).ToList();
+                Assert.True(activationSpans.Count > 0, "Expected at least one activation span for the migrated grain");
+            }
+            finally
+            {
+                parent?.Stop();
                 AssertNoApplicationSpansParentedByRuntimeSpans();
                 PrintActivityDiagnostics();
             }
@@ -749,6 +813,37 @@ namespace UnitTests.General
         public void OnRehydrate(IRehydrationContext migrationContext)
         {
             migrationContext.TryGetValue("state", out _state);
+        }
+
+        public ValueTask<GrainAddress> GetGrainAddress() => new(GrainContext.Address);
+    }
+
+    /// <summary>
+    /// Test grain interface for migration tracing tests without IGrainMigrationParticipant.
+    /// </summary>
+    public interface ISimpleMigrationTracingTestGrain : IGrainWithIntegerKey
+    {
+        ValueTask<GrainAddress> GetGrainAddress();
+        ValueTask SetState(int state);
+        ValueTask<int> GetState();
+    }
+
+    /// <summary>
+    /// Test grain implementation for migration tracing tests that does NOT implement IGrainMigrationParticipant.
+    /// Uses RandomPlacement to allow migration to different silos.
+    /// This grain will lose its state during migration since it doesn't participate in dehydration/rehydration.
+    /// </summary>
+    [RandomPlacement]
+    public class SimpleMigrationTracingTestGrain : Grain, ISimpleMigrationTracingTestGrain
+    {
+        private int _state;
+
+        public ValueTask<int> GetState() => new(_state);
+
+        public ValueTask SetState(int state)
+        {
+            _state = state;
+            return default;
         }
 
         public ValueTask<GrainAddress> GetGrainAddress() => new(GrainContext.Address);
