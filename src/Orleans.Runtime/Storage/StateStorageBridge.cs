@@ -1,13 +1,11 @@
 #nullable enable
-using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
+using Orleans.Diagnostics;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Serializers;
 using Orleans.Storage;
@@ -93,8 +91,8 @@ namespace Orleans.Core
                 }
 
                 using var activity = parentContext.HasValue
-                    ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.StorageRead, ActivityKind.Client, parentContext.Value)
-                    : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.StorageRead, ActivityKind.Client);
+                    ? ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageRead, ActivityKind.Client, parentContext.Value)
+                    : ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageRead, ActivityKind.Client);
                 activity?.SetTag("orleans.grain.id", _grainContext.GrainId.ToString());
                 activity?.SetTag("orleans.storage.provider", _shared.ProviderTypeName);
                 activity?.SetTag("orleans.storage.state.name", _shared.Name);
@@ -127,8 +125,8 @@ namespace Orleans.Core
                 }
 
                 using var activity = parentContext.HasValue
-                    ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.StorageWrite, ActivityKind.Client, parentContext.Value)
-                    : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.StorageWrite, ActivityKind.Client);
+                    ? ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageWrite, ActivityKind.Client, parentContext.Value)
+                    : ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageWrite, ActivityKind.Client);
                 activity?.SetTag("orleans.grain.id", _grainContext.GrainId.ToString());
                 activity?.SetTag("orleans.storage.provider", _shared.ProviderTypeName);
                 activity?.SetTag("orleans.storage.state.name", _shared.Name);
@@ -160,8 +158,8 @@ namespace Orleans.Core
                 }
 
                 using var activity = parentContext.HasValue
-                    ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.StorageClear, ActivityKind.Client, parentContext.Value)
-                    : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.StorageClear, ActivityKind.Client);
+                    ? ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageClear, ActivityKind.Client, parentContext.Value)
+                    : ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageClear, ActivityKind.Client);
                 activity?.SetTag("orleans.grain.id", _grainContext.GrainId.ToString());
                 activity?.SetTag("orleans.storage.provider", _shared.ProviderTypeName);
                 activity?.SetTag("orleans.storage.state.name", _shared.Name);

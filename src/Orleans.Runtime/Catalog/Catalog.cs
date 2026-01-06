@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.GrainDirectory;
 using System.Diagnostics;
+using Orleans.Diagnostics;
 
 namespace Orleans.Runtime
 {
@@ -171,8 +172,8 @@ namespace Orleans.Runtime
             // Start activation span with parent context from request if available
             var parentContext = TryGetActivityContext(requestContextData);
             Activity activationActivity = parentContext.HasValue
-                ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal, parentContext.Value)
-                : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal);
+                ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal, parentContext.Value)
+                : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal);
             if (activationActivity is not null)
             {
                 activationActivity.SetTag("orleans.grain.id", grainId.ToString());
