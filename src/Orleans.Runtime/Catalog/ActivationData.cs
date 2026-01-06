@@ -1,17 +1,14 @@
 #nullable enable
-using System;
 using System.Buffers;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Core.Internal;
+using Orleans.Diagnostics;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
 using Orleans.Runtime.Placement;
@@ -1212,9 +1209,9 @@ internal sealed partial class ActivationData :
             {
                 // Start a span for rehydration
                 rehydrateSpan = _activationActivity is not null
-                    ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivationRehydrate,
+                    ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivationRehydrate,
                         ActivityKind.Internal, _activationActivity.Context)
-                    : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivationRehydrate,
+                    : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivationRehydrate,
                         ActivityKind.Internal);
                 rehydrateSpan?.SetTag("orleans.grain.id", GrainId.ToString());
                 rehydrateSpan?.SetTag("orleans.grain.type", _shared.GrainTypeName);
@@ -1290,9 +1287,9 @@ internal sealed partial class ActivationData :
                 {
                     // Start a span for dehydration, parented to the migration request that triggered it
                     dehydrateSpan = parentContext.HasValue
-                        ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivationDehydrate,
+                        ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivationDehydrate,
                             ActivityKind.Internal, parentContext.Value)
-                        : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivationDehydrate,
+                        : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivationDehydrate,
                             ActivityKind.Internal);
                     dehydrateSpan?.SetTag("orleans.grain.id", GrainId.ToString());
                     dehydrateSpan?.SetTag("orleans.grain.type", _shared.GrainTypeName);
@@ -1556,8 +1553,8 @@ internal sealed partial class ActivationData :
             {
                 // Start directory registration activity as a child of the activation activity
                 Activity? registerSpan = _activationActivity is not null
-                    ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.RegisterDirectoryEntry, ActivityKind.Internal, _activationActivity.Context)
-                    : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.RegisterDirectoryEntry, ActivityKind.Internal);
+                    ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.RegisterDirectoryEntry, ActivityKind.Internal, _activationActivity.Context)
+                    : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.RegisterDirectoryEntry, ActivityKind.Internal);
                 registerSpan?.SetTag("orleans.grain.id", GrainId.ToString());
                 registerSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
                 registerSpan?.SetTag("orleans.activation.id", ActivationId.ToString());
@@ -1676,8 +1673,8 @@ internal sealed partial class ActivationData :
                 {
                     // Start a span for OnActivateAsync execution
                     using var onActivateSpan = _activationActivity is not null
-                        ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.OnActivate, ActivityKind.Internal, _activationActivity.Context)
-                        : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.OnActivate, ActivityKind.Internal);
+                        ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.OnActivate, ActivityKind.Internal, _activationActivity.Context)
+                        : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.OnActivate, ActivityKind.Internal);
                     onActivateSpan?.SetTag("orleans.grain.id", GrainId.ToString());
                     onActivateSpan?.SetTag("orleans.grain.type", _shared.GrainTypeName ?? GrainInstance.GetType().FullName);
                     onActivateSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
