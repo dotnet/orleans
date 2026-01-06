@@ -254,7 +254,7 @@ namespace UnitTests.General
                 Assert.Equal(testParentTraceId, activationSpan.TraceId.ToString());
 
                 // Find the storage read span - should share the same trace ID as test-parent
-                var storageReadSpan = Started.FirstOrDefault(a => a.OperationName == "orleans.storage.read");
+                var storageReadSpan = Started.FirstOrDefault(a => a.OperationName == ActivityNames.StorageRead);
                 Assert.NotNull(storageReadSpan);
                 Assert.Equal(testParentTraceId, storageReadSpan.TraceId.ToString());
 
@@ -321,7 +321,7 @@ namespace UnitTests.General
                 var testParentTraceId = parent.TraceId.ToString();
 
                 // Verify dehydrate span was created
-                var dehydrateSpans = Started.Where(a => a.OperationName == "orleans.activation.dehydrate").ToList();
+                var dehydrateSpans = Started.Where(a => a.OperationName == ActivityNames.ActivationDehydrate).ToList();
                 Assert.True(dehydrateSpans.Count > 0, "Expected at least one dehydrate span to be created during migration");
 
                 var dehydrateSpan = dehydrateSpans.First();
@@ -334,7 +334,7 @@ namespace UnitTests.General
                 Assert.Equal(testParentTraceId, dehydrateSpan.TraceId.ToString());
 
                 // Verify rehydrate span was created on the target silo
-                var rehydrateSpans = Started.Where(a => a.OperationName == "orleans.activation.rehydrate").ToList();
+                var rehydrateSpans = Started.Where(a => a.OperationName == ActivityNames.ActivationRehydrate).ToList();
                 Assert.True(rehydrateSpans.Count > 0, "Expected at least one rehydrate span to be created during migration");
 
                 var rehydrateSpan = rehydrateSpans.First();
@@ -406,16 +406,16 @@ namespace UnitTests.General
                 await Task.Delay(500);
 
                 // Verify dehydrate span was created
-                var dehydrateSpans = Started.Where(a => a.OperationName == "orleans.activation.dehydrate").ToList();
+                var dehydrateSpans = Started.Where(a => a.OperationName == ActivityNames.ActivationDehydrate).ToList();
                 Assert.True(dehydrateSpans.Count > 0, "Expected at least one dehydrate span to be created during migration");
 
                 // Verify rehydrate span was created
-                var rehydrateSpans = Started.Where(a => a.OperationName == "orleans.activation.rehydrate").ToList();
+                var rehydrateSpans = Started.Where(a => a.OperationName == ActivityNames.ActivationRehydrate).ToList();
                 Assert.True(rehydrateSpans.Count > 0, "Expected at least one rehydrate span to be created during migration");
 
                 // Verify storage read span was NOT created during rehydration (state is transferred via migration context)
                 // Note: Storage read should NOT happen during migration - the state is transferred in-memory
-                var storageReadSpansAfterMigration = Started.Where(a => a.OperationName == "orleans.storage.read").ToList();
+                var storageReadSpansAfterMigration = Started.Where(a => a.OperationName == ActivityNames.StorageRead).ToList();
                 // During migration, storage should not be read because state is transferred via dehydration context
                 // The storage read only happens on fresh activation, not on rehydration
             }

@@ -1207,8 +1207,8 @@ internal sealed partial class ActivationData :
 
             // Start a span for rehydration
             using var rehydrateSpan = _activationActivity is not null
-                ? ActivitySources.RuntimeGrainSource.StartActivity("orleans.activation.rehydrate", ActivityKind.Internal, _activationActivity.Context)
-                : ActivitySources.RuntimeGrainSource.StartActivity("orleans.activation.rehydrate", ActivityKind.Internal);
+                ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivationRehydrate, ActivityKind.Internal, _activationActivity.Context)
+                : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivationRehydrate, ActivityKind.Internal);
             rehydrateSpan?.SetTag("orleans.grain.id", GrainId.ToString());
             rehydrateSpan?.SetTag("orleans.grain.type", _shared.GrainTypeName);
             rehydrateSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
@@ -1260,8 +1260,8 @@ internal sealed partial class ActivationData :
 
         // Start a span for dehydration, parented to the migration request that triggered it
         using var dehydrateSpan = parentContext.HasValue
-            ? ActivitySources.RuntimeGrainSource.StartActivity("orleans.activation.dehydrate", ActivityKind.Internal, parentContext.Value)
-            : ActivitySources.RuntimeGrainSource.StartActivity("orleans.activation.dehydrate", ActivityKind.Internal);
+            ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivationDehydrate, ActivityKind.Internal, parentContext.Value)
+            : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.ActivationDehydrate, ActivityKind.Internal);
         dehydrateSpan?.SetTag("orleans.grain.id", GrainId.ToString());
         dehydrateSpan?.SetTag("orleans.grain.type", _shared.GrainTypeName);
         dehydrateSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
