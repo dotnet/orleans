@@ -63,7 +63,10 @@ namespace UnitTests.General
             // Ensure initial statistics are propagated before creating grains
             await ForceStatisticsRefreshOnAllSilos();
             
+            // Create grains in batches with stats refresh between each batch to ensure
+            // placement directors have accurate activation counts during placement.
             await AddTestGrains(perSilo);
+            await ForceStatisticsRefreshOnAllSilos();
             await AddTestGrains(perSilo);
 
             // Force statistics refresh so placement directors have accurate counts
@@ -83,9 +86,13 @@ namespace UnitTests.General
             await ForceStatisticsRefreshOnAllSilos();
 
             logger.LogInformation("\n\n\n----- Phase 2 -----\n\n");
+            // Create grains in batches with stats refresh between each batch
             await AddTestGrains(perSilo);
+            await ForceStatisticsRefreshOnAllSilos();
             await AddTestGrains(perSilo);
+            await ForceStatisticsRefreshOnAllSilos();
             await AddTestGrains(perSilo);
+            await ForceStatisticsRefreshOnAllSilos();
             await AddTestGrains(perSilo);
 
             // Force statistics refresh before assertions
@@ -101,8 +108,11 @@ namespace UnitTests.General
             AssertIsInRange(activationCounts[silo3], expected, leavy);
 
             logger.LogInformation("\n\n\n----- Phase 3 -----\n\n");
+            // Create grains in batches with stats refresh between each batch
             await AddTestGrains(perSilo);
+            await ForceStatisticsRefreshOnAllSilos();
             await AddTestGrains(perSilo);
+            await ForceStatisticsRefreshOnAllSilos();
             await AddTestGrains(perSilo);
 
             // Force statistics refresh before final assertions

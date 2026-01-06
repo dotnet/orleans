@@ -40,14 +40,16 @@ namespace UnitTests.ActivationsLifeCycleTests
         private ILogger logger;
         private GrainDiagnosticObserver _diagnosticObserver;
 
-        private async Task Initialize(TimeSpan collectionAgeLimit, TimeSpan quantum)
+        private async Task Initialize(TimeSpan collectionAgeLimit, TimeSpan quantum, bool useFakeTimeProvider = true)
         {
             // Initialize the diagnostic observer before deploying the cluster
             // so it can capture all grain lifecycle events from the start
             _diagnosticObserver = GrainDiagnosticObserver.Create();
 
-            // Create a FakeTimeProvider for deterministic time control
-            _sharedTimeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+            // Create a FakeTimeProvider for deterministic time control (unless disabled)
+            // Some tests (like busy grain tests) need real time because they mix concurrent real-time
+            // activity with idle time tracking - FakeTimeProvider doesn't work in those scenarios.
+            _sharedTimeProvider = useFakeTimeProvider ? new FakeTimeProvider(DateTimeOffset.UtcNow) : null;
 
             var builder = new TestClusterBuilder(1);
             builder.Properties["CollectionQuantum"] = quantum.ToString();
@@ -97,6 +99,11 @@ namespace UnitTests.ActivationsLifeCycleTests
         private async Task Initialize(TimeSpan collectionAgeLimit)
         {
             await Initialize(collectionAgeLimit, DEFAULT_COLLECTION_QUANTUM);
+        }
+
+        private async Task Initialize(TimeSpan collectionAgeLimit, bool useFakeTimeProvider)
+        {
+            await Initialize(collectionAgeLimit, DEFAULT_COLLECTION_QUANTUM, useFakeTimeProvider);
         }
 
         public async Task DisposeAsync()
@@ -187,7 +194,13 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyActivations()
         {
-            await Initialize(DEFAULT_IDLE_TIMEOUT);
+            // This test mixes concurrent real-time activity with idle time tracking.
+            // FakeTimeProvider doesn't work here because:
+            // 1. Busy grains have their idle timestamps updated using TimeProvider.GetTimestamp()
+            // 2. When we advance FakeTimeProvider, ALL grains (including busy ones) appear idle
+            // 3. Real-time requests don't prevent collection because timestamps use fake time
+            // Therefore, we must use real time for this test.
+            await Initialize(DEFAULT_IDLE_TIMEOUT, useFakeTimeProvider: false);
 
             const int idleGrainCount = 500;
             const int busyGrainCount = 500;
@@ -235,14 +248,9 @@ namespace UnitTests.ActivationsLifeCycleTests
                 idleGrainCount,
                 DEFAULT_IDLE_TIMEOUT.TotalSeconds);
 
-            // Advance virtual time past the collection age limit so idle grains become stale.
-            // Busy grains will continue making real-time requests, keeping them active.
-            _sharedTimeProvider!.Advance(DEFAULT_IDLE_TIMEOUT + TimeSpan.FromSeconds(5));
-
-            // Wait for all idle grains to be deactivated using event-driven approach
-            // NOTE: Do NOT pass _sharedTimeProvider here. Time has already been advanced past the idle timeout.
-            // If we continue advancing time, the busy grains (whose activity is tracked in virtual time) will
-            // also appear stale and get collected, even though the background task keeps them busy in real time.
+            // Wait for all idle grains to be deactivated using event-driven approach.
+            // Using real time: the activation collector will naturally find idle grains
+            // while the busy worker keeps the busy grains active with real-time requests.
             await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain1", idleGrainCount, MAX_WAIT_TIME);
 
             // we should have only collected grains from the idle category (IdleActivationGcTestGrain1).
@@ -252,12 +260,16 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(busyGrainCount, busyActivationsNotCollected);
 
             quit[0] = true;
-        }          
+        }
         
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ManualCollectionShouldNotCollectBusyActivations()
         {
-            await Initialize(DEFAULT_IDLE_TIMEOUT);
+            // This test mixes concurrent real-time activity with idle time tracking.
+            // FakeTimeProvider doesn't work here because busy grains track idle time
+            // using the fake TimeProvider, so advancing time affects them too.
+            // We must use real time for this test.
+            await Initialize(DEFAULT_IDLE_TIMEOUT, useFakeTimeProvider: false);
 
             TimeSpan shortIdleTimeout = TimeSpan.FromSeconds(1);
             const int idleGrainCount = 500;
@@ -305,33 +317,20 @@ namespace UnitTests.ActivationsLifeCycleTests
                 "ManualCollectionShouldNotCollectBusyActivations: grains activated; waiting {TotalSeconds} sec before triggering manual collection.",
                 shortIdleTimeout.TotalSeconds);
             
-            // Give the busyWorker time to start making requests on real time
-            // This ensures all busy grains have recent activity before we advance virtual time
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
-
-            TimeSpan everything = TimeSpan.FromMinutes(10);
+            // Wait for the idle timeout to pass in real time
+            await Task.Delay(shortIdleTimeout + TimeSpan.FromMilliseconds(500));
             
-            // Advance virtual time so idle grains are considered idle for more than 10 minutes.
-            _sharedTimeProvider!.Advance(everything + TimeSpan.FromSeconds(5));
-            
-            // Give the busy worker time to cycle through all grains after time advancement.
-            // This ensures busy grains have their idle timestamp reset to the new (advanced) time,
-            // so they won't be collected.
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
-            
-            logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: triggering manual collection (timespan is {TotalSeconds} sec).",  everything.TotalSeconds);
+            logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: triggering manual collection (timespan is {TotalSeconds} sec).", shortIdleTimeout.TotalSeconds);
             IManagementGrain mgmtGrain = this.testCluster.GrainFactory.GetGrain<IManagementGrain>(0);
-            await mgmtGrain.ForceActivationCollection(everything);
+            await mgmtGrain.ForceActivationCollection(shortIdleTimeout);
 
             logger.LogInformation(
                 "ManualCollectionShouldNotCollectBusyActivations: waiting for {Count} idle grain deactivations (activation GC idle timeout is {DefaultIdleTime} sec).",
                 idleGrainCount,
                 DEFAULT_IDLE_TIMEOUT.TotalSeconds);
 
-            // Wait for all idle grains to be deactivated using event-driven approach
-            // NOTE: Do NOT pass _sharedTimeProvider here. Time has already been advanced past the idle timeout.
-            // If we continue advancing time, the busy grains (whose activity is tracked in virtual time) will
-            // also appear stale and get collected, even though the background task keeps them busy in real time.
+            // Wait for all idle grains to be deactivated using event-driven approach.
+            // Using real time: busy grains are kept active by the busy worker loop.
             await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain1", idleGrainCount, MAX_WAIT_TIME);
 
             // we should have only collected grains from the idle category (IdleActivationGcTestGrain).
@@ -341,7 +340,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(busyGrainCount, busyActivationsNotCollected);
 
             quit[0] = true;
-        }    
+        }
         
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldCollectIdleActivationsSpecifiedInPerTypeConfiguration()
@@ -384,9 +383,13 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration()
         {
-            //make sure default value won't cause activation collection during wait time
+            // This test mixes concurrent real-time activity with idle time tracking.
+            // FakeTimeProvider doesn't work here because busy grains track idle time
+            // using the fake TimeProvider, so advancing time affects them too.
+            // We must use real time for this test.
+            // Make sure default value won't cause activation collection during wait time.
             var defaultCollectionAgeLimit = MAX_WAIT_TIME.Multiply(2);
-            await Initialize(defaultCollectionAgeLimit);
+            await Initialize(defaultCollectionAgeLimit, useFakeTimeProvider: false);
 
             const int idleGrainCount = 500;
             const int busyGrainCount = 500;
@@ -434,14 +437,9 @@ namespace UnitTests.ActivationsLifeCycleTests
                 idleGrainCount,
                 DEFAULT_IDLE_TIMEOUT.TotalSeconds);
 
-            // Advance virtual time past the per-type collection age limit (DEFAULT_IDLE_TIMEOUT) so idle grains become stale.
-            // Busy grains will continue making real-time requests, keeping them active.
-            _sharedTimeProvider!.Advance(DEFAULT_IDLE_TIMEOUT + TimeSpan.FromSeconds(5));
-
-            // Wait for all idle grains to be deactivated using event-driven approach
-            // NOTE: Do NOT pass _sharedTimeProvider here. Time has already been advanced past the idle timeout.
-            // If we continue advancing time, the busy grains (whose activity is tracked in virtual time) will
-            // also appear stale and get collected, even though the background task keeps them busy in real time.
+            // Wait for all idle grains to be deactivated using event-driven approach.
+            // Using real time: the activation collector will naturally find idle grains
+            // while the busy worker keeps the busy grains active with real-time requests.
             await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain2", idleGrainCount, MAX_WAIT_TIME);
 
             // we should have only collected grains from the idle category (IdleActivationGcTestGrain2).
@@ -451,7 +449,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(busyGrainCount, busyActivationsNotCollected);
 
             quit[0] = true;
-        } 
+        }
   
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyStatelessWorkers()
