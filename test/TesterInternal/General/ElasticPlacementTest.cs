@@ -310,6 +310,11 @@ namespace UnitTests.General
             var taintedSilo = this.HostedCluster.StartAdditionalSilo();
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
+            // Ensure all silos have the new silo in their placement statistics cache
+            // before we taint it. Without this, placement directors may not know about
+            // the new silo and fail to find candidates.
+            await ForceStatisticsRefreshOnAllSilos();
+
             const long sampleSize = 10;
 
             var taintedGrain = await GetGrainAtSilo(taintedSilo.SiloAddress);

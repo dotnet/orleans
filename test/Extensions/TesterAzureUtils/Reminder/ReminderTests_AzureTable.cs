@@ -299,11 +299,12 @@ namespace Tester.AzureUtils.TimerTests
             // Wait for at least 2 ticks for g2
             await WaitForReminderTickCountAsync(g2, DR, 2, ENDWAIT);
             
-            long last1 = await g1.GetCounter(DR);
+            // Use GetReminderTickCount for consistent counting (not GetCounter which uses time-based sequence numbers)
+            int last1 = await g1.GetReminderTickCount(DR);
             // g1 has been running while g2 was getting its 2 ticks, so g1 should have at least 3
             // (2 initial + roughly 1 more during g2's 2 ticks, given timing variance in real-time tests)
             Assert.True(last1 >= 3, $"Expected g1 to have at least 3 ticks, got {last1}");
-            long last2 = await g2.GetCounter(DR);
+            int last2 = await g2.GetReminderTickCount(DR);
             Assert.True(last2 >= 2, $"Expected g2 to have at least 2 ticks, got {last2}");
 
             await g1.StopReminder(DR);
@@ -311,9 +312,9 @@ namespace Tester.AzureUtils.TimerTests
             await WaitForReminderTickCountAsync(g2, DR, 4, ENDWAIT);
             await g2.StopReminder(DR);
             
-            long curr1 = await g1.GetCounter(DR);
+            int curr1 = await g1.GetReminderTickCount(DR);
             Assert.True(curr1 >= last1 && curr1 <= last1 + 1, $"Expected g1 counter to stay near {last1} after stopping, got {curr1}");
-            long curr2 = await g2.GetCounter(DR);
+            int curr2 = await g2.GetReminderTickCount(DR);
             Assert.True(curr2 >= 4, $"Expected g2 to have at least 4 ticks, got {curr2}");
         }
 
