@@ -19,6 +19,7 @@ namespace UnitTests.General
     /// Failing test demonstrating missing activation tracing spans.
     /// Expects an activation Activity to be created on first grain activation.
     /// </summary>
+    [Collection("ActivationTracing")]
     public class ActivationTracingTests : OrleansTestingBase, IClassFixture<ActivationTracingTests.Fixture>
     {
         private static string ActivationSourceName = ActivitySources.RuntimeActivitySourceName;
@@ -82,8 +83,8 @@ namespace UnitTests.General
         {
             Started.Clear();
 
-            using var parent = new Activity("test-parent");
-            parent.Start();
+            using var parent = ActivitySources.ApplicationGrainSource.StartActivity("test-parent");
+            parent?.Start();
             try
             {
                 var grain = _fixture.GrainFactory.GetGrain<IFilteredActivityGrain>(Random.Shared.Next());
@@ -158,8 +159,8 @@ namespace UnitTests.General
         {
             Started.Clear();
 
-            using var parent = new Activity("test-parent-storage");
-            parent.Start();
+            using var parent = ActivitySources.ApplicationGrainSource.StartActivity("test-parent-storage");
+            parent?.Start();
             try
             {
                 var grain = _fixture.GrainFactory.GetGrain<IPersistentStateActivityGrain>(Random.Shared.Next());
@@ -228,8 +229,8 @@ namespace UnitTests.General
                 // Clear activities before migration to isolate migration spans
                 Started.Clear();
 
-                parent = new Activity("test-parent-migration");
-                parent.Start();
+                parent = ActivitySources.ApplicationGrainSource.StartActivity("test-parent-migration");
+                parent?.Start();
 
                 // Trigger migration with a placement hint to coerce the placement director to use the target silo
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
@@ -285,8 +286,8 @@ namespace UnitTests.General
         {
             Started.Clear();
 
-            using var parent = new Activity("test-parent-migration-persistent");
-            parent.Start();
+            using var parent = ActivitySources.ApplicationGrainSource.StartActivity("test-parent-migration-persistent");
+            parent?.Start();
             try
             {
                 // Create a grain with persistent state and set some state
@@ -520,7 +521,7 @@ namespace UnitTests.General
 
     #endregion
 
-    #region Test Grain with Persistent State for Tracing
+    #region Test Grain with Persistent State for tracing
 
     /// <summary>
     /// Test grain interface with persistent state for tracing tests.
