@@ -1,4 +1,3 @@
-#nullable enable
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -20,7 +19,7 @@ namespace Orleans.Runtime
         private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
         private readonly GrainContextActivator grainActivator;
-        private ISiloStatusOracle? _siloStatusOracle;
+        private ISiloStatusOracle _siloStatusOracle;
 
         // Lock striping is used for activation creation to reduce contention
         private const int LockCount = 32; // Must be a power of 2
@@ -124,10 +123,10 @@ namespace Orleans.Runtime
         /// <param name="requestContextData">Optional request context data.</param>
         /// <param name="rehydrationContext">Optional rehydration context.</param>
         /// <returns></returns>
-        public IGrainContext? GetOrCreateActivation(
+        public IGrainContext GetOrCreateActivation(
             in GrainId grainId,
-            Dictionary<string, object>? requestContextData,
-            MigrationContext? rehydrationContext)
+            Dictionary<string, object> requestContextData,
+            MigrationContext rehydrationContext)
         {
             if (TryGetGrainContext(grainId, out var result))
             {
@@ -171,7 +170,7 @@ namespace Orleans.Runtime
 
             // Start activation span with parent context from request if available
             var parentContext = TryGetActivityContext(requestContextData);
-            Activity? activationActivity = parentContext.HasValue
+            Activity activationActivity = parentContext.HasValue
                 ? ActivitySources.RuntimeGrainSource.StartActivity("orleans.activation", ActivityKind.Internal, parentContext.Value)
                 : ActivitySources.RuntimeGrainSource.StartActivity("orleans.activation", ActivityKind.Internal);
             if (activationActivity is not null)
@@ -201,10 +200,10 @@ namespace Orleans.Runtime
             return result;
 
             [MethodImpl(MethodImplOptions.NoInlining)]
-            static IGrainContext? UnableToCreateActivation(Catalog self, GrainId grainId)
+            static IGrainContext UnableToCreateActivation(Catalog self, GrainId grainId)
             {
                 // Did not find and did not start placing new
-                var status = self._siloStatusOracle!.CurrentStatus;
+                var status = self._siloStatusOracle.CurrentStatus;
                 var isTerminating = status.IsTerminating();
                 if (status is not SiloStatus.Active)
                 {
@@ -252,7 +251,7 @@ namespace Orleans.Runtime
         /// </summary>
         private bool TryGetGrainContext(GrainId grainId, out IGrainContext data)
         {
-            data = activations.FindTarget(grainId)!;
+            data = activations.FindTarget(grainId);
             return data != null;
         }
 
@@ -454,15 +453,15 @@ namespace Orleans.Runtime
         /// <summary>
         /// Extracts an ActivityContext from request context data if present.
         /// </summary>
-        private static ActivityContext? TryGetActivityContext(Dictionary<string, object>? requestContextData)
+        private static ActivityContext? TryGetActivityContext(Dictionary<string, object> requestContextData)
         {
             if (requestContextData is not { Count: > 0 })
             {
                 return null;
             }
 
-            string? traceParent = null;
-            string? traceState = null;
+            string traceParent = null;
+            string traceState = null;
 
             if (requestContextData.TryGetValue(TraceParentHeaderName, out var traceParentObj) && traceParentObj is string tp)
             {
