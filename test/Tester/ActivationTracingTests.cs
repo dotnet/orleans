@@ -28,7 +28,7 @@ namespace UnitTests.General
         {
             var listener = new ActivityListener
             {
-                ShouldListenTo = src => true /*src.Name == ActivationSourceName*/,
+                ShouldListenTo = src => src.Name == ActivitySources.ApplicationGrainActivitySourceName || src.Name == ActivitySources.RuntimeActivitySourceName,
                 Sample = (ref ActivityCreationOptions<ActivityContext> options) => ActivitySamplingResult.AllData,
                 SampleUsingParentId = (ref ActivityCreationOptions<string> options) => ActivitySamplingResult.AllData,
                 ActivityStarted = activity => Started.Add(activity),

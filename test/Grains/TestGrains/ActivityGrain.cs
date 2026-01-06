@@ -3,10 +3,8 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class ActivityGrain : Grain, IActivityGrain
+    public class ActivityGrain : IActivityGrain
     {
-        public override Task OnActivateAsync(CancellationToken cancellationToken) => base.OnActivateAsync(cancellationToken);
-
         public Task<ActivityData> GetActivityId()
         {
             var activity = Activity.Current;
