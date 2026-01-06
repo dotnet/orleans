@@ -1631,15 +1631,15 @@ internal sealed partial class ActivationData :
                 }
 
                 registerSpan?.Stop();
-                 if (!success)
-                 {
-                     Deactivate(new(DeactivationReasonCode.DirectoryFailure, registrationException, "Failed to register activation in grain directory."));
+                if (!success)
+                {
+                    Deactivate(new(DeactivationReasonCode.DirectoryFailure, registrationException, "Failed to register activation in grain directory."));
 
-                     // Activation failed.
-                     _activationActivity?.SetStatus(ActivityStatusCode.Error);
-                     _activationActivity?.AddEvent(new ActivityEvent("activation-aborted"));
-                     return;
-                 }
+                    // Activation failed.
+                    _activationActivity?.SetStatus(ActivityStatusCode.Error);
+                    _activationActivity?.AddEvent(new ActivityEvent("activation-aborted"));
+                    return;
+                }
             }
 
             lock (this)

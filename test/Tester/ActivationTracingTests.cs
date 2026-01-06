@@ -28,7 +28,6 @@ namespace UnitTests.General
         {
             var listener = new ActivityListener
             {
-                //ShouldListenTo = src => src.Name.StartsWith("Microsoft.Orleans"),
                 ShouldListenTo = src => src.Name == ActivitySources.ApplicationGrainActivitySourceName
                                         || src.Name == ActivitySources.LifecycleActivitySourceName
                                         || src.Name == ActivitySources.StorageActivitySourceName,
@@ -335,9 +334,6 @@ namespace UnitTests.General
                 var targetHost = _fixture.HostedCluster.GetActiveSilos()
                     .Select(s => s.SiloAddress)
                     .First(address => address != originalHost);
-
-                // Clear activities before migration to isolate migration spans
-                //Started.Clear();
 
                 // Trigger migration with a placement hint
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);

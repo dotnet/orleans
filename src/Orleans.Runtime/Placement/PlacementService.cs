@@ -17,8 +17,6 @@ namespace Orleans.Runtime.Placement
     /// </summary>
     internal partial class PlacementService : IPlacementContext
     {
-        private const string TraceParentHeaderName = "traceparent";
-        private const string TraceStateHeaderName = "tracestate";
         private const int PlacementWorkerCount = 16;
         private readonly PlacementStrategyResolver _strategyResolver;
         private readonly PlacementDirectorResolver _directorResolver;
@@ -425,12 +423,12 @@ namespace Orleans.Runtime.Placement
             string traceParent = null;
             string traceState = null;
 
-            if (requestContextData.TryGetValue(TraceParentHeaderName, out var traceParentObj) && traceParentObj is string tp)
+            if (requestContextData.TryGetValue(OpenTelemetryHeaders.TraceParent, out var traceParentObj) && traceParentObj is string tp)
             {
                 traceParent = tp;
             }
 
-            if (requestContextData.TryGetValue(TraceStateHeaderName, out var traceStateObj) && traceStateObj is string ts)
+            if (requestContextData.TryGetValue(OpenTelemetryHeaders.TraceState, out var traceStateObj) && traceStateObj is string ts)
             {
                 traceState = ts;
             }
