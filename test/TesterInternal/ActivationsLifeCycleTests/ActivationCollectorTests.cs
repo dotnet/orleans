@@ -177,7 +177,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             _sharedTimeProvider!.Advance(DEFAULT_IDLE_TIMEOUT + TimeSpan.FromSeconds(5));
 
             // Wait for all grains to be deactivated using event-driven approach
-            await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain1", grainCount, MAX_WAIT_TIME);
+            // Pass the FakeTimeProvider to continue advancing time during polling
+            await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain1", grainCount, MAX_WAIT_TIME, _sharedTimeProvider);
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
@@ -239,7 +240,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             _sharedTimeProvider!.Advance(DEFAULT_IDLE_TIMEOUT + TimeSpan.FromSeconds(5));
 
             // Wait for all idle grains to be deactivated using event-driven approach
-            await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain1", idleGrainCount, MAX_WAIT_TIME);
+            // Pass the FakeTimeProvider to continue advancing time during polling
+            await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain1", idleGrainCount, MAX_WAIT_TIME, _sharedTimeProvider);
 
             // we should have only collected grains from the idle category (IdleActivationGcTestGrain1).
             int idleActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, idleGrainTypeName);
@@ -325,7 +327,8 @@ namespace UnitTests.ActivationsLifeCycleTests
                 DEFAULT_IDLE_TIMEOUT.TotalSeconds);
 
             // Wait for all idle grains to be deactivated using event-driven approach
-            await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain1", idleGrainCount, MAX_WAIT_TIME);
+            // Pass the FakeTimeProvider to continue advancing time during polling
+            await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain1", idleGrainCount, MAX_WAIT_TIME, _sharedTimeProvider);
 
             // we should have only collected grains from the idle category (IdleActivationGcTestGrain).
             int idleActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, idleGrainTypeName);
@@ -367,7 +370,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             _sharedTimeProvider!.Advance(DEFAULT_IDLE_TIMEOUT + TimeSpan.FromSeconds(5));
 
             // Wait for all grains to be deactivated using event-driven approach
-            await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain2", grainCount, MAX_WAIT_TIME);
+            // Pass the FakeTimeProvider to continue advancing time during polling
+            await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain2", grainCount, MAX_WAIT_TIME, _sharedTimeProvider);
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
@@ -431,7 +435,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             _sharedTimeProvider!.Advance(DEFAULT_IDLE_TIMEOUT + TimeSpan.FromSeconds(5));
 
             // Wait for all idle grains to be deactivated using event-driven approach
-            await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain2", idleGrainCount, MAX_WAIT_TIME);
+            // Pass the FakeTimeProvider to continue advancing time during polling
+            await _diagnosticObserver.WaitForDeactivationCountAsync("IdleActivationGcTestGrain2", idleGrainCount, MAX_WAIT_TIME, _sharedTimeProvider);
 
             // we should have only collected grains from the idle category (IdleActivationGcTestGrain2).
             int idleActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, idleGrainTypeName);
@@ -536,10 +541,12 @@ namespace UnitTests.ActivationsLifeCycleTests
                     "ActivationCollectorShouldNotCollectBusyStatelessWorkers: waiting for {ExpectedDeactivations} deactivations.",
                     expectedDeactivations);
 
+                // Pass the FakeTimeProvider to continue advancing time during polling
                 await _diagnosticObserver.WaitForDeactivationCountAsync(
                     "StatelessWorkerActivationCollectorTestGrain1",
                     expectedDeactivations,
-                    MAX_WAIT_TIME);
+                    MAX_WAIT_TIME,
+                    _sharedTimeProvider);
 
                 // Step 5: Stop the busy worker and verify exactly one activation remains
                 iterationCts.Cancel();
@@ -596,7 +603,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             _sharedTimeProvider!.Advance(TimeSpan.FromSeconds(15));
 
             // Wait for all grains to be deactivated using event-driven approach
-            await _diagnosticObserver.WaitForDeactivationCountAsync("CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain", grainCount, MAX_WAIT_TIME);
+            // Pass the FakeTimeProvider to continue advancing time during polling
+            await _diagnosticObserver.WaitForDeactivationCountAsync("CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain", grainCount, MAX_WAIT_TIME, _sharedTimeProvider);
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);

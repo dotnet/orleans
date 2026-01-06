@@ -1,6 +1,7 @@
 #nullable enable
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using Microsoft.Extensions.Time.Testing;
 using Orleans;
 using Orleans.Diagnostics;
 using Orleans.Runtime;
@@ -194,9 +195,12 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<DiagnosticL
     /// <param name="grainTypeName">The grain type name to filter by.</param>
     /// <param name="expectedCount">The minimum number of deactivations to wait for.</param>
     /// <param name="timeout">Maximum time to wait. Defaults to 60 seconds.</param>
+    /// <param name="fakeTimeProvider">Optional FakeTimeProvider to advance during waiting. When provided,
+    /// time will be advanced in 1-second increments during each polling iteration to trigger time-dependent
+    /// operations like the ActivationCollector's PeriodicTimer.</param>
     /// <returns>A task that completes when the expected count is reached.</returns>
     /// <exception cref="TimeoutException">Thrown if the expected count is not reached within the timeout.</exception>
-    public async Task WaitForDeactivationCountAsync(string grainTypeName, int expectedCount, TimeSpan? timeout = null)
+    public async Task WaitForDeactivationCountAsync(string grainTypeName, int expectedCount, TimeSpan? timeout = null, FakeTimeProvider? fakeTimeProvider = null)
     {
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(60);
         using var cts = new CancellationTokenSource(effectiveTimeout);
@@ -208,6 +212,10 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<DiagnosticL
             {
                 return;
             }
+
+            // Advance fake time if provided to trigger time-dependent operations
+            // like the ActivationCollector's PeriodicTimer
+            fakeTimeProvider?.Advance(TimeSpan.FromSeconds(1));
 
             try
             {
