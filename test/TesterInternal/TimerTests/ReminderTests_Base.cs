@@ -118,6 +118,7 @@ namespace UnitTests.TimerTests
 
         /// <summary>
         /// Event-driven waiting: advances virtual time and waits for TickCompleted events.
+        /// This method advances time incrementally and gives the async infrastructure time to process.
         /// </summary>
         private async Task<int> WaitForReminderTickCountWithEventsAsync(GrainId grainId, string reminderName, int expectedCount, TimeSpan timeout)
         {
@@ -131,39 +132,32 @@ namespace UnitTests.TimerTests
                 return currentCount;
             }
 
-            // Calculate how many more ticks we need
             // Default reminder config: period = 12s, dueTime = 10s (period - 2s)
-            // So first tick needs ~10s, each subsequent tick needs ~12s more
-            // We advance in 2-second increments to ensure we don't miss timer firings
-            // and allow enough iterations to cover the expected time needed
-            int ticksNeeded = expectedCount - currentCount;
+            // We need to advance enough virtual time and give the async machinery time to process.
+            // Use a pattern similar to the ActivationCollector tests: advance time, wait briefly for processing.
             const int SecondsPerAdvance = 2;
-            const int ExpectedPeriodSeconds = 12;
-            const int ExpectedDueTimeSeconds = 10;
             
-            // Calculate how many seconds of virtual time we need to advance
-            int secondsNeeded = ExpectedDueTimeSeconds + (ticksNeeded * ExpectedPeriodSeconds);
-            var maxIterations = (secondsNeeded / SecondsPerAdvance) + 20; // Extra buffer for timing variations
+            // Calculate maximum iterations needed:
+            // - First tick needs ~10s (dueTime)
+            // - Subsequent ticks need ~12s each (period)
+            // - For expectedCount ticks: ~10 + (expectedCount * 12) seconds of virtual time
+            // - With 2 seconds per advance: (10 + expectedCount * 12) / 2 iterations
+            // - Add generous buffer for timing variations
+            var maxIterations = (10 + expectedCount * 12) / SecondsPerAdvance + 50;
             
             for (int i = 0; i < maxIterations && currentCount < expectedCount; i++)
             {
-                // Create an awaiter for the next tick event BEFORE advancing time
-                var awaiter = DiagnosticCollector!.CreateEventAwaiter(OrleansRemindersDiagnostics.EventNames.TickCompleted);
-                
                 // Advance time in increments to trigger timers
                 FakeTimeProvider!.Advance(TimeSpan.FromSeconds(SecondsPerAdvance));
                 
-                // Wait briefly for the event (with a short real timeout since FakeTimeProvider should make it instant)
-                try
-                {
-                    await awaiter.Task.WaitAsync(TimeSpan.FromMilliseconds(100));
-                }
-                catch (TimeoutException)
-                {
-                    // No event fired this iteration, continue
-                }
+                // Give the async timer infrastructure time to process
+                // Use Task.Delay with a real timeout to allow continuations to run
+                await Task.Delay(50);
                 
-                // Recount
+                // Yield to allow any pending async operations to complete
+                await Task.Yield();
+                
+                // Recount tick events
                 currentCount = CountTickCompletedEvents(grainId, reminderName);
             }
 
@@ -174,8 +168,8 @@ namespace UnitTests.TimerTests
             }
             else
             {
-                log.LogWarning("WaitForReminderTickCount (events): {ReminderName} only reached {Count} ticks (expected {Expected})", 
-                    reminderName, currentCount, expectedCount);
+                log.LogWarning("WaitForReminderTickCount (events): {ReminderName} only reached {Count} ticks (expected {Expected}) after {Iterations} iterations", 
+                    reminderName, currentCount, expectedCount, maxIterations);
             }
             
             return currentCount;
