@@ -128,9 +128,7 @@ namespace Orleans.Runtime.Placement
                     var director = _placementFilterDirectoryResolver.GetFilterDirector(placementFilter);
 
                     // Create a span for each filter invocation
-                    using var filterSpan = ActivitySources.RuntimeGrainSource.StartActivity(
-                        "orleans.placement.filter",
-                        ActivityKind.Internal);
+                    using var filterSpan = ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.FilterPlacementCandidates);
                     filterSpan?.SetTag("orleans.placement.filter.type", placementFilter.GetType().Name);
                     filterSpan?.SetTag("orleans.grain.type", grainType.ToString());
 
@@ -380,7 +378,7 @@ namespace Orleans.Runtime.Placement
 
                 // Restore activity context from the message's request context data
                 // This ensures directory lookups are properly traced as children of the original request
-                using var restoredActivity = TryRestoreActivityContext(firstMessage.RequestContextData, "orleans.placement");
+                using var restoredActivity = TryRestoreActivityContext(firstMessage.RequestContextData, ActivityNames.PlaceGrain);
 
                 var target = new PlacementTarget(
                     firstMessage.TargetGrain,
