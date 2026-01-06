@@ -1531,8 +1531,8 @@ internal sealed partial class ActivationData :
             {
                 // Start directory registration activity as a child of the activation activity
                 Activity? registerSpan = _activationActivity is not null
-                    ? ActivitySources.RuntimeGrainSource.StartActivity("orleans.directory.register", ActivityKind.Client, _activationActivity.Context)
-                    : ActivitySources.RuntimeGrainSource.StartActivity("orleans.directory.register", ActivityKind.Client);
+                    ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.RegisterDirectoryEntry, ActivityKind.Internal, _activationActivity.Context)
+                    : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.RegisterDirectoryEntry, ActivityKind.Internal);
                 registerSpan?.SetTag("orleans.grain.id", GrainId.ToString());
                 registerSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
                 registerSpan?.SetTag("orleans.activation.id", ActivationId.ToString());
@@ -1651,8 +1651,8 @@ internal sealed partial class ActivationData :
                 {
                     // Start a span for OnActivateAsync execution
                     using var onActivateSpan = _activationActivity is not null
-                        ? ActivitySources.RuntimeGrainSource.StartActivity("orleans.activation.on-activate", ActivityKind.Internal, _activationActivity.Context)
-                        : ActivitySources.RuntimeGrainSource.StartActivity("orleans.activation.on-activate", ActivityKind.Internal);
+                        ? ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.OnActivate, ActivityKind.Internal, _activationActivity.Context)
+                        : ActivitySources.RuntimeGrainSource.StartActivity(ActivityNames.OnActivate, ActivityKind.Internal);
                     onActivateSpan?.SetTag("orleans.grain.id", GrainId.ToString());
                     onActivateSpan?.SetTag("orleans.grain.type", _shared.GrainTypeName ?? GrainInstance.GetType().FullName);
                     onActivateSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
