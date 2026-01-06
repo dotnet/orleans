@@ -87,7 +87,7 @@ namespace UnitTests.General
             parent?.Start();
             try
             {
-                var grain = _fixture.GrainFactory.GetGrain<IFilteredActivityGrain>(Random.Shared.Next());
+                var grain = _fixture.GrainFactory.GetGrain<IActivityGrain>(Random.Shared.Next());
                 // First call should force activation
                 var _ = await grain.GetActivityId();
 
@@ -99,29 +99,25 @@ namespace UnitTests.General
                 var testParentTraceId = parent.TraceId.ToString();
 
                 // Find the placement span - should be parented to the grain call which is parented to test-parent
-                var placementSpan = Started.FirstOrDefault(a => a.OperationName == "orleans.placement");
+                var placementSpan = Started.FirstOrDefault(a => a.OperationName == ActivityNames.PlaceGrain);
                 Assert.NotNull(placementSpan);
                 Assert.Equal(testParentTraceId, placementSpan.TraceId.ToString());
 
                 // Find the placement filter span - should share the same trace ID as test-parent
-                var placementFilterSpan = Started.FirstOrDefault(a => a.OperationName == "orleans.placement.filter");
-                Assert.NotNull(placementFilterSpan);
-                Assert.Equal(testParentTraceId, placementFilterSpan.TraceId.ToString());
-                Assert.Equal("TracingTestPlacementFilterStrategy", placementFilterSpan.Tags.FirstOrDefault(t => t.Key == "orleans.placement.filter.type").Value);
+                var placementFilterSpan = Started.FirstOrDefault(a => a.OperationName == ActivityNames.FilterPlacementCandidates);
+                Assert.Null(placementFilterSpan);
 
                 // Find the activation span - should be parented to the grain call which is parented to test-parent
-                var activationSpan = Started.FirstOrDefault(a => a.OperationName == "orleans.activation");
+                var activationSpan = Started.FirstOrDefault(a => a.OperationName == ActivityNames.ActivateGrain);
                 Assert.NotNull(activationSpan);
                 Assert.Equal(testParentTraceId, activationSpan.TraceId.ToString());
 
                 // Find the OnActivateAsync span - should be parented to the activation span
-                var onActivateSpan = Started.FirstOrDefault(a => a.OperationName == "orleans.activation.on-activate");
-                Assert.NotNull(onActivateSpan);
-                Assert.Equal(testParentTraceId, onActivateSpan.TraceId.ToString());
-                Assert.Equal(activationSpan.SpanId.ToString(), onActivateSpan.ParentSpanId.ToString());
+                var onActivateSpan = Started.FirstOrDefault(a => a.OperationName == ActivityNames.OnActivate);
+                Assert.Null(onActivateSpan);
 
                 // Find the directory register span - should be parented to activation span
-                var directoryRegisterSpan = Started.FirstOrDefault(a => a.OperationName == "orleans.directory.register");
+                var directoryRegisterSpan = Started.FirstOrDefault(a => a.OperationName == ActivityNames.RegisterDirectoryEntry);
                 Assert.NotNull(directoryRegisterSpan);
                 Assert.Equal(testParentTraceId, directoryRegisterSpan.TraceId.ToString());
                 Assert.Equal(activationSpan.SpanId.ToString(), directoryRegisterSpan.ParentSpanId.ToString());
@@ -149,6 +145,84 @@ namespace UnitTests.General
             finally
             {
                 parent.Stop();
+                AssertNoApplicationSpansParentedByRuntimeSpans();
+                PrintActivityDiagnostics();
+            }
+        }
+
+        [Fact]
+        [TestCategory("BVT")]
+        public async Task ActivationSpanIncludesFilter()
+        {
+            Started.Clear();
+
+            using var parent = ActivitySources.ApplicationGrainSource.StartActivity("test-parent-filter");
+            parent?.Start();
+            try
+            {
+                var grain = _fixture.GrainFactory.GetGrain<IFilteredActivityGrain>(Random.Shared.Next());
+                // First call should force activation
+                var _ = await grain.GetActivityId();
+
+                // Expect at least one activation-related activity
+                var activationActivities = Started.Where(a => a.Source.Name == ActivationSourceName).ToList();
+                Assert.True(activationActivities.Count > 0, "Expected activation tracing activity to be created, but none were observed.");
+
+                // Verify all expected spans are present and properly parented under test-parent
+                var testParentTraceId = parent.TraceId.ToString();
+
+                // Find the placement span - should be parented to the grain call which is parented to test-parent
+                var placementSpan = Started.FirstOrDefault(a => a.OperationName == ActivityNames.PlaceGrain);
+                Assert.NotNull(placementSpan);
+                Assert.Equal(testParentTraceId, placementSpan.TraceId.ToString());
+
+                // Find the placement filter span - should share the same trace ID as test-parent
+                var placementFilterSpan = Started.FirstOrDefault(a => a.OperationName == ActivityNames.FilterPlacementCandidates);
+                Assert.NotNull(placementFilterSpan);
+                Assert.Equal(testParentTraceId, placementFilterSpan.TraceId.ToString());
+                Assert.Equal("TracingTestPlacementFilterStrategy", placementFilterSpan.Tags.FirstOrDefault(t => t.Key == "orleans.placement.filter.type").Value);
+
+                // Find the activation span - should be parented to the grain call which is parented to test-parent
+                var activationSpan = Started.FirstOrDefault(a => a.OperationName == ActivityNames.ActivateGrain);
+                Assert.NotNull(activationSpan);
+                Assert.Equal(testParentTraceId, activationSpan.TraceId.ToString());
+
+                // Find the OnActivateAsync span - should be parented to the activation span
+                var onActivateSpan = Started.FirstOrDefault(a => a.OperationName == ActivityNames.OnActivate);
+                Assert.NotNull(onActivateSpan);
+                Assert.Equal(testParentTraceId, onActivateSpan.TraceId.ToString());
+                Assert.Equal(activationSpan.SpanId.ToString(), onActivateSpan.ParentSpanId.ToString());
+
+                // Find the directory register span - should be parented to activation span
+                var directoryRegisterSpan = Started.FirstOrDefault(a => a.OperationName == ActivityNames.RegisterDirectoryEntry);
+                Assert.NotNull(directoryRegisterSpan);
+                Assert.Equal(testParentTraceId, directoryRegisterSpan.TraceId.ToString());
+                Assert.Equal(activationSpan.SpanId.ToString(), directoryRegisterSpan.ParentSpanId.ToString());
+
+                // Find the directory lookup spans - should share the same trace ID as test-parent
+                var lookupSpans = Started.Where(a =>
+                    a.OperationName == "IGrainDirectoryPartition/LookupAsync" &&
+                    a.Source.Name == ActivitySources.RuntimeActivitySourceName).ToList();
+                Assert.True(lookupSpans.Count > 0, "Expected at least one directory lookup span");
+                foreach (var lookupSpan in lookupSpans)
+                {
+                    Assert.Equal(testParentTraceId, lookupSpan.TraceId.ToString());
+                }
+
+                // Find the directory register RPC spans - should share the same trace ID as test-parent
+                var registerSpans = Started.Where(a =>
+                    a.OperationName == "IGrainDirectoryPartition/RegisterAsync" &&
+                    a.Source.Name == ActivitySources.RuntimeActivitySourceName).ToList();
+                Assert.True(registerSpans.Count > 0, "Expected at least one directory register RPC span");
+                foreach (var registerSpan in registerSpans)
+                {
+                    Assert.Equal(testParentTraceId, registerSpan.TraceId.ToString());
+                }
+            }
+            finally
+            {
+                parent.Stop();
+                AssertNoApplicationSpansParentedByRuntimeSpans();
                 PrintActivityDiagnostics();
             }
         }
@@ -175,7 +249,7 @@ namespace UnitTests.General
                 var testParentTraceId = parent.TraceId.ToString();
 
                 // Find the activation span - should be parented to the grain call which is parented to test-parent
-                var activationSpan = Started.FirstOrDefault(a => a.OperationName == "orleans.activation" && a.Tags.First(kv => kv.Key == "orleans.grain.type").Value == "persistentstateactivity");
+                var activationSpan = Started.FirstOrDefault(a => a.OperationName == ActivityNames.ActivateGrain && a.Tags.First(kv => kv.Key == "orleans.grain.type").Value == "persistentstateactivity");
                 Assert.NotNull(activationSpan);
                 Assert.Equal(testParentTraceId, activationSpan.TraceId.ToString());
 
@@ -196,6 +270,7 @@ namespace UnitTests.General
             finally
             {
                 parent.Stop();
+                AssertNoApplicationSpansParentedByRuntimeSpans();
                 PrintActivityDiagnostics();
             }
         }
@@ -272,6 +347,7 @@ namespace UnitTests.General
             finally
             {
                 parent?.Stop();
+                AssertNoApplicationSpansParentedByRuntimeSpans();
                 PrintActivityDiagnostics();
             }
         }
@@ -346,7 +422,50 @@ namespace UnitTests.General
             finally
             {
                 parent.Stop();
+                AssertNoApplicationSpansParentedByRuntimeSpans();
                 PrintActivityDiagnostics();
+            }
+        }
+
+        /// <summary>
+        /// Asserts that no spans from ApplicationGrainActivitySourceName have parents from RuntimeActivitySourceName.
+        /// This ensures that if only ApplicationGrainActivitySourceName has been added (without RuntimeActivitySourceName),
+        /// there won't be any hanging traces put at root because of missing RuntimeActivitySourceName spans
+        /// that would otherwise propagate the trace context.
+        /// </summary>
+        private void AssertNoApplicationSpansParentedByRuntimeSpans()
+        {
+            var activities = Started.ToList();
+            var activityById = activities
+                .Where(a => a.Id is not null)
+                .ToDictionary(a => a.Id!);
+
+            var applicationSpans = activities
+                .Where(a => a.Source.Name == ActivitySources.ApplicationGrainActivitySourceName)
+                .ToList();
+
+            var violations = new List<(Activity Child, Activity Parent)>();
+
+            foreach (var appSpan in applicationSpans)
+            {
+                if (appSpan.ParentId is not null && activityById.TryGetValue(appSpan.ParentId, out var parentActivity))
+                {
+                    if (parentActivity.Source.Name == ActivitySources.RuntimeActivitySourceName)
+                    {
+                        violations.Add((appSpan, parentActivity));
+                    }
+                }
+            }
+
+            if (violations.Count > 0)
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine($"Found {violations.Count} ApplicationGrainActivitySourceName span(s) with RuntimeActivitySourceName parent(s):");
+                foreach (var (child, violationParent) in violations)
+                {
+                    sb.AppendLine($"  - Application span '{child.OperationName}' (Id: {child.Id}) has Runtime parent '{violationParent.OperationName}' (Id: {violationParent.Id})");
+                }
+                Assert.Fail(sb.ToString());
             }
         }
 
