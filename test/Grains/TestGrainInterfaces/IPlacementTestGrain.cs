@@ -32,6 +32,16 @@ namespace UnitTests.GrainInterfaces
         /// Call this after latching CPU/overloaded on all silos to ensure deterministic behavior.
         /// </summary>
         Task RefreshOverloadDetectorAndPropagateStatistics();
+        /// <summary>
+        /// Atomically latches CPU usage and refreshes OverloadDetector, then propagates statistics.
+        /// This avoids race conditions where the OverloadDetector auto-refreshes between latch and explicit refresh.
+        /// </summary>
+        Task LatchCpuUsageAndPropagate(float value);
+        /// <summary>
+        /// Atomically latches overloaded status and refreshes OverloadDetector, then propagates statistics.
+        /// This avoids race conditions where the OverloadDetector auto-refreshes between latch and explicit refresh.
+        /// </summary>
+        Task LatchOverloadedAndPropagate();
         Task<SiloAddress> GetLocation();
     }
 

@@ -233,17 +233,13 @@ namespace UnitTests.General
             var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
             var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.SecondarySilos.First().SiloAddress);
 
-            // Latch CPU/overloaded on all silos in parallel.
-            // This ensures all silos are tainted before any gateway starts rejecting requests.
+            // Atomically latch and propagate on all silos in parallel.
+            // Using the atomic methods avoids the race condition where OverloadDetector
+            // auto-refreshes between latching and explicit refresh, causing the silo
+            // to reject subsequent RPC calls.
             await Task.WhenAll(
-                taintedGrainPrimary.LatchCpuUsageOnly(100.0f),
-                taintedGrainSecondary.LatchOverloadedOnly());
-
-            // Now refresh OverloadDetector caches and propagate statistics in parallel.
-            // After this, both silos will reject requests due to overload.
-            await Task.WhenAll(
-                taintedGrainPrimary.RefreshOverloadDetectorAndPropagateStatistics(),
-                taintedGrainSecondary.RefreshOverloadDetectorAndPropagateStatistics());
+                taintedGrainPrimary.LatchCpuUsageAndPropagate(100.0f),
+                taintedGrainSecondary.LatchOverloadedAndPropagate());
 
             // OrleansException or GatewayTooBusyException
             var exception = await Assert.ThrowsAnyAsync<Exception>(() =>

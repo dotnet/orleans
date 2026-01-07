@@ -200,6 +200,38 @@ namespace UnitTests.Grains
             return PropagateStatisticsToCluster(GrainFactory);
         }
 
+        public Task LatchCpuUsageAndPropagate(float value)
+        {
+            var stats = environmentStatistics.GetEnvironmentStatistics();
+            environmentStatistics.LatchHardwareStatistics(new(
+                cpuUsagePercentage: value,
+                rawCpuUsagePercentage: value,
+                memoryUsageBytes: stats.FilteredMemoryUsageBytes,
+                rawMemoryUsageBytes: stats.RawMemoryUsageBytes,
+                availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
+                rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
+                maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
+            // Atomically refresh the OverloadDetector cache
+            overloadDetector.ForceRefresh();
+            return PropagateStatisticsToCluster(GrainFactory);
+        }
+
+        public Task LatchOverloadedAndPropagate()
+        {
+            var stats = environmentStatistics.GetEnvironmentStatistics();
+            environmentStatistics.LatchHardwareStatistics(new EnvironmentStatistics(
+                cpuUsagePercentage: loadSheddingOptions.CpuThreshold + 1,
+                rawCpuUsagePercentage: loadSheddingOptions.CpuThreshold + 1,
+                memoryUsageBytes: stats.FilteredMemoryUsageBytes,
+                rawMemoryUsageBytes: stats.RawMemoryUsageBytes,
+                availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
+                rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
+                maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
+            // Atomically refresh the OverloadDetector cache
+            overloadDetector.ForceRefresh();
+            return PropagateStatisticsToCluster(GrainFactory);
+        }
+
         public Task<SiloAddress> GetLocation()
         {
             return Task.FromResult(_grainContext.Address.SiloAddress);

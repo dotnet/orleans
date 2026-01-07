@@ -80,7 +80,11 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
         await Cluster.StopSiloAsync(Cluster.Silos.First(x => x.SiloAddress.Equals(rebalancerHost)));
 
         // Wait for 3 more cycles (total 6)
-        await RebalancerObserver.WaitForCycleCountAsync(totalCycles, timeout: TimeSpan.FromSeconds(60));
+        // After stopping the silo, a new rebalancer must spin up on another silo.
+        // The new rebalancer has a RebalancerDueTime (5s) delay before starting,
+        // then needs to complete 3 cycles (3s each). We use a longer timeout to
+        // account for election/startup overhead and any system delays.
+        await RebalancerObserver.WaitForCycleCountAsync(totalCycles, timeout: TimeSpan.FromSeconds(90));
 
         stats = await MgmtGrain.GetDetailedGrainStatistics();
 
