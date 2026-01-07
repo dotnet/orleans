@@ -4,16 +4,9 @@ using System.Collections.Generic;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class ConnectionLogScope : IReadOnlyList<KeyValuePair<string, object>>
+    internal class ConnectionLogScope(Connection connection) : IReadOnlyList<KeyValuePair<string, object>>
     {
-        private readonly Connection _connection;
-
         private string _cachedToString;
-
-        public ConnectionLogScope(Connection connection)
-        {
-            _connection = connection;
-        }
 
         public KeyValuePair<string, object> this[int index]
         {
@@ -21,17 +14,17 @@ namespace Orleans.Runtime.Messaging
             {
                 if (index == 0)
                 {
-                    return new KeyValuePair<string, object>(nameof(Connection.ConnectionId), _connection.ConnectionId);
+                    return new KeyValuePair<string, object>(nameof(Connection.ConnectionId), connection.ConnectionId);
                 }
 
                 if (index == 1)
                 {
-                    return new KeyValuePair<string, object>(nameof(Connection.LocalEndPoint), _connection.LocalEndPoint);
+                    return new KeyValuePair<string, object>(nameof(Connection.LocalEndPoint), connection.LocalEndPoint);
                 }
 
                 if (index == 2)
                 {
-                    return new KeyValuePair<string, object>(nameof(Connection.RemoteEndPoint), _connection.RemoteEndPoint);
+                    return new KeyValuePair<string, object>(nameof(Connection.RemoteEndPoint), connection.RemoteEndPoint);
                 }
 
                 throw new ArgumentOutOfRangeException(nameof(index));
@@ -57,7 +50,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (_cachedToString == null)
             {
-                _cachedToString = _connection.ToString();
+                _cachedToString = connection.ToString();
             }
 
             return _cachedToString;

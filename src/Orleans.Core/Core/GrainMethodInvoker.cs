@@ -12,40 +12,24 @@ namespace Orleans.Runtime
     /// <summary>
     /// Invokes a request on a grain.
     /// </summary>
-    internal sealed class GrainMethodInvoker : IIncomingGrainCallContext
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="GrainMethodInvoker"/> class.
+    /// </remarks>
+    /// <param name="message">The message.</param>
+    /// <param name="grainContext">The grain.</param>
+    /// <param name="request">The request.</param>
+    /// <param name="filters">The invocation interceptors.</param>
+    /// <param name="interfaceToImplementationMapping">The implementation map.</param>
+    /// <param name="responseCopier">The response copier.</param>
+    internal sealed class GrainMethodInvoker(
+        Message message,
+        IGrainContext grainContext,
+        IInvokable request,
+        List<IIncomingGrainCallFilter> filters,
+        InterfaceToImplementationMappingCache interfaceToImplementationMapping,
+        DeepCopier<Response> responseCopier) : IIncomingGrainCallContext
     {
-        private readonly Message message;
-        private readonly IInvokable request;
-        private readonly List<IIncomingGrainCallFilter> filters;
-        private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
-        private readonly DeepCopier<Response> responseCopier;
-        private readonly IGrainContext grainContext;
         private int stage;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="GrainMethodInvoker"/> class.
-        /// </summary>
-        /// <param name="message">The message.</param>
-        /// <param name="grainContext">The grain.</param>
-        /// <param name="request">The request.</param>
-        /// <param name="filters">The invocation interceptors.</param>
-        /// <param name="interfaceToImplementationMapping">The implementation map.</param>
-        /// <param name="responseCopier">The response copier.</param>
-        public GrainMethodInvoker(
-            Message message,
-            IGrainContext grainContext,
-            IInvokable request,
-            List<IIncomingGrainCallFilter> filters,
-            InterfaceToImplementationMappingCache interfaceToImplementationMapping,
-            DeepCopier<Response> responseCopier)
-        {
-            this.message = message;
-            this.request = request;
-            this.grainContext = grainContext;
-            this.filters = filters;
-            this.interfaceToImplementationMapping = interfaceToImplementationMapping;
-            this.responseCopier = responseCopier;
-        }
 
         public IInvokable Request => request;
 
@@ -89,7 +73,7 @@ namespace Orleans.Runtime
                 if (stage < numFilters)
                 {
                     // Call each of the specified interceptors.
-                    var systemWideFilter = this.filters[stage];
+                    var systemWideFilter = filters[stage];
                     stage++;
                     await systemWideFilter.Invoke(this);
 
@@ -132,7 +116,7 @@ namespace Orleans.Runtime
                         ExceptionDispatchInfo.Capture(exception).Throw();
                     }
 
-                    this.Response = this.responseCopier.Copy(this.Response);
+                    this.Response = responseCopier.Copy(this.Response);
 
                     return;
                 }
@@ -160,8 +144,8 @@ namespace Orleans.Runtime
 
         private (MethodInfo ImplementationMethod, MethodInfo InterfaceMethod) GetMethodEntry()
         {
-            var interfaceType = this.request.GetInterfaceType();
-            var implementationType = this.request.GetTarget().GetType();
+            var interfaceType = request.GetInterfaceType();
+            var implementationType = request.GetTarget().GetType();
 
             // Get or create the implementation map for this object.
             var implementationMap = interfaceToImplementationMapping.GetOrCreate(

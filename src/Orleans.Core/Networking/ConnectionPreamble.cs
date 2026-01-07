@@ -24,21 +24,16 @@ namespace Orleans.Runtime.Messaging
         public string ClusterId { get; init; }
     }
 
-    internal sealed class ConnectionPreambleHelper
+    internal sealed class ConnectionPreambleHelper(Serializer<ConnectionPreamble> preambleSerializer)
     {
         private const int MaxPreambleLength = 1024;
-        private readonly Serializer<ConnectionPreamble> _preambleSerializer;
-        public ConnectionPreambleHelper(Serializer<ConnectionPreamble> preambleSerializer)
-        {
-            _preambleSerializer = preambleSerializer;
-        }
 
         internal async ValueTask Write(ConnectionContext connection, ConnectionPreamble preamble)
         {
             var output = connection.Transport.Output;
             using var outputWriter = new PrefixingBufferWriter(sizeof(int), 1024, MemoryPool<byte>.Shared);
             outputWriter.Init(output);
-            _preambleSerializer.Serialize(
+            preambleSerializer.Serialize(
                 preamble,
                 outputWriter);
 
@@ -108,7 +103,7 @@ namespace Orleans.Runtime.Messaging
 
             try
             {
-                var preamble = _preambleSerializer.Deserialize(payloadBuffer);
+                var preamble = preambleSerializer.Deserialize(payloadBuffer);
                 return preamble;
             }
             finally

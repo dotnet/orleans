@@ -16,10 +16,7 @@ namespace Orleans.Threading
         private int lockState = UNLOCKED;
         private readonly Func<bool> spinCondition;
 
-        public RecursiveInterlockedExchangeLock()
-        {
-            this.spinCondition = this.TryGet;
-        }
+        public RecursiveInterlockedExchangeLock() => this.spinCondition = this.TryGet;
 
         private static int ThreadId => localThreadId != 0 ? localThreadId : localThreadId = Environment.CurrentManagedThreadId;
 

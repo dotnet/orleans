@@ -9,39 +9,22 @@ using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed partial class ClientOutboundConnection : Connection
+    internal sealed partial class ClientOutboundConnection(
+        SiloAddress remoteSiloAddress,
+        ConnectionContext connection,
+        ConnectionDelegate middleware,
+        ClientMessageCenter messageCenter,
+        ConnectionManager connectionManager,
+        ConnectionOptions connectionOptions,
+        ConnectionCommon connectionShared,
+        ConnectionPreambleHelper connectionPreambleHelper,
+        ClusterOptions clusterOptions) : Connection(connection, middleware, connectionShared)
     {
-        private readonly ClientMessageCenter messageCenter;
-        private readonly ConnectionManager connectionManager;
-        private readonly ConnectionOptions connectionOptions;
-        private readonly ClusterOptions clusterOptions;
-        private readonly ConnectionPreambleHelper connectionPreambleHelper;
-
-        public ClientOutboundConnection(
-            SiloAddress remoteSiloAddress,
-            ConnectionContext connection,
-            ConnectionDelegate middleware,
-            ClientMessageCenter messageCenter,
-            ConnectionManager connectionManager,
-            ConnectionOptions connectionOptions,
-            ConnectionCommon connectionShared,
-            ConnectionPreambleHelper connectionPreambleHelper,
-            ClusterOptions clusterOptions)
-            : base(connection, middleware, connectionShared)
-        {
-            this.messageCenter = messageCenter;
-            this.connectionManager = connectionManager;
-            this.connectionOptions = connectionOptions;
-            this.connectionPreambleHelper = connectionPreambleHelper;
-            this.clusterOptions = clusterOptions;
-            this.RemoteSiloAddress = remoteSiloAddress ?? throw new ArgumentNullException(nameof(remoteSiloAddress));
-        }
-
-        public SiloAddress RemoteSiloAddress { get; }
+        public SiloAddress RemoteSiloAddress { get; } = remoteSiloAddress ?? throw new ArgumentNullException(nameof(remoteSiloAddress));
 
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.ClientToGateway;
 
-        protected override IMessageCenter MessageCenter => this.messageCenter;
+        protected override IMessageCenter MessageCenter => messageCenter;
 
         protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
         {
@@ -55,7 +38,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnReceivedMessage(Message message)
         {
-            this.messageCenter.DispatchLocalMessage(message);
+            messageCenter.DispatchLocalMessage(message);
         }
 
         protected override async Task RunInternal()
@@ -63,15 +46,15 @@ namespace Orleans.Runtime.Messaging
             Exception error = default;
             try
             {
-                this.messageCenter.OnGatewayConnectionOpen();
+                messageCenter.OnGatewayConnectionOpen();
 
                 var myClusterId = clusterOptions.ClusterId;
                 await connectionPreambleHelper.Write(
                     this.Context,
                     new ConnectionPreamble
                     {
-                        NetworkProtocolVersion = this.connectionOptions.ProtocolVersion,
-                        NodeIdentity = this.messageCenter.ClientId.GrainId,
+                        NetworkProtocolVersion = connectionOptions.ProtocolVersion,
+                        NodeIdentity = messageCenter.ClientId.GrainId,
                         SiloAddress = null,
                         ClusterId = myClusterId
                     });
@@ -92,8 +75,8 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                this.connectionManager.OnConnectionTerminated(this.RemoteSiloAddress, this, error);
-                this.messageCenter.OnGatewayConnectionClosed();
+                connectionManager.OnConnectionTerminated(this.RemoteSiloAddress, this, error);
+                messageCenter.OnGatewayConnectionClosed();
             }
         }
 
@@ -104,7 +87,7 @@ namespace Orleans.Runtime.Messaging
             {
                 // Recycle the message we've dequeued. Note that this will recycle messages that were queued up to be sent when the gateway connection is declared dead
                 msg.TargetSilo = null;
-                this.messageCenter.SendMessage(msg);
+                messageCenter.SendMessage(msg);
                 return false;
             }
 
@@ -122,7 +105,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 ++msg.RetryCount;
-                this.messageCenter.SendMessage(msg);
+                messageCenter.SendMessage(msg);
             }
             else
             {
@@ -165,7 +148,7 @@ namespace Orleans.Runtime.Messaging
         protected override void OnSendMessageFailure(Message message, string error)
         {
             message.TargetSilo = null;
-            this.messageCenter.SendMessage(message);
+            messageCenter.SendMessage(message);
         }
 
         [LoggerMessage(

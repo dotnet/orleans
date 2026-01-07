@@ -9,27 +9,20 @@ namespace Orleans.Metadata
     /// <summary>
     /// Associates a <see cref="GrainInterfaceType"/> with a <see cref="Type" />.
     /// </summary>
-    public class GrainInterfaceTypeResolver
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="GrainInterfaceTypeResolver"/> class.
+    /// </remarks>
+    /// <param name="providers">
+    /// The collection of grain interface type providers.
+    /// </param>
+    /// <param name="typeConverter">
+    /// The type converter, used for generic parameter names.
+    /// </param>
+    public class GrainInterfaceTypeResolver(
+        IEnumerable<IGrainInterfaceTypeProvider> providers,
+        TypeConverter typeConverter)
     {
-        private readonly IGrainInterfaceTypeProvider[] _providers;
-        private readonly TypeConverter _typeConverter;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="GrainInterfaceTypeResolver"/> class.
-        /// </summary>
-        /// <param name="providers">
-        /// The collection of grain interface type providers.
-        /// </param>
-        /// <param name="typeConverter">
-        /// The type converter, used for generic parameter names.
-        /// </param>
-        public GrainInterfaceTypeResolver(
-            IEnumerable<IGrainInterfaceTypeProvider> providers,
-            TypeConverter typeConverter)
-        {
-            _providers = providers.ToArray();
-            _typeConverter = typeConverter;
-        }
+        private readonly IGrainInterfaceTypeProvider[] _providers = providers.ToArray();
 
         /// <summary>
         /// Returns the <see cref="GrainInterfaceType"/> for the provided interface.
@@ -64,7 +57,7 @@ namespace Orleans.Metadata
         /// <returns>The grain interface type name.</returns>
         public GrainInterfaceType GetGrainInterfaceTypeByConvention(Type type)
         {
-            var result = GrainInterfaceType.Create(_typeConverter.Format(type, input => input switch
+            var result = GrainInterfaceType.Create(typeConverter.Format(type, input => input switch
             {
                 AssemblyQualifiedTypeSpec asm => asm.Type, // drop outer assembly qualification
                 _ => input
@@ -81,7 +74,7 @@ namespace Orleans.Metadata
                 && !type.ContainsGenericParameters
                 && !genericGrainType.IsConstructed)
             {
-                result = genericGrainType.Construct(_typeConverter, type.GetGenericArguments()).Value;
+                result = genericGrainType.Construct(typeConverter, type.GetGenericArguments()).Value;
             }
 
             return result;

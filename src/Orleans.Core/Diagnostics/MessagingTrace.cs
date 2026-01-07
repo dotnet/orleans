@@ -64,10 +64,7 @@ namespace Orleans.Runtime
 
         private readonly ILogger log;
 
-        public MessagingTrace(ILoggerFactory loggerFactory) : base(Category)
-        {
-            this.log = loggerFactory.CreateLogger(Category);
-        }
+        public MessagingTrace(ILoggerFactory loggerFactory) : base(Category) => this.log = loggerFactory.CreateLogger(Category);
 
         public void OnSendMessage(Message message)
         {

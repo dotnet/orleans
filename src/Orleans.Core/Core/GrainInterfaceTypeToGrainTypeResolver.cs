@@ -25,10 +25,7 @@ namespace Orleans
         /// Creates a new instance of the <see cref="GrainInterfaceTypeToGrainTypeResolver"/> class.
         /// </summary>
         /// <param name="clusterManifestProvider">The cluster manifest provider.</param>
-        public GrainInterfaceTypeToGrainTypeResolver(IClusterManifestProvider clusterManifestProvider)
-        {
-            _clusterManifestProvider = clusterManifestProvider;
-        }
+        public GrainInterfaceTypeToGrainTypeResolver(IClusterManifestProvider clusterManifestProvider) => _clusterManifestProvider = clusterManifestProvider;
 
         /// <summary>
         /// Returns the <see cref="GrainType"/> which supports the provided <see cref="GrainInterfaceType"/> and which has an implementing type name beginning with the provided prefix string.

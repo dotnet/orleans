@@ -12,20 +12,15 @@ namespace Orleans.Serialization
     /// <summary>
     /// Utility class for configuring <see cref="JsonSerializerSettings"/> to support Orleans types.
     /// </summary>
-    public class OrleansJsonSerializer
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="OrleansJsonSerializer"/> class.
+    /// </remarks>
+    public class OrleansJsonSerializer(IOptions<OrleansJsonSerializerOptions> options)
     {
         public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
         public const string IndentJsonProperty = "IndentJSON";
         public const string TypeNameHandlingProperty = "TypeNameHandling";
-        private readonly JsonSerializerSettings settings;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="OrleansJsonSerializer"/> class.
-        /// </summary>
-        public OrleansJsonSerializer(IOptions<OrleansJsonSerializerOptions> options)
-        {
-            this.settings = options.Value.JsonSerializerSettings;
-        }
+        private readonly JsonSerializerSettings settings = options.Value.JsonSerializerSettings;
 
         /// <summary>
         /// Deserializes an object of the specified expected type from the provided input.

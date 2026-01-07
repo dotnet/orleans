@@ -7,19 +7,13 @@ namespace Orleans.Metadata
     /// <summary>
     /// Populates grain interface properties with the grain interfaces implemented by a grain class.
     /// </summary>
-    internal sealed class ImplementedInterfaceProvider : IGrainPropertiesProvider
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="ImplementedInterfaceProvider"/> class.
+    /// </remarks>
+    /// <param name="interfaceTypeResolver">The interface type resolver.</param>
+    internal sealed class ImplementedInterfaceProvider(GrainInterfaceTypeResolver interfaceTypeResolver) : IGrainPropertiesProvider
     {
-        private readonly GrainInterfaceTypeResolver interfaceTypeResolver;
         private readonly string[] _cachedKeys = new string[16];
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ImplementedInterfaceProvider"/> class.
-        /// </summary>
-        /// <param name="interfaceTypeResolver">The interface type resolver.</param>
-        public ImplementedInterfaceProvider(GrainInterfaceTypeResolver interfaceTypeResolver)
-        {
-            this.interfaceTypeResolver = interfaceTypeResolver;
-        }
 
         /// <inheritdoc/>
         public void Populate(Type grainClass, GrainType grainType, Dictionary<string, string> properties)
@@ -34,7 +28,7 @@ namespace Orleans.Metadata
                     { IsGenericType: true } when grainClass is { IsGenericType: true } => @interface.GetGenericTypeDefinition(),
                     _ => @interface
                 };
-                var interfaceId = this.interfaceTypeResolver.GetGrainInterfaceType(type);
+                var interfaceId = interfaceTypeResolver.GetGrainInterfaceType(type);
                 var key = (uint)counter < (uint)_cachedKeys.Length ? (_cachedKeys[counter] ??= GetKey(counter)) : GetKey(counter);
                 properties[key] = interfaceId.ToString();
                 ++counter;
