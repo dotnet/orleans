@@ -164,7 +164,7 @@ namespace Orleans.EventSourcing.Common
             Debug.Assert(host != null && services != null && initialstate != null);
             this.Host = host;
             this.Services = services;
-            this.initialstate = Services.DeepCopy(initialstate);
+            this.Initialstate = Services.DeepCopy(initialstate);
             InitializeConfirmedView(initialstate);
             worker = new BatchWorkerFromDelegate(Work);
         }
@@ -257,7 +257,7 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// Cached version of initial state used during initialization. And for resetting.
         /// </summary>
-        protected TLogView initialstate { init; get => Services.DeepCopy(field); }
+        protected TLogView Initialstate { init; get => Services.DeepCopy(field); }
 
         /// statistics gathering. Is null unless stats collection is turned on.
         protected LogConsistencyStatistics stats = null;
