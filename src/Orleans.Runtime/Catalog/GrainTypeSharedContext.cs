@@ -119,6 +119,28 @@ public sealed class GrainTypeSharedContext
     }
 
     /// <summary>
+    /// Gets a component.
+    /// </summary>
+    /// <param name="componentType">The type of the component.</param>
+    /// <returns>The component with the specified type.</returns>
+    public object? GetComponent(Type componentType)
+    {
+        if (componentType == typeof(PlacementStrategy))
+        {
+            return PlacementStrategy;
+        }
+
+        if (componentType == typeof(ILogger))
+        {
+            return Logger;
+        }
+
+        if (_components is null) return default;
+        _components.TryGetValue(componentType, out var resultObj);
+        return resultObj;
+    }
+
+    /// <summary>
     /// Registers a component.
     /// </summary>
     /// <typeparam name="TComponent">The type which can be used as a key to <see cref="GetComponent{TComponent}"/>.</typeparam>

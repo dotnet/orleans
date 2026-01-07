@@ -1,0 +1,8 @@
+schemaVersion: 0.0.1
+isProduction: true
+accountableOwners:
+  service: 29f743e3-3a8f-4955-89e1-dcd58905919a
+routing:
+  defaultAreaPath:
+    org: devdiv
+    path: DevDiv\ASP.NET Core
