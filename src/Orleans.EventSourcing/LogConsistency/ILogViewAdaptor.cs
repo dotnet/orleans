@@ -119,8 +119,8 @@ namespace Orleans.EventSourcing
         /// Clear the log stream completely. Throws <see cref="NotSupportedException"/> if
         /// the log stream does not support clearing.
         /// </summary>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
+        /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
+        /// <returns>A task that represents the asynchronous clear operation.</returns>
         Task ClearLogAsync(CancellationToken cancellationToken);
     }
 }
