@@ -11,6 +11,7 @@ public static class TargetHolderExtensions
     /// Gets the component with the specified type.
     /// </summary>
     /// <typeparam name="TComponent">The component type.</typeparam>
+    /// <param name="targetHolder">The target holder from which to retrieve the component.</param>
     /// <returns>The component with the specified type.</returns>
     public static TComponent? GetComponent<TComponent>(this ITargetHolder targetHolder) where TComponent : class => targetHolder.GetComponent(typeof(TComponent)) as TComponent;
 }
