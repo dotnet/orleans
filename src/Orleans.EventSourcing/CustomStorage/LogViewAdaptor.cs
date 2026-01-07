@@ -57,7 +57,7 @@ namespace Orleans.EventSourcing.CustomStorage
         public override async Task ClearLogAsync(CancellationToken cancellationToken)
         {
             await this.customGrainStorage.ClearStoredState();
-            InitializeConfirmedView(this.initialstate);
+            InitializeConfirmedView(this.Initialstate);
             ResetTentativeState();
             await Synchronize();
         }
