@@ -173,7 +173,7 @@ namespace Tester.AzureUtils.Streaming
             await fixture.Runner.StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients();
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5648"), TestCategory("Functional")]
+[SkippableFact, TestCategory("Functional")]
         public async Task AQ_07_ManyDifferent_ManyProducerClientsManyConsumerGrains()
         {
             await fixture.Runner.StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains();
@@ -270,7 +270,7 @@ namespace Tester.AzureUtils.Streaming
             await fixture.Runner.StreamTest_20_ConsumerImplicitlySubscribedToProducerGrain();
         }
 
-        [SkippableFact(Skip = "Ignored"), TestCategory("Failures")]
+        [SkippableFact(Skip = "Generic consumer grain (Streaming_ImplicitlySubscribedGenericConsumerGrain) not implemented"), TestCategory("Failures")]
         public async Task AQ_21_GenericConsumerImplicitlySubscribedToProducerGrain()
         {
             // todo: currently, the Azure queue queue adaptor doesn't support namespaces, so this test will fail.

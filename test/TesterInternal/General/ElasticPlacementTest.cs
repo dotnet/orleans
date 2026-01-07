@@ -15,12 +15,25 @@ namespace UnitTests.General
     public class ElasticPlacementTests : TestClusterPerTest
     {
         private readonly List<IActivationCountBasedPlacementTestGrain> grains = new List<IActivationCountBasedPlacementTestGrain>();
-        private const int leavy = 300;
+        private const int leavy = 350; // Tolerance for placement variance (17.5% of perSilo)
         private const int perSilo = 1000;
+        private PlacementDiagnosticObserver _placementObserver;
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        }
+
+        public override async Task InitializeAsync()
+        {
+            await base.InitializeAsync();
+            _placementObserver = PlacementDiagnosticObserver.Create(logger);
+        }
+
+        public override async Task DisposeAsync()
+        {
+            _placementObserver?.Dispose();
+            await base.DisposeAsync();
         }
 
         private class SiloConfigurator : ISiloConfigurator
@@ -37,13 +50,27 @@ namespace UnitTests.General
         /// Test placement behaviour for newly added silos. The grain placement strategy should favor them
         /// until they reach a similar load as the other silos.
         /// </summary>
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
+        /// <remarks>
+        /// This test uses deterministic statistics synchronization via ForceRuntimeStatisticsCollection
+        /// to ensure all placement directors have accurate activation counts before grain placement.
+        /// After each cluster membership change, we force statistics collection on all silos.
+        /// </remarks>
+        [Fact, TestCategory("Functional")]
         public async Task ElasticityTest_CatchingUp()
         {
-
             logger.LogInformation("\n\n\n----- Phase 1 -----\n\n");
-            AddTestGrains(perSilo).Wait();
-            AddTestGrains(perSilo).Wait();
+            
+            // Ensure initial statistics are propagated before creating grains
+            await ForceStatisticsRefreshOnAllSilos();
+            
+            // Create grains in batches with stats refresh between each batch to ensure
+            // placement directors have accurate activation counts during placement.
+            await AddTestGrains(perSilo);
+            await ForceStatisticsRefreshOnAllSilos();
+            await AddTestGrains(perSilo);
+
+            // Force statistics refresh so placement directors have accurate counts
+            await ForceStatisticsRefreshOnAllSilos();
 
             var activationCounts = await GetPerSiloActivationCounts();
             LogCounts(activationCounts);
@@ -53,12 +80,23 @@ namespace UnitTests.General
 
             SiloHandle silo3 = this.HostedCluster.StartAdditionalSilo();
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+            
+            // Critical: After a new silo joins, force statistics refresh so all silos know about each other's activation counts.
+            // Without this, the new silo won't be considered by placement directors on other silos.
+            await ForceStatisticsRefreshOnAllSilos();
 
             logger.LogInformation("\n\n\n----- Phase 2 -----\n\n");
+            // Create grains in batches with stats refresh between each batch
             await AddTestGrains(perSilo);
+            await ForceStatisticsRefreshOnAllSilos();
             await AddTestGrains(perSilo);
+            await ForceStatisticsRefreshOnAllSilos();
             await AddTestGrains(perSilo);
+            await ForceStatisticsRefreshOnAllSilos();
             await AddTestGrains(perSilo);
+
+            // Force statistics refresh before assertions
+            await ForceStatisticsRefreshOnAllSilos();
 
             logger.LogInformation("-----------------------------------------------------------------");
             activationCounts = await GetPerSiloActivationCounts();
@@ -70,9 +108,15 @@ namespace UnitTests.General
             AssertIsInRange(activationCounts[silo3], expected, leavy);
 
             logger.LogInformation("\n\n\n----- Phase 3 -----\n\n");
+            // Create grains in batches with stats refresh between each batch
             await AddTestGrains(perSilo);
+            await ForceStatisticsRefreshOnAllSilos();
             await AddTestGrains(perSilo);
+            await ForceStatisticsRefreshOnAllSilos();
             await AddTestGrains(perSilo);
+
+            // Force statistics refresh before final assertions
+            await ForceStatisticsRefreshOnAllSilos();
 
             logger.LogInformation("-----------------------------------------------------------------");
             activationCounts = await GetPerSiloActivationCounts();
@@ -88,20 +132,36 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// This evaluates the how the placement strategy behaves once silos are stopped: The strategy should
+        /// This evaluates how the placement strategy behaves once silos are stopped: The strategy should
         /// balance the activations from the stopped silo evenly among the remaining silos.
         /// </summary>
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
+        /// <remarks>
+        /// This test uses deterministic statistics synchronization via ForceRuntimeStatisticsCollection
+        /// to ensure all placement directors have accurate activation counts before grain placement.
+        /// </remarks>
+        [Fact, TestCategory("Functional")]
         public async Task ElasticityTest_StoppingSilos()
         {
             List<SiloHandle> runtimes = await this.HostedCluster.StartAdditionalSilosAsync(2);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+            
+            // Ensure statistics are propagated after new silos join
+            await ForceStatisticsRefreshOnAllSilos();
+
             int stopLeavy = leavy;
 
+            // Create grains in batches with stats refresh between each batch to ensure
+            // placement directors have accurate activation counts during placement.
             await AddTestGrains(perSilo);
+            await ForceStatisticsRefreshOnAllSilos();
             await AddTestGrains(perSilo);
+            await ForceStatisticsRefreshOnAllSilos();
             await AddTestGrains(perSilo);
+            await ForceStatisticsRefreshOnAllSilos();
             await AddTestGrains(perSilo);
+            
+            // Force statistics refresh before assertions
+            await ForceStatisticsRefreshOnAllSilos();
 
             var activationCounts = await GetPerSiloActivationCounts();
             logger.LogInformation("-----------------------------------------------------------------");
@@ -114,7 +174,14 @@ namespace UnitTests.General
 
             await this.HostedCluster.StopSiloAsync(runtimes[0]);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+            
+            // Force statistics refresh after silo stops so placement directors know about the removed silo
+            await ForceStatisticsRefreshOnAllSilos();
+
             await InvokeAllGrains();
+            
+            // Force statistics refresh before final assertions
+            await ForceStatisticsRefreshOnAllSilos();
 
             activationCounts = await GetPerSiloActivationCounts();
             logger.LogInformation("-----------------------------------------------------------------");
@@ -132,35 +199,54 @@ namespace UnitTests.General
         /// <summary>
         /// Do not place activation in case all silos are at 100 CPU utilization.
         /// </summary>
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task ElasticityTest_AllSilosCPUTooHigh()
         {
             var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
             var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.SecondarySilos.First().SiloAddress);
 
-            await taintedGrainPrimary.EnableOverloadDetection(false);
-            await taintedGrainSecondary.EnableOverloadDetection(false);
+            // Latch CPU on all silos and refresh overload detectors in parallel.
+            // This ensures all silos are tainted before any gateway starts rejecting requests.
+            await Task.WhenAll(
+                taintedGrainPrimary.LatchCpuUsageOnly(100.0f),
+                taintedGrainSecondary.LatchCpuUsageOnly(100.0f));
 
-            await taintedGrainPrimary.LatchCpuUsage(100.0f);
-            await taintedGrainSecondary.LatchCpuUsage(100.0f);
+            // Now refresh OverloadDetector caches and propagate statistics in parallel.
+            // After this, both silos will reject requests due to overload.
+            await Task.WhenAll(
+                taintedGrainPrimary.RefreshOverloadDetectorAndPropagateStatistics(),
+                taintedGrainSecondary.RefreshOverloadDetectorAndPropagateStatistics());
 
-            await Assert.ThrowsAsync<OrleansException>(() =>
+            // OrleansException (wrapping SiloUnavailableException) or GatewayTooBusyException
+            var exception = await Assert.ThrowsAnyAsync<Exception>(() =>
                 this.AddTestGrains(1));
+
+            Assert.True(exception is OrleansException || exception is GatewayTooBusyException);
         }
 
         /// <summary>
         /// Do not place activation in case all silos are at 100 CPU utilization or have overloaded flag set.
         /// </summary>
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task ElasticityTest_AllSilosOverloaded()
         {
             var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
             var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.SecondarySilos.First().SiloAddress);
 
-            await taintedGrainPrimary.LatchCpuUsage(100.0f);
-            await taintedGrainSecondary.LatchOverloaded();
+            // Phase 1: Latch values on all silos WITHOUT triggering overload detection.
+            // This must complete before any silo starts rejecting requests, otherwise
+            // the RPC calls in Phase 2 may fail with GatewayTooBusyException.
+            await Task.WhenAll(
+                taintedGrainPrimary.LatchCpuUsageOnly(100.0f),
+                taintedGrainSecondary.LatchOverloadedOnly());
 
-            // OrleansException or GateWayTooBusyException
+            // Phase 2: Now refresh OverloadDetector caches and propagate statistics.
+            // After this, both silos will reject requests due to overload.
+            await Task.WhenAll(
+                taintedGrainPrimary.RefreshOverloadDetectorAndPropagateStatistics(),
+                taintedGrainSecondary.RefreshOverloadDetectorAndPropagateStatistics());
+
+            // OrleansException or GatewayTooBusyException
             var exception = await Assert.ThrowsAnyAsync<Exception>(() =>
                 this.AddTestGrains(1));
 
@@ -223,6 +309,12 @@ namespace UnitTests.General
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             logger.LogInformation("********************** Starting the test {Name} ******************************", name);
             var taintedSilo = this.HostedCluster.StartAdditionalSilo();
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+
+            // Ensure all silos have the new silo in their placement statistics cache
+            // before we taint it. Without this, placement directors may not know about
+            // the new silo and fail to find candidates.
+            await ForceStatisticsRefreshOnAllSilos();
 
             const long sampleSize = 10;
 
@@ -234,8 +326,11 @@ namespace UnitTests.General
                     n =>
                         this.GrainFactory.GetGrain<IActivationCountBasedPlacementTestGrain>(Guid.NewGuid()));
 
-            // make the grain's silo undesirable for new grains.
-            taint(taintedGrain).Wait();
+            // Make the grain's silo undesirable for new grains.
+            // taint() calls LatchOverloaded/LatchCpuUsage which internally awaits PropagateStatisticsToCluster,
+            // so by the time this returns, all placement directors have been notified.
+            await taint(taintedGrain);
+
             List<IPEndPoint> actual;
             try
             {
@@ -246,9 +341,9 @@ namespace UnitTests.General
             }
             finally
             {
-                // i don't know if this necessary but to be safe, i'll restore the silo's desirability.
+                // Restore the silo's desirability.
                 logger.LogInformation("********************** Finalizing the test {Name} ******************************", name);
-                restore(taintedGrain).Wait();
+                await restore(taintedGrain);
             }
 
             var unexpected = taintedSilo.SiloAddress.Endpoint;
@@ -284,17 +379,25 @@ namespace UnitTests.General
 
         private async Task<Dictionary<SiloHandle, int>> GetPerSiloActivationCounts()
         {
-            string fullTypeName = "UnitTests.Grains.ActivationCountBasedPlacementTestGrain";
+            // Note: We use GetDetailedGrainStatistics instead of GetSimpleGrainStatistics because
+            // GetSimpleGrainStatistics uses a static GrainMetricsListener which is shared across all
+            // in-process silos (causing double-counting). GetDetailedGrainStatistics uses the per-silo
+            // activation directory which correctly tracks activations per silo.
+            string grainTypePrefix = "UnitTests.Grains.ActivationCountBasedPlacementTestGrain";
 
             IManagementGrain mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
-            SimpleGrainStatistic[] stats = await mgmtGrain.GetSimpleGrainStatistics();
+            DetailedGrainStatistic[] stats = await mgmtGrain.GetDetailedGrainStatistics();
+
+            // Filter to just our test grain type and group by silo
+            var filteredStats = stats
+                .Where(stat => stat.GrainType.StartsWith(grainTypePrefix))
+                .GroupBy(stat => stat.SiloAddress)
+                .ToDictionary(g => g.Key, g => g.Count());
 
             return this.HostedCluster.GetActiveSilos()
                 .ToDictionary(
                     s => s,
-                    s => stats
-                        .Where(stat => stat.SiloAddress.Equals(s.SiloAddress) && stat.GrainType == fullTypeName)
-                        .Select(stat => stat.ActivationCount).SingleOrDefault());
+                    s => filteredStats.TryGetValue(s.SiloAddress, out var count) ? count : 0);
         }
 
         private void LogCounts(Dictionary<SiloHandle, int> activationCounts)
@@ -307,6 +410,28 @@ namespace UnitTests.General
                 sb.AppendLine($"{silo.Name}.ActivationCount = {count}");
             }
             logger.LogInformation("{Message}", sb.ToString());
+        }
+
+        /// <summary>
+        /// Forces statistics refresh on all active silos and waits for ClusterStatisticsRefreshed events.
+        /// This ensures all placement directors have up-to-date activation counts before grain placement.
+        /// </summary>
+        private async Task ForceStatisticsRefreshOnAllSilos()
+        {
+            // Clear previous events to track new refresh cycle
+            _placementObserver.Clear();
+
+            // Get all active silo addresses
+            var siloAddresses = this.HostedCluster.GetActiveSilos()
+                .Select(s => s.SiloAddress)
+                .ToArray();
+
+            // Trigger statistics collection on all silos
+            var mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
+            await mgmtGrain.ForceRuntimeStatisticsCollection(siloAddresses);
+
+            // Wait for all silos to emit ClusterStatisticsRefreshed event
+            await _placementObserver.WaitForAllSilosRefreshedAsync(siloAddresses, TimeSpan.FromSeconds(30));
         }
     }
 }

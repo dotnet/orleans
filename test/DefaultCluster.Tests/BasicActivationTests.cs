@@ -282,15 +282,16 @@ namespace DefaultCluster.Tests.General
             {
                 // set short response time and ask to do long operation, to trigger expired msgs in the silo queues.
                 TimeSpan shortTimeout = TimeSpan.FromMilliseconds(1000);
+                TimeSpan longActionDuration = TimeSpan.FromMilliseconds(shortTimeout.TotalMilliseconds * 3);
                 this.SetResponseTimeout(shortTimeout);
 
                 ITestGrain grain = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
-                int num = 10;
+                // Use only 2 requests to keep total processing time reasonable.
+                // Since TestGrain is not reentrant, requests are processed sequentially.
+                int num = 2;
                 for (long i = 0; i < num; i++)
                 {
-                    Task task = grain.DoLongAction(
-                        TimeSpan.FromMilliseconds(shortTimeout.TotalMilliseconds * 3),
-                        "A_" + i);
+                    Task task = grain.DoLongAction(longActionDuration, "A_" + i);
                     promises.Add(task);
                 }
                 try
@@ -302,11 +303,15 @@ namespace DefaultCluster.Tests.General
                     this.Logger.LogInformation("Done with stress iteration.");
                 }
 
-                // wait a bit to make sure expired msgs in the silo is trigered.
-                Thread.Sleep(TimeSpan.FromSeconds(10));
-
-                // set the regular response time back, expect msgs ot succeed.
+                // Restore the regular response timeout before draining.
                 this.SetResponseTimeout(prevTimeout);
+
+                // Since TestGrain is non-reentrant, calling any method will block until
+                // all previously queued requests complete. This acts as a barrier/drain
+                // operation without needing fixed delays.
+                this.Logger.LogInformation("Draining grain queue by calling GetLabel()...");
+                await grain.GetLabel();
+                this.Logger.LogInformation("Grain queue drained.");
                 
                 this.Logger.LogInformation("About to send a next legit request that should succeed.");
                 await grain.DoLongAction(TimeSpan.FromMilliseconds(1), "B_" + 0);

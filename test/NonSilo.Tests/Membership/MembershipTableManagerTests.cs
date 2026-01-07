@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Configuration;
 using Orleans.Runtime.MembershipService;
 using Xunit;
@@ -26,6 +27,7 @@ namespace NonSilo.Tests.Membership
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly IMembershipGossiper membershipGossiper;
         private readonly SiloLifecycleSubject lifecycle;
+        private readonly FakeTimeProvider timeProvider;
 
         public MembershipTableManagerTests(ITestOutputHelper output)
         {
@@ -42,6 +44,7 @@ namespace NonSilo.Tests.Membership
             this.fatalErrorHandler.IsUnexpected(default).ReturnsForAnyArgs(true);
             this.membershipGossiper = Substitute.For<IMembershipGossiper>();
             this.lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            this.timeProvider = new FakeTimeProvider();
         }
 
         /// <summary>
@@ -223,7 +226,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, this.timeProvider),
                 this.lifecycle);
 
             // Validate that the initial snapshot is valid and contains the local silo.
@@ -319,7 +322,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, this.timeProvider),
                 this.lifecycle);
 
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
@@ -361,7 +364,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, this.timeProvider),
                 this.lifecycle);
 
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
@@ -399,7 +402,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, this.timeProvider),
                 siloLifecycle: this.lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
@@ -445,7 +448,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, this.timeProvider),
                 siloLifecycle: this.lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
@@ -487,7 +490,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, this.timeProvider),
                 siloLifecycle: this.lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
@@ -519,7 +522,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, this.timeProvider),
                 siloLifecycle: this.lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
@@ -561,7 +564,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, this.timeProvider),
                 siloLifecycle: this.lifecycle);
 
             // Rig the local clock.
@@ -634,7 +637,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, this.timeProvider),
                 siloLifecycle: this.lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();

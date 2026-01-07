@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using NonSilo.Tests.Utilities;
 using NSubstitute;
 using Orleans.Configuration;
@@ -32,6 +33,7 @@ namespace NonSilo.Tests.Membership
         private readonly ILocalSiloHealthMonitor localSiloHealthMonitor;
         private readonly InMemoryMembershipTable membershipTable;
         private readonly IRemoteSiloProber prober;
+        private readonly FakeTimeProvider timeProvider;
 
         public ClusterHealthMonitorTests(ITestOutputHelper output)
         {
@@ -68,6 +70,7 @@ namespace NonSilo.Tests.Membership
 
             this.prober = Substitute.For<IRemoteSiloProber>();
             this.membershipTable = new InMemoryMembershipTable(new TableVersion(1, "1"));
+            this.timeProvider = new FakeTimeProvider();
         }
 
         /// <summary>
@@ -558,7 +561,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, this.timeProvider),
                 this.lifecycle);
 
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);

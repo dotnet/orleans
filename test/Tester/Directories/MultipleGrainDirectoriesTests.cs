@@ -31,8 +31,6 @@ namespace Tester.Directories
             Assert.Equal(++primaryCounter, await grainOnSecondary.ProxyPing(grainOnPrimary));
             Assert.Equal(++secondaryCounter, await grainOnPrimary.ProxyPing(grainOnSecondary));
 
-            await Task.Delay(5000);
-
             // Shutdown the secondary silo
             await this.HostedCluster.StopSecondarySilosAsync();
 
