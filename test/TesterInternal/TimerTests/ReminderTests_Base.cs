@@ -397,25 +397,21 @@ namespace UnitTests.TimerTests
             IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
-            TimeSpan period = await g1.GetReminderPeriod(DR);
-
-            Task<bool>[] tasks =
-            {
-                Task.Run(() => this.PerGrainMultiReminderTestChurn(g1)),
-                Task.Run(() => this.PerGrainMultiReminderTestChurn(g2)),
-                Task.Run(() => this.PerGrainMultiReminderTestChurn(g3)),
-                Task.Run(() => this.PerGrainMultiReminderTestChurn(g4)),
-                Task.Run(() => this.PerGrainMultiReminderTestChurn(g5)),
-            };
-
-            await AdvanceTimeAsync(period.Multiply(5));
-
-            // start another silo ... although it will take it a while before it stabilizes
+            // Run churn tests sequentially to avoid race conditions with FakeTimeProvider.
+            // Concurrent tasks advancing the shared FakeTimeProvider causes non-deterministic behavior
+            // because each task's WaitForReminderTickCountAsync advances time independently,
+            // interfering with other tasks' tick counting.
+            await this.PerGrainMultiReminderTestChurn(g1);
+            
+            // Start another silo after first grain's churn test (simulates the "1J" - 1 Join scenario)
             log.LogInformation("Starting another silo");
             await this.HostedCluster.StartAdditionalSilosAsync(1, true);
-
-            //Block until all tasks complete.
-            await Task.WhenAll(tasks).WaitAsync(ENDWAIT);
+            
+            // Continue with remaining grains on the now-expanded cluster
+            await this.PerGrainMultiReminderTestChurn(g2);
+            await this.PerGrainMultiReminderTestChurn(g3);
+            await this.PerGrainMultiReminderTestChurn(g4);
+            await this.PerGrainMultiReminderTestChurn(g5);
         }
 
         public async Task Test_Reminders_ReminderNotFound()
