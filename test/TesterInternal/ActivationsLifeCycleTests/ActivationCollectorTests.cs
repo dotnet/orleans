@@ -556,6 +556,30 @@ namespace UnitTests.ActivationsLifeCycleTests
                     "ActivationCollectorShouldNotCollectBusyStatelessWorkers: iteration {Iteration} completed successfully. {Remaining} activation(s) remaining.",
                     iteration,
                     remainingActivations);
+
+                // Before starting the next iteration, ensure all activations are collected
+                // Stateless workers pool activations by type, so we need to clean up before the next iteration
+                if (iteration < 1) // Don't wait after the last iteration
+                {
+                    this.logger.LogInformation(
+                        "ActivationCollectorShouldNotCollectBusyStatelessWorkers: cleaning up {Count} activation(s) before next iteration.",
+                        remainingActivations);
+                    
+                    _sharedTimeProvider!.Advance(DEFAULT_IDLE_TIMEOUT + TimeSpan.FromSeconds(5));
+                    _diagnosticObserver.Clear(); // Reset count for next iteration's deactivations
+                    
+                    // Wait for all remaining activations to be collected
+                    await _diagnosticObserver.WaitForDeactivationCountAsync(
+                        "StatelessWorkerActivationCollectorTestGrain1",
+                        remainingActivations,
+                        MAX_WAIT_TIME,
+                        _sharedTimeProvider);
+                    
+                    int activationsAfterCleanup = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, grainTypeName);
+                    this.logger.LogInformation(
+                        "ActivationCollectorShouldNotCollectBusyStatelessWorkers: {Count} activation(s) remaining after cleanup.",
+                        activationsAfterCleanup);
+                }
             }
         }
 
