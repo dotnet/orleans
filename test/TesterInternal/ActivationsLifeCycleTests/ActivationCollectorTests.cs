@@ -110,6 +110,11 @@ namespace UnitTests.ActivationsLifeCycleTests
         {
             _diagnosticObserver?.Dispose();
 
+            // Release any blocked grains before stopping the cluster to prevent hangs during shutdown.
+            // This ensures test cleanup completes even if a test times out while grains are blocked.
+            BusyActivationGcTestGrain1.ReleaseAllBlocked();
+            StatelessWorkerActivationCollectorTestGrain1.ReleaseAllBlocked();
+
             if (testCluster is null) return;
 
             try
@@ -268,11 +273,15 @@ namespace UnitTests.ActivationsLifeCycleTests
             // 1. Idle activations become stale when fake time is advanced (GetIdleness() > CollectionAgeLimit)
             // 2. Busy activations remain not-inactive (IsCurrentlyExecuting = true) regardless of time
             // 3. The collector only collects activations that are both inactive AND stale
+            //
+            // NOTE: We use smaller grain counts (100 each) compared to the automatic collection test (500 each)
+            // because we need to call ForceActivationCollection while grains are blocked. Blocking too many grains
+            // exhausts the silo thread pool and causes the management grain call to timeout.
             await Initialize(DEFAULT_IDLE_TIMEOUT, useFakeTimeProvider: true);
 
             TimeSpan shortIdleTimeout = TimeSpan.FromSeconds(1);
-            const int idleGrainCount = 500;
-            const int busyGrainCount = 500;
+            const int idleGrainCount = 100;
+            const int busyGrainCount = 100;
             var idleGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain1));
             var busyGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(BusyActivationGcTestGrain1));
 
@@ -543,6 +552,18 @@ namespace UnitTests.ActivationsLifeCycleTests
                     "ActivationCollectorShouldNotCollectBusyStatelessWorkers: iteration {Iteration} completed successfully. {Remaining} activation(s) remaining.",
                     iteration,
                     remainingActivations);
+
+                // Wait for all remaining activations to be collected before next iteration
+                // This ensures test isolation between iterations
+                if (iteration < 1) // Don't wait after the last iteration
+                {
+                    _sharedTimeProvider!.Advance(DEFAULT_IDLE_TIMEOUT + TimeSpan.FromSeconds(5));
+                    await _diagnosticObserver.WaitForDeactivationCountAsync(
+                        "StatelessWorkerActivationCollectorTestGrain1",
+                        expectedDeactivations + grainCount, // Total deactivations including the one just released
+                        MAX_WAIT_TIME,
+                        _sharedTimeProvider);
+                }
             }
         }
 
