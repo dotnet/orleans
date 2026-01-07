@@ -25,6 +25,7 @@ namespace UnitTests.Grains
         private readonly string _id = Guid.NewGuid().ToString();
         private readonly ActivationCollector activationCollector;
         private readonly IGrainContext _grainContext;
+        private readonly TimeProvider _timeProvider;
 
         // Static signal shared across all activations to coordinate blocking/releasing
         private static TaskCompletionSource _globalBlockTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -52,10 +53,11 @@ namespace UnitTests.Grains
             }
         }
 
-        public BusyActivationGcTestGrain1(ActivationCollector activationCollector, IGrainContext grainContext)
+        public BusyActivationGcTestGrain1(ActivationCollector activationCollector, IGrainContext grainContext, TimeProvider timeProvider)
         {
             this.activationCollector = activationCollector;
             _grainContext = grainContext;
+            _timeProvider = timeProvider;
         }
 
         public Task Nop()
@@ -65,7 +67,11 @@ namespace UnitTests.Grains
 
         public Task Delay(TimeSpan dt)
         {
-            return Task.Delay(dt);
+            // Use TimeProvider-based delay which respects FakeTimeProvider in tests
+            // This allows tests to advance fake time instead of waiting real time
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var timer = _timeProvider.CreateTimer(_ => tcs.TrySetResult(), null, dt, Timeout.InfiniteTimeSpan);
+            return tcs.Task.ContinueWith(_ => timer.Dispose(), TaskScheduler.Default);
         }
 
         public Task<string> IdentifyActivation()

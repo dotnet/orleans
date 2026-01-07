@@ -263,34 +263,26 @@ namespace UnitTests.ActivationsLifeCycleTests
             await Task.WhenAll(blockingTasks);
         }
         
-        [Fact(Skip = "This test is inherently flaky in CI environments. Blocking grains while calling ForceActivationCollection " +
-                      "exhausts the thread pool, causing timeouts. The automatic collection test (ActivationCollectorShouldNotCollectBusyActivations) " +
-                      "already verifies that busy grains aren't collected, so this test is redundant."), 
-         TestCategory("ActivationCollector"), TestCategory("Functional")]
+        [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ManualCollectionShouldNotCollectBusyActivations()
         {
             // This test uses FakeTimeProvider to verify that busy activations are not collected
             // during manual collection triggered via ForceActivationCollection.
-            // The key is to use BlockUntilReleased() to keep activations truly busy (IsInactive = false)
+            // The key is to use TimeProvider.Delay() to keep activations truly busy (IsInactive = false)
             // while advancing fake time. This ensures:
             // 1. Idle activations become stale when fake time is advanced (GetIdleness() > CollectionAgeLimit)
             // 2. Busy activations remain not-inactive (IsCurrentlyExecuting = true) regardless of time
             // 3. The collector only collects activations that are both inactive AND stale
             //
-            // NOTE: We use much smaller grain counts (20 each) compared to the automatic collection test (500 each)
-            // because we need to call ForceActivationCollection while grains are blocked. Blocking too many grains
-            // exhausts the silo thread pool and causes the management grain call to timeout.
-            // CI environments have limited thread pool capacity, so we keep the count very low.
+            // By using TimeProvider.Delay instead of TaskCompletionSource blocking, we avoid
+            // thread pool exhaustion issues while keeping grains busy with in-flight requests.
             await Initialize(DEFAULT_IDLE_TIMEOUT, useFakeTimeProvider: true);
 
             TimeSpan shortIdleTimeout = TimeSpan.FromSeconds(1);
-            const int idleGrainCount = 20;
-            const int busyGrainCount = 20;
+            const int idleGrainCount = 500;
+            const int busyGrainCount = 500;
             var idleGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain1));
             var busyGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(BusyActivationGcTestGrain1));
-
-            // Reset the global block signal before starting
-            BusyActivationGcTestGrain1.ResetGlobalBlock();
 
             List<Task> tasks0 = new List<Task>();
             List<IBusyActivationGcTestGrain1> busyGrains = new List<IBusyActivationGcTestGrain1>();
@@ -315,14 +307,20 @@ namespace UnitTests.ActivationsLifeCycleTests
             int activationsCreated = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, idleGrainTypeName) + await TestUtils.GetActivationCount(this.testCluster.GrainFactory, busyGrainTypeName);
             Assert.Equal(idleGrainCount + busyGrainCount, activationsCreated);
 
-            // Start blocking requests to keep all busy grains truly busy (IsCurrentlyExecuting = true)
-            var blockingTasks = busyGrains.Select(g => g.BlockUntilReleased()).ToList();
+            // Start delay requests using TimeProvider.Delay to keep all busy grains truly busy (IsCurrentlyExecuting = true)
+            // We use a very long delay (1 hour of virtual time) that will complete when we advance fake time
+            var busyDuration = TimeSpan.FromHours(1);
+            var delayTasks = busyGrains.Select(g => g.Delay(busyDuration)).ToList();
+
+            // Give the runtime a moment to process the delay requests and mark grains as executing
+            await Task.Delay(100);
 
             logger.LogInformation(
                 "ManualCollectionShouldNotCollectBusyActivations: advancing time by {TotalSeconds} sec before triggering manual collection.",
                 shortIdleTimeout.TotalSeconds);
             
-            // Advance fake time past the short idle timeout so grains become stale
+            // Advance fake time past the short idle timeout so IDLE grains become stale
+            // Busy grains won't be affected because they're currently executing a 1-hour delay
             _sharedTimeProvider!.Advance(shortIdleTimeout + TimeSpan.FromMilliseconds(500));
             
             logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: triggering manual collection (timespan is {TotalSeconds} sec).", shortIdleTimeout.TotalSeconds);
@@ -342,9 +340,9 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(0, idleActivationsNotCollected);
             Assert.Equal(busyGrainCount, busyActivationsNotCollected);
 
-            // Release all blocked grains
-            BusyActivationGcTestGrain1.ReleaseAllBlocked();
-            await Task.WhenAll(blockingTasks);
+            // Advance fake time past the busy duration to complete the delay tasks
+            _sharedTimeProvider.Advance(busyDuration);
+            await Task.WhenAll(delayTasks);
         }
         
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
