@@ -274,14 +274,15 @@ namespace UnitTests.ActivationsLifeCycleTests
             // 2. Busy activations remain not-inactive (IsCurrentlyExecuting = true) regardless of time
             // 3. The collector only collects activations that are both inactive AND stale
             //
-            // NOTE: We use smaller grain counts (100 each) compared to the automatic collection test (500 each)
+            // NOTE: We use much smaller grain counts (20 each) compared to the automatic collection test (500 each)
             // because we need to call ForceActivationCollection while grains are blocked. Blocking too many grains
             // exhausts the silo thread pool and causes the management grain call to timeout.
+            // CI environments have limited thread pool capacity, so we keep the count very low.
             await Initialize(DEFAULT_IDLE_TIMEOUT, useFakeTimeProvider: true);
 
             TimeSpan shortIdleTimeout = TimeSpan.FromSeconds(1);
-            const int idleGrainCount = 100;
-            const int busyGrainCount = 100;
+            const int idleGrainCount = 20;
+            const int busyGrainCount = 20;
             var idleGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain1));
             var busyGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(BusyActivationGcTestGrain1));
 
