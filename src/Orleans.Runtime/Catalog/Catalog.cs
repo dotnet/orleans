@@ -1,12 +1,10 @@
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.GrainDirectory;
+using System.Diagnostics;
+using Orleans.Diagnostics;
 
 namespace Orleans.Runtime
 {
@@ -166,6 +164,25 @@ namespace Orleans.Runtime
             {
                 rehydrationContext?.Dispose();
                 return UnableToCreateActivation(this, grainId);
+            }
+
+            // Start activation span with parent context from request if available
+            var parentContext = TryGetActivityContext(requestContextData);
+            Activity activationActivity = parentContext.HasValue
+                ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal, parentContext.Value)
+                : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal);
+            if (activationActivity is not null)
+            {
+                activationActivity.SetTag("orleans.grain.id", grainId.ToString());
+                activationActivity.SetTag("orleans.grain.type", grainId.Type.ToString());
+                activationActivity.SetTag("orleans.silo.id", Silo.ToString());
+                activationActivity.SetTag("orleans.activation.cause", rehydrationContext is null ? "new" : "rehydrate");
+                if (result is ActivationData act)
+                {
+                    activationActivity.SetTag("orleans.activation.id", act.ActivationId.ToString());
+                    act.SetActivationActivity(activationActivity);
+                    activationActivity.AddEvent(new ActivityEvent("creating"));
+                }
             }
 
             CatalogInstruments.ActivationsCreated.Add(1);
@@ -431,5 +448,35 @@ namespace Orleans.Runtime
         )]
         private partial void LogFailedToUnregisterNonExistingActivation(GrainAddress address, Exception exception);
 
+        /// <summary>
+        /// Extracts an ActivityContext from request context data if present.
+        /// </summary>
+        private static ActivityContext? TryGetActivityContext(Dictionary<string, object> requestContextData)
+        {
+            if (requestContextData is not { Count: > 0 })
+            {
+                return null;
+            }
+
+            string traceParent = null;
+            string traceState = null;
+
+            if (requestContextData.TryGetValue(OpenTelemetryHeaders.TraceParent, out var traceParentObj) && traceParentObj is string tp)
+            {
+                traceParent = tp;
+            }
+
+            if (requestContextData.TryGetValue(OpenTelemetryHeaders.TraceState, out var traceStateObj) && traceStateObj is string ts)
+            {
+                traceState = ts;
+            }
+
+            if (!string.IsNullOrEmpty(traceParent) && ActivityContext.TryParse(traceParent, traceState, isRemote: true, out var parentContext))
+            {
+                return parentContext;
+            }
+
+            return null;
+        }
     }
 }
