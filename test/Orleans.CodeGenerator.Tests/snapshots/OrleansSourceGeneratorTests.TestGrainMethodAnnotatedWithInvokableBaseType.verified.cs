@@ -1,4 +1,4 @@
-﻿#pragma warning disable CS1591, RS0016, RS0041
+#pragma warning disable CS1591, RS0016, RS0041
 [assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
@@ -28,7 +28,7 @@ namespace OrleansCodeGen.TestProject
         public override string GetActivityName() => "IHelloGrain/SayHello";
         public override global::System.Type GetInterfaceType() => typeof(global::TestProject.IHelloGrain);
         public override global::System.Reflection.MethodInfo GetMethod() => MethodBackingField;
-        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) => _target = holder.GetTarget<global::TestProject.IHelloGrain>();
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) => _target = (global::TestProject.IHelloGrain)holder.GetTarget();
         public override object GetTarget() => _target;
         public override void Dispose()
         {
