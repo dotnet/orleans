@@ -1,9 +1,7 @@
-#nullable enable
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 
-#nullable disable
 namespace Orleans
 {
     internal sealed class ClientGrainContext : IGrainContext, IGrainExtensionBinder, IGrainContextAccessor
