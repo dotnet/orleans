@@ -11,6 +11,7 @@ namespace Orleans.Runtime
     {
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
+        private readonly ApplicationRequestInstruments _applicationRequestInstruments;
         private int completed;
         private StatusResponse? lastKnownStatus;
         private ValueStopwatch stopwatch;
@@ -19,11 +20,13 @@ namespace Orleans.Runtime
         public CallbackData(
             SharedCallbackData shared,
             IResponseCompletionSource ctx,
-            Message msg)
+            Message msg,
+            ApplicationRequestInstruments applicationRequestInstruments)
         {
             this.shared = shared;
             this.context = ctx;
             this.Message = msg;
+            _applicationRequestInstruments = applicationRequestInstruments;
             this.stopwatch = ValueStopwatch.StartNew();
         }
 
@@ -101,8 +104,8 @@ namespace Orleans.Runtime
             stopwatch.Stop();
             SignalCancellation();
             shared.Unregister(Message);
-            ApplicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
-            ApplicationRequestInstruments.OnAppRequestsTimedOut();
+            _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
+            _applicationRequestInstruments.OnAppRequestsTimedOut();
             OrleansCallBackDataEvent.Log.OnCanceled(Message);
             context.Complete(Response.FromException(new OperationCanceledException(_cancellationTokenRegistration.Token)));
             _cancellationTokenRegistration.Dispose();
@@ -123,8 +126,8 @@ namespace Orleans.Runtime
 
             this.shared.Unregister(this.Message);
             _cancellationTokenRegistration.Dispose();
-            ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
-            ApplicationRequestInstruments.OnAppRequestsTimedOut();
+            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+            _applicationRequestInstruments.OnAppRequestsTimedOut();
 
             OrleansCallBackDataEvent.Log.OnTimeout(this.Message);
 
@@ -148,7 +151,7 @@ namespace Orleans.Runtime
             this.stopwatch.Stop();
             this.shared.Unregister(this.Message);
             _cancellationTokenRegistration.Dispose();
-            ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             OrleansCallBackDataEvent.Log.OnTargetSiloFail(this.Message);
             var msg = this.Message;
@@ -169,7 +172,7 @@ namespace Orleans.Runtime
 
             this.stopwatch.Stop();
             _cancellationTokenRegistration.Dispose();
-            ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             ResponseCallback(response, this.context);
