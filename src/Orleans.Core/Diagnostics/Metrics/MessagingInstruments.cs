@@ -4,6 +4,7 @@ using System.Diagnostics.Metrics;
 using System.Threading;
 using Orleans.Messaging;
 
+#nullable disable
 namespace Orleans.Runtime
 {
     internal static class MessagingInstruments

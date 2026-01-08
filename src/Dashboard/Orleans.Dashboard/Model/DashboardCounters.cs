@@ -2,6 +2,7 @@ using System;
 using System.Collections.Immutable;
 using System.Linq;
 
+#nullable disable
 namespace Orleans.Dashboard.Model;
 
 [GenerateSerializer]

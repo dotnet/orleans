@@ -7,6 +7,7 @@ using Azure.Data.Tables;
 using Newtonsoft.Json;
 using Orleans.Transactions.Abstractions;
 
+#nullable disable
 namespace Orleans.Transactions.AzureStorage
 {
     internal readonly struct StateEntity

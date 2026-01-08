@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Reminders.AdoNet.Storage;
 
+#nullable disable
 namespace Orleans.Runtime.ReminderService
 {
     internal sealed class AdoNetReminderTable : IReminderTable

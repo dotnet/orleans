@@ -3,6 +3,7 @@ using Orleans.Persistence.AdoNet.Storage;
 using Orleans.Runtime;
 using Orleans.Storage;
 
+#nullable disable
 namespace Orleans.Configuration
 {
     /// <summary>

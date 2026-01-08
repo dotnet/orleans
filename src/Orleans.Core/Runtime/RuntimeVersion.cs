@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 
+#nullable disable
 namespace Orleans.Runtime
 {
     internal static class RuntimeVersion

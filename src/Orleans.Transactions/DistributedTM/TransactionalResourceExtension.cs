@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
+#nullable disable
 namespace Orleans.Transactions
 {
     public class TransactionalResourceExtension : ITransactionalResourceExtension

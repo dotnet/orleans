@@ -2,6 +2,7 @@
 using System;
 using Orleans.Providers.Streams.Generator;
 
+#nullable disable
 namespace Orleans.Hosting
 {
     /// <summary>

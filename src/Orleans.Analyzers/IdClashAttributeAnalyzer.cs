@@ -8,6 +8,7 @@ using System.Linq;
 
 namespace Orleans.Analyzers;
 
+#nullable disable
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class IdClashAttributeAnalyzer : DiagnosticAnalyzer
 {

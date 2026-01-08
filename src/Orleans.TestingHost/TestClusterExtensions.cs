@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 
+#nullable disable
 namespace Orleans.TestingHost
 {
     /// <summary>

@@ -14,6 +14,7 @@ using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Serialization.Invocation;
 
+#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal abstract partial class Connection

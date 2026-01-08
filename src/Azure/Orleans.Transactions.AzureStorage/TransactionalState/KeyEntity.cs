@@ -2,6 +2,7 @@ using System;
 using Azure;
 using Azure.Data.Tables;
 
+#nullable disable
 namespace Orleans.Transactions.AzureStorage
 {
     internal class KeyEntity : ITableEntity

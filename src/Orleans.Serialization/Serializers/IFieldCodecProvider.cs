@@ -1,4 +1,3 @@
-#nullable enable
 using Orleans.Serialization.Codecs;
 using System;
 

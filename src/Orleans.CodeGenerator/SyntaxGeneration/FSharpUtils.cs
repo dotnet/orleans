@@ -6,6 +6,7 @@ using Orleans.CodeGenerator.SyntaxGeneration;
 using static Orleans.CodeGenerator.SerializerGenerator;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
+#nullable disable
 namespace Orleans.CodeGenerator
 {
     internal static class FSharpUtilities

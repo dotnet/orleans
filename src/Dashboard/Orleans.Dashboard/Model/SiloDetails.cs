@@ -1,5 +1,6 @@
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans.Dashboard.Model;
 
 [GenerateSerializer]

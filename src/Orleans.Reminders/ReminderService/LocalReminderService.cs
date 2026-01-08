@@ -14,6 +14,7 @@ using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 
+#nullable disable
 namespace Orleans.Runtime.ReminderService
 {
     internal sealed partial class LocalReminderService : GrainService, IReminderService, ILifecycleParticipant<ISiloLifecycle>

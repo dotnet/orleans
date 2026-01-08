@@ -4,6 +4,7 @@ using Orleans.Serialization.Buffers;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.WireProtocol;
 
+#nullable disable
 namespace Orleans.Serialization.Buffers
 {
     public ref partial struct Writer<TBufferWriter>

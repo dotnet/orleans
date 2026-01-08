@@ -1,4 +1,3 @@
-#nullable enable
 namespace Orleans.Runtime;
 
 internal sealed class ClientLocalActivationStatusChecker : ILocalActivationStatusChecker

@@ -10,6 +10,7 @@ using System.Reflection.Metadata;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
+#nullable disable
 namespace Orleans.Serialization.Session
 {
     /// <summary>

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 
+#nullable disable
 namespace Orleans.Transactions.TestKit.Consistency
 {
     public class ConsistencyTestHarness
