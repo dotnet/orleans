@@ -36,8 +36,8 @@ namespace Orleans.CodeGenerator
             SerializationCallbacksAttribute = Type("Orleans.SerializationCallbacksAttribute");
             IActivator_1 = Type("Orleans.Serialization.Activators.IActivator`1");
             IBufferWriter = Type("System.Buffers.IBufferWriter`1");
-            IdAttributeTypes = options.IdAttributes.Select(Type).ToArray();
-            ConstructorAttributeTypes = options.ConstructorAttributes.Select(Type).ToArray();
+            IdAttributeType = Type(CodeGeneratorOptions.IdAttribute);
+            ConstructorAttributeTypes = CodeGeneratorOptions.ConstructorAttributes.Select(Type).ToArray();
             AliasAttribute = Type("Orleans.AliasAttribute");
             IInvokable = Type("Orleans.Serialization.Invocation.IInvokable");
             InvokeMethodNameAttribute = Type("Orleans.InvokeMethodNameAttribute");
@@ -149,7 +149,7 @@ namespace Orleans.CodeGenerator
                     new(compilation.GetSpecialType(SpecialType.System_Nullable_T), Type("Orleans.Serialization.Codecs.NullableCopier`1")),
             };
             Exception = Type("System.Exception");
-            ImmutableAttributes = options.ImmutableAttributes.Select(Type).ToArray();
+            ImmutableAttribute = Type(CodeGeneratorOptions.ImmutableAttribute);
             TimeSpan = Type("System.TimeSpan");
             _ipAddress = Type("System.Net.IPAddress");
             _ipEndPoint = Type("System.Net.IPEndPoint");
@@ -185,7 +185,6 @@ namespace Orleans.CodeGenerator
                 };
 
             LanguageVersion = (compilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions)?.LanguageVersion;
-            GenerateSerializerAttributes = options.GenerateSerializerAttributes.Select(compilation.GetTypeByMetadataName).ToArray();
 
             INamedTypeSymbol Type(string metadataName)
             {
@@ -244,7 +243,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol ValueTypeGetter_2 { get; private set; }
         public INamedTypeSymbol ValueTypeSetter_2 { get; private set; }
         public INamedTypeSymbol Writer { get; private set; }
-        public INamedTypeSymbol[] IdAttributeTypes { get; private set; }
+        public INamedTypeSymbol IdAttributeType { get; private set; }
         public INamedTypeSymbol[] ConstructorAttributeTypes { get; private set; }
         public INamedTypeSymbol AliasAttribute { get; private set; }
         public WellKnownCodecDescription[] StaticCodecs { get; private set; }
@@ -297,7 +296,7 @@ namespace Orleans.CodeGenerator
             _half
         }.Where(t => t is {}).ToArray()!;
 
-        public INamedTypeSymbol[] ImmutableAttributes { get; private set; }
+        public INamedTypeSymbol ImmutableAttribute { get; private set; }
         public INamedTypeSymbol Exception { get; private set; }
         public INamedTypeSymbol ApplicationPartAttribute { get; private set; }
         public INamedTypeSymbol InvokeMethodNameAttribute { get; private set; }
@@ -314,8 +313,6 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol RuntimeHelpers { get; private set; }
 
         public LanguageVersion? LanguageVersion { get; private set; }
-
-        public INamedTypeSymbol?[] GenerateSerializerAttributes { get; }
 
         public bool IsShallowCopyable(ITypeSymbol type)
         {
@@ -352,7 +349,7 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            if (type.IsSealed && type.HasAnyAttribute(ImmutableAttributes))
+            if (type.IsSealed && type.HasAttribute(ImmutableAttribute))
             {
                 return _shallowCopyableTypes[type] = true;
             }
