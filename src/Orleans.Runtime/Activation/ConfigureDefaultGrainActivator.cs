@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Orleans.Metadata;
 
 namespace Orleans.Runtime
@@ -16,7 +16,7 @@ namespace Orleans.Runtime
 
         public void Configure(GrainType grainType, GrainProperties properties, GrainTypeSharedContext shared)
         {
-            if (shared.GetComponent<IGrainActivator>() is object) return;
+            if (shared.GetComponent<IGrainActivator>() is not null) return;
 
             if (!_grainClassMap.TryGetGrainClass(grainType, out var grainClass))
             {

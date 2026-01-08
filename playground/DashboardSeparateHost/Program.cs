@@ -31,7 +31,7 @@ dashboardBuilder.UseOrleansClient(clientBuilder =>
     clientBuilder.UseStaticClustering(options => options.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 30000).ToGatewayUri()));
 
     // Add dashboard services
-    clientBuilder.AddOrleansDashboard();
+    clientBuilder.AddDashboard();
 });
 
 var dashboardApp = dashboardBuilder.Build();

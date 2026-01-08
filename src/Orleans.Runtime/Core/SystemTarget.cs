@@ -288,19 +288,35 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        TComponent? ITargetHolder.GetComponent<TComponent>() where TComponent : class
+        object? ITargetHolder.GetComponent(Type componentType)
         {
-            var result = GetComponent<TComponent>();
-            if (result is null && typeof(IGrainExtension).IsAssignableFrom(typeof(TComponent)))
+            object? result;
+            if (componentType.IsAssignableFrom(GetType()))
             {
-                var implementation = ActivationServices.GetKeyedService<IGrainExtension>(typeof(TComponent));
-                if (implementation is not TComponent typedResult)
+                result = this;
+            }
+            else if (_components.TryGetValue(componentType, out var resultObj))
+            {
+                result = resultObj;
+            }
+            else if (componentType == typeof(PlacementStrategy))
+            {
+                result = SystemTargetPlacementStrategy.Instance;
+            }
+            else if (typeof(IGrainExtension).IsAssignableFrom(componentType))
+            {
+                var implementation = ActivationServices.GetKeyedService<IGrainExtension>(componentType);
+                if (implementation is null)
                 {
-                    throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TComponent)} is installed on this instance and no implementations are registered for automated install");
+                    throw new GrainExtensionNotInstalledException($"No extension of type {componentType} is installed on this instance and no implementations are registered for automated install");
                 }
 
-                SetComponent<TComponent>(typedResult);
-                result = typedResult;
+                _components[componentType] = implementation;
+                result = implementation;
+            }
+            else
+            {
+                result = default;
             }
 
             return result;
@@ -353,7 +369,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)(object)this;
+        public object? GetTarget() => this;
 
         /// <inheritdoc/>
         public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) { }
