@@ -1,7 +1,6 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Operations;
 using System.Collections.Immutable;
 
 namespace Orleans.Analyzers
@@ -16,44 +15,52 @@ namespace Orleans.Analyzers
 
         internal static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(RuleId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [Rule];
 
         public override void Initialize(AnalysisContext context)
         {
             context.EnableConcurrentExecution();
-            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze);
-            context.RegisterSyntaxNodeAction(CheckSyntaxNode, SyntaxKind.ClassDeclaration, SyntaxKind.StructDeclaration);
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.RegisterCompilationStartAction(context =>
+            {
+                var idAttribute = context.Compilation.GetTypeByMetadataName("Orleans.IdAttribute");
+                var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName("Orleans.GenerateSerializerAttribute");
+                if (idAttribute is null || generateSerializerAttributeSymbol is null)
+                {
+                    return;
+                }
+
+                context.RegisterSymbolStartAction(context =>
+                {
+                    if (SerializationAttributesHelper.ShouldGenerateSerializer((INamedTypeSymbol)context.Symbol, generateSerializerAttributeSymbol))
+                    {
+                        context.RegisterOperationAction(context => AnalyzeAttribute(context, idAttribute), OperationKind.Attribute);
+                    }
+                }, SymbolKind.NamedType);
+            });
         }
 
-        private void CheckSyntaxNode(SyntaxNodeAnalysisContext context)
+        private static void AnalyzeAttribute(OperationAnalysisContext context, INamedTypeSymbol idAttribute)
         {
-            if (context.Node is TypeDeclarationSyntax declaration && SerializationAttributesHelper.ShouldGenerateSerializer(declaration))
+            var attributeOperation = (IAttributeOperation)context.Operation;
+            string modifier;
+            if (context.ContainingSymbol.IsAbstract)
             {
-                var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
-                foreach (var member in analysis.AnnotatedMembers)
-                {
-                    string modifier = null;
-                    if (member.IsAbstract())
-                    {
-                        modifier = "abstract";
-                    }
-                    else if (member.IsStatic())
-                    {
-                        modifier = "static";
-                    }
+                modifier = "abstract";
+            }
+            else if (context.ContainingSymbol.IsStatic)
+            {
+                modifier = "static";
+            }
+            else
+            {
+                return;
+            }
 
-                    if (modifier is not null)
-                    {
-                        var location = member.GetLocation();
-                        if (member.TryGetAttribute(Constants.IdAttributeName, out var attribute))
-                        {
-                            location = attribute.GetLocation();
-                        }
-
-                        var name = member.GetMemberNameOrDefault();
-                        context.ReportDiagnostic(Diagnostic.Create(Rule, location, name, modifier));
-                    }
-                }
+            if (attributeOperation.Operation is IObjectCreationOperation objectCreationOperation &&
+                idAttribute.Equals(objectCreationOperation.Constructor.ContainingType, SymbolEqualityComparer.Default))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(Rule, attributeOperation.Syntax.GetLocation(), context.ContainingSymbol.Name, modifier));
             }
         }
     }
