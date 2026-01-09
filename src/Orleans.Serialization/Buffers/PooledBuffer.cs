@@ -253,9 +253,8 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     public void Write(ReadOnlySpan<byte> value)
     {
         // Fast path, try copying to the available memory directly
-        if (WriteHead is { Array: var head })
+        if (WriteHead is { Array: { } head })
         {
-            _ = head.Length; // assert not null
             var destination = head.AsSpan(CurrentPosition);
             if ((uint)value.Length <= (uint)destination.Length)
             {
