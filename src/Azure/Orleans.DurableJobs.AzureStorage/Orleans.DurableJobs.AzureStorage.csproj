@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageId>Microsoft.Orleans.DurableJobs.AzureStorage</PackageId>
+    <Title>Microsoft Orleans Azure Storage Durable Jobs Provider</Title>
+    <Description>Microsoft Orleans durable jobs provider backed by Azure Blob Storage</Description>
+    <PackageTags>$(PackageTags) Azure Storage</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <AssemblyName>Orleans.DurableJobs.AzureStorage</AssemblyName>
+    <RootNamespace>Orleans.DurableJobs.AzureStorage</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants)</DefineConstants>
+    <Nullable>enable</Nullable>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.DurableJobs\Orleans.DurableJobs.csproj" />
+    <PackageReference Include="Azure.Core" />
+    <PackageReference Include="Azure.Storage.Blobs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

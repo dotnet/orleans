@@ -830,7 +830,6 @@ namespace Orleans.Serialization.UnitTests
         public string StringValue { get; }
         public MyCustomEnum EnumValue { get; }
 
-        [OrleansConstructor]
         public ClassWithImplicitFieldIds(string stringValue, MyCustomEnum enumValue)
         {
             StringValue = stringValue;

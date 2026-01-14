@@ -1,4 +1,4 @@
-﻿#pragma warning disable CS1591, RS0016, RS0041
+#pragma warning disable CS1591, RS0016, RS0041
 [assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
@@ -10,7 +10,7 @@ namespace OrleansCodeGen.TestProject
     using global::Orleans.Serialization.Codecs;
     using global::Orleans.Serialization.GeneratedCodeHelpers;
 
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "9.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::TestProject.IComplexGrain), "67FE5808")]
     public sealed class Invokable_IComplexGrain_GrainReference_67FE5808 : global::Orleans.Runtime.TaskRequest<global::TestProject.ComplexData>
     {
@@ -29,7 +29,7 @@ namespace OrleansCodeGen.TestProject
         public override global::System.Reflection.MethodInfo GetMethod() => MethodBackingField;
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder)
         {
-            _target = holder.GetTarget<global::TestProject.IComplexGrain>();
+            _target = (global::TestProject.IComplexGrain)holder.GetTarget();
             _cts = new();
             arg3 = _cts.Token;
         }
@@ -89,12 +89,19 @@ namespace OrleansCodeGen.TestProject
         public override global::System.Threading.CancellationToken GetCancellationToken() => arg3;
         public override bool TryCancel()
         {
-            _cts?.Cancel(false);
-            return true;
+            if (_cts is { } cts)
+            {
+                cts.Cancel(false);
+                return true;
+            }
+
+            return false;
         }
+
+        public override bool IsCancellable => true;
     }
 
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "9.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Proxy_IComplexGrain : global::Orleans.Runtime.GrainReference, global::TestProject.IComplexGrain
     {
         private readonly OrleansCodeGen.TestProject.Copier_ComplexData _copier0;
@@ -115,7 +122,7 @@ namespace OrleansCodeGen.TestProject
         }
     }
 
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "9.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Codec_ComplexData : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.ComplexData>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.ComplexData>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.ComplexData);
@@ -193,7 +200,7 @@ namespace OrleansCodeGen.TestProject
         }
     }
 
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "9.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_ComplexData : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.ComplexData>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.ComplexData>
     {
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -217,13 +224,13 @@ namespace OrleansCodeGen.TestProject
         }
     }
 
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "9.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Activator_ComplexData : global::Orleans.Serialization.Activators.IActivator<global::TestProject.ComplexData>
     {
         public global::TestProject.ComplexData Create() => new global::TestProject.ComplexData();
     }
 
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "9.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Codec_Invokable_IComplexGrain_GrainReference_67FE5808 : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808>
     {
         private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808);
@@ -312,7 +319,7 @@ namespace OrleansCodeGen.TestProject
         }
     }
 
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "9.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_Invokable_IComplexGrain_GrainReference_67FE5808 : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808>
     {
         private readonly OrleansCodeGen.TestProject.Copier_ComplexData _copier0;
@@ -335,7 +342,7 @@ namespace OrleansCodeGen.TestProject
         }
     }
 
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "9.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Codec_ComplexGrain : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.ComplexGrain>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.ComplexGrain>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.ComplexGrain);
@@ -395,7 +402,7 @@ namespace OrleansCodeGen.TestProject
         }
     }
 
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "9.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_ComplexGrain : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.ComplexGrain>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.ComplexGrain>
     {
         private readonly global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.Grain> _baseTypeCopier;
@@ -424,13 +431,13 @@ namespace OrleansCodeGen.TestProject
         }
     }
 
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "9.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Activator_ComplexGrain : global::Orleans.Serialization.Activators.IActivator<global::TestProject.ComplexGrain>
     {
         public global::TestProject.ComplexGrain Create() => new global::TestProject.ComplexGrain();
     }
 
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "9.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)

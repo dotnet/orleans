@@ -13,7 +13,7 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.Scheduler;
 
-[DebuggerDisplay("WorkItemGroup Context={GrainContext} State={state}")]
+[DebuggerDisplay("WorkItemGroup Context={GrainContext} State={_state}")]
 internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
 {
     private enum WorkGroupStatus : byte
@@ -242,7 +242,7 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
             (int)ErrorCode.Runtime_Error_100032,
             ex,
             "Worker thread {Thread} caught an exception thrown from IWorkItem.Execute",
-            Thread.CurrentThread.ManagedThreadId);
+            Environment.CurrentManagedThreadId);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -261,7 +261,7 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
             GrainContext.ToString(),
             taskDuration.ToString("g"),
             _schedulingOptions.TurnWarningLengthThreshold,
-            Thread.CurrentThread.ManagedThreadId.ToString());
+            Environment.CurrentManagedThreadId.ToString());
     }
 
     public override string ToString() => $"{(GrainContext is SystemTarget ? "System*" : "")}WorkItemGroup:Name={GrainContext?.ToString() ?? "Unknown"},WorkGroupStatus={_state}";

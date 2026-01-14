@@ -1,8 +1,10 @@
 using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core.Internal;
 using Orleans.Placement;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
+using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
 
@@ -25,7 +27,6 @@ namespace DefaultCluster.Tests.General
             {
                 var grain = GrainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
                 var expectedState = Random.Shared.Next();
-                await grain.SetState(expectedState);
                 var originalAddress = await grain.GetGrainAddress();
                 GrainAddress newAddress;
                 do
@@ -33,6 +34,7 @@ namespace DefaultCluster.Tests.General
                     // Trigger migration without setting a placement hint, so the grain placement provider will be
                     // free to select any location including the existing one.
                     await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+                    await grain.SetState(expectedState);
                     newAddress = await grain.GetGrainAddress();
                 } while (originalAddress == newAddress);
 
@@ -238,11 +240,26 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT")]
         public async Task FailDehydrationTest()
         {
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
             var grain = GrainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
             var expectedState = Random.Shared.Next();
             await grain.SetState(expectedState);
             var originalAddress = await grain.GetGrainAddress();
             var targetHost = Fixture.HostedCluster.GetActiveSilos().Select(s => s.SiloAddress).First(address => address != originalAddress.SiloAddress);
+
+            // Wait for membership to stabilize and for cluster manifests to be propagated.
+            // We do this by repeatedly trying to activate a grain on the target silo.
+            var primaryGrainFactory = ((InProcessSiloHandle)Fixture.HostedCluster.Primary).ServiceProvider.GetRequiredService<IGrainFactory>();
+            SiloAddress grainOnOtherSiloAddr;
+            do
+            {
+                cts.Token.ThrowIfCancellationRequested();
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
+                var grainOnOtherSilo = primaryGrainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
+                var addr = await grainOnOtherSilo.GetGrainAddress();
+                grainOnOtherSiloAddr = addr.SiloAddress;
+                await Task.Delay(100);
+            } while (!targetHost.Equals(grainOnOtherSiloAddr));
 
             // Trigger migration, setting a placement hint to coerce the placement director to use the target silo
             // Also, tell the grain to fail to dehydrate (by stuffing some data into the request context which tells it to throw)
@@ -250,12 +267,12 @@ namespace DefaultCluster.Tests.General
             RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
             await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
 
-            var newAddress = await grain.GetGrainAddress();
-            Assert.Equal(targetHost, newAddress.SiloAddress);
-
             // The grain should have lost its state during the failed migration.
             var newState = await grain.GetState();
             Assert.NotEqual(expectedState, newState);
+
+            var newAddress = await grain.GetGrainAddress();
+            Assert.Equal(targetHost, newAddress.SiloAddress);
         }
 
         /// <summary>
@@ -309,21 +326,18 @@ namespace DefaultCluster.Tests.General
 
         public void OnDehydrate(IDehydrationContext migrationContext)
         {
+            if (RequestContext.Get("fail_rehydrate") is true)
+            {
+                migrationContext.TryAddValue("fail_rehydrate", true);
+            }
+
+            if (RequestContext.Get("fail_dehydrate") is true)
+            {
+                throw new InvalidOperationException("Failing to dehydrate on-command");
+            }
+
             migrationContext.TryAddValue("state", _state);
 
-            {
-                if (RequestContext.Get("fail_rehydrate") is bool fail && fail)
-                {
-                    migrationContext.TryAddValue("fail_rehydrate", true);
-                }
-            }
-
-            {
-                if (RequestContext.Get("fail_dehydrate") is bool fail && fail)
-                {
-                    throw new InvalidOperationException("Failing to dehydrate on-command");
-                }
-            }
         }
 
         public void OnRehydrate(IRehydrationContext migrationContext)

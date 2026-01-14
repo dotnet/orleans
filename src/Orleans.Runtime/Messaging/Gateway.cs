@@ -84,7 +84,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal async Task SendStopSendMessages(IInternalGrainFactory grainFactory)
+        internal async Task SendStopSendMessages(IInternalGrainFactory grainFactory, CancellationToken cancellationToken = default)
         {
             lock (clients)
             {
@@ -98,7 +98,7 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
-            await Task.Delay(this.messagingOptions.ClientGatewayShutdownNotificationTimeout);
+            await Task.Delay(this.messagingOptions.ClientGatewayShutdownNotificationTimeout, cancellationToken);
         }
 
         internal async Task StopAsync()

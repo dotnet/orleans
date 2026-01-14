@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
@@ -35,14 +36,13 @@ namespace Orleans.Tests.SqlUtils
             InvariantNamePostgreSql,
             InvariantNameSqlLite,
             InvariantNameSqlServer,
-            InvariantNameSqlServerDotnetCore,
             InvariantNameMySqlConnector
         }));
 
         /// <summary>
         /// Microsoft SQL Server invariant name string.
         /// </summary>
-        public const string InvariantNameSqlServer = "System.Data.SqlClient";
+        public const string InvariantNameSqlServer = "Microsoft.Data.SqlClient";
 
         /// <summary>
         /// Oracle Database server invariant name string.
@@ -67,7 +67,8 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// Dotnet core Microsoft SQL Server invariant name string.
         /// </summary>
-        public const string InvariantNameSqlServerDotnetCore = "Microsoft.Data.SqlClient";
+        [Obsolete("Use InvariantNameSqlServer instead.")]
+        public const string InvariantNameSqlServerDotnetCore = InvariantNameSqlServer;
 
         /// <summary>
         /// An open source implementation of the MySQL connector library.

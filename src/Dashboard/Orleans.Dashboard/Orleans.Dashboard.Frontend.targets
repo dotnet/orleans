@@ -1,0 +1,123 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Frontend paths -->
+    <NpmAppRootDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Orleans.Dashboard.App'))</NpmAppRootDirectory>
+    <NpmBuildOutput>$([System.IO.Path]::GetFullPath('$(NpmAppRootDirectory)\dist\'))</NpmBuildOutput>
+    <AzureDevOpsNpmrcFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\.azdo\.npmrc'))</AzureDevOpsNpmrcFile>
+  </PropertyGroup>
+
+  <!-- Collect frontend source files for incremental build tracking -->
+  <ItemGroup>
+    <NpmAppSources Include="$(NpmAppRootDirectory)\src\**\*" />
+    <NpmAppSources Include="$(NpmAppRootDirectory)\public\**\*" />
+    <NpmAppSources Include="$(NpmAppRootDirectory)\package.json" />
+    <NpmAppSources Include="$(NpmAppRootDirectory)\vite.config.ts" />
+    <NpmAppSources Include="$(NpmAppRootDirectory)\tsconfig.json" />
+    <NpmAppSources Include="$(NpmAppRootDirectory)\index.html" />
+  </ItemGroup>
+
+  <!-- Use a marker file for incremental build tracking -->
+  <PropertyGroup>
+    <NpmAppBuildMarker>$(BaseIntermediateOutputPath)frontend.build.marker</NpmAppBuildMarker>
+  </PropertyGroup>
+
+  <Target
+    Name="DeleteNpmBuildMarker"
+    AfterTargets="Clean"
+    Condition="Exists($(NpmAppBuildMarker))">
+    <Delete Files="$(NpmAppBuildMarker)" />
+  </Target>
+
+  <!-- Build the frontend application.
+       This target runs once regardless of how many target frameworks are being built.
+       See: https://learn.microsoft.com/visualstudio/msbuild/run-target-exactly-once -->
+  <Target Name="BuildNpmApp" Inputs="@(NpmAppSources)" Outputs="$(NpmAppBuildMarker)">
+    <Exec Command="node --version" ConsoleToMsBuild="true" StandardOutputImportance="Low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="NodeVersion" />
+    </Exec>
+    <Message Importance="High" Text="Building Orleans Dashboard frontend with Node.js $(NodeVersion)" />
+
+    <!-- Use Azure DevOps npmrc if running in CI -->
+    <PropertyGroup>
+      <NpmConfigArg Condition="'$(TF_BUILD)' == 'true'">--userconfig "$(AzureDevOpsNpmrcFile)"</NpmConfigArg>
+    </PropertyGroup>
+
+    <!-- Install dependencies -->
+    <Exec
+      Command="npm ci --prefer-offline --no-audit $(NpmConfigArg)"
+      WorkingDirectory="$(NpmAppRootDirectory)"
+      ConsoleToMsBuild="true" />
+
+    <!-- Build the frontend -->
+    <Exec
+      Command="npm run build"
+      WorkingDirectory="$(NpmAppRootDirectory)"
+      ConsoleToMsBuild="true" />
+
+    <!-- Create marker file to track successful build -->
+    <Touch Files="$(NpmAppBuildMarker)" AlwaysCreate="true" />
+  </Target>
+
+  <!-- Hook BuildNpmApp to run once before DispatchToInnerBuilds for multi-targeted builds.
+       DispatchToInnerBuilds only runs once during multi-targeted builds, so attaching here
+       ensures the npm build runs exactly once before all inner framework builds. -->
+  <Target
+    Name="BuildNpmAppBeforeOuterBuild"
+    DependsOnTargets="BuildNpmApp"
+    BeforeTargets="DispatchToInnerBuilds"
+    />
+
+  <!-- Include frontend assets as embedded resources.
+       This target:
+       1. Calls BuildNpmApp to ensure the dist folder exists (via MSBuild task for outer build)
+       2. Validates required files exist
+       3. Dynamically discovers and adds all dist files as embedded resources
+       
+       BeforeTargets="BeforeBuild" ensures items are added early enough to be processed by the compiler.
+       We use ItemGroup inside the target to dynamically discover files at target execution time,
+       rather than relying on static globs which are evaluated at project load time. -->
+  <Target Name="IncludeFrontendAssets" BeforeTargets="BeforeBuild">
+    <!-- Call BuildNpmApp once via the outer build (without TargetFramework) -->
+    <MSBuild
+      Projects="$(MSBuildProjectFullPath)"
+      Targets="BuildNpmApp"
+      RemoveProperties="TargetFramework" />
+
+    <!-- Validate required files exist -->
+    <Error 
+      Condition="!Exists('$(NpmBuildOutput)index.html')" 
+      Text="Required frontend asset is missing: $(NpmBuildOutput)index.html. The frontend build may have failed. Ensure Node.js is installed." />
+    <Error 
+      Condition="!Exists('$(NpmBuildOutput)index.min.js')" 
+      Text="Required frontend asset is missing: $(NpmBuildOutput)index.min.js. The frontend build may have failed. Ensure Node.js is installed." />
+    <Error 
+      Condition="!Exists('$(NpmBuildOutput)index.css')" 
+      Text="Required frontend asset is missing: $(NpmBuildOutput)index.css. The frontend build may have failed. Ensure Node.js is installed." />
+
+    <!-- Dynamically discover and add all dist files as embedded resources -->
+    <ItemGroup>
+      <_DistFiles Include="$(NpmBuildOutput)**\*" />
+      <EmbeddedResource Include="@(_DistFiles)" Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)" />
+    </ItemGroup>
+
+    <!-- Fail the build if no assets were found -->
+    <Error Condition="'@(_DistFiles)' == ''" Text="No frontend assets found in $(NpmBuildOutput). The frontend build may have failed." />
+  </Target>
+
+  <!-- Validate that frontend assets were actually included as embedded resources.
+       This runs after CreateManifestResourceNames has processed all EmbeddedResource items,
+       providing a final check that the resources will be compiled into the assembly.
+       Only runs during build (not during pack) by checking that IncludeFrontendAssets ran. -->
+  <Target Name="ValidateFrontendEmbeddedResources" AfterTargets="CreateManifestResourceNames" Condition="'@(_DistFiles)' != ''">
+    <ItemGroup>
+      <_FrontendEmbeddedResources Include="@(EmbeddedResource)" Condition="'%(Link)' != '' and $([System.String]::Copy('%(Link)').StartsWith('wwwroot'))" />
+    </ItemGroup>
+
+    <Error 
+      Condition="'@(_FrontendEmbeddedResources)' == ''" 
+      Text="No frontend assets found in EmbeddedResource items. The frontend assets were not properly included." />
+  </Target>
+
+</Project>
+

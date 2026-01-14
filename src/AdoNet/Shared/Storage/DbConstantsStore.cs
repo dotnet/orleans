@@ -44,7 +44,7 @@ namespace Orleans.Tests.SqlUtils
                                     startEscapeIndicator: '"',
                                     endEscapeIndicator: '"',
                                     unionAllSelectTemplate: " UNION ALL SELECT ",
-                                    isSynchronousAdoNetImplementation: true, //there are some intermittent PostgreSQL problems too, see more discussion at https://github.com/dotnet/orleans/pull/2949.
+                                    isSynchronousAdoNetImplementation: false,
                                     supportsStreamNatively: true,
                                     supportsCommandCancellation: true, // See https://dev.mysql.com/doc/connector-net/en/connector-net-ref-mysqlclient-mysqlcommandmembers.html.
                                     commandInterceptor: NoOpCommandInterceptor.Instance)
@@ -59,16 +59,6 @@ namespace Orleans.Tests.SqlUtils
                                     supportsCommandCancellation: false, // Is supported but the remarks sound scary: https://docs.oracle.com/cd/E11882_01/win.112/e23174/OracleCommandClass.htm#DAFIEHHG.
                                     commandInterceptor: OracleCommandInterceptor.Instance)
 
-                },
-                {
-                    AdoNetInvariants.InvariantNameSqlServerDotnetCore,
-                    new DbConstants(startEscapeIndicator: '[',
-                                    endEscapeIndicator: ']',
-                                    unionAllSelectTemplate: " UNION ALL SELECT ",
-                                    isSynchronousAdoNetImplementation: false,
-                                    supportsStreamNatively: true,
-                                    supportsCommandCancellation: true,
-                                    commandInterceptor: NoOpCommandInterceptor.Instance)
                 },
                 {
                     AdoNetInvariants.InvariantNameMySqlConnector,

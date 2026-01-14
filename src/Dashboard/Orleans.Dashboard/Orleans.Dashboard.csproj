@@ -1,0 +1,40 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Dashboard</PackageId>
+    <Title>Microsoft Orleans Dashboard</Title>
+    <Description>Real-time monitoring and visualization dashboard for Microsoft Orleans showing grain statistics, performance metrics, and cluster health.</Description>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RootNamespace>Orleans.Dashboard</RootNamespace>
+  </PropertyGroup>
+
+  <Import Project="Orleans.Dashboard.Frontend.targets" />
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OpenTelemetry" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Dashboard.Abstractions\Orleans.Dashboard.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Orleans.Reminders\Orleans.Reminders.csproj" />
+    <ProjectReference Include="..\..\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="..\..\Orleans.Sdk\Orleans.Sdk.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Dashboard.TestGrains" />
+    <InternalsVisibleTo Include="Orleans.Dashboard.UnitTests" />
+    <InternalsVisibleTo Include="Benchmarks" />
+  </ItemGroup>
+  
+</Project>

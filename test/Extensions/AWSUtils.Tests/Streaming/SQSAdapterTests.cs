@@ -1,9 +1,11 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 using OrleansAWSUtils.Streams;
 using AWSUtils.Tests.StorageTests;
@@ -62,7 +64,14 @@ namespace AWSUtils.Tests.Streaming
             {
                 ConnectionString = AWSTestConstants.SqsConnectionString,
             };
-            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), Options.Create(new ClusterOptions()), null, null);
+
+            // Create a service collection to build a serializer
+            var serviceProvider = new ServiceCollection()
+                .AddSerializer()
+                .BuildServiceProvider();
+            var serializer = serviceProvider.GetRequiredService<Serializer>();
+
+            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), Options.Create(new ClusterOptions()), serializer, NullLoggerFactory.Instance);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);
         }

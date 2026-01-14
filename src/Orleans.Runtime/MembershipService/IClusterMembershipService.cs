@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime
@@ -24,8 +25,9 @@ namespace Orleans.Runtime
         /// Refreshes cluster membership if it is not at or above the specified minimum version.
         /// </summary>
         /// <param name="minimumVersion">The minimum version.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A <see cref="ValueTask"/> representing the work performed.</returns>
-        ValueTask Refresh(MembershipVersion minimumVersion = default);
+        ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Unilaterally declares the specified silo defunct.

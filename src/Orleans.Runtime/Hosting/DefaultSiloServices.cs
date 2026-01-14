@@ -91,9 +91,9 @@ namespace Orleans.Hosting
 #pragma warning restore 618
 
             services.TryAddSingleton<OverloadDetector>();
+            services.TryAddFromExisting<IOverloadDetector, OverloadDetector>();
 
             services.AddSingleton<SystemTargetShared>();
-            services.AddSingleton<LifecycleSchedulingSystemTarget>();
 
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
 
@@ -264,6 +264,7 @@ namespace Orleans.Hosting
             services.AddSingleton<IncomingRequestMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IncomingRequestMonitor>();
             services.AddFromExisting<IActivationWorkingSetObserver, IncomingRequestMonitor>();
+            services.AddSingleton<ILocalActivationStatusChecker, Runtime.LocalActivationStatusChecker>();
 
             // Scoped to a grain activation
             services.AddScoped<IGrainContext>(sp => RuntimeContext.Current ?? throw new InvalidOperationException("No current grain context available."));
@@ -415,7 +416,6 @@ namespace Orleans.Hosting
             services.AddSingleton<SharedMemoryPool>();
 
             // Activation migration
-            services.AddSingleton<MigrationContext.SerializationHooks>();
             services.AddSingleton<ActivationMigrationManager>();
             services.AddFromExisting<IActivationMigrationManager, ActivationMigrationManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationMigrationManager>();

@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Streaming.NATS</PackageId>
+    <Title>Microsoft Orleans NATS Streaming Provider</Title>
+    <Description>Microsoft Orleans streaming provider backed by NATS</Description>
+    <PackageTags>$(PackageTags) NATS</PackageTags>
+    <DefineConstants>$(DefineConstants);ORLEANS_NATS</DefineConstants>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <AssemblyName>Orleans.Streaming.NATS</AssemblyName>
+    <RootNamespace>Orleans.Streaming.NATS</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <Nullable>enable</Nullable>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
+    <PackageReference Include="NATS.Net" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="NATS.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

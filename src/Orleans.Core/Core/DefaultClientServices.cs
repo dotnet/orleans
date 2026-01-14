@@ -132,7 +132,6 @@ namespace Orleans
             services.AddSingleton<ISpecializableCodec, GrainReferenceCodecProvider>();
             services.AddSingleton<ISpecializableCopier, GrainReferenceCopierProvider>();
             services.AddSingleton<OnDeserializedCallbacks>();
-            services.AddSingleton<MigrationContext.SerializationHooks>();
             services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, ConfigureOrleansJsonSerializerOptions>();
             services.AddSingleton<OrleansJsonSerializer>();
 
@@ -163,6 +162,7 @@ namespace Orleans
             services.AddSingleton<IGrainPropertiesProvider, ImplementedInterfaceProvider>();
 
             services.AddSingleton<IGrainCallCancellationManager, ExternalClientGrainCallCancellationManager>();
+            services.AddSingleton<ILocalActivationStatusChecker, ClientLocalActivationStatusChecker>();
 
             ApplyConfiguration(builder);
         }

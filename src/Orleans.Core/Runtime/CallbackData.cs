@@ -46,7 +46,16 @@ namespace Orleans.Runtime
             }, this);
         }
 
-        private void SignalCancellation() => shared.CancellationManager?.SignalCancellation(Message.TargetSilo, Message.TargetGrain, Message.SendingGrain, Message.Id);
+        private void SignalCancellation()
+        {
+            // Only cancel requests which honor cancellation token.
+            // Not all targets support IGrainCallCancellationExtension, so sending a cancellation in those cases could result in an error.
+            // There are opportunities to cancel requests at the infrastructure layer which this will not exploit if the target method does not support cancellation.
+            if (Message.BodyObject is IInvokable invokable && invokable.IsCancellable)
+            {
+                shared.CancellationManager?.SignalCancellation(Message.TargetSilo, Message.TargetGrain, Message.SendingGrain, Message.Id);
+            }
+        }
 
         public void OnStatusUpdate(StatusResponse status)
         {

@@ -95,7 +95,7 @@ namespace Orleans.Runtime
                 callbackDataLogger,
                 this.messagingOptions.SystemResponseTimeout,
                 cancelOnTimeout: false,
-                waitForCancellationAcknowledgement: false,
+                waitForCancellationAcknowledgement: this.messagingOptions.WaitForCancellationAcknowledgement,
                 cancellationManager: null);
         }
 
@@ -211,11 +211,14 @@ namespace Orleans.Runtime
         {
             try
             {
-                if (message.CacheInvalidationHeader != null)
+                if (message.CacheInvalidationHeader is { } cacheUpdates)
                 {
-                    foreach (var update in message.CacheInvalidationHeader)
+                    lock (cacheUpdates)
                     {
-                        GrainLocator.UpdateCache(update);
+                        foreach (var update in cacheUpdates)
+                        {
+                            GrainLocator.UpdateCache(update);
+                        }
                     }
                 }
 
@@ -418,7 +421,7 @@ namespace Orleans.Runtime
                 }
                 else
                 {
-                    if (messagingOptions.CancelRequestOnTimeout)
+                    if (messagingOptions.CancelUnknownRequestOnStatusUpdate)
                     {
                         // Cancel the call since the caller has abandoned it.
                         // Note that the target and sender arguments are swapped because this is a response to the original request.
@@ -524,6 +527,7 @@ namespace Orleans.Runtime
         {
             _cancellationManager = this.ServiceProvider.GetRequiredService<IGrainCallCancellationManager>();
             sharedCallbackData.CancellationManager = _cancellationManager;
+            systemSharedCallbackData.CancellationManager = _cancellationManager;
             lifecycle.Subscribe<InsideRuntimeClient>(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
         }
 

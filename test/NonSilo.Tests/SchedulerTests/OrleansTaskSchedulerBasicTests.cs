@@ -1,12 +1,9 @@
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.TestingHost.Utils;
-using Orleans.Internal;
-using Orleans;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -56,8 +53,8 @@ namespace UnitTests.SchedulerTests
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) { }
         public Task Deactivated => Task.CompletedTask;
         public void Dispose() => (Scheduler as IDisposable)?.Dispose();
-        public TComponent GetComponent<TComponent>() where TComponent : class => throw new NotImplementedException();
-        public TTarget GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
+        public object GetComponent(Type componentType) => throw new NotImplementedException();
+        public object GetTarget() => throw new NotImplementedException();
         public void ReceiveMessage(object message) => throw new NotImplementedException();
 
         public void SetComponent<TComponent>(TComponent value) where TComponent : class => throw new NotImplementedException();
@@ -66,7 +63,7 @@ namespace UnitTests.SchedulerTests
         void IGrainContext.Rehydrate(IRehydrationContext context) => throw new NotImplementedException();
         void IGrainContext.Migrate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) => throw new NotImplementedException();
     }
-    
+
     /// <summary>
     /// Basic tests for the Orleans task scheduler, which is the core component responsible for scheduling grain work items.
     /// The scheduler ensures single-threaded execution semantics for grains while efficiently utilizing thread pool resources.
@@ -75,18 +72,18 @@ namespace UnitTests.SchedulerTests
     [TestCategory("BVT"), TestCategory("Scheduler")]
     public class OrleansTaskSchedulerBasicTests : IDisposable
     {
-        private readonly ITestOutputHelper output;
-        private static readonly object Lockable = new object();
-        private readonly UnitTestSchedulingContext rootContext;
-        private readonly ILoggerFactory loggerFactory;
+        private static readonly object Lockable = new();
+        private readonly ITestOutputHelper _output;
+        private readonly UnitTestSchedulingContext _rootContext;
+        private readonly ILoggerFactory _loggerFactory;
         public OrleansTaskSchedulerBasicTests(ITestOutputHelper output)
         {
-            this.output = output;
+            _output = output;
             SynchronizationContext.SetSynchronizationContext(null);
-            this.loggerFactory = InitSchedulerLogging();
-            this.rootContext = UnitTestSchedulingContext.Create(loggerFactory);
+            _loggerFactory = InitSchedulerLogging();
+            _rootContext = UnitTestSchedulingContext.Create(_loggerFactory);
         }
-        
+
         public void Dispose()
         {
             SynchronizationContext.SetSynchronizationContext(null);
@@ -99,12 +96,12 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("AsynchronyPrimitives")]
         public async Task Async_Task_Start_ActivationTaskScheduler()
         {
-            int expected = 2;
-            bool done = false;
-            Task<int> t = new Task<int>(() => { done = true; return expected; });
-            rootContext.Scheduler.QueueTask(t);
+            var expected = 2;
+            var done = false;
+            var t = new Task<int>(() => { done = true; return expected; });
+            _rootContext.Scheduler.QueueTask(t);
 
-            int received = await t;
+            var received = await t;
             Assert.True(t.IsCompleted, "Task should have completed");
             Assert.False(t.IsFaulted, "Task should not thrown exception: " + t.Exception);
             Assert.True(done, "Task should be done");
@@ -112,26 +109,27 @@ namespace UnitTests.SchedulerTests
         }
 
         [Fact]
-        public void Sched_SimpleFifoTest()
+        public async Task Sched_SimpleFifoTest()
         {
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
             // is completely and thoroughly broken and both closures are executed "simultaneously"
 
-            int n = 0;
+            var n = 0;
+            var completed = new TaskCompletionSource<bool>();
             // ReSharper disable AccessToModifiedClosure
             void item1() { n = n + 5; }
-            void item2() { n = n * 3; }
+            void item2() { n = n * 3; completed.SetResult(true); }
             // ReSharper restore AccessToModifiedClosure
-            this.rootContext.Scheduler.QueueAction(item1);
-            rootContext.Scheduler.QueueAction(item2);
+            _rootContext.Scheduler.QueueAction(item1);
+            _rootContext.Scheduler.QueueAction(item2);
 
-            // Pause to let things run
-            Thread.Sleep(1000);
+            // Wait for completion
+            await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
             // N should be 15, because the two tasks should execute in order
             Assert.True(n != 0, "Work items did not get executed");
             Assert.Equal(15, n);
-            this.output.WriteLine("Test executed OK.");
+            _output.WriteLine("Test executed OK.");
         }
 
         [Fact]
@@ -140,15 +138,19 @@ namespace UnitTests.SchedulerTests
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
             // is completely and thoroughly broken and both closures are executed "simultaneously"
 
-            int n = 0;
+            var n = 0;
+            var gate = new SemaphoreSlim(0, 1);
 
             // ReSharper disable AccessToModifiedClosure
-            Task task1 = new Task(() => { Thread.Sleep(1000); n = n + 5; });
-            Task task2 = new Task(() => { n = n * 3; });
+            var task1 = new Task(() => { gate.Wait(); n = n + 5; });
+            var task2 = new Task(() => { n = n * 3; });
             // ReSharper restore AccessToModifiedClosure
 
-            rootContext.Scheduler.QueueTask(task1);
-            rootContext.Scheduler.QueueTask(task2);
+            _rootContext.Scheduler.QueueTask(task1);
+            _rootContext.Scheduler.QueueTask(task2);
+
+            // Release task1 to proceed
+            gate.Release();
 
             await Task.WhenAll(task1, task2).WaitAsync(TimeSpan.FromSeconds(5));
 
@@ -162,43 +164,43 @@ namespace UnitTests.SchedulerTests
         {
             const int NumTasks = 10;
 
-            ManualResetEvent[] flags = new ManualResetEvent[NumTasks];
-            for (int i = 0; i < NumTasks; i++)
+            var flags = new ManualResetEvent[NumTasks];
+            for (var i = 0; i < NumTasks; i++)
             {
                 flags[i] = new ManualResetEvent(false);
             }
 
-            Task[] tasks = new Task[NumTasks];
-            for (int i = 0; i < NumTasks; i++)
+            var tasks = new Task[NumTasks];
+            for (var i = 0; i < NumTasks; i++)
             {
-                int taskNum = i; // Capture
-                tasks[i] = new Task(() => { this.output.WriteLine("Inside Task-" + taskNum); flags[taskNum].WaitOne(); });
+                var taskNum = i; // Capture
+                tasks[i] = new Task(() => { _output.WriteLine("Inside Task-" + taskNum); flags[taskNum].WaitOne(); });
             }
 
-            Action[] workItems = new Action[NumTasks];
-            for (int i = 0; i < NumTasks; i++)
+            var workItems = new Action[NumTasks];
+            for (var i = 0; i < NumTasks; i++)
             {
-                int taskNum = i; // Capture
+                var taskNum = i; // Capture
                 workItems[i] = () =>
                 {
-                    this.output.WriteLine("Inside ClosureWorkItem-" + taskNum);
+                    _output.WriteLine("Inside ClosureWorkItem-" + taskNum);
                     tasks[taskNum].Start(TaskScheduler.Default);
 #pragma warning disable xUnit1031 // Do not use blocking task operations in test method
-                    bool ok = tasks[taskNum].Wait(TimeSpan.FromMilliseconds(NumTasks * 100));
+                    var ok = tasks[taskNum].Wait(TimeSpan.FromMilliseconds(NumTasks * 100));
 #pragma warning restore xUnit1031 // Do not use blocking task operations in test method
                     Assert.True(ok, "Wait completed successfully inside ClosureWorkItem-" + taskNum);
                 };
             }
 
-            foreach (var workItem in workItems) this.rootContext.Scheduler.QueueAction(workItem);
+            foreach (var workItem in workItems) _rootContext.Scheduler.QueueAction(workItem);
             foreach (var flag in flags) flag.Set();
-            for (int i = 0; i < tasks.Length; i++)
+            for (var i = 0; i < tasks.Length; i++)
             {
                 await tasks[i].WaitAsync(TimeSpan.FromMilliseconds(NumTasks * 150));
             }
 
 
-            for (int i = 0; i < tasks.Length; i++)
+            for (var i = 0; i < tasks.Length; i++)
             {
                 Assert.False(tasks[i].IsFaulted, "Task.IsFaulted-" + i + " Exception=" + tasks[i].Exception);
                 Assert.True(tasks[i].IsCompleted, "Task.IsCompleted-" + i);
@@ -212,20 +214,20 @@ namespace UnitTests.SchedulerTests
             var result1 = new TaskCompletionSource<bool>();
 
             Task t1 = null;
-            rootContext.Scheduler.QueueAction(() =>
+            _rootContext.Scheduler.QueueAction(() =>
             {
                 try
                 {
-                    this.output.WriteLine("#0 - TaskWorkItem - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
+                    _output.WriteLine("#0 - TaskWorkItem - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                         SynchronizationContext.Current, TaskScheduler.Current);
-                    var taskScheduler = ((WorkItemGroup)rootContext.Scheduler).TaskScheduler;
+                    var taskScheduler = ((WorkItemGroup)_rootContext.Scheduler).TaskScheduler;
                     Assert.Equal(taskScheduler, TaskScheduler.Current); //
 
                     t1 = new Task(() =>
                     {
-                        this.output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
+                        _output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                             SynchronizationContext.Current, TaskScheduler.Current);
-                        var taskScheduler = ((WorkItemGroup)rootContext.Scheduler).TaskScheduler;  // "TaskScheduler.Current #1"
+                        var taskScheduler = ((WorkItemGroup)_rootContext.Scheduler).TaskScheduler;  // "TaskScheduler.Current #1"
                         Assert.Equal(taskScheduler, TaskScheduler.Current); //
                         result1.SetResult(true);
                     });
@@ -252,22 +254,29 @@ namespace UnitTests.SchedulerTests
             Assert.False(t1.IsFaulted, "Task-1 faulted: " + t1.Exception);
             Assert.True(await result1.Task, "Task-1 completed");
         }
-                
+
         [Fact]
         public async Task Sched_Task_SubTaskExecutionSequencing()
         {
             LogContext("Main-task " + Task.CurrentId);
 
-            int n = 0;
-            TaskCompletionSource<int> finished = new TaskCompletionSource<int>();
+            var n = 0;
+            var finished = new TaskCompletionSource<int>();
             var numCompleted = new[] {0};
+            var gates = new SemaphoreSlim[10];
+            for (var i = 0; i < 10; i++)
+            {
+                gates[i] = new SemaphoreSlim(0, 1);
+            }
+
             void closure()
             {
                 LogContext("ClosureWorkItem-task " + Task.CurrentId);
 
-                for (int i = 0; i < 10; i++)
+                for (var i = 0; i < 10; i++)
                 {
-                    int id = -1;
+                    var taskIndex = i;
+                    var id = -1;
                     void action()
                     {
                         id = Task.CurrentId.HasValue ? (int)Task.CurrentId : -1;
@@ -275,10 +284,10 @@ namespace UnitTests.SchedulerTests
                         // ReSharper disable AccessToModifiedClosure
                         LogContext("Sub-task " + id + " n=" + n);
 
-                        int k = n;
-                        this.output.WriteLine("Sub-task " + id + " sleeping");
-                        Thread.Sleep(100);
-                        this.output.WriteLine("Sub-task " + id + " awake");
+                        var k = n;
+                        _output.WriteLine("Sub-task " + id + " waiting for gate");
+                        gates[taskIndex].Wait();
+                        _output.WriteLine("Sub-task " + id + " proceeding");
                         n = k + 1;
                         // ReSharper restore AccessToModifiedClosure
                     }
@@ -286,55 +295,61 @@ namespace UnitTests.SchedulerTests
                     {
                         LogContext("Sub-task " + id + "-ContinueWith");
 
-                        this.output.WriteLine("Sub-task " + id + " Done");
+                        _output.WriteLine("Sub-task " + id + " Done");
                         if (Interlocked.Increment(ref numCompleted[0]) == 10)
                         {
                             finished.SetResult(0);
                         }
                     });
                 }
+
+                // Release all gates in sequence to ensure sequential execution
+                for (var i = 0; i < 10; i++)
+                {
+                    gates[i].Release();
+                }
             }
 
-            rootContext.Scheduler.QueueAction(closure);
+            _rootContext.Scheduler.QueueAction(closure);
 
-            // Pause to let things run
-            this.output.WriteLine("Main-task sleeping");
-            await Task.WhenAny(Task.Delay(TimeSpan.FromSeconds(10)), finished.Task);
-            this.output.WriteLine("Main-task awake");
+            // Wait for completion
+            _output.WriteLine("Main-task waiting");
+            await finished.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            _output.WriteLine("Main-task done");
 
             // N should be 10, because all tasks should execute serially
             Assert.True(n != 0, "Work items did not get executed");
             Assert.Equal(10, n);  // "Work items executed concurrently"
         }
-        
+
         [Fact]
         public async Task Sched_AC_RequestContext_StartNew_ContinueWith()
         {
             const string key = "A";
-            int val = Random.Shared.Next();
+            var val = Random.Shared.Next();
             RequestContext.Set(key, val);
 
-            this.output.WriteLine("Initial - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
+            _output.WriteLine("Initial - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                 SynchronizationContext.Current, TaskScheduler.Current);
 
             Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get Initial"
 
             Task t0 = Task.Factory.StartNew(async () =>
             {
-                this.output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
+                _output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                     SynchronizationContext.Current, TaskScheduler.Current);
 
                 Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get #0"
 
                 Task t1 = Task.Factory.StartNew(() =>
                 {
-                    this.output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
+                    _output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                         SynchronizationContext.Current, TaskScheduler.Current);
                     Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get #1"
                 });
                 Task t2 = t1.ContinueWith((_) =>
                 {
-                    this.output.WriteLine("#2 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
+                    _output.WriteLine("#2 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                         SynchronizationContext.Current, TaskScheduler.Current);
                     Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get #2"
                 });
@@ -347,16 +362,16 @@ namespace UnitTests.SchedulerTests
         [Fact]
         public async Task RequestContextProtectedInQueuedTasksTest()
         {
-            string key = Guid.NewGuid().ToString();
-            string value = Guid.NewGuid().ToString();
+            var key = Guid.NewGuid().ToString();
+            var value = Guid.NewGuid().ToString();
 
             // Caller RequestContext is protected from clear within QueueTask
             RequestContext.Set(key, value);
-            await rootContext.QueueTask(() => AsyncCheckClearRequestContext(key));
+            await _rootContext.QueueTask(() => AsyncCheckClearRequestContext(key));
             Assert.Equal(value, (string)RequestContext.Get(key));
 
             // Caller RequestContext is protected from clear within QueueTask even if work is not actually asynchronous.
-            await this.rootContext.QueueTask(() => NonAsyncCheckClearRequestContext(key));
+            await _rootContext.QueueTask(() => NonAsyncCheckClearRequestContext(key));
             Assert.Equal(value, (string)RequestContext.Get(key));
 
             // Caller RequestContext is protected from clear when work is asynchronous.
@@ -378,25 +393,25 @@ namespace UnitTests.SchedulerTests
             }
             await nonAsyncCheckClearRequestContext();
             Assert.Null(RequestContext.Get(key));
-        }
 
-        private static async Task AsyncCheckClearRequestContext(string key)
-        {
-            Assert.Null(RequestContext.Get(key));
-            await Task.Delay(TimeSpan.Zero);
-        }
+            static async Task AsyncCheckClearRequestContext(string key)
+            {
+                Assert.Null(RequestContext.Get(key));
+                await Task.Delay(TimeSpan.Zero);
+            }
 
-        private static Task NonAsyncCheckClearRequestContext(string key)
-        {
-            Assert.Null(RequestContext.Get(key));
-            return Task.CompletedTask;
+            static Task NonAsyncCheckClearRequestContext(string key)
+            {
+                Assert.Null(RequestContext.Get(key));
+                return Task.CompletedTask;
+            }
         }
 
         private void LogContext(string what)
         {
             lock (Lockable)
             {
-                this.output.WriteLine(
+                _output.WriteLine(
                     "{0}\n"
                     + " TaskScheduler.Current={1}\n"
                     + " Task.Factory.Scheduler={2}\n"

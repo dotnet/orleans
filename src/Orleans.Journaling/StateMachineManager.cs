@@ -1,7 +1,9 @@
 using System.Buffers;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Runtime.Internal;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
@@ -13,16 +15,20 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     private const int MinApplicationStateMachineId = 8;
     private static readonly StringCodec StringCodec = new();
     private static readonly UInt64Codec UInt64Codec = new();
+    private static readonly DateTimeCodec DateTimeCodec = new();
     private readonly object _lock = new();
     private readonly Dictionary<string, IDurableStateMachine> _stateMachines = new(StringComparer.Ordinal);
     private readonly Dictionary<ulong, IDurableStateMachine> _stateMachinesMap = [];
     private readonly IStateMachineStorage _storage;
     private readonly ILogger<StateMachineManager> _logger;
+    private readonly TimeProvider _timeProvider;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Queue<WorkItem> _workQueue = new();
     private readonly CancellationTokenSource _shutdownCancellation = new();
     private readonly StateMachineManagerState _stateMachineIds;
-    private readonly Task _workLoop;
+    private readonly StateMachinesRetirementTracker _retirementTracker;
+    private readonly TimeSpan _retirementGracePeriod;
+    private Task? _workLoop;
     private ManagerState _state;
     private Task? _pendingWrite;
     private ulong _nextStateMachineId = MinApplicationStateMachineId;
@@ -31,27 +37,59 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     public StateMachineManager(
         IStateMachineStorage storage,
         ILogger<StateMachineManager> logger,
-        SerializerSessionPool serializerSessionPool)
+        IOptions<StateMachineManagerOptions> options,
+        SerializerSessionPool serializerSessionPool,
+        TimeProvider timeProvider)
     {
         _storage = storage;
         _logger = logger;
+        _timeProvider = timeProvider;
+        _retirementGracePeriod = options.Value.RetirementGracePeriod;
 
         // The list of known state machines is itself stored as a durable state machine with the implicit id 0.
         // This allows us to recover the list of state machines ids without having to store it separately.
         _stateMachineIds = new StateMachineManagerState(this, StringCodec, UInt64Codec, serializerSessionPool);
-        _stateMachinesMap[0] = _stateMachineIds;
+        _stateMachinesMap[StateMachineManagerState.Id] = _stateMachineIds;
 
-        _workLoop = Start();
+        // The retirement tracker is a special internal state machine with a fixed id.
+        // It is not stored in _stateMachineIds and does not participate in the general name->id mapping.
+        _retirementTracker = new StateMachinesRetirementTracker(this, StringCodec, DateTimeCodec, serializerSessionPool);
+        _stateMachinesMap[StateMachinesRetirementTracker.Id] = _retirementTracker;
     }
 
     public void RegisterStateMachine(string name, IDurableStateMachine stateMachine)
     {
-        _shutdownCancellation.Token.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNullOrEmpty(name);
+        _shutdownCancellation.Token.ThrowIfCancellationRequested();
 
         lock (_lock)
         {
-            _stateMachines.Add(name, stateMachine);
+            if (_stateMachines.TryGetValue(name, out var machine))
+            {
+                if (machine is RetiredStateMachineVessel vessel)
+                {
+                    // If the existing machine is a vessel for a retired one, it means the machine was loaded from a previous
+                    // log during recovery but has not been re-registered. We effectively are "staging" the resurrection of the machine.
+                    // The removal from the tracker is handled within the serialized loop. This is to prevent logical race conditions with the recovery process.
+                    // We also make sure to apply any buffered data that could have occured while the vessel took this machine's place.
+                    stateMachine.Reset(new StateMachineLogWriter(this, new(_stateMachineIds[name])));      
+                    foreach (var entry in vessel.BufferedData)
+                    {
+                        stateMachine.Apply(new ReadOnlySequence<byte>(entry));
+                    }
+                    _stateMachines[name] = stateMachine;
+                }
+                else
+                {
+                    // A real state machine is already registered with this name, this must be a developer error.
+                    throw new ArgumentException($"A state machine with the key '{name}' has already been registered.");
+                }
+            }
+            else
+            {
+                _stateMachines.Add(name, stateMachine);
+            }
+
             _workQueue.Enqueue(new WorkItem(WorkItemType.RegisterStateMachine, completion: null)
             {
                 Context = name
@@ -65,6 +103,8 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     {
         cancellationToken.ThrowIfCancellationRequested();
         _shutdownCancellation.Token.ThrowIfCancellationRequested();
+        Debug.Assert(_workLoop is null, "InitializeAsync should only be called once.");
+        _workLoop = Start();
 
         Task task;
         lock (_lock)
@@ -125,28 +165,32 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
                             //       If the current log length is greater than the snapshot size, then take a snapshot instead of appending more log entries.
                             var isSnapshot = workItem.Type is WorkItemType.WriteSnapshot;
                             LogExtentBuilder? logSegment;
+
                             lock (_lock)
                             {
-                                if (isSnapshot && _currentLogSegment is { } existingSegment)
+                                if (isSnapshot)
                                 {
                                     // If there are pending writes, reset them since they will be captured by the snapshot instead.
                                     // If we did not do this, the log would begin with some writes which would be followed by a snapshot which also included those writes.
-                                    existingSegment.Reset();
+                                    _currentLogSegment?.Reset();
+
+                                    if (_retirementTracker.Count > 0)
+                                    {
+                                        RetireOrResurectStateMachines();
+                                    }
                                 }
-                                else
-                                {
-                                    _currentLogSegment ??= new();
-                                }
+
+                                _currentLogSegment ??= new();
 
                                 // The map of state machine ids is itself stored as a durable state machine with the id 0.
                                 // This must be stored first, since it includes the identities of all other state machines, which are needed when replaying the log.
+                                // If we removed retired machines, this snapshot will persist that change.
                                 AppendUpdatesOrSnapshotStateMachine(_currentLogSegment, isSnapshot, 0, _stateMachineIds);
 
                                 foreach (var (id, stateMachine) in _stateMachinesMap)
                                 {
                                     if (id is 0 || stateMachine is null)
                                     {
-                                        // Skip state machines which have been removed.
                                         continue;
                                     }
 
@@ -256,6 +300,39 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
         }
     }
 
+    private void RetireOrResurectStateMachines()
+    {
+        foreach (var (name, timestamp) in _retirementTracker)
+        {
+            var isDuetime = _timeProvider.GetUtcNow().UtcDateTime - timestamp >= _retirementGracePeriod;
+            if (isDuetime && _stateMachineIds.TryGetValue(name, out var id))
+            {
+                var stateMachine = _stateMachines[name];
+
+                Debug.Assert(stateMachine is not null);
+
+                if (stateMachine is RetiredStateMachineVessel)
+                {
+                    LogRemovingRetiredStateMachine(_logger, name);
+
+                    // Since we are permanently removing this state machine, we will clean it up by reseting it.
+                    stateMachine.Reset(new StateMachineLogWriter(this, new(id)));
+
+                    _stateMachinesMap.Remove(id);
+                    // We remove these from memory only, since the snapshot will persist these changes.
+                    _stateMachineIds.ApplyRemove(name);
+                    _retirementTracker.ApplyRemove(name);
+                }
+                else
+                {
+                    LogRetiredStateMachineComebackDetected(_logger, name);
+                    // We remove the tracker from memory only, since the snapshot will persist the change.
+                    _retirementTracker.ApplyRemove(name);
+                }
+            }
+        }
+    }
+
     private static void AppendUpdatesOrSnapshotStateMachine(LogExtentBuilder logSegment, bool isSnapshot, ulong id, IDurableStateMachine stateMachine)
     {
         var writer = logSegment.CreateLogWriter(new(id));
@@ -285,8 +362,12 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
 
     private async Task RecoverAsync(CancellationToken cancellationToken)
     {
-        _stateMachineIds.ResetVolatileState();
-        await foreach (var segment in _storage.ReadAsync(cancellationToken))
+        lock (_lock)
+        {
+            _stateMachineIds.ResetVolatileState();
+        }
+
+        await foreach (var segment in _storage.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -303,9 +384,21 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
             }
         }
 
-        foreach (var stateMachine in _stateMachines.Values)
+        lock (_lock)
         {
-            stateMachine.OnRecoveryCompleted();
+            foreach ((var name, var stateMachine) in _stateMachines)
+            {
+                stateMachine.OnRecoveryCompleted();
+
+                if (stateMachine is RetiredStateMachineVessel)
+                {
+                    // We can use TryAdd since recovery has finished.
+                    if (_retirementTracker.TryAdd(name, _timeProvider.GetUtcNow().UtcDateTime))
+                    {
+                        LogRetiredStateMachineDetected(_logger, name);
+                    }
+                }
+            }
         }
     }
 
@@ -363,7 +456,13 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
             }
             else
             {
-                throw new InvalidOperationException($"State machine \"{name}\" (id: {id}) has not been registered on this state machine manager.");
+                var vessel = new RetiredStateMachineVessel();
+
+                // We must not make the vessel self-register with the manager, since it will
+                // result in a late-registration after the manager is 'ready'. Instead we add it inline here.
+
+                _stateMachines.Add(name, vessel);
+                _stateMachinesMap[id] = vessel;
             }
         }
     }
@@ -376,7 +475,10 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     {
         _shutdownCancellation.Cancel();
         _workSignal.Signal();
-        await _workLoop.WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+        if (_workLoop is { } task)
+        {
+            await task.WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+        }
     }
 
     void IDisposable.Dispose()
@@ -429,7 +531,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     private enum ManagerState
     {
         Unknown,
-        Ready,
+        Ready
     }
 
     private sealed class StateMachineManagerState(
@@ -438,15 +540,74 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
         IFieldCodec<ulong> valueCodec,
         SerializerSessionPool serializerSessionPool) : DurableDictionary<string, ulong>(keyCodec, valueCodec, serializerSessionPool)
     {
+        public const int Id = 0;
+
         private readonly StateMachineManager _manager = manager;
 
-        public void ResetVolatileState() => ((IDurableStateMachine)this).Reset(new StateMachineLogWriter(_manager, new(0)));
+        public void ResetVolatileState() => ((IDurableStateMachine)this).Reset(new StateMachineLogWriter(_manager, new(Id)));
 
         protected override void OnSet(string key, ulong value) => _manager.OnSetStateMachineId(key, value);
     }
+
+    /// <summary>
+    /// Used to track state machines that are not registered via user-code anymore, until time-based purging has elapsed.
+    /// </summary>
+    /// <remarks>Resurrecting of retired machines is supported.</remarks>
+    private sealed class StateMachinesRetirementTracker(
+        StateMachineManager manager, IFieldCodec<string> keyCodec, IFieldCodec<DateTime> valueCodec, SerializerSessionPool sessionPool)
+            : DurableDictionary<string, DateTime>(keyCodec, valueCodec, sessionPool)
+    {
+        public const int Id = 1;
+
+        private readonly StateMachineLogWriter _logWriter = new(manager, new(Id));
+
+        protected override IStateMachineLogWriter GetStorage() => _logWriter;
+    }
+
+    /// <summary>
+    /// Used to keep retired machines into a purgatory state until time-based purging or if a comeback occurs.
+    /// This keeps buffering entries and dumps them back into the log upon compaction.
+    /// </summary>
+    [DebuggerDisplay(nameof(RetiredStateMachineVessel))]
+    private sealed class RetiredStateMachineVessel : IDurableStateMachine
+    {
+        private readonly List<byte[]> _bufferedData = [];
+
+        public ReadOnlyCollection<byte[]> BufferedData => _bufferedData.AsReadOnly();
+
+        void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter)
+        {
+            foreach (var data in _bufferedData)
+            {
+                snapshotWriter.AppendEntry(data);
+            }
+        }
+
+        void IDurableStateMachine.Reset(IStateMachineLogWriter storage) => _bufferedData.Clear();
+        void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry) => _bufferedData.Add(logEntry.ToArray());
+        void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter) { }
+        IDurableStateMachine IDurableStateMachine.DeepCopy() => throw new NotSupportedException();
+    }
+
 
     [LoggerMessage(
         Level = LogLevel.Error,
         Message = "Error processing work items.")]
     private static partial void LogErrorProcessingWorkItems(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "State machine \"{Name}\" was not found. I have substituted a placeholder for graceful time-based retirement.")]
+    private static partial void LogRetiredStateMachineDetected(ILogger logger, string name);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "State machine \"{Name}\" was previously retired (but not removed), and has hence been re-introduced. " +
+                  "There is still time left before its permanent removal, so I will resurrect it.")]
+    private static partial void LogRetiredStateMachineComebackDetected(ILogger logger, string name);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Removing retired state machine \"{Name}\" and its data. Operation will be durably persisted shortly after compaction has finalized.")]
+    private static partial void LogRemovingRetiredStateMachine(ILogger logger, string name);
 }

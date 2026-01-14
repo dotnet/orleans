@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+	  <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Orleans.Core\Orleans.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.Reminders\Orleans.Reminders.csproj" />
+    <ProjectReference Include="..\..\..\src\Dashboard\Orleans.Dashboard\Orleans.Dashboard.csproj" />
+    <ProjectReference Include="..\..\..\src\Dashboard\Orleans.Dashboard.Abstractions\Orleans.Dashboard.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.Sdk\Orleans.Sdk.csproj" />
+  </ItemGroup>
+</Project>

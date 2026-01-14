@@ -315,7 +315,7 @@ namespace Orleans
                 }
                 else
                 {
-                    if (clientMessagingOptions.CancelRequestOnTimeout)
+                    if (clientMessagingOptions.CancelUnknownRequestOnStatusUpdate)
                     {
                         // Cancel the call since the caller has abandoned it.
                         // Note that the target and sender arguments are swapped because this is a response to the original request.

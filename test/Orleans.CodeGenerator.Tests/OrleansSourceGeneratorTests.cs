@@ -103,7 +103,6 @@ public class DemoDataWithFields
     [Id(1)]
     private readonly string _stringValue;
 
-    [GeneratedActivatorConstructor]
     public DemoDataWithFields(int intValue, string stringValue)
     {
         _intValue = intValue;
@@ -139,7 +138,6 @@ public class DerivedData : BaseData
     [Id(1)]
     public string DerivedValue { get; set; } = string.Empty;
 
-    [OrleansConstructor]
     public DerivedData(string baseValue, string derivedValue) : base(baseValue)
     {
         DerivedValue = derivedValue;
@@ -576,7 +574,6 @@ namespace TestProject;
 [GenerateSerializer]
 public class NoPublicCtor
 {
-    [OrleansConstructor]
     private NoPublicCtor() { }
 
     [Id(0)]
@@ -630,12 +627,13 @@ public class InterfaceCtorParam
 }");
 
     [Fact]
-    public Task TestClassesWithOrleansConstructorAnnotation() => AssertSuccessfulSourceGeneration(
+    public Task TestClassesWithGeneratedActivatorConstructorAnnotation() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
 
 namespace TestProject;
 
-public class ClassWithOrleansConstructor
+[GenerateSerializer]
+public class ClassWithGeneratedActivatorConstructor
 {
     [Id(0)]
     public int Value { get; set; }
@@ -643,14 +641,15 @@ public class ClassWithOrleansConstructor
     [Id(1)]
     public string Name { get; set; } = string.Empty;
 
-    [OrleansConstructor]
-    public ClassWithOrleansConstructor(int value, string name)
+    [GeneratedActivatorConstructor]
+    public ClassWithGeneratedActivatorConstructor()
     {
-        Value = value;
-        Name = name;
     }
 
-    public ClassWithOrleansConstructor() { }
+    public ClassWithGeneratedActivatorConstructor(int value)
+    {
+        Value = value;
+    }
 }");
 
     [Fact]
@@ -683,15 +682,8 @@ public enum MyCustomEnum
 [GenerateSerializer(GenerateFieldIds = GenerateFieldIds.PublicProperties), Immutable]
 public class ClassWithImplicitFieldIds
 {
-    public string StringValue { get; }
-    public MyCustomEnum EnumValue { get; }
-
-    [OrleansConstructor]
-    public ClassWithImplicitFieldIds(string stringValue, MyCustomEnum enumValue)
-    {
-        StringValue = stringValue;
-        EnumValue = enumValue;
-    }
+    public string StringValue { get; set; } = string.Empty;
+    public MyCustomEnum EnumValue { get; set; }
 }");
 
     /// <summary>
@@ -1066,7 +1058,17 @@ public class DemoClass
     /// </summary>
     private static async Task<CSharpCompilation> CreateCompilation(string sourceCode, string assemblyName = "TestProject")
     {
+#if NET10_0_OR_GREATER
+        // Manually construct .NET 10.0 reference assemblies
+        var net10References = new ReferenceAssemblies(
+            "net10.0",
+            new PackageIdentity("Microsoft.NETCore.App.Ref", "10.0.0"),
+            Path.Combine("ref", "net10.0"));
+        
+        var references = await net10References.ResolveAsync(LanguageNames.CSharp, default);
+#else
         var references = await ReferenceAssemblies.Net.Net80.ResolveAsync(LanguageNames.CSharp, default);
+#endif
 
         // Add the Orleans Orleans.Core.Abstractions assembly
         references = references.AddRange(

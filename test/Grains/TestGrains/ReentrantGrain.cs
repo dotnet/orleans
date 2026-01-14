@@ -239,26 +239,6 @@ namespace UnitTests.Grains
         }
     }
 
-    public class UnorderedNonRentrantGrain : Grain, IUnorderedNonReentrantGrain
-    {
-        private IUnorderedNonReentrantGrain Self { get; set; }
-
-        public Task<string> One()
-        {
-            return Task.FromResult("one");
-        }
-
-        public async Task<string> Two()
-        {
-            return await Self.One() + " two";
-        }
-
-        public Task SetSelf(IUnorderedNonReentrantGrain self)
-        {
-            Self = self;
-            return Task.CompletedTask;
-        }
-    }
     [Reentrant]
     public class ReentrantSelfManagedGrain1 : Grain, IReentrantSelfManagedGrain
     {

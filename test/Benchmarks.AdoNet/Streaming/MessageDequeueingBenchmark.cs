@@ -1,4 +1,4 @@
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Engines;
 using Orleans.Streaming.AdoNet;

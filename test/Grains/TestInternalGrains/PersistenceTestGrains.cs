@@ -26,7 +26,7 @@ namespace UnitTests.Grains
                 TaskScheduler={TaskScheduler.Current}
                 RuntimeContext={RuntimeContext.Current}
                 WorkerPoolThread={Thread.CurrentThread.Name}
-                Thread.CurrentThread.ManagedThreadId={Thread.CurrentThread.ManagedThreadId}
+                Thread.CurrentThread.ManagedThreadId={Environment.CurrentManagedThreadId}
                 StackTrace={callStack}
                 """;
         }

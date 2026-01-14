@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.DurableJobs</PackageId>
+    <Title>Microsoft Orleans Durable Jobs Library</Title>
+    <Description>Durable Jobs library for Microsoft Orleans used on the server.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <DefineConstants>$(DefineConstants)</DefineConstants>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Orleans.Sdk\Orleans.Sdk.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

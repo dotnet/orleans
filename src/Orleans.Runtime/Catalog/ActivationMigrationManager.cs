@@ -109,6 +109,10 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             }
         }
 
+        // Wait for all activations to become active or reach a terminal state.
+        // This ensures that the activation has completed registration in the directory (or is abandoned) before we return.
+        // Otherwise, there could be a race where the original silo removes the activation from its catalog, receives a new message for that activation,
+        // and re-activates it before the new activation on this silo has been registered with the directory.
         while (true)
         {
             var allActiveOrTerminal = true;

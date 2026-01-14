@@ -5,7 +5,7 @@
 . ./common.ps1
 
 $scriptDir = Split-Path $script:MyInvocation.MyCommand.Path
-$solution = Join-Path $scriptDir "Orleans.sln"
+$solution = Join-Path $scriptDir "Orleans.slnx"
 
 # Define build flags & config
 if ($null -eq $env:BUILD_FLAGS)

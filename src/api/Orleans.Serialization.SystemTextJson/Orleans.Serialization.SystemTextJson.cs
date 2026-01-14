@@ -36,6 +36,8 @@ namespace Orleans.Serialization
         public System.Text.Json.JsonReaderOptions ReaderOptions { get { throw null; } set { } }
 
         public System.Text.Json.JsonSerializerOptions SerializerOptions { get { throw null; } set { } }
+
+        public System.Text.Json.JsonWriterOptions WriterOptions { get { throw null; } set { } }
     }
 
     public static partial class SerializationHostingExtensions

@@ -156,7 +156,8 @@ namespace Orleans.CodeGenerator
                     GenerateSetArgumentMethod(method, fieldDescriptions),
                     GenerateInvokeInnerMethod(method, fieldDescriptions, targetField),
                     GenerateGetCancellationTokenMethod(method, fieldDescriptions),
-                    GenerateTryCancelMethod(method, fieldDescriptions));
+                    GenerateTryCancelMethod(method, fieldDescriptions),
+                    GenerateIsCancellableProperty(method));
 
             if (method.AllTypeParameters.Count > 0)
             {
@@ -285,16 +286,21 @@ namespace Orleans.CodeGenerator
             var holderParameter = holder.Identifier;
 
             var containingInterface = methodDescription.ContainingInterface;
+            var targetType = containingInterface.ToTypeSyntax();
             var isExtension = methodDescription.Key.ProxyBase.IsExtension;
-            var getTarget = InvocationExpression(
+            var (name, args) = isExtension switch
+            {
+                true => ("GetComponent", SingletonSeparatedList(Argument(TypeOfExpression(targetType)))),
+                _ => ("GetTarget", SeparatedList<ArgumentSyntax>())
+            };
+            var getTarget = CastExpression(
+                targetType,
+                InvocationExpression(
                     MemberAccessExpression(
                         SyntaxKind.SimpleMemberAccessExpression,
                         holder,
-                        GenericName(isExtension ? "GetComponent" : "GetTarget")
-                            .WithTypeArgumentList(
-                                TypeArgumentList(
-                                    SingletonSeparatedList(containingInterface.ToTypeSyntax())))))
-                .WithArgumentList(ArgumentList());
+                        IdentifierName(name)),
+                    ArgumentList(args)));
 
             var member =
             MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "SetTarget")
@@ -321,7 +327,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private MemberDeclarationSyntax GenerateGetTargetMethod(TargetFieldDescription targetField)
+        private static MethodDeclarationSyntax GenerateGetTargetMethod(TargetFieldDescription targetField)
         {
             return MethodDeclaration(PredefinedType(Token(SyntaxKind.ObjectKeyword)), "GetTarget")
                 .WithParameterList(ParameterList())
@@ -348,6 +354,22 @@ namespace Orleans.CodeGenerator
             return member;
         }
 
+        private MemberDeclarationSyntax GenerateIsCancellableProperty(InvokableMethodDescription method)
+        {
+            if (!method.IsCancellable)
+            {
+                return null;
+            }
+
+            // Property to indicate if the invokable is cancellable
+            // C#: public override bool IsCancellable => true;
+            var member = PropertyDeclaration(PredefinedType(Token(SyntaxKind.BoolKeyword)), "IsCancellable")
+                .WithExpressionBody(ArrowExpressionClause(LiteralExpression(SyntaxKind.TrueLiteralExpression)))
+                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
+                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword));
+            return member;
+        }
+
         private MemberDeclarationSyntax GenerateTryCancelMethod(InvokableMethodDescription method, List<InvokerFieldDescription> fields)
         {
             if (!method.IsCancellable)
@@ -359,18 +381,29 @@ namespace Orleans.CodeGenerator
             // C#:
             // TryCancel()
             // {
-            //   _cts?.Cancel(false);
-            //   return true;
+            //   if (_cts is { } cts)
+            //   {
+            //     cts.Cancel(false);
+            //     return true;
+            //   }
+            //   return false;
             // }
             var cancellationTokenField = fields.First(f => f is CancellationTokenSourceFieldDescription);
             var member = MethodDeclaration(PredefinedType(Token(SyntaxKind.BoolKeyword)), "TryCancel")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword))
                 .WithBody(Block(
-                    ExpressionStatement(ConditionalAccessExpression(
-                        IdentifierName(cancellationTokenField.FieldName),
-                        InvocationExpression(MemberBindingExpression(IdentifierName("Cancel")))
-                            .WithArgumentList(ArgumentList(SeparatedList([Argument(LiteralExpression(SyntaxKind.FalseLiteralExpression))]))))),
-                    ReturnStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression))));
+                    IfStatement(
+                        IsPatternExpression(
+                            IdentifierName(cancellationTokenField.FieldName),
+                            RecursivePattern()
+                                .WithPropertyPatternClause(PropertyPatternClause())
+                                .WithDesignation(SingleVariableDesignation(Identifier("cts")))),
+                        Block(
+                            ExpressionStatement(InvocationExpression(
+                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("cts"), IdentifierName("Cancel")))
+                                .WithArgumentList(ArgumentList(SeparatedList([Argument(LiteralExpression(SyntaxKind.FalseLiteralExpression))])))),
+                            ReturnStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression)))),
+                    ReturnStatement(LiteralExpression(SyntaxKind.FalseLiteralExpression))));
             return member;
         }
 

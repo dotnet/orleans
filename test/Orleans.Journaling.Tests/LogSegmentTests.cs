@@ -48,6 +48,7 @@ public abstract class LogSegmentTests : IAsyncLifetime
     private IServiceProvider _serviceProvider = null!;
     private SiloLifecycleSubject? _siloLifecycle;
     private IStateMachineStorageProvider _storageProvider = null!;
+    private static readonly IOptions<StateMachineManagerOptions> ManagerOptions = Options.Create(new StateMachineManagerOptions());
 
     public virtual async Task InitializeAsync()
     {
@@ -85,7 +86,7 @@ public abstract class LogSegmentTests : IAsyncLifetime
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
         var grainContext = new TestGrainContext(grainId); // Use provided GrainId
         var storage = _storageProvider.Create(grainContext);
-        var manager = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), sessionPool);
+        var manager = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), ManagerOptions, sessionPool, TimeProvider.System);
         var list = new DurableList<T>(listName, manager, codecProvider.GetCodec<T>(), sessionPool);
         return (manager, list, storage);
     }
@@ -143,7 +144,7 @@ public abstract class LogSegmentTests : IAsyncLifetime
 
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
-        var manager2 = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), sessionPool);
+        var manager2 = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), ManagerOptions, sessionPool, TimeProvider.System);
         var list2 = new DurableList<string>(listName, manager2, codecProvider.GetCodec<string>(), sessionPool);
         await manager2.InitializeAsync(cts.Token);
 
@@ -342,7 +343,7 @@ public abstract class LogSegmentTests : IAsyncLifetime
         // Test recovery (potentially from snapshot)
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
-        var manager2 = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), sessionPool); // Reuses the storage object linked via grainId
+        var manager2 = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), ManagerOptions, sessionPool, TimeProvider.System);// Reuses the storage object linked via grainId
         var list2 = new DurableList<int>(listName, manager2, codecProvider.GetCodec<int>(), sessionPool);
         await manager2.InitializeAsync(cts.Token);
 
@@ -382,7 +383,9 @@ public abstract class LogSegmentTests : IAsyncLifetime
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public bool Equals(IGrainContext? other) => throw new NotImplementedException();
         public TComponent? GetComponent<TComponent>() where TComponent : class => throw new NotImplementedException();
+        public object? GetComponent(Type componentType) => throw new NotImplementedException();
         public TTarget? GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
+        public object? GetTarget() => throw new NotImplementedException();
         public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public void ReceiveMessage(object message) => throw new NotImplementedException();
         public void Rehydrate(IRehydrationContext context) => throw new NotImplementedException();

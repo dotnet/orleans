@@ -64,7 +64,7 @@ namespace Orleans.Messaging
             }
 
             var knownGateways = await this.gatewayListProvider.GetGateways();
-            if (knownGateways.Count == 0)
+            if (knownGateways == null || knownGateways.Count == 0)
             {
                 // this situation can occur if the client starts faster than the silos.
                 var providerName = this.gatewayListProvider.GetType().FullName;
@@ -410,9 +410,9 @@ namespace Orleans.Messaging
 
         [LoggerMessage(
             Level = LogLevel.Information,
-            Message = "Closing connection to '{Endpoint}' because it has been marked as dead."
+            Message = "Closing connection to '{EndPoint}' because it has been marked as dead."
         )]
-        private static partial void LogClosingConnectionToDeadGateway(ILogger logger, SiloAddress endpoint);
+        private static partial void LogClosingConnectionToDeadGateway(ILogger logger, SiloAddress endPoint);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.GatewayManager_AllGatewaysDead,

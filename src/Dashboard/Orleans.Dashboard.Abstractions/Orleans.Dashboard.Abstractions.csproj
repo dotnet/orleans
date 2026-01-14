@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Dashboard.Abstractions</PackageId>
+    <Title>Microsoft Orleans Dashboard Abstractions</Title>
+    <Description>Shared types used by the Orleans Dashboard package.</Description>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <RootNamespace>Orleans.Dashboard</RootNamespace>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute"/>
+  </ItemGroup>
+
+</Project>

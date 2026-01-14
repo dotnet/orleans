@@ -37,6 +37,8 @@ namespace OrleansAWSUtils.Streams
             Orleans.Serialization.Serializer serializer, 
             ILoggerFactory loggerFactory)
         {
+            ArgumentNullException.ThrowIfNull(serializer);
+
             this.providerName = name;
             this.sqsOptions = sqsOptions;
             this.clusterOptions = clusterOptions.Value;

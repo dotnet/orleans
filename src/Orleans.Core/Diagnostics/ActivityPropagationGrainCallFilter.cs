@@ -26,6 +26,12 @@ namespace Orleans.Runtime
                 ? RuntimeGrainSource
                 : ApplicationGrainSource;
 
+        protected static void GetRequestContextValue(object carrier, string fieldName, out string fieldValue, out IEnumerable<string> fieldValues)
+        {
+            fieldValues = default;
+            fieldValue = RequestContext.Get(fieldName) as string;
+        }
+
         protected static async Task Process(IGrainCallContext context, Activity activity)
         {
             if (activity is not null)
@@ -49,10 +55,6 @@ namespace Orleans.Runtime
             try
             {
                 await context.Invoke();
-                if (activity is not null && activity.IsAllDataRequested)
-                {
-                    activity.SetStatus(ActivityStatusCode.Ok);
-                }
             }
             catch (Exception e)
             {
@@ -64,13 +66,13 @@ namespace Orleans.Runtime
                     activity.SetTag("exception.type", e.GetType().FullName);
                     activity.SetTag("exception.message", e.Message);
 
-                    // Note that "exception.stacktrace" is the full exception detail, not just the StackTrace property. 
+                    // Note that "exception.stacktrace" is the full exception detail, not just the StackTrace property.
                     // See https://opentelemetry.io/docs/specs/semconv/attributes-registry/exception/
                     // and https://github.com/open-telemetry/opentelemetry-specification/pull/697#discussion_r453662519
                     activity.SetTag("exception.stacktrace", e.ToString());
                     activity.SetTag("exception.escaped", true);
                 }
-                
+
                 throw;
             }
             finally
@@ -132,14 +134,7 @@ namespace Orleans.Runtime
         public Task Invoke(IIncomingGrainCallContext context)
         {
             Activity activity = default;
-            _propagator.ExtractTraceIdAndState(null,
-                static (object carrier, string fieldName, out string fieldValue, out IEnumerable<string> fieldValues) =>
-                {
-                    fieldValues = default;
-                    fieldValue = RequestContext.Get(fieldName) as string;
-                },
-                out var traceParent,
-                out var traceState);
+            _propagator.ExtractTraceIdAndState(null, GetRequestContextValue, out var traceParent, out var traceState);
 
             var source = GetActivitySource(context);
             if (!string.IsNullOrEmpty(traceParent))
@@ -162,11 +157,7 @@ namespace Orleans.Runtime
                         activity.TraceStateString = traceState;
                     }
 
-                    var baggage = _propagator.ExtractBaggage(null, static (object carrier, string fieldName, out string fieldValue, out IEnumerable<string> fieldValues) =>
-                    {
-                        fieldValues = default;
-                        fieldValue = RequestContext.Get(fieldName) as string;
-                    });
+                    var baggage = _propagator.ExtractBaggage(null, GetRequestContextValue);
 
                     if (baggage is not null)
                     {

@@ -76,39 +76,3 @@ namespace Orleans.Hosting
         public static ISiloBuilder AddAdoNetStreams(this ISiloBuilder builder, string name, System.Action<SiloAdoNetStreamConfigurator> configure) { throw null; }
     }
 }
-
-namespace Orleans.Streaming.AdoNet.Storage
-{
-    public partial class OrleansRelationalDownloadStream : System.IO.Stream
-    {
-        public OrleansRelationalDownloadStream(System.Data.Common.DbDataReader reader, int ordinal) { }
-
-        public override bool CanRead { get { throw null; } }
-
-        public override bool CanSeek { get { throw null; } }
-
-        public override bool CanTimeout { get { throw null; } }
-
-        public override bool CanWrite { get { throw null; } }
-
-        public override long Length { get { throw null; } }
-
-        public override long Position { get { throw null; } set { } }
-
-        public override System.Threading.Tasks.Task CopyToAsync(System.IO.Stream destination, int bufferSize, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        protected override void Dispose(bool disposing) { }
-
-        public override void Flush() { }
-
-        public override int Read(byte[] buffer, int offset, int count) { throw null; }
-
-        public override System.Threading.Tasks.Task<int> ReadAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        public override long Seek(long offset, System.IO.SeekOrigin origin) { throw null; }
-
-        public override void SetLength(long value) { }
-
-        public override void Write(byte[] buffer, int offset, int count) { }
-    }
-}

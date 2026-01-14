@@ -86,7 +86,7 @@ namespace Orleans.Runtime
         /// Returns a span representation of this instance.
         /// </summary>
         /// <returns>
-        /// A span representation fo this instance.
+        /// A span representation of this instance.
         /// </returns>
         public ReadOnlySpan<byte> AsSpan() => _value;
 

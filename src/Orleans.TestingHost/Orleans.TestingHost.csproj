@@ -5,6 +5,8 @@
     <Description>Microsoft Orleans library for hosting a silo in a testing project.</Description>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <!-- DurableJobs is pre-release, so we are suppressing NU5104 -->
+    <NoWarn>$(NoWarn);NU5104</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,6 +14,7 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders\Orleans.Reminders.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.DurableJobs\Orleans.DurableJobs.csproj" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
 </Project>

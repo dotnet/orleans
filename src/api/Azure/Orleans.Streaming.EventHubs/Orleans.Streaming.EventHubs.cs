@@ -322,6 +322,8 @@ namespace Orleans.Streaming.EventHubs
         public bool ImportRequestContext() { throw null; }
 
         public static Azure.Messaging.EventHubs.EventData ToEventData<T>(Serialization.Serializer bodySerializer, Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, System.Collections.Generic.Dictionary<string, object> requestContext) { throw null; }
+
+        public static void UpdateEventData<T>(Azure.Messaging.EventHubs.EventData eventData, Serialization.Serializer bodySerializer, Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, System.Collections.Generic.Dictionary<string, object> requestContext) { }
     }
 
     public partial class EventHubBlockPoolMonitorDimensions : EventHubMonitorAggregationDimensions
