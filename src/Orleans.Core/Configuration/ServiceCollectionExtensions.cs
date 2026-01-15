@@ -1,9 +1,76 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Configuration.Internal
 {
+    /// <summary>
+    /// A <see cref="ServiceDescriptor"/> subclass that tracks the underlying implementation type
+    /// used when registering a service via <see cref="ServiceCollectionExtensions.AddFromExisting"/>.
+    /// This allows service registrations to be identified and removed later based on their implementation type.
+    /// </summary>
+    internal sealed class TaggedServiceDescriptor : ServiceDescriptor
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TaggedServiceDescriptor"/> class.
+        /// </summary>
+        /// <param name="serviceType">The type of the service.</param>
+        /// <param name="factory">The factory used for creating service instances.</param>
+        /// <param name="lifetime">The lifetime of the service.</param>
+        /// <param name="implementationType">The underlying implementation type this registration was created from.</param>
+        public TaggedServiceDescriptor(
+            Type serviceType,
+            Func<IServiceProvider, object> factory,
+            ServiceLifetime lifetime,
+            Type implementationType)
+            : base(serviceType, factory, lifetime)
+        {
+            SourceImplementationType = implementationType;
+        }
+
+        /// <summary>
+        /// Gets the underlying implementation type that this service registration was created from.
+        /// </summary>
+        public Type SourceImplementationType { get; }
+
+        /// <summary>
+        /// Removes all service descriptors from the collection that were registered from the specified implementation type.
+        /// </summary>
+        /// <typeparam name="TImplementation">The implementation type to remove registrations for.</typeparam>
+        /// <param name="services">The service collection to remove from.</param>
+        public static void RemoveAllForImplementation<TImplementation>(IServiceCollection services)
+        {
+            RemoveAllForImplementation(services, typeof(TImplementation));
+        }
+
+        /// <summary>
+        /// Removes all service descriptors from the collection that were registered from the specified implementation type.
+        /// </summary>
+        /// <param name="services">The service collection to remove from.</param>
+        /// <param name="implementationType">The implementation type to remove registrations for.</param>
+        public static void RemoveAllForImplementation(IServiceCollection services, Type implementationType)
+        {
+            var toRemove = new List<ServiceDescriptor>();
+            foreach (var descriptor in services)
+            {
+                if (descriptor is TaggedServiceDescriptor tagged && tagged.SourceImplementationType == implementationType)
+                {
+                    toRemove.Add(descriptor);
+                }
+                else if (descriptor.ServiceType == implementationType || descriptor.ImplementationType == implementationType)
+                {
+                    toRemove.Add(descriptor);
+                }
+            }
+
+            foreach (var descriptor in toRemove)
+            {
+                services.Remove(descriptor);
+            }
+        }
+    }
+
     /// <summary>
     /// Extension methods for configuring dependency injection.
     /// </summary>
@@ -43,10 +110,11 @@ namespace Orleans.Configuration.Internal
                 throw new ArgumentNullException(nameof(implementation), $"Unable to find previously registered ServiceType of '{implementation.FullName}'");
             }
 
-            var newRegistration = new ServiceDescriptor(
+            var newRegistration = new TaggedServiceDescriptor(
                 service,
                 sp => sp.GetRequiredService(implementation),
-                registration.Lifetime);
+                registration.Lifetime,
+                implementation);
             services.Add(newRegistration);
         }
 
