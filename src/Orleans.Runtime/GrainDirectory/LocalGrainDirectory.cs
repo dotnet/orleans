@@ -45,10 +45,10 @@ namespace Orleans.Runtime.GrainDirectory
             ILocalSiloDetails siloDetails,
             ISiloStatusOracle siloStatusOracle,
             IInternalGrainFactory grainFactory,
-            Factory<LocalGrainDirectoryPartition> grainDirectoryPartitionFactory,
             IOptions<DevelopmentClusterMembershipOptions> developmentClusterMembershipOptions,
             IOptions<GrainDirectoryOptions> grainDirectoryOptions,
             ILoggerFactory loggerFactory,
+            ILogger<LocalGrainDirectoryPartition> partitionLogger,
             SystemTargetShared systemTargetShared)
         {
             this.log = loggerFactory.CreateLogger<LocalGrainDirectory>();
@@ -66,8 +66,8 @@ namespace Orleans.Runtime.GrainDirectory
                 this.seed = this.MyAddress.Endpoint.Equals(primarySiloEndPoint) ? this.MyAddress : SiloAddress.New(primarySiloEndPoint, 0);
             }
 
-            DirectoryPartition = grainDirectoryPartitionFactory();
-            HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, grainDirectoryPartitionFactory, loggerFactory);
+            DirectoryPartition = new LocalGrainDirectoryPartition(siloStatusOracle, grainDirectoryOptions, partitionLogger);
+            HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, loggerFactory);
 
             RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceType, systemTargetShared);
             CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorType, systemTargetShared);
