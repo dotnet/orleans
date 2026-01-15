@@ -12,6 +12,7 @@ using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
 using Orleans.Core;
+using Orleans.GrainDirectory;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Networking.Shared;

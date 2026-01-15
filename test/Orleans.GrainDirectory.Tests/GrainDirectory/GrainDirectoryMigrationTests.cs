@@ -132,9 +132,7 @@ public sealed class GrainDirectoryMigrationTests(ITestOutputHelper output) : IAs
             var siloNumber = int.Parse(options.SiloName.Split('_')[1], CultureInfo.InvariantCulture);
             if (siloNumber >= FirstNewSiloInstance)
             {
-#pragma warning disable ORLEANSEXP003 // Type is for evaluation purposes only
                 siloBuilder.AddDistributedGrainDirectory();
-#pragma warning restore ORLEANSEXP003
             }
         });
 
