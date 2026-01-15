@@ -34,7 +34,7 @@ namespace Orleans.Providers.Azure
         AzureBlobProvider_ClearError                = AzureBlobProviderBase + 14,
         AzureBlobProvider_ClearingData              = AzureBlobProviderBase + 15,
         AzureBlobProvider_Cleared                   = AzureBlobProviderBase + 16,
-
+        AzureBlobProvider_LargePayloadFallback      = AzureBlobProviderBase + 17,
 
 
     }
