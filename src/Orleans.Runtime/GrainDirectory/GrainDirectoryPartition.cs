@@ -239,6 +239,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             }
         });
     }
+
     internal Task OnSiloRemovedFromClusterAsync(ClusterMember change) =>
         this.QueueAction(
             static state => state.Self.OnSiloRemovedFromCluster(state.Change),

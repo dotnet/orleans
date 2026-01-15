@@ -330,10 +330,12 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
         async Task OnShuttingDown(CancellationToken token)
         {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            cts.CancelAfter(TimeSpan.FromSeconds(10));
             var tasks = new List<Task>(_partitions.Length);
             foreach (var partition in _partitions)
             {
-                tasks.Add(partition.OnShuttingDown(token));
+                tasks.Add(partition.OnShuttingDown(cts.Token));
             }
 
             await Task.WhenAll(tasks).SuppressThrowing();
