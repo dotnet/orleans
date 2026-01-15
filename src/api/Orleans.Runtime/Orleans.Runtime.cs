@@ -401,7 +401,6 @@ namespace Orleans.Hosting
     {
         public static ISiloBuilder AddActivityPropagation(this ISiloBuilder builder) { throw null; }
 
-        [System.Diagnostics.CodeAnalysis.Experimental("ORLEANSEXP003")]
         public static ISiloBuilder AddDistributedGrainDirectory(this ISiloBuilder siloBuilder, string? name = null) { throw null; }
 
         public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.DevelopmentClusterMembershipOptions>> configureOptions) { throw null; }

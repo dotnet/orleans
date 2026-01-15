@@ -26,9 +26,7 @@ public sealed class GrainDirectoryShutdownMigrationTests
         {
             siloBuilder.Services.AddSingleton<MembershipTableManager>();
             siloBuilder.Services.AddSingleton<IMembershipManager, DelayedMembershipManager>();
-#pragma warning disable ORLEANSEXP003
             siloBuilder.AddDistributedGrainDirectory();
-#pragma warning restore ORLEANSEXP003
         });
 
         await using var cluster = builder.Build();

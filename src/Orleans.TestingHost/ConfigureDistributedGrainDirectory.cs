@@ -8,7 +8,6 @@ namespace Orleans.TestingHost;
 
 internal class ConfigureDistributedGrainDirectory : ISiloConfigurator
 {
-#pragma warning disable ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
     public void Configure(ISiloBuilder siloBuilder)
     {
         if (siloBuilder.Services.Any(static service => service.ServiceType == typeof(DistributedGrainDirectory)))
@@ -24,5 +23,4 @@ internal class ConfigureDistributedGrainDirectory : ISiloConfigurator
             siloBuilder.AddDistributedGrainDirectory();
         }
     }
-#pragma warning restore ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 }
