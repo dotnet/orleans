@@ -5,7 +5,6 @@ using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -26,7 +25,6 @@ namespace Orleans.Runtime.GrainDirectory
 #else
         private readonly object writeLock = new();
 #endif
-        private readonly IServiceProvider _serviceProvider;
         private readonly ActivationDirectory activations;
         private readonly GrainDirectoryResolver grainDirectoryResolver;
         private DirectoryMembership directoryMembership = DirectoryMembership.Default;
@@ -35,7 +33,6 @@ namespace Orleans.Runtime.GrainDirectory
         internal const int HOP_LIMIT = 6; // forward a remote request no more than 5 times
         public static readonly TimeSpan RETRY_DELAY = TimeSpan.FromMilliseconds(200); // Pause 200ms between forwards to let the membership directory settle down
         internal bool Running;
-        private Catalog? _catalog;
 
         internal SiloAddress MyAddress { get; }
 
@@ -96,7 +93,6 @@ namespace Orleans.Runtime.GrainDirectory
                 return ring.Count == 0 ? 0 : ((float)100 / (float)ring.Count);
             });
             DirectoryInstruments.RegisterRingSizeObserve(() => this.directoryMembership.MembershipRingList.Count);
-            _serviceProvider = serviceProvider;
         }
 
         public void Start()
@@ -171,17 +167,6 @@ namespace Orleans.Runtime.GrainDirectory
 
             lock (this.writeLock)
             {
-                try
-                {
-                    // Only notify the catalog once. Order is important: call BEFORE updating membershipRingList.
-                    _catalog = _serviceProvider.GetRequiredService<Catalog>();
-                    _catalog.OnSiloStatusChange(this, silo, status);
-                }
-                catch (Exception exc)
-                {
-                    LogErrorCatalogSiloStatusChangeNotificationException(exc, new(silo));
-                }
-
                 var existing = this.directoryMembership;
                 if (!existing.MembershipCache.Contains(silo))
                 {
@@ -909,13 +894,6 @@ namespace Orleans.Runtime.GrainDirectory
             Message = "Exception while collecting activations to deactivate after removal of silo {Silo}."
         )]
         private partial void LogErrorCollectActivationsToDeactivate(SiloAddressLogValue silo, Exception exception);
-
-        [LoggerMessage(
-            EventId = (int)ErrorCode.Directory_SiloStatusChangeNotification_Exception,
-            Level = LogLevel.Error,
-            Message = "CatalogSiloStatusListener.SiloStatusChangeNotification has thrown an exception when notified about removed silo {Silo}."
-        )]
-        private partial void LogErrorCatalogSiloStatusChangeNotificationException(Exception exception, SiloAddressLogValue silo);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.Catalog_SiloStatusChangeNotification,

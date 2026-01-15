@@ -18,7 +18,6 @@ namespace Orleans.Runtime
         GrainLocator grainLocator,
         CompatibilityDirectorManager compatibilityDirectorManager,
         IOptions<GrainCollectionOptions> collectionOptions,
-        ILocalGrainDirectory localGrainDirectory,
         IActivationWorkingSet activationWorkingSet,
         ActivationCollector activationCollector)
     {
