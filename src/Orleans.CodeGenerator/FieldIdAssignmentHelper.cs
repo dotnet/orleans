@@ -77,7 +77,8 @@ internal class FieldIdAssignmentHelper
                 }
                 else if (PropertyUtility.GetMatchingPrimaryConstructorParameter(prop, _constructorParameters) is { } prm)
                 {
-                    id = CodeGenerator.GetId(_libraryTypes, prop);
+                    // Check for [Id] attribute on the primary constructor parameter
+                    id = CodeGenerator.GetId(_libraryTypes, prm);
                     if (id.HasValue)
                     {
                         _symbols[member] = (id.Value, true);
@@ -108,7 +109,12 @@ internal class FieldIdAssignmentHelper
                         var constructorParameter = _constructorParameters.FirstOrDefault(x => x.Name.Equals(property.Name, StringComparison.OrdinalIgnoreCase));
                         if (constructorParameter is not null)
                         {
-                            id = (uint)_constructorParameters.IndexOf(constructorParameter);
+                            // Check for [Id] attribute on the constructor parameter
+                            id = CodeGenerator.GetId(_libraryTypes, constructorParameter);
+                            if (!id.HasValue)
+                            {
+                                id = (uint)_constructorParameters.IndexOf(constructorParameter);
+                            }
                             isConstructorParameter = true;
                         }
                     }
