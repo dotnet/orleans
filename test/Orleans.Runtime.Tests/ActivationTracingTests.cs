@@ -53,7 +53,6 @@ namespace UnitTests.General
 
             private class SiloCfg : ISiloConfigurator
             {
-#pragma warning disable ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates.
                 public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
@@ -65,7 +64,6 @@ namespace UnitTests.General
                     hostBuilder.Services.AddPlacementFilter<TracingTestPlacementFilterStrategy, TracingTestPlacementFilterDirector>(ServiceLifetime.Singleton);
                     hostBuilder.Services.AddPlacementFilter<SecondTracingTestPlacementFilterStrategy, SecondTracingTestPlacementFilterDirector>(ServiceLifetime.Singleton);
                 }
-#pragma warning restore ORLEANSEXP003
             }
 
             private class ClientCfg : IClientBuilderConfigurator

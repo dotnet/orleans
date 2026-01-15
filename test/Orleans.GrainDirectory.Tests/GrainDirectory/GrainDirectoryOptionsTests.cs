@@ -19,10 +19,8 @@ public sealed class GrainDirectoryOptionsTests
         var builder = new InProcessTestClusterBuilder(1);
         builder.ConfigureSilo((_, siloBuilder) =>
         {
-#pragma warning disable ORLEANSEXP003
             siloBuilder.Configure<GrainDirectoryOptions>(options => options.PartitionsPerSilo = 3);
             siloBuilder.AddDistributedGrainDirectory();
-#pragma warning restore ORLEANSEXP003
         });
 
         var cluster = builder.Build();

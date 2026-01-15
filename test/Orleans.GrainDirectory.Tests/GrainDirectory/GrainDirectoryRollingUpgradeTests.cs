@@ -63,9 +63,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 return;
             }
 
-#pragma warning disable ORLEANSEXP003
             siloBuilder.AddDistributedGrainDirectory();
-#pragma warning restore ORLEANSEXP003
         });
         builder.ConfigureSiloHost((_, hostBuilder) => ConfigureErrorLogCapture(hostBuilder, clusterId));
         builder.ConfigureSiloHost((_, hostBuilder) => ConfigureRollingUpgradeDiagnosticCapture(hostBuilder, clusterId));
@@ -739,9 +737,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 return;
             }
 
-#pragma warning disable ORLEANSEXP003
             siloBuilder.AddDistributedGrainDirectory();
-#pragma warning restore ORLEANSEXP003
         });
         builder.ConfigureSiloHost((siloOptions, hostBuilder) =>
         {
