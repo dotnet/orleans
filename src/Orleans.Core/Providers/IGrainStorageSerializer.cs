@@ -1,4 +1,7 @@
 using System;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
@@ -25,6 +28,30 @@ namespace Orleans.Storage
         /// <typeparam name="T">The output type.</typeparam>
         /// <returns>The deserialized object.</returns>
         T Deserialize<T>(BinaryData input);
+    }
+
+    /// <summary>
+    /// Optional stream-based serializer for grain state.
+    /// </summary>
+    public interface IGrainStorageStreamingSerializer
+    {
+        /// <summary>
+        /// Serializes the object input to a stream.
+        /// </summary>
+        /// <param name="input">The object to serialize.</param>
+        /// <param name="destination">The destination stream.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <typeparam name="T">The input type.</typeparam>
+        ValueTask SerializeAsync<T>(T input, Stream destination, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Deserializes the provided data from a stream.
+        /// </summary>
+        /// <param name="input">The input stream.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <typeparam name="T">The output type.</typeparam>
+        /// <returns>The deserialized object.</returns>
+        ValueTask<T> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default);
     }
 
     /// <summary>
