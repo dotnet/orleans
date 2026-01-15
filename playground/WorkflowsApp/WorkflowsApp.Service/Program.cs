@@ -422,6 +422,7 @@ public record class Invoice();
 [Alias("PaymentResult")]
 public record class PaymentResult()
 {
+    [Id(0)]
     public bool IsSuccess { get; internal set; }
 }
 
