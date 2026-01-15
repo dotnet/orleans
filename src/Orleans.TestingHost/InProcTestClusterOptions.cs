@@ -41,7 +41,7 @@ public sealed class InProcessTestClusterOptions
     /// Gets or sets a value indicating whether to use test cluster membership.
     /// </summary>
     /// <value><see langword="true" /> if test cluster membership should be used; otherwise, <see langword="false" />.</value>
-    internal bool UseTestClusterMembership { get; set; }
+    public bool UseTestClusterMembership { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether to use the test cluster's shared in-memory grain directory.
