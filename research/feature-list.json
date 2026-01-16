@@ -405,7 +405,7 @@
       "Test observer callback via IDurableInboxObserver",
       "Test atomic persistence across request/response"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
