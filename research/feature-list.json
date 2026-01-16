@@ -445,7 +445,7 @@
       "Test network partition recovery",
       "Test silo failure and message persistence"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "performance",
@@ -461,7 +461,7 @@
       "Measure end-to-end latency",
       "Measure throughput with concurrent transfers"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "performance",
@@ -546,6 +546,7 @@
       "Run dotnet test with Category=BVT filter",
       "Fix any failing BVT tests"
     ],
-    "passes": false
+    "passes": true,
+    "notes": "Build succeeded with 0 warnings, 0 errors. BVT tests passed: 362 NonSilo, 98 Analyzers, 5 DurableTasks, 5 Consul. Known non-BVT test failures: EveryCodecHasTests (meta-test), high-throughput backpressure tests (not yet implemented)."
   }
 ]
