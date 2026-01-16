@@ -268,3 +268,101 @@ dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filt
 - ✅ `research/feature-list.json` (marked feature as passing)
 - ✅ `research/progress.txt` (this file)
 
+## 2025-01-15: DurableEnvelopeBuilder Implementation (COMPLETED)
+
+### Summary
+Successfully implemented the DurableEnvelopeBuilder fluent API for creating durable envelopes with builder pattern. This provides a type-safe, ergonomic way to construct envelopes with body, context values, correlation keys, and reply-to addresses, all serialized efficiently into a shared ArcBufferWriter.
+
+### Implementation Details
+
+**File Created:**
+- `src/Orleans.Journaling/Messaging/DurableEnvelopeBuilder.cs` (300 lines)
+
+**Key Features Implemented:**
+1. **IBufferWriter<byte> Implementation**: Direct serialization into shared ArcBufferWriter for zero-copy performance
+2. **Fluent API Methods**:
+   - `To(GrainId target, string routeKey)` - Sets receiver and handler route
+   - `WithBody<T>(T body)` - Serializes message body (generic, type-safe)
+   - `WithCorrelationKey(CorrelationKey)` / `WithCorrelationKey(string)` - Sets hierarchical correlation
+   - `WithReplyTo(GrainId)` - Sets reply target for durable RPC
+   - `WithContextValue<T>(string key, T value)` - Adds per-key typed context values
+   - `Build()` - Creates immutable DurableEnvelope
+   - `Reset()` - Clears state for builder pooling
+3. **Validation**:
+   - Prevents duplicate body setting
+   - Prevents duplicate context keys
+   - Requires body and route before building
+   - Validates route key (not null/empty/whitespace)
+4. **Order Independence**: Body and context values can be added in any order
+5. **Reflection-Based Construction**: Uses cached FieldInfo to set private DurableEnvelopeData fields
+6. **Comprehensive XML Documentation**: All public methods have detailed docs with examples
+
+**Test Coverage:**
+- `test/Orleans.Journaling.Tests/DurableEnvelopeBuilderTests.cs` (26 tests, all passing)
+- Tests cover:
+  - To() parameter validation (null, empty, whitespace route keys)
+  - WithBody() basic usage and duplicate detection
+  - WithCorrelationKey() both overloads (CorrelationKey object and string)
+  - WithReplyTo() usage
+  - WithContextValue() validation (null/empty keys, duplicate keys)
+  - WithContextValue() with multiple keys
+  - Build() validation (missing body, missing route)
+  - Build() with all optional fields
+  - Order independence (body before context, context before body)
+  - Multiple context values retrieval
+  - Reset() clears all fields
+  - Complex body types (custom record with [GenerateSerializer])
+  - Hierarchical correlation keys
+
+**Test Results:**
+- ✅ All 26 tests passing on net10.0
+- ✅ All 26 tests passing on net8.0
+- ✅ No compilation warnings or errors
+- ✅ Code style validation passed
+- ✅ Builds successfully for both target frameworks
+
+**Design Patterns Applied:**
+1. **Fluent Builder Pattern**: Method chaining for ergonomic API
+2. **Object Pool Pattern**: Reset() enables builder reuse
+3. **Factory Pattern**: CreateEnvelope() in IInboxHandlerContext will inject dependencies
+4. **Strategy Pattern**: IBufferWriter<byte> abstraction allows different buffer implementations
+
+**Code Quality:**
+- Follows Orleans coding standards (Allman braces, 4-space indent, `var` everywhere)
+- Comprehensive XML documentation with realistic usage examples
+- Proper use of modern C# features (init properties, pattern matching, ArgumentException.ThrowIfNullOrWhiteSpace)
+- Reflection caching via static readonly FieldInfo for performance
+
+**Architectural Benefits:**
+1. **Type Safety**: Generic methods provide compile-time type checking for body and context
+2. **Zero-Copy Performance**: All data serialized into single shared buffer
+3. **Memory Efficiency**: Shared ArcBufferWriter reduces allocations
+4. **Ergonomic API**: Fluent interface is self-documenting and IDE-friendly
+5. **Pooling Support**: Reset() enables object pooling for high-throughput scenarios
+6. **Validation**: Fail-fast on invalid builder state prevents runtime errors
+
+### Next Steps
+The DurableEnvelopeBuilder implementation is complete and ready for use in subsequent features:
+- **IDurableOutbox** - Will use non-generic Send(DurableEnvelope) method
+- **IInboxHandlerContext** - Will provide CreateEnvelope() returning DurableEnvelopeBuilder
+- **InboxHandlerContext** - Implementation that injects SessionPool and SenderId into builder
+- OutgoingEnvelopeBuilder deletion (superseded by DurableEnvelopeBuilder)
+
+### Verification Commands
+```powershell
+# Build the project
+dotnet build src/Orleans.Journaling/Orleans.Journaling.csproj
+
+# Run all DurableEnvelopeBuilder tests (net10.0)
+dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filter "FullyQualifiedName~DurableEnvelopeBuilderTests" --framework net10.0
+
+# Run all DurableEnvelopeBuilder tests (net8.0)
+dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filter "FullyQualifiedName~DurableEnvelopeBuilderTests" --framework net8.0
+```
+
+### Files Modified
+- ✅ `src/Orleans.Journaling/Messaging/DurableEnvelopeBuilder.cs` (created)
+- ✅ `test/Orleans.Journaling.Tests/DurableEnvelopeBuilderTests.cs` (created)
+- ✅ `research/feature-list.json` (marked feature as passing)
+- ✅ `research/progress.txt` (this file)
+

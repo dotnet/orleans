@@ -67,7 +67,7 @@
       "Add unit tests for builder usage patterns",
       "Add unit tests for order-independence (body/context can be added in any order)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
