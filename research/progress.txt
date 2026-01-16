@@ -1840,3 +1840,31 @@ dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj
 - ✅ test/Orleans.Journaling.Tests/DurableRpcIntegrationTests.cs (fixed RequestGrain durable storage)
 - ✅ research/feature-list.json (marked feature as passing)
 - ✅ research/progress.txt (this entry)
+
+---
+
+## 2026-01-16: Integration Tests for Recovery Scenarios (test/Orleans.Journaling.Tests/DurableMessagingRecoveryTests.cs)
+
+Created comprehensive integration tests for durable messaging recovery scenarios. These tests verify that the Orleans.Journaling inbox/outbox system maintains exactly-once delivery guarantees across grain deactivation and reactivation cycles.
+
+### Implementation Summary
+
+**File Created**: test/Orleans.Journaling.Tests/DurableMessagingRecoveryTests.cs (308 lines)
+
+**Test Coverage** (3 tests, all passing on net8.0 and net10.0):
+
+1. **Deduplication_WorksAcrossReactivation** - Verifies that duplicate messages (same SenderId + MessageId) are rejected even after grain deactivation and reactivation, proving the processed message tracking persists correctly across grain lifecycle.
+
+2. **OutboxDelivery_WorksCorrectly** - Verifies that messages sent via outbox are delivered to the receiver grain and removed from the outbox after successful delivery, confirming the outbox delivery pump functions correctly.
+
+3. **MessageProcessing_WorksAfterReactivation** - Verifies that the inbox processing pump works correctly across grain lifecycle, processing messages both before and after grain deactivation.
+
+### Test Design Philosophy
+
+**Focus on Built-In Recovery Mechanisms**: The tests focus on verifying that the framework's built-in deduplication and delivery mechanisms survive grain reactivation, rather than custom application state.
+
+### Files Modified
+- Created: test/Orleans.Journaling.Tests/DurableMessagingRecoveryTests.cs (308 lines)
+- Updated: research/feature-list.json (marked recovery scenarios as passing)
+- Updated: research/progress.txt (this entry)
+
