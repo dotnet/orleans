@@ -197,6 +197,12 @@ public class InboxProcessingPumpTests : IClassFixture<IntegrationTestFixture>
             envelope = _messages.FirstOrDefault(e => e.MessageId == messageId);
             return envelope.MessageId != Guid.Empty;
         }
+
+        public Task DeliverPendingMessagesAsync(CancellationToken cancellationToken = default)
+        {
+            // No-op for test purposes
+            return Task.CompletedTask;
+        }
     }
 
     /// <summary>

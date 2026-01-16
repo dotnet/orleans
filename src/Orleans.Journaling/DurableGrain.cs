@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Journaling.Messaging;
 
 namespace Orleans.Journaling;
 
@@ -7,6 +8,8 @@ namespace Orleans.Journaling;
 /// </summary>
 public abstract class DurableGrain : Grain, IGrainBase
 {
+    private IDurableOutbox? _outbox;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="DurableGrain"/> class and associates its state manager with the grain lifecycle.
     /// </summary>
@@ -55,10 +58,21 @@ public abstract class DurableGrain : Grain, IGrainBase
         return result;
     }
 
+    private IDurableOutbox? GetOutboxForDelivery() => _outbox ??= ServiceProvider.GetService<IDurableOutbox>();
+
     /// <summary>
-    /// Writes the registered journaled state.
+    /// Writes the registered journaled state and delivers pending outbox messages.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the write operation.</returns>
-    protected ValueTask WriteStateAsync(CancellationToken cancellationToken = default) => StateManager.WriteStateAsync(cancellationToken);
+    protected async ValueTask WriteStateAsync(CancellationToken cancellationToken = default)
+    {
+        await StateManager.WriteStateAsync(cancellationToken).ConfigureAwait(false);
+
+        var outbox = GetOutboxForDelivery();
+        if (outbox is not null && outbox.Count > 0)
+        {
+            await outbox.DeliverPendingMessagesAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
 }

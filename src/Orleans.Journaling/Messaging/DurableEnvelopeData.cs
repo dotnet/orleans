@@ -55,6 +55,7 @@ public sealed class DurableEnvelopeData : IDisposable
     [GeneratedActivatorConstructor]
     public DurableEnvelopeData(SerializerSessionPool sessionPool)
     {
+        Console.WriteLine($"[DEBUG-DATA] DurableEnvelopeData ctor: sessionPool={(sessionPool is null ? "NULL" : "provided")}");
         _sessionPool = sessionPool;
     }
 
@@ -79,23 +80,33 @@ public sealed class DurableEnvelopeData : IDisposable
     /// <returns>True if deserialization succeeded; otherwise, false.</returns>
     public bool TryGetBody<T>([MaybeNullWhen(false)] out T value)
     {
+        Console.WriteLine($"[DEBUG-DATA] TryGetBody<{typeof(T).Name}>: _sessionPool={((_sessionPool is null) ? "NULL" : "present")}, _bodySlice.Length={_bodySlice.Length}");
         if (_sessionPool is null || _bodySlice.Length == 0)
         {
+            Console.WriteLine($"[DEBUG-DATA] TryGetBody: Returning false - sessionPool null or body empty");
             value = default;
             return false;
         }
 
         try
         {
+            Console.WriteLine($"[DEBUG-DATA] TryGetBody: Buffer.First={_buffer.First?.GetHashCode()}, Buffer.Length={_buffer.Length}, Offset={_buffer.Offset}");
+            if (_buffer.First is not null)
+            {
+                Console.WriteLine($"[DEBUG-DATA] TryGetBody: Page version={_buffer.First.Version}");
+            }
             var slice = _buffer.Slice(_bodySlice.Offset, _bodySlice.Length);
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(slice.AsReadOnlySequence(), session);
             var field = reader.ReadFieldHeader();
             value = _sessionPool.CodecProvider.GetCodec<T>().ReadValue(ref reader, field);
+            Console.WriteLine($"[DEBUG-DATA] TryGetBody: Deserialized successfully, value is {(value is null ? "null" : "not null")}");
             return value is not null;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"[DEBUG-DATA] TryGetBody: Exception during deserialization: {ex.GetType().Name}: {ex.Message}");
+            Console.WriteLine($"[DEBUG-DATA] TryGetBody: Stack trace: {ex.StackTrace}");
             value = default;
             return false;
         }

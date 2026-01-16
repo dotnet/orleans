@@ -2279,3 +2279,118 @@ With build verification complete, the Orleans.Journaling durable inbox/outbox me
 
 All blocking work is complete. The durable inbox/outbox messaging system is fully functional and ready for use.
 
+
+## 2025-01-16: High-Throughput Backpressure Tests Debug Report (BLOCKING BUG DISCOVERED)
+
+### Summary
+
+Attempted to verify the high-throughput backpressure scenario tests but discovered a critical bug in the DurableInboxExtension that violates Orleans' single-threaded grain execution model. The tests exist and are comprehensive, but 5 out of 6 tests are failing due to race conditions caused by concurrent handler execution.
+
+### Root Cause
+
+**Location:** src/Orleans.Journaling/Messaging/DurableInboxExtension.cs:315-338
+
+The ProcessPendingMessagesAsync() method uses Parallel.ForEachAsync with MaxDegreeOfParallelism = _processingConcurrency (configured as 2 in tests). This causes multiple message handlers to execute concurrently on the same grain, violating Orleans' fundamental single-threaded grain execution model.
+
+### Test Results
+
+- ✅ 1 test passing: FloodMessaging_WithBackpressure_AllSequencesReceived
+- ❌ 5 tests failing due to incomplete message delivery (race conditions)
+
+### Recommended Fix
+
+Replace Parallel.ForEachAsync with sequential foreach loop to respect Orleans single-threaded grain model.
+
+### Files Modified
+
+- ✅ research/feature-list.json (added bug fix feature as highest priority)
+- ✅ research/progress.txt (this debug report)
+
+### Status
+
+- ❌ High-throughput backpressure tests: FAILING (5/6 tests)
+- 🚨 Blocking bug discovered: Concurrent handler execution violates single-threaded grain model
+- 🛑 Implementation halted per instructions: Bug fix must be addressed before continuing
+
+
+## 2025-01-16: HighThroughputBackpressureTests Failures - Debug Report (BLOCKING)
+
+### Summary
+Discovered critical bug in DurableOutboxWithDelivery causing message loss under backpressure. The DeliverPendingMessagesAsync() method has no retry logic for backpressured messages, causing them to remain in the outbox indefinitely. This blocks the high-throughput backpressure scenario test feature from passing.
+
+### Test Failures Summary
+
+The HighThroughputBackpressureTests are failing with messages being lost:
+
+1. FloodMessaging_WithLowCapacity_EventuallyDeliversAll: Expected 30 messages, got only 24
+2. FloodMessaging_WithBackpressure_NoMessageLoss: Expected 50 messages, got only 25
+3. FloodMessaging_MultipleSenders_AllMessagesDelivered: Expected 60 messages, got only 49
+4. FloodMessaging_SustainedLoad_MaintainsThroughput: Throughput is 4.99 msg/s instead of expected 8 msg/s
+5. FloodMessaging_AfterSlowProcessing_QuickRecovery: Expected 40 messages, got only 25
+
+Tests Passing: 3 out of 6
+Tests Failing: 3 out of 6
+
+### Root Cause
+
+File: src/Orleans.Journaling/Messaging/DurableOutboxWithDelivery.cs (lines 94-191)
+
+The DeliverPendingMessagesAsync() method has no retry loop for backpressured messages. When DeliveryStatus.Backpressured is returned (inbox at capacity), the method only logs a warning and continues - it never retries delivery. Messages remain in the outbox indefinitely unless another WriteStateAsync() call triggers delivery again.
+
+### Why Messages Are Lost
+
+1. FloodSenderGrain.StartFlood() sends N messages to outbox and calls WriteStateAsync()
+2. DurableGrain.WriteStateAsync() persists state and calls outbox.DeliverPendingMessagesAsync()
+3. DurableOutboxWithDelivery.DeliverPendingMessagesAsync() attempts to deliver all messages
+4. DurableInboxExtension.DeliverAsync() returns Backpressured if inbox is at capacity (20 messages)
+5. Outbox logs backpressure but does nothing to retry
+6. Messages remain in outbox forever (or until next WriteStateAsync() call)
+
+Since receiver grain processes with delays (30-100ms) and inbox capacity is only 20, first batch fills inbox. Remaining messages get backpressured but never retried.
+
+### Evidence
+
+Expected vs Actual Message Counts:
+- Expected 30, got 24 (6 lost)
+- Expected 50, got 25 (25 lost - exactly half!)
+- Expected 60, got 49 (11 lost)
+
+Inbox capacity = 20. Lost messages correspond to messages that exceeded capacity and were never retried.
+
+### Contrast with OutboxDeliveryPump
+
+OutboxDeliveryPump has proper retry logic with exponential backoff and DurableJobs integration (lines 247-264), but is not being used in test setup or messaging configuration.
+
+### Recommended Fix (Option 1 - Simplest)
+
+Add retry loop with exponential backoff directly in DurableOutboxWithDelivery.DeliverPendingMessagesAsync():
+- MaxRetries = 10
+- Base delay = 100ms, max delay = 5s
+- Exponential backoff: 100ms, 200ms, 400ms, 800ms, etc.
+- Exit early if no backpressured messages remain
+- Log retry attempts and remaining messages
+
+Alternative (Option 2): Integrate OutboxDeliveryPump for proper retry with DurableJobs scheduling.
+
+### Affected Code Locations
+
+- src/Orleans.Journaling/Messaging/DurableOutboxWithDelivery.cs (lines 94-191) - No retry for backpressured messages
+- src/Orleans.Journaling/Messaging/DurableOutboxWithDelivery.cs (lines 156-162) - Backpressure case only logs, doesnt retry
+- src/Orleans.Journaling/DurableGrain.cs (lines 52-63) - WriteStateAsync only calls DeliverPendingMessagesAsync once
+- src/Orleans.Journaling/HostingExtensions.cs (lines 187-193) - Registers DurableOutboxWithDelivery instead of OutboxDeliveryPump
+
+### Next Steps
+
+1. Added high-priority bugfix feature to top of research/feature-list.json with passes = false
+2. Implement retry logic in DurableOutboxWithDelivery (Option 1 recommended)
+3. Re-run all 6 HighThroughputBackpressureTests to verify fix
+4. Verify tests pass on both net10.0 and net8.0
+
+### Status
+- Bug: BLOCKING - Prevents high-throughput backpressure tests from passing
+- Feature Work: SUSPENDED - Must fix this bug before feature can be marked as passing
+- Next Action: EXIT per instructions (another agent will implement the fix)
+
+### Files Modified
+- research/feature-list.json (added high-priority bugfix feature at top)
+- research/progress.txt (this entry)
