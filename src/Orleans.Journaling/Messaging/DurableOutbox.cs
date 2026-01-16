@@ -49,17 +49,30 @@ internal sealed class DurableOutbox : IDurableOutbox
     }
 
     /// <summary>
-    /// Removes a message after successful delivery.
+    /// Removes a message after successful delivery and disposes its envelope data.
     /// </summary>
     /// <param name="messageId">The unique identifier of the message to remove.</param>
     /// <returns>True if the message was found and removed; otherwise, false.</returns>
     /// <remarks>
     /// Called by the delivery pump after receiving DeliveryResult.Accepted or DeliveryResult.Duplicate
     /// from the target inbox. The removal is persisted via IStateMachineManager.WriteStateAsync().
+    /// The envelope's ArcBuffer resources are disposed to prevent memory leaks.
     /// </remarks>
     public bool RemoveMessage(Guid messageId)
     {
-        return _outbox.Remove(messageId);
+        // Get the envelope before removing to dispose its data
+        if (_outbox.TryGetValue(messageId, out var envelope))
+        {
+            var removed = _outbox.Remove(messageId);
+            if (removed)
+            {
+                // Dispose ArcBuffer resources
+                envelope.Data.Dispose();
+            }
+            return removed;
+        }
+        
+        return false;
     }
 
     /// <summary>

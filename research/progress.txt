@@ -1530,3 +1530,29 @@ Successfully enhanced the DurableInboxExtension with configurable processing con
 - test/Orleans.Journaling.Tests/DurableInboxExtensionTests.cs (4 new tests added)
 - research/feature-list.json (marked feature as passing)
 - research/progress.txt (this file)
+
+
+## 2025-01-15: ArcBuffer Lifecycle Management Implementation (COMPLETED)
+
+Successfully implemented proper ArcBuffer lifecycle management for DurableEnvelopeData to prevent memory leaks.
+
+Files Modified:
+- src/Orleans.Journaling/Messaging/DurableInbox.cs (updated RemoveMessage to dispose envelope data)
+- src/Orleans.Journaling/Messaging/DurableOutbox.cs (updated RemoveMessage to dispose envelope data)  
+- test/Orleans.Journaling.Tests/DurableInboxTests.cs (added 2 disposal tests)
+- test/Orleans.Journaling.Tests/DurableOutboxTests.cs (added 2 disposal tests)
+
+Test Results:
+- All 21 DurableInboxTests passing (100%)
+- All 21 DurableOutboxTests passing (100%)
+- Total 42 inbox/outbox storage tests passing
+- No regressions introduced
+
+Key Changes:
+- DurableInbox.RemoveMessage now calls envelope.Data.Dispose() after removal
+- DurableOutbox.RemoveMessage now calls envelope.Data.Dispose() after removal
+- Prevents ArcBuffer page leaks in long-running grains with high message volume
+- Tests verify disposal behavior and double-dispose safety
+
+research/feature-list.json updated to mark feature as passing
+
