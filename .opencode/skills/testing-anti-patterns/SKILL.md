@@ -1,6 +1,6 @@
 ---
 name: testing-anti-patterns
-description: Use when writing or changing tests, adding mocks, or tempted to add test-only methods to production code - prevents testing mock behavior, production pollution with test-only methods, and mocking without understanding dependencies
+description: Use when writing or changing tests, adding mocks, or tempted to add test-only methods to production code - prevents testing mock behavior, production pollution with test-only methods, mocking without understanding dependencies, sleep-style waiting, and non-deterministic tests
 ---
 
 # Testing Anti-Patterns
@@ -251,6 +251,298 @@ TDD cycle:
 4. THEN claim complete
 ```
 
+## Anti-Pattern 6: Sleep-Style Waiting
+
+**The violation:**
+```csharp
+// ❌ BAD: Fixed delay hoping state changes
+[Fact]
+public async Task GrainActivates()
+{
+    var grain = GrainFactory.GetGrain<IMyGrain>(Guid.NewGuid());
+    await grain.StartProcessing();
+    
+    await Task.Delay(5000);  // Hope 5 seconds is enough!
+    
+    var result = await grain.GetResult();
+    Assert.NotNull(result);
+}
+```
+
+**Why this is wrong:**
+- **Non-deterministic** - Works on fast machines, fails on slow CI runners
+- **Wastes time** - If operation takes 100ms, you still wait 5 seconds
+- **Fragile** - Any timing change breaks tests
+- **Slow test suites** - Many delays compound into minutes of wasted time
+- **False confidence** - Passes locally, fails in CI (or vice versa)
+
+**The Iron Rule:** Tests must be as fast and deterministic as possible. Never use fixed delays.
+
+**The fixes:**
+
+```csharp
+// ✅ GOOD: Event-based waiting (preferred)
+[Fact]
+public async Task GrainActivates()
+{
+    var completionSource = new TaskCompletionSource();
+    var grain = GrainFactory.GetGrain<IMyGrain>(Guid.NewGuid());
+    
+    grain.OnProcessingComplete += () => completionSource.SetResult();
+    await grain.StartProcessing();
+    
+    await completionSource.Task.WaitAsync(TimeSpan.FromSeconds(30));
+    var result = await grain.GetResult();
+    Assert.NotNull(result);
+}
+
+// ✅ GOOD: Polling loop with observable condition
+[Fact]
+public async Task GrainActivates()
+{
+    var grain = GrainFactory.GetGrain<IMyGrain>(Guid.NewGuid());
+    await grain.StartProcessing();
+    
+    // Delay in loop with guard condition - this is acceptable
+    for (int i = 0; i < 100; i++)
+    {
+        var status = await grain.GetStatus();
+        if (status == ProcessingStatus.Complete)
+            break;
+        await Task.Delay(100);  // Short delay, but checking condition
+    }
+    
+    var result = await grain.GetResult();
+    Assert.NotNull(result);
+}
+
+// ✅ GOOD: Use test utilities for common patterns
+[Fact]
+public async Task GrainActivates()
+{
+    var grain = GrainFactory.GetGrain<IMyGrain>(Guid.NewGuid());
+    await grain.StartProcessing();
+    
+    await TestingUtils.WaitUntilAsync(
+        () => grain.GetStatus(),
+        status => status == ProcessingStatus.Complete,
+        timeout: TimeSpan.FromSeconds(30));
+    
+    var result = await grain.GetResult();
+    Assert.NotNull(result);
+}
+```
+
+### Gate Function
+
+```
+BEFORE adding Task.Delay/Thread.Sleep to a test:
+  STOP - This is almost always wrong
+
+  Ask: "What condition am I waiting for?"
+
+  IF waiting for state change:
+    Use event-based waiting (TaskCompletionSource, events, callbacks)
+    OR use polling loop with observable guard condition
+
+  IF no observable condition exists:
+    STOP - Improve system testability first (see Anti-Pattern 7)
+    Add events, callbacks, or observable state to enable proper testing
+
+  Acceptable delay patterns:
+    ✅ Delay inside loop with guard condition check
+    ✅ Delay to simulate real-world timing (rare, document why)
+    
+  Unacceptable patterns:
+    ❌ Fixed delay hoping operation completes
+    ❌ Delay without any condition check
+    ❌ "Just add more delay" to fix flaky test
+```
+
+## Anti-Pattern 7: Untestable Behavior
+
+**The violation:**
+```csharp
+// ❌ BAD: No way to observe completion
+public class BackgroundProcessor
+{
+    public void StartProcessing()  // Fire and forget!
+    {
+        Task.Run(async () => {
+            await DoWork();
+            // No signal that work completed
+        });
+    }
+}
+
+// Test has no choice but to use fixed delay
+[Fact]
+public async Task ProcessorCompletesWork()
+{
+    var processor = new BackgroundProcessor();
+    processor.StartProcessing();
+    await Task.Delay(5000);  // Forced into bad pattern!
+    // Assert something...
+}
+```
+
+**Why this is wrong:**
+- System lacks observable state or completion signals
+- Tests forced into non-deterministic patterns
+- "Untestable" is a design smell, not a testing problem
+
+**The Iron Rule:** If behavior cannot easily be tested, improve the testability of the system itself. Then rewrite the test using the new, more testable functionality.
+
+**The fix:**
+
+```csharp
+// ✅ GOOD: Design for testability
+public class BackgroundProcessor
+{
+    public event Action? OnProcessingComplete;
+    public ProcessingStatus Status { get; private set; }
+    
+    public Task StartProcessingAsync()  // Return awaitable task
+    {
+        return Task.Run(async () => {
+            Status = ProcessingStatus.Running;
+            await DoWork();
+            Status = ProcessingStatus.Complete;
+            OnProcessingComplete?.Invoke();
+        });
+    }
+}
+
+// Now test is deterministic and fast
+[Fact]
+public async Task ProcessorCompletesWork()
+{
+    var processor = new BackgroundProcessor();
+    var completed = new TaskCompletionSource();
+    processor.OnProcessingComplete += () => completed.SetResult();
+    
+    _ = processor.StartProcessingAsync();
+    await completed.Task.WaitAsync(TimeSpan.FromSeconds(30));
+    
+    Assert.Equal(ProcessingStatus.Complete, processor.Status);
+}
+```
+
+### Gate Function
+
+```
+BEFORE accepting "this can't be tested properly":
+  STOP - This is a design problem, not a testing limitation
+
+  Ask: "What would make this testable?"
+    - Add completion events/callbacks
+    - Expose observable state
+    - Return Task/awaitable instead of fire-and-forget
+    - Add dependency injection for time-dependent components
+
+  Steps:
+    1. Identify what condition the test needs to observe
+    2. Add that observability to the production code (this IS production value)
+    3. Rewrite test using the new testable interface
+
+  Remember:
+    - Testability improvements ARE production improvements
+    - Observable state helps debugging and monitoring too
+    - Fire-and-forget is often a code smell anyway
+```
+
+## Anti-Pattern 8: Non-Deterministic Tests
+
+**The violation:**
+```csharp
+// ❌ BAD: Race conditions in test
+[Fact]
+public async Task ConcurrentGrainAccess()
+{
+    var grain = GrainFactory.GetGrain<ICounterGrain>(Guid.NewGuid());
+    
+    // Fire off concurrent calls
+    var tasks = Enumerable.Range(0, 100)
+        .Select(_ => grain.Increment());
+    await Task.WhenAll(tasks);
+    
+    await Task.Delay(1000);  // Hope everything settled!
+    
+    var count = await grain.GetCount();
+    Assert.Equal(100, count);  // Sometimes 99, sometimes 100...
+}
+```
+
+**Why this is wrong:**
+- Test outcome depends on timing, not correctness
+- Flaky tests erode confidence in test suite
+- Developers start ignoring test failures
+- CI becomes unreliable
+
+**The Iron Rule:** Tests must be deterministic. Same inputs → same outputs, every time.
+
+**The fix:**
+```csharp
+// ✅ GOOD: Proper synchronization
+[Fact]
+public async Task ConcurrentGrainAccess()
+{
+    var grain = GrainFactory.GetGrain<ICounterGrain>(Guid.NewGuid());
+    
+    // Await all operations properly
+    var tasks = Enumerable.Range(0, 100)
+        .Select(_ => grain.Increment())
+        .ToList();
+    await Task.WhenAll(tasks);
+    
+    // All increments complete before check - no delay needed
+    var count = await grain.GetCount();
+    Assert.Equal(100, count);
+}
+
+// ✅ GOOD: If order matters, use explicit synchronization
+[Fact]
+public async Task SequentialOperations()
+{
+    var grain = GrainFactory.GetGrain<IMyGrain>(Guid.NewGuid());
+    
+    using var semaphore = new SemaphoreSlim(1);
+    
+    async Task SafeOperation(int value)
+    {
+        await semaphore.WaitAsync();
+        try { await grain.Process(value); }
+        finally { semaphore.Release(); }
+    }
+    
+    await Task.WhenAll(
+        SafeOperation(1),
+        SafeOperation(2),
+        SafeOperation(3));
+}
+```
+
+### Gate Function
+
+```
+BEFORE writing concurrent test code:
+  Ask: "Can this test ever produce different results on different runs?"
+
+  IF yes:
+    STOP - Make it deterministic first
+
+  Checklist:
+    □ All async operations properly awaited
+    □ No race conditions between setup and assertion  
+    □ No timing-dependent assertions
+    □ Shared state properly synchronized
+
+  IF test is flaky:
+    DO NOT add delays to "fix" it
+    DO find and fix the race condition
+    DO improve observability if needed
+```
+
 ## When Mocks Become Too Complex
 
 **Warning signs:**
@@ -283,6 +575,9 @@ TDD cycle:
 | Incomplete mocks                | Mirror real API completely                    |
 | Tests as afterthought           | TDD - tests first                             |
 | Over-complex mocks              | Consider integration tests                    |
+| Fixed delays (Task.Delay)       | Event-based waiting or polling with guard     |
+| Untestable behavior             | Improve system testability, then rewrite test |
+| Non-deterministic tests         | Proper synchronization, no timing dependence  |
 
 ## Red Flags
 
@@ -292,6 +587,11 @@ TDD cycle:
 - Test fails when you remove mock
 - Can't explain why mock is needed
 - Mocking "just to be safe"
+- `Task.Delay` or `Thread.Sleep` without loop/guard condition
+- "Just increase the delay" to fix flaky test
+- Fire-and-forget operations with no completion signal
+- Test passes locally but fails in CI (or vice versa)
+- Test marked `[Trait("Flaky", "true")]` without investigation
 
 ## The Bottom Line
 
