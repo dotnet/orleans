@@ -66,7 +66,6 @@
     <Project Path="src/Orleans.Serialization/Orleans.Serialization.csproj" />
     <Project Path="src/Orleans.Server/Orleans.Server.csproj" />
     <Project Path="src/Orleans.Streaming/Orleans.Streaming.csproj" />
-    <Project Path="src/Orleans.Streaming.Abstractions/Orleans.Streaming.Abstractions.csproj" />
     <Project Path="src/Orleans.TestingHost/Orleans.TestingHost.csproj" />
     <Project Path="src/Serializers/Orleans.Serialization.Protobuf/Orleans.Serialization.Protobuf.csproj" />
     <Project Path="src/System.Distributed.DurableTasks/System.Distributed.DurableTasks.csproj" />
