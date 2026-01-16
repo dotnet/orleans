@@ -39,7 +39,6 @@ public class DurableMessagingHostingTests : IClassFixture<DurableMessagingHostin
         // Note: The test fixture overrides some values, so we check those
         Assert.Equal(500, options.Value.MaxCapacity);
         Assert.Equal(TimeSpan.FromDays(14), options.Value.DeduplicationWindow);
-        Assert.Equal(2, options.Value.ProcessingConcurrency);
         Assert.True(options.Value.EnableLongPolling);
         Assert.Equal(TimeSpan.FromSeconds(30), options.Value.DefaultPollTimeout);
     }
@@ -173,16 +172,7 @@ public class DurableMessagingHostingTests : IClassFixture<DurableMessagingHostin
         Assert.Contains("DeduplicationWindow", ex.Message);
     }
 
-    [Fact, TestCategory("BVT"), TestCategory("Functional")]
-    public void DurableInboxOptions_Validate_ThrowsOnInvalidProcessingConcurrency()
-    {
-        // Arrange
-        var options = new DurableInboxOptions { ProcessingConcurrency = 0 };
 
-        // Act & Assert
-        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => options.Validate());
-        Assert.Contains("ProcessingConcurrency", ex.Message);
-    }
 
     [Fact, TestCategory("BVT"), TestCategory("Functional")]
     public void DurableInboxOptions_Validate_ThrowsOnInvalidDefaultPollTimeout()
@@ -208,7 +198,6 @@ public class DurableMessagingHostingTests : IClassFixture<DurableMessagingHostin
                 {
                     opts.MaxCapacity = 500;
                     opts.DeduplicationWindow = TimeSpan.FromDays(14);
-                    opts.ProcessingConcurrency = 2;
                 });
             });
         }
