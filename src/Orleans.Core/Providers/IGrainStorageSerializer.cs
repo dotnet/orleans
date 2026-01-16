@@ -30,6 +30,7 @@ namespace Orleans.Storage
         T Deserialize<T>(BinaryData input);
     }
 
+#nullable enable
     /// <summary>
     /// Optional stream-based serializer for grain state.
     /// </summary>
@@ -51,8 +52,9 @@ namespace Orleans.Storage
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <typeparam name="T">The output type.</typeparam>
         /// <returns>The deserialized object.</returns>
-        ValueTask<T> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default);
+        ValueTask<T?> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default);
     }
+#nullable restore
 
     /// <summary>
     /// Extensions for <see cref="IGrainStorageSerializer"/>.
@@ -103,7 +105,7 @@ namespace Orleans.Storage
         {
             if (options.GrainStorageSerializer == default)
             {
-                // First, try to get a IGrainStorageSerializer that was registered with 
+                // First, try to get a IGrainStorageSerializer that was registered with
                 // the same name as the storage provider
                 // If none is found, fallback to system wide default
                 options.GrainStorageSerializer = _serviceProvider.GetKeyedService<IGrainStorageSerializer>(name) ?? _serviceProvider.GetRequiredService<IGrainStorageSerializer>();
