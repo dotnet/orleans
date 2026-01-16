@@ -237,7 +237,7 @@
       "Configure DurableInboxOptions with IOptions pattern",
       "Add integration tests for DI resolution"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
