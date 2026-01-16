@@ -136,6 +136,30 @@ public class DurableInboxOptions
     public TimeSpan DefaultPollTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
+    /// Gets or sets the base delay between retry attempts when outbox delivery encounters backpressure.
+    /// The actual delay includes jitter (up to 50% additional random delay) to prevent thundering herd effects.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// When the target inbox is at capacity and returns <c>DeliveryResult.Backpressured()</c>,
+    /// the outbox delivery pump will wait this duration (plus jitter) before retrying.
+    /// </para>
+    /// <para>
+    /// A shorter delay (e.g., 100ms) enables faster recovery when the target processes messages quickly,
+    /// but may increase CPU usage during sustained backpressure. A longer delay (e.g., 5 seconds)
+    /// reduces retry overhead but increases latency for message delivery.
+    /// </para>
+    /// <para>
+    /// For high-throughput scenarios where quick recovery from backpressure is important,
+    /// consider values between 100-500ms. For less time-sensitive workloads, 1-5 seconds is appropriate.
+    /// </para>
+    /// </remarks>
+    /// <value>
+    /// The base backpressure retry delay. Must be greater than zero. Defaults to 1 second.
+    /// </value>
+    public TimeSpan BackpressureRetryDelay { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>
     /// Validates the configuration values and throws if any are invalid.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">
@@ -162,6 +186,11 @@ public class DurableInboxOptions
         if (DefaultPollTimeout <= TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(nameof(DefaultPollTimeout), DefaultPollTimeout, "DefaultPollTimeout must be greater than TimeSpan.Zero.");
+        }
+
+        if (BackpressureRetryDelay <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(BackpressureRetryDelay), BackpressureRetryDelay, "BackpressureRetryDelay must be greater than TimeSpan.Zero.");
         }
     }
 }

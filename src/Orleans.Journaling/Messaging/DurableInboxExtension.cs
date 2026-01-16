@@ -28,8 +28,14 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     private readonly Dictionary<Guid, TaskCompletionSource<DeliveryResult>> _pendingDeliveries;
     private readonly int _maxCapacity;
     private readonly TimeSpan _deduplicationWindow;
-    private readonly SemaphoreSlim _processingLock = new(1, 1);
-    private volatile bool _processingRequested;
+    private readonly object _processingLock = new();
+    private Task? _processingTask;
+    
+    /// <summary>
+    /// Counter incremented when new messages are added. The processing task checks this
+    /// to determine if new work arrived while it was processing.
+    /// </summary>
+    private int _processingVersion;
 
     /// <summary>
     /// Creates a new inbox extension instance.
@@ -132,14 +138,11 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         DeliveryOptions options,
         CancellationToken cancellationToken = default)
     {
-        Console.WriteLine($"[DEBUG-INBOX] DeliverAsync: Received message {envelope.MessageId} from {envelope.SenderId} to {envelope.ReceiverId} on route '{envelope.RouteKey}'");
-        
         var key = (envelope.SenderId, envelope.MessageId);
 
         // Check for duplicate (already processed)
         if (_processed.ContainsKey(key))
         {
-            Console.WriteLine($"[DEBUG-INBOX] Message {envelope.MessageId} is duplicate (already processed)");
             _logger.LogDebug(
                 "Duplicate message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}'",
                 envelope.MessageId,
@@ -153,7 +156,6 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         // Check for duplicate (already in inbox)
         if (_inboxDict.ContainsKey(key))
         {
-            Console.WriteLine($"[DEBUG-INBOX] Message {envelope.MessageId} is duplicate (already in inbox)");
             _logger.LogDebug(
                 "Duplicate message {MessageId} from {SenderId} already in inbox for {ReceiverId} on route '{RouteKey}'",
                 envelope.MessageId,
@@ -164,7 +166,7 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
             // If long-polling, wait for existing processing to complete
             if (options.PollTimeout > TimeSpan.Zero)
             {
-                return await WaitForProcessingAsync(envelope.MessageId, options.PollTimeout, cancellationToken).ConfigureAwait(false);
+                return await WaitForProcessingAsync(envelope.MessageId, options.PollTimeout, cancellationToken).ConfigureAwait(true);
             }
 
             return DeliveryResult.Duplicate();
@@ -173,7 +175,6 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         // Check capacity (backpressure)
         if (_inboxDict.Count >= _maxCapacity)
         {
-            Console.WriteLine($"[DEBUG-INBOX] Message {envelope.MessageId} rejected - inbox at capacity ({_inboxDict.Count}/{_maxCapacity})");
             _logger.LogWarning(
                 "Inbox at capacity ({Count}/{Capacity}) for grain {GrainId}, rejecting message {MessageId} from {SenderId}",
                 _inboxDict.Count,
@@ -192,12 +193,10 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
             // and the message has a CorrelationKey (for observer-based response handling)
             if (envelope.CorrelationKey is not null && _grainContext.GrainInstance is IDurableInboxObserver)
             {
-                Console.WriteLine($"[DEBUG-INBOX] Message {envelope.MessageId} accepted - grain implements IDurableInboxObserver with CorrelationKey");
                 // Fall through to accept the message for observer-based processing
             }
             else
             {
-                Console.WriteLine($"[DEBUG-INBOX] Message {envelope.MessageId} rejected - no handler for route '{envelope.RouteKey}'");
                 _logger.LogWarning(
                     "No handler registered for route '{RouteKey}' on grain {GrainId}, rejecting message {MessageId} from {SenderId}",
                     envelope.RouteKey,
@@ -209,13 +208,11 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
             }
         }
 
-        Console.WriteLine($"[DEBUG-INBOX] Message {envelope.MessageId} accepted - handler/observer found for route '{envelope.RouteKey}'");
-        
         // Accept message into inbox
         _inboxDict[key] = envelope;
 
         // Persist atomically
-        await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(false);
+        await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
 
         _logger.LogInformation(
             "Accepted message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})",
@@ -228,11 +225,12 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         // If long-polling, wait for processing to complete
         if (options.PollTimeout > TimeSpan.Zero)
         {
-            return await WaitForProcessingAsync(envelope.MessageId, options.PollTimeout, cancellationToken).ConfigureAwait(false);
+            return await WaitForProcessingAsync(envelope.MessageId, options.PollTimeout, cancellationToken).ConfigureAwait(true);
         }
 
-        // Trigger async processing (fire-and-forget)
-        _ = ProcessPendingMessagesAsync();
+        // Schedule async processing.
+        // Increment version to signal new work, then ensure a processing task is running.
+        ScheduleProcessing();
 
         return DeliveryResult.Accepted();
     }
@@ -252,18 +250,18 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
 
         try
         {
-            // Trigger async processing
-            _ = ProcessPendingMessagesAsync();
+            // Schedule async processing
+            ScheduleProcessing();
 
             // Wait for completion or timeout
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(timeout);
 
-            var task = await Task.WhenAny(tcs.Task, Task.Delay(timeout, cts.Token)).ConfigureAwait(false);
+            var task = await Task.WhenAny(tcs.Task, Task.Delay(timeout, cts.Token)).ConfigureAwait(true);
 
             if (task == tcs.Task)
             {
-                return await tcs.Task.ConfigureAwait(false);
+                return await tcs.Task.ConfigureAwait(true);
             }
 
             // Timeout - return pending status
@@ -277,91 +275,104 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     }
 
     /// <summary>
-    /// Processes all pending messages in the inbox sequentially.
-    /// Uses a lock to prevent concurrent processing runs, and loops until all messages are processed.
+    /// Schedules processing of pending messages. Thread-safe - can be called concurrently
+    /// from multiple interleaved DeliverAsync calls.
     /// </summary>
-    /// <remarks>
-    /// Messages are processed sequentially (not concurrently) to respect Orleans' single-threaded grain model.
-    /// Orleans grains are designed to handle one request at a time, which provides:
-    /// <list type="bullet">
-    /// <item>Automatic synchronization - no need for locks when accessing grain state</item>
-    /// <item>Predictable execution order - handlers see consistent state</item>
-    /// <item>No race conditions - state modifications are serialized</item>
-    /// </list>
-    /// Concurrent processing would violate these guarantees and could lead to:
-    /// <list type="bullet">
-    /// <item>Race conditions when handlers access _inboxDict, _processed, or _outbox</item>
-    /// <item>Unpredictable state corruption if multiple handlers modify the same grain fields</item>
-    /// <item>Complex debugging issues that only manifest under high concurrency</item>
-    /// </list>
-    /// For high-throughput scenarios, scale horizontally by:
-    /// <list type="bullet">
-    /// <item>Partitioning work across multiple grain instances</item>
-    /// <item>Using grain keys to distribute load (e.g., account-123, account-456)</item>
-    /// <item>Avoiding sequential dependencies between messages when possible</item>
-    /// </list>
-    /// </remarks>
+    private void ScheduleProcessing()
+    {
+        lock (_processingLock)
+        {
+            // Increment version to signal new work
+            Interlocked.Increment(ref _processingVersion);
+
+            // If no processing task is running, start one.
+            // Note: We must check IsCompleted because the task might still be "running"
+            // (hasn't returned yet) but has already exited the processing loop.
+            // The version increment above ensures any exiting task will see new work
+            // and restart if needed.
+            if (_processingTask is null || _processingTask.IsCompleted)
+            {
+                _processingTask = ProcessingLoopAsync();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Background loop that processes pending messages. Continues until inbox is empty
+    /// and no new work has been signaled via _processingVersion.
+    /// </summary>
+    private async Task ProcessingLoopAsync()
+    {
+        while (true)
+        {
+            // Capture current version INSIDE the lock to avoid races with ScheduleProcessing
+            int versionBeforeProcessing;
+            lock (_processingLock)
+            {
+                versionBeforeProcessing = Volatile.Read(ref _processingVersion);
+            }
+
+            // Process all current messages
+            if (_inboxDict.Count > 0)
+            {
+                await ProcessPendingMessagesAsync().ConfigureAwait(true);
+            }
+
+            // Check if we should exit - must hold lock to coordinate with ScheduleProcessing
+            lock (_processingLock)
+            {
+                var currentVersion = Volatile.Read(ref _processingVersion);
+                
+                // If version changed, new work was added - continue processing
+                if (currentVersion != versionBeforeProcessing)
+                {
+                    continue;
+                }
+
+                // If inbox is not empty, continue processing
+                if (_inboxDict.Count > 0)
+                {
+                    continue;
+                }
+
+                // CRITICAL: Set _processingTask to a completed task BEFORE returning.
+                // This ensures any concurrent ScheduleProcessing call will see IsCompleted=true
+                // and start a new task. We're inside the lock so no race can occur.
+                _processingTask = Task.CompletedTask;
+                return;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Processes all pending messages in the inbox sequentially.
+    /// Called from ProcessingLoopAsync on the grain's scheduler.
+    /// </summary>
     private async Task ProcessPendingMessagesAsync()
     {
-        Console.WriteLine($"[DEBUG-INBOX] ProcessPendingMessagesAsync: Starting, inbox count={_inboxDict.Count}");
-        
-        // Mark that processing was requested
-        _processingRequested = true;
-
-        // Try to acquire the processing lock
-        if (!await _processingLock.WaitAsync(0).ConfigureAwait(false))
+        if (_inboxDict.Count == 0)
         {
-            Console.WriteLine($"[DEBUG-INBOX] ProcessPendingMessagesAsync: Could not acquire lock, returning");
-            return; // Another processing run is already in progress, it will pick up new messages
+            return;
         }
 
-        try
+        // Create a snapshot of pending messages to avoid collection modification
+        var pending = new List<DurableEnvelope>(_inboxDict.Values);
+
+        foreach (var envelope in pending)
         {
-            // Keep processing until no more messages or no more processing requests
-            while (_inboxDict.Count > 0)
+            try
             {
-                Console.WriteLine($"[DEBUG-INBOX] ProcessPendingMessagesAsync: Processing loop, inbox count={_inboxDict.Count}");
-                
-                // Clear the processing request flag before processing
-                _processingRequested = false;
-
-                // Create a snapshot of pending messages to avoid collection modification
-                var pending = new List<DurableEnvelope>(_inboxDict.Values);
-
-                // Process messages sequentially to respect Orleans' single-threaded grain model.
-                // Concurrent processing would violate grain semantics and could lead to race conditions
-                // when accessing grain state (_inboxDict, _processed, _outbox).
-                foreach (var envelope in pending)
-                {
-                    try
-                    {
-                        Console.WriteLine($"[DEBUG-INBOX] ProcessPendingMessagesAsync: Processing message {envelope.MessageId}");
-                        await ProcessMessageAsync(envelope).ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[DEBUG-INBOX] ProcessPendingMessagesAsync: Error processing message {envelope.MessageId}: {ex.Message}");
-                        _logger.LogError(
-                            ex,
-                            "Error processing message {MessageId} from {SenderId} on route '{RouteKey}'",
-                            envelope.MessageId,
-                            envelope.SenderId,
-                            envelope.RouteKey);
-                    }
-                }
-
-                // If no new processing requests came in, we're done
-                if (!_processingRequested)
-                {
-                    break;
-                }
+                await ProcessMessageAsync(envelope).ConfigureAwait(true);
             }
-            
-            Console.WriteLine($"[DEBUG-INBOX] ProcessPendingMessagesAsync: Done, inbox count={_inboxDict.Count}");
-        }
-        finally
-        {
-            _processingLock.Release();
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error processing message {MessageId} from {SenderId} on route '{RouteKey}'",
+                    envelope.MessageId,
+                    envelope.SenderId,
+                    envelope.RouteKey);
+            }
         }
     }
 
@@ -370,14 +381,11 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     /// </summary>
     private async Task ProcessMessageAsync(DurableEnvelope envelope)
     {
-        Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Processing message {envelope.MessageId} on route '{envelope.RouteKey}'");
-        
         var key = (envelope.SenderId, envelope.MessageId);
 
         // Check if already processed (concurrent processing guard)
         if (!_inboxDict.ContainsKey(key))
         {
-            Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Message {envelope.MessageId} already processed (not in inbox)");
             return;
         }
 
@@ -387,18 +395,15 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
             // Check if the grain implements IDurableInboxObserver for correlation-based responses
             if (envelope.CorrelationKey is not null && _grainContext.GrainInstance is IDurableInboxObserver observer)
             {
-                Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: No route handler, but grain implements IDurableInboxObserver - calling OnResponseAsync");
                 try
                 {
                     var options = new DeliveryOptions { PollTimeout = TimeSpan.Zero };
-                    var result = await observer.OnResponseAsync(envelope.CorrelationKey, envelope, options, CancellationToken.None).ConfigureAwait(false);
-                    
-                    Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Observer.OnResponseAsync returned {result.Status}");
+                    var result = await observer.OnResponseAsync(envelope.CorrelationKey, envelope, options, CancellationToken.None).ConfigureAwait(true);
 
                     // Mark as processed
                     _inboxDict.Remove(key);
                     _processed[key] = DateTimeOffset.UtcNow;
-                    await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(false);
+                    await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
 
                     // Dispose envelope data to release ArcBuffer resources (after persistence)
                     envelope.Data.Dispose();
@@ -406,8 +411,7 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                     // Trigger delivery of any responses the observer queued in the outbox
                     if (_outbox.Count > 0)
                     {
-                        Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Delivering {_outbox.Count} response messages from outbox");
-                        await _outbox.DeliverPendingMessagesAsync(CancellationToken.None).ConfigureAwait(false);
+                        await _outbox.DeliverPendingMessagesAsync(CancellationToken.None).ConfigureAwait(true);
                     }
 
                     _logger.LogInformation(
@@ -422,7 +426,6 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Observer.OnResponseAsync threw exception: {ex.GetType().Name}: {ex.Message}");
                     _logger.LogError(
                         ex,
                         "IDurableInboxObserver.OnResponseAsync threw exception for message {MessageId} from {SenderId}",
@@ -432,7 +435,7 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                     // Mark as processed to avoid infinite retry
                     _inboxDict.Remove(key);
                     _processed[key] = DateTimeOffset.UtcNow;
-                    await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(false);
+                    await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
 
                     // Dispose envelope data
                     envelope.Data.Dispose();
@@ -443,7 +446,6 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                 }
             }
 
-            Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: No handler found for route '{envelope.RouteKey}'");
             _logger.LogWarning(
                 "Handler for route '{RouteKey}' not found during processing of message {MessageId}",
                 envelope.RouteKey,
@@ -452,7 +454,7 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
             // Remove from inbox and mark as processed
             _inboxDict.Remove(key);
             _processed[key] = DateTimeOffset.UtcNow;
-            await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(false);
+            await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
 
             // Dispose envelope data to release ArcBuffer resources
             envelope.Data.Dispose();
@@ -464,22 +466,18 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
 
         try
         {
-            Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Handler found, invoking for message {envelope.MessageId}");
-            
             // Create handler context using the grain's durable outbox
             var context = new InboxHandlerContext(envelope, _grainContext.GrainId, _outbox, _sessionPool);
 
             // Invoke handler
-            await handler.HandleAsync(envelope, context, CancellationToken.None).ConfigureAwait(false);
-            
-            Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Handler completed for message {envelope.MessageId}, outbox count={_outbox.Count}");
+            await handler.HandleAsync(envelope, context, CancellationToken.None).ConfigureAwait(true);
 
             // Mark as processed
             _inboxDict.Remove(key);
             _processed[key] = DateTimeOffset.UtcNow;
 
             // Persist atomically
-            await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(false);
+            await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
 
             // Dispose envelope data to release ArcBuffer resources (after persistence)
             envelope.Data.Dispose();
@@ -487,8 +485,7 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
             // Trigger delivery of any responses the handler queued in the outbox
             if (_outbox.Count > 0)
             {
-                Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Delivering {_outbox.Count} response messages from outbox");
-                await _outbox.DeliverPendingMessagesAsync(CancellationToken.None).ConfigureAwait(false);
+                await _outbox.DeliverPendingMessagesAsync(CancellationToken.None).ConfigureAwait(true);
             }
 
             _logger.LogInformation(
@@ -502,7 +499,6 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Handler threw exception for message {envelope.MessageId}: {ex.GetType().Name}: {ex.Message}");
             _logger.LogError(
                 ex,
                 "Handler threw exception for message {MessageId} from {SenderId} on route '{RouteKey}'",
@@ -514,7 +510,7 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
             // In production, this should use a retry policy or dead-letter queue
             _inboxDict.Remove(key);
             _processed[key] = DateTimeOffset.UtcNow;
-            await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(false);
+            await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
 
             // Dispose envelope data to release ArcBuffer resources (after persistence)
             envelope.Data.Dispose();

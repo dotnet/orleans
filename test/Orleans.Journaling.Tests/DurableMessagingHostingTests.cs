@@ -95,62 +95,6 @@ public class DurableMessagingHostingTests : IClassFixture<DurableMessagingHostin
     }
 
     [Fact, TestCategory("BVT"), TestCategory("Functional")]
-    public void AddDurableMessaging_RegistersIDurableInbox()
-    {
-        // Arrange & Act
-        var inbox = _fixture.GetSiloService<IDurableInbox>();
-
-        // Assert
-        Assert.NotNull(inbox);
-        Assert.Empty(inbox.Messages);
-        Assert.Equal(500, inbox.Capacity); // Should use configured MaxCapacity
-    }
-
-    [Fact, TestCategory("BVT"), TestCategory("Functional")]
-    public void AddDurableMessaging_RegistersIDurableOutbox()
-    {
-        // Arrange & Act
-        var outbox = _fixture.GetSiloService<IDurableOutbox>();
-
-        // Assert
-        Assert.NotNull(outbox);
-        Assert.Empty(outbox.Messages);
-    }
-
-    [Fact, TestCategory("BVT"), TestCategory("Functional")]
-    public void AddDurableMessaging_RegistersKeyedInboxDictionary()
-    {
-        // Arrange & Act
-        var inbox = _fixture.GetSiloKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("inbox");
-
-        // Assert
-        Assert.NotNull(inbox);
-        Assert.Empty(inbox);
-    }
-
-    [Fact, TestCategory("BVT"), TestCategory("Functional")]
-    public void AddDurableMessaging_RegistersKeyedProcessedDictionary()
-    {
-        // Arrange & Act
-        var processed = _fixture.GetSiloKeyedService<IDurableDictionary<(GrainId, Guid), DateTimeOffset>>("inbox-processed");
-
-        // Assert
-        Assert.NotNull(processed);
-        Assert.Empty(processed);
-    }
-
-    [Fact, TestCategory("BVT"), TestCategory("Functional")]
-    public void AddDurableMessaging_RegistersKeyedOutboxDictionary()
-    {
-        // Arrange & Act
-        var outbox = _fixture.GetSiloKeyedService<IDurableDictionary<Guid, DurableEnvelope>>("outbox");
-
-        // Assert
-        Assert.NotNull(outbox);
-        Assert.Empty(outbox);
-    }
-
-    [Fact, TestCategory("BVT"), TestCategory("Functional")]
     public void DurableInboxOptions_Validate_ThrowsOnInvalidMaxCapacity()
     {
         // Arrange

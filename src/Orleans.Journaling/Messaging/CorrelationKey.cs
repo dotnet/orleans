@@ -10,7 +10,7 @@ namespace Orleans.Journaling.Messaging;
 /// </summary>
 /// <remarks>
 /// <para>
-/// CorrelationKey uses '/' as the segment separator and '\\' as the escape character,
+/// CorrelationKey uses '/' as the segment separator and '\' as the escape character,
 /// allowing for hierarchical correlation across distributed operations.
 /// </para>
 /// <para>

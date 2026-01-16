@@ -82,6 +82,22 @@ public class OutboxDeliveryPumpTests
         IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable)_inner).GetEnumerator();
     }
 
+    /// <summary>
+    /// Test implementation of IDurableOutbox for unit testing.
+    /// </summary>
+    private sealed class TestOutbox : IDurableOutbox
+    {
+        private readonly Dictionary<Guid, DurableEnvelope> _messages = new();
+
+        public int Count => _messages.Count;
+        public IEnumerable<DurableEnvelope> Messages => _messages.Values;
+
+        public void Send(DurableEnvelope envelope) => _messages[envelope.MessageId] = envelope;
+        public bool RemoveMessage(Guid messageId) => _messages.Remove(messageId);
+        public bool TryGetMessage(Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope) => _messages.TryGetValue(messageId, out envelope);
+        public Task DeliverPendingMessagesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
     private sealed class TestInboxExtension : IDurableInboxExtension
     {
         private readonly DeliveryResult _result;
@@ -103,7 +119,7 @@ public class OutboxDeliveryPumpTests
         // Arrange
         var grainFactory = Substitute.For<IGrainFactory>();
         var jobManager = Substitute.For<ILocalDurableJobManager>();
-        var outbox = new DurableOutbox(new MockDurableDictionary<Guid, DurableEnvelope>());
+        var outbox = new TestOutbox();
         var stateMachineManager = Substitute.For<IStateMachineManager>();
         var logger = NullLogger<OutboxDeliveryPump>.Instance;
         var grainId = CreateTestGrainId();
@@ -120,7 +136,7 @@ public class OutboxDeliveryPumpTests
     {
         // Arrange
         var jobManager = Substitute.For<ILocalDurableJobManager>();
-        var outbox = new DurableOutbox(new MockDurableDictionary<Guid, DurableEnvelope>());
+        var outbox = new TestOutbox();
         var stateMachineManager = Substitute.For<IStateMachineManager>();
         var logger = NullLogger<OutboxDeliveryPump>.Instance;
         var grainId = CreateTestGrainId();
@@ -135,7 +151,7 @@ public class OutboxDeliveryPumpTests
     {
         // Arrange
         var grainFactory = Substitute.For<IGrainFactory>();
-        var outbox = new DurableOutbox(new MockDurableDictionary<Guid, DurableEnvelope>());
+        var outbox = new TestOutbox();
         var stateMachineManager = Substitute.For<IStateMachineManager>();
         var logger = NullLogger<OutboxDeliveryPump>.Instance;
         var grainId = CreateTestGrainId();
@@ -166,7 +182,7 @@ public class OutboxDeliveryPumpTests
         // Arrange
         var grainFactory = Substitute.For<IGrainFactory>();
         var jobManager = Substitute.For<ILocalDurableJobManager>();
-        var outbox = new DurableOutbox(new MockDurableDictionary<Guid, DurableEnvelope>());
+        var outbox = new TestOutbox();
         var stateMachineManager = Substitute.For<IStateMachineManager>();
         var logger = NullLogger<OutboxDeliveryPump>.Instance;
         var grainId = CreateTestGrainId();
@@ -191,8 +207,7 @@ public class OutboxDeliveryPumpTests
         // Arrange
         var grainFactory = Substitute.For<IGrainFactory>();
         var jobManager = Substitute.For<ILocalDurableJobManager>();
-        var outboxDict = new MockDurableDictionary<Guid, DurableEnvelope>();
-        var outbox = new DurableOutbox(outboxDict);
+        var outbox = new TestOutbox();
         var stateMachineManager = Substitute.For<IStateMachineManager>();
         var logger = NullLogger<OutboxDeliveryPump>.Instance;
         var grainId = CreateTestGrainId();
@@ -239,8 +254,7 @@ public class OutboxDeliveryPumpTests
         // Arrange
         var grainFactory = Substitute.For<IGrainFactory>();
         var jobManager = Substitute.For<ILocalDurableJobManager>();
-        var outboxDict = new MockDurableDictionary<Guid, DurableEnvelope>();
-        var outbox = new DurableOutbox(outboxDict);
+        var outbox = new TestOutbox();
         var stateMachineManager = Substitute.For<IStateMachineManager>();
         var logger = NullLogger<OutboxDeliveryPump>.Instance;
         var grainId = CreateTestGrainId();
@@ -286,8 +300,7 @@ public class OutboxDeliveryPumpTests
         // Arrange
         var grainFactory = Substitute.For<IGrainFactory>();
         var jobManager = Substitute.For<ILocalDurableJobManager>();
-        var outboxDict = new MockDurableDictionary<Guid, DurableEnvelope>();
-        var outbox = new DurableOutbox(outboxDict);
+        var outbox = new TestOutbox();
         var stateMachineManager = Substitute.For<IStateMachineManager>();
         var logger = NullLogger<OutboxDeliveryPump>.Instance;
         var grainId = CreateTestGrainId();
@@ -333,8 +346,7 @@ public class OutboxDeliveryPumpTests
         // Arrange
         var grainFactory = Substitute.For<IGrainFactory>();
         var jobManager = Substitute.For<ILocalDurableJobManager>();
-        var outboxDict = new MockDurableDictionary<Guid, DurableEnvelope>();
-        var outbox = new DurableOutbox(outboxDict);
+        var outbox = new TestOutbox();
         var stateMachineManager = Substitute.For<IStateMachineManager>();
         var logger = NullLogger<OutboxDeliveryPump>.Instance;
         var grainId = CreateTestGrainId();
@@ -388,8 +400,7 @@ public class OutboxDeliveryPumpTests
         // Arrange
         var grainFactory = Substitute.For<IGrainFactory>();
         var jobManager = Substitute.For<ILocalDurableJobManager>();
-        var outboxDict = new MockDurableDictionary<Guid, DurableEnvelope>();
-        var outbox = new DurableOutbox(outboxDict);
+        var outbox = new TestOutbox();
         var stateMachineManager = Substitute.For<IStateMachineManager>();
         var logger = NullLogger<OutboxDeliveryPump>.Instance;
         var grainId = CreateTestGrainId();
@@ -435,8 +446,7 @@ public class OutboxDeliveryPumpTests
         // Arrange
         var grainFactory = Substitute.For<IGrainFactory>();
         var jobManager = Substitute.For<ILocalDurableJobManager>();
-        var outboxDict = new MockDurableDictionary<Guid, DurableEnvelope>();
-        var outbox = new DurableOutbox(outboxDict);
+        var outbox = new TestOutbox();
         var stateMachineManager = Substitute.For<IStateMachineManager>();
         var logger = NullLogger<OutboxDeliveryPump>.Instance;
         var grainId = CreateTestGrainId();
@@ -486,8 +496,7 @@ public class OutboxDeliveryPumpTests
         // Arrange
         var grainFactory = Substitute.For<IGrainFactory>();
         var jobManager = Substitute.For<ILocalDurableJobManager>();
-        var outboxDict = new MockDurableDictionary<Guid, DurableEnvelope>();
-        var outbox = new DurableOutbox(outboxDict);
+        var outbox = new TestOutbox();
         var stateMachineManager = Substitute.For<IStateMachineManager>();
         var logger = NullLogger<OutboxDeliveryPump>.Instance;
         var grainId = CreateTestGrainId();
@@ -537,8 +546,7 @@ public class OutboxDeliveryPumpTests
         // Arrange
         var grainFactory = Substitute.For<IGrainFactory>();
         var jobManager = Substitute.For<ILocalDurableJobManager>();
-        var outboxDict = new MockDurableDictionary<Guid, DurableEnvelope>();
-        var outbox = new DurableOutbox(outboxDict);
+        var outbox = new TestOutbox();
         var stateMachineManager = Substitute.For<IStateMachineManager>();
         var logger = NullLogger<OutboxDeliveryPump>.Instance;
         var grainId = CreateTestGrainId();

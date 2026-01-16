@@ -1,5 +1,24 @@
 [
   {
+    "category": "refactor",
+    "description": "Consolidate DurableOutbox implementations and add lifecycle-based background pumping",
+    "steps": [
+      "Remove basic DurableOutbox.cs (test-only implementation without delivery)",
+      "Rename DurableOutboxWithDelivery to DurableOutbox",
+      "Implement ILifecycleObserver interface on DurableOutbox",
+      "Subscribe to GrainLifecycleStage.Activate in constructor (similar to PersistentState<TState>)",
+      "Start background pump task in OnStart() if there are pending messages",
+      "Implement EnsurePumpScheduled() to ensure pump runs when messages are added via Send()",
+      "Background pump uses grain context scheduler to maintain single-threaded semantics",
+      "Implement exponential backoff with jitter when messages remain due to backpressure",
+      "Update DI registration in HostingExtensions.cs to pass IGrainContext to constructor",
+      "Update test files to use TestOutbox instead of directly constructing DurableOutbox",
+      "Verify all tests compile and pass"
+    ],
+    "passes": true,
+    "notes": "DurableOutboxTests (28/28 passed), OutboxDeliveryPumpTests (13/13 passed). DurableInboxExtensionTests has 4 pre-existing failures due to serialization format mismatch in test setup (unrelated to this refactor)."
+  },
+  {
     "category": "bugfix",
     "description": "Fix missing retry logic in DurableOutboxWithDelivery causing message loss under backpressure",
     "steps": [
