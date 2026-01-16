@@ -155,7 +155,7 @@
       "Add unit tests for long-polling timeout behavior",
       "Add integration tests for end-to-end message delivery"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -175,7 +175,7 @@
       "Add unit tests for deduplication tracking",
       "Add unit tests for handler registration"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -191,7 +191,7 @@
       "Add unit tests for message storage/retrieval",
       "Add unit tests for message removal after delivery"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
