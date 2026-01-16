@@ -31,7 +31,7 @@
       "Add unit tests for per-key serialization/deserialization",
       "Add unit tests for partial failure isolation (one bad value doesn't prevent accessing others)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -44,7 +44,7 @@
       "Add unit tests for serialization round-trip with CorrelationKey",
       "Add unit tests for null CorrelationKey handling"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
