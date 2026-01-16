@@ -4,41 +4,105 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Journaling.Configuration;
+using Orleans.Runtime;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Session;
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Journaling.Messaging;
 
 /// <summary>
-/// Durable outbox implementation for sending messages.
-/// Uses IDurableDictionary for persistent storage with automatic journaling.
+/// Durable outbox implementation that inherits from <see cref="DurableDictionary{K,V}"/> and provides
+/// background delivery capability.
+/// Implements <see cref="ILifecycleObserver"/> to start pumping messages when the grain activates.
 /// </summary>
 /// <remarks>
-/// This basic implementation does not include delivery capability.
-/// Use <see cref="DurableOutboxWithDelivery"/> for production use with synchronous delivery,
-/// or integrate with <see cref="OutboxDeliveryPump"/> for asynchronous delivery via DurableJobs.
+/// <para>
+/// This implementation uses a background task to pump messages from the outbox to target grains.
+/// The pumping task is started when the grain activates (via lifecycle subscription) and is
+/// also scheduled whenever messages become durable (via OnWriteCompleted callback from base class).
+/// </para>
+/// <para>
+/// IMPORTANT: Messages are only sent AFTER they have been durably persisted. This ensures that
+/// if the grain crashes after Send() but before WriteStateAsync() completes, the message won't
+/// be lost and can be recovered and resent on reactivation.
+/// </para>
+/// <para>
+/// Messages that fail due to backpressure remain in the outbox and will be retried by the
+/// background pump. This design avoids blocking the grain for extended periods, maintaining
+/// Orleans' non-blocking grain model.
+/// </para>
 /// </remarks>
-internal sealed class DurableOutbox : IDurableOutbox
+internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, IDurableOutbox, ILifecycleObserver
 {
-    private readonly IDurableDictionary<Guid, DurableEnvelope> _outbox;
+    private readonly IGrainFactory _grainFactory;
+    private readonly IGrainContext _grainContext;
+    private readonly ILogger<DurableOutbox> _logger;
+    private readonly TimeSpan _backpressureRetryDelay;
+    private readonly CancellationTokenSource _shutdownCts = new();
+
+    /// <summary>
+    /// Set of message IDs that have been added to the outbox but not yet durably persisted.
+    /// Messages in this set will be skipped by the delivery pump until they become durable.
+    /// </summary>
+    private readonly HashSet<Guid> _pendingMessageIds = [];
+
+    private Task? _pumpTask;
+    private readonly object _pumpLock = new();
+
+    /// <summary>
+    /// Counter incremented when messages become durable. The pump loop checks this
+    /// to determine if new work arrived while it was processing.
+    /// </summary>
+    private int _pumpVersion;
 
     /// <summary>
     /// Creates a new DurableOutbox instance.
     /// </summary>
-    /// <param name="outbox">Durable dictionary for storing pending outbound messages.</param>
-    public DurableOutbox(IDurableDictionary<Guid, DurableEnvelope> outbox)
+    /// <param name="key">The keyed service key for state machine registration.</param>
+    /// <param name="manager">State machine manager for durable storage.</param>
+    /// <param name="keyCodec">Codec for serializing message IDs (Guid keys).</param>
+    /// <param name="valueCodec">Codec for serializing envelope values.</param>
+    /// <param name="serializerSessionPool">Serializer session pool.</param>
+    /// <param name="grainFactory">Grain factory for accessing target grains.</param>
+    /// <param name="grainContext">The grain context for lifecycle subscription.</param>
+    /// <param name="logger">Logger for diagnostics.</param>
+    /// <param name="options">Durable inbox options containing backpressure retry delay.</param>
+    public DurableOutbox(
+        [ServiceKey] string key,
+        IStateMachineManager manager,
+        IFieldCodec<Guid> keyCodec,
+        IFieldCodec<DurableEnvelope> valueCodec,
+        SerializerSessionPool serializerSessionPool,
+        IGrainFactory grainFactory,
+        IGrainContext grainContext,
+        ILogger<DurableOutbox> logger,
+        IOptions<DurableInboxOptions> options)
+        : base(key, manager, keyCodec, valueCodec, serializerSessionPool)
     {
-        ArgumentNullException.ThrowIfNull(outbox);
-        _outbox = outbox;
-    }
+        ArgumentNullException.ThrowIfNull(grainFactory);
+        ArgumentNullException.ThrowIfNull(grainContext);
+        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(options);
 
-    /// <summary>
-    /// Number of pending outbound messages.
-    /// </summary>
-    public int Count => _outbox.Count;
+        _grainFactory = grainFactory;
+        _grainContext = grainContext;
+        _logger = logger;
+        _backpressureRetryDelay = options.Value.BackpressureRetryDelay;
+
+        // Subscribe to the grain lifecycle to start pumping on activation
+        var lifecycle = grainContext.ObservableLifecycle;
+        lifecycle.Subscribe(RuntimeTypeNameFormatter.Format(GetType()), GrainLifecycleStage.Activate, this);
+    }
 
     /// <summary>
     /// Gets all pending outbound messages (no ordering guarantee).
     /// </summary>
-    public IEnumerable<DurableEnvelope> Messages => _outbox.Values;
+    public IEnumerable<DurableEnvelope> Messages => Values;
 
     /// <summary>
     /// Enqueues a fully-built envelope for delivery (non-generic).
@@ -46,13 +110,36 @@ internal sealed class DurableOutbox : IDurableOutbox
     /// <param name="envelope">The envelope to send.</param>
     /// <remarks>
     /// The message is persisted atomically with grain state when IStateMachineManager.WriteStateAsync()
-    /// is called. The message will remain in the outbox until it is successfully delivered and removed
-    /// via RemoveMessage.
+    /// is called. The background pump will deliver the message to the target grain ONLY AFTER
+    /// the message has been durably persisted.
     /// </remarks>
     public void Send(DurableEnvelope envelope)
     {
+        // Track this message as pending (not yet durable)
+        _pendingMessageIds.Add(envelope.MessageId);
+
         // Store envelope keyed by MessageId for O(1) lookup during removal
-        _outbox[envelope.MessageId] = envelope;
+        this[envelope.MessageId] = envelope;
+
+        // NOTE: We do NOT call EnsurePumpScheduled() here. The pump will be scheduled
+        // when OnWriteCompleted is called, which happens after WriteStateAsync() completes.
+        // This ensures we only send messages that are durably persisted.
+    }
+
+    /// <summary>
+    /// Called when the outbox dictionary's pending writes have been durably persisted.
+    /// This is when we schedule the pump to deliver the now-durable messages.
+    /// </summary>
+    protected override void OnWriteCompleted()
+    {
+        // Clear the pending set - all messages in the outbox are now durable
+        _pendingMessageIds.Clear();
+
+        // Schedule the pump to deliver the durable messages
+        if (Count > 0)
+        {
+            EnsurePumpScheduled();
+        }
     }
 
     /// <summary>
@@ -61,8 +148,6 @@ internal sealed class DurableOutbox : IDurableOutbox
     /// <param name="messageId">The unique identifier of the message to remove.</param>
     /// <returns>True if the message was found and removed; otherwise, false.</returns>
     /// <remarks>
-    /// Called by the delivery pump after receiving DeliveryResult.Accepted or DeliveryResult.Duplicate
-    /// from the target inbox. The removal is persisted via IStateMachineManager.WriteStateAsync().
     /// Note: We do NOT dispose the envelope's ArcBuffer here because the envelope has been
     /// delivered to the receiver. Due to [Immutable] marking on DurableEnvelope/DurableEnvelopeData,
     /// Orleans may share the reference (especially for local calls), so the receiver still needs
@@ -70,7 +155,8 @@ internal sealed class DurableOutbox : IDurableOutbox
     /// </remarks>
     public bool RemoveMessage(Guid messageId)
     {
-        return _outbox.Remove(messageId);
+        _pendingMessageIds.Remove(messageId);
+        return Remove(messageId);
     }
 
     /// <summary>
@@ -79,28 +165,248 @@ internal sealed class DurableOutbox : IDurableOutbox
     /// <param name="messageId">The unique identifier of the message.</param>
     /// <param name="envelope">When this method returns, contains the envelope if found; otherwise, the default value.</param>
     /// <returns>True if the message was found; otherwise, false.</returns>
-    /// <remarks>
-    /// Used for diagnostics, monitoring, or manual retry operations.
-    /// </remarks>
     public bool TryGetMessage(Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope)
     {
-        return _outbox.TryGetValue(messageId, out envelope);
+        return TryGetValue(messageId, out envelope);
     }
 
     /// <summary>
-    /// This basic implementation does not support delivery.
-    /// Use <see cref="DurableOutboxWithDelivery"/> for production use with delivery capability.
+    /// Triggers delivery of all durable pending messages in the outbox (single attempt).
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A completed task.</returns>
+    /// <returns>A task representing the delivery operation.</returns>
     /// <remarks>
-    /// This method is a no-op in the basic implementation. Messages must be delivered
-    /// by an external mechanism such as the <see cref="OutboxDeliveryPump"/>.
+    /// This method makes a SINGLE attempt to deliver each durable pending message. Messages that
+    /// are still pending (not yet durably persisted) are skipped. Messages that fail due to
+    /// backpressure remain in the outbox and will be retried by the background pump.
     /// </remarks>
-    public Task DeliverPendingMessagesAsync(CancellationToken cancellationToken = default)
+    public async Task DeliverPendingMessagesAsync(CancellationToken cancellationToken = default)
     {
-        // No-op: basic implementation does not deliver
-        // Use DurableOutboxWithDelivery or OutboxDeliveryPump for actual delivery
+        if (Count == 0)
+        {
+            return;
+        }
+
+        // Snapshot pending messages and skip those not yet durable
+        var pending = Values
+            .Where(e => !_pendingMessageIds.Contains(e.MessageId))
+            .ToList();
+
+        if (pending.Count == 0)
+        {
+            _logger.LogDebug("No durable messages to deliver (all {Count} messages are still pending)", Count);
+            return;
+        }
+
+        _logger.LogDebug("Delivering {Count} durable messages from outbox", pending.Count);
+
+        var deliveredCount = 0;
+        var backpressuredCount = 0;
+        var failedCount = 0;
+
+        foreach (var envelope in pending)
+        {
+            try
+            {
+                // Get the target grain's inbox extension
+                var targetGrain = _grainFactory.GetGrain<IDurableInboxExtension>(envelope.ReceiverId);
+
+                // Deliver with no long-polling (immediate return after persistence)
+                var options = new DeliveryOptions { PollTimeout = TimeSpan.Zero };
+
+                var result = await targetGrain.DeliverAsync(envelope, options, cancellationToken).ConfigureAwait(true);
+
+                switch (result.Status)
+                {
+                    case DeliveryStatus.Accepted:
+                    case DeliveryStatus.Duplicate:
+                    case DeliveryStatus.Processed:
+                        // Success - remove from outbox
+                        RemoveMessage(envelope.MessageId);
+                        deliveredCount++;
+
+                        _logger.LogDebug(
+                            "Delivered message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}' (Status: {Status})",
+                            envelope.MessageId,
+                            envelope.SenderId,
+                            envelope.ReceiverId,
+                            envelope.RouteKey,
+                            result.Status);
+                        break;
+
+                    case DeliveryStatus.RouteNotFound:
+                        // No handler for route - log but keep in outbox for retry
+                        // (handler might be registered later)
+                        _logger.LogWarning(
+                            "Route not found for message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}': {Message}",
+                            envelope.MessageId,
+                            envelope.SenderId,
+                            envelope.ReceiverId,
+                            envelope.RouteKey,
+                            result.Message ?? "(no message)");
+                        failedCount++;
+                        break;
+
+                    case DeliveryStatus.Backpressured:
+                        // Leave in outbox - will be retried by background pump
+                        backpressuredCount++;
+                        _logger.LogDebug(
+                            "Backpressured delivering message {MessageId} to {ReceiverId}, will retry later",
+                            envelope.MessageId,
+                            envelope.ReceiverId);
+                        break;
+
+                    default:
+                        _logger.LogWarning(
+                            "Unexpected delivery status {Status} for message {MessageId}",
+                            result.Status,
+                            envelope.MessageId);
+                        failedCount++;
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                failedCount++;
+                _logger.LogError(
+                    ex,
+                    "Error delivering message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}'",
+                    envelope.MessageId,
+                    envelope.SenderId,
+                    envelope.ReceiverId,
+                    envelope.RouteKey);
+            }
+        }
+
+        _logger.LogInformation(
+            "Outbox delivery complete: {DeliveredCount} delivered, {BackpressuredCount} backpressured, {FailedCount} failed, {RemainingCount} remaining",
+            deliveredCount,
+            backpressuredCount,
+            failedCount,
+            Count);
+    }
+
+    /// <summary>
+    /// Called when the grain activates. Starts the background pump if there are pending durable messages.
+    /// </summary>
+    public Task OnStart(CancellationToken cancellationToken = default)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.CompletedTask;
+        }
+
+        // On reactivation, all messages in the outbox are durable (they were persisted before deactivation)
+        // The _pendingMessageIds set is empty since it's not persisted
+        if (Count > 0)
+        {
+            _logger.LogDebug("Grain activated with {Count} pending outbox messages, starting pump", Count);
+            EnsurePumpScheduled();
+        }
+
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Called when the grain deactivates. Stops the background pump.
+    /// </summary>
+    public Task OnStop(CancellationToken cancellationToken = default)
+    {
+        _shutdownCts.Cancel();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Ensures the background pump task is scheduled to run.
+    /// Thread-safe - can be called from multiple concurrent calls.
+    /// </summary>
+    private void EnsurePumpScheduled()
+    {
+        lock (_pumpLock)
+        {
+            // Increment version to signal new work
+            Interlocked.Increment(ref _pumpVersion);
+
+            // If no pump task is running, start one
+            if (_pumpTask is null || _pumpTask.IsCompleted)
+            {
+                _pumpTask = PumpLoopAsync(_shutdownCts.Token);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Background loop that pumps messages from the outbox.
+    /// Uses version-based coordination to avoid race conditions.
+    /// </summary>
+    private async Task PumpLoopAsync(CancellationToken cancellationToken)
+    {
+        // Yield to allow the caller to continue before we start pumping
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            // Capture current version INSIDE the lock to avoid races with EnsurePumpScheduled
+            int versionBeforePump;
+            lock (_pumpLock)
+            {
+                versionBeforePump = Volatile.Read(ref _pumpVersion);
+            }
+
+            // Check if there are any durable messages to deliver
+            var durableCount = Count - _pendingMessageIds.Count;
+            if (durableCount <= 0)
+            {
+                // Check if we should exit - must hold lock to coordinate with EnsurePumpScheduled
+                lock (_pumpLock)
+                {
+                    var currentVersion = Volatile.Read(ref _pumpVersion);
+
+                    // If version changed, new work was added - continue processing
+                    if (currentVersion != versionBeforePump)
+                    {
+                        continue;
+                    }
+
+                    // If there are still no durable messages, safe to exit
+                    durableCount = Count - _pendingMessageIds.Count;
+                    if (durableCount <= 0)
+                    {
+                        // Set _pumpTask to completed BEFORE returning to ensure
+                        // any concurrent EnsurePumpScheduled sees IsCompleted=true
+                        _pumpTask = Task.CompletedTask;
+                        return;
+                    }
+                }
+                continue;
+            }
+
+            try
+            {
+                await DeliverPendingMessagesAsync(cancellationToken).ConfigureAwait(true);
+
+                // If there are still durable messages in the outbox (due to backpressure), wait and retry
+                durableCount = Count - _pendingMessageIds.Count;
+                if (durableCount > 0)
+                {
+                    // Configurable backoff with jitter (up to 50% additional random delay)
+                    var jitterMs = (int)(_backpressureRetryDelay.TotalMilliseconds * 0.5);
+                    var delay = _backpressureRetryDelay + TimeSpan.FromMilliseconds(Random.Shared.Next(0, jitterMs));
+                    await Task.Delay(delay, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Shutdown requested, exit gracefully
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in outbox pump loop");
+
+                // Wait before retrying on error
+                await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            }
+        }
     }
 }

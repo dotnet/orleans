@@ -135,6 +135,7 @@ dotnet test --framework net8.0 --filter "Category=BVT" --blame-hang-timeout 10m 
 - Use `async`/`await` consistently - Orleans is built on async patterns
 - Forward `CancellationToken` parameters to methods that accept them
 - Use `ValueTask` correctly (don't await multiple times)
+- **CRITICAL: Never use `ConfigureAwait(false)` in grain code or grain library code** (e.g., `Orleans.Journaling`, `Orleans.DurableJobs`, etc.). Orleans grains rely on the synchronization context to maintain single-threaded execution semantics. Using `ConfigureAwait(false)` causes the continuation to run on a thread pool thread, breaking grain thread-safety guarantees and causing subtle race conditions. Use `ConfigureAwait(true)` (the default) or omit `ConfigureAwait` entirely in grain-related code.
 
 ### Modern C# Features
 
