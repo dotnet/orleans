@@ -1,7 +1,7 @@
 ---
 description: Document codebase as-is with research directory for historical context.
 agent: build
-model: anthropic/claude-opus-4-5
+model: github-copilot/claude-opus-4.5
 ---
 
 # Research Codebase

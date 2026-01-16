@@ -1,7 +1,7 @@
 ---
 description: Implement a SINGLE feature from `research/feature-list.json` based on the provided execution plan.
 agent: build
-model: anthropic/claude-sonnet-4-5
+model: github-copilot/claude-sonnet-4.5
 ---
 
 You are tasked with implementing a SINGLE feature from the `research/feature-list.json` file.

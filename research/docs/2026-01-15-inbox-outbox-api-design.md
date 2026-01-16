@@ -151,7 +151,7 @@ public class MySaga : IdempotentSaga<MySagaData>, IHandleMessages<MyMessage>
 
 3. **DurableGrain base class** (`src/Orleans.Journaling/DurableGrain.cs:34`):
    ```csharp
-   protected ValueTask WriteStateAsync(CancellationToken cancellationToken = default) 
+   protected ValueTask WriteStateAsync(CancellationToken cancellationToken = default)
        => StateMachineManager.WriteStateAsync(cancellationToken);
    ```
 
@@ -194,23 +194,23 @@ public interface IDurableInbox<TMessage> where TMessage : IInboxMessage
     /// Gets the number of unprocessed messages in the inbox.
     /// </summary>
     int Count { get; }
-    
+
     /// <summary>
     /// Attempts to dequeue the next message for processing.
     /// Returns false if inbox is empty.
     /// </summary>
     bool TryDequeue([MaybeNullWhen(false)] out TMessage message);
-    
+
     /// <summary>
     /// Peeks at the next message without removing it.
     /// </summary>
     bool TryPeek([MaybeNullWhen(false)] out TMessage message);
-    
+
     /// <summary>
     /// Checks if a message has already been processed (idempotency check).
     /// </summary>
     bool IsProcessed(Guid messageId);
-    
+
     /// <summary>
     /// Marks a message as processed. Call after successful handling.
     /// </summary>
@@ -228,7 +228,7 @@ public interface IDurableOutbox<TMessage>
     /// The message is persisted with the next WriteStateAsync() call.
     /// </summary>
     void Send(GrainId target, TMessage message);
-    
+
     /// <summary>
     /// Enqueues a message for delivery via the specified grain reference.
     /// </summary>
@@ -275,7 +275,7 @@ public class BankAccountGrain : DurableGrain, IBankAccountGrain, IDurableJobHand
     private readonly IDurableValue<decimal> _balance;
     private readonly IDurableInbox<TransferRequest> _inbox;
     private readonly IDurableOutbox<TransferCompleted> _outbox;
-    
+
     public BankAccountGrain(
         [FromKeyedServices("balance")] IDurableValue<decimal> balance,
         [FromKeyedServices("inbox")] IDurableInbox<TransferRequest> inbox,
@@ -285,7 +285,7 @@ public class BankAccountGrain : DurableGrain, IBankAccountGrain, IDurableJobHand
         _inbox = inbox;
         _outbox = outbox;
     }
-    
+
     public async Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
     {
         // Process inbox messages (triggered by DurableJob or timer)
@@ -296,23 +296,23 @@ public class BankAccountGrain : DurableGrain, IBankAccountGrain, IDurableJobHand
             {
                 continue;
             }
-            
+
             // Business logic
             var success = TryDebit(request.Amount);
-            
+
             // Send response via outbox
             _outbox.Send(
                 GrainId.Parse(request.SourceAccount),
                 new TransferCompleted(Guid.NewGuid(), context.Job.Id, success));
-            
+
             // Mark as processed
             _inbox.MarkProcessed(request.MessageId);
         }
-        
+
         // Atomic persist: balance + inbox state + outbox messages
         await WriteStateAsync(cancellationToken);
     }
-    
+
     private bool TryDebit(decimal amount)
     {
         if (_balance.Value >= amount)
@@ -339,7 +339,7 @@ public class DurableInboxAttribute : Attribute
 {
     public Type MessageType { get; }
     public string Key { get; set; } = "inbox";
-    
+
     public DurableInboxAttribute(Type messageType)
     {
         MessageType = messageType;
@@ -355,7 +355,7 @@ public class DurableOutboxAttribute : Attribute
 {
     public Type MessageType { get; }
     public string Key { get; set; } = "outbox";
-    
+
     public DurableOutboxAttribute(Type messageType)
     {
         MessageType = messageType;
@@ -398,12 +398,12 @@ public interface IMessageContext
     /// The ID of the grain that sent this message.
     /// </summary>
     GrainId SenderId { get; }
-    
+
     /// <summary>
     /// Sends a message via the outbox (persisted atomically).
     /// </summary>
     void Send<T>(GrainId target, T message);
-    
+
     /// <summary>
     /// Sends a message via the outbox to a grain reference.
     /// </summary>
@@ -414,16 +414,16 @@ public interface IMessageContext
 public class BankAccountGrain : DurableGrain, IBankAccountGrain, IDurableMessageHandler<TransferRequest>
 {
     public async ValueTask HandleAsync(
-        TransferRequest message, 
-        IMessageContext context, 
+        TransferRequest message,
+        IMessageContext context,
         CancellationToken cancellationToken)
     {
         // Idempotency handled automatically by framework
         var success = TryDebit(message.Amount);
-        
+
         // Outbox handled automatically
         context.Send(message.SourceAccountGrainId, new TransferCompleted(...));
-        
+
         // WriteStateAsync called automatically after handler completes
     }
 }
@@ -478,7 +478,7 @@ public interface IDurableInboxOptions
     /// Default: 7 days
     /// </summary>
     TimeSpan DeduplicationWindow { get; set; }
-    
+
     /// <summary>
     /// How often to clean up old processing state entries.
     /// Default: 1 hour
@@ -493,40 +493,47 @@ public interface IDurableInboxOptions
 
 ## Outbox Delivery Strategy
 
-### Background Delivery Service
+### Work-Driving Loop (DurableJobs-Driven)
+
+Per the intended architecture (see `2026-01-15-durable-tasks-journaling-architecture.md`), delivery is driven by a work-driving loop: when a grain has pending outbox (or inbox) work, a DurableJob is scheduled which runs a grain-local pump to make progress.
+
+The pump should attempt delivery immediately when it runs. If delivery fails, the message remains persisted in the outbox and is retried later using backoff.
 
 ```csharp
 /// <summary>
 /// Delivers outbox messages from grains to their destinations.
-/// Runs as a per-silo system target.
+/// This can be hosted as a per-silo driver which schedules grain-local pumps via DurableJobs.
 /// </summary>
 internal class OutboxDeliveryService : SystemTarget, ILifecycleParticipant<ISiloLifecycle>
 {
     private readonly IGrainFactory _grainFactory;
     private readonly IStateMachineStorageProvider _storage;
-    
+
     public async Task DeliverPendingMessagesAsync(CancellationToken cancellationToken)
     {
-        // Query grains with pending outbox messages
-        // For each grain:
-        //   1. Load outbox queue
-        //   2. For each message: call target grain's inbox extension
-        //   3. On success: dequeue from outbox
-        //   4. WriteStateAsync() to persist outbox changes
+        // For each grain with pending work:
+        //   1. Ensure a DurableJob is scheduled (idempotently) to run that grain's pump.
+        // The grain-local pump:
+        //   - Loads persisted inbox/outbox state via Journaling
+        //   - Attempts delivery immediately
+        //   - On success: dequeues from outbox and persists via WriteStateAsync()
+        //   - On failure: retains outbox entry, records attempt/failure state, and relies on backoff + retry
     }
 }
 ```
 
-### Grain-Local Delivery (Simpler)
+### Grain-Local Delivery (Pump)
 
-Alternatively, each grain can deliver its own outbox messages after `WriteStateAsync()`:
+The grain-local pump is the simplest conceptual model: it is invoked by DurableJobs (or equivalent scheduling) and it tries to deliver persisted outbox messages immediately when it runs.
+
+Outbox messages must not bypass persistence, even when the destination is on the same silo: enqueue to the outbox first, persist, then attempt delivery.
 
 ```csharp
 internal class DurableOutbox<TMessage> : IDurableOutbox<TMessage>, IDurableStateMachine
 {
     private readonly IDurableQueue<OutboxEntry<TMessage>> _queue;
     private readonly IGrainFactory _grainFactory;
-    
+
     public async ValueTask DeliverPendingAsync(CancellationToken cancellationToken)
     {
         while (_queue.TryPeek(out var entry))
@@ -557,16 +564,18 @@ internal class DurableOutbox<TMessage> : IDurableOutbox<TMessage>, IDurableState
 LocalDurableJobManager
     └── ScheduleJobAsync() → JobShard.TryScheduleJobAsync()
                                 └── InMemoryJobQueue.TryEnqueue()
-                                └── PersistAddJobAsync() [NO-OP in InMemoryJobShard]
+                                └── PersistAddJobAsync() [NO-OP in InMemoryJobShard; durable providers persist]
 
 ShardExecutor
     └── RunShardAsync() → shard.ConsumeDurableJobsAsync()
                             └── IDurableJobReceiverExtension.DeliverDurableJobAsync()
 ```
 
-**Problem:** `InMemoryJobShard.PersistAddJobAsync()` returns `Task.CompletedTask` - no durability.
+**Note:** `InMemoryJobShard.PersistAddJobAsync()` returns `Task.CompletedTask`, making it a non-durable/testing-oriented implementation. DurableJobs also has production-ready durable persistence implementations (for example, an Azure Blob Storage-backed provider).
 
 ### Proposed Refactoring
+
+This refactoring is about leveraging Orleans.Journaling atomicity for the inbox/outbox design and related grain-local state, not about making DurableJobs durable (DurableJobs is already designed to be durable).
 
 ```csharp
 /// <summary>
@@ -577,9 +586,9 @@ public class DurableJobShard : JobShard, IDurableStateMachine
     private readonly IDurableQueue<DurableJob> _jobQueue;
     private readonly IDurableDictionary<string, JobProcessingState> _processingState;
     private readonly IStateMachineManager _stateMachineManager;
-    
+
     protected override async Task PersistAddJobAsync(
-        string jobId, string jobName, DateTimeOffset dueTime, 
+        string jobId, string jobName, DateTimeOffset dueTime,
         GrainId target, IReadOnlyDictionary<string, string>? metadata,
         CancellationToken cancellationToken)
     {
@@ -587,12 +596,12 @@ public class DurableJobShard : JobShard, IDurableStateMachine
         // Just persist the state machines
         await _stateMachineManager.WriteStateAsync(cancellationToken);
     }
-    
+
     protected override async Task PersistRemoveJobAsync(string jobId, CancellationToken cancellationToken)
     {
         await _stateMachineManager.WriteStateAsync(cancellationToken);
     }
-    
+
     protected override async Task PersistRetryJobAsync(
         string jobId, DateTimeOffset newDueTime, CancellationToken cancellationToken)
     {
@@ -637,14 +646,14 @@ public async Task ProcessOrderAsync(Order order)
 {
     // Update grain state
     _orders.Add(order.Id, order);
-    
+
     // Schedule reminder job - stored in outbox
     _jobOutbox.Schedule(
         this.GetGrainId(),
         "check-payment-status",
         DateTimeOffset.UtcNow.AddHours(24),
         new Dictionary<string, string> { ["orderId"] = order.Id });
-    
+
     // Both persisted atomically
     await WriteStateAsync();
 }
@@ -674,7 +683,7 @@ public async Task ProcessOrderAsync(Order order)
 1. **Create `DurableJobShard` implementation** of `JobShard` using journaling
 2. **Model jobs as scheduled outbox messages**
 3. **Integrate with existing `ShardExecutor`** for delivery
-4. **Add migration path** from `InMemoryJobShard`
+4. **Add migration path** from `InMemoryJobShard` (non-durable/testing implementation)
 
 ### Phase 4: Developer Experience
 
@@ -687,26 +696,25 @@ public async Task ProcessOrderAsync(Order order)
 
 ## Open Questions
 
-1. **Outbox delivery timing:** Should delivery happen:
-   - Immediately after `WriteStateAsync()` (lower latency, more grain load)?
-   - Via background service (higher latency, less grain load)?
-   - Hybrid (immediate attempt, background retry)?
+The items below reflect current decisions/requirements for this design (leaving deeper details as open implementation choices).
 
-2. **Multi-message handlers:** Should a grain support multiple inbox message types?
-   - Single `IDurableMessageHandler<T>` per grain?
-   - Multiple handlers via interface composition?
+1. **Outbox delivery timing:** Delivery is driven by the work-driving loop. When the driver runs, it should attempt delivery immediately.
+    - If delivery cannot complete, leave the message in the persisted outbox and retry later.
+    - This aligns with the DurableTasks-on-Journaling + DurableJobs-as-driver architecture.
 
-3. **Error handling:** What happens when inbox processing fails?
-   - Dead letter queue?
-   - Retry with backoff?
-   - Alert/monitoring integration?
+2. **Multi-message support:** Grains must support multiple inbox message types.
+    - Prefer composition over inheritance: multiple `IDurableInbox<T>` and/or multiple `IDurableMessageHandler<T>` per grain (via interface composition) is a good fit.
+    - Keep the default developer surface area simple (opt-in only for what you use).
 
-4. **Cross-silo optimization:** Should outbox messages to grains on the same silo bypass persistence?
-   - Performance benefit vs. complexity tradeoff
+3. **Failure handling:** When inbox processing fails, retry with backoff.
+    - Add metrics and logging around failures and retries (including attempt counts and last-failure causes) so operators can observe unhealthy grains/messages.
+    - Dead-letter behavior can be a future extension, but backoff + visibility is the baseline.
 
-5. **Transaction boundaries:** Should inbox/outbox support opt-in "ambient transactions" spanning multiple grains?
-   - Similar to NServiceBus transaction scope support
-   - Would require distributed transaction coordination
+4. **Same-silo delivery optimization:** Outbox messages must not bypass persistence, even when the target grain is on the same silo.
+    - Prefer correctness and recovery semantics over micro-optimizations.
+
+5. **Transactions:** Do not support transactions at this time.
+    - Avoid ambient/distributed transactions spanning grains; rely on Journaling atomicity within a grain and idempotent at-least-once delivery.
 
 ---
 
@@ -722,7 +730,7 @@ public async Task ProcessOrderAsync(Order order)
 ### Orleans.DurableJobs
 - `src/Orleans.DurableJobs/IDurableJobHandler.cs:93-113` - Job handler interface
 - `src/Orleans.DurableJobs/IDurableJobReceiverExtension.cs:12-21` - Extension pattern
-- `src/Orleans.DurableJobs/InMemoryJobShard.cs:19-32` - No-op persistence hooks
+- `src/Orleans.DurableJobs/InMemoryJobShard.cs:19-32` - No-op persistence hooks (non-durable implementation)
 - `src/Orleans.DurableJobs/LocalDurableJobManager.cs:55-103` - Job scheduling
 
 ### Playground Examples

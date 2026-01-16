@@ -34,9 +34,18 @@ The Orleans codebase contains three related libraries for durable execution:
 
 2. **Orleans.DurableTasks** (built atop `System.Distributed.DurableTasks`) provides durable workflow execution with custom async/await patterns. Task state is persisted via `IDurableTaskGrainStorage`, which has both volatile and journaled implementations.
 
-3. **Orleans.DurableJobs** provides distributed job scheduling with time-based sharding. It is currently **vertically integrated** with no use of Orleans.Journaling - jobs are managed via in-memory queues and shard ownership tracking with abstract persistence hooks.
+3. **Orleans.DurableJobs** provides distributed job scheduling with time-based sharding. It is currently **vertically integrated** (not built on Orleans.Journaling): jobs are driven via in-memory execution queues with persistence behind abstract hooks. DurableJobs has a production-ready Azure Blob Storage-backed implementation and durability is a core requirement.
 
 Additionally, an **experimental `DurableChannel`** class exists (currently disabled with `#if false`) that demonstrates an inbox/outbox pattern using Orleans.Journaling primitives.
+
+### Intended Direction (Proposed)
+
+The intended direction is to make **Orleans.DurableTasks primarily a Journaling-backed system**:
+
+- DurableTasks persists its durable execution state (including **Inbox + Outbox** and any additional workflow/task bookkeeping) via **Orleans.Journaling**, so that all task-related state transitions can be committed atomically using a single `WriteStateAsync()`.
+- **Orleans.DurableJobs is used as a work-driver**, not as the source of truth for task state: the Inbox/Outbox uses DurableJobs to ensure that any grain which has pending inbox/outbox work has a scheduled **per-grain driver job**.
+   - The driver job is keyed per grain (one job can drive many tasks/work items) and is independent from the work being processed.
+   - The driver job is therefore naturally idempotent: its purpose is to keep the grain active so it can drain its persisted backlog.
 
 ## Detailed Findings
 
@@ -164,6 +173,8 @@ interface IDurableTaskGrainStorage
 - Each operation applies to in-memory state AND appends a journal entry
 - Recovery replays all entries to rebuild `_items` dictionary
 
+**Compaction/expiration**: Snapshotting/compaction is driven by the Orleans.Journaling infrastructure. During snapshot creation, the implementation can omit tasks and inbox/outbox items which have expired (for example, completed tasks older than a threshold or stale inbox/outbox entries). Expiration should be governed by a configurable policy.
+
 ---
 
 ### 3. Orleans.DurableJobs - Distributed Job Scheduling
@@ -189,13 +200,13 @@ DurableJobs is a **time-based sharded job scheduling system**:
 
 **Current state**: DurableJobs does NOT use Orleans.Journaling. State is managed through:
 
-1. **In-memory queues** (`InMemoryJobQueue`) - jobs stored in priority queue by due time
+1. **In-memory queues** (`InMemoryJobQueue`) - active jobs stored in a priority queue by due time for efficient local scheduling
 2. **Abstract persistence hooks** in `JobShard`:
    - `PersistAddJobAsync()` - called when job scheduled
    - `PersistRemoveJobAsync()` - called when job removed
    - `PersistRetryJobAsync()` - called when job rescheduled
 
-The `InMemoryJobShard` implementation returns `Task.CompletedTask` for all persistence methods - no actual durability.
+The `InMemoryJobShard` implementation returns `Task.CompletedTask` for all persistence methods, making it a non-durable/testing-oriented implementation. Production deployments use durable persistence implementations (for example, the Azure Blob Storage-backed provider).
 
 #### Job Execution Flow
 
@@ -234,6 +245,7 @@ class DurableMessageChannelGrainExtension : IGrainExtension, ILifecycleParticipa
 #### Key Patterns
 
 1. **Idempotency via Processing State**: Messages keyed by `(SenderId, MessageId)` tuple
+   - The deduplication key tuple `(GrainId, IdempotencyKey)` is considered sufficient for the intended inbox/outbox driving scenarios.
 2. **Deduplication**: Check `_processingState` before processing inbox message
 3. **Atomic Persistence**: All three collections are durable state machines - `WriteStateAsync()` persists them atomically
 
@@ -256,7 +268,7 @@ await _stateMachineManager.WriteStateAsync(cancellationToken);
 
 ## Architecture Documentation
 
-### Current Layering
+### Current Layering (As Implemented Today)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -281,6 +293,32 @@ await _stateMachineManager.WriteStateAsync(cancellationToken);
 └─────────────────────────────────────────────────────────────┘
 ```
 
+### Intended Layering (Inbox/Outbox Driven by DurableJobs)
+
+The intended layering is to treat **Journaling as the durable source of truth** for task execution state (including inbox/outbox), and treat **DurableJobs as a scheduler/driver** which ensures pending work is processed.
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                                User Grains                               │
+│        (define workflows via DurableTask<T>, send/await durable work)     │
+├──────────────────────────────────────────────────────────────────────────┤
+│                           Orleans.DurableTasks                            │
+│   (runtime + execution state machines: inbox/outbox + task/workflow state)│
+├──────────────────────────────────────────────────────────────────────────┤
+│                           Orleans.Journaling                              │
+│   (IStateMachineManager atomically persists all task state machines)      │
+├──────────────────────────────────────────────────────────────────────────┤
+│                           Work-Driving Layer                              │
+│                        Orleans.DurableJobs (driver)                       │
+│   Ensures: if inbox/outbox has pending work => a job is scheduled to run  │
+│   a grain-local "pump" which drains inbox/outbox and advances execution.  │
+├──────────────────────────────────────────────────────────────────────────┤
+│                           IStateMachineStorage                             │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+In this model, job scheduling is a mechanism for **liveness** (the system keeps making progress), while Journaling is the mechanism for **durability and atomicity** (state transitions are committed consistently).
+
 ### Key Insight: Atomicity Pattern
 
 The core value proposition of Orleans.Journaling is:
@@ -292,12 +330,23 @@ This enables patterns like:
 - No distributed transactions needed
 - Replay from log provides recovery
 
-### DurableJobs Integration Gap
+### DurableJobs Role in the Proposed Design
 
-`Orleans.DurableJobs` currently does NOT leverage this atomicity:
-- Uses abstract `PersistXxxAsync()` hooks instead of `IDurableStateMachine`
-- Job queue state is in-memory only with `InMemoryJobShard`
-- No atomic relationship between job state and grain state
+Today, `Orleans.DurableJobs` does not leverage Journaling atomicity (it uses abstract persistence hooks and currently has in-memory implementations). In the proposed layering, DurableJobs does not need to participate in the atomic task state transition itself.
+
+Instead, DurableJobs provides a cluster-level mechanism to ensure:
+
+- **Pending-work implies scheduled-work**: when a grain's Journaling-backed inbox/outbox transitions from empty to non-empty (or otherwise has pending work), schedule a DurableJob to drive processing.
+- **Per-grain driver jobs**: a single driver job per grain (keyed by grain identity) can drive many workflows/tasks/work items.
+- **Idempotent driving**: scheduling can be at-least-once; the driver job is independent from work processing and exists to keep the grain activated while work remains. The grain-local pump uses Journaling-backed deduplication/processing-state to avoid double-processing.
+- **Progress after failures/restarts**: if a silo crashes or the grain deactivates, the job system re-drives execution based on persisted inbox/outbox state.
+- **Recovery behavior**: when a grain activates/recovers, inbox/outbox processing resumes immediately in the background.
+
+### Outbox Results for Callers Without Return Address
+
+When callers schedule work via the inbox but do not have a stable return address (or do not want to register an observer), they can poll for results from the outbox. DurableTasks already uses this pattern for scheduled work; the same approach should be extended to the inbox/outbox design (with appropriate expiration policies for outbox results).
+
+This keeps the atomicity boundary inside Journaling (single-grain state machines), while leveraging DurableJobs for liveness.
 
 ---
 
@@ -329,11 +378,13 @@ This enables patterns like:
 
 ## Observations for Refactoring
 
-### What DurableJobs Needs from Journaling
+### Implication of the Proposed Layering
 
-1. **Atomic job state updates**: Creating, completing, or retrying a job should be atomic with any grain state changes
-2. **Inbox abstraction**: Jobs delivered to grains are conceptually inbox messages
-3. **Outbox abstraction**: Scheduling new jobs (e.g., retries, child jobs) is conceptually outbox messages
+If DurableTasks is Journaling-backed for inbox/outbox and related task state, then the key integration point is:
+
+1. **Journaling-backed state as the source of truth**: inbox/outbox/task state transitions are committed atomically via `IStateMachineManager.WriteStateAsync()`.
+2. **DurableJobs as a liveness driver**: job scheduling ensures that persisted pending work is observed and processed without relying on external triggers.
+3. **Derived scheduling**: the presence of a scheduled job becomes a derived property of persisted state (“there exists pending work”), rather than the authoritative representation of that state.
 
 ### Existing Primitives That Could Be Reused
 
@@ -353,17 +404,10 @@ This could be generalized into an `IInbox<T>` / `IOutbox<T>` abstraction that:
 - Uses `DurableQueue<T>` internally
 - Tracks processing state for exactly-once semantics
 - Integrates with grain lifecycle for automatic recovery
+- Can be paired with a DurableJobs-driven pump so that “pending messages” implies “scheduled work”
 
 ---
 
 ## Open Questions
 
-1. **Shard persistence**: How should shard ownership and metadata be persisted? Currently only in-memory/static dictionary.
-
-2. **Cross-grain atomicity**: DurableJobs spans multiple grains (manager, executors). How to maintain consistency across shard handoffs?
-
-3. **Deduplication scope**: `DurableChannel` uses `(GrainId, IdempotencyKey)` for deduplication. Is this sufficient for all job scenarios?
-
-4. **Compaction strategy**: What triggers snapshot vs. incremental append for job-related state machines?
-
-5. **Recovery ordering**: When a grain recovers, should inbox processing resume before or after completing in-flight jobs?
+1. **Pending-work scheduling contract**: With a per-grain driver job, what is the durable invariant between “inbox/outbox has pending work” and “a driver job exists to keep the grain active”, and how is it enforced (and throttled) idempotently?

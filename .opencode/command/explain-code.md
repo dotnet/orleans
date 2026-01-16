@@ -1,7 +1,7 @@
 ---
 description: Explain code functionality in detail.
 agent: build
-model: anthropic/claude-sonnet-4-5
+model: github-copilot/claude-sonnet-4.5
 ---
 
 # Analyze and explain code functionality

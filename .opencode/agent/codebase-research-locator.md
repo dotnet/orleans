@@ -1,7 +1,7 @@
 ---
 description: Discovers relevant documents in research/ directory (We use this for all sorts of metadata storage!). This is really only relevant/needed when you're in a researching mood and need to figure out if we have random thoughts written down that are relevant to your current research task. Based on the name, I imagine you can guess this is the `research` equivalent of `codebase-locator`
 mode: subagent
-model: anthropic/claude-sonnet-4-5
+model: github-copilot/claude-sonnet-4.5
 tools:
   write: true
   edit: true

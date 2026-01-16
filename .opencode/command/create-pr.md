@@ -1,7 +1,7 @@
 ---
 description: Create a new branch, commit changes, and submit a pull request.
 agent: build
-model: anthropic/claude-sonnet-4-5
+model: github-copilot/claude-sonnet-4.5
 ---
 
 # Create Pull Request Command
