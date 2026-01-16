@@ -26,7 +26,7 @@
     <PackageVersion Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.13.12" />
     <PackageVersion Include="BenchmarkDotNet" Version="0.13.12" />
     <PackageVersion Include="CassandraCSharpDriver" Version="3.22.0" />
-    <PackageVersion Include="Consul" Version="1.7.14.10" />
+    <PackageVersion Include="Consul" Version="1.7.14.2" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="coverlet.msbuild" Version="8.0.0" />
     <PackageVersion Include="CsCheck" Version="4.5.0" />
