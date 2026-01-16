@@ -1211,9 +1211,9 @@ The spec has been updated with the following design changes that are **not yet r
 
 | Spec Change | Description | Implementation Status |
 |-------------|-------------|----------------------|
-| `CorrelationKey` | Hierarchical UTF-8 string (like DurableTask's `TaskId`) replaces `Guid CorrelationId` | **Not implemented** - files still use `Guid? CorrelationId` |
-| `DurableEnvelopeData` keyed context | MigrationContext-style `Dictionary<string, (int, int)>` indices for per-key context access | **Not implemented** - files still use `Dictionary<string, object?>` |
-| `DurableEnvelopeBuilder` | New builder with `WithCorrelationKey()`, `WithContextValue<T>()`, implements `IBufferWriter<byte>` | **Not implemented** - files still have `OutgoingEnvelopeBuilder` with old design |
+| `CorrelationKey` | Hierarchical UTF-8 string (like DurableTask's `TaskId`) replaces `Guid CorrelationId` | **✅ Implemented** - CorrelationKey.cs created with full hierarchy support |
+| `DurableEnvelopeData` keyed context | MigrationContext-style `Dictionary<string, (int, int)>` indices for per-key context access | **✅ Implemented** - keyed context indices with per-key deserialization |
+| `DurableEnvelopeBuilder` | New builder with `WithCorrelationKey()`, `WithContextValue<T>()`, implements `IBufferWriter<byte>` | **✅ Implemented** - DurableEnvelopeBuilder.cs created, OutgoingEnvelopeBuilder superseded |
 | `IInboxHandlerContext` | Builder pattern with `CreateEnvelope()` + non-generic `Send()` | **Not implemented** - files still have generic `Send<TBody>()` and `Reply<TBody>()` |
 | `IDurableOutbox` | Non-generic `Send(DurableEnvelope)` | **Not implemented** - files still have generic `Send<TBody>(...)` |
 
@@ -1226,27 +1226,27 @@ The following core types exist in `src/Orleans.Journaling/Messaging/` but need u
 | `DeliveryStatus.cs` | `DeliveryStatus` enum | **Up to date** | Accepted, Duplicate, Backpressured, RouteNotFound, Pending, Processed |
 | `DeliveryResult.cs` | `DeliveryResult` struct | **Up to date** | Status, Response, Message + factory methods |
 | `DeliveryOptions.cs` | `DeliveryOptions` struct | **Up to date** | PollTimeout, Observer for long-polling |
-| `DurableEnvelopeData.cs` | `DurableEnvelopeData` class | **Needs update** | Change to keyed context indices (MigrationContext pattern) |
-| `DurableEnvelope.cs` | `DurableEnvelope` struct | **Needs update** | Change `Guid? CorrelationId` to `CorrelationKey? CorrelationKey` |
+| `DurableEnvelopeData.cs` | `DurableEnvelopeData` class | **✅ Up to date** | Keyed context indices (MigrationContext pattern) implemented |
+| `DurableEnvelope.cs` | `DurableEnvelope` struct | **✅ Up to date** | Uses `CorrelationKey? CorrelationKey` for hierarchical correlation |
 | `IDurableInboxExtension.cs` | `IDurableInboxExtension` | **Up to date** | `DeliverAsync()` with `[AlwaysInterleave]` |
 | `IDurableInboxExtension.cs` | `IDurableInboxObserver` | **Needs update** | Change `Guid correlationId` to `CorrelationKey correlationKey` |
 | `IInboxHandler.cs` | `IInboxHandler` | **Up to date** | Base handler interface |
 | `IInboxHandler.cs` | `IInboxHandler<TMessage>` | **Up to date** | Typed handler with default implementation |
 | `IInboxHandlerContext.cs` | `IInboxHandlerContext` | **Needs update** | Change to builder pattern (`CreateEnvelope()` + non-generic `Send()`) |
-| `OutgoingEnvelopeBuilder.cs` | `OutgoingEnvelopeBuilder` | **Replace** | Replace with `DurableEnvelopeBuilder` |
+| `DurableEnvelopeBuilder.cs` | `DurableEnvelopeBuilder` | **✅ Implemented** | Fluent builder with `WithCorrelationKey()`, `WithContextValue<T>()`, `IBufferWriter<byte>` |
 | `IDurableInbox.cs` | `IDurableInbox` | **Up to date** | Inbox interface with handler registration |
 | `IDurableOutbox.cs` | `IDurableOutbox` | **Needs update** | Change to non-generic `Send(DurableEnvelope)` |
-| (new) | `CorrelationKey` | **Not created** | New type modeled after `HierarchicalKey` |
+| `CorrelationKey.cs` | `CorrelationKey` | **✅ Implemented** | Hierarchical UTF-8 string type modeled after `HierarchicalKey` |
 | `DurableChannel.cs` | (legacy) | **Disabled** | Old prototype; superseded by new design |
 
 ### 9.3 Remaining Implementation Work
 
 | Component | Priority | Status | Notes |
 |-----------|----------|--------|-------|
-| `CorrelationKey` | High | **Not Started** | New type modeled after `HierarchicalKey` |
-| Update `DurableEnvelope` | High | **Not Started** | Change `CorrelationId` to `CorrelationKey` |
-| Update `DurableEnvelopeData` | High | **Not Started** | Change to keyed context indices (MigrationContext pattern) |
-| Create `DurableEnvelopeBuilder` | High | **Not Started** | Replace `OutgoingEnvelopeBuilder` with new builder |
+| `CorrelationKey` | High | **✅ Completed** | Hierarchical UTF-8 string type with parent/child relationships |
+| Update `DurableEnvelope` | High | **✅ Completed** | Uses `CorrelationKey? CorrelationKey` for hierarchical correlation |
+| Update `DurableEnvelopeData` | High | **✅ Completed** | Keyed context indices (MigrationContext pattern) with per-key access |
+| Create `DurableEnvelopeBuilder` | High | **✅ Completed** | Fluent builder replacing OutgoingEnvelopeBuilder |
 | Update `IInboxHandlerContext` | High | **Not Started** | Change to builder pattern |
 | Update `IDurableOutbox` | High | **Not Started** | Change to non-generic `Send()` |
 | Update `IDurableInboxObserver` | Medium | **Not Started** | Change to `CorrelationKey` parameter |
@@ -1295,12 +1295,13 @@ The following core types exist in `src/Orleans.Journaling/Messaging/` but need u
 - `src/Orleans.Journaling/Messaging/DeliveryStatus.cs` - Delivery status enum
 - `src/Orleans.Journaling/Messaging/DeliveryResult.cs` - Delivery result struct with factory methods
 - `src/Orleans.Journaling/Messaging/DeliveryOptions.cs` - Long-polling options struct
+- `src/Orleans.Journaling/Messaging/CorrelationKey.cs` - Hierarchical UTF-8 string type for message correlation
 - `src/Orleans.Journaling/Messaging/DurableEnvelopeData.cs` - Opaque ArcBuffer storage with deferred deserialization
 - `src/Orleans.Journaling/Messaging/DurableEnvelope.cs` - Envelope struct
+- `src/Orleans.Journaling/Messaging/DurableEnvelopeBuilder.cs` - Fluent builder for creating envelopes
 - `src/Orleans.Journaling/Messaging/IDurableInboxExtension.cs` - Extension interfaces
 - `src/Orleans.Journaling/Messaging/IInboxHandler.cs` - Handler interfaces
 - `src/Orleans.Journaling/Messaging/IInboxHandlerContext.cs` - Handler context interface
-- `src/Orleans.Journaling/Messaging/OutgoingEnvelopeBuilder.cs` - Builder for outgoing envelopes
 - `src/Orleans.Journaling/Messaging/IDurableInbox.cs` - Inbox interface
 - `src/Orleans.Journaling/Messaging/IDurableOutbox.cs` - Outbox interface
 - `src/Orleans.Journaling/Messaging/DurableChannel.cs` - Legacy prototype (disabled with `#if false`)
