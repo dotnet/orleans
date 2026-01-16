@@ -419,7 +419,7 @@
       "Test deduplication across grain reactivation",
       "Test processed message tracking persistence"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
