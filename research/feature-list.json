@@ -558,7 +558,8 @@
       "Add correlation context propagation",
       "Test log output in various scenarios"
     ],
-    "passes": false
+    "passes": true,
+    "notes": "Implemented structured logging using LoggerMessage source generator for DurableInboxExtension and DurableOutbox. All log messages include CorrelationKey for distributed tracing. Logs cover: message delivery (accepted/duplicate/backpressured/route_not_found), processing (success/error), handler registration, deserialization errors, and outbox delivery (success/backpressured/route_not_found/error). All 351 tests passing."
   },
   {
     "category": "functional",

@@ -38,7 +38,7 @@ namespace Orleans.Journaling.Messaging;
 /// Orleans' non-blocking grain model.
 /// </para>
 /// </remarks>
-internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, IDurableOutbox, ILifecycleObserver
+internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, IDurableOutbox, ILifecycleObserver
 {
     private readonly IGrainFactory _grainFactory;
     private readonly IGrainContext _grainContext;
@@ -202,11 +202,11 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
 
         if (pending.Count == 0)
         {
-            _logger.LogDebug("No durable messages to deliver (all {Count} messages are still pending)", Count);
+            LogNoDurableMessages(_logger, Count);
             return;
         }
 
-        _logger.LogDebug("Delivering {Count} durable messages from outbox", pending.Count);
+        LogDeliveringMessages(_logger, pending.Count);
 
         var grainTypeName = _grainContext.GrainId.Type.ToString();
         var deliveredCount = 0;
@@ -237,13 +237,14 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
                         RemoveMessage(envelope.MessageId);
                         deliveredCount++;
 
-                        _logger.LogDebug(
-                            "Delivered message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}' (Status: {Status})",
+                        LogMessageDelivered(
+                            _logger,
                             envelope.MessageId,
                             envelope.SenderId,
                             envelope.ReceiverId,
                             envelope.RouteKey,
-                            result.Status);
+                            result.Status,
+                            envelope.CorrelationKey?.ToString());
 
                         // Record successful delivery metrics
                         var statusLabel = result.Status.ToString().ToLowerInvariant();
@@ -254,12 +255,13 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
                     case DeliveryStatus.RouteNotFound:
                         // No handler for route - log but keep in outbox for retry
                         // (handler might be registered later)
-                        _logger.LogWarning(
-                            "Route not found for message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}': {Message}",
+                        LogDeliveryRouteNotFound(
+                            _logger,
                             envelope.MessageId,
                             envelope.SenderId,
                             envelope.ReceiverId,
                             envelope.RouteKey,
+                            envelope.CorrelationKey?.ToString(),
                             result.Message ?? "(no message)");
                         failedCount++;
 
@@ -271,10 +273,12 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
                     case DeliveryStatus.Backpressured:
                         // Leave in outbox - will be retried by background pump
                         backpressuredCount++;
-                        _logger.LogDebug(
-                            "Backpressured delivering message {MessageId} to {ReceiverId}, will retry later",
+                        LogDeliveryBackpressured(
+                            _logger,
                             envelope.MessageId,
-                            envelope.ReceiverId);
+                            envelope.ReceiverId,
+                            envelope.RouteKey,
+                            envelope.CorrelationKey?.ToString());
 
                         // Record metric
                         JournalingInstruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "backpressured");
@@ -282,10 +286,12 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
                         break;
 
                     default:
-                        _logger.LogWarning(
-                            "Unexpected delivery status {Status} for message {MessageId}",
+                        LogUnexpectedDeliveryStatus(
+                            _logger,
                             result.Status,
-                            envelope.MessageId);
+                            envelope.MessageId,
+                            envelope.RouteKey,
+                            envelope.CorrelationKey?.ToString());
                         failedCount++;
                         break;
                 }
@@ -294,13 +300,14 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
             {
                 stopwatch.Stop();
                 failedCount++;
-                _logger.LogError(
+                LogDeliveryError(
+                    _logger,
                     ex,
-                    "Error delivering message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}'",
                     envelope.MessageId,
                     envelope.SenderId,
                     envelope.ReceiverId,
-                    envelope.RouteKey);
+                    envelope.RouteKey,
+                    envelope.CorrelationKey?.ToString());
 
                 // Record error metric
                 JournalingInstruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "error");
@@ -308,12 +315,7 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
             }
         }
 
-        _logger.LogInformation(
-            "Outbox delivery complete: {DeliveredCount} delivered, {BackpressuredCount} backpressured, {FailedCount} failed, {RemainingCount} remaining",
-            deliveredCount,
-            backpressuredCount,
-            failedCount,
-            Count);
+        LogDeliveryComplete(_logger, deliveredCount, backpressuredCount, failedCount, Count);
     }
 
     /// <summary>
@@ -330,7 +332,7 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
         // The _pendingMessageIds set is empty since it's not persisted
         if (Count > 0)
         {
-            _logger.LogDebug("Grain activated with {Count} pending outbox messages, starting pump", Count);
+            LogPumpStartingOnActivation(_logger, Count);
             EnsurePumpScheduled();
         }
 
@@ -432,11 +434,63 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in outbox pump loop");
+                LogPumpLoopError(_logger, ex);
 
                 // Wait before retrying on error
                 await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
             }
         }
     }
+
+    // Structured logging using LoggerMessage source generator
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "No durable messages to deliver (all {Count} messages are still pending)")]
+    private static partial void LogNoDurableMessages(ILogger logger, int count);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Delivering {Count} durable messages from outbox")]
+    private static partial void LogDeliveringMessages(ILogger logger, int count);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Delivered message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}' (Status: {Status}, CorrelationKey: {CorrelationKey})")]
+    private static partial void LogMessageDelivered(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId, string routeKey, DeliveryStatus status, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Route not found for message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey}): {Message}")]
+    private static partial void LogDeliveryRouteNotFound(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId, string routeKey, string? correlationKey, string? message);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Backpressured delivering message {MessageId} to {ReceiverId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey}), will retry later")]
+    private static partial void LogDeliveryBackpressured(ILogger logger, Guid messageId, GrainId receiverId, string routeKey, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Unexpected delivery status {Status} for message {MessageId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
+    private static partial void LogUnexpectedDeliveryStatus(ILogger logger, DeliveryStatus status, Guid messageId, string routeKey, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error delivering message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
+    private static partial void LogDeliveryError(ILogger logger, Exception exception, Guid messageId, GrainId senderId, GrainId receiverId, string routeKey, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Outbox delivery complete: {DeliveredCount} delivered, {BackpressuredCount} backpressured, {FailedCount} failed, {RemainingCount} remaining")]
+    private static partial void LogDeliveryComplete(ILogger logger, int deliveredCount, int backpressuredCount, int failedCount, int remainingCount);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Grain activated with {Count} pending outbox messages, starting pump")]
+    private static partial void LogPumpStartingOnActivation(ILogger logger, int count);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error in outbox pump loop")]
+    private static partial void LogPumpLoopError(ILogger logger, Exception exception);
 }
