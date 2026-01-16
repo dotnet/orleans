@@ -62,26 +62,33 @@ public class DurableInboxOptions
 
     /// <summary>
     /// Gets or sets the maximum number of inbox messages to process concurrently.
-    /// This controls parallelism for handler invocation within a single grain.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// A value of 1 enforces sequential processing, which simplifies handler logic but may
-    /// reduce throughput. Higher values (e.g., 4-8) allow concurrent handler execution,
-    /// improving throughput for I/O-bound handlers.
+    /// <strong>DEPRECATED:</strong> This property is obsolete and no longer affects processing behavior.
+    /// Orleans grains process messages sequentially to maintain the single-threaded grain model.
     /// </para>
     /// <para>
-    /// Note: Handlers must be thread-safe if <c>ProcessingConcurrency &gt; 1</c>. Handler exceptions
-    /// are caught and logged individually, so one failing handler does not block others.
+    /// Concurrent processing violates Orleans' fundamental grain semantics, which guarantee that:
+    /// <list type="bullet">
+    /// <item>Grains handle one request at a time (automatic synchronization)</item>
+    /// <item>State modifications are serialized (no race conditions)</item>
+    /// <item>Handlers see consistent state (predictable execution order)</item>
+    /// </list>
     /// </para>
     /// <para>
-    /// Concurrency affects only handler invocation. Message delivery and persistence are
-    /// always serialized to maintain ordering guarantees during state machine transitions.
+    /// For high-throughput scenarios, scale horizontally by:
+    /// <list type="bullet">
+    /// <item>Partitioning work across multiple grain instances</item>
+    /// <item>Using grain keys to distribute load (e.g., account-123, account-456)</item>
+    /// <item>Avoiding sequential dependencies between messages when possible</item>
+    /// </list>
     /// </para>
     /// </remarks>
     /// <value>
-    /// The maximum concurrent handler invocations. Must be greater than zero. Defaults to 1 (sequential processing).
+    /// This value is ignored. Messages are always processed sequentially. Defaults to 1.
     /// </value>
+    [Obsolete("Concurrent message processing violates Orleans' single-threaded grain model. This property is ignored; messages are always processed sequentially.")]
     public int ProcessingConcurrency { get; set; } = 1;
 
     /// <summary>
@@ -133,7 +140,6 @@ public class DurableInboxOptions
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown if <see cref="MaxCapacity"/> is less than or equal to zero,
-    /// or if <see cref="ProcessingConcurrency"/> is less than or equal to zero,
     /// or if <see cref="DeduplicationWindow"/> is less than or equal to <see cref="TimeSpan.Zero"/>,
     /// or if <see cref="DefaultPollTimeout"/> is less than or equal to <see cref="TimeSpan.Zero"/>.
     /// </exception>
@@ -151,11 +157,6 @@ public class DurableInboxOptions
         if (DeduplicationWindow <= TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(nameof(DeduplicationWindow), DeduplicationWindow, "DeduplicationWindow must be greater than TimeSpan.Zero.");
-        }
-
-        if (ProcessingConcurrency <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(ProcessingConcurrency), ProcessingConcurrency, "ProcessingConcurrency must be greater than zero.");
         }
 
         if (DefaultPollTimeout <= TimeSpan.Zero)

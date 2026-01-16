@@ -1,6 +1,21 @@
 [
   {
     "category": "bugfix",
+    "description": "Fix DurableInboxExtension concurrent handler execution violating single-threaded grain model",
+    "steps": [
+      "Read DurableInboxExtension.ProcessPendingMessagesAsync() method (lines 315-338)",
+      "Replace Parallel.ForEachAsync with sequential foreach loop",
+      "Remove parallelOptions with MaxDegreeOfParallelism configuration",
+      "Process messages sequentially to respect Orleans single-threaded grain model",
+      "Consider deprecating or removing ProcessingConcurrency from DurableInboxOptions",
+      "Add documentation explaining why concurrent processing violates grain semantics",
+      "Run all HighThroughputBackpressureTests to verify fix",
+      "Verify all 7 tests pass on both net10.0 and net8.0"
+    ],
+    "passes": true
+  },
+  {
+    "category": "bugfix",
     "description": "Fix InboxProcessingPumpTests failing due to null sessionPool parameter",
     "steps": [
       "Read InboxProcessingPumpTests.cs to understand test structure",

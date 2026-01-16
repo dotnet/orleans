@@ -19,7 +19,6 @@ public class DurableInboxOptionsTests
         // Assert
         Assert.Equal(1000, options.MaxCapacity);
         Assert.Equal(TimeSpan.FromDays(7), options.DeduplicationWindow);
-        Assert.Equal(1, options.ProcessingConcurrency);
         Assert.True(options.EnableLongPolling);
         Assert.Equal(TimeSpan.FromSeconds(30), options.DefaultPollTimeout);
     }
@@ -51,18 +50,7 @@ public class DurableInboxOptionsTests
         Assert.Equal(window, options.DeduplicationWindow);
     }
 
-    [Fact]
-    public void ProcessingConcurrency_CanBeSet()
-    {
-        // Arrange
-        var options = new DurableInboxOptions();
 
-        // Act
-        options.ProcessingConcurrency = 8;
-
-        // Assert
-        Assert.Equal(8, options.ProcessingConcurrency);
-    }
 
     [Fact]
     public void EnableLongPolling_CanBeSet()
@@ -109,7 +97,6 @@ public class DurableInboxOptionsTests
         {
             MaxCapacity = 5000,
             DeduplicationWindow = TimeSpan.FromDays(30),
-            ProcessingConcurrency = 4,
             EnableLongPolling = false,
             DefaultPollTimeout = TimeSpan.FromMinutes(5)
         };
@@ -178,35 +165,7 @@ public class DurableInboxOptionsTests
         Assert.Contains("must be greater than TimeSpan.Zero", ex.Message);
     }
 
-    [Fact]
-    public void Validate_WithZeroProcessingConcurrency_ThrowsArgumentOutOfRangeException()
-    {
-        // Arrange
-        var options = new DurableInboxOptions
-        {
-            ProcessingConcurrency = 0
-        };
 
-        // Act & Assert
-        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => options.Validate());
-        Assert.Equal("ProcessingConcurrency", ex.ParamName);
-        Assert.Contains("must be greater than zero", ex.Message);
-    }
-
-    [Fact]
-    public void Validate_WithNegativeProcessingConcurrency_ThrowsArgumentOutOfRangeException()
-    {
-        // Arrange
-        var options = new DurableInboxOptions
-        {
-            ProcessingConcurrency = -1
-        };
-
-        // Act & Assert
-        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => options.Validate());
-        Assert.Equal("ProcessingConcurrency", ex.ParamName);
-        Assert.Contains("must be greater than zero", ex.Message);
-    }
 
     [Fact]
     public void Validate_WithZeroDefaultPollTimeout_ThrowsArgumentOutOfRangeException()
@@ -246,7 +205,6 @@ public class DurableInboxOptionsTests
         {
             MaxCapacity = 1,
             DeduplicationWindow = TimeSpan.FromTicks(1),
-            ProcessingConcurrency = 1,
             DefaultPollTimeout = TimeSpan.FromTicks(1)
         };
 
@@ -262,7 +220,6 @@ public class DurableInboxOptionsTests
         {
             MaxCapacity = int.MaxValue,
             DeduplicationWindow = TimeSpan.FromDays(365),
-            ProcessingConcurrency = 1000,
             DefaultPollTimeout = TimeSpan.FromHours(24)
         };
 
@@ -291,27 +248,7 @@ public class DurableInboxOptionsTests
         Assert.Equal(TimeSpan.FromDays(deduplicationDays), options.DeduplicationWindow);
     }
 
-    [Theory]
-    [InlineData(1, true)]
-    [InlineData(4, true)]
-    [InlineData(8, false)]
-    [InlineData(16, false)]
-    public void ProcessingConcurrency_WithVariousValues_WorksCorrectly(int concurrency, bool enableLongPolling)
-    {
-        // Arrange
-        var options = new DurableInboxOptions
-        {
-            ProcessingConcurrency = concurrency,
-            EnableLongPolling = enableLongPolling
-        };
 
-        // Act
-        options.Validate();
-
-        // Assert
-        Assert.Equal(concurrency, options.ProcessingConcurrency);
-        Assert.Equal(enableLongPolling, options.EnableLongPolling);
-    }
 
     [Theory]
     [InlineData(5)]

@@ -212,7 +212,6 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
                 {
                     opts.MaxCapacity = 100;
                     opts.DeduplicationWindow = TimeSpan.FromDays(7);
-                    opts.ProcessingConcurrency = 4;
                     opts.EnableLongPolling = false;
                 });
             });

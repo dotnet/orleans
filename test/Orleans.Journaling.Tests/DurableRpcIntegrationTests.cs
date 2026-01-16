@@ -226,7 +226,6 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
                 {
                     opts.MaxCapacity = 100;
                     opts.DeduplicationWindow = TimeSpan.FromDays(7);
-                    opts.ProcessingConcurrency = 4;
                     opts.EnableLongPolling = true;
                     opts.DefaultPollTimeout = TimeSpan.FromSeconds(30);
                 });

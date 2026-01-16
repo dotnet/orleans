@@ -53,14 +53,23 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
 
         inbox ??= new Dictionary<(GrainId, Guid), DurableEnvelope>();
         processed ??= new Dictionary<(GrainId, Guid), DateTimeOffset>();
+        
+        // Create a test DurableInbox for handler registration
+        var durableInbox = new TestDurableInbox();
+        
+        // Create a test outbox backed by a simple dictionary
+        var outboxDict = new TestDurableDictionary<Guid, DurableEnvelope>();
+        var outbox = new DurableOutbox(outboxDict);
 
         return new DurableInboxExtension(
             grainContext,
             stateMachineManager,
             sessionPool,
             logger,
+            durableInbox,
             inbox,
             processed,
+            outbox,
             maxCapacity);
     }
 
@@ -405,17 +414,21 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         var logger = NullLogger<DurableInboxExtension>.Instance;
         var inbox = new Dictionary<(GrainId, Guid), DurableEnvelope>();
         var processed = new Dictionary<(GrainId, Guid), DateTimeOffset>();
+        var durableInbox = new TestDurableInbox();
+        var outboxDict = new TestDurableDictionary<Guid, DurableEnvelope>();
+        var outbox = new DurableOutbox(outboxDict);
 
         var extension = new DurableInboxExtension(
             grainContext,
             stateMachineManager,
             sessionPool,
             logger,
+            durableInbox,
             inbox,
             processed,
+            outbox,
             maxCapacity: 1000,
-            deduplicationWindow: TimeSpan.FromDays(7),
-            processingConcurrency: 4);
+            deduplicationWindow: TimeSpan.FromDays(7));
 
         var handler = new CountingMessageHandler();
         extension.RegisterHandler("test.route", handler);
@@ -452,17 +465,21 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         var logger = NullLogger<DurableInboxExtension>.Instance;
         var inbox = new Dictionary<(GrainId, Guid), DurableEnvelope>();
         var processed = new Dictionary<(GrainId, Guid), DateTimeOffset>();
+        var durableInbox = new TestDurableInbox();
+        var outboxDict = new TestDurableDictionary<Guid, DurableEnvelope>();
+        var outbox = new DurableOutbox(outboxDict);
 
         var extension = new DurableInboxExtension(
             grainContext,
             stateMachineManager,
             sessionPool,
             logger,
+            durableInbox,
             inbox,
             processed,
+            outbox,
             maxCapacity: 1000,
-            deduplicationWindow: TimeSpan.FromDays(7),
-            processingConcurrency: 4);
+            deduplicationWindow: TimeSpan.FromDays(7));
 
         // Register handlers: one throws, one succeeds
         var throwingHandler = new ThrowingMessageHandler();
@@ -614,5 +631,56 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         {
             return operation();
         }
+    }
+
+    // Test IDurableInbox implementation for handler registration
+    private class TestDurableInbox : IDurableInbox
+    {
+        private readonly Dictionary<string, IInboxHandler> _handlers = new();
+
+        public int Count => 0;
+        public int Capacity => 1000;
+        public IEnumerable<DurableEnvelope> Messages => Array.Empty<DurableEnvelope>();
+
+        public bool ContainsOrProcessed(GrainId senderId, Guid messageId) => false;
+        public bool HasHandler(string routeKey) => _handlers.ContainsKey(routeKey);
+        public void MarkProcessed(GrainId senderId, Guid messageId) { }
+        public void RegisterHandler(string routeKey, IInboxHandler handler) => _handlers[routeKey] = handler;
+        public bool RemoveMessage(GrainId senderId, Guid messageId) => false;
+        public bool TryGetHandler(string routeKey, [MaybeNullWhen(false)] out IInboxHandler handler) => _handlers.TryGetValue(routeKey, out handler);
+        public bool TryGetMessage(GrainId senderId, Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope)
+        {
+            envelope = default;
+            return false;
+        }
+    }
+
+    // Test IDurableDictionary implementation for simple in-memory storage
+    private class TestDurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue> where TKey : notnull
+    {
+        private readonly Dictionary<TKey, TValue> _dict = new();
+
+        public TValue this[TKey key]
+        {
+            get => _dict[key];
+            set => _dict[key] = value;
+        }
+
+        public ICollection<TKey> Keys => _dict.Keys;
+        public ICollection<TValue> Values => _dict.Values;
+        public int Count => _dict.Count;
+        public bool IsReadOnly => false;
+
+        public void Add(TKey key, TValue value) => _dict.Add(key, value);
+        public void Add(KeyValuePair<TKey, TValue> item) => _dict.Add(item.Key, item.Value);
+        public void Clear() => _dict.Clear();
+        public bool Contains(KeyValuePair<TKey, TValue> item) => ((IDictionary<TKey, TValue>)_dict).Contains(item);
+        public bool ContainsKey(TKey key) => _dict.ContainsKey(key);
+        public void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex) => ((IDictionary<TKey, TValue>)_dict).CopyTo(array, arrayIndex);
+        public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() => _dict.GetEnumerator();
+        public bool Remove(TKey key) => _dict.Remove(key);
+        public bool Remove(KeyValuePair<TKey, TValue> item) => ((IDictionary<TKey, TValue>)_dict).Remove(item);
+        public bool TryGetValue(TKey key, [MaybeNullWhen(false)] out TValue value) => _dict.TryGetValue(key, out value);
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => _dict.GetEnumerator();
     }
 }
