@@ -524,7 +524,8 @@
       "Measure steady-state throughput under backpressure",
       "Measure recovery time when backpressure is relieved"
     ],
-    "passes": false
+    "passes": true,
+    "notes": "All 6 tests passing on net10.0 and net8.0. Tests verify backpressure through observable effects (no message loss, throughput limits, recovery time) rather than mocking internal implementation. Implementation confirmed: OutboxDeliveryPump implements exponential backoff (line 294-296) and handles DeliveryStatus.Backpressured (line 181-192)."
   },
   {
     "category": "functional",
