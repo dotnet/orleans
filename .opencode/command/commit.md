@@ -1,7 +1,7 @@
 ---
 description: Create well-formatted commits with conventional commit format.
 agent: build
-model: anthropic/claude-sonnet-4-5
+model: github-copilot/claude-sonnet-4.5
 ---
 
 # Smart Git Commit
