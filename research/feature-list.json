@@ -77,7 +77,7 @@
       "Verify no references remain to OutgoingEnvelopeBuilder in codebase",
       "Update any documentation referencing OutgoingEnvelopeBuilder"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
