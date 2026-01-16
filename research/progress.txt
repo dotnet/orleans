@@ -2818,3 +2818,55 @@ The RequestContext propagation feature was already implemented. This verificatio
 
 ### Status
 Feature COMPLETE and VERIFIED. Build: 0 warnings, 0 errors.
+
+## 2026-01-16: Processed Messages Compaction Implementation (VERIFIED COMPLETE)
+
+### Summary
+Verified that processed messages compaction during journaling snapshots is fully implemented and tested. The compaction mechanism prevents unbounded growth of the processed messages dictionary by removing entries older than the configured DeduplicationWindow (default: 7 days).
+
+### Implementation Details
+
+**Implementation Location:**
+- src/Orleans.Journaling/Messaging/DurableInboxExtension.cs (lines 617-660)
+
+**Key Features Verified:**
+1. CompactProcessedMessages() Method:
+   - Calculates cutoff time: DateTimeOffset.UtcNow - _deduplicationWindow
+   - Identifies entries older than the deduplication window
+   - Removes expired entries from the _processed dictionary
+   - Returns count of removed entries
+
+2. Automatic Compaction Trigger:
+   - Called automatically after each message processing (lines 444, 485, 513, 548, 591)
+   - Integrated with state persistence workflow via IStateMachineManager.WriteStateAsync()
+   - No manual intervention required
+
+3. Configuration:
+   - Deduplication window configured via DurableInboxOptions.DeduplicationWindow
+   - Default: 7 days (lines 61, 86 in DurableInboxOptions.cs)
+   - Customizable per grain deployment
+
+4. Design Principles:
+   - Balances deduplication guarantees with memory usage
+   - Prevents unbounded state growth over time
+   - Maintains exactly-once semantics within the deduplication window
+   - Degrades to at-least-once semantics beyond the window (acceptable tradeoff)
+
+### Test Coverage
+
+Test File: test/Orleans.Journaling.Tests/ProcessedMessagesCompactionTests.cs (423 lines)
+
+Tests Implemented (6 tests, all passing on net10.0 and net8.0):
+1. ProcessMessageAsync_WithOldProcessedEntries_CompactsAfterPersistence
+2. ProcessMessageAsync_WithAllRecentProcessedEntries_DoesNotCompact
+3. ProcessMessageAsync_WithEmptyProcessedDict_HandlesGracefully
+4. ProcessMessageAsync_WithMixedTimestamps_CompactsOnlyOldEntries
+5. ProcessMessageAsync_WithCustomDeduplicationWindow_CompactsAccordingly
+6. ProcessMessageAsync_CompactsOnEveryProcessedMessage
+
+### Test Results
+Test Run Successful - 6/6 passing on both net10.0 and net8.0
+
+### Status
+Feature COMPLETE and TESTED. No implementation work required - this was a verification task that confirmed existing implementation is correct and fully tested.
+
