@@ -87,7 +87,6 @@ public static class HostingExtensions
     /// {
     ///     options.MaxCapacity = 500;
     ///     options.DeduplicationWindow = TimeSpan.FromDays(14);
-    ///     options.ProcessingConcurrency = 4;
     /// });
     /// </code>
     /// </para>
@@ -165,7 +164,7 @@ public static class HostingExtensions
             {
                 return false;
             }
-        }, "DurableInboxOptions validation failed. Check MaxCapacity, DeduplicationWindow, ProcessingConcurrency, and DefaultPollTimeout.");
+        }, "DurableInboxOptions validation failed. Check MaxCapacity, DeduplicationWindow, and DefaultPollTimeout.");
 
         services.ConfigureNamedOptionForLogging<DurableInboxOptions>(Options.DefaultName);
 
@@ -181,16 +180,25 @@ public static class HostingExtensions
 
             // Get inbox and processed dictionaries via keyed services
             // These are registered with KeyedService.AnyKey, so we need specific keys
-            var inbox = sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("inbox");
+            var inboxDict = sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("inbox");
             var processed = sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DateTimeOffset>>("inbox-processed");
+            
+            // Get the shared outbox (DurableOutboxWithDelivery) that has delivery capability
+            // This is the same instance the grain uses via DI, ensuring responses are delivered
+            var outbox = sp.GetRequiredService<IDurableOutbox>();
+
+            // Get the shared DurableInbox that grains use (for handler registration)
+            var durableInbox = sp.GetRequiredService<IDurableInbox>();
 
             return new DurableInboxExtension(
                 grainContext,
                 stateMachineManager,
                 sessionPool,
                 logger,
-                inbox,  // IDurableDictionary<K,V> implements IDictionary<K,V>
+                durableInbox,  // Shared inbox for handler registration
+                inboxDict,     // IDurableDictionary<K,V> implements IDictionary<K,V>
                 processed,
+                outbox,        // Shared outbox with delivery capability
                 options.MaxCapacity,
                 options.DeduplicationWindow);
         });
@@ -215,7 +223,9 @@ public static class HostingExtensions
         services.TryAddScoped<IDurableOutbox>(sp =>
         {
             var outbox = sp.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEnvelope>>("outbox");
-            return new DurableOutbox(outbox);
+            var grainFactory = sp.GetRequiredService<IGrainFactory>();
+            var logger = sp.GetRequiredService<ILogger<DurableOutboxWithDelivery>>();
+            return new DurableOutboxWithDelivery(outbox, grainFactory, logger);
         });
 
         return services;
@@ -243,7 +253,7 @@ public static class HostingExtensions
             {
                 return false;
             }
-        }, "DurableInboxOptions validation failed. Check MaxCapacity, DeduplicationWindow, ProcessingConcurrency, and DefaultPollTimeout.");
+        }, "DurableInboxOptions validation failed. Check MaxCapacity, DeduplicationWindow, and DefaultPollTimeout.");
 
         services.ConfigureNamedOptionForLogging<DurableInboxOptions>(Options.DefaultName);
 

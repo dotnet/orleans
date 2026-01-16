@@ -28,7 +28,6 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     private readonly Dictionary<Guid, TaskCompletionSource<DeliveryResult>> _pendingDeliveries;
     private readonly int _maxCapacity;
     private readonly TimeSpan _deduplicationWindow;
-    private readonly int _processingConcurrency;
     private readonly SemaphoreSlim _processingLock = new(1, 1);
     private volatile bool _processingRequested;
 
@@ -45,7 +44,6 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     /// <param name="outbox">Durable outbox for sending response messages.</param>
     /// <param name="maxCapacity">Maximum inbox capacity (default: 1000).</param>
     /// <param name="deduplicationWindow">How long to track processed messages (default: 7 days).</param>
-    /// <param name="processingConcurrency">Maximum number of messages to process concurrently (default: 1).</param>
     public DurableInboxExtension(
         IGrainContext grainContext,
         IStateMachineManager stateMachineManager,
@@ -56,8 +54,7 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         IDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> processed,
         IDurableOutbox outbox,
         int maxCapacity = 1000,
-        TimeSpan? deduplicationWindow = null,
-        int processingConcurrency = 1)
+        TimeSpan? deduplicationWindow = null)
     {
         ArgumentNullException.ThrowIfNull(grainContext);
         ArgumentNullException.ThrowIfNull(stateMachineManager);
@@ -68,7 +65,6 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         ArgumentNullException.ThrowIfNull(processed);
         ArgumentNullException.ThrowIfNull(outbox);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxCapacity);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(processingConcurrency);
 
         _grainContext = grainContext;
         _stateMachineManager = stateMachineManager;
@@ -81,7 +77,6 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         _pendingDeliveries = new Dictionary<Guid, TaskCompletionSource<DeliveryResult>>();
         _maxCapacity = maxCapacity;
         _deduplicationWindow = deduplicationWindow ?? TimeSpan.FromDays(7);
-        _processingConcurrency = processingConcurrency;
     }
 
     /// <summary>
@@ -282,9 +277,30 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     }
 
     /// <summary>
-    /// Processes all pending messages in the inbox with configured concurrency.
+    /// Processes all pending messages in the inbox sequentially.
     /// Uses a lock to prevent concurrent processing runs, and loops until all messages are processed.
     /// </summary>
+    /// <remarks>
+    /// Messages are processed sequentially (not concurrently) to respect Orleans' single-threaded grain model.
+    /// Orleans grains are designed to handle one request at a time, which provides:
+    /// <list type="bullet">
+    /// <item>Automatic synchronization - no need for locks when accessing grain state</item>
+    /// <item>Predictable execution order - handlers see consistent state</item>
+    /// <item>No race conditions - state modifications are serialized</item>
+    /// </list>
+    /// Concurrent processing would violate these guarantees and could lead to:
+    /// <list type="bullet">
+    /// <item>Race conditions when handlers access _inboxDict, _processed, or _outbox</item>
+    /// <item>Unpredictable state corruption if multiple handlers modify the same grain fields</item>
+    /// <item>Complex debugging issues that only manifest under high concurrency</item>
+    /// </list>
+    /// For high-throughput scenarios, scale horizontally by:
+    /// <list type="bullet">
+    /// <item>Partitioning work across multiple grain instances</item>
+    /// <item>Using grain keys to distribute load (e.g., account-123, account-456)</item>
+    /// <item>Avoiding sequential dependencies between messages when possible</item>
+    /// </list>
+    /// </remarks>
     private async Task ProcessPendingMessagesAsync()
     {
         Console.WriteLine($"[DEBUG-INBOX] ProcessPendingMessagesAsync: Starting, inbox count={_inboxDict.Count}");
@@ -312,13 +328,10 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                 // Create a snapshot of pending messages to avoid collection modification
                 var pending = new List<DurableEnvelope>(_inboxDict.Values);
 
-                // Use ParallelOptions to control concurrency
-                var parallelOptions = new ParallelOptions
-                {
-                    MaxDegreeOfParallelism = _processingConcurrency
-                };
-
-                await Parallel.ForEachAsync(pending, parallelOptions, async (envelope, cancellationToken) =>
+                // Process messages sequentially to respect Orleans' single-threaded grain model.
+                // Concurrent processing would violate grain semantics and could lead to race conditions
+                // when accessing grain state (_inboxDict, _processed, _outbox).
+                foreach (var envelope in pending)
                 {
                     try
                     {
@@ -335,7 +348,7 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                             envelope.SenderId,
                             envelope.RouteKey);
                     }
-                }).ConfigureAwait(false);
+                }
 
                 // If no new processing requests came in, we're done
                 if (!_processingRequested)
