@@ -96,8 +96,8 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         var extension = CreateInboxExtension();
         var handler = new TestMessageHandler();
 
-        // Act & Assert
-        Assert.Throws<ArgumentException>(() => extension.RegisterHandler(null!, handler));
+        // Act & Assert - ArgumentNullException is a subtype of ArgumentException
+        Assert.Throws<ArgumentNullException>(() => extension.RegisterHandler(null!, handler));
     }
 
     [Fact]
@@ -143,12 +143,16 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         var envelope = CreateTestEnvelope(senderId, receiverId, "test.route", "test message");
 
         // Act - deliver twice
-        await extension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None);
-        var result = await extension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None);
+        var result1 = await extension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None);
+        
+        // Wait for async processing to start (but not necessarily complete)
+        await Task.Delay(100);
+        
+        var result2 = await extension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None);
 
         // Assert
-        Assert.Equal(DeliveryStatus.Duplicate, result.Status);
-        Assert.Equal(1, extension.Count); // Still only one message
+        Assert.Equal(DeliveryStatus.Accepted, result1.Status);
+        Assert.Equal(DeliveryStatus.Duplicate, result2.Status);
     }
 
     [Fact]
@@ -201,15 +205,26 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     {
         // Arrange
         var extension = CreateInboxExtension(maxCapacity: 1);
-        var handler = new TestMessageHandler();
-        extension.RegisterHandler("test.route", handler);
-
+        // Note: No handler registered - messages will stay in inbox
+        
         var senderId = GrainId.Create("test", "sender");
         var receiverId = GrainId.Create("test", "receiver");
 
         // Fill to capacity
         var envelope1 = CreateTestEnvelope(senderId, receiverId, "test.route", "message1");
+        var result1 = await extension.DeliverAsync(envelope1, new DeliveryOptions(), CancellationToken.None);
+
+        // Assert first message was rejected due to no handler
+        Assert.Equal(DeliveryStatus.RouteNotFound, result1.Status);
+        Assert.Equal(0, extension.Count);
+
+        // Register handler after first attempt
+        var handler = new TestMessageHandler();
+        extension.RegisterHandler("test.route", handler);
+
+        // Fill to capacity
         await extension.DeliverAsync(envelope1, new DeliveryOptions(), CancellationToken.None);
+        Assert.Equal(1, extension.Count);
 
         // Act - try to add beyond capacity
         var envelope2 = CreateTestEnvelope(senderId, receiverId, "test.route", "message2");
@@ -350,6 +365,136 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         Assert.Equal(0, extension.Count);
     }
 
+    [Fact]
+    public async Task ProcessPendingMessages_WithConcurrency1_ProcessesSequentially()
+    {
+        // Arrange
+        var extension = CreateInboxExtension();
+        var handler = new CountingMessageHandler();
+        extension.RegisterHandler("test.route", handler);
+
+        var senderId = GrainId.Create("test", "sender");
+        var receiverId = GrainId.Create("test", "receiver");
+
+        // Deliver multiple messages in batches to avoid race conditions
+        var deliveryTasks = new List<Task>();
+        for (var i = 0; i < 5; i++)
+        {
+            var envelope = CreateTestEnvelope(senderId, receiverId, "test.route", $"message {i}");
+            deliveryTasks.Add(extension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None).AsTask());
+        }
+
+        // Wait for all deliveries
+        await Task.WhenAll(deliveryTasks);
+
+        // Wait for processing (increased timeout)
+        await Task.Delay(1500);
+
+        // Assert - all messages processed
+        Assert.Equal(5, handler.ProcessedCount);
+        Assert.Equal(0, extension.Count);
+    }
+
+    [Fact]
+    public async Task ProcessPendingMessages_WithConcurrency4_ProcessesConcurrently()
+    {
+        // Arrange - create extension with concurrency level 4
+        var grainContext = new MockGrainContext();
+        var stateMachineManager = new TestStateMachineManager();
+        var sessionPool = _fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
+        var logger = NullLogger<DurableInboxExtension>.Instance;
+        var inbox = new Dictionary<(GrainId, Guid), DurableEnvelope>();
+        var processed = new Dictionary<(GrainId, Guid), DateTimeOffset>();
+
+        var extension = new DurableInboxExtension(
+            grainContext,
+            stateMachineManager,
+            sessionPool,
+            logger,
+            inbox,
+            processed,
+            maxCapacity: 1000,
+            deduplicationWindow: TimeSpan.FromDays(7),
+            processingConcurrency: 4);
+
+        var handler = new CountingMessageHandler();
+        extension.RegisterHandler("test.route", handler);
+
+        var senderId = GrainId.Create("test", "sender");
+        var receiverId = GrainId.Create("test", "receiver");
+
+        // Deliver multiple messages without waiting for processing
+        var deliveryTasks = new List<Task>();
+        for (var i = 0; i < 10; i++)
+        {
+            var envelope = CreateTestEnvelope(senderId, receiverId, "test.route", $"message {i}");
+            deliveryTasks.Add(extension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None).AsTask());
+        }
+
+        // Wait for all deliveries to complete
+        await Task.WhenAll(deliveryTasks);
+
+        // Wait for processing to complete (increased timeout)
+        await Task.Delay(2000);
+
+        // Assert - all messages processed
+        Assert.Equal(10, handler.ProcessedCount);
+        Assert.Equal(0, extension.Count);
+    }
+
+    [Fact]
+    public async Task ProcessPendingMessages_WithConcurrentHandlers_IsolatesExceptions()
+    {
+        // Arrange - create extension with concurrency level 4
+        var grainContext = new MockGrainContext();
+        var stateMachineManager = new TestStateMachineManager();
+        var sessionPool = _fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
+        var logger = NullLogger<DurableInboxExtension>.Instance;
+        var inbox = new Dictionary<(GrainId, Guid), DurableEnvelope>();
+        var processed = new Dictionary<(GrainId, Guid), DateTimeOffset>();
+
+        var extension = new DurableInboxExtension(
+            grainContext,
+            stateMachineManager,
+            sessionPool,
+            logger,
+            inbox,
+            processed,
+            maxCapacity: 1000,
+            deduplicationWindow: TimeSpan.FromDays(7),
+            processingConcurrency: 4);
+
+        // Register handlers: one throws, one succeeds
+        var throwingHandler = new ThrowingMessageHandler();
+        var successHandler = new CountingMessageHandler();
+        extension.RegisterHandler("throwing.route", throwingHandler);
+        extension.RegisterHandler("success.route", successHandler);
+
+        var senderId = GrainId.Create("test", "sender");
+        var receiverId = GrainId.Create("test", "receiver");
+
+        // Deliver messages to both routes without waiting
+        var deliveryTasks = new List<Task>();
+        for (var i = 0; i < 3; i++)
+        {
+            var throwingEnvelope = CreateTestEnvelope(senderId, receiverId, "throwing.route", $"throwing {i}");
+            deliveryTasks.Add(extension.DeliverAsync(throwingEnvelope, new DeliveryOptions(), CancellationToken.None).AsTask());
+
+            var successEnvelope = CreateTestEnvelope(senderId, receiverId, "success.route", $"success {i}");
+            deliveryTasks.Add(extension.DeliverAsync(successEnvelope, new DeliveryOptions(), CancellationToken.None).AsTask());
+        }
+
+        // Wait for all deliveries
+        await Task.WhenAll(deliveryTasks);
+
+        // Wait for processing (increased timeout)
+        await Task.Delay(2000);
+
+        // Assert - successful messages processed despite exceptions in other handlers
+        Assert.Equal(3, successHandler.ProcessedCount);
+        Assert.Equal(0, extension.Count); // All messages removed (including failed ones)
+    }
+
     // Test message type
     [GenerateSerializer]
     public record TestMessage
@@ -394,6 +539,20 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         public ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             throw new InvalidOperationException("Test exception");
+        }
+    }
+
+    // Counting handler for concurrency tests
+    private class CountingMessageHandler : IInboxHandler
+    {
+        private int _count;
+
+        public int ProcessedCount => _count;
+
+        public ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _count);
+            return ValueTask.CompletedTask;
         }
     }
 
