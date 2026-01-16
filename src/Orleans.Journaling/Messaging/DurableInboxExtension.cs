@@ -16,7 +16,7 @@ namespace Orleans.Journaling.Messaging;
 /// Implementation of durable inbox extension for grain message delivery.
 /// Handles message persistence, deduplication, long-polling, and processing.
 /// </summary>
-internal sealed class DurableInboxExtension : IDurableInboxExtension
+internal sealed partial class DurableInboxExtension : IDurableInboxExtension
 {
     private readonly IGrainContext _grainContext;
     private readonly IStateMachineManager _stateMachineManager;
@@ -111,7 +111,7 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         ArgumentNullException.ThrowIfNull(handler);
 
         _durableInbox.RegisterHandler(routeKey, handler);
-        _logger.LogDebug("Registered handler for route '{RouteKey}' on grain {GrainId}", routeKey, _grainContext.GrainId);
+        LogHandlerRegistered(_logger, routeKey, _grainContext.GrainId);
     }
 
     /// <summary>
@@ -147,12 +147,13 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         // Check for duplicate (already processed)
         if (_processed.ContainsKey(key))
         {
-            _logger.LogDebug(
-                "Duplicate message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}'",
+            LogDuplicateMessageDetected(
+                _logger,
                 envelope.MessageId,
                 envelope.SenderId,
                 envelope.ReceiverId,
-                envelope.RouteKey);
+                envelope.RouteKey,
+                envelope.CorrelationKey?.ToString());
 
             // Record duplicate message metric
             var grainType = _grainContext.GrainId.Type.ToString();
@@ -164,12 +165,13 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         // Check for duplicate (already in inbox)
         if (_inboxDict.ContainsKey(key))
         {
-            _logger.LogDebug(
-                "Duplicate message {MessageId} from {SenderId} already in inbox for {ReceiverId} on route '{RouteKey}'",
+            LogDuplicateMessageInInbox(
+                _logger,
                 envelope.MessageId,
                 envelope.SenderId,
                 envelope.ReceiverId,
-                envelope.RouteKey);
+                envelope.RouteKey,
+                envelope.CorrelationKey?.ToString());
 
             // Record duplicate message metric
             var grainType = _grainContext.GrainId.Type.ToString();
@@ -187,13 +189,15 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         // Check capacity (backpressure)
         if (_inboxDict.Count >= _maxCapacity)
         {
-            _logger.LogWarning(
-                "Inbox at capacity ({Count}/{Capacity}) for grain {GrainId}, rejecting message {MessageId} from {SenderId}",
+            LogBackpressureRejection(
+                _logger,
                 _inboxDict.Count,
                 _maxCapacity,
                 _grainContext.GrainId,
                 envelope.MessageId,
-                envelope.SenderId);
+                envelope.SenderId,
+                envelope.RouteKey,
+                envelope.CorrelationKey?.ToString());
 
             // Record backpressure metric
             var grainType = _grainContext.GrainId.Type.ToString();
@@ -213,12 +217,13 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
             }
             else
             {
-                _logger.LogWarning(
-                    "No handler registered for route '{RouteKey}' on grain {GrainId}, rejecting message {MessageId} from {SenderId}",
+                LogRouteNotFound(
+                    _logger,
                     envelope.RouteKey,
                     _grainContext.GrainId,
                     envelope.MessageId,
-                    envelope.SenderId);
+                    envelope.SenderId,
+                    envelope.CorrelationKey?.ToString());
 
                 // Record route not found metric
                 var grainType = _grainContext.GrainId.Type.ToString();
@@ -234,13 +239,13 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         // Persist atomically
         await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
 
-        _logger.LogInformation(
-            "Accepted message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})",
+        LogMessageAccepted(
+            _logger,
             envelope.MessageId,
             envelope.SenderId,
             envelope.ReceiverId,
             envelope.RouteKey,
-            envelope.CorrelationKey?.ToString() ?? "(none)");
+            envelope.CorrelationKey?.ToString());
 
         // Record accepted message metric
         var grainTypeName = _grainContext.GrainId.Type.ToString();
@@ -390,12 +395,13 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
             }
             catch (Exception ex)
             {
-                _logger.LogError(
+                LogProcessingError(
+                    _logger,
                     ex,
-                    "Error processing message {MessageId} from {SenderId} on route '{RouteKey}'",
                     envelope.MessageId,
                     envelope.SenderId,
-                    envelope.RouteKey);
+                    envelope.RouteKey,
+                    envelope.CorrelationKey?.ToString());
             }
         }
     }
@@ -437,16 +443,16 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                     // Trigger delivery of any responses the observer queued in the outbox
                     if (_outbox.Count > 0)
                     {
-                        await _outbox.DeliverPendingMessagesAsync(CancellationToken.None).ConfigureAwait(true);
-                    }
+                    await _outbox.DeliverPendingMessagesAsync(CancellationToken.None).ConfigureAwait(true);
+                }
 
-                    _logger.LogInformation(
-                        "Processed message {MessageId} from {SenderId} via IDurableInboxObserver (CorrelationKey: {CorrelationKey})",
-                        envelope.MessageId,
-                        envelope.SenderId,
-                        envelope.CorrelationKey);
+                LogMessageProcessedViaObserver(
+                    _logger,
+                    envelope.MessageId,
+                    envelope.SenderId,
+                    envelope.CorrelationKey?.ToString());
 
-                    // Record processing metrics
+                // Record processing metrics
                     stopwatch.Stop();
                     JournalingInstruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "success");
                     JournalingInstruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
@@ -455,15 +461,16 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                     CompleteDelivery(envelope.MessageId, result);
                     return;
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError(
-                        ex,
-                        "IDurableInboxObserver.OnResponseAsync threw exception for message {MessageId} from {SenderId}",
-                        envelope.MessageId,
-                        envelope.SenderId);
+            catch (Exception ex)
+            {
+                LogObserverProcessingError(
+                    _logger,
+                    ex,
+                    envelope.MessageId,
+                    envelope.SenderId,
+                    envelope.CorrelationKey?.ToString());
 
-                    // Mark as processed to avoid infinite retry
+                // Mark as processed to avoid infinite retry
                     _inboxDict.Remove(key);
                     _processed[key] = DateTimeOffset.UtcNow;
                     await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
@@ -480,14 +487,15 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                     CompleteDelivery(envelope.MessageId, DeliveryResult.Processed());
                     return;
                 }
-            }
+        }
 
-            _logger.LogWarning(
-                "Handler for route '{RouteKey}' not found during processing of message {MessageId}",
-                envelope.RouteKey,
-                envelope.MessageId);
+        LogHandlerNotFoundDuringProcessing(
+            _logger,
+            envelope.RouteKey,
+            envelope.MessageId,
+            envelope.CorrelationKey?.ToString());
 
-            // Remove from inbox and mark as processed
+        // Remove from inbox and mark as processed
             _inboxDict.Remove(key);
             _processed[key] = DateTimeOffset.UtcNow;
             await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
@@ -526,16 +534,17 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
             // Trigger delivery of any responses the handler queued in the outbox
             if (_outbox.Count > 0)
             {
-                await _outbox.DeliverPendingMessagesAsync(CancellationToken.None).ConfigureAwait(true);
-            }
+            await _outbox.DeliverPendingMessagesAsync(CancellationToken.None).ConfigureAwait(true);
+        }
 
-            _logger.LogInformation(
-                "Processed message {MessageId} from {SenderId} on route '{RouteKey}'",
-                envelope.MessageId,
-                envelope.SenderId,
-                envelope.RouteKey);
+        LogMessageProcessed(
+            _logger,
+            envelope.MessageId,
+            envelope.SenderId,
+            envelope.RouteKey,
+            envelope.CorrelationKey?.ToString());
 
-            // Record processing metrics
+        // Record processing metrics
             stopwatch.Stop();
             JournalingInstruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "success");
             JournalingInstruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
@@ -545,12 +554,13 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         }
         catch (Exception ex)
         {
-            _logger.LogError(
+            LogHandlerException(
+                _logger,
                 ex,
-                "Handler threw exception for message {MessageId} from {SenderId} on route '{RouteKey}'",
                 envelope.MessageId,
                 envelope.SenderId,
-                envelope.RouteKey);
+                envelope.RouteKey,
+                envelope.CorrelationKey?.ToString());
 
             // For now, mark as processed to avoid infinite retry
             // In production, this should use a retry policy or dead-letter queue
@@ -581,4 +591,66 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
             tcs.TrySetResult(result);
         }
     }
+
+    // Structured logging using LoggerMessage source generator
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Registered handler for route '{RouteKey}' on grain {GrainId}")]
+    private static partial void LogHandlerRegistered(ILogger logger, string routeKey, GrainId grainId);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Duplicate message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
+    private static partial void LogDuplicateMessageDetected(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId, string routeKey, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Duplicate message {MessageId} from {SenderId} already in inbox for {ReceiverId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
+    private static partial void LogDuplicateMessageInInbox(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId, string routeKey, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Inbox at capacity ({Count}/{Capacity}) for grain {GrainId}, rejecting message {MessageId} from {SenderId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
+    private static partial void LogBackpressureRejection(ILogger logger, int count, int capacity, GrainId grainId, Guid messageId, GrainId senderId, string routeKey, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "No handler registered for route '{RouteKey}' on grain {GrainId}, rejecting message {MessageId} from {SenderId} (CorrelationKey: {CorrelationKey})")]
+    private static partial void LogRouteNotFound(ILogger logger, string routeKey, GrainId grainId, Guid messageId, GrainId senderId, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Accepted message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
+    private static partial void LogMessageAccepted(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId, string routeKey, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error processing message {MessageId} from {SenderId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
+    private static partial void LogProcessingError(ILogger logger, Exception exception, Guid messageId, GrainId senderId, string routeKey, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Handler for route '{RouteKey}' not found during processing of message {MessageId} (CorrelationKey: {CorrelationKey})")]
+    private static partial void LogHandlerNotFoundDuringProcessing(ILogger logger, string routeKey, Guid messageId, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Processed message {MessageId} from {SenderId} via IDurableInboxObserver (CorrelationKey: {CorrelationKey})")]
+    private static partial void LogMessageProcessedViaObserver(ILogger logger, Guid messageId, GrainId senderId, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "IDurableInboxObserver.OnResponseAsync threw exception for message {MessageId} from {SenderId} (CorrelationKey: {CorrelationKey})")]
+    private static partial void LogObserverProcessingError(ILogger logger, Exception exception, Guid messageId, GrainId senderId, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Processed message {MessageId} from {SenderId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
+    private static partial void LogMessageProcessed(ILogger logger, Guid messageId, GrainId senderId, string routeKey, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Handler threw exception for message {MessageId} from {SenderId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
+    private static partial void LogHandlerException(ILogger logger, Exception exception, Guid messageId, GrainId senderId, string routeKey, string? correlationKey);
 }
