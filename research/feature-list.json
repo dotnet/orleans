@@ -1,5 +1,25 @@
 [
   {
+    "category": "bugfix",
+    "description": "Fix missing ArcBuffer codec causing serialization failures",
+    "steps": [
+      "Create src/Orleans.Serialization/Codecs/ArcBufferCodec.cs",
+      "Implement IFieldCodec<ArcBuffer> with WriteField and ReadValue methods",
+      "Serialize ArcBuffer as length-prefixed byte segments",
+      "Deserialize into new ArcBufferWriter and return consumed slice",
+      "Implement IDeepCopier<ArcBuffer> and IOptionalDeepCopier for copying",
+      "Use shallow copy with Slice() since ArcBuffer is immutable and reference-counted",
+      "Add [RegisterSerializer] and [RegisterCopier] attributes for automatic registration",
+      "Add unit tests in test/Orleans.Serialization.UnitTests/ArcBufferCodecTests.cs",
+      "Test round-trip serialization/deserialization",
+      "Test empty buffer handling",
+      "Test multi-segment buffer handling",
+      "Test copier behavior",
+      "Verify Orleans.Journaling.Tests pass with the codec in place"
+    ],
+    "passes": true
+  },
+  {
     "category": "functional",
     "description": "Create CorrelationKey hierarchical UTF-8 string type",
     "steps": [
@@ -113,7 +133,7 @@
       "Update XML documentation to reference hierarchical correlation",
       "Add unit tests for observer callbacks with CorrelationKey"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
