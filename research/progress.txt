@@ -1251,3 +1251,92 @@ Verified that the InboxHandlerContext implementation is complete and all tests a
 - ✅ research/feature-list.json (marked feature as passing)
 - ✅ research/progress.txt (this file)
 
+
+## 2025-01-15: DurableInboxOptions Configuration Implementation (COMPLETED)
+
+### Summary
+Successfully implemented the DurableInboxOptions configuration class with comprehensive validation and unit tests. This provides the foundation for configuring the durable inbox messaging system with proper defaults and validation.
+
+### Implementation Details
+
+**File Created:**
+- src/Orleans.Journaling/Configuration/DurableInboxOptions.cs (178 lines)
+- test/Orleans.Journaling.Tests/DurableInboxOptionsTests.cs (319 lines)
+
+**Key Features Implemented:**
+
+1. **Configuration Properties**:
+   - MaxCapacity (default: 1000) - Maximum pending messages before backpressure
+   - DeduplicationWindow (default: 7 days) - Time window for tracking processed messages
+   - ProcessingConcurrency (default: 1) - Number of concurrent handler invocations per grain
+   - EnableLongPolling (default: true) - Enable/disable long-polling support
+   - DefaultPollTimeout (default: 30 seconds) - Default timeout when PollTimeout not specified
+
+2. **Validation Logic**:
+   - Validate() method checks all configuration values
+   - MaxCapacity must be greater than zero
+   - DeduplicationWindow must be greater than TimeSpan.Zero
+   - ProcessingConcurrency must be greater than zero
+   - DefaultPollTimeout must be greater than TimeSpan.Zero
+   - Throws ArgumentOutOfRangeException with descriptive messages on invalid values
+
+3. **Comprehensive XML Documentation**:
+   - Each property includes detailed remarks explaining usage, tradeoffs, and best practices
+   - Examples for capacity planning and retry policy integration
+   - Guidance on performance characteristics and memory usage
+
+**Test Coverage:**
+- test/Orleans.Journaling.Tests/DurableInboxOptionsTests.cs (29 tests, all passing)
+- Tests cover:
+  - Default values verification
+  - Property setters
+  - Validate() with default values
+  - Validate() with custom valid values
+  - Zero/negative value validation for all numeric properties
+  - Zero/negative TimeSpan validation for time-based properties
+  - Minimal valid values (1, TimeSpan.FromTicks(1))
+  - Large valid values (int.MaxValue, 365 days)
+  - Theory tests with various combinations of valid values
+
+**Test Results:**
+- ✅ All 29 tests passing on net10.0
+- ✅ All 29 tests passing on net8.0
+- ✅ No compilation warnings or errors
+- ✅ Code style validation passed
+- ✅ Builds successfully for both target frameworks
+
+**Design Patterns Applied:**
+1. **Options Pattern**: Follows ASP.NET Core IOptions<T> pattern for configuration
+2. **Fail-Fast**: Validate() method enables early detection of configuration errors
+3. **Sensible Defaults**: Default values are production-ready for most scenarios
+
+**Code Quality:**
+- Follows Orleans coding standards (Allman braces, 4-space indent, var everywhere)
+- Comprehensive XML documentation with performance and memory usage guidance
+- Proper use of modern C# features (property initializers, TimeSpan constructors)
+- Configuration class placed in Orleans.Journaling.Configuration namespace
+
+### Next Steps
+The DurableInboxOptions implementation is complete and ready for use in subsequent features:
+- **DI Registration** - IServiceCollection extension methods to register options with IOptions<T>
+- **DurableInboxExtension** - Use options instead of constructor parameters
+- **DurableInbox** - Use options.MaxCapacity instead of hardcoded value
+
+### Verification Commands
+`powershell
+# Build the project
+dotnet build src/Orleans.Journaling/Orleans.Journaling.csproj
+
+# Run all DurableInboxOptions tests (net10.0)
+dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filter \"FullyQualifiedName~DurableInboxOptionsTests\" --framework net10.0
+
+# Run all DurableInboxOptions tests (net8.0)
+dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filter \"FullyQualifiedName~DurableInboxOptionsTests\" --framework net8.0
+`
+
+### Files Modified
+- ✅ src/Orleans.Journaling/Configuration/DurableInboxOptions.cs (created)
+- ✅ test/Orleans.Journaling.Tests/DurableInboxOptionsTests.cs (created)
+- ✅ research/feature-list.json (marked feature as passing)
+- ✅ research/progress.txt (this file)
+
