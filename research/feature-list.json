@@ -586,7 +586,8 @@
       "Add unit tests for compaction logic",
       "Add integration tests for compaction during snapshot"
     ],
-    "passes": false
+    "passes": true,
+    "notes": "Compaction already fully implemented in DurableInboxExtension.CompactProcessedMessages() (lines 617-660). Called after each message processing. 6 comprehensive tests in ProcessedMessagesCompactionTests.cs all passing on both net10.0 and net8.0. Tests verify: old entry removal, recent entry retention, empty dict handling, mixed timestamps, custom deduplication windows, and per-message compaction."
   },
   {
     "category": "functional",
