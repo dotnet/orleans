@@ -432,7 +432,7 @@
       "Test logging/metrics for deserialization failures",
       "Test graceful degradation (skip bad message vs crash)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
