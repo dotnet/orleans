@@ -1556,3 +1556,137 @@ Key Changes:
 
 research/feature-list.json updated to mark feature as passing
 
+
+## 2025-01-15: InboxProcessingPumpTests Bug Fix (COMPLETED)
+
+### Summary
+Fixed critical bugs in InboxProcessingPumpTests that caused 10 out of 14 tests to fail. The issues involved null SerializerSessionPool references and misaligned "processed" dictionaries between test infrastructure and InboxProcessingPump. All 15 tests now pass on both net10.0 and net8.0.
+
+### Bug Discovery
+
+**Initial Test Status:**
+- 4 out of 14 tests passing (29% pass rate)
+- 10 tests failing with `System.ArgumentNullException: Value cannot be null. (Parameter 'sessionPool')`
+
+**Root Cause #1: Null SessionPool**
+- Tests were passing `SerializerSessionPool sessionPool = null!;` to InboxProcessingPump constructor
+- InboxProcessingPump requires a valid SessionPool for creating InboxHandlerContext instances
+- Solution: Use IntegrationTestFixture to obtain real SerializerSessionPool from Orleans silo
+
+**Root Cause #2: Misaligned Processed Dictionaries**
+- After fixing sessionPool, test status improved to 11/15 passing
+- 4 tests still failing with `Assert.True() Failure` on `inbox.IsProcessed()` checks
+- Problem: InboxProcessingPump wrote processed messages to external dictionary, but TestInbox.IsProcessed() only checked internal _processed dictionary
+- Solution: Updated TestInbox to accept external processed dictionary via constructor parameter
+
+### Implementation Details
+
+**Files Modified:**
+- test/Orleans.Journaling.Tests/InboxProcessingPumpTests.cs
+
+**Key Changes Implemented:**
+
+1. **Added IClassFixture<IntegrationTestFixture>**:
+   - Changed class declaration to `public class InboxProcessingPumpTests : IClassFixture<IntegrationTestFixture>`
+   - Added constructor accepting IntegrationTestFixture
+   - Added private field `_sessionPool` initialized from fixture
+
+2. **Added Test Category Attributes**:
+   - Added `[TestCategory("BVT"), TestCategory("Journaling")]` to test class
+
+3. **Fixed SessionPool References**:
+   - Replaced 13 instances of `SerializerSessionPool sessionPool = null!;` with `var sessionPool = _sessionPool;`
+   - Added missing validation test: `Constructor_ThrowsArgumentNullException_WhenSessionPoolIsNull`
+
+4. **Updated TestInbox Class**:
+   - Added optional `processed` parameter to constructor: `TestInbox(int capacity = 1000, IDictionary<(GrainId, Guid), DateTimeOffset>? processed = null)`
+   - Added private field `_externalProcessed` to store external processed dictionary reference
+   - Updated `IsProcessed()` to check both internal and external dictionaries:
+     ```csharp
+     public bool IsProcessed(GrainId senderId, Guid messageId)
+     {
+         var key = (senderId, messageId);
+         return _internalProcessed.ContainsKey(key) || (_externalProcessed?.ContainsKey(key) == true);
+     }
+     ```
+   - Updated `ContainsOrProcessed()` similarly to check both dictionaries
+
+5. **Updated 4 Failing Tests**:
+   - Modified tests to pass `processed` dictionary to TestInbox constructor:
+     - `ExecuteJobAsync_ProcessesMessage_WhenHandlerExists`
+     - `ExecuteJobAsync_RemovesMessage_WhenNoHandlerRegistered`
+     - `ExecuteJobAsync_RemovesMessage_WhenHandlerThrowsException_AndRemoveOnExceptionIsTrue`
+     - `ExecuteJobAsync_ProcessesMultipleMessages_InOrder`
+   - Example change:
+     ```csharp
+     // Before:
+     var inbox = new TestInbox(capacity: 100);
+     
+     // After:
+     var inbox = new TestInbox(capacity: 100, processed: processed);
+     ```
+
+### Test Coverage
+
+**Final Test Results:**
+- ✅ All 15 tests passing on net10.0 (100%)
+- ✅ All 15 tests passing on net8.0 (100%)
+- ✅ No compilation warnings or errors
+- ✅ No regressions in other test suites
+
+**Tests Fixed:**
+1. Constructor_ThrowsArgumentNullException_WhenInboxIsNull
+2. Constructor_ThrowsArgumentNullException_WhenOutboxIsNull
+3. Constructor_ThrowsArgumentNullException_WhenStateMachineManagerIsNull
+4. Constructor_ThrowsArgumentNullException_WhenLoggerIsNull
+5. Constructor_ThrowsArgumentNullException_WhenSessionPoolIsNull (new test)
+6. Constructor_ThrowsArgumentOutOfRangeException_WhenConcurrencyIsZero
+7. Constructor_ThrowsArgumentOutOfRangeException_WhenConcurrencyIsNegative
+8. ExecuteJobAsync_ProcessesMessage_WhenHandlerExists (fixed)
+9. ExecuteJobAsync_RemovesMessage_WhenNoHandlerRegistered (fixed)
+10. ExecuteJobAsync_RemovesMessage_WhenHandlerThrowsException_AndRemoveOnExceptionIsTrue (fixed)
+11. ExecuteJobAsync_DoesNotRemoveMessage_WhenHandlerThrowsException_AndRemoveOnExceptionIsFalse
+12. ExecuteJobAsync_ProcessesMultipleMessages_InOrder (fixed)
+13. ExecuteJobAsync_CreatesInboxHandlerContext_WithCorrectProperties
+14. ExecuteJobAsync_SkipsMessage_WhenNoHandlerRegistered_AndDoesNotMarkAsProcessed
+15. ExecuteJobAsync_ProcessesMessages_Concurrently_WhenConcurrencyGreaterThanOne
+
+### Architectural Impact
+
+**TestInbox Design Pattern:**
+The solution introduces a pattern for testing components that interact with shared state:
+1. **Shared Dictionary Pattern**: External dictionary passed to test infrastructure
+2. **Dual Tracking**: Both internal and external dictionaries checked for processed messages
+3. **Test Isolation**: Tests can verify exact behavior without mocking frameworks
+
+**Benefits:**
+1. **Realistic Testing**: Uses actual Orleans serialization infrastructure via IntegrationTestFixture
+2. **Better Coverage**: Tests now verify the complete message processing flow including serialization
+3. **No Mocking**: Avoids complex mocking of SerializerSessionPool (difficult to mock correctly)
+4. **Maintainability**: Test infrastructure mirrors production code structure more closely
+
+### Verification Commands
+
+```powershell
+# Run InboxProcessingPumpTests (net10.0)
+dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filter "FullyQualifiedName~InboxProcessingPumpTests" --framework net10.0
+
+# Run InboxProcessingPumpTests (net8.0)
+dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filter "FullyQualifiedName~InboxProcessingPumpTests" --framework net8.0
+
+# Run all Orleans.Journaling tests to check for regressions
+dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --framework net10.0
+```
+
+### Files Modified
+- ✅ test/Orleans.Journaling.Tests/InboxProcessingPumpTests.cs (fixed sessionPool and processed dictionary issues)
+- ✅ research/feature-list.json (marked feature as passing)
+- ✅ research/progress.txt (this entry)
+
+### Next Steps
+Now that InboxProcessingPumpTests are passing, ready to:
+1. Verify remaining test features (deduplication, backpressure, long-polling)
+2. Update feature-list.json with verified statuses
+3. Commit all changes including InboxProcessingPump implementation and tests
+
+
