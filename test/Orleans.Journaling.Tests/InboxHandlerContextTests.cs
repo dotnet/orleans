@@ -472,5 +472,11 @@ public class InboxHandlerContextTests : IClassFixture<DefaultClusterFixture>
         {
             return _messages.TryGetValue(messageId, out envelope);
         }
+
+        public Task DeliverPendingMessagesAsync(CancellationToken cancellationToken = default)
+        {
+            // No-op for test purposes
+            return Task.CompletedTask;
+        }
     }
 }
