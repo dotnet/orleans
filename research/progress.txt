@@ -1465,3 +1465,68 @@ dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filt
 - ✅ research/feature-list.json (marked feature as passing)
 - ✅ research/progress.txt (this file)
 
+
+## 2025-01-15: Inbox Processing Pump Implementation (COMPLETED)
+
+### Summary
+Successfully enhanced the DurableInboxExtension with configurable processing concurrency support. The inbox processing pump now supports parallel message processing with configurable MaxDegreeOfParallelism, enabling high-throughput message handling while maintaining exactly-once delivery guarantees.
+
+### Implementation Details
+
+**Files Modified:**
+- src/Orleans.Journaling/Messaging/DurableInboxExtension.cs (enhanced with concurrency support)
+- test/Orleans.Journaling.Tests/DurableInboxExtensionTests.cs (4 new concurrency tests added)
+
+**Key Features Implemented:**
+
+1. **Configurable Processing Concurrency**:
+   - Added processingConcurrency field (default: 1 for sequential processing)
+   - Constructor accepts processingConcurrency parameter
+   - Uses Parallel.ForEachAsync with MaxDegreeOfParallelism for concurrent processing
+   - Validation via ArgumentOutOfRangeException.ThrowIfNegativeOrZero
+
+2. **Processing Pump Enhancements**:
+   - Added SemaphoreSlim processingLock to prevent concurrent processing runs
+   - Added volatile bool processingRequested flag for new message detection
+   - Processing loop continues until all messages processed
+   - Snapshots inbox before processing to avoid collection modification
+   - Each handler invocation wrapped in try-catch for exception isolation
+
+3. **Synchronization Logic**:
+   - ProcessPendingMessagesAsync() acquires lock via WaitAsync(0) (non-blocking)
+   - If lock unavailable, returns immediately (another processing run is active)
+   - Processing loop checks processingRequested flag to handle messages added during processing
+   - Flag cleared before each processing pass, set by new DeliverAsync calls
+   - Loop continues until inbox empty and no new requests pending
+
+**Test Coverage:**
+- 17 tests total (all passing on net10.0 and net8.0)
+- New tests added:
+  - ProcessPendingMessages_WithConcurrency1_ProcessesSequentially
+  - ProcessPendingMessages_WithConcurrency4_ProcessesConcurrently
+  - ProcessPendingMessages_WithConcurrentHandlers_IsolatesExceptions
+
+**Test Results:**
+- All 17 tests passing on net10.0
+- All 17 tests passing on net8.0
+- No compilation warnings or errors
+- Code style validation passed
+
+**Design Patterns Applied:**
+1. Producer-Consumer Pattern: DeliverAsync produces, ProcessPendingMessagesAsync consumes
+2. Semaphore Pattern: Prevents concurrent processing runs while allowing new deliveries
+3. Parallel Iterator Pattern: Processes messages concurrently via Parallel.ForEachAsync
+4. Optimistic Concurrency: Uses processingRequested flag to detect new work without blocking
+
+**Architectural Benefits:**
+1. Throughput Scaling: Concurrency level tunable based on handler I/O vs CPU characteristics
+2. Fault Isolation: Handler exceptions do not block other messages from processing
+3. Sequential Guarantee: Concurrency=1 maintains strict message ordering when required
+4. Graceful Degradation: Processing continues even if individual handlers fail
+5. Backpressure Integration: Works with existing capacity limits and backpressure signaling
+
+### Files Modified
+- src/Orleans.Journaling/Messaging/DurableInboxExtension.cs (enhanced with concurrency)
+- test/Orleans.Journaling.Tests/DurableInboxExtensionTests.cs (4 new tests added)
+- research/feature-list.json (marked feature as passing)
+- research/progress.txt (this file)
