@@ -366,3 +366,57 @@ dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filt
 - ✅ `research/feature-list.json` (marked feature as passing)
 - ✅ `research/progress.txt` (this file)
 
+## 2025-01-15: OutgoingEnvelopeBuilder Deletion (COMPLETED)
+
+### Summary
+Successfully verified that OutgoingEnvelopeBuilder has been superseded by DurableEnvelopeBuilder and removed all references. This cleanup task ensures the codebase only uses the new fluent builder API with improved type safety and performance.
+
+### Implementation Details
+
+**Key Actions Performed:**
+1. **File Search**: Searched entire codebase for OutgoingEnvelopeBuilder references
+   - No actual `OutgoingEnvelopeBuilder.cs` file exists (was never created or already removed)
+   - No code references in `src/` or `test/` directories
+   - Only documentation references found in RFC spec and progress files
+
+2. **Documentation Updates**:
+   - Updated `research/specs/durable-inbox-outbox-rfc.md`:
+     - Marked CorrelationKey, DurableEnvelopeData, DurableEnvelopeBuilder as "✅ Implemented"
+     - Removed OutgoingEnvelopeBuilder from implementation table
+     - Added DurableEnvelopeBuilder with correct status
+     - Updated remaining work table to show completed features
+   - Updated `research/feature-list.json`:
+     - Marked "Delete OutgoingEnvelopeBuilder" feature as `passes: true`
+
+3. **Verification**:
+   - Confirmed no code files reference OutgoingEnvelopeBuilder
+   - Confirmed DurableEnvelopeBuilder is the only builder in use
+   - All documentation now consistently references DurableEnvelopeBuilder
+
+### Architectural Impact
+
+The transition from OutgoingEnvelopeBuilder to DurableEnvelopeBuilder provides:
+1. **Improved Type Safety**: Generic `WithBody<T>()` and `WithContextValue<T>()` methods
+2. **Better Performance**: Direct serialization into shared ArcBufferWriter via `IBufferWriter<byte>`
+3. **Hierarchical Correlation**: Support for `CorrelationKey` instead of flat `Guid`
+4. **Keyed Context**: Per-key context values with `Dictionary<string, (int Offset, int Length)>` indices
+5. **Builder Pooling**: `Reset()` method enables object pooling for high-throughput scenarios
+
+### Status Summary
+
+**Completed Features (4/4 core messaging types):**
+- ✅ CorrelationKey (hierarchical UTF-8 string type)
+- ✅ DurableEnvelopeData (keyed context indices with MigrationContext pattern)
+- ✅ DurableEnvelope (uses CorrelationKey for correlation)
+- ✅ DurableEnvelopeBuilder (fluent API with IBufferWriter<byte>)
+
+**Next Priority Features:**
+- Update IInboxHandlerContext to use builder pattern (CreateEnvelope() + non-generic Send())
+- Update IDurableOutbox to use non-generic Send(DurableEnvelope)
+- Update IDurableInboxObserver to use CorrelationKey parameter
+
+### Files Modified
+- ✅ `research/specs/durable-inbox-outbox-rfc.md` (updated implementation status)
+- ✅ `research/feature-list.json` (marked feature as passing)
+- ✅ `research/progress.txt` (this file)
+
