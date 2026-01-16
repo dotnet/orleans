@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -26,6 +27,9 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     private readonly Dictionary<Guid, TaskCompletionSource<DeliveryResult>> _pendingDeliveries;
     private readonly int _maxCapacity;
     private readonly TimeSpan _deduplicationWindow;
+    private readonly int _processingConcurrency;
+    private readonly SemaphoreSlim _processingLock = new(1, 1);
+    private volatile bool _processingRequested;
 
     /// <summary>
     /// Creates a new inbox extension instance.
@@ -38,6 +42,7 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     /// <param name="processed">Durable dictionary for processed message tracking.</param>
     /// <param name="maxCapacity">Maximum inbox capacity (default: 1000).</param>
     /// <param name="deduplicationWindow">How long to track processed messages (default: 7 days).</param>
+    /// <param name="processingConcurrency">Maximum number of messages to process concurrently (default: 1).</param>
     public DurableInboxExtension(
         IGrainContext grainContext,
         IStateMachineManager stateMachineManager,
@@ -46,7 +51,8 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         IDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> inbox,
         IDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> processed,
         int maxCapacity = 1000,
-        TimeSpan? deduplicationWindow = null)
+        TimeSpan? deduplicationWindow = null,
+        int processingConcurrency = 1)
     {
         ArgumentNullException.ThrowIfNull(grainContext);
         ArgumentNullException.ThrowIfNull(stateMachineManager);
@@ -55,6 +61,7 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         ArgumentNullException.ThrowIfNull(inbox);
         ArgumentNullException.ThrowIfNull(processed);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxCapacity);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(processingConcurrency);
 
         _grainContext = grainContext;
         _stateMachineManager = stateMachineManager;
@@ -66,6 +73,7 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         _pendingDeliveries = new Dictionary<Guid, TaskCompletionSource<DeliveryResult>>();
         _maxCapacity = maxCapacity;
         _deduplicationWindow = deduplicationWindow ?? TimeSpan.FromDays(7);
+        _processingConcurrency = processingConcurrency;
     }
 
     /// <summary>
@@ -98,6 +106,14 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     /// <param name="routeKey">The route key to check.</param>
     /// <returns>True if a handler is registered; otherwise, false.</returns>
     public bool HasHandler(string routeKey) => _handlers.ContainsKey(routeKey);
+
+    /// <summary>
+    /// Tries to get a handler for the specified route key.
+    /// </summary>
+    /// <param name="routeKey">The route key to get the handler for.</param>
+    /// <param name="handler">The handler if found.</param>
+    /// <returns>True if a handler is registered; otherwise, false.</returns>
+    public bool TryGetHandler(string routeKey, [MaybeNullWhen(false)] out IInboxHandler handler) => _handlers.TryGetValue(routeKey, out handler);
 
     /// <summary>
     /// Delivers a message to this grain's durable inbox.
@@ -239,28 +255,64 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     }
 
     /// <summary>
-    /// Processes all pending messages in the inbox.
+    /// Processes all pending messages in the inbox with configured concurrency.
+    /// Uses a lock to prevent concurrent processing runs, and loops until all messages are processed.
     /// </summary>
     private async Task ProcessPendingMessagesAsync()
     {
-        // Create a snapshot of pending messages to avoid collection modification
-        var pending = new List<DurableEnvelope>(_inbox.Values);
+        // Mark that processing was requested
+        _processingRequested = true;
 
-        foreach (var envelope in pending)
+        // Try to acquire the processing lock
+        if (!await _processingLock.WaitAsync(0).ConfigureAwait(false))
         {
-            try
+            return; // Another processing run is already in progress, it will pick up new messages
+        }
+
+        try
+        {
+            // Keep processing until no more messages or no more processing requests
+            while (_inbox.Count > 0)
             {
-                await ProcessMessageAsync(envelope).ConfigureAwait(false);
+                // Clear the processing request flag before processing
+                _processingRequested = false;
+
+                // Create a snapshot of pending messages to avoid collection modification
+                var pending = new List<DurableEnvelope>(_inbox.Values);
+
+                // Use ParallelOptions to control concurrency
+                var parallelOptions = new ParallelOptions
+                {
+                    MaxDegreeOfParallelism = _processingConcurrency
+                };
+
+                await Parallel.ForEachAsync(pending, parallelOptions, async (envelope, cancellationToken) =>
+                {
+                    try
+                    {
+                        await ProcessMessageAsync(envelope).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(
+                            ex,
+                            "Error processing message {MessageId} from {SenderId} on route '{RouteKey}'",
+                            envelope.MessageId,
+                            envelope.SenderId,
+                            envelope.RouteKey);
+                    }
+                }).ConfigureAwait(false);
+
+                // If no new processing requests came in, we're done
+                if (!_processingRequested)
+                {
+                    break;
+                }
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(
-                    ex,
-                    "Error processing message {MessageId} from {SenderId} on route '{RouteKey}'",
-                    envelope.MessageId,
-                    envelope.SenderId,
-                    envelope.RouteKey);
-            }
+        }
+        finally
+        {
+            _processingLock.Release();
         }
     }
 

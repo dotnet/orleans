@@ -255,7 +255,7 @@
       "Add unit tests for delivery scenarios",
       "Add integration tests for cross-grain message delivery"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -273,7 +273,7 @@
       "Add unit tests for processing scenarios",
       "Add unit tests for handler exceptions"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "refactor",
