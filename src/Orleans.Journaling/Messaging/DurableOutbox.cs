@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Orleans.Journaling.Messaging;
 
@@ -9,6 +11,11 @@ namespace Orleans.Journaling.Messaging;
 /// Durable outbox implementation for sending messages.
 /// Uses IDurableDictionary for persistent storage with automatic journaling.
 /// </summary>
+/// <remarks>
+/// This basic implementation does not include delivery capability.
+/// Use <see cref="DurableOutboxWithDelivery"/> for production use with synchronous delivery,
+/// or integrate with <see cref="OutboxDeliveryPump"/> for asynchronous delivery via DurableJobs.
+/// </remarks>
 internal sealed class DurableOutbox : IDurableOutbox
 {
     private readonly IDurableDictionary<Guid, DurableEnvelope> _outbox;
@@ -49,30 +56,21 @@ internal sealed class DurableOutbox : IDurableOutbox
     }
 
     /// <summary>
-    /// Removes a message after successful delivery and disposes its envelope data.
+    /// Removes a message after successful delivery.
     /// </summary>
     /// <param name="messageId">The unique identifier of the message to remove.</param>
     /// <returns>True if the message was found and removed; otherwise, false.</returns>
     /// <remarks>
     /// Called by the delivery pump after receiving DeliveryResult.Accepted or DeliveryResult.Duplicate
     /// from the target inbox. The removal is persisted via IStateMachineManager.WriteStateAsync().
-    /// The envelope's ArcBuffer resources are disposed to prevent memory leaks.
+    /// Note: We do NOT dispose the envelope's ArcBuffer here because the envelope has been
+    /// delivered to the receiver. Due to [Immutable] marking on DurableEnvelope/DurableEnvelopeData,
+    /// Orleans may share the reference (especially for local calls), so the receiver still needs
+    /// the buffer to be valid. The receiver is responsible for disposing after processing.
     /// </remarks>
     public bool RemoveMessage(Guid messageId)
     {
-        // Get the envelope before removing to dispose its data
-        if (_outbox.TryGetValue(messageId, out var envelope))
-        {
-            var removed = _outbox.Remove(messageId);
-            if (removed)
-            {
-                // Dispose ArcBuffer resources
-                envelope.Data.Dispose();
-            }
-            return removed;
-        }
-        
-        return false;
+        return _outbox.Remove(messageId);
     }
 
     /// <summary>
@@ -87,5 +85,22 @@ internal sealed class DurableOutbox : IDurableOutbox
     public bool TryGetMessage(Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope)
     {
         return _outbox.TryGetValue(messageId, out envelope);
+    }
+
+    /// <summary>
+    /// This basic implementation does not support delivery.
+    /// Use <see cref="DurableOutboxWithDelivery"/> for production use with delivery capability.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A completed task.</returns>
+    /// <remarks>
+    /// This method is a no-op in the basic implementation. Messages must be delivered
+    /// by an external mechanism such as the <see cref="OutboxDeliveryPump"/>.
+    /// </remarks>
+    public Task DeliverPendingMessagesAsync(CancellationToken cancellationToken = default)
+    {
+        // No-op: basic implementation does not deliver
+        // Use DurableOutboxWithDelivery or OutboxDeliveryPump for actual delivery
+        return Task.CompletedTask;
     }
 }

@@ -1,6 +1,21 @@
 [
   {
     "category": "bugfix",
+    "description": "Fix missing retry logic in DurableOutboxWithDelivery causing message loss under backpressure",
+    "steps": [
+      "Read src/Orleans.Journaling/Messaging/DurableOutboxWithDelivery.cs (lines 94-191)",
+      "DECISION: Use single-attempt delivery model, not synchronous retry loop (avoids blocking grain)",
+      "Remove retry loop to prevent Orleans grain method timeouts (30s timeout exceeded with blocking retries)",
+      "Rely on natural retry mechanism via ACK feedback loop: receiver sends ACK -> sender WriteStateAsync() -> retry delivery",
+      "Update logging to show backpressured messages remain in outbox for next attempt",
+      "Messages eventually delivered via repeated WriteStateAsync() calls triggered by grain activity",
+      "Run HighThroughputBackpressureTests to verify eventual delivery without timeouts",
+      "Verify tests pass on both net10.0 and net8.0"
+    ],
+    "passes": true
+  },
+  {
+    "category": "bugfix",
     "description": "Fix DurableInboxExtension concurrent handler execution violating single-threaded grain model",
     "steps": [
       "Read DurableInboxExtension.ProcessPendingMessagesAsync() method (lines 315-338)",

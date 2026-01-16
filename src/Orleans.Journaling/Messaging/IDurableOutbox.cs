@@ -112,4 +112,16 @@ public interface IDurableOutbox
     /// iterates messages via the <see cref="Messages"/> property.
     /// </remarks>
     bool TryGetMessage(Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope);
+
+    /// <summary>
+    /// Triggers delivery of all pending messages in the outbox.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task representing the delivery operation.</returns>
+    /// <remarks>
+    /// This method should be called after <c>IStateMachineManager.WriteStateAsync()</c> to deliver
+    /// messages that were added via <see cref="Send"/>. If the outbox is empty, this method returns immediately.
+    /// Delivery is done synchronously - for asynchronous delivery, use the <see cref="OutboxDeliveryPump"/> with DurableJobs.
+    /// </remarks>
+    Task DeliverPendingMessagesAsync(CancellationToken cancellationToken = default);
 }
