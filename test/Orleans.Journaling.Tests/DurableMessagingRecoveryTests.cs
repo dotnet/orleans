@@ -205,7 +205,6 @@ public class DurableMessagingRecoveryTests : IClassFixture<DurableMessagingRecov
                 {
                     opts.MaxCapacity = 100;
                     opts.DeduplicationWindow = TimeSpan.FromDays(7);
-                    opts.ProcessingConcurrency = 4;
                     opts.EnableLongPolling = false;
                     opts.DefaultPollTimeout = TimeSpan.FromSeconds(1);
                 });
