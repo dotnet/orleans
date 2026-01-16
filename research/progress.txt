@@ -1,0 +1,92 @@
+# Orleans Journaling - Implementation Progress
+
+## 2025-01-15: CorrelationKey Implementation (COMPLETED)
+
+### Summary
+Successfully implemented the CorrelationKey hierarchical UTF-8 string type for distributed message correlation in Orleans.Journaling. This is the foundational type for the durable messaging system, modeled after HierarchicalKey from System.Distributed.DurableTasks.
+
+### Implementation Details
+
+**File Created:**
+- `src/Orleans.Journaling/Messaging/CorrelationKey.cs` (710 lines)
+
+**Key Features Implemented:**
+1. **Hierarchical Path Structure**: Uses '/' as segment separator and '\\' as escape character
+2. **Interface Implementations**:
+   - `ISpanFormattable` - for efficient string formatting without allocations
+   - `IEquatable<CorrelationKey>` - with semantic equality (same path = equal, regardless of construction)
+   - `IParsable<CorrelationKey>` - for parsing from strings
+   - `ISpanParsable<CorrelationKey>` - for parsing from spans
+3. **Factory Methods**:
+   - `Create(string)` - creates key from path string with validation
+   - `Create(CorrelationKey?, string)` - creates child key with parent reference
+   - `CreateChildKey(string)` - instance method to create child
+   - `CreateEscapedChildKey(string)` - creates child with escaped separators
+   - `CreateEscaped(string)` - static method to create escaped key
+4. **Relationship Methods**:
+   - `IsParentOf()` - checks if this key is direct parent
+   - `IsChildOf()` - checks if this key is direct child
+   - `IsAncestorOf()` - checks if this key is ancestor (includes self)
+   - `GetParent()` - returns parent key or null
+5. **Validation**: `IsSegmentationValid()` validates no empty segments, proper escape sequences
+6. **Enumeration**: `SegmentEnumerator` ref struct for efficient segment iteration
+7. **Optimizations**:
+   - Uses stackalloc for small strings (≤256 chars) in GetHashCode
+   - ArrayPool for larger allocations
+   - Linked-list structure enables efficient child creation
+
+**Test Coverage:**
+- `test/Orleans.Journaling.Tests/CorrelationKeyTests.cs` (47 tests, all passing)
+- Tests cover:
+  - Basic creation and validation
+  - Semantic equality across different construction methods
+  - Escaping of segment separators and escape characters
+  - Parent/child/ancestor relationships
+  - GetParent() navigation
+  - Parse/TryParse methods (string and span variants)
+  - TryFormat for ISpanFormattable
+  - Segment enumeration with and without escaped characters
+  - Length property calculation
+  - Complex multi-level hierarchies
+  - Invalid input rejection (empty segments, incomplete escapes, invalid escape sequences)
+
+**Test Results:**
+- ✅ All 47 tests passing on net10.0
+- ✅ All 47 tests passing on net8.0
+- ✅ No compilation warnings or errors
+- ✅ Code style validation passed
+
+**Design Patterns Applied:**
+- **Factory Pattern**: Static factory methods control instance creation and validation
+- **Linked List Pattern**: Parent references enable efficient hierarchy navigation
+- **Flyweight Pattern**: Shared parent references reduce memory overhead
+- **State Machine**: Escape character handling uses simple boolean state machine
+
+**Code Quality:**
+- Follows Orleans coding standards (Allman braces, 4-space indent, `var` everywhere)
+- Comprehensive XML documentation on all public members
+- Proper use of modern C# features (pattern matching, switch expressions, stackalloc)
+- Attributes for Orleans serialization: `[GenerateSerializer, Immutable]`
+
+### Next Steps
+The CorrelationKey implementation is complete and ready for use in subsequent features:
+- DurableEnvelopeData keyed context (uses CorrelationKey)
+- DurableEnvelope update (replaces Guid? CorrelationId with CorrelationKey?)
+- DurableEnvelopeBuilder (uses CorrelationKey for correlation)
+- IDurableInboxObserver (uses CorrelationKey instead of Guid)
+
+### Verification Commands
+```powershell
+# Build the project
+dotnet build src/Orleans.Journaling/Orleans.Journaling.csproj
+
+# Run all CorrelationKey tests
+dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filter "FullyQualifiedName~CorrelationKeyTests"
+```
+
+### Files Modified
+- ✅ `src/Orleans.Journaling/Messaging/CorrelationKey.cs` (created)
+- ✅ `test/Orleans.Journaling.Tests/CorrelationKeyTests.cs` (created)
+- ✅ `research/feature-list.json` (marked feature as passing)
+- ✅ `research/progress.txt` (this file)
+
