@@ -91,7 +91,7 @@
       "Add unit tests for builder pattern usage",
       "Add unit tests showing reply pattern via CreateEnvelope().To(Envelope.ReplyTo.Value, routeKey)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -103,7 +103,7 @@
       "Keep void return type (no MessageId returned)",
       "Add unit tests for non-generic Send usage"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
