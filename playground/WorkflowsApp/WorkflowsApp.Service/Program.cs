@@ -46,8 +46,8 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
         builder.Host.UseDefaultServiceProvider(o => o.ValidateOnBuild = false);
-        builder.AddKeyedAzureBlobClient("state");
-        builder.AddKeyedAzureTableClient("clustering");
+        builder.AddKeyedAzureBlobServiceClient("state");
+        builder.AddKeyedAzureTableServiceClient("clustering");
         builder.UseOrleans(siloBuilder =>
             {
                 //siloBuilder.UseLocalhostClustering();
