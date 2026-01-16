@@ -221,7 +221,7 @@
       "Add unit tests for default values",
       "Add unit tests for validation"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
