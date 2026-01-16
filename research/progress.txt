@@ -1868,3 +1868,111 @@ Created comprehensive integration tests for durable messaging recovery scenarios
 - Updated: research/feature-list.json (marked recovery scenarios as passing)
 - Updated: research/progress.txt (this entry)
 
+
+
+## 2026-01-16: Deserialization Failure Integration Tests (COMPLETED)
+
+### Summary
+Successfully implemented comprehensive integration tests for deserialization failure handling in the Orleans.Journaling durable messaging system. These tests verify that grains can gracefully recover from deserialization failures when message body or context values have type mismatches, ensuring robust operation even when message schemas change over time.
+
+### Implementation Details
+
+**File Created:**
+- test/Orleans.Journaling.Tests/DeserializationFailureTests.cs (685 lines)
+
+**Key Features Tested:**
+
+1. **Type Mismatch Handling**:
+   - Handler_WithTypeMismatch_ContinuesOperationGracefully - Verifies TryGetBody<T>() returns false on type mismatch
+   - Grain continues operating and tracks failure without crashing
+   - Tests int vs string body type mismatch
+
+2. **Context Value Isolation**:
+   - Handler_WithContextTypeMismatch_AccessesBodySuccessfully - Tests TryGetContextValue<T>() isolation
+   - Verifies context deserialization failure doesn't prevent body access
+   - Tests int context value when string expected
+
+3. **Type Discovery Pattern**:
+   - Handler_WithUnavailableType_SkipsMessageGracefully - Tests handler trying multiple types
+   - Simulates schema evolution where old message types aren't available
+   - Handler tries TypeA, TypeB, TypeC until one succeeds
+
+4. **Fallback to Raw Bytes**:
+   - Handler_WithDeserializationFailure_UsesFallbackLogic - Verifies fallback pattern
+   - Uses GetBodyBytes() and TryGetContextBytes() when typed deserialization fails
+   - Enables logging raw message data for debugging
+
+5. **Mixed Message Processing**:
+   - Handler_WithMixedMessages_ProcessesValidOnesOnly - Tests selective processing
+   - Handler receives 3 valid + 2 invalid messages
+   - Verifies valid messages processed, invalid messages skipped gracefully
+   - Tracks valid/invalid counts for monitoring
+
+6. **Grain Survival Across Deactivation**:
+   - Handler_AfterDeserializationFailure_SurvivesDeactivation - Tests persistence
+   - Grain processes invalid message, deactivates, then reactivates
+   - Verifies grain state (counters) persists correctly
+   - Ensures no data corruption from deserialization failures
+
+**Test Grains Implemented:**
+- SenderGrain - Sends various message types to test receivers
+- TypeMismatchHandlerGrain - Expects int but receives string, detects mismatch via TryGetBody
+- ContextMismatchHandlerGrain - Tests context value type mismatch isolation
+- UnavailableTypeHandlerGrain - Tries TypeA/TypeB/TypeC until one deserializes
+- FallbackHandlerGrain - Falls back to raw bytes (GetBodyBytes/TryGetContextBytes)
+- MixedMessageHandlerGrain - Tracks ValidCount/InvalidCount for selective processing
+- SurvivorGrain - Tests survival across deactivation/reactivation after failures
+
+**Message Types:**
+- TypeA, TypeB, TypeC - Test types for type discovery pattern
+- All marked with [GenerateSerializer, Immutable] for Orleans serialization
+
+**Test Results:**
+- ✅ All 6 tests passing on net10.0 (7.5 seconds total)
+- ✅ All 6 tests passing on net8.0 (9.8 seconds total)
+- ✅ No compilation warnings or errors
+- ✅ Code style validation passed
+- ✅ Tests validate graceful degradation without grain crashes
+
+**Design Patterns Applied:**
+1. **Try Pattern**: TryGetBody<T>() and TryGetContextValue<T>() return bool for success/failure
+2. **Fallback Pattern**: Handlers can fall back to raw bytes (GetBodyBytes) on typed failure
+3. **Selective Processing**: Handlers skip invalid messages and continue with valid ones
+4. **Type Discovery**: Handlers try multiple types until one deserializes successfully
+
+**Code Quality:**
+- Follows Orleans coding standards (Allman braces, 4-space indent, var everywhere)
+- Uses [TestCategory("BVT"), TestCategory("Journaling")] for test categorization
+- Comprehensive test grain implementations demonstrating real-world patterns
+- Integration tests use InProcessTestCluster for realistic grain behavior
+- Tests verify state persistence via grain deactivation/reactivation
+
+**Architectural Benefits:**
+1. **Fault Tolerance**: Grains recover from deserialization failures without crashing
+2. **Schema Evolution**: Supports gradual rollout of message schema changes
+3. **Observability**: Handlers can track invalid message counts for monitoring
+4. **Debugging**: Raw byte access enables logging of problematic messages
+5. **Isolation**: Body deserialization failures don't prevent context value access
+
+### Verification Commands
+```powershell
+# Run all deserialization failure tests (net10.0)
+dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filter "FullyQualifiedName~DeserializationFailureTests" --framework net10.0
+
+# Run all deserialization failure tests (net8.0)
+dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filter "FullyQualifiedName~DeserializationFailureTests" --framework net8.0
+```
+
+### Files Modified
+- ✅ test/Orleans.Journaling.Tests/DeserializationFailureTests.cs (created, 685 lines)
+- ✅ research/feature-list.json (marked feature as passing)
+- ✅ research/progress.txt (this entry)
+
+### Next Priority Features
+The following features remain to be implemented:
+- Integration tests for multi-silo delivery
+- End-to-end test: Bank transfer workflow (canonical inbox/outbox example)
+- High-throughput backpressure scenario test
+- Add observability metrics for inbox/outbox
+- Add structured logging for inbox/outbox operations
+- Implement request context propagation for distributed tracing
