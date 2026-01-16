@@ -420,3 +420,204 @@ The transition from OutgoingEnvelopeBuilder to DurableEnvelopeBuilder provides:
 - ✅ `research/feature-list.json` (marked feature as passing)
 - ✅ `research/progress.txt` (this file)
 
+## 2025-01-15: IInboxHandlerContext and Handler Interfaces Implementation (COMPLETED)
+
+### Summary
+Successfully implemented the IInboxHandlerContext interface with builder pattern, along with IInboxHandler, IDurableOutbox interfaces, and the InboxHandlerContext implementation. This provides the core abstraction for inbox message handling with non-generic envelope creation and sending.
+
+### Implementation Details
+
+**Files Created:**
+- `src/Orleans.Journaling/Messaging/IInboxHandler.cs` (132 lines)
+- `src/Orleans.Journaling/Messaging/IInboxHandlerContext.cs` (215 lines)
+- `src/Orleans.Journaling/Messaging/IDurableOutbox.cs` (104 lines)
+- `src/Orleans.Journaling/Messaging/InboxHandlerContext.cs` (152 lines)
+- `test/Orleans.Journaling.Tests/InboxHandlerContextTests.cs` (451 lines)
+
+**Key Features Implemented:**
+
+1. **IInboxHandler Interface**:
+   - Base interface with `HandleAsync(DurableEnvelope, IInboxHandlerContext, CancellationToken)` method
+   - Generic `IInboxHandler<TMessage>` variant with automatic deserialization
+   - Default interface implementation that deserializes envelope body and invokes typed handler
+   - Throws `InvalidOperationException` on deserialization failure for type safety
+
+2. **IInboxHandlerContext Interface**:
+   - `Envelope` property - provides access to current envelope being processed
+   - `GrainId` property - returns current grain's identity (used for ReplyTo)
+   - `CreateEnvelope()` method - returns pre-configured `DurableEnvelopeBuilder` with SessionPool and SenderId
+   - `Send(DurableEnvelope)` method - non-generic send that delegates to outbox
+   - `Outbox` property - provides direct access to `IDurableOutbox` for advanced scenarios
+   - Comprehensive XML documentation with examples showing reply patterns, correlation, and context values
+
+3. **IDurableOutbox Interface**:
+   - `Send(DurableEnvelope)` method - non-generic send accepting fully-built envelopes
+   - `Count` property - number of pending messages (for monitoring/backpressure)
+   - `Messages` property - enumeration of pending messages (no ordering guarantee)
+   - `RemoveMessage(Guid)` method - removes message after successful delivery
+   - `TryGetMessage(Guid, out DurableEnvelope)` method - retrieves specific message for diagnostics
+   - Dictionary-based storage (no ordering guarantees, aids deduplication)
+
+4. **InboxHandlerContext Implementation**:
+   - Immutable, thread-safe implementation of `IInboxHandlerContext`
+   - Constructor accepts: envelope, grainId, outbox, serializerSessionPool
+   - `CreateEnvelope()` returns new builder instance with injected SessionPool and SenderId
+   - `Send()` delegates directly to `Outbox.Send()`
+   - Lightweight design suitable for per-message instantiation
+
+**Test Coverage:**
+- `test/Orleans.Journaling.Tests/InboxHandlerContextTests.cs` (15 tests, all passing)
+- Tests cover:
+  - Constructor parameter injection and property exposure
+  - Envelope, GrainId, Outbox property getters
+  - CreateEnvelope() returning configured builder
+  - CreateEnvelope() setting correct SenderId on built envelopes
+  - CreateEnvelope() returning new instances (not pooled)
+  - Send() delegating to outbox
+  - Multiple Send() calls tracking all messages
+  - Reply pattern with ReplyTo set to context.GrainId
+  - Correlation key propagation and child key creation
+  - Context value serialization via WithContextValue()
+  - Typed handler deserialization and invocation
+  - Typed handler exception on type mismatch
+  - Envelope metadata access (SenderId, CorrelationKey, ReplyTo, etc.)
+
+**Test Results:**
+- ✅ All 15 tests passing on net10.0
+- ✅ All 15 tests passing on net8.0
+- ✅ No compilation warnings or errors
+- ✅ Code style validation passed
+- ✅ Builds successfully for both target frameworks
+
+**Design Patterns Applied:**
+1. **Builder Pattern**: CreateEnvelope() returns fluent builder for envelope construction
+2. **Strategy Pattern**: IInboxHandler allows different handling strategies per route
+3. **Template Method Pattern**: IInboxHandler<T> provides typed wrapper over non-generic IInboxHandler
+4. **Factory Pattern**: IInboxHandlerContext acts as factory for envelope builders
+5. **Dependency Injection**: Context receives outbox and session pool via constructor
+
+**Code Quality:**
+- Follows Orleans coding standards (Allman braces, 4-space indent, `var` everywhere)
+- Comprehensive XML documentation on all public members with realistic examples
+- Proper use of modern C# features (default interface methods, nullable reference types)
+- All XML documentation special characters properly escaped (`&lt;`, `&gt;`)
+- Internal implementation class for InboxHandlerContext (sealed for performance)
+
+**Architectural Benefits:**
+1. **Non-Generic API**: Matches Orleans patterns (streaming, transactions) for extension interfaces
+2. **Builder Pattern**: Ergonomic message creation without generic type parameters at send site
+3. **Type Safety**: Generic WithBody<T>() and WithContextValue<T>() provide compile-time checking
+4. **Testability**: Simple mock implementation (TestOutbox) demonstrates easy testing without mocking frameworks
+5. **Separation of Concerns**: Clear separation between handler context, builder, and outbox responsibilities
+6. **Durable RPC Support**: Built-in support for reply patterns via ReplyTo and correlation via CorrelationKey
+
+### Next Steps
+The IInboxHandlerContext implementation is complete and ready for use in subsequent features:
+- **IDurableInbox** - Will use IInboxHandler for route-based message dispatch
+- **DurableInboxExtension** - Will create InboxHandlerContext instances when invoking handlers
+- **IDurableInboxExtension** - Non-generic extension interface for message delivery
+- **OutboxDeliveryPump** - Will iterate IDurableOutbox.Messages and call DeliverAsync()
+
+### Verification Commands
+```powershell
+# Build the project
+dotnet build src/Orleans.Journaling/Orleans.Journaling.csproj
+
+# Run all InboxHandlerContext tests (net10.0)
+dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filter "FullyQualifiedName~InboxHandlerContextTests" --framework net10.0
+
+# Run all InboxHandlerContext tests (net8.0)
+dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filter "FullyQualifiedName~InboxHandlerContextTests" --framework net8.0
+```
+
+### Files Modified
+- ✅ `src/Orleans.Journaling/Messaging/IInboxHandler.cs` (created)
+- ✅ `src/Orleans.Journaling/Messaging/IInboxHandlerContext.cs` (created)
+- ✅ `src/Orleans.Journaling/Messaging/IDurableOutbox.cs` (created)
+- ✅ `src/Orleans.Journaling/Messaging/InboxHandlerContext.cs` (created)
+- ✅ `test/Orleans.Journaling.Tests/InboxHandlerContextTests.cs` (created)
+- ✅ `research/feature-list.json` (marked feature as passing)
+- ✅ `research/progress.txt` (this file)
+
+## 2025-01-15: IDurableOutbox Non-Generic Send Verification (COMPLETED)
+
+### Summary
+Verified that the IDurableOutbox interface already uses the non-generic `Send(DurableEnvelope envelope)` method as specified in the RFC. This feature was already implemented as part of the IInboxHandlerContext implementation. The interface follows the Orleans pattern of non-generic extension interfaces, similar to streaming and transactions.
+
+### Verification Details
+
+**Interface Status:**
+- ✅ `IDurableOutbox.Send(DurableEnvelope envelope)` method exists (non-generic)
+- ✅ No generic `Send<TBody>()` methods present in the codebase
+- ✅ Comprehensive XML documentation references `DurableEnvelopeBuilder`
+- ✅ Returns `void` (no MessageId returned, as specified)
+
+**Key Methods:**
+1. **Non-Generic Send**: `void Send(DurableEnvelope envelope)` - accepts fully-built envelopes
+2. **Message Management**:
+   - `Count` property - number of pending messages
+   - `Messages` property - enumeration of pending messages (no ordering guarantee)
+   - `RemoveMessage(Guid)` - removes message after successful delivery
+   - `TryGetMessage(Guid, out DurableEnvelope)` - retrieves specific message for diagnostics
+
+**Documentation Quality:**
+- Explains dictionary-based storage (no ordering guarantees)
+- Shows usage examples with `context.CreateEnvelope()` pattern
+- Documents integration with delivery pump and `IStateMachineManager.WriteStateAsync()`
+- Explains delivery result handling (Accepted, Duplicate, Backpressured, RouteNotFound)
+
+**Test Coverage:**
+- 15 tests in `InboxHandlerContextTests.cs` verify non-generic Send usage
+- Tests cover:
+  - Send delegation from `IInboxHandlerContext.Send()` to `IDurableOutbox.Send()`
+  - Multiple Send calls tracking all messages
+  - Builder pattern integration with `CreateEnvelope()`
+  - ReplyTo pattern
+  - Correlation key propagation
+  - Context value serialization
+- `TestOutbox` mock implementation demonstrates interface correctness
+- All tests pass on both net10.0 and net8.0
+
+**Test Results:**
+- ✅ All 15 tests passing on net10.0
+- ✅ All 15 tests passing on net8.0
+- ✅ No compilation warnings or errors
+- ✅ Code style validation passed
+
+**Architectural Benefits:**
+1. **Non-Generic Interface**: Follows Orleans conventions (streaming, transactions) for extension interfaces
+2. **Builder Pattern Integration**: Works seamlessly with `DurableEnvelopeBuilder` for ergonomic API
+3. **Type Safety**: Generic `WithBody<T>()` in builder provides compile-time checking before non-generic send
+4. **Simplicity**: No generic constraints at send site; all type complexity handled by builder
+5. **Testability**: Simple interface makes mocking easy (see `TestOutbox` implementation)
+
+### Status Summary
+
+**Completed Features (7/7 core messaging types and interfaces):**
+- ✅ CorrelationKey (hierarchical UTF-8 string type)
+- ✅ DurableEnvelopeData (keyed context indices with MigrationContext pattern)
+- ✅ DurableEnvelope (uses CorrelationKey for correlation)
+- ✅ DurableEnvelopeBuilder (fluent API with IBufferWriter<byte>)
+- ✅ OutgoingEnvelopeBuilder deletion
+- ✅ IInboxHandlerContext update (builder pattern with CreateEnvelope() + non-generic Send())
+- ✅ IDurableOutbox update (non-generic Send(DurableEnvelope))
+
+**Next Priority Features:**
+- Update IDurableInboxObserver to use CorrelationKey parameter
+- Implement DurableInboxExtension runtime
+- Implement DurableInbox storage and handler management
+- Implement DurableOutbox storage
+
+### Verification Commands
+```powershell
+# Run all InboxHandlerContext tests (net10.0) - verifies IDurableOutbox.Send()
+dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filter "FullyQualifiedName~InboxHandlerContextTests" --framework net10.0
+
+# Run all InboxHandlerContext tests (net8.0)
+dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filter "FullyQualifiedName~InboxHandlerContextTests" --framework net8.0
+```
+
+### Files Modified
+- ✅ `research/feature-list.json` (marked feature as passing)
+- ✅ `research/progress.txt` (this file)
+
