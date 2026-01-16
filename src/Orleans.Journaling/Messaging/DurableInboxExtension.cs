@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
@@ -83,6 +84,9 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         _pendingDeliveries = new Dictionary<Guid, TaskCompletionSource<DeliveryResult>>();
         _maxCapacity = maxCapacity;
         _deduplicationWindow = deduplicationWindow ?? TimeSpan.FromDays(7);
+
+        // Register observable gauge for inbox depth
+        JournalingInstruments.RegisterInboxDepthObserve(() => _inboxDict.Count);
     }
 
     /// <summary>
@@ -150,6 +154,10 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                 envelope.ReceiverId,
                 envelope.RouteKey);
 
+            // Record duplicate message metric
+            var grainType = _grainContext.GrainId.Type.ToString();
+            JournalingInstruments.OnInboxMessageReceived(grainType, envelope.RouteKey, "duplicate");
+
             return DeliveryResult.Duplicate();
         }
 
@@ -162,6 +170,10 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                 envelope.SenderId,
                 envelope.ReceiverId,
                 envelope.RouteKey);
+
+            // Record duplicate message metric
+            var grainType = _grainContext.GrainId.Type.ToString();
+            JournalingInstruments.OnInboxMessageReceived(grainType, envelope.RouteKey, "duplicate");
 
             // If long-polling, wait for existing processing to complete
             if (options.PollTimeout > TimeSpan.Zero)
@@ -182,6 +194,10 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                 _grainContext.GrainId,
                 envelope.MessageId,
                 envelope.SenderId);
+
+            // Record backpressure metric
+            var grainType = _grainContext.GrainId.Type.ToString();
+            JournalingInstruments.OnInboxMessageReceived(grainType, envelope.RouteKey, "backpressured");
 
             return DeliveryResult.Backpressured();
         }
@@ -204,6 +220,10 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                     envelope.MessageId,
                     envelope.SenderId);
 
+                // Record route not found metric
+                var grainType = _grainContext.GrainId.Type.ToString();
+                JournalingInstruments.OnInboxMessageReceived(grainType, envelope.RouteKey, "route_not_found");
+
                 return DeliveryResult.RouteNotFound(envelope.RouteKey);
             }
         }
@@ -221,6 +241,10 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
             envelope.ReceiverId,
             envelope.RouteKey,
             envelope.CorrelationKey?.ToString() ?? "(none)");
+
+        // Record accepted message metric
+        var grainTypeName = _grainContext.GrainId.Type.ToString();
+        JournalingInstruments.OnInboxMessageReceived(grainTypeName, envelope.RouteKey, "accepted");
 
         // If long-polling, wait for processing to complete
         if (options.PollTimeout > TimeSpan.Zero)
@@ -382,6 +406,8 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     private async Task ProcessMessageAsync(DurableEnvelope envelope)
     {
         var key = (envelope.SenderId, envelope.MessageId);
+        var grainTypeName = _grainContext.GrainId.Type.ToString();
+        var stopwatch = Stopwatch.StartNew();
 
         // Check if already processed (concurrent processing guard)
         if (!_inboxDict.ContainsKey(key))
@@ -420,6 +446,11 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                         envelope.SenderId,
                         envelope.CorrelationKey);
 
+                    // Record processing metrics
+                    stopwatch.Stop();
+                    JournalingInstruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "success");
+                    JournalingInstruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+
                     // Notify waiters
                     CompleteDelivery(envelope.MessageId, result);
                     return;
@@ -440,6 +471,11 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                     // Dispose envelope data
                     envelope.Data.Dispose();
 
+                    // Record processing metrics (error case)
+                    stopwatch.Stop();
+                    JournalingInstruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "error");
+                    JournalingInstruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+
                     // Notify waiters with error
                     CompleteDelivery(envelope.MessageId, DeliveryResult.Processed());
                     return;
@@ -458,6 +494,11 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
 
             // Dispose envelope data to release ArcBuffer resources
             envelope.Data.Dispose();
+
+            // Record metrics (route not found during processing)
+            stopwatch.Stop();
+            JournalingInstruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "route_not_found");
+            JournalingInstruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
 
             // Notify waiters
             CompleteDelivery(envelope.MessageId, DeliveryResult.RouteNotFound(envelope.RouteKey));
@@ -494,6 +535,11 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                 envelope.SenderId,
                 envelope.RouteKey);
 
+            // Record processing metrics
+            stopwatch.Stop();
+            JournalingInstruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "success");
+            JournalingInstruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+
             // Notify waiters
             CompleteDelivery(envelope.MessageId, DeliveryResult.Processed());
         }
@@ -514,6 +560,11 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
 
             // Dispose envelope data to release ArcBuffer resources (after persistence)
             envelope.Data.Dispose();
+
+            // Record processing metrics (error case)
+            stopwatch.Stop();
+            JournalingInstruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "error");
+            JournalingInstruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
 
             // Notify waiters with error
             CompleteDelivery(envelope.MessageId, DeliveryResult.Processed());

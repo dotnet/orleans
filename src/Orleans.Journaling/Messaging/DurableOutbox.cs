@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
@@ -94,6 +95,9 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
         _logger = logger;
         _backpressureRetryDelay = options.Value.BackpressureRetryDelay;
 
+        // Register observable gauge for outbox depth
+        JournalingInstruments.RegisterOutboxDepthObserve(() => Count);
+
         // Subscribe to the grain lifecycle to start pumping on activation
         var lifecycle = grainContext.ObservableLifecycle;
         lifecycle.Subscribe(RuntimeTypeNameFormatter.Format(GetType()), GrainLifecycleStage.Activate, this);
@@ -120,6 +124,10 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
 
         // Store envelope keyed by MessageId for O(1) lookup during removal
         this[envelope.MessageId] = envelope;
+
+        // Record metric for message sent
+        var grainType = _grainContext.GrainId.Type.ToString();
+        JournalingInstruments.OnOutboxMessageSent(grainType, envelope.RouteKey);
 
         // NOTE: We do NOT call EnsurePumpScheduled() here. The pump will be scheduled
         // when OnWriteCompleted is called, which happens after WriteStateAsync() completes.
@@ -200,12 +208,14 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
 
         _logger.LogDebug("Delivering {Count} durable messages from outbox", pending.Count);
 
+        var grainTypeName = _grainContext.GrainId.Type.ToString();
         var deliveredCount = 0;
         var backpressuredCount = 0;
         var failedCount = 0;
 
         foreach (var envelope in pending)
         {
+            var stopwatch = Stopwatch.StartNew();
             try
             {
                 // Get the target grain's inbox extension
@@ -215,6 +225,8 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
                 var options = new DeliveryOptions { PollTimeout = TimeSpan.Zero };
 
                 var result = await targetGrain.DeliverAsync(envelope, options, cancellationToken).ConfigureAwait(true);
+
+                stopwatch.Stop();
 
                 switch (result.Status)
                 {
@@ -232,6 +244,11 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
                             envelope.ReceiverId,
                             envelope.RouteKey,
                             result.Status);
+
+                        // Record successful delivery metrics
+                        var statusLabel = result.Status.ToString().ToLowerInvariant();
+                        JournalingInstruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, statusLabel);
+                        JournalingInstruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
                         break;
 
                     case DeliveryStatus.RouteNotFound:
@@ -245,6 +262,10 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
                             envelope.RouteKey,
                             result.Message ?? "(no message)");
                         failedCount++;
+
+                        // Record metric
+                        JournalingInstruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "route_not_found");
+                        JournalingInstruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
                         break;
 
                     case DeliveryStatus.Backpressured:
@@ -254,6 +275,10 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
                             "Backpressured delivering message {MessageId} to {ReceiverId}, will retry later",
                             envelope.MessageId,
                             envelope.ReceiverId);
+
+                        // Record metric
+                        JournalingInstruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "backpressured");
+                        JournalingInstruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
                         break;
 
                     default:
@@ -267,6 +292,7 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
             }
             catch (Exception ex)
             {
+                stopwatch.Stop();
                 failedCount++;
                 _logger.LogError(
                     ex,
@@ -275,6 +301,10 @@ internal sealed class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, 
                     envelope.SenderId,
                     envelope.ReceiverId,
                     envelope.RouteKey);
+
+                // Record error metric
+                JournalingInstruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "error");
+                JournalingInstruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
             }
         }
 
