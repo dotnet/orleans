@@ -22,6 +22,7 @@ public class IntegrationTestFixture : IAsyncLifetime
         builder.ConfigureSilo((options, siloBuilder) =>
         {
             siloBuilder.AddJournalStorage();
+            siloBuilder.AddDurableMessaging();
             siloBuilder.UseJsonJournalFormat(JournalingTestsJsonContext.Default);
             siloBuilder.Services.AddSingleton(storageProvider);
             siloBuilder.Services.AddSingleton<IJournalStorageProvider>(storageProvider);
