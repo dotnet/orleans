@@ -1,0 +1,512 @@
+[
+  {
+    "category": "functional",
+    "description": "Create CorrelationKey hierarchical UTF-8 string type",
+    "steps": [
+      "Create src/Orleans.Journaling/Messaging/CorrelationKey.cs",
+      "Model after HierarchicalKey from System.Distributed.DurableTasks",
+      "Implement '/' as segment separator and '\\' as escape character",
+      "Implement ISpanFormattable, IEquatable<CorrelationKey>, IParsable<CorrelationKey>",
+      "Add Create(), CreateChildKey(), CreateEscapedChildKey() factory methods",
+      "Add IsParentOf(), IsChildOf(), IsAncestorOf() relationship methods",
+      "Add GetParent() method to navigate hierarchy",
+      "Add SegmentEnumerator for iterating over path segments",
+      "Add validation logic via IsSegmentationValid()",
+      "Add unit tests for creation, parsing, hierarchy, escaping"
+    ],
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "Update DurableEnvelopeData to use keyed context indices (MigrationContext pattern)",
+    "steps": [
+      "Replace Dictionary<string, object?> with Dictionary<string, (int Offset, int Length)> _contextIndices",
+      "Remove _requestContextSlice field (replaced by keyed indices)",
+      "Remove TryGetRequestContext() method",
+      "Add TryGetContextValue<T>(string key) method for per-key typed access",
+      "Add HasContextKey(string key) method",
+      "Add ContextKeys property to enumerate keys",
+      "Add TryGetContextBytes(string key) for raw forwarding without deserialization",
+      "Update internal storage to share ArcBuffer for body and all context values",
+      "Add unit tests for per-key serialization/deserialization",
+      "Add unit tests for partial failure isolation (one bad value doesn't prevent accessing others)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Update DurableEnvelope to use CorrelationKey instead of Guid",
+    "steps": [
+      "Change field from 'Guid? CorrelationId' to 'CorrelationKey? CorrelationKey'",
+      "Update XML documentation to reference hierarchical correlation",
+      "Update examples in comments to show hierarchical keys (e.g., 'transfer-123/debit')",
+      "Verify [GenerateSerializer, Immutable] attributes are present",
+      "Add unit tests for serialization round-trip with CorrelationKey",
+      "Add unit tests for null CorrelationKey handling"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Create DurableEnvelopeBuilder with builder pattern and keyed context",
+    "steps": [
+      "Create src/Orleans.Journaling/Messaging/DurableEnvelopeBuilder.cs",
+      "Implement IBufferWriter<byte> for direct serialization into shared buffer",
+      "Add internal SerializerSessionPool and GrainId SenderId properties",
+      "Add To(GrainId target, string routeKey) method",
+      "Add WithBody<T>(T body) method with immediate serialization",
+      "Add WithCorrelationKey(CorrelationKey) and WithCorrelationKey(string) overloads",
+      "Add WithReplyTo(GrainId replyTo) method",
+      "Add WithContextValue<T>(string key, T value) for per-key typed context",
+      "Use Dictionary<string, (int Offset, int Length)> for context indices",
+      "Add Build() method to create DurableEnvelope",
+      "Add Reset() method for builder pooling",
+      "Store body and context in shared ArcBufferWriter",
+      "Add validation for duplicate keys in WithContextValue",
+      "Add validation for missing body/route in Build()",
+      "Add unit tests for builder usage patterns",
+      "Add unit tests for order-independence (body/context can be added in any order)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Delete OutgoingEnvelopeBuilder (superseded by DurableEnvelopeBuilder)",
+    "steps": [
+      "Remove src/Orleans.Journaling/Messaging/OutgoingEnvelopeBuilder.cs",
+      "Verify no references remain to OutgoingEnvelopeBuilder in codebase",
+      "Update any documentation referencing OutgoingEnvelopeBuilder"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Update IInboxHandlerContext to use builder pattern",
+    "steps": [
+      "Replace Reply<TBody>() method with non-generic Send(DurableEnvelope)",
+      "Replace Send<TBody>() method with CreateEnvelope() returning DurableEnvelopeBuilder",
+      "Update Send() to accept DurableEnvelope directly (non-generic)",
+      "Update XML documentation to describe builder pattern usage",
+      "Add example showing CreateEnvelope().To(...).WithBody(...).Build() pattern",
+      "Add unit tests for builder pattern usage",
+      "Add unit tests showing reply pattern via CreateEnvelope().To(Envelope.ReplyTo.Value, routeKey)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Update IDurableOutbox to use non-generic Send",
+    "steps": [
+      "Replace Send<TBody>(...) method with Send(DurableEnvelope envelope)",
+      "Remove generic type parameter and all individual parameters",
+      "Update XML documentation to reference DurableEnvelopeBuilder",
+      "Keep void return type (no MessageId returned)",
+      "Add unit tests for non-generic Send usage"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Update IDurableInboxObserver to use CorrelationKey",
+    "steps": [
+      "Change OnResponseAsync parameter from 'Guid correlationId' to 'CorrelationKey correlationKey'",
+      "Update XML documentation to reference hierarchical correlation",
+      "Add unit tests for observer callbacks with CorrelationKey"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Implement DurableInboxExtension runtime",
+    "steps": [
+      "Create src/Orleans.Journaling/Messaging/DurableInboxExtension.cs",
+      "Implement IDurableInboxExtension interface",
+      "Implement ILifecycleParticipant<IGrainLifecycle> for activation lifecycle",
+      "Add constructor with IGrainContext, IStateMachineManager, inbox/processed dictionaries",
+      "Implement DeliverAsync with route validation, deduplication, backpressure, persistence",
+      "Add long-polling support via TaskCompletionSource<DeliveryResult> tracking",
+      "Add CompleteDelivery(Guid messageId, DeliveryResult) for processing pump callback",
+      "Add handler registry Dictionary<string, IInboxHandler>",
+      "Implement handler registration via RegisterHandler(string routeKey, IInboxHandler)",
+      "Add processing pump to invoke handlers for pending messages",
+      "Implement atomic persistence via IStateMachineManager.WriteStateAsync",
+      "Add metrics/logging for delivery, processing, backpressure",
+      "Add unit tests for DeliverAsync scenarios (accepted, duplicate, backpressured, route not found)",
+      "Add unit tests for long-polling timeout behavior",
+      "Add integration tests for end-to-end message delivery"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Implement DurableInbox storage and handler management",
+    "steps": [
+      "Create src/Orleans.Journaling/Messaging/DurableInbox.cs",
+      "Implement IDurableInbox interface",
+      "Use IDurableDictionary<(GrainId, Guid), DurableEnvelope> for inbox storage",
+      "Use IDurableDictionary<(GrainId, Guid), DateTimeOffset> for processed messages tracking",
+      "Implement Count, Capacity, Messages properties",
+      "Implement TryGetMessage, RemoveMessage, ContainsOrProcessed methods",
+      "Implement MarkProcessed for deduplication tracking",
+      "Add handler registry Dictionary<string, IInboxHandler>",
+      "Implement RegisterHandler, HasHandler methods",
+      "Add capacity checking for backpressure",
+      "Add unit tests for message storage/retrieval",
+      "Add unit tests for deduplication tracking",
+      "Add unit tests for handler registration"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Implement DurableOutbox storage",
+    "steps": [
+      "Create src/Orleans.Journaling/Messaging/DurableOutbox.cs",
+      "Implement IDurableOutbox interface",
+      "Use IDurableDictionary<Guid, DurableEnvelope> for outbox storage",
+      "Implement Count, Messages properties",
+      "Implement Send(DurableEnvelope) method",
+      "Implement RemoveMessage, TryGetMessage methods",
+      "Add atomic persistence via IStateMachineManager.WriteStateAsync",
+      "Add unit tests for message storage/retrieval",
+      "Add unit tests for message removal after delivery"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Implement InboxHandlerContext",
+    "steps": [
+      "Create src/Orleans.Journaling/Messaging/InboxHandlerContext.cs",
+      "Implement IInboxHandlerContext interface",
+      "Add constructor with Envelope, GrainId, IDurableOutbox, SerializerSessionPool",
+      "Implement Envelope, GrainId, Outbox properties",
+      "Implement CreateEnvelope() to return DurableEnvelopeBuilder with injected SessionPool/SenderId",
+      "Implement Send(DurableEnvelope) to delegate to Outbox.Send",
+      "Add unit tests for builder creation",
+      "Add unit tests for Send delegation"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Create DurableInboxOptions configuration",
+    "steps": [
+      "Create src/Orleans.Journaling/Messaging/DurableInboxOptions.cs",
+      "Add MaxCapacity property (default: 1000)",
+      "Add DeduplicationWindow property (default: 7 days)",
+      "Add ProcessingConcurrency property for parallel handler invocation",
+      "Add EnableLongPolling property",
+      "Add validation logic for configuration values",
+      "Add unit tests for default values",
+      "Add unit tests for validation"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Implement DI registration for inbox/outbox",
+    "steps": [
+      "Create extension methods for IServiceCollection",
+      "Add keyed service registration for inbox IDurableDictionary (key: 'inbox')",
+      "Add keyed service registration for processed messages IDurableDictionary (key: 'inbox-processed')",
+      "Add keyed service registration for outbox IDurableDictionary (key: 'outbox')",
+      "Register DurableInboxExtension as grain extension",
+      "Register DurableInbox, DurableOutbox implementations",
+      "Register InboxHandlerContext factory",
+      "Configure DurableInboxOptions with IOptions pattern",
+      "Add integration tests for DI resolution"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Implement outbox delivery pump with DurableJobs integration",
+    "steps": [
+      "Create delivery pump that iterates pending outbox messages",
+      "For each message, call target grain's IDurableInboxExtension.DeliverAsync",
+      "Handle DeliveryResult status codes (Accepted, Duplicate, Backpressured, RouteNotFound)",
+      "Remove message from outbox on Accepted or Duplicate",
+      "Implement exponential backoff on Backpressured",
+      "Log warnings on RouteNotFound (may require manual intervention)",
+      "Integrate with DurableJobs as per-grain liveness driver",
+      "Ensure grains with pending outbox work are activated",
+      "Add metrics for delivery attempts, successes, failures",
+      "Add unit tests for delivery scenarios",
+      "Add integration tests for cross-grain message delivery"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Implement inbox processing pump",
+    "steps": [
+      "Create processing pump that iterates pending inbox messages",
+      "Route messages to handlers by RouteKey",
+      "Invoke handlers with IInboxHandlerContext",
+      "Handle handler exceptions gracefully (log, optionally retry)",
+      "Mark messages as processed after successful handler completion",
+      "Remove processed messages from inbox",
+      "Persist state atomically via IStateMachineManager.WriteStateAsync",
+      "Notify long-polling waiters via CompleteDelivery",
+      "Add configurable processing concurrency",
+      "Add unit tests for processing scenarios",
+      "Add unit tests for handler exceptions"
+    ],
+    "passes": false
+  },
+  {
+    "category": "refactor",
+    "description": "Implement ArcBuffer lifecycle management for DurableEnvelopeData",
+    "steps": [
+      "Ensure DurableEnvelopeData.Dispose() properly disposes ArcBuffer",
+      "Track buffer lifecycle in inbox/outbox dictionaries",
+      "Dispose DurableEnvelopeData when messages are removed",
+      "Add finalizer to detect buffer leaks",
+      "Add unit tests for buffer disposal",
+      "Add memory leak tests"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Unit tests for CorrelationKey",
+    "steps": [
+      "Test Create() with valid/invalid inputs",
+      "Test Parse() and TryParse() methods",
+      "Test CreateChildKey() and CreateEscapedChildKey()",
+      "Test IsParentOf(), IsChildOf(), IsAncestorOf()",
+      "Test GetParent() navigation",
+      "Test segment enumeration",
+      "Test escaping behavior (\\/)",
+      "Test equality and GetHashCode",
+      "Test TryFormat() and ToString()",
+      "Test empty segment validation"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Unit tests for DurableEnvelopeData keyed context",
+    "steps": [
+      "Test TryGetContextValue<T>() for existing/missing keys",
+      "Test HasContextKey() and ContextKeys enumeration",
+      "Test TryGetContextBytes() for raw forwarding",
+      "Test per-key serialization round-trip",
+      "Test partial failure isolation (bad value doesn't affect others)",
+      "Test TryGetBody<T>() still works correctly",
+      "Test buffer lifecycle and disposal",
+      "Test empty context (no keys added)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Unit tests for DurableEnvelopeBuilder",
+    "steps": [
+      "Test To() + WithBody() + Build() basic pattern",
+      "Test WithCorrelationKey(CorrelationKey) and WithCorrelationKey(string)",
+      "Test WithReplyTo(GrainId)",
+      "Test WithContextValue<T>() for multiple keys",
+      "Test order-independence (body/context can be added in any order)",
+      "Test duplicate key detection in WithContextValue",
+      "Test validation errors (missing body, missing route)",
+      "Test Reset() for builder pooling",
+      "Test IBufferWriter<byte> integration"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Unit tests for inbox/outbox deduplication",
+    "steps": [
+      "Test (SenderId, MessageId) composite key deduplication",
+      "Test duplicate message rejection",
+      "Test ContainsOrProcessed() checking both inbox and processed dictionaries",
+      "Test MarkProcessed() tracking",
+      "Test deduplication window expiration (if implemented)",
+      "Test deduplication across grain reactivation"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Unit tests for backpressure",
+    "steps": [
+      "Test DeliveryResult.Backpressured() when inbox at capacity",
+      "Test backpressure signaling to sender",
+      "Test exponential backoff in delivery pump",
+      "Test capacity configuration via DurableInboxOptions",
+      "Test message acceptance after capacity becomes available"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Unit tests for long-polling",
+    "steps": [
+      "Test DeliverAsync with PollTimeout > 0",
+      "Test DeliveryResult.Pending() on timeout",
+      "Test DeliveryResult.Processed() on completion within timeout",
+      "Test CompleteDelivery() notification to waiters",
+      "Test multiple concurrent waiters",
+      "Test cancellation token handling"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Integration tests for end-to-end durable RPC",
+    "steps": [
+      "Create test grains with inbox/outbox handlers",
+      "Test request/response flow with CorrelationKey",
+      "Test reply via Envelope.ReplyTo",
+      "Test hierarchical correlation (parent/child requests)",
+      "Test long-polling request/response",
+      "Test observer callback via IDurableInboxObserver",
+      "Test atomic persistence across request/response"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Integration tests for recovery scenarios",
+    "steps": [
+      "Test grain deactivation with pending inbox messages",
+      "Test grain reactivation and message processing resumption",
+      "Test grain deactivation with pending outbox messages",
+      "Test outbox delivery pump resumption after reactivation",
+      "Test cluster restart with pending messages",
+      "Test deduplication across grain reactivation",
+      "Test processed message tracking persistence"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Integration tests for deserialization failure handling",
+    "steps": [
+      "Test TryGetBody<T>() returning false on type mismatch",
+      "Test TryGetContextValue<T>() returning false on type mismatch",
+      "Test grain recovery when body type is unavailable",
+      "Test handler receiving undeserializable message",
+      "Test logging/metrics for deserialization failures",
+      "Test graceful degradation (skip bad message vs crash)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Integration tests for multi-silo delivery",
+    "steps": [
+      "Create multi-silo test cluster",
+      "Test message delivery from grain on silo A to grain on silo B",
+      "Test backpressure signaling across silos",
+      "Test long-polling across silos",
+      "Test network partition recovery",
+      "Test silo failure and message persistence"
+    ],
+    "passes": false
+  },
+  {
+    "category": "performance",
+    "description": "End-to-end test: Bank transfer workflow (canonical inbox/outbox example)",
+    "steps": [
+      "Implement AccountGrain with debit/credit handlers",
+      "Implement TransferGrain with inbox/outbox coordination",
+      "Test transfer workflow: initiate -> debit -> credit -> complete",
+      "Test rollback on failure (credit fails, rollback debit)",
+      "Test exactly-once debit/credit via deduplication",
+      "Test atomic persistence of transfer state",
+      "Test recovery after grain deactivation mid-transfer",
+      "Measure end-to-end latency",
+      "Measure throughput with concurrent transfers"
+    ],
+    "passes": false
+  },
+  {
+    "category": "performance",
+    "description": "High-throughput backpressure scenario test",
+    "steps": [
+      "Create sender grain flooding messages to receiver",
+      "Configure low inbox capacity to trigger backpressure",
+      "Verify DeliveryResult.Backpressured() is returned",
+      "Verify sender implements exponential backoff",
+      "Verify messages are not lost",
+      "Measure steady-state throughput under backpressure",
+      "Measure recovery time when backpressure is relieved"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Add observability metrics for inbox/outbox",
+    "steps": [
+      "Implement orleans_inbox_messages_received_total counter",
+      "Implement orleans_inbox_messages_processed_total counter",
+      "Implement orleans_inbox_depth gauge",
+      "Implement orleans_outbox_depth gauge",
+      "Implement orleans_inbox_processing_duration_seconds histogram",
+      "Add labels for grain_type, route_key, status",
+      "Add metrics tests",
+      "Add Prometheus/OpenTelemetry integration"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Add structured logging for inbox/outbox operations",
+    "steps": [
+      "Add log for message delivery (DeliverAsync)",
+      "Add log for message processing (handler invocation)",
+      "Add log for backpressure events",
+      "Add log for deserialization errors",
+      "Add log for route not found errors",
+      "Add log for outbox delivery attempts",
+      "Add log for duplicate message detection",
+      "Include CorrelationKey in all logs for tracing",
+      "Add correlation context propagation",
+      "Test log output in various scenarios"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Implement request context propagation for distributed tracing",
+    "steps": [
+      "Propagate RequestContext from DurableEnvelopeData",
+      "Integrate with Orleans distributed tracing",
+      "Ensure trace IDs are preserved across message hops",
+      "Test context propagation with keyed context access",
+      "Test partial deserialization failures don't break tracing",
+      "Add integration tests for trace correlation"
+    ],
+    "passes": false
+  },
+  {
+    "category": "refactor",
+    "description": "Implement processed messages compaction during journaling snapshots",
+    "steps": [
+      "Add compaction policy for _processedMessages dictionary",
+      "Remove entries older than DeduplicationWindow",
+      "Integrate with IStateMachineManager snapshot mechanism",
+      "Add configuration for compaction frequency",
+      "Add unit tests for compaction logic",
+      "Add integration tests for compaction during snapshot"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Build verification and compilation",
+    "steps": [
+      "Run dotnet build Orleans.slnx",
+      "Fix any compilation errors",
+      "Ensure no warnings (TreatWarningsAsErrors: true)",
+      "Verify EnforceCodeStyleInBuild passes",
+      "Run dotnet test with Category=BVT filter",
+      "Fix any failing BVT tests"
+    ],
+    "passes": false
+  }
+]
