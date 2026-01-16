@@ -117,7 +117,7 @@ internal sealed class InboxProcessingPump : IDurableJobHandler
             PumpJobName,
             DateTimeOffset.UtcNow,
             metadata: null,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken).ConfigureAwait(true);
 
         return job;
     }
@@ -155,7 +155,7 @@ internal sealed class InboxProcessingPump : IDurableJobHandler
         {
             try
             {
-                var result = await ProcessMessageAsync(envelope, cancellationToken).ConfigureAwait(false);
+                var result = await ProcessMessageAsync(envelope, cancellationToken).ConfigureAwait(true);
 
                 switch (result)
                 {
@@ -212,7 +212,7 @@ internal sealed class InboxProcessingPump : IDurableJobHandler
         }
 
         // Persist inbox and processed state atomically
-        await _stateMachineManager.WriteStateAsync(cancellationToken).ConfigureAwait(false);
+        await _stateMachineManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
 
         _logger.LogInformation(
             "Completed inbox processing pump for grain {GrainId}: {ProcessedCount} processed, {NoHandlerCount} no handler, {FailedCount} failed, {RemainingCount} remaining",
@@ -235,7 +235,7 @@ internal sealed class InboxProcessingPump : IDurableJobHandler
                 PumpJobName,
                 DateTimeOffset.UtcNow,
                 metadata: null,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(true);
         }
     }
 
@@ -273,7 +273,7 @@ internal sealed class InboxProcessingPump : IDurableJobHandler
             var handler = GetHandler(envelope.RouteKey);
 
             // Invoke handler
-            await handler.HandleAsync(envelope, context, cancellationToken).ConfigureAwait(false);
+            await handler.HandleAsync(envelope, context, cancellationToken).ConfigureAwait(true);
 
             // Mark as processed
             _inbox.RemoveMessage(envelope.SenderId, envelope.MessageId);

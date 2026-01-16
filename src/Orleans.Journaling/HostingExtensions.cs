@@ -89,36 +89,6 @@ public static class HostingExtensions
     }
 
     /// <summary>
-    /// Adds durable inbox and outbox messaging support to the silo with options builder configuration.
-    /// </summary>
-    /// <param name="builder">The silo builder.</param>
-    /// <param name="configureOptionsBuilder">Optional configuration action for <see cref="OptionsBuilder{DurableInboxOptions}"/>.</param>
-    /// <returns>The silo builder for chaining.</returns>
-    /// <remarks>
-    /// <para>
-    /// This overload provides access to the full <see cref="OptionsBuilder{TOptions}"/> API for advanced
-    /// configuration scenarios, including validation, post-configuration, and binding from external sources.
-    /// </para>
-    /// <para>
-    /// <b>Usage:</b>
-    /// <code>
-    /// builder.AddDurableMessaging(optionsBuilder =&gt;
-    /// {
-    ///     optionsBuilder.Configure(options =&gt;
-    ///     {
-    ///         options.MaxCapacity = 500;
-    ///     });
-    ///     optionsBuilder.Validate(options =&gt; options.MaxCapacity &gt; 0, "MaxCapacity must be positive");
-    /// });
-    /// </code>
-    /// </para>
-    /// </remarks>
-    public static ISiloBuilder AddDurableMessaging(this ISiloBuilder builder, Action<OptionsBuilder<DurableInboxOptions>>? configureOptionsBuilder = null)
-    {
-        return builder.ConfigureServices(services => services.AddDurableMessaging(configureOptionsBuilder));
-    }
-
-    /// <summary>
     /// Adds durable inbox and outbox messaging services to the service collection.
     /// </summary>
     /// <param name="services">The service collection.</param>
@@ -175,7 +145,7 @@ public static class HostingExtensions
             var inboxDict = sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("inbox");
             var processed = sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DateTimeOffset>>("inbox-processed");
             
-            // Get the shared outbox (DurableOutboxWithDelivery) that has delivery capability
+            // Get the shared outbox (DurableOutbox) that has delivery capability
             // This is the same instance the grain uses via DI, ensuring responses are delivered
             var outbox = sp.GetRequiredService<IDurableOutbox>();
 
@@ -212,44 +182,12 @@ public static class HostingExtensions
             return new DurableInbox(inbox, processed, options.MaxCapacity);
         });
 
-        services.TryAddScoped<IDurableOutbox>(sp =>
-        {
-            var outbox = sp.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEnvelope>>("outbox");
-            var grainFactory = sp.GetRequiredService<IGrainFactory>();
-            var logger = sp.GetRequiredService<ILogger<DurableOutboxWithDelivery>>();
-            return new DurableOutboxWithDelivery(outbox, grainFactory, logger);
-        });
+        // Register DurableOutbox directly - it inherits from DurableDictionary and registers itself
+        // with the state machine manager via the base class constructor
+        services.TryAddKeyedScoped<IDurableOutbox, DurableOutbox>("outbox");
+        // Also register the non-keyed version for dependency injection
+        services.TryAddScoped<IDurableOutbox>(sp => sp.GetRequiredKeyedService<IDurableOutbox>("outbox"));
 
         return services;
-    }
-
-    /// <summary>
-    /// Adds durable inbox and outbox messaging services with options builder configuration.
-    /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <param name="configureOptionsBuilder">Optional configuration action for <see cref="OptionsBuilder{DurableInboxOptions}"/>.</param>
-    /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddDurableMessaging(this IServiceCollection services, Action<OptionsBuilder<DurableInboxOptions>>? configureOptionsBuilder = null)
-    {
-        var optionsBuilder = services.AddOptions<DurableInboxOptions>();
-        configureOptionsBuilder?.Invoke(optionsBuilder);
-        
-        optionsBuilder.Validate(options =>
-        {
-            try
-            {
-                options.Validate();
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
-        }, "DurableInboxOptions validation failed. Check MaxCapacity, DeduplicationWindow, and DefaultPollTimeout.");
-
-        services.ConfigureNamedOptionForLogging<DurableInboxOptions>(Options.DefaultName);
-
-        // Delegate to the main implementation
-        return services.AddDurableMessaging((Action<DurableInboxOptions>?)null);
     }
 }

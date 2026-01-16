@@ -5,7 +5,7 @@ namespace Orleans.Journaling;
 
 public abstract class DurableGrain : Grain, IGrainBase
 {
-    private IDurableOutbox? _outbox;
+    private IDurableOutbox _outbox;
 
     protected DurableGrain()
     {
@@ -14,6 +14,7 @@ public abstract class DurableGrain : Grain, IGrainBase
         {
             participant.Participate(((IGrainBase)this).GrainContext.ObservableLifecycle);
         }
+        _outbox = ServiceProvider.GetRequiredService<IDurableOutbox>();
     }
 
     protected IJournaledStateManager StateManager { get; }
@@ -28,7 +29,7 @@ public abstract class DurableGrain : Grain, IGrainBase
     {
         // Lazy initialization - only get the outbox if it hasn't been retrieved yet
         // This avoids always pulling it from DI when it might not be used
-        return _outbox ??= ServiceProvider.GetService<IDurableOutbox>();
+        return _outbox;
     }
 
     protected TState GetOrCreateState<TArg, TState>(string name, Func<TArg, TState> createState, TArg arg) where TState : class, IJournaledState
@@ -52,13 +53,13 @@ public abstract class DurableGrain : Grain, IGrainBase
     protected async ValueTask WriteStateAsync(CancellationToken cancellationToken = default)
     {
         // First, persist all state changes (including outbox messages)
-        await StateManager.WriteStateAsync(cancellationToken).ConfigureAwait(false);
+        await StateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
 
         // Then trigger delivery of any pending outbox messages
-        var outbox = GetOutboxForDelivery();
+        var outbox = _outbox;
         if (outbox is not null && outbox.Count > 0)
         {
-            await outbox.DeliverPendingMessagesAsync(cancellationToken).ConfigureAwait(false);
+            await outbox.DeliverPendingMessagesAsync(cancellationToken).ConfigureAwait(true);
         }
     }
 }

@@ -117,7 +117,7 @@ internal sealed class OutboxDeliveryPump : IDurableJobHandler
             PumpJobName,
             DateTimeOffset.UtcNow,
             metadata: null,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken).ConfigureAwait(true);
 
         return job;
     }
@@ -156,7 +156,7 @@ internal sealed class OutboxDeliveryPump : IDurableJobHandler
         {
             try
             {
-                var result = await DeliverMessageAsync(envelope, cancellationToken).ConfigureAwait(false);
+                var result = await DeliverMessageAsync(envelope, cancellationToken).ConfigureAwait(true);
 
                 switch (result.Status)
                 {
@@ -233,7 +233,7 @@ internal sealed class OutboxDeliveryPump : IDurableJobHandler
         }
 
         // Persist outbox changes atomically
-        await _stateMachineManager.WriteStateAsync(cancellationToken).ConfigureAwait(false);
+        await _stateMachineManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
 
         _logger.LogInformation(
             "Completed outbox delivery pump for grain {GrainId}: {DeliveredCount} delivered, {BackpressuredCount} backpressured, {RouteNotFoundCount} route not found, {FailedCount} failed, {RemainingCount} remaining",
@@ -260,7 +260,7 @@ internal sealed class OutboxDeliveryPump : IDurableJobHandler
                 PumpJobName,
                 DateTimeOffset.UtcNow.Add(nextDelay),
                 metadata: null,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(true);
         }
     }
 
@@ -275,7 +275,7 @@ internal sealed class OutboxDeliveryPump : IDurableJobHandler
         // Deliver with no long-polling (immediate return after persistence)
         var options = new DeliveryOptions { PollTimeout = TimeSpan.Zero };
 
-        var result = await targetGrain.DeliverAsync(envelope, options, cancellationToken).ConfigureAwait(false);
+        var result = await targetGrain.DeliverAsync(envelope, options, cancellationToken).ConfigureAwait(true);
 
         return result;
     }
