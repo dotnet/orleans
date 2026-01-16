@@ -1690,3 +1690,153 @@ Now that InboxProcessingPumpTests are passing, ready to:
 3. Commit all changes including InboxProcessingPump implementation and tests
 
 
+## 2026-01-16: End-to-End Durable RPC Integration Tests (COMPLETED)
+
+### Summary
+Successfully implemented and fixed all 6 end-to-end integration tests for the durable RPC messaging system. These tests verify the complete request/response flow, hierarchical correlation, long-polling, observer callbacks, and atomic persistence across grain deactivation/reactivation cycles.
+
+### Implementation Details
+
+**Test File:**
+- test/Orleans.Journaling.Tests/DurableRpcIntegrationTests.cs (557 lines)
+
+**Test Coverage (6 tests, all passing):**
+
+1. **DurableRpc_RequestResponse_WithCorrelationKey**
+   - Tests basic request/response flow with CorrelationKey preservation
+   - RequestGrain sends message to WorkerGrain with correlation "test-request-123"
+   - WorkerGrain processes request and sends response back
+   - Verifies response received with correct correlation key and result
+
+2. **DurableRpc_ReplyTo_RoutesResponseCorrectly**
+   - Tests reply pattern using Envelope.ReplyTo field
+   - Verifies ReplyTo field correctly routes responses to original requester
+   - Worker uses context.Envelope.ReplyTo to determine response destination
+
+3. **DurableRpc_HierarchicalCorrelation_PreservesParentChildRelationship**
+   - Tests hierarchical correlation with parent/child requests
+   - OrchestratorGrain sends parent request with CorrelationKey "orchestration-456"
+   - Creates two child keys: "orchestration-456/task1" and "orchestration-456/task2"
+   - Verifies both responses preserve parent-child relationships via IsAncestorOf()
+   - Confirms both tasks complete successfully
+
+4. **DurableRpc_LongPolling_WaitsForProcessingCompletion**
+   - Tests long-polling request/response pattern
+   - Uses DeliveryOptions.PollTimeout for synchronous RPC semantics
+   - Verifies DeliverAsync waits for processing completion within timeout
+   - Returns Processed status instead of Pending when handler completes
+
+5. **DurableRpc_Observer_ReceivesResponseCallback**
+   - Tests observer callback pattern using IDurableInboxObserver
+   - ObserverGrain implements IDurableInboxObserver interface
+   - Sends request with correlation key, worker sends response
+   - Response delivered via OnResponseAsync() callback instead of registered handlers
+   - Verifies observer receives callback with correct correlation key
+
+6. **DurableRpc_AtomicPersistence_SurvivesGrainDeactivation**
+   - Tests atomic persistence across request/response cycle
+   - RequestGrain uses IDurableValue<WorkResponse?> for durable response storage
+   - Sends request, then explicitly deactivates via DeactivateOnIdle()
+   - Verifies different activation IDs before/after deactivation
+   - Confirms response still received after reactivation (persisted durably)
+
+**Test Grain Implementations:**
+
+1. **RequestGrain**: Sends requests and handles responses
+   - Registers "response" handler for WorkResponse messages
+   - Uses DurableEnvelopeBuilder to create requests with ReplyTo and CorrelationKey
+   - Stores received responses in IDurableValue<WorkResponse?> for durable persistence
+
+2. **WorkerGrain**: Processes requests and sends responses
+   - Registers "ProcessData" handler for WorkRequest messages
+   - Processes message and sends response if Envelope.ReplyTo is set
+   - Preserves CorrelationKey in response envelope
+
+3. **OrchestratorGrain**: Coordinates multiple worker tasks with hierarchical correlation
+   - Creates child correlation keys from parent: parentKey.CreateChildKey("task1")
+   - Sends tasks to multiple workers with different child keys
+   - Collects responses via "task-response" handler
+
+4. **ObserverGrain**: Uses IDurableInboxObserver for response callbacks
+   - Implements both IObserverGrain and IDurableInboxObserver interfaces
+   - OnResponseAsync() receives responses based on CorrelationKey matching
+   - Stores observed response durably via IDurableValue
+
+**Test Results:**
+- ✅ All 6 tests passing on net10.0
+- ✅ All 6 tests passing on net8.0
+- ✅ No compilation warnings or errors
+- ✅ Code style validation passed
+- ✅ Total execution time: ~5-7 seconds per framework
+
+### Bugs Fixed During Implementation
+
+**Bug 1: Observer Pattern Not Implemented**
+- **Symptom**: DurableRpc_Observer_ReceivesResponseCallback failed with "RouteNotFound" error
+- **Root Cause**: DurableInboxExtension.DeliverAsync only checked for registered route handlers
+- **Fix**: Added IDurableInboxObserver support in DurableInboxExtension:
+  - DeliverAsync checks if grain implements IDurableInboxObserver when no route handler exists
+  - ProcessMessageAsync invokes OnResponseAsync() for observer grains with CorrelationKey
+  - Observer pattern now works alongside traditional route-based handlers
+- **File Modified**: src/Orleans.Journaling/Messaging/DurableInboxExtension.cs
+
+**Bug 2: Non-Durable Response Storage**
+- **Symptom**: DurableRpc_AtomicPersistence_SurvivesGrainDeactivation failed with null response
+- **Root Cause**: RequestGrain stored response in in-memory field instead of durable storage
+- **Fix**: Changed RequestGrain to use IDurableValue<WorkResponse?> for persistent storage:
+  - Replaced primary constructor with regular constructor for DI injection
+  - Added [FromKeyedServices("receivedResponse")] attribute for keyed service resolution
+  - Updated ResponseHandler.HandleAsync to persist response durably via WriteStateAsync()
+- **File Modified**: test/Orleans.Journaling.Tests/DurableRpcIntegrationTests.cs
+
+### Design Patterns Applied
+
+1. **Observer Pattern**: IDurableInboxObserver for correlation-based response handling
+2. **Builder Pattern**: DurableEnvelopeBuilder for fluent envelope creation
+3. **Dependency Injection**: Keyed services for IDurableValue resolution
+4. **Test Fixture Pattern**: IntegrationTestFixture with InProcessTestCluster
+5. **Durable State Pattern**: IDurableValue for persistent grain state
+
+### Code Quality
+
+- Follows Orleans coding standards (Allman braces, 4-space indent, var everywhere)
+- Comprehensive XML documentation on test methods explaining purpose
+- Proper use of [TestCategory("BVT"), TestCategory("Functional"), TestCategory("Journaling")]
+- Test grains implement realistic patterns (primary constructors, DI, durable storage)
+- Uses await Task.Delay() for async processing windows (realistic timing)
+
+### Architectural Benefits
+
+1. **End-to-End Validation**: Tests verify complete message flow from sender to receiver
+2. **Realistic Scenarios**: Uses actual Orleans cluster, serialization, and grain activation
+3. **Hierarchical Correlation**: Demonstrates parent/child request tracking for orchestration
+4. **Durable State Testing**: Verifies state persists across grain deactivation cycles
+5. **Observer Pattern Support**: Alternative to route-based handlers for flexible response handling
+6. **Long-Polling Verification**: Tests synchronous RPC semantics over async messaging
+
+### Next Steps
+
+The end-to-end durable RPC integration tests are complete. Ready to implement:
+- **Integration tests for recovery scenarios** (grain reactivation with pending messages)
+- **Integration tests for deserialization failure handling** (graceful degradation)
+- **Integration tests for multi-silo delivery** (cross-silo messaging)
+- **Performance tests**: Bank transfer workflow, high-throughput backpressure
+
+### Verification Commands
+
+```powershell
+# Run all DurableRpcIntegrationTests (net10.0)
+dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filter "FullyQualifiedName~DurableRpcIntegrationTests" --framework net10.0
+
+# Run all DurableRpcIntegrationTests (net8.0)
+dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj --filter "FullyQualifiedName~DurableRpcIntegrationTests" --framework net8.0
+
+# Run all Orleans.Journaling tests
+dotnet test test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj
+```
+
+### Files Modified
+- ✅ src/Orleans.Journaling/Messaging/DurableInboxExtension.cs (added IDurableInboxObserver support)
+- ✅ test/Orleans.Journaling.Tests/DurableRpcIntegrationTests.cs (fixed RequestGrain durable storage)
+- ✅ research/feature-list.json (marked feature as passing)
+- ✅ research/progress.txt (this entry)

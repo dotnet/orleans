@@ -21,9 +21,10 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     private readonly IStateMachineManager _stateMachineManager;
     private readonly SerializerSessionPool _sessionPool;
     private readonly ILogger<DurableInboxExtension> _logger;
-    private readonly IDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> _inbox;
+    private readonly IDurableInbox _durableInbox;
+    private readonly IDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> _inboxDict;
     private readonly IDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> _processed;
-    private readonly Dictionary<string, IInboxHandler> _handlers;
+    private readonly IDurableOutbox _outbox;
     private readonly Dictionary<Guid, TaskCompletionSource<DeliveryResult>> _pendingDeliveries;
     private readonly int _maxCapacity;
     private readonly TimeSpan _deduplicationWindow;
@@ -38,8 +39,10 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     /// <param name="stateMachineManager">State machine manager for atomic persistence.</param>
     /// <param name="sessionPool">Serializer session pool for envelope creation.</param>
     /// <param name="logger">Logger for diagnostics.</param>
-    /// <param name="inbox">Durable dictionary for inbox messages.</param>
+    /// <param name="durableInbox">The grain's durable inbox (shared with grain DI).</param>
+    /// <param name="inboxDict">Durable dictionary for inbox messages.</param>
     /// <param name="processed">Durable dictionary for processed message tracking.</param>
+    /// <param name="outbox">Durable outbox for sending response messages.</param>
     /// <param name="maxCapacity">Maximum inbox capacity (default: 1000).</param>
     /// <param name="deduplicationWindow">How long to track processed messages (default: 7 days).</param>
     /// <param name="processingConcurrency">Maximum number of messages to process concurrently (default: 1).</param>
@@ -48,8 +51,10 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         IStateMachineManager stateMachineManager,
         SerializerSessionPool sessionPool,
         ILogger<DurableInboxExtension> logger,
-        IDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> inbox,
+        IDurableInbox durableInbox,
+        IDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> inboxDict,
         IDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> processed,
+        IDurableOutbox outbox,
         int maxCapacity = 1000,
         TimeSpan? deduplicationWindow = null,
         int processingConcurrency = 1)
@@ -58,8 +63,10 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         ArgumentNullException.ThrowIfNull(stateMachineManager);
         ArgumentNullException.ThrowIfNull(sessionPool);
         ArgumentNullException.ThrowIfNull(logger);
-        ArgumentNullException.ThrowIfNull(inbox);
+        ArgumentNullException.ThrowIfNull(durableInbox);
+        ArgumentNullException.ThrowIfNull(inboxDict);
         ArgumentNullException.ThrowIfNull(processed);
+        ArgumentNullException.ThrowIfNull(outbox);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxCapacity);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(processingConcurrency);
 
@@ -67,9 +74,10 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         _stateMachineManager = stateMachineManager;
         _sessionPool = sessionPool;
         _logger = logger;
-        _inbox = inbox;
+        _durableInbox = durableInbox;
+        _inboxDict = inboxDict;
         _processed = processed;
-        _handlers = new Dictionary<string, IInboxHandler>();
+        _outbox = outbox;
         _pendingDeliveries = new Dictionary<Guid, TaskCompletionSource<DeliveryResult>>();
         _maxCapacity = maxCapacity;
         _deduplicationWindow = deduplicationWindow ?? TimeSpan.FromDays(7);
@@ -79,7 +87,7 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     /// <summary>
     /// Gets the number of messages currently in the inbox.
     /// </summary>
-    public int Count => _inbox.Count;
+    public int Count => _inboxDict.Count;
 
     /// <summary>
     /// Gets the inbox capacity limit.
@@ -88,6 +96,7 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
 
     /// <summary>
     /// Registers a handler for a specific route key.
+    /// Delegates to the shared durable inbox that is injected into grains.
     /// </summary>
     /// <param name="routeKey">The route key to handle.</param>
     /// <param name="handler">The handler implementation.</param>
@@ -96,7 +105,7 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         ArgumentException.ThrowIfNullOrWhiteSpace(routeKey);
         ArgumentNullException.ThrowIfNull(handler);
 
-        _handlers[routeKey] = handler;
+        _durableInbox.RegisterHandler(routeKey, handler);
         _logger.LogDebug("Registered handler for route '{RouteKey}' on grain {GrainId}", routeKey, _grainContext.GrainId);
     }
 
@@ -105,7 +114,7 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     /// </summary>
     /// <param name="routeKey">The route key to check.</param>
     /// <returns>True if a handler is registered; otherwise, false.</returns>
-    public bool HasHandler(string routeKey) => _handlers.ContainsKey(routeKey);
+    public bool HasHandler(string routeKey) => _durableInbox.HasHandler(routeKey);
 
     /// <summary>
     /// Tries to get a handler for the specified route key.
@@ -113,7 +122,7 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     /// <param name="routeKey">The route key to get the handler for.</param>
     /// <param name="handler">The handler if found.</param>
     /// <returns>True if a handler is registered; otherwise, false.</returns>
-    public bool TryGetHandler(string routeKey, [MaybeNullWhen(false)] out IInboxHandler handler) => _handlers.TryGetValue(routeKey, out handler);
+    public bool TryGetHandler(string routeKey, [MaybeNullWhen(false)] out IInboxHandler handler) => _durableInbox.TryGetHandler(routeKey, out handler);
 
     /// <summary>
     /// Delivers a message to this grain's durable inbox.
@@ -128,11 +137,14 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         DeliveryOptions options,
         CancellationToken cancellationToken = default)
     {
+        Console.WriteLine($"[DEBUG-INBOX] DeliverAsync: Received message {envelope.MessageId} from {envelope.SenderId} to {envelope.ReceiverId} on route '{envelope.RouteKey}'");
+        
         var key = (envelope.SenderId, envelope.MessageId);
 
         // Check for duplicate (already processed)
         if (_processed.ContainsKey(key))
         {
+            Console.WriteLine($"[DEBUG-INBOX] Message {envelope.MessageId} is duplicate (already processed)");
             _logger.LogDebug(
                 "Duplicate message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}'",
                 envelope.MessageId,
@@ -144,8 +156,9 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         }
 
         // Check for duplicate (already in inbox)
-        if (_inbox.ContainsKey(key))
+        if (_inboxDict.ContainsKey(key))
         {
+            Console.WriteLine($"[DEBUG-INBOX] Message {envelope.MessageId} is duplicate (already in inbox)");
             _logger.LogDebug(
                 "Duplicate message {MessageId} from {SenderId} already in inbox for {ReceiverId} on route '{RouteKey}'",
                 envelope.MessageId,
@@ -163,11 +176,12 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         }
 
         // Check capacity (backpressure)
-        if (_inbox.Count >= _maxCapacity)
+        if (_inboxDict.Count >= _maxCapacity)
         {
+            Console.WriteLine($"[DEBUG-INBOX] Message {envelope.MessageId} rejected - inbox at capacity ({_inboxDict.Count}/{_maxCapacity})");
             _logger.LogWarning(
                 "Inbox at capacity ({Count}/{Capacity}) for grain {GrainId}, rejecting message {MessageId} from {SenderId}",
-                _inbox.Count,
+                _inboxDict.Count,
                 _maxCapacity,
                 _grainContext.GrainId,
                 envelope.MessageId,
@@ -176,21 +190,34 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
             return DeliveryResult.Backpressured();
         }
 
-        // Check if handler exists
-        if (!_handlers.ContainsKey(envelope.RouteKey))
+        // Check if handler exists (use the shared durable inbox to check handlers)
+        if (!_durableInbox.HasHandler(envelope.RouteKey))
         {
-            _logger.LogWarning(
-                "No handler registered for route '{RouteKey}' on grain {GrainId}, rejecting message {MessageId} from {SenderId}",
-                envelope.RouteKey,
-                _grainContext.GrainId,
-                envelope.MessageId,
-                envelope.SenderId);
+            // If no route handler, check if the grain implements IDurableInboxObserver
+            // and the message has a CorrelationKey (for observer-based response handling)
+            if (envelope.CorrelationKey is not null && _grainContext.GrainInstance is IDurableInboxObserver)
+            {
+                Console.WriteLine($"[DEBUG-INBOX] Message {envelope.MessageId} accepted - grain implements IDurableInboxObserver with CorrelationKey");
+                // Fall through to accept the message for observer-based processing
+            }
+            else
+            {
+                Console.WriteLine($"[DEBUG-INBOX] Message {envelope.MessageId} rejected - no handler for route '{envelope.RouteKey}'");
+                _logger.LogWarning(
+                    "No handler registered for route '{RouteKey}' on grain {GrainId}, rejecting message {MessageId} from {SenderId}",
+                    envelope.RouteKey,
+                    _grainContext.GrainId,
+                    envelope.MessageId,
+                    envelope.SenderId);
 
-            return DeliveryResult.RouteNotFound(envelope.RouteKey);
+                return DeliveryResult.RouteNotFound(envelope.RouteKey);
+            }
         }
 
+        Console.WriteLine($"[DEBUG-INBOX] Message {envelope.MessageId} accepted - handler/observer found for route '{envelope.RouteKey}'");
+        
         // Accept message into inbox
-        _inbox[key] = envelope;
+        _inboxDict[key] = envelope;
 
         // Persist atomically
         await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(false);
@@ -260,25 +287,30 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     /// </summary>
     private async Task ProcessPendingMessagesAsync()
     {
+        Console.WriteLine($"[DEBUG-INBOX] ProcessPendingMessagesAsync: Starting, inbox count={_inboxDict.Count}");
+        
         // Mark that processing was requested
         _processingRequested = true;
 
         // Try to acquire the processing lock
         if (!await _processingLock.WaitAsync(0).ConfigureAwait(false))
         {
+            Console.WriteLine($"[DEBUG-INBOX] ProcessPendingMessagesAsync: Could not acquire lock, returning");
             return; // Another processing run is already in progress, it will pick up new messages
         }
 
         try
         {
             // Keep processing until no more messages or no more processing requests
-            while (_inbox.Count > 0)
+            while (_inboxDict.Count > 0)
             {
+                Console.WriteLine($"[DEBUG-INBOX] ProcessPendingMessagesAsync: Processing loop, inbox count={_inboxDict.Count}");
+                
                 // Clear the processing request flag before processing
                 _processingRequested = false;
 
                 // Create a snapshot of pending messages to avoid collection modification
-                var pending = new List<DurableEnvelope>(_inbox.Values);
+                var pending = new List<DurableEnvelope>(_inboxDict.Values);
 
                 // Use ParallelOptions to control concurrency
                 var parallelOptions = new ParallelOptions
@@ -290,10 +322,12 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                 {
                     try
                     {
+                        Console.WriteLine($"[DEBUG-INBOX] ProcessPendingMessagesAsync: Processing message {envelope.MessageId}");
                         await ProcessMessageAsync(envelope).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
+                        Console.WriteLine($"[DEBUG-INBOX] ProcessPendingMessagesAsync: Error processing message {envelope.MessageId}: {ex.Message}");
                         _logger.LogError(
                             ex,
                             "Error processing message {MessageId} from {SenderId} on route '{RouteKey}'",
@@ -309,6 +343,8 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                     break;
                 }
             }
+            
+            Console.WriteLine($"[DEBUG-INBOX] ProcessPendingMessagesAsync: Done, inbox count={_inboxDict.Count}");
         }
         finally
         {
@@ -321,26 +357,92 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
     /// </summary>
     private async Task ProcessMessageAsync(DurableEnvelope envelope)
     {
+        Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Processing message {envelope.MessageId} on route '{envelope.RouteKey}'");
+        
         var key = (envelope.SenderId, envelope.MessageId);
 
         // Check if already processed (concurrent processing guard)
-        if (!_inbox.ContainsKey(key))
+        if (!_inboxDict.ContainsKey(key))
         {
+            Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Message {envelope.MessageId} already processed (not in inbox)");
             return;
         }
 
         // Get handler
-        if (!_handlers.TryGetValue(envelope.RouteKey, out var handler))
+        if (!_durableInbox.TryGetHandler(envelope.RouteKey, out var handler))
         {
+            // Check if the grain implements IDurableInboxObserver for correlation-based responses
+            if (envelope.CorrelationKey is not null && _grainContext.GrainInstance is IDurableInboxObserver observer)
+            {
+                Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: No route handler, but grain implements IDurableInboxObserver - calling OnResponseAsync");
+                try
+                {
+                    var options = new DeliveryOptions { PollTimeout = TimeSpan.Zero };
+                    var result = await observer.OnResponseAsync(envelope.CorrelationKey, envelope, options, CancellationToken.None).ConfigureAwait(false);
+                    
+                    Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Observer.OnResponseAsync returned {result.Status}");
+
+                    // Mark as processed
+                    _inboxDict.Remove(key);
+                    _processed[key] = DateTimeOffset.UtcNow;
+                    await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(false);
+
+                    // Dispose envelope data to release ArcBuffer resources (after persistence)
+                    envelope.Data.Dispose();
+
+                    // Trigger delivery of any responses the observer queued in the outbox
+                    if (_outbox.Count > 0)
+                    {
+                        Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Delivering {_outbox.Count} response messages from outbox");
+                        await _outbox.DeliverPendingMessagesAsync(CancellationToken.None).ConfigureAwait(false);
+                    }
+
+                    _logger.LogInformation(
+                        "Processed message {MessageId} from {SenderId} via IDurableInboxObserver (CorrelationKey: {CorrelationKey})",
+                        envelope.MessageId,
+                        envelope.SenderId,
+                        envelope.CorrelationKey);
+
+                    // Notify waiters
+                    CompleteDelivery(envelope.MessageId, result);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Observer.OnResponseAsync threw exception: {ex.GetType().Name}: {ex.Message}");
+                    _logger.LogError(
+                        ex,
+                        "IDurableInboxObserver.OnResponseAsync threw exception for message {MessageId} from {SenderId}",
+                        envelope.MessageId,
+                        envelope.SenderId);
+
+                    // Mark as processed to avoid infinite retry
+                    _inboxDict.Remove(key);
+                    _processed[key] = DateTimeOffset.UtcNow;
+                    await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(false);
+
+                    // Dispose envelope data
+                    envelope.Data.Dispose();
+
+                    // Notify waiters with error
+                    CompleteDelivery(envelope.MessageId, DeliveryResult.Processed());
+                    return;
+                }
+            }
+
+            Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: No handler found for route '{envelope.RouteKey}'");
             _logger.LogWarning(
                 "Handler for route '{RouteKey}' not found during processing of message {MessageId}",
                 envelope.RouteKey,
                 envelope.MessageId);
 
             // Remove from inbox and mark as processed
-            _inbox.Remove(key);
+            _inboxDict.Remove(key);
             _processed[key] = DateTimeOffset.UtcNow;
             await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(false);
+
+            // Dispose envelope data to release ArcBuffer resources
+            envelope.Data.Dispose();
 
             // Notify waiters
             CompleteDelivery(envelope.MessageId, DeliveryResult.RouteNotFound(envelope.RouteKey));
@@ -349,20 +451,32 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
 
         try
         {
-            // Create handler context
-            // Note: We need an outbox implementation - for now, create a stub
-            var outbox = new InMemoryOutbox();
-            var context = new InboxHandlerContext(envelope, _grainContext.GrainId, outbox, _sessionPool);
+            Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Handler found, invoking for message {envelope.MessageId}");
+            
+            // Create handler context using the grain's durable outbox
+            var context = new InboxHandlerContext(envelope, _grainContext.GrainId, _outbox, _sessionPool);
 
             // Invoke handler
             await handler.HandleAsync(envelope, context, CancellationToken.None).ConfigureAwait(false);
+            
+            Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Handler completed for message {envelope.MessageId}, outbox count={_outbox.Count}");
 
             // Mark as processed
-            _inbox.Remove(key);
+            _inboxDict.Remove(key);
             _processed[key] = DateTimeOffset.UtcNow;
 
             // Persist atomically
             await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(false);
+
+            // Dispose envelope data to release ArcBuffer resources (after persistence)
+            envelope.Data.Dispose();
+
+            // Trigger delivery of any responses the handler queued in the outbox
+            if (_outbox.Count > 0)
+            {
+                Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Delivering {_outbox.Count} response messages from outbox");
+                await _outbox.DeliverPendingMessagesAsync(CancellationToken.None).ConfigureAwait(false);
+            }
 
             _logger.LogInformation(
                 "Processed message {MessageId} from {SenderId} on route '{RouteKey}'",
@@ -370,14 +484,12 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
                 envelope.SenderId,
                 envelope.RouteKey);
 
-            // Check for response in outbox
-            var response = outbox.Messages.FirstOrDefault();
-
             // Notify waiters
-            CompleteDelivery(envelope.MessageId, DeliveryResult.Processed(response));
+            CompleteDelivery(envelope.MessageId, DeliveryResult.Processed());
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[DEBUG-INBOX] ProcessMessageAsync: Handler threw exception for message {envelope.MessageId}: {ex.GetType().Name}: {ex.Message}");
             _logger.LogError(
                 ex,
                 "Handler threw exception for message {MessageId} from {SenderId} on route '{RouteKey}'",
@@ -387,9 +499,12 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
 
             // For now, mark as processed to avoid infinite retry
             // In production, this should use a retry policy or dead-letter queue
-            _inbox.Remove(key);
+            _inboxDict.Remove(key);
             _processed[key] = DateTimeOffset.UtcNow;
             await _stateMachineManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(false);
+
+            // Dispose envelope data to release ArcBuffer resources (after persistence)
+            envelope.Data.Dispose();
 
             // Notify waiters with error
             CompleteDelivery(envelope.MessageId, DeliveryResult.Processed());
@@ -404,38 +519,6 @@ internal sealed class DurableInboxExtension : IDurableInboxExtension
         if (_pendingDeliveries.TryGetValue(messageId, out var tcs))
         {
             tcs.TrySetResult(result);
-        }
-    }
-
-    /// <summary>
-    /// Stub outbox implementation for handler context.
-    /// TODO: Replace with actual DurableOutbox implementation.
-    /// </summary>
-    private sealed class InMemoryOutbox : IDurableOutbox
-    {
-        private readonly List<DurableEnvelope> _messages = new();
-
-        public int Count => _messages.Count;
-
-        public IEnumerable<DurableEnvelope> Messages => _messages;
-
-        public void Send(DurableEnvelope envelope) => _messages.Add(envelope);
-
-        public bool RemoveMessage(Guid messageId)
-        {
-            var index = _messages.FindIndex(e => e.MessageId == messageId);
-            if (index >= 0)
-            {
-                _messages.RemoveAt(index);
-                return true;
-            }
-            return false;
-        }
-
-        public bool TryGetMessage(Guid messageId, out DurableEnvelope envelope)
-        {
-            envelope = _messages.FirstOrDefault(e => e.MessageId == messageId);
-            return envelope.MessageId != Guid.Empty;
         }
     }
 }
