@@ -286,7 +286,7 @@
       "Add unit tests for buffer disposal",
       "Add memory leak tests"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

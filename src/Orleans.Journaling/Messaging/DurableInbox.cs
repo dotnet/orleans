@@ -66,7 +66,7 @@ internal sealed class DurableInbox : IDurableInbox
     }
 
     /// <summary>
-    /// Removes a message after processing.
+    /// Removes a message after processing and disposes its envelope data.
     /// </summary>
     /// <param name="senderId">The sender grain ID.</param>
     /// <param name="messageId">The message ID.</param>
@@ -74,7 +74,20 @@ internal sealed class DurableInbox : IDurableInbox
     public bool RemoveMessage(GrainId senderId, Guid messageId)
     {
         var key = (senderId, messageId);
-        return _inbox.Remove(key);
+        
+        // Get the envelope before removing to dispose its data
+        if (_inbox.TryGetValue(key, out var envelope))
+        {
+            var removed = _inbox.Remove(key);
+            if (removed)
+            {
+                // Dispose ArcBuffer resources
+                envelope.Data.Dispose();
+            }
+            return removed;
+        }
+        
+        return false;
     }
 
     /// <summary>
@@ -121,5 +134,16 @@ internal sealed class DurableInbox : IDurableInbox
     public bool HasHandler(string routeKey)
     {
         return _handlers.ContainsKey(routeKey);
+    }
+
+    /// <summary>
+    /// Tries to get a handler for a specific route.
+    /// </summary>
+    /// <param name="routeKey">The route key to get the handler for.</param>
+    /// <param name="handler">The handler if found.</param>
+    /// <returns>True if a handler is registered for this route; otherwise, false.</returns>
+    public bool TryGetHandler(string routeKey, [MaybeNullWhen(false)] out IInboxHandler handler)
+    {
+        return _handlers.TryGetValue(routeKey, out handler);
     }
 }

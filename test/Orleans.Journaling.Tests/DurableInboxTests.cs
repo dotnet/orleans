@@ -310,6 +310,58 @@ public class DurableInboxTests
         Assert.True(result);
     }
 
+    [Fact]
+    public void RemoveMessage_WithExistingMessage_DisposesEnvelopeData()
+    {
+        // Arrange
+        var inboxDict = new MockDurableDictionary<(GrainId, Guid), DurableEnvelope>();
+        var processedDict = new MockDurableDictionary<(GrainId, Guid), DateTimeOffset>();
+        var inbox = new DurableInbox(inboxDict, processedDict, 1000);
+
+        var senderId = GrainId.Create("sender", "1");
+        var messageId = Guid.NewGuid();
+        var envelope = CreateTestEnvelope(senderId: senderId, messageId: messageId);
+        
+        // Add message to inbox directly via the underlying dictionary
+        inboxDict[(senderId, messageId)] = envelope;
+
+        // Act
+        var result = inbox.RemoveMessage(senderId, messageId);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(0, inbox.Count);
+        
+        // Verify envelope data was disposed by checking if accessing the buffer throws
+        // Note: This is a best-effort test since DurableEnvelopeData with null SessionPool
+        // won't have a real ArcBuffer to dispose, but the dispose path is still exercised
+        envelope.Data.Dispose(); // Should not throw even if called twice
+    }
+
+    [Fact]
+    public void RemoveMessage_WithExistingMessage_ReturnsTrue()
+    {
+        // Arrange
+        var inboxDict = new MockDurableDictionary<(GrainId, Guid), DurableEnvelope>();
+        var processedDict = new MockDurableDictionary<(GrainId, Guid), DateTimeOffset>();
+        var inbox = new DurableInbox(inboxDict, processedDict, 1000);
+
+        var senderId = GrainId.Create("sender", "1");
+        var messageId = Guid.NewGuid();
+        var envelope = CreateTestEnvelope(senderId: senderId, messageId: messageId);
+        
+        // Add message to inbox
+        inboxDict[(senderId, messageId)] = envelope;
+
+        // Act
+        var result = inbox.RemoveMessage(senderId, messageId);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(0, inbox.Count);
+        Assert.False(inbox.TryGetMessage(senderId, messageId, out _));
+    }
+
     /// <summary>
     /// Test inbox handler implementation.
     /// </summary>

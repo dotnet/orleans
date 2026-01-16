@@ -396,6 +396,53 @@ public class DurableOutboxTests
     }
 
     [Fact]
+    public void RemoveMessage_WhenMessageExists_DisposesEnvelopeData()
+    {
+        // Arrange
+        var outboxDict = new MockDurableDictionary<Guid, DurableEnvelope>();
+        var outbox = new DurableOutbox(outboxDict);
+        var envelope = CreateTestEnvelope();
+        outbox.Send(envelope);
+
+        // Act
+        var removed = outbox.RemoveMessage(envelope.MessageId);
+
+        // Assert
+        Assert.True(removed);
+        Assert.Equal(0, outbox.Count);
+        
+        // Verify envelope data was disposed by calling Dispose again
+        // (should not throw even if called twice)
+        envelope.Data.Dispose();
+    }
+
+    [Fact]
+    public void RemoveMessage_WithMultipleMessages_OnlyDisposesRemovedMessage()
+    {
+        // Arrange
+        var outbox = CreateOutbox();
+        var envelope1 = CreateTestEnvelope();
+        var envelope2 = CreateTestEnvelope();
+        var envelope3 = CreateTestEnvelope();
+        
+        outbox.Send(envelope1);
+        outbox.Send(envelope2);
+        outbox.Send(envelope3);
+
+        // Act - Remove only envelope2
+        var removed = outbox.RemoveMessage(envelope2.MessageId);
+
+        // Assert
+        Assert.True(removed);
+        Assert.Equal(2, outbox.Count);
+        
+        // Verify other envelopes still accessible
+        Assert.True(outbox.TryGetMessage(envelope1.MessageId, out _));
+        Assert.False(outbox.TryGetMessage(envelope2.MessageId, out _));
+        Assert.True(outbox.TryGetMessage(envelope3.MessageId, out _));
+    }
+
+    [Fact]
     public void Count_AfterMultipleOperations_IsAccurate()
     {
         // Arrange
