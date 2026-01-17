@@ -333,7 +333,7 @@
       "Test concurrent access to cache",
       "Run tests and verify all pass"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "testing",
