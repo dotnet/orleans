@@ -761,3 +761,154 @@ The next feature in the list is #10: Create RouteKeyHandler base class for exact
 **Next Steps**:
 The next feature in the list is #11: Create RoutePrefixHandler base class for prefix-based routing.
 
+---
+
+## Feature Implementation Summary - January 17, 2026 (Continued)
+
+### Completed: Create RoutePrefixHandler base class for prefix-based routing (Feature #11)
+
+**Objective**: Create a base class that simplifies implementing handlers that respond to messages with a route key prefix, enabling hierarchical routing patterns (e.g., "rpc/" matches "rpc/request", "rpc/reply", etc.).
+
+**Implementation Details**:
+
+1. **Created RoutePrefixHandler.cs** (src/Orleans.Journaling/Messaging/RoutePrefixHandler.cs)
+   - Abstract base class implementing IInboxHandler
+   - Constructor accepts string prefix with validation (ArgumentNullException for null, ArgumentException for empty/whitespace)
+   - **Automatic prefix normalization**: Ensures prefix always ends with '/' for proper boundary matching (e.g., "rpc" becomes "rpc/")
+   - Protected Prefix property exposes the normalized prefix to derived classes
+   - CanHandle implementation performs case-sensitive prefix matching: context.Envelope.RouteKey?.StartsWith(_prefix, StringComparison.Ordinal)
+   - **GetRouteSuffix helper method**: Extracts the portion of the route key after the prefix (e.g., "rpc/request" → "request")
+   - Abstract HandleAsync method for derived classes to implement message processing logic
+   - Explicit interface implementation delegates to protected HandleAsync method
+   - Comprehensive XML documentation with usage examples for RPC-style routing
+
+2. **Key Design Decisions**:
+   - **Prefix normalization with '/' boundary**: Prevents false matches (e.g., "order" won't match "order-archive/request")
+   - **Case-sensitive matching**: Consistent with Orleans conventions and RouteKeyHandler behavior
+   - **Null safety**: Returns false for null route keys, does not throw
+   - **Validation at construction time**: Ensures prefix is valid before handler is registered
+   - **GetRouteSuffix utility**: Enables operation-based routing within a prefix namespace
+   - **Protected prefix access**: Allows derived classes to inspect the configured prefix if needed
+
+3. **Created comprehensive unit tests** (test/Orleans.Journaling.Tests/RoutePrefixHandlerTests.cs)
+   - 20 BVT tests covering all RoutePrefixHandler functionality
+   - Tests for prefix matching behavior (matches all routes starting with prefix)
+   - Tests for null route key handling
+   - Tests for case-sensitivity
+   - Tests for prefix normalization (with and without trailing slash)
+   - Tests for partial word match prevention (boundary protection)
+   - Tests for matching the prefix itself
+   - Tests for constructor validation (null, empty, whitespace)
+   - Tests for Prefix property exposure
+   - Tests for GetRouteSuffix method (correct suffix extraction, null handling, nested paths)
+   - Tests for HandleAsync invocation
+   - Tests for cancellation token respect
+   - Tests for multiple instances working independently
+   - Tests for special characters in prefixes
+   - Tests for deeply nested prefixes
+   - Tests for routes with additional slashes
+   - Tests for operation-based routing patterns
+
+**Build Status**: ✅ Clean build, 0 warnings, 0 errors
+
+**Test Results**: 
+- RoutePrefixHandlerTests (net10.0): ✅ 20/20 passed
+- RoutePrefixHandlerTests (net8.0): ✅ 20/20 passed  
+- Orleans.Journaling all tests (net10.0): ✅ 397/398 passed (1 pre-existing flaky test unrelated to RoutePrefixHandler)
+
+**Files Modified**:
+- src/Orleans.Journaling/Messaging/RoutePrefixHandler.cs (NEW)
+- test/Orleans.Journaling.Tests/RoutePrefixHandlerTests.cs (NEW)
+- research/feature-list.json (marked Feature #11 as passing)
+
+**Benefits**:
+- ✅ Simplifies handler implementation for prefix-based routing
+- ✅ Eliminates boilerplate CanHandle implementation for prefix patterns
+- ✅ Type-safe prefix validation at construction time
+- ✅ Clear separation between routing logic (CanHandle) and processing logic (HandleAsync)
+- ✅ GetRouteSuffix enables elegant operation-based routing within a namespace
+- ✅ Consistent with Orleans patterns and RouteKeyHandler design
+- ✅ Foundation for hierarchical routing patterns (e.g., "api/v1/", "rpc/", "workflow/")
+- ✅ Prevents false matches through automatic boundary normalization
+
+**Test Coverage Summary**:
+
+| Test Category | Coverage |
+|--------------|----------|
+| Basic functionality | ✅ Prefix matching, null handling, suffix extraction |
+| Edge cases | ✅ Case sensitivity, partial word match prevention, prefix itself matching |
+| Validation | ✅ Constructor argument validation (null, empty, whitespace) |
+| Integration | ✅ Multiple handlers, HandleAsync invocation |
+| Special cases | ✅ Special characters, deeply nested prefixes, additional slashes |
+| Cancellation | ✅ Respects cancellation token |
+| Operation routing | ✅ GetRouteSuffix enables switch/case patterns |
+
+**Example Usage** (from tests and documentation):
+
+```csharp
+// RPC prefix handler that routes based on suffix
+public class RpcPrefixHandler : RoutePrefixHandler
+{
+    public RpcPrefixHandler() : base("rpc/")  // Normalized to "rpc/"
+    {
+    }
+    
+    protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken ct)
+    {
+        // Get the operation from the route suffix
+        var operation = GetRouteSuffix(context.Envelope.RouteKey);
+        
+        switch (operation)
+        {
+            case "request":
+                await HandleRequest(context, ct);
+                break;
+            case "reply":
+                await HandleReply(context, ct);
+                break;
+            default:
+                throw new InvalidOperationException($"Unknown RPC operation: {operation}");
+        }
+    }
+    
+    private async ValueTask HandleRequest(IInboxHandlerContext context, CancellationToken ct)
+    {
+        // Handle RPC request
+        if (!context.Envelope.Data.TryGetBody<RpcRequest>(out var request))
+        {
+            throw new InvalidOperationException("Failed to deserialize RpcRequest");
+        }
+        
+        // Process and send reply
+        var result = await ProcessRequest(request, ct);
+        
+        if (context.Envelope.ReplyTo is { } replyTo)
+        {
+            var response = context.CreateEnvelope()
+                .To(replyTo, "rpc/reply")
+                .WithBody(result)
+                .WithCorrelationKey(context.Envelope.CorrelationKey)
+                .Build();
+            
+            context.Send(response);
+        }
+    }
+}
+
+// Registration
+inbox.RegisterHandler(new RpcPrefixHandler());
+
+// This handler will match:
+// - "rpc/request"
+// - "rpc/reply"
+// - "rpc/anything"
+// But NOT:
+// - "rpc" (no trailing slash)
+// - "rpc-legacy/request" (boundary protection)
+// - "order/process" (different prefix)
+```
+
+**Next Steps**:
+The next feature in the list is #12: Create CorrelationHandler base class for correlation-based matching.
+
+
