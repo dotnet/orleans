@@ -353,14 +353,14 @@
     "category": "testing",
     "description": "Create HandlerPrecedenceTests for registration order",
     "steps": [
-      "Create new file test/DefaultCluster.Tests/HandlerPrecedenceTests.cs",
+      "Create new file test/Orleans.Journaling.Tests/HandlerPrecedenceTests.cs",
       "Add [TestCategory(\"Functional\")] attribute",
       "Test first-match-wins with multiple matching handlers",
       "Test specific handler before generic prefix handler",
       "Test handler registration order affects dispatch",
       "Run tests and verify all pass"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "testing",
