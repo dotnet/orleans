@@ -559,7 +559,7 @@ public class InboxProcessingPumpTests : IClassFixture<IntegrationTestFixture>
 
         // Register handler that sends a message
         var replyEnvelope = CreateTestEnvelope(senderId: grainId, routeKey: "reply-route");
-        var handler = new TestHandler(async (env, ctx, ct) =>
+        var handler = new TestHandler(async (ctx, ct) =>
         {
             ctx.Send(replyEnvelope);
             await ValueTask.CompletedTask;
@@ -616,7 +616,7 @@ public class InboxProcessingPumpTests : IClassFixture<IntegrationTestFixture>
             removeOnHandlerException: true);
 
         // Register handler that throws
-        var handler = new TestHandler((env, ctx, ct) => throw new InvalidOperationException("Test exception"));
+        var handler = new TestHandler((ctx, ct) => throw new InvalidOperationException("Test exception"));
         inbox.RegisterHandler("test-route", handler);
 
         // Add message to inbox
@@ -668,7 +668,7 @@ public class InboxProcessingPumpTests : IClassFixture<IntegrationTestFixture>
             removeOnHandlerException: false);
 
         // Register handler that throws
-        var handler = new TestHandler((env, ctx, ct) => throw new InvalidOperationException("Test exception"));
+        var handler = new TestHandler((ctx, ct) => throw new InvalidOperationException("Test exception"));
         inbox.RegisterHandler("test-route", handler);
 
         // Add message to inbox
@@ -777,7 +777,7 @@ public class InboxProcessingPumpTests : IClassFixture<IntegrationTestFixture>
             removeOnHandlerException: false); // Keep failed messages
 
         // Register handler that throws
-        var handler = new TestHandler((env, ctx, ct) => throw new InvalidOperationException("Test exception"));
+        var handler = new TestHandler((ctx, ct) => throw new InvalidOperationException("Test exception"));
         inbox.RegisterHandler("test-route", handler);
 
         // Add message to inbox

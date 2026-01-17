@@ -1,5 +1,22 @@
 [
   {
+    "category": "bugfix",
+    "description": "Fix build errors in test files after IInboxHandler.HandleAsync signature change",
+    "steps": [
+      "Read test/Orleans.Journaling.Tests/InboxHandlerContextTests.cs (lines 354, 389)",
+      "Update line 354: Remove envelope parameter from HandleAsync call",
+      "Update line 389: Remove envelope parameter from HandleAsync call",
+      "Read test/Orleans.Journaling.Tests/InboxProcessingPumpTests.cs (lines 562, 619, 671, 780)",
+      "Update line 562: Change lambda from (env, ctx, ct) to (ctx, ct)",
+      "Update line 619: Change lambda from (env, ctx, ct) to (ctx, ct)",
+      "Update line 671: Change lambda from (env, ctx, ct) to (ctx, ct)",
+      "Update line 780: Change lambda from (env, ctx, ct) to (ctx, ct)",
+      "Build Orleans.Journaling.Tests project to verify compilation",
+      "Run all BVT tests in Orleans.Journaling.Tests to verify fixes"
+    ],
+    "passes": true
+  },
+  {
     "category": "refactor",
     "description": "Move HierarchicalKey from System.Distributed.DurableTasks to Orleans.Core.Abstractions",
     "steps": [
