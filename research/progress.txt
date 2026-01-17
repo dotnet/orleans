@@ -191,3 +191,88 @@ With CorrelationKey now wrapping HierarchicalKey, future work includes:
 - Feature #6: Remove or type-forward original HierarchicalKey from System.Distributed.DurableTasks
 - Eventually remove CorrelationKey wrapper when all consumers have migrated
 
+---
+
+## Feature Implementation Summary - January 17, 2026 (Continued)
+
+### Completed: Enable TaskId to HierarchicalKey conversion via extension methods (Feature #5)
+
+**Objective**: Provide seamless interoperability between TaskId (from System.Distributed.DurableTasks) and HierarchicalKey (from Orleans.Core.Abstractions) to enable unified hierarchical key usage across Orleans components.
+
+**Challenge Encountered**: 
+Initial approach attempted to add implicit conversion operators directly in TaskId.cs, but this created a circular dependency:
+- Orleans.Core.Abstractions already references System.Distributed.DurableTasks (line 37)
+- Adding a System.Distributed.DurableTasks → Orleans.Core.Abstractions reference would create a cycle
+
+**Solution Implemented**:
+Used the extension method pattern to provide conversion methods in Orleans.Core.Abstractions, which already has visibility to both types.
+
+**Implementation Details**:
+
+1. **Created TaskIdExtensions.cs** (`src/Orleans.Core.Abstractions/DurableTasks/TaskIdExtensions.cs`)
+   - Added `ToHierarchicalKey(this TaskId)` extension method
+   - Added `ToTaskId(this HierarchicalKey?)` extension method
+   - Both methods use string-based conversion via Parse() and ToString()
+   - Comprehensive XML documentation with usage examples
+   
+2. **Design Rationale**:
+   - **String-based conversion**: Both types have identical string representations, making string conversion reliable
+   - **Extension methods**: Avoids circular dependency while providing ergonomic API
+   - **Null handling**: Properly handles TaskId.None and null HierarchicalKey cases
+   - **No implicit operators**: Avoids the ambiguity and compilation issues from implicit conversions across assemblies
+
+3. **Created comprehensive unit tests** (`test/NonSilo.Tests/Orleans/TaskIdExtensionsTests.cs`)
+   - 10 BVT tests covering all conversion scenarios
+   - Tests for basic conversions in both directions
+   - Tests for null/default value handling
+   - Round-trip tests to verify conversion fidelity
+   - Tests for hierarchy preservation (parent-child relationships)
+   - Tests accounting for TaskId's auto-escaping behavior
+
+**Build Status**: ✅ Clean build, 0 warnings, 0 errors
+
+**Test Results**: 
+- TaskIdExtensionsTests (net10.0): ✅ 10/10 passed
+- Orleans.DurableTasks.Tests BVT: ✅ 5/5 passed
+- System.Distributed.DurableTasks: ✅ Builds successfully
+- Orleans.Core.Abstractions: ✅ Builds successfully
+
+**Files Modified**:
+- `src/Orleans.Core.Abstractions/DurableTasks/TaskIdExtensions.cs` (NEW)
+- `test/NonSilo.Tests/Orleans/TaskIdExtensionsTests.cs` (NEW)
+- `research/feature-list.json` (marked Feature #5 as passing)
+
+**Key Behavioral Notes**:
+- **TaskId.Create()**: Uses `HierarchicalKey.CreateEscaped()` internally, which escapes forward slashes
+- **HierarchicalKey.Create()**: Treats forward slashes as segment separators
+- **Round-trip conversion**: Works correctly despite different escaping behaviors
+- **Extension methods**: Available when using `Orleans` namespace
+
+**Usage Example**:
+```csharp
+using Orleans;
+using System.Distributed.DurableTasks;
+
+// Convert TaskId to HierarchicalKey
+TaskId taskId = TaskId.Create("workflow-123");
+HierarchicalKey key = taskId.ToHierarchicalKey();
+
+// Convert HierarchicalKey to TaskId
+HierarchicalKey key2 = HierarchicalKey.Create("parent/child");
+TaskId taskId2 = key2.ToTaskId();
+
+// Null safety
+TaskId.None.ToHierarchicalKey(); // returns null
+((HierarchicalKey)null).ToTaskId(); // returns TaskId.None
+```
+
+**Benefits**:
+- ✅ Enables TaskId and HierarchicalKey to be used interchangeably
+- ✅ No breaking changes to existing code
+- ✅ No circular dependencies
+- ✅ Clean, testable API
+- ✅ Foundation for future DurableTask and Orleans messaging integration
+
+**Next Steps**:
+- Feature #6: Consider removing or type-forwarding the internal HierarchicalKey from System.Distributed.DurableTasks to eliminate duplication
+
