@@ -557,7 +557,7 @@ With CanHandle method now available, future features include:
 **Files Modified**:
 - 	est/Orleans.Journaling.Tests/InboxHandlerContextTests.cs (2 fixes)
 - 	est/Orleans.Journaling.Tests/InboxProcessingPumpTests.cs (4 fixes)
-- esearch/feature-list.json (marked Feature #0 as passing)
+- research/feature-list.json (marked Feature #0 as passing)
 
 **Key Insights**:
 - When refactoring interface signatures, always check for:
@@ -568,11 +568,120 @@ With CanHandle method now available, future features include:
 - The TestHandler class was correctly updated in the initial refactoring, but the lambda expressions creating TestHandler instances were not
 
 **Benefits**:
-- ? All build errors resolved
-- ? All tests passing
-- ? Feature #8 refactoring now complete
-- ? API is now cleaner with envelope accessible via context.Envelope
+- ✅ All build errors resolved
+- ✅ All tests passing
+- ✅ Feature #8 refactoring now complete
+- ✅ API is now cleaner with envelope accessible via context.Envelope
 
 **Next Steps**:
 The next priority feature is #9: Create IInboxHandler<TMessage> typed handler interface (already exists but may need updates).
+
+
+---
+
+## Feature Implementation Summary - January 17, 2026 (Continued)
+
+### Completed: Verify and test IInboxHandler<TMessage> typed handler interface (Feature #9)
+
+**Objective**: Verify the existing IInboxHandler<TMessage> typed handler interface works correctly and add comprehensive unit tests to validate automatic deserialization, type checking, and error handling.
+
+**Status**: The IInboxHandler<TMessage> interface already existed in the codebase with full functionality (added in earlier features). This task focused on creating comprehensive unit tests to verify correctness and mark the feature as complete.
+
+**Implementation Details**:
+
+1. **Verified existing interface** (src/Orleans.Journaling/Messaging/IInboxHandler.cs, lines 124-219)
+   - ✅ IInboxHandler<TMessage> inherits from IInboxHandler
+   - ✅ Has typed HandleAsync(TMessage message, IInboxHandlerContext context, CancellationToken) method
+   - ✅ Default implementation handles deserialization via TryGetBody<TMessage>()
+   - ✅ Throws InvalidOperationException when deserialization fails
+   - ✅ Default CanHandle() returns true (allows all messages by default)
+   - ✅ Comprehensive XML documentation with examples
+
+2. **Created comprehensive unit tests** (test/Orleans.Journaling.Tests/TypedInboxHandlerTests.cs)
+   - 8 BVT tests covering all IInboxHandler<TMessage> scenarios
+   - Tests for successful deserialization and handling
+   - Tests for deserialization failure handling (empty body)
+   - Tests for default CanHandle behavior (returns true)
+   - Tests for custom CanHandle override (route-based filtering)
+   - Tests for context passing (envelope metadata, grainId, correlationKey)
+   - Tests for cancellation token respect
+   - Tests for multiple typed handlers with different message types
+   - All tests use proper SerializerSessionPool setup for realistic serialization
+
+**Test Infrastructure**:
+- Used Microsoft.Extensions.DependencyInjection for service provider setup
+- Created helper method CreateEnvelopeData<TBody> that properly serializes messages using ArcBufferWriter
+- Used reflection to populate DurableEnvelopeData internal fields (following pattern from DurableEnvelopeDataTests)
+- Created MockInboxHandlerContext for isolated unit testing
+- Defined two test message types: TestMessage and DifferentMessage
+
+**Build Status**: ✅ Clean build, 0 warnings, 0 errors
+
+**Test Results**: 
+- TypedInboxHandlerTests (net10.0): ✅ 8/8 passed
+- TypedInboxHandlerTests (net8.0): ✅ 8/8 passed
+
+**Files Modified**:
+- `test/Orleans.Journaling.Tests/TypedInboxHandlerTests.cs` (NEW - 8 comprehensive tests)
+- `research/feature-list.json` (marked Feature #9 as passing)
+
+**Key Design Decisions**:
+
+1. **Deserialization error handling**: The default implementation uses TryGetBody<TMessage>() which returns false on type mismatch, then throws InvalidOperationException with a clear error message
+2. **Default CanHandle behavior**: Returns true for all messages, deferring type checking to deserialization time
+3. **Custom CanHandle support**: Typed handlers can override CanHandle for metadata-based filtering (route, correlation, etc.)
+4. **Context-based API**: All envelope data flows through IInboxHandlerContext, maintaining consistency with feature #8
+
+**Test Coverage**:
+
+| Test | Description |
+|------|-------------|
+| TypedHandler_WithMatchingType_DeserializesAndHandlesSuccessfully | Verifies successful message handling with correct type |
+| TypedHandler_WithEmptyBody_ThrowsInvalidOperationException | Verifies exception on deserialization failure |
+| TypedHandler_WithCustomCanHandle_FiltersCorrectly | Verifies custom CanHandle can filter by route |
+| TypedHandler_DefaultCanHandle_ReturnsTrue | Verifies default CanHandle accepts all messages |
+| TypedHandler_PassesCorrectContext | Verifies context (envelope, grainId, correlation) is passed correctly |
+| TypedHandler_RespectsCancellationToken | Verifies cancellation token is honored |
+| MultipleTypedHandlers_WithDifferentTypes_WorkIndependently | Verifies multiple handlers coexist properly |
+| MultipleTypedHandlers_HandleDifferentMessages | Verifies handlers with different message types work correctly |
+
+**Benefits**:
+- ✅ IInboxHandler<TMessage> is fully tested and verified working
+- ✅ Clear documentation of expected behavior through tests
+- ✅ Strong type safety for message handling
+- ✅ Automatic deserialization reduces boilerplate
+- ✅ Graceful error handling for type mismatches
+- ✅ Foundation for higher-level handler base classes (RouteKeyHandler, RoutePrefixHandler, etc.)
+
+**Example Usage** (from tests):
+```csharp
+// Simple typed handler
+public class TestTypedHandler : IInboxHandler<TestMessage>
+{
+    public ValueTask HandleAsync(TestMessage message, IInboxHandlerContext context, CancellationToken ct)
+    {
+        // Message is already deserialized and type-checked
+        Console.WriteLine($"Received: {message.Data}");
+        return ValueTask.CompletedTask;
+    }
+}
+
+// Typed handler with custom CanHandle
+public class SelectiveTypedHandler : IInboxHandler<TestMessage>
+{
+    bool IInboxHandler.CanHandle(IInboxHandlerContext context)
+    {
+        return context.Envelope.RouteKey == "payment/process";
+    }
+
+    public ValueTask HandleAsync(TestMessage message, IInboxHandlerContext context, CancellationToken ct)
+    {
+        // Only processes messages with route "payment/process"
+        return ValueTask.CompletedTask;
+    }
+}
+```
+
+**Next Steps**:
+The next feature in the list is #10: Create RouteKeyHandler base class for exact route matching.
 
