@@ -338,3 +338,114 @@ This feature demonstrates a pragmatic approach to technical debt: when architect
 Future features will focus on adding inbox handler capabilities with the CanHandle pattern for capability-based message routing.
 
 
+---
+
+## Feature Implementation Summary - January 17, 2026 (Continued)
+
+### Completed: Add CanHandle method to IInboxHandler interface (Feature #7)
+
+**Objective**: Enable capability-based dispatch by adding a CanHandle method to the IInboxHandler interface, allowing handlers to be selected based on message metadata without requiring pre-registration with explicit route keys.
+
+**Implementation Details**:
+
+1. **Added CanHandle method to IInboxHandler interface** (src/Orleans.Journaling/Messaging/IInboxHandler.cs)
+   - New method signature: `bool CanHandle(IInboxHandlerContext context)`
+   - Enables handlers to inspect envelope metadata (route key, correlation key, context values, etc.)
+   - Supports capability-based dispatch with first-match-wins semantics
+   - Performance-focused: method should perform fast, metadata-only checks
+   - Comprehensive XML documentation with usage examples
+
+2. **Added default implementation for IInboxHandler<TMessage>**
+   - Default implementation returns `true` (accepts all messages by default)
+   - Typed handlers can override CanHandle for route-based, correlation-based, or other metadata filtering
+   - Type checking happens during deserialization, not during CanHandle
+   - Enables handlers to inspect metadata without deserialization overhead
+
+3. **Updated 11 existing test handlers** to implement CanHandle
+   - DeserializationFailureTests.cs: TypeMismatchHandler, UnavailableTypeHandler, FallbackHandler, MixedMessageHandler, SurvivorHandler
+   - DurableInboxExtensionTests.cs: SlowMessageHandler, ThrowingMessageHandler, CountingMessageHandler
+   - DurableInboxTests.cs: TestInboxHandler
+   - Grains.cs: TestMessageHandler
+   - InboxProcessingPumpTests.cs: TestHandler
+   - All handlers that directly implement IInboxHandler now have `public bool CanHandle(IInboxHandlerContext context) => true;`
+
+4. **Created comprehensive unit tests** (test/Orleans.Journaling.Tests/InboxHandlerCanHandleTests.cs)
+   - 6 BVT tests covering all CanHandle scenarios
+   - Tests for default behavior with typed handlers
+   - Tests for custom route-based filtering
+   - Tests for correlation key filtering
+   - Tests for prefix-based routing
+   - Tests for typed handlers with custom CanHandle override
+   - Tests for context verification and metadata access
+
+**Build Status**: ✅ Clean build, 0 warnings, 0 errors
+
+**Test Results**: 
+- InboxHandlerCanHandleTests (net10.0): ✅ 6/6 passed
+- Orleans.Journaling BVT tests (net10.0): ✅ 307/307 passed (includes the 6 new tests)
+
+**Files Modified**:
+- `src/Orleans.Journaling/Messaging/IInboxHandler.cs` (added CanHandle method)
+- `test/Orleans.Journaling.Tests/DeserializationFailureTests.cs` (updated 5 handlers)
+- `test/Orleans.Journaling.Tests/DurableInboxExtensionTests.cs` (updated 3 handlers)
+- `test/Orleans.Journaling.Tests/DurableInboxTests.cs` (updated 1 handler)
+- `test/Orleans.Journaling.Tests/Grains.cs` (updated 1 handler)
+- `test/Orleans.Journaling.Tests/InboxProcessingPumpTests.cs` (updated 1 handler)
+- `test/Orleans.Journaling.Tests/InboxHandlerCanHandleTests.cs` (NEW - 6 comprehensive tests)
+- `research/feature-list.json` (marked Feature #7 as passing)
+
+**Key Design Decisions**:
+
+1. **Fast, metadata-only checks**: CanHandle is designed for O(1) or O(n) linear scans without deserialization
+2. **Default implementation for typed handlers**: IInboxHandler<TMessage> returns true by default, deferring type checking to deserialization
+3. **First-match-wins semantics**: When multiple handlers return true, the first registered handler wins
+4. **Handler precedence**: Documented that specific handlers should be registered before generic ones
+5. **Explicit interface implementation**: Typed handlers use explicit interface implementation to keep the API clean
+
+**Benefits**:
+- ✅ Enables capability-based message routing without explicit route key registration
+- ✅ Supports prefix-based routing (e.g., "rpc/" matches "rpc/request", "rpc/reply")
+- ✅ Supports correlation-based routing for hierarchical workflows
+- ✅ Foundation for future features: RouteKeyHandler, RoutePrefixHandler, CorrelationHandler
+- ✅ Maintains backward compatibility - existing handlers just need to add CanHandle method
+- ✅ No performance impact - CanHandle checks are designed to be fast
+
+**Example Usage**:
+```csharp
+// Route-specific handler
+public class OrderHandler : IInboxHandler<OrderRequest>
+{
+    bool IInboxHandler.CanHandle(IInboxHandlerContext context)
+    {
+        return context.Envelope.RouteKey == "order/process";
+    }
+    
+    public async ValueTask HandleAsync(OrderRequest message, IInboxHandlerContext context, CancellationToken ct)
+    {
+        // Handle the order
+    }
+}
+
+// Prefix-based handler for all RPC messages
+public class RpcHandler : IInboxHandler
+{
+    public bool CanHandle(IInboxHandlerContext context)
+    {
+        return context.Envelope.RouteKey?.StartsWith("rpc/") == true;
+    }
+    
+    public async ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken ct)
+    {
+        // Handle any RPC message
+    }
+}
+```
+
+**Next Steps**:
+With CanHandle method now available, future features include:
+- Feature #8: Update IInboxHandler.HandleAsync to remove redundant envelope parameter
+- Feature #9: Create IInboxHandler<TMessage> typed handler interface (already exists, but may need updates)
+- Feature #10: Create RouteKeyHandler base class for exact route matching
+- Feature #11: Create RoutePrefixHandler base class for prefix-based routing
+- Feature #12: Create CorrelationHandler base class for correlation-based matching
+
