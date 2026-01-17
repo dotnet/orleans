@@ -164,7 +164,7 @@ public class InboxHandlerCanHandleTests
             return context.Envelope.RouteKey == _expectedRoute;
         }
 
-        public ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             return ValueTask.CompletedTask;
         }
@@ -184,7 +184,7 @@ public class InboxHandlerCanHandleTests
             return context.Envelope.CorrelationKey?.Equals(_expectedKey) == true;
         }
 
-        public ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             return ValueTask.CompletedTask;
         }
@@ -204,7 +204,7 @@ public class InboxHandlerCanHandleTests
             return context.Envelope.RouteKey?.StartsWith(_prefix) == true;
         }
 
-        public ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             return ValueTask.CompletedTask;
         }
@@ -237,7 +237,7 @@ public class InboxHandlerCanHandleTests
             return true;
         }
 
-        public ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             return ValueTask.CompletedTask;
         }

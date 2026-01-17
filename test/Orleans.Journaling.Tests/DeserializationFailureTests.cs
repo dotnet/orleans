@@ -419,10 +419,10 @@ public class TypeMismatchHandlerGrain : DurableGrain, ITypeMismatchHandlerGrain
 
         public bool CanHandle(IInboxHandlerContext context) => true;
 
-        public async ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
+        public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             // Try to get as int (handler expects int)
-            if (envelope.Data.TryGetBody<int>(out var intValue))
+            if (context.Envelope.Data.TryGetBody<int>(out var intValue))
             {
                 _grain._handledSuccessfully = true;
             }
@@ -522,15 +522,15 @@ public class UnavailableTypeHandlerGrain : DurableGrain, IUnavailableTypeHandler
 
         public bool CanHandle(IInboxHandlerContext context) => true;
 
-        public async ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
+        public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             // Try SimpleMessage first
-            if (envelope.Data.TryGetBody<SimpleMessage>(out var simpleMsg))
+            if (context.Envelope.Data.TryGetBody<SimpleMessage>(out var simpleMsg))
             {
                 _grain._successfulMessageCount++;
             }
             // Try ComplexMessage (which may fail if type changed)
-            else if (envelope.Data.TryGetBody<ComplexMessage>(out var complexMsg))
+            else if (context.Envelope.Data.TryGetBody<ComplexMessage>(out var complexMsg))
             {
                 _grain._successfulMessageCount++;
             }
@@ -579,10 +579,10 @@ public class FallbackHandlerGrain : DurableGrain, IFallbackHandlerGrain
 
         public bool CanHandle(IInboxHandlerContext context) => true;
 
-        public async ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
+        public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             // Try to deserialize as expected type
-            if (envelope.Data.TryGetBody<int>(out var value))
+            if (context.Envelope.Data.TryGetBody<int>(out var value))
             {
                 // Success - process normally
             }
@@ -590,7 +590,7 @@ public class FallbackHandlerGrain : DurableGrain, IFallbackHandlerGrain
             {
                 // Fallback: use raw bytes
                 _grain._usedFallback = true;
-                var rawBytes = envelope.Data.GetBodyBytes();
+                var rawBytes = context.Envelope.Data.GetBodyBytes();
                 _grain._rawBytesReceived = rawBytes.Length > 0;
             }
 
@@ -635,9 +635,9 @@ public class MixedMessageHandlerGrain : DurableGrain, IMixedMessageHandlerGrain
 
         public bool CanHandle(IInboxHandlerContext context) => true;
 
-        public async ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
+        public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
-            if (envelope.Data.TryGetBody<SimpleMessage>(out var message))
+            if (context.Envelope.Data.TryGetBody<SimpleMessage>(out var message))
             {
                 _grain._validMessageCount++;
                 _grain._processedValues.Add(message.Value);
@@ -689,9 +689,9 @@ public class SurvivorGrain : DurableGrain, ISurvivorGrain
 
         public bool CanHandle(IInboxHandlerContext context) => true;
 
-        public async ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
+        public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
-            if (envelope.Data.TryGetBody<SimpleMessage>(out var message))
+            if (context.Envelope.Data.TryGetBody<SimpleMessage>(out var message))
             {
                 _grain._lastReceivedValue.Value = message.Value;
                 await _grain.WriteStateAsync();

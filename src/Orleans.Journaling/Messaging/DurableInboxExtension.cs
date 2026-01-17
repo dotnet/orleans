@@ -519,7 +519,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
             var context = new InboxHandlerContext(envelope, _grainContext.GrainId, _outbox, _sessionPool);
 
             // Invoke handler
-            await handler.HandleAsync(envelope, context, CancellationToken.None).ConfigureAwait(true);
+            await handler.HandleAsync(context, CancellationToken.None).ConfigureAwait(true);
 
             // Mark as processed
             _inboxDict.Remove(key);
