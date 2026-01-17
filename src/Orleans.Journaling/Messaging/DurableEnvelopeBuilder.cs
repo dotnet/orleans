@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Reflection;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
@@ -48,7 +49,7 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
 
     private GrainId _receiverId;
     private string _routeKey = string.Empty;
-    private CorrelationKey? _correlationKey;
+    private HierarchicalKey? _correlationKey;
     private GrainId? _replyTo;
 
     // MigrationContext-style keyed context storage
@@ -119,14 +120,14 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     /// <example>
     /// <code>
     /// // Parent request
-    /// builder.WithCorrelationKey(CorrelationKey.Create("transfer-123"));
+    /// builder.WithCorrelationKey(HierarchicalKey.Create("transfer-123"));
     /// 
     /// // Child request
-    /// var parentKey = CorrelationKey.Create("transfer-123");
+    /// var parentKey = HierarchicalKey.Create("transfer-123");
     /// builder.WithCorrelationKey(parentKey.CreateChildKey("debit"));
     /// </code>
     /// </example>
-    public DurableEnvelopeBuilder WithCorrelationKey(CorrelationKey correlationKey)
+    public DurableEnvelopeBuilder WithCorrelationKey(HierarchicalKey correlationKey)
     {
         _correlationKey = correlationKey;
         return this;
@@ -147,7 +148,7 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     public DurableEnvelopeBuilder WithCorrelationKey(string correlationKey)
     {
         ArgumentNullException.ThrowIfNull(correlationKey);
-        _correlationKey = CorrelationKey.Create(correlationKey);
+        _correlationKey = HierarchicalKey.Create(correlationKey);
         return this;
     }
 

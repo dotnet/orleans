@@ -1,3 +1,4 @@
+using Orleans;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -40,10 +41,10 @@ public interface IDurableInboxObserver : IGrainExtension
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Result indicating delivery/processing status.</returns>
     /// <remarks>
-    /// The <paramref name="correlationKey"/> parameter uses hierarchical <see cref="CorrelationKey"/> 
+    /// The <paramref name="correlationKey"/> parameter uses hierarchical <see cref="HierarchicalKey"/> 
     /// to support parent/child request relationships. This enables correlated sub-requests 
     /// (e.g., "transfer-123" → "transfer-123/debit" → "transfer-123/credit").
     /// </remarks>
     [Alias("OnResponse"), AlwaysInterleave]
-    ValueTask<DeliveryResult> OnResponseAsync(CorrelationKey correlationKey, DurableEnvelope response, DeliveryOptions options, CancellationToken cancellationToken = default);
+    ValueTask<DeliveryResult> OnResponseAsync(HierarchicalKey correlationKey, DurableEnvelope response, DeliveryOptions options, CancellationToken cancellationToken = default);
 }

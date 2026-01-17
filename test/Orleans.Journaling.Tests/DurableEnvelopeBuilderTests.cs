@@ -120,7 +120,7 @@ public class DurableEnvelopeBuilderTests : IClassFixture<DefaultClusterFixture>
         var senderId = GrainId.Create("test", "sender");
         var receiverId = GrainId.Create("test", "receiver");
         var builder = CreateBuilder(senderId);
-        var correlationKey = CorrelationKey.Create("transfer-123");
+        var correlationKey = HierarchicalKey.Create("transfer-123");
 
         // Act
         var result = builder
@@ -332,7 +332,7 @@ public class DurableEnvelopeBuilderTests : IClassFixture<DefaultClusterFixture>
         var senderId = GrainId.Create("test", "sender");
         var receiverId = GrainId.Create("test", "receiver");
         var replyTo = GrainId.Create("test", "reply");
-        var correlationKey = CorrelationKey.Create("transfer-123/debit");
+        var correlationKey = HierarchicalKey.Create("transfer-123/debit");
         var builder = CreateBuilder(senderId);
 
         // Act
@@ -481,7 +481,7 @@ public class DurableEnvelopeBuilderTests : IClassFixture<DefaultClusterFixture>
         var senderId = GrainId.Create("test", "sender");
         var receiverId = GrainId.Create("test", "receiver");
         var builder = CreateBuilder(senderId);
-        var parentKey = CorrelationKey.Create("transfer-123");
+        var parentKey = HierarchicalKey.Create("transfer-123");
         var childKey = parentKey.CreateChildKey("debit");
 
         // Act
