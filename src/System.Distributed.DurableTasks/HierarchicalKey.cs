@@ -1,10 +1,28 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
 namespace System.Distributed.DurableTasks;
 
+/// <summary>
+/// Internal implementation of hierarchical key for use within System.Distributed.DurableTasks.
+/// </summary>
+/// <remarks>
+/// <para>
+/// This internal implementation is kept in System.Distributed.DurableTasks for architectural reasons:
+/// adding a dependency on Orleans.Core.Abstractions (which contains the public Orleans.HierarchicalKey)
+/// would create a circular dependency, since Orleans.Core.Abstractions already references this assembly.
+/// </para>
+/// <para>
+/// For interoperability between TaskId and Orleans.HierarchicalKey, use the extension methods defined
+/// in Orleans.Core.Abstractions (TaskIdExtensions.ToHierarchicalKey and ToTaskId).
+/// </para>
+/// <para>
+/// Public consumers should use the Orleans.HierarchicalKey type from Orleans.Core.Abstractions, which
+/// provides the same functionality as this internal implementation.
+/// </para>
+/// </remarks>
 internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalKey>, IParsable<HierarchicalKey>, ISpanParsable<HierarchicalKey>
 {
     public const char EscapeCharacter = '\\';

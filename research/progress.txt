@@ -276,3 +276,65 @@ TaskId.None.ToHierarchicalKey(); // returns null
 **Next Steps**:
 - Feature #6: Consider removing or type-forwarding the internal HierarchicalKey from System.Distributed.DurableTasks to eliminate duplication
 
+---
+
+## Feature Implementation Summary - January 17, 2026 (Continued)
+
+### Completed: Document internal HierarchicalKey in System.Distributed.DurableTasks (Feature #6)
+
+**Objective**: Address the duplication of HierarchicalKey implementations by documenting why the internal implementation must remain in System.Distributed.DurableTasks.
+
+**Challenge Analysis**:
+The feature description suggested "removing or type-forwarding" the original HierarchicalKey from System.Distributed.DurableTasks. However, analysis revealed this is not architecturally feasible due to circular dependency constraints:
+
+1. **Current Architecture**:
+   - `Orleans.Core.Abstractions` depends on `System.Distributed.DurableTasks` (line 37 of Orleans.Core.Abstractions.csproj)
+   - `System.Distributed.DurableTasks.TaskId` uses the internal `HierarchicalKey` implementation
+   - `Orleans.HierarchicalKey` exists as a public API in Orleans.Core.Abstractions
+
+2. **Why Removal/Type-Forwarding is Not Possible**:
+   - **Removal**: TaskId.cs requires HierarchicalKey for its implementation - removing it would break TaskId
+   - **Type-Forwarding**: Would require System.Distributed.DurableTasks to reference Orleans.Core.Abstractions
+   - **Circular Dependency**: This creates `System.Distributed.DurableTasks → Orleans.Core.Abstractions → System.Distributed.DurableTasks`
+   - **Build Error**: MSBuild reports "MSB4006: There is a circular dependency in the target dependency graph"
+
+**Solution Implemented**:
+Since architectural constraints prevent removing the duplication, the pragmatic solution is to document why both implementations must coexist:
+
+1. **Added comprehensive XML documentation** to the internal HierarchicalKey (src/System.Distributed.DurableTasks/HierarchicalKey.cs)
+   - Explains the internal implementation is kept for architectural reasons
+   - Documents that adding Orleans.Core.Abstractions dependency would create circular dependency
+   - Directs users to the extension methods (TaskIdExtensions) for interoperability
+   - Recommends public consumers use Orleans.HierarchicalKey from Orleans.Core.Abstractions
+
+2. **Documentation includes**:
+   - Clear explanation of why the internal class must remain
+   - Reference to the TaskIdExtensions bridge between the two types
+   - Guidance for public consumers to use the Orleans.HierarchicalKey type
+
+**Build Status**: ✅ Clean build, 0 warnings, 0 errors
+
+**Test Results**: 
+- Orleans.DurableTasks.Tests BVT: ✅ 5/5 passed
+- HierarchicalKeyTests (net10.0): ✅ 44/44 passed
+- TaskIdExtensionsTests (net10.0): ✅ 10/10 passed
+
+**Files Modified**:
+- `src/System.Distributed.DurableTasks/HierarchicalKey.cs` (added XML documentation)
+- `research/feature-list.json` (marked Feature #6 as passing)
+
+**Architectural Decision**:
+This feature demonstrates a pragmatic approach to technical debt: when architectural constraints prevent ideal solutions, clear documentation of the trade-offs and workarounds is the next best option. The extension methods in Orleans.Core.Abstractions provide a clean bridge between the two implementations, enabling interoperability without violating dependency rules.
+
+**Key Takeaways**:
+- ✅ Both HierarchicalKey implementations coexist by design
+- ✅ Internal implementation in System.Distributed.DurableTasks cannot be removed
+- ✅ Public implementation in Orleans.Core.Abstractions is the recommended API
+- ✅ TaskIdExtensions provide seamless conversion between TaskId and Orleans.HierarchicalKey
+- ✅ No circular dependencies
+- ✅ Clear documentation guides users to the correct usage patterns
+
+**Next Steps**:
+Future features will focus on adding inbox handler capabilities with the CanHandle pattern for capability-based message routing.
+
+
