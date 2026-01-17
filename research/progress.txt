@@ -1,5 +1,68 @@
 ## Feature Implementation Summary - January 17, 2026
 
+### Completed: Update DurableEnvelope to use HierarchicalKey instead of CorrelationKey
+
+**Objective**: Migrate DurableEnvelope from using CorrelationKey to HierarchicalKey to unify hierarchical correlation across Orleans messaging.
+
+**Implementation Details**:
+
+1. **Updated DurableEnvelope.cs**
+   - Changed `CorrelationKey?` property type to `HierarchicalKey?` (line 149)
+   - Added `using Orleans;` directive
+   - Updated XML documentation to reference HierarchicalKey
+   - Updated code examples in documentation to use HierarchicalKey
+
+2. **Updated DurableEnvelopeBuilder.cs**
+   - Changed `_correlationKey` field from `CorrelationKey?` to `HierarchicalKey?`
+   - Updated `WithCorrelationKey(CorrelationKey)` to `WithCorrelationKey(HierarchicalKey)`
+   - Updated `WithCorrelationKey(string)` to call `HierarchicalKey.Create()`
+   - Added `using Orleans;` directive
+
+3. **Updated IDurableInboxExtension.cs (IDurableInboxObserver interface)**
+   - Changed `OnResponseAsync` parameter from `CorrelationKey` to `HierarchicalKey`
+   - Updated XML documentation
+   - Added `using Orleans;` directive
+
+4. **Updated test files** (via debugger agent)
+   - BankTransferWorkflowTests.cs: Updated interfaces and grain implementations
+   - DurableInboxObserverTests.cs: Updated TestObserver implementation
+   - DurableRpcIntegrationTests.cs: Updated all grain interfaces and implementations
+   - MultiSiloDeliveryTests.cs: Updated message types and grain interfaces
+   - InboxHandlerContextTests.cs: Updated test helper methods
+   - All test files (except CorrelationKeyTests.cs): Replaced `CorrelationKey.Create` with `HierarchicalKey.Create`
+
+**Build Status**: ✅ Clean build, 0 warnings, 0 errors
+
+**Test Results**: 
+- DurableEnvelopeTests: ✅ 4/4 passed
+- All BVT tests: ✅ 301/301 passed
+
+**Files Modified**:
+- `src/Orleans.Journaling/Messaging/DurableEnvelope.cs`
+- `src/Orleans.Journaling/Messaging/DurableEnvelopeBuilder.cs`
+- `src/Orleans.Journaling/Messaging/IDurableInboxExtension.cs`
+- `test/Orleans.Journaling.Tests/BankTransferWorkflowTests.cs`
+- `test/Orleans.Journaling.Tests/DurableInboxObserverTests.cs`
+- `test/Orleans.Journaling.Tests/DurableRpcIntegrationTests.cs`
+- `test/Orleans.Journaling.Tests/MultiSiloDeliveryTests.cs`
+- `test/Orleans.Journaling.Tests/DurableEnvelopeBuilderTests.cs`
+- `test/Orleans.Journaling.Tests/DurableEnvelopeTests.cs`
+- `test/Orleans.Journaling.Tests/InboxHandlerContextTests.cs`
+- `research/feature-list.json` (marked feature as passing)
+
+**Benefits**:
+- Unified hierarchical key type across Orleans.Core.Abstractions, Orleans.Journaling, and System.Distributed.DurableTasks
+- Consistent API for hierarchical correlation across messaging and workflow systems
+- Single source of truth for hierarchical key implementation
+- Foundation for future deprecation of CorrelationKey wrapper
+
+**Next Steps**:
+The next feature in the list is to update DurableEnvelopeBuilder, which was partially completed as part of this feature. Future work includes creating a deprecated CorrelationKey wrapper for backward compatibility.
+
+---
+
+## Feature Implementation Summary - January 17, 2026
+
 ### Completed: Move HierarchicalKey from System.Distributed.DurableTasks to Orleans.Core.Abstractions
 
 **Objective**: Extract HierarchicalKey class from System.Distributed.DurableTasks and make it publicly available in Orleans.Core.Abstractions as a foundation for hierarchical routing and correlation in Orleans messaging.
