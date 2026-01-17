@@ -61,7 +61,7 @@
       "Build System.Distributed.DurableTasks project to verify compilation",
       "Run DurableTask unit tests to verify functionality"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "refactor",
