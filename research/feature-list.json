@@ -347,7 +347,7 @@
       "Test with RouteKeyHandler and RoutePrefixHandler",
       "Run tests and verify all pass"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "testing",
