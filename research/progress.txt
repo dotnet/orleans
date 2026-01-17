@@ -1,0 +1,45 @@
+## Feature Implementation Summary - January 17, 2026
+
+### Completed: Move HierarchicalKey from System.Distributed.DurableTasks to Orleans.Core.Abstractions
+
+**Objective**: Extract HierarchicalKey class from System.Distributed.DurableTasks and make it publicly available in Orleans.Core.Abstractions as a foundation for hierarchical routing and correlation in Orleans messaging.
+
+**Implementation Details**:
+
+1. **Created new public HierarchicalKey class** (`src/Orleans.Core.Abstractions/HierarchicalKey.cs`)
+   - Changed namespace from `System.Distributed.DurableTasks` to `Orleans`
+   - Changed visibility from `internal sealed class` to `public sealed class`
+   - Added serialization attributes: `[GenerateSerializer, Immutable]`
+   - Added `[Id(0)]` and `[Id(1)]` attributes to private fields for Orleans serialization
+   - Preserved all original functionality including:
+     - Hierarchical key creation and parsing
+     - Parent-child relationship methods (IsParentOf, IsChildOf, IsAncestorOf)
+     - Escape character handling for segment separators
+     - Segment enumeration support
+     - Hash code and equality implementations
+
+2. **Created comprehensive unit tests** (`test/NonSilo.Tests/Orleans/HierarchicalKeyTests.cs`)
+   - 44 BVT tests covering all core functionality
+   - Tests for parsing, creation, hierarchy relationships
+   - Tests for escaped characters and edge cases
+   - Tests for equality, hash codes, and enumeration
+   - All 44 tests pass on both net8.0 and net10.0
+
+**Build Status**: ✅ Clean build, 0 warnings, 0 errors
+
+**Test Results**: 
+- net10.0: ✅ 44/44 passed
+- net8.0: ✅ 44/44 passed
+
+**Files Modified**:
+- `src/Orleans.Core.Abstractions/HierarchicalKey.cs` (NEW)
+- `test/NonSilo.Tests/Orleans/HierarchicalKeyTests.cs` (NEW)
+- `research/feature-list.json` (marked first feature as passing)
+
+**Next Steps**:
+The original HierarchicalKey in System.Distributed.DurableTasks should remain for now to maintain backward compatibility. Future features will update consumers to use the new public Orleans.HierarchicalKey and eventually remove or type-forward the original internal implementation.
+
+This refactoring enables:
+- Shared hierarchical key infrastructure across Orleans components
+- Public API for correlation-based routing in Orleans.Journaling
+- Foundation for DurableEnvelope correlation key migration from CorrelationKey to HierarchicalKey
