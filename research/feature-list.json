@@ -401,7 +401,7 @@
       "Build Orleans.Runtime project to verify compilation",
       "Run DurableTask integration tests"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "refactor",
