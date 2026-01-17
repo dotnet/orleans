@@ -1672,3 +1672,80 @@ Feature #23 is now marked as complete. The next features in the list are:
 
 This verification confirms that Feature #23 was successfully implemented earlier with comprehensive test coverage and only required validation and documentation of completion status.
 
+
+---
+
+## Feature Implementation Summary - January 17, 2026 (Continued)
+
+### Completed: Create HandlerCacheTests for caching behavior (Feature #24)
+
+**Objective**: Create comprehensive unit tests to verify the DurableInbox handler caching mechanism works correctly, including cache hits, cache invalidation, null result caching, and concurrent access handling.
+
+**Implementation Details**:
+
+1. **Created HandlerCacheTests.cs** (test/Orleans.Journaling.Tests/HandlerCacheTests.cs)
+   - 9 comprehensive BVT tests covering all caching scenarios
+   - Tests verify correct caching behavior, invalidation, and thread safety
+   - All tests use CanHandleCountingHandler to verify cache hits/misses
+   
+2. **Test Coverage**:
+   
+   | Test | Description |
+   |------|-------------|
+   | DurableInbox_TryFindHandler_CachesResultAfterFirstLookup | Verifies handler lookups are cached after first evaluation |
+   | DurableInbox_RegisterHandler_InvalidatesCache | Verifies cache is cleared when new handlers are registered |
+   | DurableInbox_LegacyRegisterHandler_InvalidatesCache | Verifies cache invalidation works with legacy registration API |
+   | DurableInbox_TryFindHandler_CachesNullResults | Verifies negative results (no handler found) are cached |
+   | DurableInbox_RegisterHandler_InvalidatesCachedNullResults | Verifies null results are invalidated when handlers are added |
+   | DurableInbox_TryFindHandler_HandlesConcurrentAccess | Verifies cache is thread-safe under concurrent access (100 parallel tasks per route) |
+   | DurableInbox_TryFindHandler_CachesSeparateEntriesPerRoute | Verifies different route keys use independent cache entries |
+   | DurableInbox_TryFindHandler_CachesNullAndEmptyRouteKeys | Verifies null/empty route keys are cached correctly |
+   | DurableInbox_TryFindHandler_CachesFirstMatchingHandler | Verifies first-match-wins precedence is cached correctly |
+
+3. **Key Design Decisions**:
+   - **CanHandleCountingHandler**: Custom test handler tracks CanHandle invocation count to verify caching
+   - **Thread safety**: Concurrent test runs 300 parallel tasks (100 per route) to verify ConcurrentDictionary safety
+   - **Linear scan awareness**: Tests account for the fact that all handlers before the matching one are evaluated
+   - **First-match-wins**: Tests verify that once a handler is cached, subsequent handlers aren't evaluated
+   
+4. **Implementation Challenges**:
+   - **Initial test failures**: Tests initially expected no CanHandle calls during linear scans for non-matching routes
+   - **Fix**: Updated test assertions to account for the linear scan behavior where all handlers before the match are evaluated
+   - **Example**: When looking up "route2" with handlers ["route1", "route2"], handler1.CanHandle is called even though it returns false
+
+**Build Status**: ✅ Clean build, 0 warnings, 0 errors
+
+**Test Results**: 
+- HandlerCacheTests (net10.0): ✅ 9/9 passed
+- HandlerCacheTests (net8.0): ✅ 9/9 passed
+
+**Files Modified**:
+- test/Orleans.Journaling.Tests/HandlerCacheTests.cs (NEW - 9 comprehensive tests, 547 lines)
+- research/feature-list.json (marked Feature #24 as passing)
+
+**Benefits**:
+- ✅ Comprehensive test coverage for DurableInbox caching mechanism
+- ✅ Verifies O(1) cache lookup performance after initial O(n) linear scan
+- ✅ Ensures thread safety with concurrent access tests
+- ✅ Documents expected caching behavior through tests
+- ✅ Catches regressions in cache invalidation logic
+- ✅ Tests verify both positive (handler found) and negative (no handler) caching
+- ✅ Validates that multiple routes don't interfere with each other's cache entries
+
+**Key Insights**:
+1. **Linear scan behavior**: The first lookup for a route performs a linear scan of all handlers until a match is found. All handlers checked during this scan have their CanHandle method called.
+2. **Cache optimization**: Subsequent lookups for the same route key hit the cache, avoiding the linear scan entirely.
+3. **Cache invalidation**: The cache is cleared on any handler registration (both new API and legacy API) to ensure correctness.
+4. **Null result caching**: Even when no handler is found, the result is cached to avoid repeated expensive linear scans for unknown routes.
+5. **Thread safety**: The ConcurrentDictionary-based cache handles concurrent access safely without locks on the read path.
+
+**Performance Characteristics**:
+- **First lookup**: O(n) where n is the number of handlers (linear scan until match)
+- **Cached lookup**: O(1) dictionary lookup
+- **Cache invalidation**: O(1) dictionary clear
+- **Concurrent reads**: Lock-free via ConcurrentDictionary
+- **Worst case**: O(n) linear scan when cache is empty or invalidated
+
+**Next Steps**:
+The next feature in the list is #25: Create DurableRpcIntegrationTests for end-to-end flow.
+
