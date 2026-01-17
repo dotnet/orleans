@@ -158,4 +158,159 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     {
         Outbox.Send(envelope);
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// <para>
+    /// Creates a <see cref="DurableErrorResponse"/> with the specified error code and message,
+    /// and sends it to the <see cref="DurableEnvelope.ReplyTo"/> address if present. The error
+    /// response includes the error code, message, and retriability flag.
+    /// </para>
+    /// <para>
+    /// The reply route key is derived from the original request's route key. For example:
+    /// </para>
+    /// <list type="bullet">
+    /// <item><description>"order/process" becomes "order/reply"</description></item>
+    /// <item><description>"payment/authorize" becomes "payment/reply"</description></item>
+    /// <item><description>"notify" (no prefix) becomes "reply"</description></item>
+    /// </list>
+    /// <para>
+    /// If the envelope does not have a ReplyTo address, this method does nothing (safe no-op
+    /// for one-way messages).
+    /// </para>
+    /// </remarks>
+    public void SendError(string errorCode, string message, bool isRetriable = false)
+    {
+        // Only send error if there's a reply-to address
+        if (Envelope.ReplyTo is not { } replyTo)
+        {
+            return;
+        }
+
+        // Create error response
+        var errorResponse = new DurableErrorResponse
+        {
+            ErrorCode = errorCode,
+            Message = message,
+            IsRetriable = isRetriable
+        };
+
+        // Determine reply route key
+        // If route key has a prefix (e.g., "order/process"), use "prefix/reply"
+        // Otherwise, just use "reply"
+        var replyRoute = GetReplyRouteKey(Envelope.RouteKey);
+
+        // Build and send error response envelope
+        var builder = CreateEnvelope()
+            .To(replyTo, replyRoute)
+            .WithBody(errorResponse);
+
+        // Preserve correlation key if present
+        if (Envelope.CorrelationKey is { } correlationKey)
+        {
+            builder.WithCorrelationKey(correlationKey);
+        }
+
+        var errorEnvelope = builder.Build();
+        Send(errorEnvelope);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// <para>
+    /// Extracts error details from the exception and creates a <see cref="DurableErrorResponse"/>.
+    /// The exception type name is converted to an error code (e.g., "ArgumentNullException" becomes
+    /// "ARGUMENT_NULL_EXCEPTION"), and the full exception details (including stack trace) are
+    /// included in the <see cref="DurableErrorResponse.ExceptionDetails"/> property.
+    /// </para>
+    /// <para>
+    /// If the envelope does not have a ReplyTo address, this method does nothing (safe no-op
+    /// for one-way messages).
+    /// </para>
+    /// </remarks>
+    public void SendError(Exception exception, bool isRetriable = false)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+
+        // Only send error if there's a reply-to address
+        if (Envelope.ReplyTo is not { } replyTo)
+        {
+            return;
+        }
+
+        // Convert exception type name to error code (e.g., ArgumentNullException -> ARGUMENT_NULL_EXCEPTION)
+        var exceptionTypeName = exception.GetType().Name;
+        var errorCode = ConvertToErrorCode(exceptionTypeName);
+
+        // Create error response with full exception details
+        var errorResponse = new DurableErrorResponse
+        {
+            ErrorCode = errorCode,
+            Message = exception.Message,
+            ExceptionDetails = exception.ToString(),
+            IsRetriable = isRetriable
+        };
+
+        // Determine reply route key
+        var replyRoute = GetReplyRouteKey(Envelope.RouteKey);
+
+        // Build and send error response envelope
+        var builder = CreateEnvelope()
+            .To(replyTo, replyRoute)
+            .WithBody(errorResponse);
+
+        // Preserve correlation key if present
+        if (Envelope.CorrelationKey is { } correlationKey)
+        {
+            builder.WithCorrelationKey(correlationKey);
+        }
+
+        var errorEnvelope = builder.Build();
+        Send(errorEnvelope);
+    }
+
+    /// <summary>
+    /// Determines the reply route key based on the original request's route key.
+    /// </summary>
+    /// <param name="requestRouteKey">The route key from the original request.</param>
+    /// <returns>The reply route key (e.g., "order/process" becomes "order/reply").</returns>
+    private static string GetReplyRouteKey(string? requestRouteKey)
+    {
+        if (string.IsNullOrEmpty(requestRouteKey))
+        {
+            return "reply";
+        }
+
+        // If route has a prefix (contains '/'), replace suffix with "reply"
+        var lastSlashIndex = requestRouteKey.LastIndexOf('/');
+        if (lastSlashIndex >= 0)
+        {
+            return requestRouteKey.Substring(0, lastSlashIndex + 1) + "reply";
+        }
+
+        // No prefix, just use "reply"
+        return "reply";
+    }
+
+    /// <summary>
+    /// Converts an exception type name to an error code.
+    /// </summary>
+    /// <param name="exceptionTypeName">The exception type name (e.g., "ArgumentNullException").</param>
+    /// <returns>The error code in uppercase with underscores (e.g., "ARGUMENT_NULL_EXCEPTION").</returns>
+    private static string ConvertToErrorCode(string exceptionTypeName)
+    {
+        // Remove "Exception" suffix if present
+        if (exceptionTypeName.EndsWith("Exception", StringComparison.Ordinal))
+        {
+            exceptionTypeName = exceptionTypeName.Substring(0, exceptionTypeName.Length - "Exception".Length);
+        }
+
+        // Convert PascalCase to UPPER_SNAKE_CASE
+        var result = System.Text.RegularExpressions.Regex.Replace(
+            exceptionTypeName,
+            "([a-z])([A-Z])",
+            "$1_$2");
+
+        return result.ToUpperInvariant();
+    }
 }

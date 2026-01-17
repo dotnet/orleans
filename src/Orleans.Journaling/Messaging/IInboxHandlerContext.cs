@@ -212,4 +212,141 @@ public interface IInboxHandlerContext
     /// </code>
     /// </example>
     IDurableOutbox Outbox { get; }
+
+    /// <summary>
+    /// Sends an error response to the requester if the envelope has a ReplyTo address.
+    /// </summary>
+    /// <param name="errorCode">The error code categorizing the failure (e.g., "VALIDATION_FAILED").</param>
+    /// <param name="message">Human-readable error message describing what went wrong.</param>
+    /// <param name="isRetriable">Indicates whether the requester should retry the operation. Defaults to false.</param>
+    /// <remarks>
+    /// <para>
+    /// This method simplifies error response handling in durable RPC scenarios. When a handler
+    /// encounters an error while processing a message with a <see cref="DurableEnvelope.ReplyTo"/>
+    /// address, it can call SendError to automatically create and send a <see cref="DurableErrorResponse"/>
+    /// to the requester.
+    /// </para>
+    /// <para>
+    /// The error response is sent with the same correlation key as the request, and the route key
+    /// is set based on the original request's route key (e.g., "order/process" becomes "order/reply").
+    /// If the request's route key doesn't contain a slash, the reply route defaults to "reply".
+    /// </para>
+    /// <para>
+    /// If the current envelope does not have a <see cref="DurableEnvelope.ReplyTo"/> address,
+    /// this method does nothing. This is a safe no-op for one-way messages that don't expect responses.
+    /// </para>
+    /// <para>
+    /// Use standard error codes from <see cref="StandardErrorCodes"/> for common scenarios, or define
+    /// custom error codes specific to your domain. Set <paramref name="isRetriable"/> to true for
+    /// transient errors (network timeouts, database connection failures) and false for permanent errors
+    /// (validation failures, authorization errors).
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// public class PaymentHandler : IInboxHandler&lt;PaymentRequest&gt;
+    /// {
+    ///     public async ValueTask HandleAsync(PaymentRequest message, IInboxHandlerContext context, CancellationToken ct)
+    ///     {
+    ///         // Validate request
+    ///         if (message.Amount &lt;= 0)
+    ///         {
+    ///             context.SendError(
+    ///                 StandardErrorCodes.ValidationFailed,
+    ///                 "Payment amount must be greater than zero",
+    ///                 isRetriable: false);
+    ///             return;  // Stop processing
+    ///         }
+    ///         
+    ///         try
+    ///         {
+    ///             await ProcessPayment(message, ct);
+    ///         }
+    ///         catch (PaymentGatewayException ex)
+    ///         {
+    ///             // Transient error - payment gateway unavailable
+    ///             context.SendError(
+    ///                 StandardErrorCodes.TransientError,
+    ///                 $"Payment gateway temporarily unavailable: {ex.Message}",
+    ///                 isRetriable: true);
+    ///             throw;  // Rethrow to mark processing as failed
+    ///         }
+    ///         catch (InsufficientFundsException ex)
+    ///         {
+    ///             // Permanent error - payment declined
+    ///             context.SendError(
+    ///                 "INSUFFICIENT_FUNDS",
+    ///                 $"Payment declined: {ex.Message}",
+    ///                 isRetriable: false);
+    ///             throw;
+    ///         }
+    ///     }
+    /// }
+    /// </code>
+    /// </example>
+    void SendError(string errorCode, string message, bool isRetriable = false);
+
+    /// <summary>
+    /// Sends an error response to the requester based on an exception, if the envelope has a ReplyTo address.
+    /// </summary>
+    /// <param name="exception">The exception that occurred during message processing.</param>
+    /// <param name="isRetriable">Indicates whether the requester should retry the operation. Defaults to false.</param>
+    /// <remarks>
+    /// <para>
+    /// This method is a convenience overload that extracts error details from an exception
+    /// and sends a <see cref="DurableErrorResponse"/> to the requester. The exception type name
+    /// is used as the error code (e.g., "ArgumentNullException" becomes "ARGUMENT_NULL_EXCEPTION"),
+    /// and the exception message is used as the error message.
+    /// </para>
+    /// <para>
+    /// The full exception details (including stack trace) are included in the
+    /// <see cref="DurableErrorResponse.ExceptionDetails"/> property via <c>exception.ToString()</c>.
+    /// In production environments, consider using the <see cref="SendError(string, string, bool)"/>
+    /// overload with custom error codes and messages to avoid exposing internal implementation details.
+    /// </para>
+    /// <para>
+    /// If the current envelope does not have a <see cref="DurableEnvelope.ReplyTo"/> address,
+    /// this method does nothing. This is a safe no-op for one-way messages that don't expect responses.
+    /// </para>
+    /// <para>
+    /// The <paramref name="isRetriable"/> parameter should be set based on the exception type:
+    /// </para>
+    /// <list type="bullet">
+    /// <item><description><c>true</c> for transient exceptions (IOException, TimeoutException, etc.)</description></item>
+    /// <item><description><c>false</c> for permanent exceptions (ArgumentException, InvalidOperationException, etc.)</description></item>
+    /// </list>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// public class OrderHandler : IInboxHandler&lt;OrderRequest&gt;
+    /// {
+    ///     public async ValueTask HandleAsync(OrderRequest message, IInboxHandlerContext context, CancellationToken ct)
+    ///     {
+    ///         try
+    ///         {
+    ///             await ProcessOrder(message, ct);
+    ///         }
+    ///         catch (ArgumentException ex)
+    ///         {
+    ///             // Validation error - not retriable
+    ///             context.SendError(ex, isRetriable: false);
+    ///             throw;
+    ///         }
+    ///         catch (TimeoutException ex)
+    ///         {
+    ///             // Transient error - retriable
+    ///             context.SendError(ex, isRetriable: true);
+    ///             throw;
+    ///         }
+    ///         catch (Exception ex)
+    ///         {
+    ///             // Unknown error - assume not retriable
+    ///             context.SendError(ex, isRetriable: false);
+    ///             throw;
+    ///         }
+    ///     }
+    /// }
+    /// </code>
+    /// </example>
+    void SendError(Exception exception, bool isRetriable = false);
 }
