@@ -2052,3 +2052,92 @@ Feature #29 verification confirmed that all Orleans.Journaling handlers already 
 **Next Steps**:
 The next incomplete feature in the list is Feature #30: \Document route key conventions\ (documentation task).
 
+
+---
+
+## Documentation Summary - January 17, 2026 (Continued)
+
+### Completed: Document route key conventions (Feature #29)
+
+**Objective**: Create comprehensive documentation for route key conventions used in Orleans.Journaling messaging system to guide developers in using standardized routing patterns.
+
+**Implementation Details**:
+
+1. **Created route-key-conventions.md** (research/docs/route-key-conventions.md)
+   - Comprehensive documentation of route key structure and conventions
+   - Documented escaping rules for special characters (/ and \)
+   - Complete coverage of standard route prefixes:
+     * rpc/ for RPC-style request/response patterns
+     * durabletask/ for DurableTask workflow orchestration
+     * job/ for DurableJob scheduling
+   
+2. **Route Key Structure**:
+   - Forward slash (/) as hierarchical separator
+   - Backslash (\) as escape character
+   - Support for prefix-based routing (e.g., rpc/ matches rpc/request, rpc/reply, etc.)
+
+3. **Standard RPC Routes**:
+   - rpc/request - Durable RPC requests from caller to responder
+   - rpc/reply - Durable RPC responses (success or error) from responder to caller
+   - rpc/notify - One-way notifications (no reply expected)
+
+4. **Routing Patterns Documented**:
+   - **Exact Route Matching** - Using RouteKeyHandler for specific routes
+   - **Prefix-Based Routing** - Using RoutePrefixHandler for route families
+   - **Correlation-Based Routing** - Using CorrelationHandler for hierarchical workflows
+
+5. **Code Examples Included**:
+   - Complete request/reply pattern example with error handling
+   - Prefix handler with operation-based switching
+   - Correlation handler for hierarchical workflows
+   - Error response patterns with standard error codes
+   - Handler registration order best practices
+
+6. **Error Response Documentation**:
+   - Standard error codes (HANDLER_NOT_FOUND, DESERIALIZATION_FAILED, HANDLER_EXCEPTION, CANCELLED, TIMEOUT)
+   - Error response routing via same route as success responses
+   - Examples of sending error responses using context.SendError()
+
+7. **Performance Considerations**:
+   - Route caching provides O(1) lookup after first match
+   - Handler selection performance characteristics
+   - Best practices for high-throughput scenarios
+
+8. **Custom Route Key Guidelines**:
+   - Use hierarchical prefixes for organization
+   - Consistent naming conventions
+   - Avoid collisions with Orleans standard prefixes
+   - Versioning strategies for APIs
+
+**Files Created**:
+- research/docs/route-key-conventions.md (NEW - comprehensive route key documentation)
+
+**Files Modified**:
+- research/feature-list.json (marked Feature #29 as passing)
+
+**Content Coverage**:
+- Route key structure and escaping rules
+- Standard route prefixes (rpc/, durabletask/, job/)
+- Complete code examples for all routing patterns
+- Error handling and standard error codes
+- Handler registration order and precedence
+- Performance considerations and caching behavior
+- Custom route key conventions and best practices
+- Cross-references to RFC and research documents
+
+**Benefits**:
+- Clear guidance for developers using Orleans.Journaling
+- Standardized route key conventions across Orleans components
+- Comprehensive examples for common patterns
+- Performance optimization guidelines
+- Foundation for consistent API design across Orleans ecosystem
+- Reduces ambiguity in message routing implementations
+
+**Related Documentation**:
+- References Unified Durable Messaging System RFC (TDD-unified-durable-messaging-system.md)
+- References Durable Messaging System Consolidation research doc
+- Complements Orleans.Journaling API documentation
+
+**Next Steps**:
+With route key conventions now documented, the next feature in the list is #30: Benchmark handler dispatch performance with caching (performance category).
+
