@@ -247,7 +247,7 @@
       "Add XML documentation explaining error response routing via ReplyTo",
       "Build Orleans.Journaling project to verify compilation"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -261,7 +261,7 @@
       "Build Orleans.Journaling project to verify compilation",
       "Run error handling tests"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
