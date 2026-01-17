@@ -255,8 +255,11 @@ internal sealed class InboxProcessingPump : IDurableJobHandler
             return ProcessingResult.AlreadyProcessed;
         }
 
-        // Check if handler exists
-        if (!_inbox.HasHandler(envelope.RouteKey))
+        // Create handler context
+        var context = new InboxHandlerContext(envelope, _grainId, _outbox, _sessionPool);
+
+        // Try to find a handler using the new capability-based dispatch
+        if (!_inbox.TryFindHandler(context, out var handler))
         {
             // Remove from inbox and mark as processed
             _inbox.RemoveMessage(envelope.SenderId, envelope.MessageId);
@@ -266,12 +269,6 @@ internal sealed class InboxProcessingPump : IDurableJobHandler
 
         try
         {
-            // Create handler context with the actual outbox
-            var context = new InboxHandlerContext(envelope, _grainId, _outbox, _sessionPool);
-
-            // Get handler (we already checked it exists)
-            var handler = GetHandler(envelope.RouteKey);
-
             // Invoke handler
             await handler.HandleAsync(context, cancellationToken).ConfigureAwait(true);
 
@@ -299,23 +296,6 @@ internal sealed class InboxProcessingPump : IDurableJobHandler
 
             return ProcessingResult.HandlerException;
         }
-    }
-
-    /// <summary>
-    /// Gets the handler for a route key.
-    /// </summary>
-    /// <remarks>
-    /// This method assumes HasHandler() was called first to verify the handler exists.
-    /// If the handler is not found, throws InvalidOperationException.
-    /// </remarks>
-    private IInboxHandler GetHandler(string routeKey)
-    {
-        if (_inbox.TryGetHandler(routeKey, out var handler))
-        {
-            return handler;
-        }
-
-        throw new InvalidOperationException($"Handler for route '{routeKey}' not found, but HasHandler returned true");
     }
 
     /// <summary>
