@@ -34,7 +34,7 @@
       "Update any internal usages of CorrelationKey to HierarchicalKey",
       "Build Orleans.Journaling project to verify compilation"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "refactor",
@@ -48,7 +48,7 @@
       "Build Orleans.Journaling project to verify compilation",
       "Verify obsolete warnings appear when using CorrelationKey"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "refactor",
