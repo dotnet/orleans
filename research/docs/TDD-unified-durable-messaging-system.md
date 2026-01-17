@@ -1,137 +1,295 @@
-# Technical Design Document: Unified Durable Messaging System
+# Unified Durable Messaging System - Technical Design Document / RFC
 
-| Field | Value |
-|-------|-------|
-| **Author** | OpenCode |
-| **Date** | 2026-01-17 |
-| **Status** | Draft |
-| **Branch** | feature/durabletask/6 |
-| **Research Doc** | [2026-01-17-durable-messaging-system-consolidation.md](./2026-01-17-durable-messaging-system-consolidation.md) |
-
----
-
-## Executive Summary
-
-This TDD describes the consolidation of Orleans.Journaling's inbox/outbox messaging system with Orleans.DurableTask's observer pattern into a unified durable messaging system. The goal is to improve layering, reduce code duplication, and provide a single, well-integrated durable messaging foundation for Orleans.DurableTask replatforming.
-
-### Key Changes
-
-1. **Unify `CorrelationKey` and `TaskId`** into a single `HierarchicalKey` type
-2. **Simplify `IInboxHandler` API** by removing redundant envelope parameter and adding `CanHandle()` for capability-based dispatch
-3. **Implement prefix-based routing** (e.g., `rpc/`, `durabletask/`) instead of per-route registration
-4. **Standardize response delivery** using `ReplyTo` as the primary mechanism for grains
-5. **Implement response acknowledgment** with outbox cleanup on inbox receipt
+| Document Metadata      | Details                                                      |
+| ---------------------- | ------------------------------------------------------------ |
+| Author(s)              | Reuben Bond                                                  |
+| Status                 | Draft (WIP)                                                  |
+| Team / Owner           | Orleans Core Team                                            |
+| Created / Last Updated | 2026-01-17                                                   |
+| Branch                 | feature/durabletask/6                                        |
+| Research Doc           | [2026-01-17-durable-messaging-system-consolidation.md](./2026-01-17-durable-messaging-system-consolidation.md) |
 
 ---
 
-## Motivation
+## 1. Executive Summary
 
-### Current State
+This RFC proposes consolidating Orleans.Journaling's inbox/outbox messaging system with Orleans.DurableTask's observer pattern into a **unified durable messaging system**. Currently, durable response delivery uses two overlapping mechanisms: `ReplyTo`-based routing in the messaging layer and `IDurableTaskObserver` callbacks in the task layer. This duplication creates inconsistent patterns, duplicate code, and two nearly-identical hierarchical key types (`CorrelationKey` vs `HierarchicalKey`).
 
-The codebase has two overlapping patterns for durable request/response:
+The proposed solution unifies these into a single messaging primitive with capability-based handler dispatch, a single `HierarchicalKey` type for correlation, and standardized response routing via `ReplyTo`. This enables Orleans.DurableTask replatforming atop Orleans.Journaling with cleaner layering and reduced complexity.
 
-1. **Orleans.Journaling Inbox/Outbox** (`src/Orleans.Journaling/Messaging/`)
-   - Uses `ReplyTo` field in `DurableEnvelope` for response routing
-   - Uses `CorrelationKey` for hierarchical correlation tracking
-   - Handlers registered per route key via `Dictionary<string, IInboxHandler>`
-
-2. **Orleans.DurableTask Observer Pattern** (`src/Orleans.Runtime/DurableTasks/`)
-   - Uses `IDurableTaskObserver.OnResponseAsync()` for callbacks
-   - Uses `TaskId` (backed by `HierarchicalKey`) for task identification
-   - Observers registered and notified on task completion
-
-Both patterns solve similar problems with different mechanisms, leading to:
-- Code duplication between messaging and task layers
-- Two different hierarchical key types (`CorrelationKey` vs `HierarchicalKey`)
-- Inconsistent response delivery patterns
-- Handler APIs with redundant parameters
-
-### Goals
-
-1. **Single hierarchical key type** for correlation across all durable messaging
-2. **Capability-based handler dispatch** with prefix routing
-3. **Unified response delivery** using `ReplyTo` for addressable grains
-4. **Cleaner handler API** without redundant parameters
-5. **Response acknowledgment** for reliable cleanup
+**Impact**: Reduced code duplication, simplified handler APIs, unified correlation tracking, and a foundation for building higher-level durable execution patterns.
 
 ---
 
-## Detailed Design
+## 2. Context and Motivation
 
-### 1. HierarchicalKey Unification
+### 2.1 Current State
+
+The Orleans durable messaging infrastructure consists of four overlapping systems:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Application Layer                             │
+│  (User grains implementing IDurableJobHandler, IInboxHandler)   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+┌─────────────────────────────┴───────────────────────────────────┐
+│                Orleans.DurableTask Layer                         │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌────────────────┐ │
+│  │ DurableTask-     │  │ DurableTask-     │  │ DurableTask-   │ │
+│  │ GrainRuntime     │  │ GrainStorage     │  │ Request        │ │
+│  │ (Execution)      │  │ (Journaled)      │  │ (Remote Calls) │ │
+│  └──────────────────┘  └──────────────────┘  └────────────────┘ │
+│  Uses: IDurableTaskObserver, TaskId (HierarchicalKey)            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+┌─────────────────────────────┴───────────────────────────────────┐
+│              Orleans.Journaling Messaging Layer                  │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌────────────────┐ │
+│  │ DurableInbox     │  │ DurableOutbox    │  │ DurableEnvelope│ │
+│  │ + Extension      │  │ + DeliveryPump   │  │ + Builder      │ │
+│  └──────────────────┘  └──────────────────┘  └────────────────┘ │
+│  Uses: ReplyTo, CorrelationKey, Dictionary<route, handler>       │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+┌─────────────────────────────┴───────────────────────────────────┐
+│             Orleans.Journaling Foundation Layer                  │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌────────────────┐ │
+│  │ StateMachine-    │  │ Durable-         │  │ LogExtent +    │ │
+│  │ Manager          │  │ Dictionary/List  │  │ Storage        │ │
+│  └──────────────────┘  └──────────────────┘  └────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key limitations:**
+
+1. **Two hierarchical key types**: `CorrelationKey` (Journaling) and `HierarchicalKey` (DurableTask) are nearly identical implementations (~766 and ~601 lines respectively) with the same segment separator (`/`), escape character (`\`), and parent/child relationship methods.
+   - Reference: Research doc, Section 3 "Correlation and Addressing"
+
+2. **Two response delivery patterns**:
+   - Journaling uses `ReplyTo` field with outbox-based delivery
+   - DurableTask uses `IDurableTaskObserver.OnResponseAsync()` callbacks
+   - Reference: Research doc, Section 4 "Orleans.DurableTask Architecture"
+
+3. **Redundant handler API**: `IInboxHandler.HandleAsync(envelope, context, ct)` passes the envelope separately when it's already available via `context.Envelope`
+   - Reference: Research doc, Section 1 "Proposed change: capability-based handler selection"
+
+4. **Inflexible route registration**: Per-route dictionary lookup (`Dictionary<string, IInboxHandler>`) requires knowing all route keys upfront, preventing prefix-based routing
+   - Reference: `DurableInbox.cs:16` - `_handlers: Dictionary<string, IInboxHandler>`
+
+### 2.2 The Problem
+
+- **Developer Experience**: Two different patterns for the same concept (durable response delivery) creates confusion and inconsistent code
+- **Code Duplication**: `CorrelationKey` and `HierarchicalKey` are ~90% identical implementations
+- **Integration Friction**: Replatforming DurableTask atop Journaling requires bridging these two patterns
+- **API Ergonomics**: Route registration requires explicit registration of every route key; prefix-based families (e.g., all `rpc/*` messages) aren't supported
+
+---
+
+## 3. Goals and Non-Goals
+
+### 3.1 Functional Goals
+
+- [x] **G1**: Unify `CorrelationKey` and `HierarchicalKey` into a single `HierarchicalKey` type in `Orleans.Core.Abstractions`
+- [x] **G2**: Simplify `IInboxHandler` API by removing redundant `envelope` parameter
+- [x] **G3**: Add capability-based handler dispatch via `CanHandle()` method
+- [x] **G4**: Support prefix-based routing (e.g., `rpc/`, `durabletask/`)
+- [x] **G5**: Standardize response routing using `ReplyTo` as the primary mechanism
+- [x] **G6**: Implement response cleanup when `DeliverAsync()` returns successfully
+- [x] **G7**: Provide helper base classes for common routing patterns
+
+### 3.2 Non-Goals (Out of Scope)
+
+- [ ] We will NOT implement long-polling in the outbox pump (grains use `ReplyTo`)
+- [ ] We will NOT change the storage format or journaling primitives
+- [ ] We will NOT modify the DurableJobs scheduling system
+- [ ] We will NOT implement complex message routing (e.g., pub/sub patterns)
+- [ ] We will NOT add new persistence providers
+
+---
+
+## 4. Proposed Solution (High-Level Design)
+
+### 4.1 System Architecture Diagram
+
+```mermaid
+flowchart TB
+    classDef grain fill:#5a67d8,stroke:#4c51bf,stroke-width:2px,color:#ffffff
+    classDef component fill:#4a90e2,stroke:#357abd,stroke-width:2px,color:#ffffff
+    classDef storage fill:#48bb78,stroke:#38a169,stroke-width:2px,color:#ffffff
+    classDef unified fill:#ed8936,stroke:#dd6b20,stroke-width:3px,color:#ffffff
+
+    subgraph Requester["Requester Grain"]
+        RHandler["Handler"]:::grain
+        ROutbox["Outbox"]:::component
+        RInbox["Inbox"]:::component
+    end
+
+    subgraph Responder["Responder Grain"]
+        HHandler["Handler"]:::grain
+        HOutbox["Outbox"]:::component
+        HInbox["Inbox"]:::component
+    end
+
+    subgraph Unified["Unified Messaging Primitives"]
+        HKey["HierarchicalKey"]:::unified
+        Envelope["DurableEnvelope"]:::unified
+        CanHandle["CanHandle() Dispatch"]:::unified
+    end
+
+    Storage[("Journaled Storage")]:::storage
+
+    RHandler -->|"1. Create request with ReplyTo"| ROutbox
+    ROutbox -->|"2. Persist + Pump"| Storage
+    Storage -->|"3. DeliverAsync()"| HInbox
+    HInbox -->|"4. CanHandle() routing"| CanHandle
+    CanHandle -->|"5. Dispatch"| HHandler
+    HHandler -->|"6. Create response"| HOutbox
+    HOutbox -->|"7. Persist + Pump"| Storage
+    Storage -->|"8. DeliverAsync() to ReplyTo"| RInbox
+    RInbox -->|"9. Response handler"| RHandler
+    HOutbox -->|"10. Remove on success"| Storage
+
+    HKey -.->|"Correlation"| Envelope
+    Envelope -.->|"ReplyTo"| RInbox
+```
+
+### 4.2 Architectural Pattern
+
+We are adopting a **Capability-Based Handler Dispatch** pattern where:
+
+1. Handlers implement `CanHandle(context)` to declare which messages they can process
+2. The inbox iterates handlers in registration order, selecting the first match
+3. Responses are delivered via the same inbox/outbox mechanism using `ReplyTo`
+4. A single `HierarchicalKey` type provides correlation across all layers
+
+### 4.3 Key Components
+
+| Component | Responsibility | Technology Stack | Justification |
+|-----------|----------------|------------------|---------------|
+| `HierarchicalKey` | Unified hierarchical correlation | `Orleans.Core.Abstractions` | Replaces both `CorrelationKey` and `TaskId` |
+| `IInboxHandler` | Message handling with capability dispatch | `Orleans.Journaling.Messaging` | Simplified API with `CanHandle()` |
+| `RouteKeyHandler` | Exact route key matching | `Orleans.Journaling.Messaging` | Helper for common pattern |
+| `RoutePrefixHandler` | Prefix-based route matching | `Orleans.Journaling.Messaging` | Enables route families like `rpc/*` |
+| `CorrelationHandler` | Correlation-based matching | `Orleans.Journaling.Messaging` | Enables response matching by key |
+
+---
+
+## 5. Detailed Design
+
+### 5.1 HierarchicalKey Unification
 
 **Decision**: Replace both `CorrelationKey` and `TaskId` with a unified `HierarchicalKey` type.
 
 #### Current State
 
-| Type | Location | Purpose |
-|------|----------|---------|
-| `CorrelationKey` | `src/Orleans.Journaling/Messaging/CorrelationKey.cs` | Message correlation |
-| `HierarchicalKey` | `src/System.Distributed.DurableTasks/HierarchicalKey.cs` | Task identification |
+| Type | Location | Lines | Purpose |
+|------|----------|-------|---------|
+| `CorrelationKey` | `src/Orleans.Journaling/Messaging/CorrelationKey.cs` | 766 | Message correlation |
+| `HierarchicalKey` | `src/System.Distributed.DurableTasks/HierarchicalKey.cs` | 601 | Task identification |
 
-Both types are nearly identical:
-- Same segment separator (`/`) and escape character (`\`)
-- Same parent/child/ancestor relationship methods
-- Same parsing and formatting logic
+Both types share identical design:
+- Segment separator: `/`
+- Escape character: `\`
+- Methods: `IsParentOf()`, `IsChildOf()`, `IsAncestorOf()`, `CreateChildKey()`
+- Reference: Research doc, Section 3
 
-#### Changes
+#### API Changes
 
-1. **Promote `HierarchicalKey` to `Orleans.Core.Abstractions`**
-   - Move from `System.Distributed.DurableTasks` to `Orleans.Core.Abstractions`
-   - Change from `internal sealed class` to `public sealed class`
-   - Add `[GenerateSerializer]` and `[Immutable]` attributes
+**New location**: `src/Orleans.Core.Abstractions/HierarchicalKey.cs`
 
-2. **Update `DurableEnvelope`** to use `HierarchicalKey`:
-   ```csharp
-   // Before
-   [Id(4)]
-   public CorrelationKey? CorrelationKey { get; init; }
+```csharp
+namespace Orleans;
 
-   // After
-   [Id(4)]
-   public HierarchicalKey? CorrelationKey { get; init; }
-   ```
+/// <summary>
+/// Represents a hierarchical key for distributed correlation and identification.
+/// Uses '/' as segment separator and '\' as escape character.
+/// </summary>
+[GenerateSerializer, Immutable]
+public sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalKey>,
+    IParsable<HierarchicalKey>, ISpanParsable<HierarchicalKey>
+{
+    public const char EscapeCharacter = '\\';
+    public const char SegmentSeparator = '/';
 
-3. **Deprecate `CorrelationKey`** with forwarding to `HierarchicalKey`:
-   ```csharp
-   [Obsolete("Use HierarchicalKey instead. This type will be removed in a future version.")]
-   public sealed class CorrelationKey
-   {
-       private readonly HierarchicalKey _inner;
+    // Factory methods
+    public static HierarchicalKey Create(string value);
+    public static HierarchicalKey Create(HierarchicalKey? parent, string value);
 
-       public static implicit operator HierarchicalKey(CorrelationKey key) => key._inner;
-       public static implicit operator CorrelationKey(HierarchicalKey key) => new(key);
-       // ... delegate all methods to _inner
-   }
-   ```
+    // Hierarchy navigation
+    public HierarchicalKey? GetParent();
+    public HierarchicalKey CreateChildKey(string value);
+    public HierarchicalKey CreateEscapedChildKey(string value);
 
-4. **Update `TaskId`** to be a type alias:
-   ```csharp
-   // In System.Distributed.DurableTasks
-   public readonly struct TaskId
-   {
-       public HierarchicalKey Key { get; }
-       public static implicit operator HierarchicalKey(TaskId id) => id.Key;
-       public static implicit operator TaskId(HierarchicalKey key) => new(key);
-   }
-   ```
+    // Relationship queries
+    public bool IsParentOf(HierarchicalKey? other);
+    public bool IsChildOf(HierarchicalKey? other);
+    public bool IsAncestorOf(HierarchicalKey? other);
+
+    // Properties
+    public int Length { get; }
+}
+```
+
+**DurableEnvelope update**:
+
+```csharp
+// Before (src/Orleans.Journaling/Messaging/DurableEnvelope.cs:148-149)
+[Id(4)]
+public CorrelationKey? CorrelationKey { get; init; }
+
+// After
+[Id(4)]
+public HierarchicalKey? CorrelationKey { get; init; }
+```
+
+**Deprecation wrapper** (backward compatibility):
+
+```csharp
+namespace Orleans.Journaling.Messaging;
+
+[Obsolete("Use Orleans.HierarchicalKey instead. This type will be removed in a future version.")]
+public sealed class CorrelationKey
+{
+    private readonly HierarchicalKey _inner;
+
+    public static implicit operator HierarchicalKey(CorrelationKey key) => key._inner;
+    public static implicit operator CorrelationKey(HierarchicalKey key) => new(key);
+
+    // Delegate all methods to _inner...
+}
+```
+
+**TaskId update** (System.Distributed.DurableTasks):
+
+```csharp
+public readonly struct TaskId : IEquatable<TaskId>
+{
+    private readonly HierarchicalKey? _key;
+
+    public static implicit operator HierarchicalKey?(TaskId id) => id._key;
+    public static implicit operator TaskId(HierarchicalKey key) => new(key);
+
+    // Existing methods delegate to _key...
+}
+```
 
 #### Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/Orleans.Core.Abstractions/HierarchicalKey.cs` | New file (moved from System.Distributed.DurableTasks) |
-| `src/Orleans.Journaling/Messaging/CorrelationKey.cs` | Deprecate, delegate to HierarchicalKey |
-| `src/Orleans.Journaling/Messaging/DurableEnvelope.cs` | Change CorrelationKey to HierarchicalKey |
-| `src/Orleans.Journaling/Messaging/DurableEnvelopeBuilder.cs` | Update correlation key methods |
-| `src/System.Distributed.DurableTasks/HierarchicalKey.cs` | Remove (or keep as type-forward) |
+| `src/Orleans.Core.Abstractions/HierarchicalKey.cs` | **New file** - moved from System.Distributed.DurableTasks |
+| `src/Orleans.Journaling/Messaging/CorrelationKey.cs` | Deprecate, wrap HierarchicalKey |
+| `src/Orleans.Journaling/Messaging/DurableEnvelope.cs` | Change property type |
+| `src/Orleans.Journaling/Messaging/DurableEnvelopeBuilder.cs` | Update method signatures |
+| `src/System.Distributed.DurableTasks/HierarchicalKey.cs` | Remove or type-forward |
 | `src/System.Distributed.DurableTasks/TaskId.cs` | Update to wrap HierarchicalKey |
 
 ---
 
-### 2. IInboxHandler API Changes
+### 5.2 IInboxHandler API Changes
 
-**Decision**: Remove redundant `envelope` parameter from `HandleAsync` and add `CanHandle()` for capability-based dispatch.
+**Decision**: Remove redundant `envelope` parameter and add `CanHandle()` for capability-based dispatch.
 
 #### Current API
 
@@ -141,17 +299,12 @@ public interface IInboxHandler
 {
     ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken);
 }
-
-public interface IInboxHandler<TMessage> : IInboxHandler
-{
-    ValueTask HandleAsync(TMessage message, IInboxHandlerContext context, CancellationToken cancellationToken);
-}
 ```
 
-**Issues**:
-1. `envelope` parameter is redundant - already available via `context.Envelope`
-2. Route-based registration requires knowing all route keys upfront
-3. No capability-based selection for route families (e.g., all `rpc/*` messages)
+**Issues** (Reference: Research doc, Section 1):
+1. `envelope` is redundant - already available via `context.Envelope`
+2. Route-based registration requires pre-registration of every route
+3. No support for prefix-based route families
 
 #### New API
 
@@ -165,24 +318,10 @@ public interface IInboxHandler
 {
     /// <summary>
     /// Determines whether this handler can process the message.
+    /// Should perform fast, metadata-only checks (avoid body deserialization).
     /// </summary>
     /// <param name="context">Handler context with envelope metadata.</param>
-    /// <returns>True if this handler can process the message; otherwise, false.</returns>
-    /// <remarks>
-    /// <para>
-    /// This method should perform fast, metadata-only checks. Avoid deserializing
-    /// the message body. Use <c>context.Envelope.RouteKey</c> for route matching
-    /// and <c>context.Envelope.CorrelationKey</c> for correlation checks.
-    /// </para>
-    /// <para>
-    /// Common patterns:
-    /// <list type="bullet">
-    /// <item><description>Exact match: <c>context.Envelope.RouteKey == "payment/process"</c></description></item>
-    /// <item><description>Prefix match: <c>context.Envelope.RouteKey.StartsWith("rpc/")</c></description></item>
-    /// <item><description>Correlation match: <c>context.Envelope.CorrelationKey?.IsChildOf(myKey) == true</c></description></item>
-    /// </list>
-    /// </para>
-    /// </remarks>
+    /// <returns>True if this handler can process the message.</returns>
     bool CanHandle(IInboxHandlerContext context);
 
     /// <summary>
@@ -190,7 +329,6 @@ public interface IInboxHandler
     /// </summary>
     /// <param name="context">Handler context for accessing envelope and sending responses.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A <see cref="ValueTask"/> representing the asynchronous operation.</returns>
     ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken);
 }
 
@@ -221,15 +359,6 @@ public interface IInboxHandler<TMessage> : IInboxHandler
 #### Handler Registration Changes
 
 ```csharp
-// Current: explicit route registration
-public interface IDurableInbox
-{
-    void RegisterHandler(string routeKey, IInboxHandler handler);
-    bool HasHandler(string routeKey);
-    bool TryGetHandler(string routeKey, out IInboxHandler handler);
-}
-
-// New: ordered handler list with capability-based selection
 public interface IDurableInbox
 {
     /// <summary>
@@ -240,12 +369,9 @@ public interface IDurableInbox
     /// <summary>
     /// Finds the first handler that can process the message.
     /// </summary>
-    /// <param name="context">The handler context.</param>
-    /// <param name="handler">The matched handler, if found.</param>
-    /// <returns>True if a handler was found; otherwise, false.</returns>
-    bool TryFindHandler(IInboxHandlerContext context, out IInboxHandler handler);
+    bool TryFindHandler(IInboxHandlerContext context, [NotNullWhen(true)] out IInboxHandler? handler);
 
-    // Backward compatibility: route-based registration creates a RouteKeyHandler wrapper
+    // Backward compatibility
     [Obsolete("Use RegisterHandler(IInboxHandler) with CanHandle() instead.")]
     void RegisterHandler(string routeKey, IInboxHandler handler);
 }
@@ -275,6 +401,7 @@ public abstract class RouteKeyHandler : IInboxHandler
 
 /// <summary>
 /// Base class for handlers that match route key prefixes.
+/// Example: "rpc/" matches "rpc/request", "rpc/reply", etc.
 /// </summary>
 public abstract class RoutePrefixHandler : IInboxHandler
 {
@@ -300,6 +427,7 @@ public abstract class RoutePrefixHandler : IInboxHandler
 
 /// <summary>
 /// Base class for handlers that match correlation key relationships.
+/// Matches messages where CorrelationKey equals or is a child of the target key.
 /// </summary>
 public abstract class CorrelationHandler : IInboxHandler
 {
@@ -319,26 +447,79 @@ public abstract class CorrelationHandler : IInboxHandler
 }
 ```
 
+#### DurableInbox Implementation Changes
+
+```csharp
+internal sealed class DurableInbox : IDurableInbox
+{
+    // Before: Dictionary<string, IInboxHandler> _handlers
+    // After: List<IInboxHandler> _handlers (ordered)
+    private readonly List<IInboxHandler> _handlers = new();
+
+    // Optional: Cache for performance
+    private readonly ConcurrentDictionary<string, IInboxHandler?> _routeCache = new();
+
+    public void RegisterHandler(IInboxHandler handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        _handlers.Add(handler);
+        _routeCache.Clear(); // Invalidate cache
+    }
+
+    public bool TryFindHandler(IInboxHandlerContext context, [NotNullWhen(true)] out IInboxHandler? handler)
+    {
+        // Check cache first
+        var routeKey = context.Envelope.RouteKey;
+        if (_routeCache.TryGetValue(routeKey, out handler) && handler is not null)
+        {
+            return true;
+        }
+
+        // Linear scan through handlers
+        foreach (var h in _handlers)
+        {
+            if (h.CanHandle(context))
+            {
+                _routeCache[routeKey] = h;
+                handler = h;
+                return true;
+            }
+        }
+
+        _routeCache[routeKey] = null;
+        handler = null;
+        return false;
+    }
+
+    // Backward compatibility wrapper
+    [Obsolete]
+    public void RegisterHandler(string routeKey, IInboxHandler handler)
+    {
+        RegisterHandler(new LegacyRouteKeyHandlerWrapper(routeKey, handler));
+    }
+}
+```
+
 #### Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/Orleans.Journaling/Messaging/IInboxHandler.cs` | Update API: remove envelope param, add CanHandle |
-| `src/Orleans.Journaling/Messaging/IDurableInbox.cs` | Update registration API |
-| `src/Orleans.Journaling/Messaging/DurableInbox.cs` | Change from dictionary to ordered list |
-| `src/Orleans.Journaling/Messaging/RouteKeyHandler.cs` | New file |
-| `src/Orleans.Journaling/Messaging/RoutePrefixHandler.cs` | New file |
-| `src/Orleans.Journaling/Messaging/CorrelationHandler.cs` | New file |
-| `src/Orleans.Journaling/Messaging/InboxProcessingPump.cs` | Update handler dispatch logic |
+| `src/Orleans.Journaling/Messaging/IInboxHandler.cs` | New API with CanHandle |
+| `src/Orleans.Journaling/Messaging/IDurableInbox.cs` | New registration API |
+| `src/Orleans.Journaling/Messaging/DurableInbox.cs` | List-based handlers with caching |
+| `src/Orleans.Journaling/Messaging/RouteKeyHandler.cs` | **New file** |
+| `src/Orleans.Journaling/Messaging/RoutePrefixHandler.cs` | **New file** |
+| `src/Orleans.Journaling/Messaging/CorrelationHandler.cs` | **New file** |
+| `src/Orleans.Journaling/Messaging/InboxProcessingPump.cs` | Use TryFindHandler |
 | `src/Orleans.Journaling/Messaging/DurableInboxExtension.cs` | Update route validation |
 
 ---
 
-### 3. Response Routing and Delivery Semantics
+### 5.3 Response Routing and Delivery Semantics
 
-**Decision**: Use `ReplyTo` as the primary response routing mechanism. Responses are stored in the responder's outbox until `IDurableInboxExtension.DeliverAsync(...)` returns successfully to the requester, at which point the responder knows the response has been durably delivered and it can be removed from the outbox.
+**Decision**: Use `ReplyTo` as the primary response routing mechanism. Responses are removed from the outbox when `DeliverAsync()` returns successfully.
 
-#### Response Flow
+#### Response Flow Diagram
 
 ```
 ┌──────────────────┐                         ┌──────────────────┐
@@ -355,84 +536,91 @@ public abstract class CorrelationHandler : IInboxHandler
         │                                            │
         │ 3. WriteStateAsync() persists outbox       │
         │                                            │
-        │ 4. Outbox pump delivers to inbox           │
+        │ 4. Outbox pump: DeliverAsync()             │
+        │    Returns: Accepted                       │
         │                                            │
-        │                                            │ 5. Handler processes
+        │ 5. Outbox pump removes message             │
         │                                            │
-        │                                            │ 6. Handler creates response
+        │                                            │ 6. Handler processes
+        │                                            │
+        │                                            │ 7. Handler creates response
         │                                            │    .To(envelope.ReplyTo, "rpc/reply")
         │                                            │    .WithCorrelationKey(envelope.CorrelationKey)
         │                                            │
-        │                                            │ 7. Add response to outbox
+        │                                            │ 8. Add response to outbox
         │                                            │
-        │ 8. Response delivered to inbox             │
+        │ 9. Response DeliverAsync()                 │
         ◀────────────────────────────────────────────┤
+        │    Returns: Accepted                       │
         │                                            │
-        │ 9. Response handler invoked                │
+        │ 10. Response handler invoked               │
         │                                            │
-        │                                            │ 10. Responder removes response from outbox
-        │                                            │     after DeliverAsync returns successfully
+        │                                            │ 11. Outbox pump removes response
 ```
 
-#### Delivery Semantics and Outbox Cleanup
+#### Delivery Semantics
 
-The delivery API already provides the durable acknowledgment we need:
+The existing `DeliverAsync()` API already provides durable acknowledgment:
 
-- When `IDurableInboxExtension.DeliverAsync(...)` returns successfully, the caller knows the message has been durably delivered (persisted by the receiver’s inbox).
-- Therefore, the sender can remove the message from its outbox immediately on success, without a separate `$ack` message.
+```csharp
+// src/Orleans.Journaling/Messaging/DurableOutbox.cs:216-317
+public async ValueTask<DeliveryStatus> DeliverMessageAsync(DurableEnvelope envelope, CancellationToken cancellationToken)
+{
+    var result = await targetInbox.DeliverAsync(envelope, options, cancellationToken);
 
-This applies equally to “normal” messages and responses routed via `ReplyTo`.
+    switch (result.Status)
+    {
+        case DeliveryStatus.Accepted:
+        case DeliveryStatus.Duplicate:
+            // Message successfully delivered - remove from outbox
+            Remove(envelope.MessageId);
+            break;
 
-#### Files to Modify
+        case DeliveryStatus.Backpressured:
+            // Target at capacity - retry with backoff
+            break;
+    }
+}
+```
 
-No separate acknowledgment message or handler is required.
+**Key insight**: When `DeliverAsync()` returns `Accepted`, the message is durably stored in the recipient's inbox. No separate acknowledgment message is needed.
+
+Reference: Research doc, Open Question 3 and 6
 
 ---
 
-### 4. Error Handling and Failure Responses
+### 5.4 Error Handling and Failure Responses
 
-**Decision**: Permanent failures are delivered as failure responses through the outbox.
+**Decision**: Permanent failures are delivered as failure responses through the outbox using the same route as success responses.
 
-We do not require separate `$error` or `$response` routes. Instead, replies (success or failure) use the same route key (e.g., `rpc/reply`) and encode status either:
-- in message metadata (envelope metadata/context), or
-- in the payload itself.
-
-#### Failure Response Structure
+#### Error Response Structure
 
 ```csharp
 /// <summary>
-/// Envelope for error responses.
+/// Represents an error response from a durable operation.
 /// </summary>
 [GenerateSerializer]
 public sealed class DurableErrorResponse
 {
-    /// <summary>
-    /// Error code for categorization.
-    /// </summary>
+    /// <summary>Error code for categorization.</summary>
     [Id(0)]
     public required string ErrorCode { get; init; }
 
-    /// <summary>
-    /// Human-readable error message.
-    /// </summary>
+    /// <summary>Human-readable error message.</summary>
     [Id(1)]
     public required string Message { get; init; }
 
-    /// <summary>
-    /// Optional exception details (for debugging, not for production).
-    /// </summary>
+    /// <summary>Optional exception details (for debugging).</summary>
     [Id(2)]
     public string? ExceptionDetails { get; init; }
 
-    /// <summary>
-    /// Indicates whether the error is retriable.
-    /// </summary>
+    /// <summary>Whether the error is retriable.</summary>
     [Id(3)]
     public bool IsRetriable { get; init; }
 }
 ```
 
-#### Error Codes
+#### Standard Error Codes
 
 | Code | Description |
 |------|-------------|
@@ -461,57 +649,33 @@ public interface IInboxHandlerContext
 }
 ```
 
-#### Implementation
-
-```csharp
-// In InboxHandlerContext
-public void SendError(string errorCode, string message, bool isRetriable = false)
-{
-    if (Envelope.ReplyTo is not { } replyTo)
-    {
-        return; // No reply address - log and discard
-    }
-
-    var response = CreateEnvelope()
-        .To(replyTo, "rpc/reply")
-        .WithBody(new DurableErrorResponse
-        {
-            ErrorCode = errorCode,
-            Message = message,
-            IsRetriable = isRetriable
-        })
-        .WithCorrelationKey(Envelope.CorrelationKey)
-        .Build();
-
-    Send(response);
-}
-```
+Reference: Research doc, Open Question 7
 
 ---
 
-### 5. Route Key Conventions
+### 5.5 Route Key Conventions
 
-The system can avoid special `$*` routes by standardizing on two primary durable RPC routes and encoding reply status in metadata/payload.
+| Prefix | Purpose | Example |
+|--------|---------|---------|
+| `rpc/request` | Durable RPC requests | `rpc/request` |
+| `rpc/reply` | Durable RPC responses (success or failure) | `rpc/reply` |
+| `durabletask/` | DurableTask transport messages | `durabletask/schedule` |
+| `job/` | DurableJob scheduling | `job/trigger` |
 
-User route keys should use descriptive prefixes:
+Success and failure responses use the same route (`rpc/reply`), with status encoded in metadata or payload.
 
-| Prefix | Purpose |
-|--------|---------|
-| `rpc/request` | Durable RPC requests |
-| `rpc/reply` | Durable RPC replies (success or failure) |
-| `durabletask/` | DurableTask transport messages |
-| `job/` | DurableJob scheduling |
+Reference: Research doc, Section 2 "Response Routing Patterns"
 
 ---
 
-### 6. External Caller Support (Polling)
+### 5.6 External Caller Support
 
 **Decision**: Grains use `ReplyTo`; external callers without stable addresses use polling.
 
-External callers (e.g., HTTP endpoints, non-grain callers) cannot receive inbox messages because they lack a stable `GrainId`. For these cases, the existing long-polling pattern is retained:
+External callers (HTTP endpoints, non-grain clients) cannot receive inbox messages. For these cases, existing long-polling is retained:
 
 ```csharp
-// External caller pattern
+// External caller pattern (src/Orleans.Journaling/Messaging/DurableInboxExtension.cs:270-304)
 var result = await targetGrain.AsReference<IDurableInboxExtension>()
     .DeliverAsync(envelope, new DeliveryOptions { PollTimeout = TimeSpan.FromSeconds(30) });
 
@@ -521,71 +685,108 @@ switch (result.Status)
         var response = result.Response; // Synchronous response
         break;
     case DeliveryStatus.Pending:
-        // Poll for completion via separate endpoint
+        // Poll for completion
         break;
 }
 ```
 
-This is an existing pattern (`DurableInboxExtension.cs:270-304`) and requires no changes.
+Reference: Research doc, Open Question 5
 
 ---
 
-## Migration Strategy
+## 6. Alternatives Considered
 
-### Phase 1: Add New APIs (Non-Breaking)
-
-1. Add `HierarchicalKey` to `Orleans.Core.Abstractions`
-2. Add `CanHandle()` to `IInboxHandler` with default implementation
-3. Add `RegisterHandler(IInboxHandler)` overload to `IDurableInbox`
-4. Add helper base classes (`RouteKeyHandler`, `RoutePrefixHandler`, `CorrelationHandler`)
-
-### Phase 2: Update Internal Usage
-
-1. Update Orleans.DurableTask to use new `HierarchicalKey`
-2. Update Orleans.Journaling handlers to use `CanHandle()` pattern
-3. Add error response handling
-
-### Phase 3: Deprecate Old APIs
-
-1. Mark `CorrelationKey` as `[Obsolete]`
-2. Mark `RegisterHandler(string, IInboxHandler)` as `[Obsolete]`
-3. Mark `IInboxHandler.HandleAsync(DurableEnvelope, ...)` as `[Obsolete]`
-
-### Phase 4: Remove Deprecated APIs (Future Major Version)
-
-1. Remove `CorrelationKey` type
-2. Remove old registration methods
-3. Remove old handler signatures
+| Option | Pros | Cons | Reason for Rejection |
+|--------|------|------|---------------------|
+| **Keep separate key types** | No migration needed | Continued duplication, inconsistent APIs | Goal is unification for DurableTask replatforming |
+| **Use $ack messages for acknowledgment** | Explicit acknowledgment | Unnecessary overhead; DeliverAsync already provides durable ack | Simpler to use existing success status |
+| **Longest-prefix-wins for handler precedence** | Deterministic by route structure | Complex to reason about; registration order is simpler | Registration order is explicit and predictable |
+| **Keep envelope parameter in HandleAsync** | Backward compatibility | Redundant with context.Envelope; expands API surface | Simplification goal; deprecation provides migration path |
 
 ---
 
-## Testing Strategy
+## 7. Cross-Cutting Concerns
 
-### Unit Tests
+### 7.1 Security and Privacy
 
-| Test Area | File |
-|-----------|------|
-| HierarchicalKey parsing and hierarchy | `test/NonSilo.Tests/HierarchicalKeyTests.cs` |
-| CanHandle routing logic | `test/NonSilo.Tests/InboxHandlerRoutingTests.cs` |
-| Error response serialization | `test/NonSilo.Tests/DurableErrorResponseTests.cs` |
+- **No changes to authentication/authorization**: Existing grain-level security applies
+- **Data handling**: Message bodies use existing serialization; no new data exposure
 
-### Integration Tests
+### 7.2 Observability Strategy
 
-| Test Area | File |
-|-----------|------|
-| End-to-end request/response | `test/DefaultCluster.Tests/DurableRpcIntegrationTests.cs` |
-| Handler registration ordering | `test/DefaultCluster.Tests/HandlerPrecedenceTests.cs` |
-| Migration compatibility | `test/DefaultCluster.Tests/CorrelationKeyMigrationTests.cs` |
+- **Existing metrics**: Inbox/outbox already have observability (added in recent commits)
+- **Correlation tracking**: `HierarchicalKey` enables distributed tracing across operations
+- **Logging**: Handler dispatch logging uses existing infrastructure
+
+### 7.3 Scalability and Capacity Planning
+
+- **Handler lookup**: O(n) linear scan mitigated by route-key caching
+- **Cache invalidation**: Only on handler registration (rare operation)
+- **Memory**: Minimal increase from List vs Dictionary storage
 
 ---
 
-## Open Questions
+## 8. Migration, Rollout, and Testing
 
-1. **Handler Caching**: Should we cache `routeKey -> handler` resolutions for performance after first lookup?
-   - **Recommendation**: Yes, add a `ConcurrentDictionary<string, IInboxHandler?>` cache that is invalidated when handlers are registered.
+### 8.1 Deployment Strategy (4 Phases)
 
-2. **Backward Compatibility**: How long should deprecated APIs be maintained?
-   - **Recommendation**: Minimum 2 minor versions before removal in next major version.
+#### Phase 1: Add New APIs (Non-Breaking)
+
+- [x] Add `HierarchicalKey` to `Orleans.Core.Abstractions`
+- [x] Add `CanHandle()` to `IInboxHandler` with default implementation returning `true`
+- [x] Add `RegisterHandler(IInboxHandler)` overload
+- [x] Add helper base classes
+
+#### Phase 2: Update Internal Usage
+
+- [ ] Update Orleans.DurableTask to use `HierarchicalKey`
+- [ ] Update Orleans.Journaling handlers to use `CanHandle()` pattern
+- [ ] Add error response handling
+
+#### Phase 3: Deprecate Old APIs
+
+- [ ] Mark `CorrelationKey` as `[Obsolete]`
+- [ ] Mark `RegisterHandler(string, IInboxHandler)` as `[Obsolete]`
+- [ ] Mark `IInboxHandler.HandleAsync(DurableEnvelope, ...)` as `[Obsolete]`
+
+#### Phase 4: Remove Deprecated APIs (Future Major Version)
+
+- [ ] Remove `CorrelationKey` type
+- [ ] Remove old registration methods
+- [ ] Remove old handler signatures
+
+### 8.2 Test Plan
+
+#### Unit Tests
+
+| Test Area | File | Category |
+|-----------|------|----------|
+| HierarchicalKey parsing and hierarchy | `test/NonSilo.Tests/HierarchicalKeyTests.cs` | BVT |
+| CanHandle routing logic | `test/NonSilo.Tests/InboxHandlerRoutingTests.cs` | BVT |
+| Error response serialization | `test/NonSilo.Tests/DurableErrorResponseTests.cs` | BVT |
+| Handler caching | `test/NonSilo.Tests/HandlerCacheTests.cs` | BVT |
+
+#### Integration Tests
+
+| Test Area | File | Category |
+|-----------|------|----------|
+| End-to-end request/response | `test/DefaultCluster.Tests/DurableRpcIntegrationTests.cs` | Functional |
+| Handler precedence ordering | `test/DefaultCluster.Tests/HandlerPrecedenceTests.cs` | Functional |
+| Migration compatibility | `test/DefaultCluster.Tests/CorrelationKeyMigrationTests.cs` | Functional |
+| Error propagation | `test/DefaultCluster.Tests/DurableErrorResponseTests.cs` | Functional |
+
+---
+
+## 9. Open Questions / Unresolved Issues
+
+- [x] ~~**Handler Caching**: Should we cache route-to-handler resolutions?~~
+  - **Resolution**: No
+
+- [x] ~~**Backward Compatibility Duration**: How long to maintain deprecated APIs?~~
+  - **Resolution**: No backward compatibility necessary - none of this has shipped yet.
+
+- [x] **Handler Registration Ordering**: Should we support priority-based ordering in addition to registration order?
+  - **Resolution**: No priority ordering, it's fine.
 
 ---
 
@@ -609,6 +810,13 @@ This is an existing pattern (`DurableInboxExtension.cs:270-304`) and requires no
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| IDurableTaskObserver | `src/Orleans.Core.Abstractions/DurableTasks/IDurableTaskGrainRuntime.cs:12-20` | Observer callback interface |
+| IDurableTaskObserver | `src/Orleans.Core.Abstractions/DurableTasks/IDurableTaskGrainRuntime.cs:12-20` | Observer callback (to be unified) |
 | DurableTaskGrainRuntime | `src/Orleans.Runtime/DurableTasks/DurableTaskGrainRuntime.cs` | Task execution runtime |
-| DurableTaskGrainStorage | `src/Orleans.Journaling/DurableTasks/DurableTaskGrainStorage.cs` | Event-sourced storage |
+| TaskId | `src/System.Distributed.DurableTasks/TaskId.cs` | Wraps HierarchicalKey |
+| NotifyClientsAndCleanupTask | `src/Orleans.Runtime/DurableTasks/DurableTaskGrainRuntime.cs:272-322` | Observer notification loop |
+
+### Research Documents
+
+| Document | Location |
+|----------|----------|
+| Durable Messaging System Consolidation | `research/docs/2026-01-17-durable-messaging-system-consolidation.md` |
