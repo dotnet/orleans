@@ -154,7 +154,7 @@
       "Add XML documentation explaining prefix matching (e.g., 'rpc/' matches 'rpc/request')",
       "Build Orleans.Journaling project to verify compilation"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
