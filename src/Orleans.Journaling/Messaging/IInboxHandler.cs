@@ -47,6 +47,60 @@ namespace Orleans.Journaling.Messaging;
 public interface IInboxHandler
 {
     /// <summary>
+    /// Determines whether this handler can handle a message based on its metadata.
+    /// </summary>
+    /// <param name="context">The handler context containing the envelope and grain information.</param>
+    /// <returns><c>true</c> if this handler can process the message; otherwise, <c>false</c>.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method enables capability-based dispatch, allowing handlers to be selected based on
+    /// message metadata (route key, correlation key, context values, etc.) without requiring
+    /// pre-registration with explicit route keys.
+    /// </para>
+    /// <para>
+    /// <b>Performance Note:</b> This method should perform fast, metadata-only checks. Avoid
+    /// deserialization, I/O operations, or expensive computations. The inbox processing pump
+    /// may call this method multiple times per message when searching for a matching handler.
+    /// </para>
+    /// <para>
+    /// <b>Handler Precedence:</b> When multiple handlers return <c>true</c>, the first registered
+    /// handler wins. Register more specific handlers before generic ones to ensure correct dispatch.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// public class OrderHandler : IInboxHandler&lt;OrderRequest&gt;
+    /// {
+    ///     public bool CanHandle(IInboxHandlerContext context)
+    ///     {
+    ///         // Match specific route key
+    ///         return context.Envelope.RouteKey == "order/process";
+    ///     }
+    ///     
+    ///     public async ValueTask HandleAsync(OrderRequest message, IInboxHandlerContext context, CancellationToken ct)
+    ///     {
+    ///         // Handle the order
+    ///     }
+    /// }
+    /// 
+    /// public class PrefixHandler : IInboxHandler
+    /// {
+    ///     public bool CanHandle(IInboxHandlerContext context)
+    ///     {
+    ///         // Match route prefix
+    ///         return context.Envelope.RouteKey?.StartsWith("rpc/") == true;
+    ///     }
+    ///     
+    ///     public async ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken ct)
+    ///     {
+    ///         // Handle any RPC message
+    ///     }
+    /// }
+    /// </code>
+    /// </example>
+    bool CanHandle(IInboxHandlerContext context);
+
+    /// <summary>
     /// Handles a message from the inbox.
     /// </summary>
     /// <param name="envelope">The full message envelope (exposed for metadata access).</param>
@@ -123,6 +177,22 @@ public interface IInboxHandler<TMessage> : IInboxHandler
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the asynchronous operation.</returns>
     ValueTask HandleAsync(TMessage message, IInboxHandlerContext context, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Default implementation that returns true (capability check deferred to derived class).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The default implementation returns <c>true</c>, meaning typed handlers accept all messages
+    /// by default. Derived classes can override <c>CanHandle</c> to add route-based, correlation-based,
+    /// or other metadata filters before message processing.
+    /// </para>
+    /// <para>
+    /// Type checking happens later during the envelope handling when the message body is deserialized.
+    /// This design allows handlers to inspect metadata without deserialization overhead.
+    /// </para>
+    /// </remarks>
+    bool IInboxHandler.CanHandle(IInboxHandlerContext context) => true;
 
     /// <summary>
     /// Default implementation with type check and deferred deserialization.
