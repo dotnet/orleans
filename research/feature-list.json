@@ -181,7 +181,7 @@
       "Add XML documentation for registration order evaluation",
       "Build Orleans.Journaling project to verify compilation"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "refactor",
@@ -196,7 +196,7 @@
       "Create LegacyRouteKeyHandlerWrapper for backward compatibility",
       "Build Orleans.Journaling project to verify compilation"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "refactor",

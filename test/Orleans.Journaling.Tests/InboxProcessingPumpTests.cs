@@ -153,6 +153,16 @@ public class InboxProcessingPumpTests : IClassFixture<IntegrationTestFixture>
             return _handlers.TryGetValue(routeKey, out handler);
         }
 
+        public void RegisterHandler(IInboxHandler handler)
+        {
+            throw new NotImplementedException("Use legacy RegisterHandler(string, IInboxHandler) for tests");
+        }
+
+        public bool TryFindHandler(IInboxHandlerContext context, [MaybeNullWhen(false)] out IInboxHandler handler)
+        {
+            return TryGetHandler(context.Envelope.RouteKey ?? string.Empty, out handler);
+        }
+
         // Test helpers
         public void AddMessage(DurableEnvelope envelope)
         {

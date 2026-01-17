@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Orleans.Journaling.Messaging;
 
@@ -13,7 +16,9 @@ internal sealed class DurableInbox : IDurableInbox
 {
     private readonly IDurableDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> _inbox;
     private readonly IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> _processed;
-    private readonly Dictionary<string, IInboxHandler> _handlers;
+    private readonly List<IInboxHandler> _handlers;
+    private readonly Dictionary<string, IInboxHandler> _legacyRouteHandlers;
+    private readonly ConcurrentDictionary<string, IInboxHandler?> _routeCache;
     private readonly int _capacity;
 
     /// <summary>
@@ -33,7 +38,9 @@ internal sealed class DurableInbox : IDurableInbox
 
         _inbox = inbox;
         _processed = processed;
-        _handlers = new Dictionary<string, IInboxHandler>();
+        _handlers = new List<IInboxHandler>();
+        _legacyRouteHandlers = new Dictionary<string, IInboxHandler>();
+        _routeCache = new ConcurrentDictionary<string, IInboxHandler?>();
         _capacity = capacity;
     }
 
@@ -114,7 +121,60 @@ internal sealed class DurableInbox : IDurableInbox
     }
 
     /// <summary>
-    /// Registers a handler for a specific route.
+    /// Registers a handler that will be evaluated using its CanHandle method.
+    /// Handlers are evaluated in registration order (first-match-wins).
+    /// </summary>
+    /// <param name="handler">The handler implementation.</param>
+    public void RegisterHandler(IInboxHandler handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+
+        _handlers.Add(handler);
+        
+        // Clear cache when new handler is registered
+        _routeCache.Clear();
+    }
+
+    /// <summary>
+    /// Tries to find a handler for the given context by calling CanHandle on registered handlers.
+    /// Returns the first handler that returns true from CanHandle.
+    /// Uses caching for performance optimization.
+    /// </summary>
+    /// <param name="context">The inbox handler context containing envelope metadata.</param>
+    /// <param name="handler">The handler if found; otherwise, null.</param>
+    /// <returns>True if a handler was found; otherwise, false.</returns>
+    public bool TryFindHandler(IInboxHandlerContext context, [MaybeNullWhen(false)] out IInboxHandler handler)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var routeKey = context.Envelope.RouteKey ?? string.Empty;
+
+        // Try cache first for performance
+        if (_routeCache.TryGetValue(routeKey, out var cachedHandler))
+        {
+            handler = cachedHandler;
+            return cachedHandler is not null;
+        }
+
+        // Linear scan through handlers in registration order
+        foreach (var candidate in _handlers)
+        {
+            if (candidate.CanHandle(context))
+            {
+                handler = candidate;
+                _routeCache[routeKey] = candidate;
+                return true;
+            }
+        }
+
+        // No handler found - cache the negative result
+        handler = null;
+        _routeCache[routeKey] = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Registers a handler for a specific route (legacy method).
     /// </summary>
     /// <param name="routeKey">The route key to handle.</param>
     /// <param name="handler">The handler implementation.</param>
@@ -123,27 +183,60 @@ internal sealed class DurableInbox : IDurableInbox
         ArgumentException.ThrowIfNullOrWhiteSpace(routeKey);
         ArgumentNullException.ThrowIfNull(handler);
 
-        _handlers[routeKey] = handler;
+        // Store in legacy dictionary
+        _legacyRouteHandlers[routeKey] = handler;
+
+        // Wrap in a RouteKeyHandler and add to new handlers list
+        var wrappedHandler = new LegacyRouteKeyHandlerWrapper(routeKey, handler);
+        _handlers.Add(wrappedHandler);
+
+        // Clear cache
+        _routeCache.Clear();
     }
 
     /// <summary>
-    /// Checks if a route has a registered handler.
+    /// Checks if a route has a registered handler (legacy method).
     /// </summary>
     /// <param name="routeKey">The route key to check.</param>
     /// <returns>True if a handler is registered for this route; otherwise, false.</returns>
     public bool HasHandler(string routeKey)
     {
-        return _handlers.ContainsKey(routeKey);
+        return _legacyRouteHandlers.ContainsKey(routeKey);
     }
 
     /// <summary>
-    /// Tries to get a handler for a specific route.
+    /// Tries to get a handler for a specific route (legacy method).
     /// </summary>
     /// <param name="routeKey">The route key to get the handler for.</param>
     /// <param name="handler">The handler if found.</param>
     /// <returns>True if a handler is registered for this route; otherwise, false.</returns>
     public bool TryGetHandler(string routeKey, [MaybeNullWhen(false)] out IInboxHandler handler)
     {
-        return _handlers.TryGetValue(routeKey, out handler);
+        return _legacyRouteHandlers.TryGetValue(routeKey, out handler);
+    }
+}
+
+/// <summary>
+/// Internal wrapper that adapts legacy route-based handlers to the new CanHandle pattern.
+/// </summary>
+internal sealed class LegacyRouteKeyHandlerWrapper : IInboxHandler
+{
+    private readonly string _routeKey;
+    private readonly IInboxHandler _innerHandler;
+
+    public LegacyRouteKeyHandlerWrapper(string routeKey, IInboxHandler innerHandler)
+    {
+        _routeKey = routeKey;
+        _innerHandler = innerHandler;
+    }
+
+    public bool CanHandle(IInboxHandlerContext context)
+    {
+        return context.Envelope.RouteKey == _routeKey;
+    }
+
+    public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    {
+        return _innerHandler.HandleAsync(context, cancellationToken);
     }
 }
