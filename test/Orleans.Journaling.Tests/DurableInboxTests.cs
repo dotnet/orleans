@@ -369,7 +369,7 @@ public class DurableInboxTests
     {
         public bool CanHandle(IInboxHandlerContext context) => true;
 
-        public ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             return ValueTask.CompletedTask;
         }
