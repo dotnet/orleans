@@ -1117,3 +1117,71 @@ The next feature in the list is #13: Update IDurableInbox with new registration 
 - ✅ Caching provides excellent performance for repeated route keys
 - ✅ Full backward compatibility with legacy registration API
 
+
+
+---
+
+## Feature Implementation Summary - January 17, 2026 (Continued)
+
+### Completed: Update InboxProcessingPump to use TryFindHandler (Feature #15)
+
+**Objective**: Migrate InboxProcessingPump from legacy handler lookup methods (HasHandler/TryGetHandler) to the new capability-based dispatch API (TryFindHandler), completing the migration to the CanHandle pattern.
+
+**Implementation Details**:
+
+1. **Updated InboxProcessingPump.ProcessMessageAsync** (src/Orleans.Journaling/Messaging/InboxProcessingPump.cs, lines 248-303)
+   - Replaced _inbox.HasHandler(envelope.RouteKey) check with _inbox.TryFindHandler(context, out var handler)
+   - Moved context creation earlier in the method (before TryFindHandler call)
+   - Removed separate handler retrieval via GetHandler(envelope.RouteKey)
+   - TryFindHandler now performs both capability checking (CanHandle) and handler retrieval in one call
+   - Updated to use the handler returned directly from TryFindHandler
+
+2. **Removed GetHandler method** (lines 304-319)
+   - Deleted the now-redundant GetHandler method
+   - This method was only used after HasHandler confirmed a handler exists
+   - TryFindHandler combines both operations, making GetHandler obsolete
+
+3. **Key Design Benefits**:
+   - **Single API call**: TryFindHandler replaces the two-step HasHandler + GetHandler pattern
+   - **Capability-based dispatch**: Handlers are now selected using CanHandle, enabling prefix matching, correlation matching, etc.
+   - **Cache optimization**: TryFindHandler uses internal caching for performance
+   - **Consistent with new pattern**: InboxProcessingPump now uses the same API as new code
+
+**Build Status**: ? Clean build, 0 warnings, 0 errors
+
+**Test Results**: 
+- Orleans.Journaling BVT tests (net10.0): ? 380/380 passed
+
+**Files Modified**:
+- src/Orleans.Journaling/Messaging/InboxProcessingPump.cs (ProcessMessageAsync method updated, GetHandler method removed)
+- research/feature-list.json (marked Feature #15 as passing)
+
+**Benefits**:
+- ? Completes migration to capability-based dispatch
+- ? Enables advanced routing patterns (prefix, correlation, custom CanHandle)
+- ? Simplifies code by removing redundant GetHandler method
+- ? Leverages TryFindHandler's caching for better performance
+- ? All existing tests pass without modification
+- ? Legacy route-based handlers still work through LegacyRouteKeyHandlerWrapper
+
+**Backward Compatibility**:
+- ? Legacy RegisterHandler(string routeKey, IInboxHandler) still works
+- ? Existing handlers registered via legacy API are wrapped and work with new dispatch
+- ? No breaking changes to public API
+- ? No changes required to existing test code
+
+**Performance Notes**:
+- TryFindHandler uses ConcurrentDictionary for caching route key lookups
+- Cache is cleared when new handlers are registered
+- First lookup for a route key performs linear scan through handlers (O(n))
+- Subsequent lookups for same route key hit cache (O(1))
+- Negative results (no handler found) are also cached to avoid repeated scans
+
+**Next Steps**:
+With InboxProcessingPump now using TryFindHandler, the next features in the queue are:
+- Feature #16: Update DurableInboxExtension to validate routes with new API
+- Feature #17: Create DurableErrorResponse class for error handling
+- Feature #18-20: Add error handling methods to IInboxHandlerContext
+
+This completes the migration of the core message processing pump to the capability-based dispatch pattern.
+
