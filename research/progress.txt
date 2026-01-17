@@ -1806,3 +1806,29 @@ Created comprehensive handler precedence tests in test/Orleans.Journaling.Tests/
 - research/feature-list.json (marked Feature #27 as passing)
 
 **Next Steps**: Feature #28: Create CorrelationKeyMigrationTests for backward compatibility
+
+Feature #28 Implementation - CorrelationKeyMigrationTests
+Date: 2026-01-17
+================================================================================
+
+**Implementation Summary**:
+Created comprehensive backward compatibility tests in test/Orleans.Journaling.Tests/CorrelationKeyMigrationTests.cs
+
+**Tests Implemented** (all 8 passing):
+1. ImplicitConversion_CorrelationKeyToHierarchicalKey: Verifies CorrelationKey → HierarchicalKey conversion preserves value
+2. ImplicitConversion_HierarchicalKeyToCorrelationKey: Verifies HierarchicalKey → CorrelationKey conversion preserves value
+3. ImplicitConversion_NullHandling: Ensures implicit conversions handle null safely
+4. Interoperability_ParentChildRelationships: Tests IsParentOf/IsChildOf/IsAncestorOf work across types
+5. Interoperability_Equality: Verifies Equals and == operators work after conversion
+6. DurableEnvelope_SerializationWithCorrelationKey: CorrelationKey implicitly converts to HierarchicalKey in envelopes
+7. DurableEnvelope_SerializationWithHierarchicalKey: HierarchicalKey in envelopes can be accessed as CorrelationKey
+8. DurableEnvelope_HierarchicalCorrelationWithMixedTypes: Mixed type usage preserves hierarchy relationships
+
+**Test Results**: 
+- CorrelationKeyMigrationTests (net10.0): 8/8 passed (total 5.5s)
+
+**Files Modified**:
+- test/Orleans.Journaling.Tests/CorrelationKeyMigrationTests.cs (new file, 267 lines)
+- research/feature-list.json (marked Feature #28 as passing)
+
+**Next Steps**: Feature #29: Create DurableErrorPropagationTests for error handling

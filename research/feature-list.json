@@ -366,7 +366,7 @@
     "category": "testing",
     "description": "Create CorrelationKeyMigrationTests for backward compatibility",
     "steps": [
-      "Create new file test/DefaultCluster.Tests/CorrelationKeyMigrationTests.cs",
+      "Create new file test/Orleans.Journaling.Tests/CorrelationKeyMigrationTests.cs",
       "Add [TestCategory(\"Functional\")] attribute",
       "Test implicit conversion from CorrelationKey to HierarchicalKey",
       "Test implicit conversion from HierarchicalKey to CorrelationKey",
@@ -374,7 +374,7 @@
       "Test DurableEnvelope serialization with both key types",
       "Run tests and verify all pass"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "testing",
