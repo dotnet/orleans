@@ -139,7 +139,7 @@
       "Add XML documentation with usage examples",
       "Build Orleans.Journaling project to verify compilation"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
