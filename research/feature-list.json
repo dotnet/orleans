@@ -276,7 +276,7 @@
       "Add XML documentation for each code",
       "Build Orleans.Journaling project to verify compilation"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "testing",
