@@ -499,3 +499,80 @@ With CanHandle method now available, future features include:
 - ✅ Consistent with Orleans patterns for context-based APIs
 - ✅ All existing tests pass without functional changes
 
+
+---
+
+## Debug Report - January 17, 2026
+
+### Issue: Build Errors in Orleans.Journaling.Tests Due to IInboxHandler.HandleAsync Signature Change
+
+**Summary**: The Orleans.Journaling.Tests project fails to build due to method signature mismatches after Feature #8 refactored the IInboxHandler.HandleAsync method signature by removing the DurableEnvelope envelope parameter.
+
+**Affected Files**:
+1. InboxHandlerContextTests.cs (lines 354, 389): 2 errors - explicit interface calls still use 3 parameters
+2. InboxProcessingPumpTests.cs (lines 562, 619, 671, 780): 4 errors - lambda expressions still use 3-parameter pattern (env, ctx, ct)
+
+**Root Cause**: Incomplete refactoring scope - the feature implementation updated production code but missed test files that:
+- Use explicit interface casts like ((IInboxHandler)handler).HandleAsync(...)
+- Use lambda expressions with 3-parameter patterns (env, ctx, ct) =>
+
+**Required Fixes**:
+- InboxHandlerContextTests.cs line 354: Change HandleAsync(envelope, context, CancellationToken.None) to HandleAsync(context, CancellationToken.None)
+- InboxHandlerContextTests.cs line 389: Same change in assertion
+- InboxProcessingPumpTests.cs lines 562, 619, 671, 780: Change lambda patterns from (env, ctx, ct) to (ctx, ct)
+
+**Related Issues**:
+- RFC documentation may still reference old signature
+- Need to verify full solution build passes after fixes
+- Consider adding CI checks to prevent similar issues in future interface changes
+
+
+---
+
+## Bugfix Implementation Summary - January 17, 2026 (Continued)
+
+### Completed: Fix build errors in test files after IInboxHandler.HandleAsync signature change
+
+**Objective**: Fix compilation errors in Orleans.Journaling.Tests caused by incomplete refactoring of the IInboxHandler.HandleAsync signature change in Feature #8.
+
+**Root Cause**: Feature #8 removed the redundant DurableEnvelope envelope parameter from IInboxHandler.HandleAsync, changing the signature from HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken) to HandleAsync(IInboxHandlerContext context, CancellationToken). However, the refactoring missed some test files that explicitly called the interface method or used lambda expressions with the old signature.
+
+**Issues Fixed**:
+
+1. **InboxHandlerContextTests.cs (2 occurrences)**
+   - Line 354: Fixed explicit interface call from ((IInboxHandler)handler).HandleAsync(envelope, context, CancellationToken.None) to ((IInboxHandler)handler).HandleAsync(context, CancellationToken.None)
+   - Line 389: Fixed explicit interface call in async assertion from wait ((IInboxHandler)handler).HandleAsync(envelope, context, CancellationToken.None) to wait ((IInboxHandler)handler).HandleAsync(context, CancellationToken.None)
+
+2. **InboxProcessingPumpTests.cs (4 occurrences)**
+   - Line 562: Fixed lambda signature from (env, ctx, ct) => to (ctx, ct) => in handler that sends a message
+   - Line 619: Fixed lambda signature from (env, ctx, ct) => to (ctx, ct) => in handler that throws (removeOnHandlerException: true)
+   - Line 671: Fixed lambda signature from (env, ctx, ct) => to (ctx, ct) => in handler that throws (removeOnHandlerException: false)
+   - Line 780: Fixed lambda signature from (env, ctx, ct) => to (ctx, ct) => in handler that throws (for rescheduling test)
+
+**Build Status**: ? Clean build, 0 warnings, 0 errors
+
+**Test Results**: 
+- Orleans.Journaling BVT tests (net10.0): ? 307/307 passed
+
+**Files Modified**:
+- 	est/Orleans.Journaling.Tests/InboxHandlerContextTests.cs (2 fixes)
+- 	est/Orleans.Journaling.Tests/InboxProcessingPumpTests.cs (4 fixes)
+- esearch/feature-list.json (marked Feature #0 as passing)
+
+**Key Insights**:
+- When refactoring interface signatures, always check for:
+  1. Explicit interface casts like ((IInterface)obj).Method(...)
+  2. Lambda expressions that match the interface signature
+  3. Delegate assignments
+- These patterns are often missed by IDE refactoring tools because they don't have explicit type information at the call site
+- The TestHandler class was correctly updated in the initial refactoring, but the lambda expressions creating TestHandler instances were not
+
+**Benefits**:
+- ? All build errors resolved
+- ? All tests passing
+- ? Feature #8 refactoring now complete
+- ? API is now cleaner with envelope accessible via context.Envelope
+
+**Next Steps**:
+The next priority feature is #9: Create IInboxHandler<TMessage> typed handler interface (already exists but may need updates).
+
