@@ -1783,3 +1783,26 @@ The next feature in the list is #25: Create DurableRpcIntegrationTests for end-t
 
 **Next Steps**: Feature #27: Create HandlerPrecedenceTests for registration order
 
+
+
+================================================================================
+Feature #27 Implementation - HandlerPrecedenceTests for registration order
+Date: 2026-01-17
+================================================================================
+
+**Implementation Summary**:
+Created comprehensive handler precedence tests in test/Orleans.Journaling.Tests/HandlerPrecedenceTests.cs
+
+**Tests Implemented** (all 3 passing):
+1. FirstMatchWins_WithMultipleMatchingHandlers: Verifies first registered handler wins with 3 identical prefix handlers
+2. SpecificHandlerBeforePrefixHandler: Tests specific RouteKeyHandler matched before generic RoutePrefixHandler
+3. RegistrationOrderAffectsDispatch: Demonstrates changing registration order changes dispatch behavior
+
+**Test Results**: 
+- HandlerPrecedenceTests (net10.0): 3/3 passed (726ms, 1s, 1s)
+
+**Files Modified**:
+- test/Orleans.Journaling.Tests/HandlerPrecedenceTests.cs (new file, 545 lines)
+- research/feature-list.json (marked Feature #27 as passing)
+
+**Next Steps**: Feature #28: Create CorrelationKeyMigrationTests for backward compatibility
