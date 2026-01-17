@@ -417,6 +417,8 @@ public class TypeMismatchHandlerGrain : DurableGrain, ITypeMismatchHandlerGrain
             _grain = grain;
         }
 
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
         public async ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             // Try to get as int (handler expects int)
@@ -518,6 +520,8 @@ public class UnavailableTypeHandlerGrain : DurableGrain, IUnavailableTypeHandler
             _grain = grain;
         }
 
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
         public async ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             // Try SimpleMessage first
@@ -573,6 +577,8 @@ public class FallbackHandlerGrain : DurableGrain, IFallbackHandlerGrain
             _grain = grain;
         }
 
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
         public async ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             // Try to deserialize as expected type
@@ -627,6 +633,8 @@ public class MixedMessageHandlerGrain : DurableGrain, IMixedMessageHandlerGrain
             _grain = grain;
         }
 
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
         public async ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             if (envelope.Data.TryGetBody<SimpleMessage>(out var message))
@@ -678,6 +686,8 @@ public class SurvivorGrain : DurableGrain, ISurvivorGrain
         {
             _grain = grain;
         }
+
+        public bool CanHandle(IInboxHandlerContext context) => true;
 
         public async ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
         {

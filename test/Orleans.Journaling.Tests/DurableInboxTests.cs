@@ -367,6 +367,8 @@ public class DurableInboxTests
     /// </summary>
     private sealed class TestInboxHandler : IInboxHandler
     {
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
         public ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             return ValueTask.CompletedTask;

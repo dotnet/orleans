@@ -541,6 +541,8 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
             _delayMs = delayMs;
         }
 
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
         public async ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             await Task.Delay(_delayMs, cancellationToken);
@@ -550,6 +552,8 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     // Throwing handler for exception tests
     private class ThrowingMessageHandler : IInboxHandler
     {
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
         public ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             throw new InvalidOperationException("Test exception");
@@ -562,6 +566,8 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         private int _count;
 
         public int ProcessedCount => _count;
+
+        public bool CanHandle(IInboxHandlerContext context) => true;
 
         public ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
         {

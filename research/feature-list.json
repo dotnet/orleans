@@ -84,7 +84,7 @@
       "Note that CanHandle should perform fast, metadata-only checks",
       "Build Orleans.Journaling project to verify compilation"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
