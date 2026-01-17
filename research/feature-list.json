@@ -427,7 +427,7 @@
       "Add examples of prefix-based routing",
       "Commit documentation"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "performance",
