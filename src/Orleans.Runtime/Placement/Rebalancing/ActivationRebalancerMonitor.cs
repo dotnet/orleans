@@ -69,7 +69,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
 
     private async Task OnStart(CancellationToken cancellationToken)
     {
-        await this.RunOrQueueTask(async () =>
+        await this.RunOrQueueTask(() =>
         {
             _monitorTimer = RegisterGrainTimer(async ct =>
             {
@@ -82,7 +82,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
 
             }, TimerPeriod, TimerPeriod);
 
-            _latestReport = await _rebalancerGrain.GetReport().AsTask().WaitAsync(cancellationToken);
+            return Task.CompletedTask;
         });
     }
 
