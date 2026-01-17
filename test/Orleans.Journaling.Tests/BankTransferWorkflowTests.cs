@@ -196,7 +196,7 @@ public class BankTransferWorkflowTests : IClassFixture<BankTransferWorkflowTests
 
         // Act - Initiate transfer with specific correlation key
         var transferId = Guid.NewGuid();
-        var transferKey = CorrelationKey.Create($"transfer-{transferId}");
+        var transferKey = HierarchicalKey.Create($"transfer-{transferId}");
         await transferGrain.InitiateTransferWithCorrelation(
             transferId,
             sourceAccount.GetGrainId(),
@@ -409,14 +409,14 @@ public interface IAccountGrain : IGrainWithGuidKey
 {
     Task<decimal> GetBalance();
     Task Deposit(decimal amount);
-    Task<CorrelationKey?> GetLastActivityCorrelationKey();
+    Task<HierarchicalKey?> GetLastActivityCorrelationKey();
 }
 
 public interface ITransferGrain : IGrainWithGuidKey
 {
     Task<Guid> GetActivationId();
     Task InitiateTransfer(Guid transferId, GrainId sourceAccountId, GrainId destinationAccountId, decimal amount);
-    Task InitiateTransferWithCorrelation(Guid transferId, GrainId sourceAccountId, GrainId destinationAccountId, decimal amount, CorrelationKey correlationKey);
+    Task InitiateTransferWithCorrelation(Guid transferId, GrainId sourceAccountId, GrainId destinationAccountId, decimal amount, HierarchicalKey correlationKey);
     Task<TransferStatus> GetStatus();
 }
 
@@ -443,13 +443,13 @@ public class AccountGrain : DurableGrain, IAccountGrain
     private readonly IDurableInbox _inbox;
     private readonly IDurableOutbox _outbox;
     private readonly IDurableValue<decimal> _balance;
-    private readonly IDurableValue<CorrelationKey?> _lastActivityCorrelationKey;
+    private readonly IDurableValue<HierarchicalKey?> _lastActivityCorrelationKey;
 
     public AccountGrain(
         IDurableInbox inbox,
         IDurableOutbox outbox,
         [FromKeyedServices("balance")] IDurableValue<decimal> balance,
-        [FromKeyedServices("lastActivityCorrelationKey")] IDurableValue<CorrelationKey?> lastActivityCorrelationKey)
+        [FromKeyedServices("lastActivityCorrelationKey")] IDurableValue<HierarchicalKey?> lastActivityCorrelationKey)
     {
         _inbox = inbox;
         _outbox = outbox;
@@ -465,7 +465,7 @@ public class AccountGrain : DurableGrain, IAccountGrain
         await WriteStateAsync();
     }
 
-    public Task<CorrelationKey?> GetLastActivityCorrelationKey() => Task.FromResult(_lastActivityCorrelationKey.Value);
+    public Task<HierarchicalKey?> GetLastActivityCorrelationKey() => Task.FromResult(_lastActivityCorrelationKey.Value);
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
@@ -589,7 +589,7 @@ public class TransferGrain : DurableGrain, ITransferGrain
     private readonly IDurableValue<GrainId?> _destinationAccountId;
     private readonly IDurableValue<decimal> _amount;
     private readonly IDurableValue<TransferStatus> _status;
-    private readonly IDurableValue<CorrelationKey?> _correlationKey;
+    private readonly IDurableValue<HierarchicalKey?> _correlationKey;
 
     public TransferGrain(
         IDurableInbox inbox,
@@ -599,7 +599,7 @@ public class TransferGrain : DurableGrain, ITransferGrain
         [FromKeyedServices("destinationAccountId")] IDurableValue<GrainId?> destinationAccountId,
         [FromKeyedServices("amount")] IDurableValue<decimal> amount,
         [FromKeyedServices("status")] IDurableValue<TransferStatus> status,
-        [FromKeyedServices("correlationKey")] IDurableValue<CorrelationKey?> correlationKey)
+        [FromKeyedServices("correlationKey")] IDurableValue<HierarchicalKey?> correlationKey)
     {
         _inbox = inbox;
         _outbox = outbox;
@@ -624,11 +624,11 @@ public class TransferGrain : DurableGrain, ITransferGrain
 
     public Task InitiateTransfer(Guid transferId, GrainId sourceAccountId, GrainId destinationAccountId, decimal amount)
     {
-        var correlationKey = CorrelationKey.Create($"transfer-{transferId}");
+        var correlationKey = HierarchicalKey.Create($"transfer-{transferId}");
         return InitiateTransferWithCorrelation(transferId, sourceAccountId, destinationAccountId, amount, correlationKey);
     }
 
-    public async Task InitiateTransferWithCorrelation(Guid transferId, GrainId sourceAccountId, GrainId destinationAccountId, decimal amount, CorrelationKey correlationKey)
+    public async Task InitiateTransferWithCorrelation(Guid transferId, GrainId sourceAccountId, GrainId destinationAccountId, decimal amount, HierarchicalKey correlationKey)
     {
         // Check if already initiated (idempotency via deduplication)
         if (_transferId.Value == transferId)

@@ -251,7 +251,7 @@ public class DurableInboxObserverTests
             return DeliveryResult.Accepted();
         }
 
-        public void MarkAsDuplicate(HierarchicalKey key)
+        public void MarkAsDuplicate(CorrelationKey key)
         {
             _processedKeys.Add(key);
         }

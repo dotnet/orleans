@@ -1,4 +1,5 @@
 using System;
+using Orleans;
 
 namespace Orleans.Journaling.Messaging;
 
@@ -115,8 +116,9 @@ public readonly struct DurableEnvelope
     /// keys support parent/child relationships and are easy to trace in logs and distributed traces.
     /// </para>
     /// <para>
-    /// This pattern is modeled after <c>HierarchicalKey</c> (TaskId) from <c>System.Distributed.DurableTasks</c>,
-    /// enabling consistent correlation across Orleans durable messaging and workflow systems.
+    /// This pattern is modeled after <c>HierarchicalKey</c> from Orleans, which is also used
+    /// as <c>TaskId</c> in <c>System.Distributed.DurableTasks</c>, enabling consistent correlation
+    /// across Orleans durable messaging and workflow systems.
     /// </para>
     /// </remarks>
     /// <example>
@@ -127,7 +129,7 @@ public readonly struct DurableEnvelope
     ///     .Build();
     /// 
     /// // Hierarchical correlation for orchestrated operations
-    /// var transferKey = CorrelationKey.Create("transfer-abc");
+    /// var transferKey = HierarchicalKey.Create("transfer-abc");
     /// 
     /// // Child operations inherit correlation hierarchy
     /// var debitEnvelope = builder
@@ -146,7 +148,7 @@ public readonly struct DurableEnvelope
     /// </code>
     /// </example>
     [Id(4)]
-    public CorrelationKey? CorrelationKey { get; init; }
+    public HierarchicalKey? CorrelationKey { get; init; }
 
     /// <summary>
     /// Optional reply-to grain ID for durable RPC callbacks.

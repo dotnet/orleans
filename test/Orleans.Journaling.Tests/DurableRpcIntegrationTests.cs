@@ -35,7 +35,7 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
         var workerGrain = _fixture.Client.GetGrain<IWorkerGrain>(Guid.NewGuid());
 
         // Act - Send request with correlation key
-        var correlationKey = CorrelationKey.Create("test-request-123");
+        var correlationKey = HierarchicalKey.Create("test-request-123");
         await requestGrain.SendRequest(workerGrain.GetGrainId(), correlationKey, "ProcessData", new WorkRequest { Data = "test data" });
 
         // Wait for response processing
@@ -85,7 +85,7 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
         var worker2 = _fixture.Client.GetGrain<IWorkerGrain>(Guid.NewGuid());
 
         // Act - Orchestrator sends parent request, then two child requests
-        var parentKey = CorrelationKey.Create("orchestration-456");
+        var parentKey = HierarchicalKey.Create("orchestration-456");
         await orchestratorGrain.OrchestrateTasks(
             worker1.GetGrainId(),
             worker2.GetGrainId(),
@@ -127,7 +127,7 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
         var workerGrain = _fixture.Client.GetGrain<IWorkerGrain>(Guid.NewGuid());
 
         // Act - Send request with long polling enabled
-        var correlationKey = CorrelationKey.Create("longpoll-789");
+        var correlationKey = HierarchicalKey.Create("longpoll-789");
         await requestGrain.SendRequestWithLongPolling(
             workerGrain.GetGrainId(),
             correlationKey,
@@ -158,7 +158,7 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
         var workerGrain = _fixture.Client.GetGrain<IWorkerGrain>(Guid.NewGuid());
 
         // Act - Send request that will trigger observer callback
-        var correlationKey = CorrelationKey.Create("observer-callback-101");
+        var correlationKey = HierarchicalKey.Create("observer-callback-101");
         await observerGrain.SendRequestWithObserver(
             workerGrain.GetGrainId(),
             correlationKey,
@@ -187,7 +187,7 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
         var workerGrain = _fixture.Client.GetGrain<IWorkerGrain>(Guid.NewGuid());
 
         // Act - Send request
-        var correlationKey = CorrelationKey.Create("persistence-202");
+        var correlationKey = HierarchicalKey.Create("persistence-202");
         await requestGrain.SendRequest(
             workerGrain.GetGrainId(),
             correlationKey,
@@ -248,7 +248,7 @@ public record WorkRequest
 public record WorkResponse
 {
     [Id(0)] public required string Result { get; init; }
-    [Id(1)] public CorrelationKey? CorrelationKey { get; init; }
+    [Id(1)] public HierarchicalKey? CorrelationKey { get; init; }
 }
 
 // ============================================================================
@@ -258,8 +258,8 @@ public record WorkResponse
 public interface IRequestGrain : IGrainWithGuidKey
 {
     Task<Guid> GetActivationId();
-    Task SendRequest(GrainId workerId, CorrelationKey? correlationKey, string routeKey, WorkRequest request);
-    Task SendRequestWithLongPolling(GrainId workerId, CorrelationKey? correlationKey, string routeKey, WorkRequest request, TimeSpan pollTimeout);
+    Task SendRequest(GrainId workerId, HierarchicalKey? correlationKey, string routeKey, WorkRequest request);
+    Task SendRequestWithLongPolling(GrainId workerId, HierarchicalKey? correlationKey, string routeKey, WorkRequest request, TimeSpan pollTimeout);
     Task<WorkResponse?> GetReceivedResponse();
 }
 
@@ -271,13 +271,13 @@ public interface IWorkerGrain : IGrainWithGuidKey
 
 public interface IOrchestratorGrain : IGrainWithGuidKey
 {
-    Task OrchestrateTasks(GrainId worker1, GrainId worker2, CorrelationKey parentKey, WorkRequest task1, WorkRequest task2);
+    Task OrchestrateTasks(GrainId worker1, GrainId worker2, HierarchicalKey parentKey, WorkRequest task1, WorkRequest task2);
     Task<List<WorkResponse>> GetCompletedTasks();
 }
 
 public interface IObserverGrain : IGrainWithGuidKey
 {
-    Task SendRequestWithObserver(GrainId workerId, CorrelationKey correlationKey, WorkRequest request);
+    Task SendRequestWithObserver(GrainId workerId, HierarchicalKey correlationKey, WorkRequest request);
     Task<WorkResponse?> GetObservedResponse();
 }
 
@@ -314,7 +314,7 @@ public class RequestGrain : DurableGrain, IRequestGrain
         return base.OnActivateAsync(cancellationToken);
     }
 
-    public async Task SendRequest(GrainId workerId, CorrelationKey? correlationKey, string routeKey, WorkRequest request)
+    public async Task SendRequest(GrainId workerId, HierarchicalKey? correlationKey, string routeKey, WorkRequest request)
     {
         Console.WriteLine($"[DEBUG-TEST] RequestGrain.SendRequest: Sending to {workerId} on route '{routeKey}'");
         var sessionPool = ServiceProvider.GetRequiredService<SerializerSessionPool>();
@@ -343,7 +343,7 @@ public class RequestGrain : DurableGrain, IRequestGrain
         Console.WriteLine($"[DEBUG-TEST] RequestGrain.SendRequest: WriteStateAsync completed, outbox count={_outbox.Count}");
     }
 
-    public async Task SendRequestWithLongPolling(GrainId workerId, CorrelationKey? correlationKey, string routeKey, WorkRequest request, TimeSpan pollTimeout)
+    public async Task SendRequestWithLongPolling(GrainId workerId, HierarchicalKey? correlationKey, string routeKey, WorkRequest request, TimeSpan pollTimeout)
     {
         var sessionPool = ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var builder = new DurableEnvelopeBuilder
@@ -466,7 +466,7 @@ public class OrchestratorGrain(IDurableInbox inbox, IDurableOutbox outbox) : Dur
         return base.OnActivateAsync(cancellationToken);
     }
 
-    public async Task OrchestrateTasks(GrainId worker1, GrainId worker2, CorrelationKey parentKey, WorkRequest task1, WorkRequest task2)
+    public async Task OrchestrateTasks(GrainId worker1, GrainId worker2, HierarchicalKey parentKey, WorkRequest task1, WorkRequest task2)
     {
         var sessionPool = ServiceProvider.GetRequiredService<SerializerSessionPool>();
 
@@ -533,7 +533,7 @@ public class ObserverGrain(IDurableOutbox outbox) : DurableGrain, IObserverGrain
     private WorkResponse? _observedResponse;
     private readonly IDurableOutbox _outbox = outbox;
 
-    public async Task SendRequestWithObserver(GrainId workerId, CorrelationKey correlationKey, WorkRequest request)
+    public async Task SendRequestWithObserver(GrainId workerId, HierarchicalKey correlationKey, WorkRequest request)
     {
         var sessionPool = ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var builder = new DurableEnvelopeBuilder
@@ -556,7 +556,7 @@ public class ObserverGrain(IDurableOutbox outbox) : DurableGrain, IObserverGrain
     public Task<WorkResponse?> GetObservedResponse() => Task.FromResult(_observedResponse);
 
     // IDurableInboxObserver implementation
-    public async ValueTask<DeliveryResult> OnResponseAsync(CorrelationKey correlationKey, DurableEnvelope envelope, DeliveryOptions options, CancellationToken cancellationToken)
+    public async ValueTask<DeliveryResult> OnResponseAsync(HierarchicalKey correlationKey, DurableEnvelope envelope, DeliveryOptions options, CancellationToken cancellationToken)
     {
         if (envelope.Data.TryGetBody<WorkResponse>(out var response))
         {

@@ -41,7 +41,7 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
         Assert.NotEqual(senderSilo, receiverSilo);
 
         // Act - Send message from silo A to silo B
-        var correlationKey = CorrelationKey.Create("cross-silo-test-1");
+        var correlationKey = HierarchicalKey.Create("cross-silo-test-1");
         await senderGrain.SendMessage(
             receiverGrain.GetGrainId(),
             correlationKey,
@@ -77,12 +77,12 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
         Assert.NotEqual(senderSilo, receiverSilo);
 
         // Act - Send messages up to capacity (100) - this should succeed
-        var correlationKey = CorrelationKey.Create("backpressure-test");
+        var correlationKey = HierarchicalKey.Create("backpressure-test");
         for (int i = 0; i < 100; i++)
         {
             await senderGrain.SendMessage(
                 receiverGrain.GetGrainId(),
-                correlationKey.CreateChildKey($"msg-{i}"),
+                HierarchicalKey.Create($"msg-{i}"),
                 "process",
                 new MultiSiloTestMessage { Content = $"Message {i}" });
         }
@@ -115,7 +115,7 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
         Assert.NotEqual(senderSilo, receiverSilo);
 
         // Act - Send message with long-polling enabled (5 second timeout)
-        var correlationKey = CorrelationKey.Create("longpoll-cross-silo");
+        var correlationKey = HierarchicalKey.Create("longpoll-cross-silo");
         await senderGrain.SendMessageWithLongPolling(
             receiverGrain.GetGrainId(),
             correlationKey,
@@ -180,7 +180,7 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
         var worker2 = await GetGrainOnSilo<IMultiSiloWorkerGrain>(_fixture.HostedCluster.Silos[0].SiloAddress);
 
         // Act - Orchestrator sends parent request, then two child requests
-        var parentKey = CorrelationKey.Create("multi-silo-orchestration");
+        var parentKey = HierarchicalKey.Create("multi-silo-orchestration");
         await orchestrator.OrchestrateCrossSiloTasks(
             worker1.GetGrainId(),
             worker2.GetGrainId(),
@@ -284,14 +284,14 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
 public record MultiSiloTestMessage
 {
     [Id(0)] public required string Content { get; init; }
-    [Id(1)] public CorrelationKey? CorrelationKey { get; init; }
+    [Id(1)] public HierarchicalKey? CorrelationKey { get; init; }
 }
 
 [GenerateSerializer]
 public record MultiSiloTaskResult
 {
     [Id(0)] public required string Result { get; init; }
-    [Id(1)] public CorrelationKey? CorrelationKey { get; init; }
+    [Id(1)] public HierarchicalKey? CorrelationKey { get; init; }
 }
 
 // ============================================================================
@@ -305,8 +305,8 @@ public interface IMultiSiloGrainBase
 
 public interface IMultiSiloSenderGrain : IGrainWithGuidKey, IMultiSiloGrainBase
 {
-    Task SendMessage(GrainId receiverId, CorrelationKey correlationKey, string routeKey, MultiSiloTestMessage message);
-    Task SendMessageWithLongPolling(GrainId receiverId, CorrelationKey correlationKey, string routeKey, MultiSiloTestMessage message, TimeSpan pollTimeout);
+    Task SendMessage(GrainId receiverId, HierarchicalKey correlationKey, string routeKey, MultiSiloTestMessage message);
+    Task SendMessageWithLongPolling(GrainId receiverId, HierarchicalKey correlationKey, string routeKey, MultiSiloTestMessage message, TimeSpan pollTimeout);
 }
 
 public interface IMultiSiloReceiverGrain : IGrainWithGuidKey, IMultiSiloGrainBase
@@ -323,13 +323,13 @@ public interface IMultiSiloBidirectionalGrain : IGrainWithGuidKey, IMultiSiloGra
 
 public interface IMultiSiloOrchestratorGrain : IGrainWithGuidKey, IMultiSiloGrainBase
 {
-    Task OrchestrateCrossSiloTasks(GrainId worker1, GrainId worker2, CorrelationKey parentKey, string task1Data, string task2Data);
+    Task OrchestrateCrossSiloTasks(GrainId worker1, GrainId worker2, HierarchicalKey parentKey, string task1Data, string task2Data);
     Task<List<MultiSiloTaskResult>> GetCompletedTasks();
 }
 
 public interface IMultiSiloWorkerGrain : IGrainWithGuidKey, IMultiSiloGrainBase
 {
-    Task<CorrelationKey?> GetLastCorrelationKey();
+    Task<HierarchicalKey?> GetLastCorrelationKey();
     Task<string?> GetLastTaskData();
 }
 
@@ -357,7 +357,7 @@ public class MultiSiloSenderGrain : DurableGrain, IMultiSiloSenderGrain
 
     public Task<string> GetSiloAddress() => Task.FromResult(_siloAddress);
 
-    public async Task SendMessage(GrainId receiverId, CorrelationKey correlationKey, string routeKey, MultiSiloTestMessage message)
+    public async Task SendMessage(GrainId receiverId, HierarchicalKey correlationKey, string routeKey, MultiSiloTestMessage message)
     {
         var sessionPool = ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var builder = new DurableEnvelopeBuilder
@@ -376,7 +376,7 @@ public class MultiSiloSenderGrain : DurableGrain, IMultiSiloSenderGrain
         await WriteStateAsync();
     }
 
-    public async Task SendMessageWithLongPolling(GrainId receiverId, CorrelationKey correlationKey, string routeKey, MultiSiloTestMessage message, TimeSpan pollTimeout)
+    public async Task SendMessageWithLongPolling(GrainId receiverId, HierarchicalKey correlationKey, string routeKey, MultiSiloTestMessage message, TimeSpan pollTimeout)
     {
         // Note: Long-polling is controlled by the outbox delivery pump via DeliveryOptions,
         // not by the envelope itself. This method just sends a regular message.
@@ -532,7 +532,7 @@ public class MultiSiloOrchestratorGrain : DurableGrain, IMultiSiloOrchestratorGr
         return base.OnActivateAsync(cancellationToken);
     }
 
-    public async Task OrchestrateCrossSiloTasks(GrainId worker1, GrainId worker2, CorrelationKey parentKey, string task1Data, string task2Data)
+    public async Task OrchestrateCrossSiloTasks(GrainId worker1, GrainId worker2, HierarchicalKey parentKey, string task1Data, string task2Data)
     {
         var sessionPool = ServiceProvider.GetRequiredService<SerializerSessionPool>();
 
@@ -596,14 +596,14 @@ public class MultiSiloWorkerGrain : DurableGrain, IMultiSiloWorkerGrain
 {
     private readonly IDurableInbox _inbox;
     private readonly IDurableOutbox _outbox;
-    private readonly IDurableValue<CorrelationKey?> _lastCorrelationKey;
+    private readonly IDurableValue<HierarchicalKey?> _lastCorrelationKey;
     private readonly IDurableValue<string?> _lastTaskData;
     private readonly string _siloAddress;
 
     public MultiSiloWorkerGrain(
         IDurableInbox inbox,
         IDurableOutbox outbox,
-        [FromKeyedServices("lastCorrelationKey")] IDurableValue<CorrelationKey?> lastCorrelationKey,
+        [FromKeyedServices("lastCorrelationKey")] IDurableValue<HierarchicalKey?> lastCorrelationKey,
         [FromKeyedServices("lastTaskData")] IDurableValue<string?> lastTaskData)
     {
         _inbox = inbox;
@@ -621,7 +621,7 @@ public class MultiSiloWorkerGrain : DurableGrain, IMultiSiloWorkerGrain
         return base.OnActivateAsync(cancellationToken);
     }
 
-    public Task<CorrelationKey?> GetLastCorrelationKey() => Task.FromResult(_lastCorrelationKey.Value);
+    public Task<HierarchicalKey?> GetLastCorrelationKey() => Task.FromResult(_lastCorrelationKey.Value);
     
     public Task<string?> GetLastTaskData() => Task.FromResult(_lastTaskData.Value);
 
