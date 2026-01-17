@@ -72,7 +72,7 @@
       "Build System.Distributed.DurableTasks project to verify compilation",
       "Run all DurableTask tests to ensure no regression"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
