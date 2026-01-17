@@ -220,7 +220,7 @@
       "Update handler registration calls to use new API",
       "Build Orleans.Journaling project to verify compilation"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

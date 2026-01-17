@@ -1185,3 +1185,52 @@ With InboxProcessingPump now using TryFindHandler, the next features in the queu
 
 This completes the migration of the core message processing pump to the capability-based dispatch pattern.
 
+
+
+---
+
+## Feature Implementation Summary - January 17, 2026 (Continued)
+
+### Completed: Update DurableInboxExtension to use TryFindHandler for capability-based route validation (Feature #17)
+
+**Objective**: Update DurableInboxExtension.DeliverAsync to use the new capability-based dispatch system (TryFindHandler) instead of the legacy exact route matching (HasHandler), enabling support for RouteKeyHandler, RoutePrefixHandler, and CorrelationHandler patterns.
+
+**Problem Statement**:
+After implementing Features #13-#16 (new handler registration API and InboxProcessingPump migration), DurableInboxExtension.DeliverAsync was still using the legacy HasHandler(string routeKey) method for route validation. This method only supported exact route key matching and could not work with:
+- Prefix-based routing (e.g., \"rpc/\" matching \"rpc/request\", \"rpc/reply\")
+- Correlation-based routing (hierarchical workflows)
+- Custom CanHandle logic in handlers
+
+**Implementation Details**:
+
+1. **Updated DurableInboxExtension.DeliverAsync route validation** (src/Orleans.Journaling/Messaging/DurableInboxExtension.cs, line 209-234)
+   - Changed from: if (!_durableInbox.HasHandler(envelope.RouteKey))
+   - Changed to: Creating InboxHandlerContext and calling if (!_durableInbox.TryFindHandler(handlerContext, out _))
+   - Created lightweight InboxHandlerContext for handler matching
+   - Preserved existing IDurableInboxObserver fallback logic
+   - Maintained all existing error handling and metrics recording
+
+2. **Key Design Decisions**:
+   - InboxHandlerContext creation for route validation
+   - Handler result discarded using out _ since we only need existence check
+   - Backward compatibility preserved via legacy handler wrapper
+   - Observer fallback maintained for correlation-based responses
+
+**Build Status**: Clean build, 0 warnings, 0 errors
+
+**Test Results**: 
+- Orleans.Journaling BVT tests (net10.0): 379/380 passed (1 flaky test unrelated to changes)
+- Individual test run of flaky test: 1/1 passed (confirmed flaky)
+
+**Files Modified**:
+- src/Orleans.Journaling/Messaging/DurableInboxExtension.cs (updated route validation)
+- research/feature-list.json (marked Feature #17 as passing)
+
+**Benefits**:
+- DurableInboxExtension now supports all capability-based dispatch patterns
+- Prefix-based routing works correctly
+- Correlation-based routing works correctly
+- Custom CanHandle logic is evaluated during message delivery
+- Consistent with InboxProcessingPump handler discovery pattern
+
+**Next Steps**: Feature #18: Create DurableErrorResponse class for structured error handling
