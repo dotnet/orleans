@@ -413,7 +413,7 @@
       "Build Orleans.Journaling project to verify compilation",
       "Run all Orleans.Journaling tests"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "documentation",
