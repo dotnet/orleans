@@ -1234,3 +1234,73 @@ After implementing Features #13-#16 (new handler registration API and InboxProce
 - Consistent with InboxProcessingPump handler discovery pattern
 
 **Next Steps**: Feature #18: Create DurableErrorResponse class for structured error handling
+
+---
+
+## Feature Implementation Summary - January 17, 2026 (Continued)
+
+### Completed: Create DurableErrorResponse class for error handling (Feature #18)
+
+**Objective**: Create a standardized error response message class for durable inbox/outbox error handling, enabling handlers to communicate errors back to requesters in durable RPC scenarios.
+
+**Implementation Details**:
+
+1. **Created DurableErrorResponse.cs** (src/Orleans.Journaling/Messaging/DurableErrorResponse.cs)
+   - Implemented as immutable readonly struct with [GenerateSerializer, Immutable] attributes
+   - Added four properties with Orleans serialization attributes:
+     * ErrorCode [Id(0)]: String for error categorization (e.g., \ HANDLER_NOT_FOUND\, \DESERIALIZATION_FAILED\)
+     * Message [Id(1)]: Human-readable error description
+     * ExceptionDetails [Id(2)]: Optional detailed exception information for debugging
+     * IsRetriable [Id(3)]: Boolean indicating whether the operation should be retried
+   - Comprehensive XML documentation with usage examples for error response patterns
+
+2. **Created StandardErrorCodes class** (same file)
+   - Static class providing standard error codes for common failure scenarios
+   - 8 standard error codes: HandlerNotFound, DeserializationFailed, HandlerException, Cancelled, Timeout, TransientError, ValidationFailed, Unauthorized
+   - Each constant includes XML documentation explaining when to use it and whether it is retriable
+
+3. **Created comprehensive unit tests** (test/Orleans.Journaling.Tests/DurableErrorResponseTests.cs)
+   - 15 BVT tests covering all DurableErrorResponse functionality
+   - Tests for serialization round-trip with all properties
+   - Tests for null handling (ExceptionDetails is optional)
+   - Tests for empty strings and long strings
+   - Tests for special characters (newlines, tabs, Unicode)
+   - Tests for each standard error code
+   - Tests for IsRetriable default value (false)
+   - All tests verify Orleans serialization using SerializerSessionPool, CodecProvider, and round-trip verification
+
+**Build Status**: Clean build, 0 warnings, 0 errors
+
+**Test Results**: 
+- DurableErrorResponseTests (net10.0): 15/15 passed
+- DurableErrorResponseTests (net8.0): 15/15 passed
+- Orleans.Journaling BVT tests (net10.0): 395/395 passed (includes 15 new tests)
+
+**Files Modified**:
+- src/Orleans.Journaling/Messaging/DurableErrorResponse.cs (NEW - 289 lines with documentation)
+- test/Orleans.Journaling.Tests/DurableErrorResponseTests.cs (NEW - 384 lines with 15 tests)
+- research/feature-list.json (marked Feature #18 as passing)
+
+**Key Design Decisions**:
+
+1. **Readonly struct**: Uses readonly struct for immutability and performance (same pattern as DurableEnvelope)
+2. **Required properties**: ErrorCode and Message are required, ExceptionDetails is optional for production safety
+3. **Standard error codes**: Provides a shared vocabulary for common errors across Orleans.Journaling
+4. **IsRetriable flag**: Enables automated retry logic for transient failures vs. permanent errors
+5. **Comprehensive documentation**: Extensive XML comments with examples for each property and error code
+6. **Production-safe**: ExceptionDetails can be omitted or redacted in production to avoid information disclosure
+
+**Benefits**:
+- Standardized error response format for durable RPC patterns
+- Strong typing for error codes enables automated error handling
+- IsRetriable flag enables intelligent retry strategies
+- Optional ExceptionDetails supports both development and production environments
+- Orleans serialization ensures compatibility with distributed messaging
+- Foundation for future error handling methods in IInboxHandlerContext (Feature #19, #20)
+
+**Next Steps**:
+The next features in the list are:
+- Feature #19: Add error handling methods to IInboxHandlerContext (SendError)
+- Feature #20: Implement SendError methods in IInboxHandlerContext implementation
+- These features will build on DurableErrorResponse to provide convenient error response APIs
+

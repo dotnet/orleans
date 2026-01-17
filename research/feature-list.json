@@ -235,7 +235,7 @@
       "Add XML documentation for each property",
       "Build Orleans.Journaling project to verify compilation"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
