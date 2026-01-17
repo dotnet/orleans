@@ -912,3 +912,154 @@ inbox.RegisterHandler(new RpcPrefixHandler());
 The next feature in the list is #12: Create CorrelationHandler base class for correlation-based matching.
 
 
+---
+
+## Feature Implementation Summary - January 17, 2026 (Continued)
+
+### Completed: Create CorrelationHandler base class for correlation-based matching (Feature #12)
+
+**Objective**: Create a base class that simplifies implementing handlers that respond to messages based on correlation key hierarchy, enabling hierarchical workflow routing where a parent workflow can handle messages from all child workflows.
+
+**Implementation Details**:
+
+1. **Created CorrelationHandler.cs** (src/Orleans.Journaling/Messaging/CorrelationHandler.cs)
+   - Abstract base class implementing IInboxHandler
+   - Constructor accepts HierarchicalKey correlationKey with validation (ArgumentNullException for null)
+   - Protected CorrelationKey property exposes the configured correlation key to derived classes
+   - CanHandle implementation uses HierarchicalKey.IsAncestorOf to check hierarchical matching:
+     * Returns true for exact correlation key match (a key is an ancestor of itself)
+     * Returns true for all descendant keys (children, grandchildren, etc.)
+     * Returns false for parent keys, siblings, or unrelated keys
+     * Returns false for null correlation keys
+   - Abstract HandleAsync method for derived classes to implement message processing logic
+   - Explicit interface implementation delegates to protected HandleAsync method
+   - Comprehensive XML documentation with hierarchical workflow examples
+
+2. **Key Design Decisions**:
+   - **IsAncestorOf semantics**: Uses HierarchicalKey.IsAncestorOf which returns true for exact matches and all descendants
+   - **Hierarchical workflow support**: Enables parent workflows to receive messages from all child workflows in the hierarchy
+   - **Null safety**: Returns false for null correlation keys, does not throw
+   - **Validation at construction time**: Ensures correlation key is not null before handler is registered
+   - **Protected CorrelationKey access**: Allows derived classes to compare against envelope's correlation key to distinguish exact match vs. child workflow
+   - **Consistent with RouteKeyHandler and RoutePrefixHandler**: Follows the same design patterns and conventions
+
+3. **Created comprehensive unit tests** (test/Orleans.Journaling.Tests/CorrelationHandlerTests.cs)
+   - 16 BVT tests covering all CorrelationHandler functionality
+   - Tests for exact correlation key matching
+   - Tests for child correlation key matching (direct child)
+   - Tests for grandchild correlation key matching (nested hierarchies)
+   - Tests for parent correlation key rejection (does not match parent)
+   - Tests for unrelated correlation key rejection
+   - Tests for null correlation key handling
+   - Tests for constructor validation (null)
+   - Tests for CorrelationKey property exposure
+   - Tests for HandleAsync invocation
+   - Tests for cancellation token respect
+   - Tests for multiple instances working independently
+   - Tests for hierarchical workflows with multiple child levels
+   - Tests for distinguishing exact match from child workflows
+   - Tests for complex hierarchical keys with multiple segments
+   - Tests for escaped characters in correlation keys
+   - Tests for IsAncestorOf semantics validation
+
+**Build Status**: ✅ Clean build, 0 warnings, 0 errors
+
+**Test Results**: 
+- CorrelationHandlerTests (net10.0): ✅ 16/16 passed
+- CorrelationHandlerTests (net8.0): ✅ 16/16 passed
+- Orleans.Journaling all tests (net10.0): ✅ 413/414 passed (1 pre-existing flaky test unrelated to CorrelationHandler)
+
+**Files Modified**:
+- src/Orleans.Journaling/Messaging/CorrelationHandler.cs (NEW)
+- test/Orleans.Journaling.Tests/CorrelationHandlerTests.cs (NEW)
+- research/feature-list.json (marked Feature #12 as passing)
+
+**Benefits**:
+- ✅ Simplifies handler implementation for hierarchical workflow routing
+- ✅ Eliminates boilerplate CanHandle implementation for correlation-based patterns
+- ✅ Type-safe correlation key validation at construction time
+- ✅ Clear separation between routing logic (CanHandle) and processing logic (HandleAsync)
+- ✅ Enables parent workflows to handle messages from all child workflows
+- ✅ Consistent with Orleans patterns and RouteKeyHandler/RoutePrefixHandler design
+- ✅ Foundation for hierarchical workflow patterns (e.g., saga orchestration, nested workflows)
+
+**Test Coverage Summary**:
+
+| Test Category | Coverage |
+|--------------|----------|
+| Basic functionality | ✅ Exact match, child match, grandchild match |
+| Edge cases | ✅ Parent rejection, unrelated rejection, null handling |
+| Validation | ✅ Constructor argument validation |
+| Integration | ✅ Multiple handlers, HandleAsync invocation |
+| Special cases | ✅ Complex hierarchies, escaped characters, IsAncestorOf semantics |
+| Cancellation | ✅ Respects cancellation token |
+| Workflow patterns | ✅ Exact vs. child distinction, multi-level hierarchies |
+
+**Example Usage** (from tests and documentation):
+
+```csharp
+// Hierarchical workflow handler
+public class OrderWorkflowHandler : CorrelationHandler
+{
+    private readonly string _orderId;
+    
+    public OrderWorkflowHandler(string orderId) 
+        : base(HierarchicalKey.Create($"workflow/order-{orderId}"))
+    {
+        _orderId = orderId;
+    }
+    
+    protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken ct)
+    {
+        // This handler receives messages from:
+        // - The main order workflow ("workflow/order-123")
+        // - Child workflows like payment ("workflow/order-123/payment")
+        // - Grandchild workflows like verification ("workflow/order-123/payment/verify")
+        
+        // Deserialize the message
+        if (!context.Envelope.Data.TryGetBody<WorkflowEvent>(out var workflowEvent))
+        {
+            throw new InvalidOperationException("Failed to deserialize WorkflowEvent");
+        }
+        
+        // Process based on correlation hierarchy
+        if (context.Envelope.CorrelationKey == CorrelationKey)
+        {
+            // Main workflow message
+            await HandleMainWorkflow(workflowEvent, ct);
+        }
+        else
+        {
+            // Child workflow message - use correlation key to identify which child
+            await HandleChildWorkflow(context.Envelope.CorrelationKey, workflowEvent, ct);
+        }
+    }
+}
+
+// Registration
+var orderId = "123";
+var handler = new OrderWorkflowHandler(orderId);
+inbox.RegisterHandler(handler);
+
+// This handler will match messages with correlation keys:
+// - "workflow/order-123" (exact match)
+// - "workflow/order-123/payment" (child)
+// - "workflow/order-123/shipping" (child)
+// - "workflow/order-123/payment/verification" (grandchild)
+// But NOT:
+// - "workflow/order-456" (unrelated)
+// - "workflow" (parent)
+// - null (no correlation key)
+```
+
+**Architectural Patterns Enabled**:
+
+1. **Saga Orchestration**: Parent saga can receive completion events from all child sagas
+2. **Nested Workflows**: Multi-level workflow hierarchies with centralized coordination
+3. **Event Aggregation**: Parent workflows can aggregate events from all child workflows
+4. **Hierarchical State Management**: State machines that manage sub-state machines
+
+**Next Steps**:
+The next feature in the list is #13: Update IDurableInbox with new registration API. This will enable registration of handlers without explicit route keys, allowing CanHandle-based capability dispatch.
+
+
