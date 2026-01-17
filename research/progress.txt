@@ -1525,3 +1525,55 @@ Feature #20 is now marked as complete. The next features in the list are:
 
 This verification confirms that Feature #20 was successfully implemented earlier and only required validation and documentation of completion status.
 
+
+
+---
+
+## Feature Verification Summary - January 17, 2026 (Continued)
+
+### Completed: Verify InboxHandlerRoutingTests for CanHandle logic (Feature #22)
+
+**Objective**: Verify that comprehensive tests exist for the CanHandle-based routing logic, including RouteKeyHandler, RoutePrefixHandler, CorrelationHandler, handler precedence, and TryFindHandler functionality.
+
+**Status**: Feature was already implemented and passing. All required tests exist in InboxHandlerRegistrationTests.cs.
+
+**Test Results**: 
+- InboxHandlerRegistrationTests (net10.0): All 16 tests passed
+- All requirements from Feature #22 are covered
+
+**Files Verified**:
+- test/Orleans.Journaling.Tests/InboxHandlerRegistrationTests.cs (existing, 523 lines)
+- research/feature-list.json (updated Feature #22 to passes: true)
+
+**Test Coverage Summary**:
+- RouteKeyHandler exact matching: TryFindHandler_WithRouteKeyHandler_FindsExactMatch
+- RoutePrefixHandler prefix matching: TryFindHandler_WithRoutePrefixHandler_FindsPrefixMatch
+- CorrelationHandler correlation matching: TryFindHandler_WithCorrelationHandler_FindsHierarchicalMatch
+- Handler precedence: TryFindHandler_WithMultipleHandlers_ReturnsFirstMatch
+- TryFindHandler with multiple handlers: Multiple tests verify this behavior
+- Caching behavior: TryFindHandler_CachesResultForSameRouteKey and TryFindHandler_CachesNegativeResults
+- Legacy API integration: LegacyRegisterHandler_IntegratesWithNewAPI
+
+**Next Steps**:
+The next feature in the list is Feature #23: Create DurableErrorResponseTests for error serialization.
+
+
+
+---
+
+## Feature Verification Summary - January 17, 2026 (Continued)
+
+### Completed: Verify InboxHandlerRoutingTests for CanHandle logic (Feature #22)
+
+**Objective**: Verify that comprehensive tests exist for the CanHandle-based routing logic.
+
+**Status**: Feature was already implemented and passing in InboxHandlerRegistrationTests.cs.
+
+**Test Results**: All 16 tests passed on net10.0
+
+**Files Verified**:
+- test/Orleans.Journaling.Tests/InboxHandlerRegistrationTests.cs
+- research/feature-list.json (updated Feature #22 to passes: true)
+
+**Next Steps**: The next feature is Feature #23: Create DurableErrorResponseTests for error serialization.
+
