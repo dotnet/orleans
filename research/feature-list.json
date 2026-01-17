@@ -209,7 +209,7 @@
       "Build Orleans.Journaling project to verify compilation",
       "Run inbox processing tests"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "refactor",
