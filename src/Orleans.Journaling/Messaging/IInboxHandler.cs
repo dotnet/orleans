@@ -91,9 +91,9 @@ public interface IInboxHandler
     ///         return context.Envelope.RouteKey?.StartsWith("rpc/") == true;
     ///     }
     ///     
-    ///     public async ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken ct)
+    ///     public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken ct)
     ///     {
-    ///         // Handle any RPC message
+    ///         // Handle any RPC message using context.Envelope
     ///     }
     /// }
     /// </code>
@@ -103,16 +103,22 @@ public interface IInboxHandler
     /// <summary>
     /// Handles a message from the inbox.
     /// </summary>
-    /// <param name="envelope">The full message envelope (exposed for metadata access).</param>
-    /// <param name="context">Handler context for creating and sending envelopes.</param>
+    /// <param name="context">Handler context containing the envelope, grain information, and methods for sending messages.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the asynchronous operation.</returns>
     /// <remarks>
+    /// <para>
+    /// The envelope is available via <see cref="IInboxHandlerContext.Envelope"/>, eliminating the need
+    /// for a redundant parameter. This simplifies the method signature and follows Orleans' established
+    /// patterns for context-based APIs.
+    /// </para>
+    /// <para>
     /// The handler should not throw exceptions for business logic errors; instead, it should handle them
     /// gracefully (e.g., log, send error response, etc.). Unhandled exceptions will be logged and may
     /// prevent the message from being marked as processed, depending on the inbox configuration.
+    /// </para>
     /// </remarks>
-    ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken);
+    ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -201,9 +207,9 @@ public interface IInboxHandler<TMessage> : IInboxHandler
     /// This method attempts to deserialize the envelope body as <typeparamref name="TMessage"/>.
     /// If deserialization fails, it throws an <see cref="InvalidOperationException"/>.
     /// </remarks>
-    ValueTask IInboxHandler.HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
+    ValueTask IInboxHandler.HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        if (envelope.Data.TryGetBody<TMessage>(out var typed))
+        if (context.Envelope.Data.TryGetBody<TMessage>(out var typed))
         {
             return HandleAsync(typed, context, cancellationToken);
         }
