@@ -2,6 +2,7 @@ using System;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 
+#nullable disable
 namespace Orleans.Serialization.Activators
 {
     internal abstract class DefaultActivator<T> : IActivator<T>

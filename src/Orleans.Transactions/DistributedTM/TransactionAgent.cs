@@ -6,6 +6,7 @@ using System.Linq;
 using Microsoft.Extensions.Logging;
 using Orleans.Transactions.Abstractions;
 
+#nullable disable
 namespace Orleans.Transactions
 {
     internal partial class TransactionAgent : ITransactionAgent

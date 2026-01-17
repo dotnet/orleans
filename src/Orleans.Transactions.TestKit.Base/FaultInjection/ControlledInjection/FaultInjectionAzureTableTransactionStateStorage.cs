@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
+#nullable disable
 namespace Orleans.Transactions.TestKit
 {
     public class FaultInjectionAzureTableTransactionStateStorage<TState> : ITransactionalStateStorage<TState>

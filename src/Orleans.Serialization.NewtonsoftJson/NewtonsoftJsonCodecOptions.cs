@@ -1,6 +1,7 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using System;
 
+#nullable disable
 namespace Orleans.Serialization;
 
 /// <summary>

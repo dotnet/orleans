@@ -3,7 +3,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Timers.Internal;
 
-#nullable enable
 namespace Orleans
 {
     /// <summary>

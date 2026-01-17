@@ -1,4 +1,3 @@
-#nullable enable
 
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;

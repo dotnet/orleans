@@ -3,6 +3,7 @@ using System.Net;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Invocation;
 
+#nullable disable
 namespace Orleans.Serialization.Configuration
 {
     internal class DefaultTypeManifestProvider : TypeManifestProviderBase, IPostConfigureOptions<TypeManifestOptions>

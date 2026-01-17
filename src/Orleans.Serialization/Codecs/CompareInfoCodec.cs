@@ -4,6 +4,7 @@ using System.Globalization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.WireProtocol;
 
+#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>

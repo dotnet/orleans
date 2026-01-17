@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.GrainDirectory;
 
+#nullable disable
 namespace Orleans.Runtime
 {
     internal sealed partial class Catalog : SystemTarget, ICatalog, ILifecycleParticipant<ISiloLifecycle>

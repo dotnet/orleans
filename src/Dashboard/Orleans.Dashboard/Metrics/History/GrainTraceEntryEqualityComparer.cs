@@ -2,6 +2,7 @@ using Orleans.Dashboard.Model;
 using System;
 using System.Collections.Generic;
 
+#nullable disable
 namespace Orleans.Dashboard.Metrics.History;
 
 internal sealed class GrainTraceEqualityComparer : IEqualityComparer<GrainTraceEntry>

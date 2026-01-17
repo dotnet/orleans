@@ -1,3 +1,4 @@
+#nullable disable
 namespace Orleans.Dashboard.Model;
 
 [GenerateSerializer]

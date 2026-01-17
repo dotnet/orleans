@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Generic;
 using Orleans.Serialization;
 
+#nullable disable
 namespace Orleans.Streams
 {
     internal partial class PersistentStreamProducer<T> : IInternalAsyncBatchObserver<T>

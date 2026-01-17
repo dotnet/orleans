@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Primitives;
 using Microsoft.Net.Http.Headers;
 
+#nullable disable
 namespace Orleans.Dashboard;
 
 internal sealed class EmbeddedAssetProvider

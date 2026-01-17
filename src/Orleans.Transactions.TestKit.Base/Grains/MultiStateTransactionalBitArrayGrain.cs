@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Orleans.Transactions.Abstractions;
 
+#nullable disable
 namespace Orleans.Transactions.TestKit.Correctnesss
 {
     [Serializable]

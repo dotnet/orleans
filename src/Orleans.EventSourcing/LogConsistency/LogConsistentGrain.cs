@@ -8,6 +8,7 @@ using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.Providers;
 
+#nullable disable
 namespace Orleans.EventSourcing
 {
     /// <summary>

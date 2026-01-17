@@ -10,6 +10,7 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.GeneratedCodeHelpers;
 
+#nullable disable
 namespace Orleans.Serialization.Serializers
 {
     /// <summary>

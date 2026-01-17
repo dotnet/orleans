@@ -11,6 +11,7 @@ using Orleans.Runtime;
 using Orleans.Statistics;
 using Orleans.Streams;
 
+#nullable disable
 namespace Orleans.Streaming.EventHubs.Testing
 {
     /// <summary>

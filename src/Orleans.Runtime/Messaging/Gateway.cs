@@ -12,6 +12,7 @@ using Orleans.ClientObservers;
 using Orleans.Configuration;
 using Orleans.Runtime.Internal;
 
+#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal sealed partial class Gateway : IConnectedClientCollection

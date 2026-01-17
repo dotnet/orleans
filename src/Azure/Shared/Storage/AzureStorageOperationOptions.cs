@@ -5,6 +5,7 @@ using Azure.Core;
 using Azure.Data.Tables;
 using Orleans.Runtime;
 
+#nullable disable
 #if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.AzureStorage
 #elif ORLEANS_PERSISTENCE

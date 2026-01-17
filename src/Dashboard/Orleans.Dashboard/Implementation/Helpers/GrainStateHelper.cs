@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
+#nullable disable
 namespace Orleans.Dashboard.Implementation.Helpers;
 
 internal static class GrainStateHelper
