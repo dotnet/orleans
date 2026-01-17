@@ -11,7 +11,7 @@
       "Build Orleans.Core.Abstractions project to verify compilation",
       "Verify all existing HierarchicalKey functionality is preserved"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "refactor",
@@ -274,7 +274,7 @@
       "Test equality and GetHashCode",
       "Run tests and verify all pass"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "testing",
