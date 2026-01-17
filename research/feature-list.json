@@ -125,7 +125,7 @@
       "Add error handling for deserialization failures",
       "Build Orleans.Journaling project to verify compilation"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
