@@ -219,6 +219,8 @@ public class InboxProcessingPumpTests : IClassFixture<IntegrationTestFixture>
             _action = action;
         }
 
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
         public async ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             InvocationCount++;

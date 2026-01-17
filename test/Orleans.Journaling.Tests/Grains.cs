@@ -119,6 +119,8 @@ public class RequestContextTestGrain(
 
     private class TestMessageHandler(RequestContextTestGrain grain) : IInboxHandler
     {
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
         public ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             // Capture the current RequestContext (which should be restored from the envelope)
