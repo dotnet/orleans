@@ -1832,3 +1832,59 @@ Created comprehensive backward compatibility tests in test/Orleans.Journaling.Te
 - research/feature-list.json (marked Feature #28 as passing)
 
 **Next Steps**: Feature #29: Create DurableErrorPropagationTests for error handling
+
+================================================================================
+Feature #28 Implementation - DurableErrorPropagationTests for error handling
+Date: 2026-01-17
+================================================================================
+
+**Objective**: Verify that error handling functionality (DurableErrorResponse and SendError methods) works correctly in end-to-end integration scenarios, ensuring errors are properly sent back to requesters via ReplyTo address with correct error codes, retriability flags, and exception details.
+
+**Implementation Summary**:
+Fixed compilation errors in existing test/Orleans.Journaling.Tests/DurableErrorPropagationTests.cs and verified all tests pass on both net8.0 and net10.0.
+
+**Compilation Errors Fixed**:
+1. Line 325: Added missing DeliveryOptions parameter to IDurableInboxExtension.DeliverAsync call
+2. Line 324: Changed from `GrainContext.ActivationServices.GetRequiredService<IDurableInboxExtension>()` to `this.AsReference<IDurableInboxExtension>()`
+3. Line 370: Fixed nullable HierarchicalKey handling in WithCorrelationKey by using conditional pattern matching
+4. Lines 43-116: Fixed nullable struct property access by using `.Value` after null checks (DurableErrorResponse is a struct)
+
+**Tests Implemented** (all 6 passing):
+1. ErrorPropagation_ValidationError_SendsErrorResponseToReplyTo: Verifies validation errors sent with StandardErrorCodes.ValidationFailed, non-retriable
+2. ErrorPropagation_TransientError_SendsRetriableErrorResponse: Verifies transient errors sent with IsRetriable=true
+3. ErrorPropagation_HandlerException_SendsErrorWithExceptionDetails: Tests SendError(Exception) with full exception details
+4. ErrorPropagation_UnauthorizedError_SendsNonRetriableErrorResponse: Verifies custom error code with IsRetriable=false
+5. ErrorPropagation_WithCorrelationKey_PreservesCorrelationInErrorResponse: Ensures correlation keys preserved in error responses
+6. ErrorPropagation_NoReplyTo_DoesNotThrow: Verifies SendError is safe no-op when ReplyTo is null
+
+**Test Architecture**:
+- ErrorRequesterGrain: Sends requests and captures error responses using handler for "test/reply" route
+- ErrorProcessorGrain: Uses RoutePrefixHandler for "test/" prefix, triggers various error scenarios (validation, transient, exception, unauthorized)
+- Test message types: ErrorTestRequest, ErrorTestResponse
+- Uses IntegrationTestFixture for full cluster testing with grain persistence
+
+**Test Results**: 
+- DurableErrorPropagationTests (net10.0): ✅ 6/6 passed (4.9s)
+- DurableErrorPropagationTests (net8.0): ✅ 6/6 passed (7.8s)
+
+**Files Modified**:
+- test/Orleans.Journaling.Tests/DurableErrorPropagationTests.cs (fixed compilation errors)
+- research/feature-list.json (marked Feature #28 as passing)
+
+**Key Design Validated**:
+- ✅ SendError methods correctly create and send DurableErrorResponse to ReplyTo address
+- ✅ Reply route key derived from request route (e.g., "test/validation" → "test/reply")
+- ✅ Correlation keys preserved in error responses
+- ✅ Exception-based SendError converts exception type to error code (InvalidOperationException → "INVALID_OPERATION")
+- ✅ IsRetriable flag works correctly for transient vs permanent errors
+- ✅ SendError with no ReplyTo is safe no-op (doesn't throw)
+- ✅ Standard error codes (ValidationFailed, TransientError, Unauthorized) work as expected
+
+**Benefits**:
+- ✅ End-to-end validation of error propagation in durable messaging
+- ✅ Confirms DurableErrorResponse serialization and deserialization works correctly
+- ✅ Verifies SendError methods provide ergonomic API for error handling
+- ✅ Tests demonstrate proper usage patterns for handling various error types
+- ✅ Integration tests with real grain instances and Orleans cluster
+
+**Next Steps**: All critical features in the durable messaging stack are now complete with comprehensive tests. Future work can focus on Feature #29 (Update Orleans.DurableTask to use unified HierarchicalKey).
