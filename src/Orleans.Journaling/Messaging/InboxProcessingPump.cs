@@ -273,7 +273,7 @@ internal sealed class InboxProcessingPump : IDurableJobHandler
             var handler = GetHandler(envelope.RouteKey);
 
             // Invoke handler
-            await handler.HandleAsync(envelope, context, cancellationToken).ConfigureAwait(true);
+            await handler.HandleAsync(context, cancellationToken).ConfigureAwait(true);
 
             // Mark as processed
             _inbox.RemoveMessage(envelope.SenderId, envelope.MessageId);

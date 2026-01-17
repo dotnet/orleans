@@ -449,3 +449,53 @@ With CanHandle method now available, future features include:
 - Feature #11: Create RoutePrefixHandler base class for prefix-based routing
 - Feature #12: Create CorrelationHandler base class for correlation-based matching
 
+
+---
+
+## Feature Implementation Summary - January 17, 2026 (Continued)
+
+### Completed: Simplify IInboxHandler.HandleAsync signature by removing redundant envelope parameter (Feature #8)
+
+**Objective**: Simplify the IInboxHandler API by removing the redundant \DurableEnvelope envelope\ parameter from the HandleAsync method, since the envelope is already accessible via \IInboxHandlerContext.Envelope\.
+
+**Rationale**:
+- Reduces parameter redundancy and simplifies the handler signature
+- Follows Orleans' established patterns for context-based APIs (similar to IGrainContext, etc.)
+- Makes the API more intuitive - all handler-related data flows through the context object
+- Eliminates potential confusion about whether to use \nvelope\ or \context.Envelope\
+
+**Implementation Details**:
+
+1. **Updated IInboxHandler interface** (src/Orleans.Journaling/Messaging/IInboxHandler.cs)
+   - Changed signature from \HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken)\ 
+   - To: \HandleAsync(IInboxHandlerContext context, CancellationToken)\
+   - Updated XML documentation to clarify envelope is available via \context.Envelope\
+   - Updated example in documentation to reflect new signature
+
+2. **Updated IInboxHandler<TMessage> default implementation**
+   - Changed explicit interface implementation
+   - Updated to use \context.Envelope.Data.TryGetBody<TMessage>()\ instead of \nvelope.Data.TryGetBody<TMessage>()\
+
+3. **Updated call sites in Orleans.Journaling**
+   - InboxProcessingPump.cs (line 276): Changed handler invocation to remove envelope parameter
+   - DurableInboxExtension.cs (line 522): Changed handler invocation to remove envelope parameter
+
+4. **Updated 15 handler implementations in test files**
+   - All handlers now use \context.Envelope.Data\ instead of \nvelope.Data\
+
+**Build Status**: ✅ Clean build, 0 warnings, 0 errors
+
+**Test Results**: 
+- Orleans.Journaling BVT tests (net10.0): ✅ 307/307 passed
+
+**Files Modified**:
+- \src/Orleans.Journaling/Messaging/IInboxHandler.cs\
+- \src/Orleans.Journaling/Messaging/InboxProcessingPump.cs\
+- \src/Orleans.Journaling/Messaging/DurableInboxExtension.cs\
+- 9 test files with 15 handler implementations updated
+
+**Benefits**:
+- ✅ Cleaner, more intuitive API with less parameter redundancy
+- ✅ Consistent with Orleans patterns for context-based APIs
+- ✅ All existing tests pass without functional changes
+

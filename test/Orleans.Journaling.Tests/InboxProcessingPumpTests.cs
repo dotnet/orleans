@@ -210,25 +210,25 @@ public class InboxProcessingPumpTests : IClassFixture<IntegrationTestFixture>
     /// </summary>
     private sealed class TestHandler : IInboxHandler
     {
-        private readonly Func<DurableEnvelope, IInboxHandlerContext, CancellationToken, ValueTask>? _action;
+        private readonly Func<IInboxHandlerContext, CancellationToken, ValueTask>? _action;
         public int InvocationCount { get; private set; }
         public DurableEnvelope? LastEnvelope { get; private set; }
 
-        public TestHandler(Func<DurableEnvelope, IInboxHandlerContext, CancellationToken, ValueTask>? action = null)
+        public TestHandler(Func<IInboxHandlerContext, CancellationToken, ValueTask>? action = null)
         {
             _action = action;
         }
 
         public bool CanHandle(IInboxHandlerContext context) => true;
 
-        public async ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
+        public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             InvocationCount++;
-            LastEnvelope = envelope;
+            LastEnvelope = context.Envelope;
 
             if (_action is not null)
             {
-                await _action(envelope, context, cancellationToken);
+                await _action(context, cancellationToken);
             }
         }
     }

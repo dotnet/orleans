@@ -543,7 +543,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
 
         public bool CanHandle(IInboxHandlerContext context) => true;
 
-        public async ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
+        public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             await Task.Delay(_delayMs, cancellationToken);
         }
@@ -554,7 +554,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     {
         public bool CanHandle(IInboxHandlerContext context) => true;
 
-        public ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             throw new InvalidOperationException("Test exception");
         }
@@ -569,7 +569,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
 
         public bool CanHandle(IInboxHandlerContext context) => true;
 
-        public ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref _count);
             return ValueTask.CompletedTask;

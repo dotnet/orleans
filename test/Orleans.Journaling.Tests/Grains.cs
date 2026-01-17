@@ -121,7 +121,7 @@ public class RequestContextTestGrain(
     {
         public bool CanHandle(IInboxHandlerContext context) => true;
 
-        public ValueTask HandleAsync(DurableEnvelope envelope, IInboxHandlerContext context, CancellationToken cancellationToken)
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             // Capture the current RequestContext (which should be restored from the envelope)
             var entries = RequestContext.Entries;
