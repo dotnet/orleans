@@ -21,7 +21,7 @@ namespace ServiceBus.Tests.MonitorTests
     {
         private const string StreamProviderName = "EventHubStreamProvider";
         private const string StreamNamespace = "EHTestsNamespace";
-        private static readonly TimeSpan timeout = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan timeout = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan monitorWriteInterval = TimeSpan.FromSeconds(2);
         private static readonly int ehPartitionCountPerSilo = 4;
 
@@ -70,7 +70,7 @@ namespace ServiceBus.Tests.MonitorTests
             seed = new Random();
         }
 
-        [Fact(Skip = "https://github.com/dotnet/orleans/issues/4594"), TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task EHStatistics_MonitorCalledAccordingly()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), StreamNamespace, StreamProviderName);

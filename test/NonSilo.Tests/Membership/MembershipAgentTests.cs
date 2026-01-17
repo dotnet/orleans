@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using NonSilo.Tests.Utilities;
 using NSubstitute;
 using Orleans;
@@ -38,6 +39,7 @@ namespace NonSilo.Tests.Membership
         private readonly MembershipAgent agent;
         private readonly ILocalSiloHealthMonitor localSiloHealthMonitor;
         private readonly IOptionsMonitor<ClusterMembershipOptions> optionsMonitor;
+        private readonly FakeTimeProvider timeProvider;
 
         public MembershipAgentTests(ITestOutputHelper output)
         {
@@ -73,6 +75,7 @@ namespace NonSilo.Tests.Membership
 
             this.membershipTable = new InMemoryMembershipTable(new TableVersion(1, "1"));
             this.clusterMembershipOptions = Options.Create(new ClusterMembershipOptions() { MaxJoinAttemptTime = TimeSpan.FromSeconds(45) });
+            this.timeProvider = new FakeTimeProvider();
             this.manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
@@ -80,7 +83,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, this.timeProvider),
                 this.lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)this.manager).Participate(this.lifecycle);
 

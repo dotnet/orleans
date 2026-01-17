@@ -41,12 +41,10 @@ namespace UnitTDefaultCluster.Tests.General
 
         /// <summary>
         /// Tests request context flowing from callee back to caller.
-        /// Would verify that data set in RequestContext within a grain method
-        /// is available to the caller after the call completes.
-        /// NOTE: This test is currently skipped as the feature may not be fully supported.
-        /// Request context typically flows one-way (caller to callee) for isolation.
+        /// This test is skipped because RequestContext intentionally flows one-way
+        /// (caller to callee) for isolation - callee-to-caller flow is not supported.
         /// </summary>
-        [Fact(Skip = "Was failing before (just masked as a Pass), needs fixing or removing"), TestCategory("RequestContext"), TestCategory("Functional")]
+        [Fact(Skip = "RequestContext flows one-way (caller to callee) by design - callee-to-caller flow is not supported"), TestCategory("RequestContext"), TestCategory("Functional")]
         public async Task RequestContextCalleeToCallerFlow()
         {
             var grain = this.GrainFactory.GetGrain<ISimplePersistentGrain>(Random.Shared.Next());

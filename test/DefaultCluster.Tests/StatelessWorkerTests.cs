@@ -142,9 +142,8 @@ namespace DefaultCluster.Tests.General
         /// Verifies that rapid concurrent activations across multiple silos
         /// don't cause forwarding failures. This ensures load distribution
         /// works correctly when workers are spread across the cluster.
-        /// NOTE: Currently skipped due to a known issue with forwarding.
         /// </summary>
-        [SkippableFact(Skip = "Skipping test for now, since there seems to be a bug"), TestCategory("Functional"), TestCategory("StatelessWorker")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerFastActivationsDontFailInMultiSiloDeployment()
         {
             var gatewayOptions = this.Fixture.Client.ServiceProvider.GetRequiredService<IOptions<StaticGatewayListProviderOptions>>();
