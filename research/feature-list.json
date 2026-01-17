@@ -23,7 +23,7 @@
       "Build Orleans.Journaling project to verify compilation",
       "Run unit tests for DurableEnvelope serialization"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "refactor",

@@ -85,7 +85,7 @@ public class DurableEnvelopeTests : IDisposable
         var senderId = GrainId.Create("sender", Guid.NewGuid().ToString());
         var receiverId = GrainId.Create("receiver", Guid.NewGuid().ToString());
         var routeKey = "test/route";
-        var correlationKey = CorrelationKey.Create("transfer-123");
+        var correlationKey = HierarchicalKey.Create("transfer-123");
         var replyTo = GrainId.Create("reply", Guid.NewGuid().ToString());
         var data = CreateEnvelopeData("test-body");
         var createdAt = DateTimeOffset.UtcNow;
@@ -191,7 +191,7 @@ public class DurableEnvelopeTests : IDisposable
     public void SerializationRoundTrip_WithHierarchicalCorrelationKey_PreservesHierarchy()
     {
         // Arrange
-        var parentKey = CorrelationKey.Create("transfer-abc");
+        var parentKey = HierarchicalKey.Create("transfer-abc");
         var correlationKey = parentKey.CreateChildKey("debit");
         var data = CreateEnvelopeData("test-body");
 
@@ -248,7 +248,7 @@ public class DurableEnvelopeTests : IDisposable
             SenderId = GrainId.Create("sender", "1"),
             ReceiverId = GrainId.Create("receiver", "1"),
             RouteKey = "test/route",
-            CorrelationKey = CorrelationKey.Create("key-1"),
+            CorrelationKey = HierarchicalKey.Create("key-1"),
             ReplyTo = null,
             Data = data1,
             CreatedAt = DateTimeOffset.UtcNow
@@ -260,7 +260,7 @@ public class DurableEnvelopeTests : IDisposable
             SenderId = envelope1.SenderId,    // Same SenderId
             ReceiverId = envelope1.ReceiverId, // Same ReceiverId
             RouteKey = envelope1.RouteKey,     // Same RouteKey
-            CorrelationKey = CorrelationKey.Create("key-2"), // Different CorrelationKey
+            CorrelationKey = HierarchicalKey.Create("key-2"), // Different CorrelationKey
             ReplyTo = null,
             Data = data2,
             CreatedAt = envelope1.CreatedAt
