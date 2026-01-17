@@ -424,8 +424,11 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
             return;
         }
 
-        // Get handler
-        if (!_durableInbox.TryGetHandler(envelope.RouteKey, out var handler))
+        // Create handler context for capability-based dispatch
+        var context = new InboxHandlerContext(envelope, _grainContext.GrainId, _outbox, _sessionPool);
+
+        // Get handler using capability-based dispatch (new API)
+        if (!_durableInbox.TryFindHandler(context, out var handler))
         {
             // Check if the grain implements IDurableInboxObserver for correlation-based responses
             if (envelope.CorrelationKey is not null && _grainContext.GrainInstance is IDurableInboxObserver observer)
@@ -518,10 +521,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
 
         try
         {
-            // Create handler context using the grain's durable outbox
-            var context = new InboxHandlerContext(envelope, _grainContext.GrainId, _outbox, _sessionPool);
-
-            // Invoke handler
+            // Invoke handler (context already created above for capability-based dispatch)
             await handler.HandleAsync(context, CancellationToken.None).ConfigureAwait(true);
 
             // Mark as processed

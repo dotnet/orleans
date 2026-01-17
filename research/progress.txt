@@ -1749,3 +1749,37 @@ This verification confirms that Feature #23 was successfully implemented earlier
 **Next Steps**:
 The next feature in the list is #25: Create DurableRpcIntegrationTests for end-to-end flow.
 
+
+---
+
+## Feature Implementation Summary - January 17, 2026 (Continued)
+
+### Completed: Create DurableRpcIntegrationTests for end-to-end flow with RouteKeyHandler and RoutePrefixHandler (Feature #26)
+
+**Objective**: Enhance the existing DurableRpcIntegrationTests with comprehensive tests that verify RouteKeyHandler and RoutePrefixHandler base classes work correctly in end-to-end integration scenarios.
+
+**Implementation Details**:
+
+1. **Added three new integration tests** (test/Orleans.Journaling.Tests/DurableRpcIntegrationTests.cs)
+   - **DurableRpc_RouteKeyHandler_MatchesExactRouteOnly** (lines 223-273): Tests RouteKeyHandler for exact route matching
+   - **DurableRpc_RoutePrefixHandler_MatchesAllRoutesWithPrefix** (lines 275-325): Tests RoutePrefixHandler for prefix-based routing with GetRouteSuffix
+   - **DurableRpc_HandlerPrecedence_SpecificRouteBeforePrefix** (lines 327-363): Tests handler registration order and first-match-wins semantics
+
+2. **Added three new test grain implementations**: RouteKeyHandlerGrain, RoutePrefixHandlerGrain, HandlerPrecedenceGrain
+
+**Critical Bug Fix**:
+- **Root Cause**: DurableInboxExtension.ProcessMessageAsync used legacy TryGetHandler method which only searched _legacyRouteHandlers dictionary
+- **Impact**: Handlers registered via new RegisterHandler(IInboxHandler) API were never found during processing
+- **Fix**: Changed line 432 to use TryFindHandler (capability-based dispatch) instead of TryGetHandler
+
+**Test Results**: 
+- All DurableRpc tests (net10.0): ✅ 9/9 passed (6 existing + 3 new)
+- Orleans.Journaling.Tests (net10.0): ✅ 456/457 passed
+
+**Files Modified**:
+- test/Orleans.Journaling.Tests/DurableRpcIntegrationTests.cs (added 3 tests + 3 grain implementations)
+- src/Orleans.Journaling/Messaging/DurableInboxExtension.cs (bug fix)
+- research/feature-list.json (marked Feature #26 as passing)
+
+**Next Steps**: Feature #27: Create HandlerPrecedenceTests for registration order
+
