@@ -214,6 +214,149 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
     }
 
     /// <summary>
+    /// Tests RouteKeyHandler base class for exact route matching.
+    /// Verifies that a grain using RouteKeyHandler only receives messages with exact route key match.
+    /// </summary>
+    [Fact]
+    public async Task DurableRpc_RouteKeyHandler_MatchesExactRouteOnly()
+    {
+        // Arrange
+        var routeKeyGrain = _fixture.Client.GetGrain<IRouteKeyHandlerGrain>(Guid.NewGuid());
+        var requestGrain = _fixture.Client.GetGrain<IRequestGrain>(Guid.NewGuid());
+
+        // Act - Send message with exact matching route key
+        await requestGrain.SendRequest(
+            routeKeyGrain.GetGrainId(),
+            HierarchicalKey.Create("routekey-test-1"),
+            "api/v1/order",
+            new WorkRequest { Data = "exact match" });
+
+        // Wait for processing
+        await Task.Delay(500);
+
+        // Assert - Message should be processed
+        var processedCount = await routeKeyGrain.GetProcessedCount();
+        Assert.Equal(1, processedCount);
+
+        // Act - Send message with non-matching route key
+        await requestGrain.SendRequest(
+            routeKeyGrain.GetGrainId(),
+            HierarchicalKey.Create("routekey-test-2"),
+            "api/v1/order/detail",
+            new WorkRequest { Data = "no match" });
+
+        // Wait for potential processing
+        await Task.Delay(500);
+
+        // Assert - Message should not be processed (count should still be 1)
+        processedCount = await routeKeyGrain.GetProcessedCount();
+        Assert.Equal(1, processedCount);
+    }
+
+    /// <summary>
+    /// Tests RoutePrefixHandler base class for prefix-based routing.
+    /// Verifies that a grain using RoutePrefixHandler receives all messages with matching prefix,
+    /// and can use GetRouteSuffix to determine the specific operation.
+    /// </summary>
+    [Fact]
+    public async Task DurableRpc_RoutePrefixHandler_MatchesAllRoutesWithPrefix()
+    {
+        // Arrange
+        var prefixGrain = _fixture.Client.GetGrain<IRoutePrefixHandlerGrain>(Guid.NewGuid());
+        var requestGrain = _fixture.Client.GetGrain<IRequestGrain>(Guid.NewGuid());
+
+        // Act - Send multiple messages with same prefix but different operations
+        await requestGrain.SendRequest(
+            prefixGrain.GetGrainId(),
+            HierarchicalKey.Create("prefix-test-1"),
+            "rpc/request",
+            new WorkRequest { Data = "request data" });
+
+        await requestGrain.SendRequest(
+            prefixGrain.GetGrainId(),
+            HierarchicalKey.Create("prefix-test-2"),
+            "rpc/reply",
+            new WorkRequest { Data = "reply data" });
+
+        await requestGrain.SendRequest(
+            prefixGrain.GetGrainId(),
+            HierarchicalKey.Create("prefix-test-3"),
+            "rpc/notify",
+            new WorkRequest { Data = "notify data" });
+
+        // Wait for processing
+        await Task.Delay(1000);
+
+        // Assert - All three messages should be processed
+        var processedCount = await prefixGrain.GetProcessedCount();
+        Assert.Equal(3, processedCount);
+
+        // Verify specific operations were captured
+        var operations = await prefixGrain.GetCapturedOperations();
+        Assert.Contains("request", operations);
+        Assert.Contains("reply", operations);
+        Assert.Contains("notify", operations);
+
+        // Act - Send message with non-matching prefix
+        await requestGrain.SendRequest(
+            prefixGrain.GetGrainId(),
+            HierarchicalKey.Create("prefix-test-4"),
+            "api/process",
+            new WorkRequest { Data = "no match" });
+
+        // Wait for potential processing
+        await Task.Delay(500);
+
+        // Assert - Count should still be 3 (non-matching message not processed)
+        processedCount = await prefixGrain.GetProcessedCount();
+        Assert.Equal(3, processedCount);
+    }
+
+    /// <summary>
+    /// Tests RouteKeyHandler and RoutePrefixHandler working together with handler precedence.
+    /// Verifies that specific RouteKeyHandler is matched before generic RoutePrefixHandler.
+    /// </summary>
+    [Fact]
+    public async Task DurableRpc_HandlerPrecedence_SpecificRouteBeforePrefix()
+    {
+        // Arrange
+        var precedenceGrain = _fixture.Client.GetGrain<IHandlerPrecedenceGrain>(Guid.NewGuid());
+        var requestGrain = _fixture.Client.GetGrain<IRequestGrain>(Guid.NewGuid());
+
+        // Act - Send message that matches both specific route and prefix
+        await requestGrain.SendRequest(
+            precedenceGrain.GetGrainId(),
+            HierarchicalKey.Create("precedence-test-1"),
+            "api/v1/special",
+            new WorkRequest { Data = "special route" });
+
+        // Wait for processing
+        await Task.Delay(500);
+
+        // Assert - Specific handler should have processed it
+        var specificCount = await precedenceGrain.GetSpecificHandlerCount();
+        var prefixCount = await precedenceGrain.GetPrefixHandlerCount();
+        Assert.Equal(1, specificCount);
+        Assert.Equal(0, prefixCount);
+
+        // Act - Send message that only matches prefix
+        await requestGrain.SendRequest(
+            precedenceGrain.GetGrainId(),
+            HierarchicalKey.Create("precedence-test-2"),
+            "api/v1/general",
+            new WorkRequest { Data = "general route" });
+
+        // Wait for processing
+        await Task.Delay(500);
+
+        // Assert - Prefix handler should have processed it
+        specificCount = await precedenceGrain.GetSpecificHandlerCount();
+        prefixCount = await precedenceGrain.GetPrefixHandlerCount();
+        Assert.Equal(1, specificCount);
+        Assert.Equal(1, prefixCount);
+    }
+
+    /// <summary>
     /// Test fixture that configures the cluster with durable messaging and test grain handlers.
     /// </summary>
     public class Fixture : IntegrationTestFixture
@@ -279,6 +422,23 @@ public interface IObserverGrain : IGrainWithGuidKey
 {
     Task SendRequestWithObserver(GrainId workerId, HierarchicalKey correlationKey, WorkRequest request);
     Task<WorkResponse?> GetObservedResponse();
+}
+
+public interface IRouteKeyHandlerGrain : IGrainWithGuidKey
+{
+    Task<int> GetProcessedCount();
+}
+
+public interface IRoutePrefixHandlerGrain : IGrainWithGuidKey
+{
+    Task<int> GetProcessedCount();
+    Task<List<string>> GetCapturedOperations();
+}
+
+public interface IHandlerPrecedenceGrain : IGrainWithGuidKey
+{
+    Task<int> GetSpecificHandlerCount();
+    Task<int> GetPrefixHandlerCount();
 }
 
 // ============================================================================
@@ -566,5 +726,139 @@ public class ObserverGrain(IDurableOutbox outbox) : DurableGrain, IObserverGrain
         }
 
         return DeliveryResult.RouteNotFound(envelope.RouteKey);
+    }
+}
+
+/// <summary>
+/// Test grain that uses RouteKeyHandler for exact route matching.
+/// </summary>
+public class RouteKeyHandlerGrain(IDurableInbox inbox) : DurableGrain, IRouteKeyHandlerGrain
+{
+    private int _processedCount;
+    private readonly IDurableInbox _inbox = inbox;
+
+    public Task<int> GetProcessedCount() => Task.FromResult(_processedCount);
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        // Register handler for exact route "api/v1/order"
+        _inbox.RegisterHandler(new OrderRouteKeyHandler(this));
+        return base.OnActivateAsync(cancellationToken);
+    }
+
+    private class OrderRouteKeyHandler : RouteKeyHandler
+    {
+        private readonly RouteKeyHandlerGrain _grain;
+
+        public OrderRouteKeyHandler(RouteKeyHandlerGrain grain) : base("api/v1/order")
+        {
+            _grain = grain;
+        }
+
+        protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        {
+            _grain._processedCount++;
+            await _grain.WriteStateAsync();
+        }
+    }
+}
+
+/// <summary>
+/// Test grain that uses RoutePrefixHandler for prefix-based routing.
+/// </summary>
+public class RoutePrefixHandlerGrain(IDurableInbox inbox) : DurableGrain, IRoutePrefixHandlerGrain
+{
+    private int _processedCount;
+    private readonly List<string> _capturedOperations = new();
+    private readonly IDurableInbox _inbox = inbox;
+
+    public Task<int> GetProcessedCount() => Task.FromResult(_processedCount);
+    public Task<List<string>> GetCapturedOperations() => Task.FromResult(new List<string>(_capturedOperations));
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        // Register handler for all routes with "rpc/" prefix
+        _inbox.RegisterHandler(new RpcPrefixHandler(this));
+        return base.OnActivateAsync(cancellationToken);
+    }
+
+    private class RpcPrefixHandler : RoutePrefixHandler
+    {
+        private readonly RoutePrefixHandlerGrain _grain;
+
+        public RpcPrefixHandler(RoutePrefixHandlerGrain grain) : base("rpc/")
+        {
+            _grain = grain;
+        }
+
+        protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        {
+            _grain._processedCount++;
+
+            // Capture the operation (suffix after prefix)
+            var operation = GetRouteSuffix(context.Envelope.RouteKey);
+            if (operation is not null)
+            {
+                _grain._capturedOperations.Add(operation);
+            }
+
+            await _grain.WriteStateAsync();
+        }
+    }
+}
+
+/// <summary>
+/// Test grain that demonstrates handler precedence with both RouteKeyHandler and RoutePrefixHandler.
+/// </summary>
+public class HandlerPrecedenceGrain(IDurableInbox inbox) : DurableGrain, IHandlerPrecedenceGrain
+{
+    private int _specificHandlerCount;
+    private int _prefixHandlerCount;
+    private readonly IDurableInbox _inbox = inbox;
+
+    public Task<int> GetSpecificHandlerCount() => Task.FromResult(_specificHandlerCount);
+    public Task<int> GetPrefixHandlerCount() => Task.FromResult(_prefixHandlerCount);
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        // Register specific handler first (should take precedence)
+        _inbox.RegisterHandler(new SpecificRouteHandler(this));
+
+        // Register prefix handler second (catches everything else with "api/v1/" prefix)
+        _inbox.RegisterHandler(new ApiPrefixHandler(this));
+
+        return base.OnActivateAsync(cancellationToken);
+    }
+
+    private class SpecificRouteHandler : RouteKeyHandler
+    {
+        private readonly HandlerPrecedenceGrain _grain;
+
+        public SpecificRouteHandler(HandlerPrecedenceGrain grain) : base("api/v1/special")
+        {
+            _grain = grain;
+        }
+
+        protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        {
+            _grain._specificHandlerCount++;
+            await _grain.WriteStateAsync();
+        }
+    }
+
+    private class ApiPrefixHandler : RoutePrefixHandler
+    {
+        private readonly HandlerPrecedenceGrain _grain;
+
+        public ApiPrefixHandler(HandlerPrecedenceGrain grain) : base("api/v1/")
+        {
+            _grain = grain;
+        }
+
+        protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        {
+            _grain._prefixHandlerCount++;
+            await _grain.WriteStateAsync();
+        }
     }
 }
