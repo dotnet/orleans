@@ -351,7 +351,7 @@ public class InboxHandlerContextTests : IClassFixture<DefaultClusterFixture>
         var handler = new TestMessageHandler();
 
         // Act - call the interface method explicitly to test default implementation
-        await ((IInboxHandler)handler).HandleAsync(envelope, context, CancellationToken.None);
+        await ((IInboxHandler)handler).HandleAsync(context, CancellationToken.None);
 
         // Assert
         Assert.True(handler.WasInvoked);
@@ -386,7 +386,7 @@ public class InboxHandlerContextTests : IClassFixture<DefaultClusterFixture>
 
         // Act & Assert - call the interface method explicitly to test default implementation
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await ((IInboxHandler)handler).HandleAsync(envelope, context, CancellationToken.None));
+            await ((IInboxHandler)handler).HandleAsync(context, CancellationToken.None));
     }
 
     [Fact]
