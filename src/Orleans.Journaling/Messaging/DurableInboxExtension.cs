@@ -206,8 +206,11 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension
             return DeliveryResult.Backpressured();
         }
 
-        // Check if handler exists (use the shared durable inbox to check handlers)
-        if (!_durableInbox.HasHandler(envelope.RouteKey))
+        // Check if handler exists using capability-based dispatch
+        // Create a lightweight context for handler matching (we don't need full outbox access here)
+        var handlerContext = new InboxHandlerContext(envelope, _grainContext.GrainId, _outbox, _sessionPool);
+        
+        if (!_durableInbox.TryFindHandler(handlerContext, out _))
         {
             // If no route handler, check if the grain implements IDurableInboxObserver
             // and the message has a CorrelationKey (for observer-based response handling)
