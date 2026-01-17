@@ -440,5 +440,15 @@ public class CorrelationHandlerTests
         }
 
         public IDurableOutbox Outbox => throw new NotImplementedException();
+
+        public void SendError(string errorCode, string message, bool isRetriable = false)
+        {
+            // No-op for testing
+        }
+
+        public void SendError(Exception exception, bool isRetriable = false)
+        {
+            // No-op for testing
+        }
     }
 }

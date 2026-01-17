@@ -422,6 +422,16 @@ public class InboxHandlerRegistrationTests
         {
             throw new NotImplementedException();
         }
+
+        public void SendError(string errorCode, string message, bool isRetriable = false)
+        {
+            // No-op for testing
+        }
+
+        public void SendError(Exception exception, bool isRetriable = false)
+        {
+            // No-op for testing
+        }
     }
 
     private sealed class MockDurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue> where TKey : notnull
