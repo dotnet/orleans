@@ -1063,3 +1063,57 @@ inbox.RegisterHandler(handler);
 The next feature in the list is #13: Update IDurableInbox with new registration API. This will enable registration of handlers without explicit route keys, allowing CanHandle-based capability dispatch.
 
 
+
+---
+
+## Feature Implementation Summary - January 17, 2026 (Continued)
+
+### Completed: Update IDurableInbox with new registration API (Feature #13 and #14)
+
+**Objective**: Add new registration API to IDurableInbox that supports capability-based dispatch via CanHandle, enabling more flexible handler routing patterns while maintaining full backward compatibility with the legacy route-based registration.
+
+**Implementation Details**:
+
+1. **Updated IDurableInbox interface** (src/Orleans.Journaling/Messaging/IDurableInbox.cs)
+   - Added new \oid RegisterHandler(IInboxHandler handler)\ method
+     * Registers handlers that use CanHandle for dispatch
+     * Handlers evaluated in registration order (first-match-wins)
+     * Comprehensive XML documentation with usage examples
+   - Added new \ool TryFindHandler(IInboxHandlerContext context, out IInboxHandler? handler)\ method
+     * Calls CanHandle on each registered handler in order
+     * Returns first handler that returns true
+     * Uses caching for performance optimization
+     * Cache invalidated on handler registration
+   - Marked legacy methods with documentation noting they will be marked obsolete in future release
+   - Note: Did not use [Obsolete] attribute yet to avoid breaking existing call sites
+
+2. **Updated DurableInbox implementation** (src/Orleans.Journaling/Messaging/DurableInbox.cs)
+   - Changed internal data structures to List<IInboxHandler> + ConcurrentDictionary cache
+   - Created LegacyRouteKeyHandlerWrapper for backward compatibility
+   - All legacy methods maintained for backward compatibility
+
+3. **Created comprehensive unit tests** (test/Orleans.Journaling.Tests/InboxHandlerRegistrationTests.cs)
+   - 16 BVT tests covering all new registration API functionality
+   - Tests for caching, handler precedence, and backward compatibility
+
+**Build Status**: ✅ Clean build, 0 warnings, 0 errors
+
+**Test Results**: 
+- InboxHandlerRegistrationTests (net10.0): ✅ 16/16 passed
+- Orleans.Journaling BVT tests (net10.0): ✅ 380/380 passed
+
+**Files Modified**:
+- \src/Orleans.Journaling/Messaging/IDurableInbox.cs\ (added new methods)
+- \src/Orleans.Journaling/Messaging/DurableInbox.cs\ (complete refactoring)
+- \	est/Orleans.Journaling.Tests/InboxHandlerRegistrationTests.cs\ (NEW - 16 tests)
+- \	est/Orleans.Journaling.Tests/InboxProcessingPumpTests.cs\ (updated mock)
+- \	est/Orleans.Journaling.Tests/DurableInboxExtensionTests.cs\ (updated mock)
+- \esearch/feature-list.json\ (marked Feature #13 and #14 as passing)
+
+**Benefits**:
+- ✅ Enables capability-based dispatch with CanHandle
+- ✅ Supports multiple handler patterns (RouteKeyHandler, RoutePrefixHandler, CorrelationHandler)
+- ✅ First-match-wins semantics allow handler precedence control
+- ✅ Caching provides excellent performance for repeated route keys
+- ✅ Full backward compatibility with legacy registration API
+
