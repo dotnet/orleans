@@ -38,11 +38,12 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
         var correlationKey = HierarchicalKey.Create("test-request-123");
         await requestGrain.SendRequest(workerGrain.GetGrainId(), correlationKey, "ProcessData", new WorkRequest { Data = "test data" });
 
-        // Wait for response processing
-        await Task.Delay(500);
+        // Wait for response to be received
+        var receivedResponse = await TestHelpers.WaitForNonNullAsync(
+            async () => await requestGrain.GetReceivedResponse(),
+            message: "Response was not received");
 
         // Assert
-        var receivedResponse = await requestGrain.GetReceivedResponse();
         Assert.NotNull(receivedResponse);
         Assert.Equal("Processed: test data", receivedResponse.Result);
         Assert.Equal(correlationKey, receivedResponse.CorrelationKey);
@@ -62,11 +63,12 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
         // Act - Worker grain processes request and sends reply
         await requestGrain.SendRequest(workerGrain.GetGrainId(), null, "ProcessData", new WorkRequest { Data = "reply test" });
 
-        // Wait for async processing
-        await Task.Delay(500);
+        // Wait for response to be received
+        var response = await TestHelpers.WaitForNonNullAsync(
+            async () => await requestGrain.GetReceivedResponse(),
+            message: "Response was not routed back to request grain via ReplyTo");
 
         // Assert - Response should be routed back to request grain via ReplyTo
-        var response = await requestGrain.GetReceivedResponse();
         Assert.NotNull(response);
         Assert.Equal("Processed: reply test", response.Result);
     }
@@ -93,8 +95,10 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
             new WorkRequest { Data = "task1" },
             new WorkRequest { Data = "task2" });
 
-        // Wait for async processing
-        await Task.Delay(1000);
+        // Wait for both child tasks to complete
+        await TestHelpers.WaitUntilAsync(
+            async () => (await orchestratorGrain.GetCompletedTasks()).Count >= 2,
+            message: "Both orchestrated tasks were not completed");
 
         // Assert - Both responses should have child correlation keys
         var results = await orchestratorGrain.GetCompletedTasks();
@@ -135,11 +139,12 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
             new WorkRequest { Data = "longpoll test" },
             TimeSpan.FromSeconds(5));
 
-        // Wait for processing
-        await Task.Delay(1000);
+        // Wait for response to be received via long-polling
+        var response = await TestHelpers.WaitForNonNullAsync(
+            async () => await requestGrain.GetReceivedResponse(),
+            message: "Response was not received via long-polling");
 
         // Assert - Response should be received via long-polling
-        var response = await requestGrain.GetReceivedResponse();
         Assert.NotNull(response);
         Assert.Equal("Processed: longpoll test", response.Result);
         Assert.Equal(correlationKey, response.CorrelationKey);
@@ -164,11 +169,12 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
             correlationKey,
             new WorkRequest { Data = "observer test" });
 
-        // Wait for async processing and observer callback
-        await Task.Delay(1000);
+        // Wait for observer callback to be received
+        var observedResponse = await TestHelpers.WaitForNonNullAsync(
+            async () => await observerGrain.GetObservedResponse(),
+            message: "Observer did not receive callback");
 
         // Assert - Observer should have received callback
-        var observedResponse = await observerGrain.GetObservedResponse();
         Assert.NotNull(observedResponse);
         Assert.Equal("Processed: observer test", observedResponse.Result);
         Assert.Equal(correlationKey, observedResponse.CorrelationKey);
@@ -194,21 +200,29 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
             "ProcessData",
             new WorkRequest { Data = "persistence test" });
 
-        // Deactivate request grain before response arrives
+        // Wait for worker to process the request first
+        // This ensures the request was delivered before we deactivate
+        await TestHelpers.WaitUntilAsync(
+            async () => await workerGrain.GetProcessedCount() >= 1,
+            message: "Worker did not process the request");
+
+        // Deactivate request grain after request was processed
         var activationIdBefore = await requestGrain.GetActivationId();
         await requestGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
 
-        // Wait for reactivation trigger
-        await Task.Delay(500);
+        // Wait for grain to be reactivated (new activation id)
+        await TestHelpers.WaitUntilAsync(
+            async () => await requestGrain.GetActivationId() != activationIdBefore,
+            message: "Grain was not reactivated after deactivation");
 
         // Assert - After reactivation, grain should still receive and process response
         var activationIdAfter = await requestGrain.GetActivationId();
         Assert.NotEqual(activationIdBefore, activationIdAfter);
 
         // Wait for response to arrive at reactivated grain
-        await Task.Delay(1000);
-
-        var response = await requestGrain.GetReceivedResponse();
+        var response = await TestHelpers.WaitForNonNullAsync(
+            async () => await requestGrain.GetReceivedResponse(),
+            message: "Response was not received after grain reactivation");
         Assert.NotNull(response);
         Assert.Equal("Processed: persistence test", response.Result);
     }
@@ -232,7 +246,9 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
             new WorkRequest { Data = "exact match" });
 
         // Wait for processing
-        await Task.Delay(500);
+        await TestHelpers.WaitUntilAsync(
+            async () => await routeKeyGrain.GetProcessedCount() >= 1,
+            message: "Message with exact route key was not processed");
 
         // Assert - Message should be processed
         var processedCount = await routeKeyGrain.GetProcessedCount();
@@ -245,8 +261,11 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
             "api/v1/order/detail",
             new WorkRequest { Data = "no match" });
 
-        // Wait for potential processing
-        await Task.Delay(500);
+        // Wait briefly to ensure non-matching message is not processed
+        // Use a short timeout since we expect this NOT to change
+        var stillOne = await TestHelpers.TryWaitUntilAsync(
+            async () => await routeKeyGrain.GetProcessedCount() > 1,
+            timeout: TimeSpan.FromMilliseconds(200));
 
         // Assert - Message should not be processed (count should still be 1)
         processedCount = await routeKeyGrain.GetProcessedCount();
@@ -284,8 +303,10 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
             "rpc/notify",
             new WorkRequest { Data = "notify data" });
 
-        // Wait for processing
-        await Task.Delay(1000);
+        // Wait for all three messages to be processed
+        await TestHelpers.WaitUntilAsync(
+            async () => await prefixGrain.GetProcessedCount() >= 3,
+            message: "All three prefix-matched messages were not processed");
 
         // Assert - All three messages should be processed
         var processedCount = await prefixGrain.GetProcessedCount();
@@ -304,8 +325,10 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
             "api/process",
             new WorkRequest { Data = "no match" });
 
-        // Wait for potential processing
-        await Task.Delay(500);
+        // Wait briefly to ensure non-matching message is not processed
+        var stillThree = await TestHelpers.TryWaitUntilAsync(
+            async () => await prefixGrain.GetProcessedCount() > 3,
+            timeout: TimeSpan.FromMilliseconds(200));
 
         // Assert - Count should still be 3 (non-matching message not processed)
         processedCount = await prefixGrain.GetProcessedCount();
@@ -330,8 +353,10 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
             "api/v1/special",
             new WorkRequest { Data = "special route" });
 
-        // Wait for processing
-        await Task.Delay(500);
+        // Wait for specific handler to process
+        await TestHelpers.WaitUntilAsync(
+            async () => await precedenceGrain.GetSpecificHandlerCount() >= 1,
+            message: "Specific handler did not process the message");
 
         // Assert - Specific handler should have processed it
         var specificCount = await precedenceGrain.GetSpecificHandlerCount();
@@ -346,8 +371,10 @@ public class DurableRpcIntegrationTests : IClassFixture<DurableRpcIntegrationTes
             "api/v1/general",
             new WorkRequest { Data = "general route" });
 
-        // Wait for processing
-        await Task.Delay(500);
+        // Wait for prefix handler to process
+        await TestHelpers.WaitUntilAsync(
+            async () => await precedenceGrain.GetPrefixHandlerCount() >= 1,
+            message: "Prefix handler did not process the message");
 
         // Assert - Prefix handler should have processed it
         specificCount = await precedenceGrain.GetSpecificHandlerCount();

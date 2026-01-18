@@ -156,13 +156,12 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         // Act - deliver twice
         var result1 = await extension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None);
         
-        // Wait for async processing to start (but not necessarily complete)
-        await Task.Delay(100);
+        // The message should have been accepted or processed
+        Assert.Equal(DeliveryStatus.Accepted, result1.Status);
         
         var result2 = await extension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None);
 
         // Assert
-        Assert.Equal(DeliveryStatus.Accepted, result1.Status);
         Assert.Equal(DeliveryStatus.Duplicate, result2.Status);
     }
 
@@ -227,11 +226,14 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         var result1 = await extension.DeliverAsync(envelope1, new DeliveryOptions(), CancellationToken.None);
         Assert.Equal(DeliveryStatus.Accepted, result1.Status);
 
-        // Give a moment for processing to start (but not complete due to slow handler)
-        await Task.Delay(50);
+        // Wait briefly for slow handler to start processing (but not complete)
+        // The slow handler has a 10 second delay, so it won't complete during this test
+        await TestHelpers.WaitUntilAsync(
+            () => extension.Count >= 1,
+            timeout: TimeSpan.FromSeconds(2),
+            message: "Message was not added to inbox");
 
         // The message should still be in the inbox since the slow handler hasn't completed
-        // Note: In synchronous test context, the handler is still running, so Count == 1
         Assert.Equal(1, extension.Count);
 
         // Act - try to add beyond capacity
@@ -318,8 +320,10 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         // Act - deliver without long polling
         await extension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None);
 
-        // Wait a bit for async processing
-        await Task.Delay(500);
+        // Wait for handler to be invoked
+        await TestHelpers.WaitUntilAsync(
+            () => handler.WasInvoked,
+            message: "Handler was not invoked");
 
         // Assert
         Assert.True(handler.WasInvoked);
@@ -342,9 +346,10 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         // Act
         await extension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None);
 
-        // In test environments with synchronous mock state machines, processing completes
-        // before DeliverAsync returns. Wait briefly then verify message was processed.
-        await Task.Delay(100);
+        // Wait for message to be processed and removed from inbox
+        await TestHelpers.WaitUntilAsync(
+            () => extension.Count == 0,
+            message: "Message was not removed from inbox after processing");
 
         // Assert - message should be removed after processing
         Assert.Equal(0, extension.Count);
@@ -365,9 +370,10 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         // Act
         await extension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None);
 
-        // In test environments with synchronous mock state machines, processing completes
-        // before DeliverAsync returns. Wait briefly then verify message was processed.
-        await Task.Delay(100);
+        // Wait for message to be processed (even with handler exception)
+        await TestHelpers.WaitUntilAsync(
+            () => extension.Count == 0,
+            message: "Message was not removed after handler exception");
 
         // Assert - message should be removed even after handler exception
         Assert.Equal(0, extension.Count);
@@ -395,8 +401,10 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         // Wait for all deliveries
         await Task.WhenAll(deliveryTasks);
 
-        // Wait for processing (increased timeout)
-        await Task.Delay(1500);
+        // Wait for all messages to be processed
+        await TestHelpers.WaitUntilAsync(
+            () => handler.ProcessedCount >= 5 && extension.Count == 0,
+            message: "Not all messages were processed");
 
         // Assert - all messages processed
         Assert.Equal(5, handler.ProcessedCount);
@@ -445,8 +453,10 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         // Wait for all deliveries to complete
         await Task.WhenAll(deliveryTasks);
 
-        // Wait for processing to complete (increased timeout)
-        await Task.Delay(2000);
+        // Wait for all messages to be processed
+        await TestHelpers.WaitUntilAsync(
+            () => handler.ProcessedCount >= 10 && extension.Count == 0,
+            message: "Not all messages were processed concurrently");
 
         // Assert - all messages processed
         Assert.Equal(10, handler.ProcessedCount);
@@ -501,8 +511,10 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         // Wait for all deliveries
         await Task.WhenAll(deliveryTasks);
 
-        // Wait for processing (increased timeout)
-        await Task.Delay(2000);
+        // Wait for all messages to be processed (both success and throwing handlers)
+        await TestHelpers.WaitUntilAsync(
+            () => successHandler.ProcessedCount >= 3 && extension.Count == 0,
+            message: "Not all messages were processed");
 
         // Assert - successful messages processed despite exceptions in other handlers
         Assert.Equal(3, successHandler.ProcessedCount);
