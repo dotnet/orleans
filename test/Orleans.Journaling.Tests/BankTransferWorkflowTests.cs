@@ -60,8 +60,10 @@ public class BankTransferWorkflowTests : IClassFixture<BankTransferWorkflowTests
             destinationAccount.GetGrainId(),
             250m);
 
-        // Wait for async processing
-        await Task.Delay(1000);
+        // Wait for transfer to complete
+        await TestHelpers.WaitUntilAsync(
+            async () => await transferGrain.GetStatus() == TransferStatus.Completed,
+            message: "Transfer did not complete");
 
         // Assert
         var sourceBalance = await sourceAccount.GetBalance();
@@ -92,13 +94,17 @@ public class BankTransferWorkflowTests : IClassFixture<BankTransferWorkflowTests
         await transferGrain.InitiateTransfer(transferId, sourceAccount.GetGrainId(), destinationAccount.GetGrainId(), 100m);
         
         // Wait for first processing
-        await Task.Delay(500);
+        await TestHelpers.WaitUntilAsync(
+            async () => await transferGrain.GetStatus() == TransferStatus.Completed,
+            message: "First transfer did not complete");
 
         // Try to initiate again with same ID (should be deduplicated)
         await transferGrain.InitiateTransfer(transferId, sourceAccount.GetGrainId(), destinationAccount.GetGrainId(), 100m);
 
-        // Wait for any duplicate processing attempts
-        await Task.Delay(1000);
+        // Brief wait to ensure any duplicate processing would have occurred
+        await TestHelpers.TryWaitUntilAsync(
+            async () => await sourceAccount.GetBalance() < 900m,
+            timeout: TimeSpan.FromMilliseconds(300));
 
         // Assert - Balance should only be debited once
         var sourceBalance = await sourceAccount.GetBalance();
@@ -126,15 +132,23 @@ public class BankTransferWorkflowTests : IClassFixture<BankTransferWorkflowTests
         var transferId = Guid.NewGuid();
         await transferGrain.InitiateTransfer(transferId, sourceAccount.GetGrainId(), destinationAccount.GetGrainId(), 300m);
 
-        // Wait for debit to process
-        await Task.Delay(500);
+        // Wait for debit to process (status moves past DebitPending)
+        await TestHelpers.WaitUntilAsync(
+            async () => await transferGrain.GetStatus() != TransferStatus.DebitPending && await transferGrain.GetStatus() != TransferStatus.Pending,
+            message: "Debit was not processed before deactivation");
 
         // Deactivate transfer grain mid-transfer
         var activationIdBefore = await transferGrain.GetActivationId();
         await transferGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
 
-        // Wait for reactivation and credit processing
-        await Task.Delay(1500);
+        // Wait for grain reactivation (new activation id) and transfer completion
+        await TestHelpers.WaitUntilAsync(
+            async () => await transferGrain.GetActivationId() != activationIdBefore,
+            message: "Grain was not reactivated");
+
+        await TestHelpers.WaitUntilAsync(
+            async () => await transferGrain.GetStatus() == TransferStatus.Completed,
+            message: "Transfer did not complete after reactivation");
 
         // Assert - Transfer should complete even after deactivation
         var activationIdAfter = await transferGrain.GetActivationId();
@@ -167,8 +181,10 @@ public class BankTransferWorkflowTests : IClassFixture<BankTransferWorkflowTests
         var transferId = Guid.NewGuid();
         await transferGrain.InitiateTransfer(transferId, sourceAccount.GetGrainId(), destinationAccount.GetGrainId(), 200m);
 
-        // Wait for processing
-        await Task.Delay(1000);
+        // Wait for transfer to fail
+        await TestHelpers.WaitUntilAsync(
+            async () => await transferGrain.GetStatus() == TransferStatus.Failed,
+            message: "Transfer did not fail for insufficient funds");
 
         // Assert - Transfer should fail and balances unchanged
         var sourceBalance = await sourceAccount.GetBalance();
@@ -204,8 +220,10 @@ public class BankTransferWorkflowTests : IClassFixture<BankTransferWorkflowTests
             150m,
             transferKey);
 
-        // Wait for processing
-        await Task.Delay(1000);
+        // Wait for transfer to complete
+        await TestHelpers.WaitUntilAsync(
+            async () => await transferGrain.GetStatus() == TransferStatus.Completed,
+            message: "Transfer did not complete");
 
         // Assert - Get correlation keys from account activity logs
         var sourceActivity = await sourceAccount.GetLastActivityCorrelationKey();
@@ -237,14 +255,20 @@ public class BankTransferWorkflowTests : IClassFixture<BankTransferWorkflowTests
         var transferId = Guid.NewGuid();
         await transferGrain.InitiateTransfer(transferId, sourceAccount.GetGrainId(), destinationAccount.GetGrainId(), 400m);
 
+        // Wait for transfer to start processing
+        await TestHelpers.WaitUntilAsync(
+            async () => await transferGrain.GetStatus() != TransferStatus.Pending,
+            message: "Transfer did not start processing");
+            
         // Deactivate all grains to force state reload
-        await Task.Delay(500);
         await sourceAccount.Cast<IGrainManagementExtension>().DeactivateOnIdle();
         await destinationAccount.Cast<IGrainManagementExtension>().DeactivateOnIdle();
         await transferGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
 
-        // Wait for reactivation
-        await Task.Delay(1000);
+        // Wait for transfer to complete after reactivation
+        await TestHelpers.WaitUntilAsync(
+            async () => await transferGrain.GetStatus() == TransferStatus.Completed,
+            message: "Transfer did not complete after reactivation");
 
         // Assert - After reactivation, transfer should complete correctly
         var sourceBalance = await sourceAccount.GetBalance();
@@ -289,7 +313,15 @@ public class BankTransferWorkflowTests : IClassFixture<BankTransferWorkflowTests
         await Task.WhenAll(tasks);
 
         // Wait for all transfers to complete
-        await Task.Delay(2000);
+        await TestHelpers.WaitUntilAsync(
+            async () =>
+            {
+                var s1 = await transfer1.GetStatus();
+                var s2 = await transfer2.GetStatus();
+                var s3 = await transfer3.GetStatus();
+                return s1 == TransferStatus.Completed && s2 == TransferStatus.Completed && s3 == TransferStatus.Completed;
+            },
+            message: "Not all transfers completed");
 
         // Assert - All transfers should succeed and destination should receive correct total
         var source1Balance = await source1.GetBalance();
@@ -326,8 +358,11 @@ public class BankTransferWorkflowTests : IClassFixture<BankTransferWorkflowTests
             await tempTransfer.InitiateTransfer(Guid.NewGuid(), tempSource.GetGrainId(), destinationAccount.GetGrainId(), 10m);
         }
 
-        // Give time for messages to queue up
-        await Task.Delay(200);
+        // Wait briefly for messages to start queuing
+        await TestHelpers.WaitUntilAsync(
+            async () => await destinationAccount.GetBalance() >= 10m,
+            timeout: TimeSpan.FromSeconds(5),
+            message: "Initial transfers did not start processing");
 
         await sourceAccount.Deposit(1000m);
         var transferGrain = _fixture.Client.GetGrain<ITransferGrain>(Guid.NewGuid());
@@ -336,8 +371,11 @@ public class BankTransferWorkflowTests : IClassFixture<BankTransferWorkflowTests
         var transferId = Guid.NewGuid();
         await transferGrain.InitiateTransfer(transferId, sourceAccount.GetGrainId(), destinationAccount.GetGrainId(), 50m);
 
-        // Wait for all transfers to complete (including retries)
-        await Task.Delay(3000);
+        // Wait for our transfer to complete (including potential retries)
+        await TestHelpers.WaitUntilAsync(
+            async () => await transferGrain.GetStatus() == TransferStatus.Completed,
+            timeout: TimeSpan.FromSeconds(15),
+            message: "Transfer did not complete despite backpressure");
 
         // Assert - Transfer should eventually succeed despite backpressure
         var transferStatus = await transferGrain.GetStatus();

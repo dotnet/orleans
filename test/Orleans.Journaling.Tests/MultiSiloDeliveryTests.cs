@@ -48,11 +48,12 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
             "process",
             new MultiSiloTestMessage { Content = "Hello from Silo A" });
 
-        // Wait for async delivery and processing
-        await Task.Delay(1000);
+        // Wait for message to be received
+        var receivedMessage = await TestHelpers.WaitForNonNullAsync(
+            async () => await receiverGrain.GetLastReceivedMessage(),
+            message: "Message was not received by receiver grain on silo B");
 
         // Assert - Receiver should have received and processed the message
-        var receivedMessage = await receiverGrain.GetLastReceivedMessage();
         Assert.NotNull(receivedMessage);
         Assert.Equal("Hello from Silo A", receivedMessage.Content);
         Assert.Equal(correlationKey, receivedMessage.CorrelationKey);
@@ -87,8 +88,10 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
                 new MultiSiloTestMessage { Content = $"Message {i}" });
         }
 
-        // Wait for delivery
-        await Task.Delay(2000);
+        // Wait for messages to be delivered
+        await TestHelpers.WaitUntilAsync(
+            async () => await receiverGrain.GetReceivedCount() > 0,
+            message: "No messages were received by receiver grain");
 
         // Assert - Receiver should have accepted up to capacity
         var receivedCount = await receiverGrain.GetReceivedCount();
@@ -123,11 +126,12 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
             new MultiSiloTestMessage { Content = "Long poll test" },
             TimeSpan.FromSeconds(5));
 
-        // Wait for processing and response
-        await Task.Delay(2000);
+        // Wait for message to be received
+        var receivedMessage = await TestHelpers.WaitForNonNullAsync(
+            async () => await receiverGrain.GetLastReceivedMessage(),
+            message: "Message was not received via long-polling");
 
         // Assert - Receiver should have processed the message
-        var receivedMessage = await receiverGrain.GetLastReceivedMessage();
         Assert.NotNull(receivedMessage);
         Assert.Equal("Long poll test", receivedMessage.Content);
     }
@@ -151,7 +155,11 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
 
         // Act - Grain 1 sends to Grain 2
         await grain1.SendPing(grain2.GetGrainId(), "Ping from Grain 1");
-        await Task.Delay(500);
+        
+        // Wait for Grain 2 to receive the message
+        await TestHelpers.WaitUntilAsync(
+            async () => (await grain2.GetReceivedMessages()).Contains("Ping from Grain 1"),
+            message: "Grain 2 did not receive ping from Grain 1");
 
         // Assert - Grain 2 received message
         var grain2Messages = await grain2.GetReceivedMessages();
@@ -159,7 +167,11 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
 
         // Act - Grain 2 sends back to Grain 1
         await grain2.SendPing(grain1.GetGrainId(), "Pong from Grain 2");
-        await Task.Delay(500);
+        
+        // Wait for Grain 1 to receive the response
+        await TestHelpers.WaitUntilAsync(
+            async () => (await grain1.GetReceivedMessages()).Contains("Pong from Grain 2"),
+            message: "Grain 1 did not receive pong from Grain 2");
 
         // Assert - Grain 1 received response
         var grain1Messages = await grain1.GetReceivedMessages();
@@ -188,8 +200,15 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
             "Task 1",
             "Task 2");
 
-        // Wait for async processing
-        await Task.Delay(1500);
+        // Wait for both workers to receive their tasks
+        await TestHelpers.WaitUntilAsync(
+            async () =>
+            {
+                var key1 = await worker1.GetLastCorrelationKey();
+                var key2 = await worker2.GetLastCorrelationKey();
+                return key1 is not null && key2 is not null;
+            },
+            message: "Both workers did not receive their tasks");
 
         // Assert - Both workers should have received messages with child correlation keys
         var worker1Key = await worker1.GetLastCorrelationKey();
@@ -199,6 +218,11 @@ public class MultiSiloDeliveryTests : IClassFixture<MultiSiloDeliveryTests.Multi
         Assert.NotNull(worker2Key);
         Assert.True(parentKey.IsAncestorOf(worker1Key));
         Assert.True(parentKey.IsAncestorOf(worker2Key));
+
+        // Wait for orchestrator to receive both responses
+        await TestHelpers.WaitUntilAsync(
+            async () => (await orchestrator.GetCompletedTasks()).Count >= 2,
+            message: "Orchestrator did not receive both task results");
 
         // Verify orchestrator received both responses with correct correlation
         var results = await orchestrator.GetCompletedTasks();
