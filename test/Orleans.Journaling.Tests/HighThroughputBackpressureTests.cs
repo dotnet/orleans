@@ -203,8 +203,17 @@ public class HighThroughputBackpressureTests : IClassFixture<HighThroughputBackp
         await receiver.ConfigureProcessing(processingDelayMs: 100, maxMessages: messageCount);
         await sender.StartFlood(receiver.GetGrainId(), messageCount: messageCount);
 
-        // Wait for some messages to queue up
-        await Task.Delay(1000);
+        // Wait for some messages to queue up (wait until at least some are received but not all are processed yet)
+        await TestHelpers.WaitUntilAsync(
+            async () =>
+            {
+                var stats = await receiver.GetStats();
+                // Wait until we have some activity but not yet complete
+                return stats.ReceivedCount > 0 && stats.ReceivedCount < messageCount;
+            },
+            timeout: TimeSpan.FromSeconds(10),
+            message: "Some messages should be received during slow processing");
+            
         var statsDuringSlow = await receiver.GetStats();
         Assert.True(statsDuringSlow.ReceivedCount < messageCount, "Some messages should still be pending");
 

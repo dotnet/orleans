@@ -40,8 +40,10 @@ public class HandlerPrecedenceTests : IClassFixture<HandlerPrecedenceTests.Fixtu
             "test/operation",
             new TestMessage { Content = "multi-match test" });
 
-        // Wait for processing
-        await Task.Delay(500);
+        // Wait for first handler to process
+        await TestHelpers.WaitUntilAsync(
+            async () => (await grain.GetHandlerCounts()).Handler1Count >= 1,
+            message: "First handler did not process the message");
 
         // Assert - First handler should have processed it
         var counts = await grain.GetHandlerCounts();
@@ -66,8 +68,10 @@ public class HandlerPrecedenceTests : IClassFixture<HandlerPrecedenceTests.Fixtu
             "api/v2/special",
             new TestMessage { Content = "specific route" });
 
-        // Wait for processing
-        await Task.Delay(500);
+        // Wait for specific handler to process
+        await TestHelpers.WaitUntilAsync(
+            async () => (await grain.GetHandlerCounts()).SpecificCount >= 1,
+            message: "Specific handler did not process the message");
 
         // Assert - Specific handler should have processed it
         var counts = await grain.GetHandlerCounts();
@@ -80,8 +84,10 @@ public class HandlerPrecedenceTests : IClassFixture<HandlerPrecedenceTests.Fixtu
             "api/v2/general",
             new TestMessage { Content = "prefix route" });
 
-        // Wait for processing
-        await Task.Delay(500);
+        // Wait for prefix handler to process
+        await TestHelpers.WaitUntilAsync(
+            async () => (await grain.GetHandlerCounts()).PrefixCount >= 1,
+            message: "Prefix handler did not process the message");
 
         // Assert - Prefix handler should have processed it
         counts = await grain.GetHandlerCounts();
@@ -106,8 +112,10 @@ public class HandlerPrecedenceTests : IClassFixture<HandlerPrecedenceTests.Fixtu
             "order/test",
             new TestMessage { Content = "order test A" });
 
-        // Wait for processing
-        await Task.Delay(500);
+        // Wait for handler A to process
+        await TestHelpers.WaitUntilAsync(
+            async () => (await grainA.GetHandlerCounts()).HandlerACount >= 1,
+            message: "Handler A did not process the message");
 
         // Assert - Handler A should have processed it
         var countsA = await grainA.GetHandlerCounts();
@@ -123,8 +131,10 @@ public class HandlerPrecedenceTests : IClassFixture<HandlerPrecedenceTests.Fixtu
             "order/test",
             new TestMessage { Content = "order test B" });
 
-        // Wait for processing
-        await Task.Delay(500);
+        // Wait for handler B to process
+        await TestHelpers.WaitUntilAsync(
+            async () => (await grainB.GetHandlerCounts()).HandlerBCount >= 1,
+            message: "Handler B did not process the message");
 
         // Assert - Handler B should have processed it
         var countsB = await grainB.GetHandlerCounts();

@@ -36,7 +36,11 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
 
         // Act - Send message with string body, but handler expects int
         await senderGrain.SendTypeMismatchMessage(typeMismatchGrain.GetGrainId(), "this is a string, not an int");
-        await Task.Delay(500);
+        
+        // Wait for type mismatch to be detected
+        await TestHelpers.WaitUntilAsync(
+            async () => await typeMismatchGrain.GetTypeMismatchDetected(),
+            message: "Type mismatch was not detected");
 
         // Assert - Grain should have detected type mismatch and handled it gracefully
         var handled = await typeMismatchGrain.GetHandledSuccessfully();
@@ -68,7 +72,10 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
             contextKey: "userId",
             contextValue: "string-not-int");
         
-        await Task.Delay(500);
+        // Wait for message to be processed
+        await TestHelpers.WaitUntilAsync(
+            async () => await contextMismatchGrain.GetBodyReceived(),
+            message: "Body was not received");
 
         // Assert - Body should be accessible despite context type mismatch
         var bodyReceived = await contextMismatchGrain.GetBodyReceived();
@@ -99,11 +106,18 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
             Nested = new NestedData { Value = 456 } 
         });
         
-        await Task.Delay(500);
+        // Wait for first message to be processed
+        await TestHelpers.WaitUntilAsync(
+            async () => await unavailableTypeGrain.GetSuccessfulMessageCount() >= 1,
+            message: "First message was not processed");
 
         // Send a valid SimpleMessage afterwards
         await senderGrain.SendSimpleMessage(unavailableTypeGrain.GetGrainId(), new SimpleMessage { Value = "valid" });
-        await Task.Delay(500);
+        
+        // Wait for second message to be processed
+        await TestHelpers.WaitUntilAsync(
+            async () => await unavailableTypeGrain.GetSuccessfulMessageCount() >= 2,
+            message: "Second message was not processed");
 
         // Assert - Both messages should have been processed successfully
         // First as ComplexMessage (after SimpleMessage attempt failed), second as SimpleMessage
@@ -125,7 +139,11 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
 
         // Act - Send message with wrong type
         await senderGrain.SendTypeMismatchMessage(fallbackGrain.GetGrainId(), "wrong type");
-        await Task.Delay(500);
+        
+        // Wait for fallback to be used
+        await TestHelpers.WaitUntilAsync(
+            async () => await fallbackGrain.GetUsedFallback(),
+            message: "Fallback was not used");
 
         // Assert - Fallback handler should have used raw bytes
         var usedFallback = await fallbackGrain.GetUsedFallback();
@@ -153,7 +171,15 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
         await senderGrain.SendTypeMismatchMessage(mixedGrain.GetGrainId(), true); // Wrong type
         await senderGrain.SendSimpleMessage(mixedGrain.GetGrainId(), new SimpleMessage { Value = "valid3" });
         
-        await Task.Delay(1000);
+        // Wait for all 5 messages to be processed (3 valid + 2 invalid)
+        await TestHelpers.WaitUntilAsync(
+            async () =>
+            {
+                var valid = await mixedGrain.GetValidMessageCount();
+                var invalid = await mixedGrain.GetInvalidMessageCount();
+                return valid + invalid >= 5;
+            },
+            message: "Not all messages were processed");
 
         // Assert - Only valid messages should be processed
         var validCount = await mixedGrain.GetValidMessageCount();
@@ -181,15 +207,27 @@ public class DeserializationFailureTests : IClassFixture<DeserializationFailureT
 
         // Act - Send bad message, then deactivate, then send good message
         await senderGrain.SendTypeMismatchMessage(survivorGrain.GetGrainId(), 999); // Bad message
-        await Task.Delay(500);
+        
+        // Wait briefly for bad message to be processed (or skipped)
+        await TestHelpers.TryWaitUntilAsync(
+            async () => await survivorGrain.GetLastReceivedValue() is not null,
+            timeout: TimeSpan.FromMilliseconds(300));
 
         var activationBefore = await survivorGrain.GetActivationId();
         await survivorGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
-        await Task.Delay(500);
+        
+        // Wait for grain to be reactivated with new activation id
+        await TestHelpers.WaitUntilAsync(
+            async () => await survivorGrain.GetActivationId() != activationBefore,
+            message: "Grain was not reactivated");
 
         // Send valid message to reactivate
         await senderGrain.SendSimpleMessage(survivorGrain.GetGrainId(), new SimpleMessage { Value = "after-reactivation" });
-        await Task.Delay(500);
+        
+        // Wait for valid message to be processed
+        await TestHelpers.WaitUntilAsync(
+            async () => await survivorGrain.GetLastReceivedValue() == "after-reactivation",
+            message: "Valid message was not received after reactivation");
 
         var activationAfter = await survivorGrain.GetActivationId();
         
