@@ -50,13 +50,19 @@ public class DurableMessagingRecoveryTests : IClassFixture<DurableMessagingRecov
         var result1 = await extension.DeliverAsync(envelope1, new DeliveryOptions(), CancellationToken.None);
         Assert.Equal(DeliveryStatus.Accepted, result1.Status);
 
-        // Wait for processing
-        await Task.Delay(1000);
+        // Wait for message to be processed
+        await TestHelpers.WaitUntilAsync(
+            async () => await receiverGrain.GetInboxCount() == 0,
+            message: "Message was not processed");
 
         // Deactivate the receiver
         var activationIdBefore = await receiverGrain.GetActivationId();
         await receiverGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
-        await Task.Delay(500);
+        
+        // Wait for grain to be reactivated with new activation id
+        await TestHelpers.WaitUntilAsync(
+            async () => await receiverGrain.GetActivationId() != activationIdBefore,
+            message: "Grain was not reactivated");
 
         // Try to deliver duplicate message (same MessageId and SenderId) after reactivation
         var envelope2 = CreateTestEnvelope(
@@ -93,8 +99,15 @@ public class DurableMessagingRecoveryTests : IClassFixture<DurableMessagingRecov
             "TestRoute",
             new TestMessage { Content = "Outbox test message" });
 
-        // Wait for delivery and processing
-        await Task.Delay(1500);
+        // Wait for outbox to be delivered and processed
+        await TestHelpers.WaitUntilAsync(
+            async () => await senderGrain.GetOutboxCount() == 0,
+            message: "Outbox was not emptied after delivery");
+
+        // Wait for receiver's inbox to be processed
+        await TestHelpers.WaitUntilAsync(
+            async () => await receiverGrain.GetInboxCount() == 0,
+            message: "Inbox was not processed");
 
         // Assert - Outbox should be empty after delivery
         var outboxCount = await senderGrain.GetOutboxCount();
@@ -125,11 +138,19 @@ public class DurableMessagingRecoveryTests : IClassFixture<DurableMessagingRecov
         var result1 = await extension.DeliverAsync(envelope1, new DeliveryOptions(), CancellationToken.None);
         Assert.Equal(DeliveryStatus.Accepted, result1.Status);
 
-        await Task.Delay(1000);
+        // Wait for first message to be processed
+        await TestHelpers.WaitUntilAsync(
+            async () => await receiverGrain.GetInboxCount() == 0,
+            message: "First message was not processed");
 
         // Deactivate the grain
+        var activationIdBefore = await receiverGrain.GetActivationId();
         await receiverGrain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
-        await Task.Delay(500);
+        
+        // Wait for grain to be reactivated
+        await TestHelpers.WaitUntilAsync(
+            async () => await receiverGrain.GetActivationId() != activationIdBefore,
+            message: "Grain was not reactivated");
 
         // Send another message after reactivation
         var envelope2 = CreateTestEnvelope(
@@ -140,8 +161,10 @@ public class DurableMessagingRecoveryTests : IClassFixture<DurableMessagingRecov
         var result2 = await extension.DeliverAsync(envelope2, new DeliveryOptions(), CancellationToken.None);
         Assert.Equal(DeliveryStatus.Accepted, result2.Status);
 
-        // Wait for processing
-        await Task.Delay(1000);
+        // Wait for second message to be processed
+        await TestHelpers.WaitUntilAsync(
+            async () => await receiverGrain.GetInboxCount() == 0,
+            message: "Second message was not processed after reactivation");
 
         // Assert - Both messages should have been processed (inbox empty)
         var inboxCount = await receiverGrain.GetInboxCount();

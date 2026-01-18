@@ -35,14 +35,17 @@ public class DurableErrorPropagationTests : IClassFixture<DurableErrorPropagatio
 
         // Act - Send request that will trigger validation error
         await requesterGrain.SendRequest(processorGrain.GetGrainId(), "validation", new ErrorTestRequest { Data = "" });
-        await Task.Delay(500);
+
+        // Wait for error response to be received
+        var errorResponse = await TestHelpers.WaitForNullableValueAsync(
+            async () => await requesterGrain.GetReceivedError(),
+            message: "Error response was not received");
 
         // Assert
-        var errorResponse = await requesterGrain.GetReceivedError();
         Assert.NotNull(errorResponse);
-        Assert.Equal(StandardErrorCodes.ValidationFailed, errorResponse.Value.ErrorCode);
-        Assert.Contains("Data cannot be empty", errorResponse.Value.Message);
-        Assert.False(errorResponse.Value.IsRetriable);
+        Assert.Equal(StandardErrorCodes.ValidationFailed, errorResponse!.Value.ErrorCode);
+        Assert.Contains("Data cannot be empty", errorResponse!.Value.Message);
+        Assert.False(errorResponse!.Value.IsRetriable);
     }
 
     /// <summary>
@@ -58,14 +61,17 @@ public class DurableErrorPropagationTests : IClassFixture<DurableErrorPropagatio
 
         // Act - Send request that will trigger transient error
         await requesterGrain.SendRequest(processorGrain.GetGrainId(), "transient", new ErrorTestRequest { Data = "test" });
-        await Task.Delay(500);
+
+        // Wait for error response to be received
+        var errorResponse = await TestHelpers.WaitForNullableValueAsync(
+            async () => await requesterGrain.GetReceivedError(),
+            message: "Transient error response was not received");
 
         // Assert
-        var errorResponse = await requesterGrain.GetReceivedError();
         Assert.NotNull(errorResponse);
-        Assert.Equal(StandardErrorCodes.TransientError, errorResponse.Value.ErrorCode);
-        Assert.Contains("temporary failure", errorResponse.Value.Message);
-        Assert.True(errorResponse.Value.IsRetriable);
+        Assert.Equal(StandardErrorCodes.TransientError, errorResponse!.Value.ErrorCode);
+        Assert.Contains("temporary failure", errorResponse!.Value.Message);
+        Assert.True(errorResponse!.Value.IsRetriable);
     }
 
     /// <summary>
@@ -81,16 +87,19 @@ public class DurableErrorPropagationTests : IClassFixture<DurableErrorPropagatio
 
         // Act - Send request that will throw exception
         await requesterGrain.SendRequest(processorGrain.GetGrainId(), "exception", new ErrorTestRequest { Data = "test" });
-        await Task.Delay(500);
+
+        // Wait for error response to be received
+        var errorResponse = await TestHelpers.WaitForNullableValueAsync(
+            async () => await requesterGrain.GetReceivedError(),
+            message: "Exception error response was not received");
 
         // Assert
-        var errorResponse = await requesterGrain.GetReceivedError();
         Assert.NotNull(errorResponse);
-        Assert.Equal("INVALID_OPERATION", errorResponse.Value.ErrorCode); // Exception type converted to error code
-        Assert.Contains("Handler exception test", errorResponse.Value.Message);
-        Assert.NotNull(errorResponse.Value.ExceptionDetails);
-        Assert.Contains("InvalidOperationException", errorResponse.Value.ExceptionDetails);
-        Assert.False(errorResponse.Value.IsRetriable);
+        Assert.Equal("INVALID_OPERATION", errorResponse!.Value.ErrorCode); // Exception type converted to error code
+        Assert.Contains("Handler exception test", errorResponse!.Value.Message);
+        Assert.NotNull(errorResponse!.Value.ExceptionDetails);
+        Assert.Contains("InvalidOperationException", errorResponse!.Value.ExceptionDetails);
+        Assert.False(errorResponse!.Value.IsRetriable);
     }
 
     /// <summary>
@@ -106,14 +115,17 @@ public class DurableErrorPropagationTests : IClassFixture<DurableErrorPropagatio
 
         // Act - Send request that will trigger unauthorized error
         await requesterGrain.SendRequest(processorGrain.GetGrainId(), "unauthorized", new ErrorTestRequest { Data = "test" });
-        await Task.Delay(500);
+
+        // Wait for error response to be received
+        var errorResponse = await TestHelpers.WaitForNullableValueAsync(
+            async () => await requesterGrain.GetReceivedError(),
+            message: "Unauthorized error response was not received");
 
         // Assert
-        var errorResponse = await requesterGrain.GetReceivedError();
         Assert.NotNull(errorResponse);
-        Assert.Equal(StandardErrorCodes.Unauthorized, errorResponse.Value.ErrorCode);
-        Assert.Contains("not authorized", errorResponse.Value.Message);
-        Assert.False(errorResponse.Value.IsRetriable);
+        Assert.Equal(StandardErrorCodes.Unauthorized, errorResponse!.Value.ErrorCode);
+        Assert.Contains("not authorized", errorResponse!.Value.Message);
+        Assert.False(errorResponse!.Value.IsRetriable);
     }
 
     /// <summary>
@@ -130,7 +142,11 @@ public class DurableErrorPropagationTests : IClassFixture<DurableErrorPropagatio
 
         // Act - Send request with correlation key that will trigger error
         await requesterGrain.SendRequestWithCorrelation(processorGrain.GetGrainId(), "validation", new ErrorTestRequest { Data = "" }, correlationKey);
-        await Task.Delay(500);
+
+        // Wait for error response to be received
+        await TestHelpers.WaitUntilAsync(
+            async () => (await requesterGrain.GetReceivedError()) != null,
+            message: "Correlation error response was not received");
 
         // Assert
         var errorResponse = await requesterGrain.GetReceivedError();
@@ -151,7 +167,11 @@ public class DurableErrorPropagationTests : IClassFixture<DurableErrorPropagatio
 
         // Act & Assert - Should not throw even though validation fails
         await processorGrain.ProcessOneWayMessage(new ErrorTestRequest { Data = "" });
-        await Task.Delay(500);
+
+        // Wait for the message to be processed
+        await TestHelpers.WaitUntilAsync(
+            async () => (await processorGrain.GetProcessedCount()) >= 1,
+            message: "One-way message was not processed");
 
         // Verify the message was processed (grain should still be alive and responsive)
         var count = await processorGrain.GetProcessedCount();
