@@ -811,7 +811,7 @@ namespace Orleans.Transactions.DynamoDB
                         Select = Select.ALL_ATTRIBUTES
                     };
 
-                    if (exclusiveStartKey != null)
+                    if (exclusiveStartKey is not null && exclusiveStartKey.Count > 0)
                     {
                         request.ExclusiveStartKey = exclusiveStartKey;
                     }
