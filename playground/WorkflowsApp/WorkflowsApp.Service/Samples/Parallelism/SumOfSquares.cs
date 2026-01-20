@@ -1,4 +1,4 @@
-﻿using System.Distributed.DurableTasks;
+using System.Distributed.DurableTasks;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace WorkflowsApp.Service.Samples.Parallelism;
@@ -18,8 +18,10 @@ internal static class SumOfSquares
         Console.WriteLine($"Workflow completed: {result}");
     }
 
+    [Alias("ISquareGrain")]
     public interface ISquareGrain : IGrainWithIntegerKey
     {
+        [Alias("Square")]
         DurableTask<int> Square(int input);
     }
 
@@ -28,8 +30,10 @@ internal static class SumOfSquares
         public DurableTask<int> Square(int value) => DurableTask.FromResult(value * value);
     }
 
+    [Alias("ISumOfSquaresGrain")]
     public interface ISumOfSquaresGrain : IGrainWithStringKey
     {
+        [Alias("SumSquares")]
         DurableTask<int> SumSquares(int input);
     }
 

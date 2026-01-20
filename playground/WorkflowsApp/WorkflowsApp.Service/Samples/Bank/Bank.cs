@@ -1,4 +1,4 @@
-﻿using System.Distributed.DurableTasks;
+using System.Distributed.DurableTasks;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Orleans.DurableTasks;
@@ -16,9 +16,10 @@ internal static class Bank
         var customer = client.GetGrain<IAccountGrain>("customer");
         var business = client.GetGrain<IAccountGrain>("business");
 
-        // await await?! awaiting ScheduleAsync yields a ScheduledTask, promising that the task has been durably scheduled.
-        // Awaiting this task will wait for the task to complete.
-        var depositTask = await customer.Deposit(120_000_000_000).ScheduleAsync("create-pc-industry");
+        // First, we durably schedule the work. If the work has been scheduled before, this is a no-op.
+        var depositTask = await customer.Deposit(120_000_000_000).ScheduleAsync("initial-deposit");
+
+        // Then, we await its completion.
         await depositTask.WaitAsync();
 
         var scheduledTask = await bank
@@ -38,7 +39,7 @@ internal static class Bank
         await workflowTask.WaitAsync();
     }
 
-    [Alias("WorkflowsApp.Service.Samples.Bank.Bank.IBankGrain")]
+    [Alias("IBankGrain")]
     public interface IBankGrain : IGrainWithStringKey
     {
         [Alias("Transfer")]
@@ -122,10 +123,10 @@ internal static class Bank
             var customer = GrainFactory.GetGrain<IAccountGrain>("customer");
             var business = GrainFactory.GetGrain<IAccountGrain>("business");
 
-            await customer.Deposit(120_000_000_000);
+            await customer.Deposit(120_000_000_000).WithId("client-initial-deposit"); // Note: no id provided
 
             // Schedule durable execution and return before completion.
-            var scheduled = await customer.Deposit(120_000_000_000).ScheduleAsync();
+            var scheduled = await customer.Deposit(120_000_000_000).ScheduleAsync("another-deposit");
             var id = scheduled.Id;
             Console.WriteLine(id);
 
@@ -170,7 +171,7 @@ internal static class Bank
             var business = client.GetGrain<IAccountGrain>("business");
 
             var randomId = await DurableTask.Run(ct => Guid.NewGuid()).WithId("generate-random-id");
-            Console.WriteLine(randomId);
+            Console.WriteLine("Random Id: " + randomId);
 
             // If the task is interrupted (eg, power outage) and is retried, it will only sleep for the remaining time.
             /*

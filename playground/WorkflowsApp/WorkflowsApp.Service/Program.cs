@@ -45,12 +45,12 @@ public class Program
     public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+        builder.AddServiceDefaults();
         builder.Host.UseDefaultServiceProvider(o => o.ValidateOnBuild = false);
         builder.AddKeyedAzureBlobServiceClient("state");
-        builder.AddKeyedAzureTableServiceClient("clustering");
         builder.UseOrleans(siloBuilder =>
             {
-                //siloBuilder.UseLocalhostClustering();
+                siloBuilder.UseLocalhostClustering();
                 siloBuilder.AddDurableTasks();
                 siloBuilder.AddStateMachineStorage();
                 siloBuilder.AddJournaledDurableTaskStorage();
@@ -60,46 +60,54 @@ public class Program
             });
 
         //logging.AddFilter((category, level) => category is not null && category.StartsWith("Orleans.DurableTasks"));
-        builder.Logging.SetMinimumLevel(LogLevel.Warning);
+        builder.Logging.SetMinimumLevel(LogLevel.Information);
+        builder.Logging.AddFilter("Azure.Core", LogLevel.Error);
         using var app = builder.Build();
+        var log = app.Services.GetRequiredService<ILogger<Program>>();
 
         HumanInTheLoop.ConfigureApp(app);
 
         await app.StartAsync();
 
+        app.MapDefaultEndpoints();
+
+        // log.LogInformation("==== Starting HumanInTheLoop sample ===");
         //await HumanInTheLoop.RunAsync(app.Services);
+        
+        log.LogInformation("==== Starting SumOfSquares sample ===");
         await SumOfSquares.RunAsync(app.Services);
+
+        log.LogInformation("==== Starting Bank sample ===");
         await Bank.RunAsync(app.Services);
+        log.LogInformation("==== Starting HelloWorld sample ===");
         await HelloWorld.RunAsync(app.Services);
+        log.LogInformation("==== Starting CancelWorld sample ===");
         await CancelWorld.RunAsync(app.Services);
 
-        /*
-        var client = host.Services.GetRequiredService<IClusterClient>();
+        var client = app.Services.GetRequiredService<IClusterClient>();
 
+        log.LogInformation("==== Starting IDurableDictionary sample ===");
         var dict = client.GetGrain<IDictionaryGrain<string, int>>("foo");
 
-        await dict.TryAddAsync("one", 1);
-        var dict = client.GetGrain<IDictionaryGrain<string, int>>("foo");
-
-        await dict.TryAddAsync("one", 1);
-        var (success, value) = await dict.TryGetValueAsync("one");
+        await dict.TryAddAsync("one", 1, version: 0);
+        var (success, value, version) = await dict.TryGetValueAsync("one");
         value++;
-        await dict.SetAsync("one", value);
+        await dict.SetAsync("one", value, version);
         Console.WriteLine($"[one] = {value}");
         for (var i = 0; i < 10; i++)
         {
             var key = $"{i}";
-            (success, value) = await dict.TryGetValueAsync(key);
+            (success, value, version) = await dict.TryGetValueAsync(key);
             value++;
-            await dict.SetAsync(key, value);
+            await dict.SetAsync(key, value, version);
         }
 
-        await foreach (var (k, v) in dict.GetValuesAsync())
+        await foreach (var (k, val, ver) in dict.GetValuesAsync())
         {
-            Console.WriteLine($"[{k}] = {v}");
+            Console.WriteLine($"[{k}] = {val} @ {ver}");
         }
-        */
 
+        log.LogInformation("==== All Done! ===");
         Console.WriteLine("Done!");
 
         await app.WaitForShutdownAsync();
