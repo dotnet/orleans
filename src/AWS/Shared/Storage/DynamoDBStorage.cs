@@ -712,9 +712,13 @@ namespace Orleans.Transactions.DynamoDB
                     ExpressionAttributeValues = keys,
                     ConsistentRead = consistentRead,
                     KeyConditionExpression = keyConditionExpression,
-                    Select = Select.ALL_ATTRIBUTES,
-                    ExclusiveStartKey = lastEvaluatedKey
+                    Select = Select.ALL_ATTRIBUTES
                 };
+
+                if (lastEvaluatedKey != null && lastEvaluatedKey.Count > 0)
+                {
+                    request.ExclusiveStartKey = lastEvaluatedKey;
+                }
 
                 if (!string.IsNullOrWhiteSpace(indexName))
                 {
@@ -795,7 +799,7 @@ namespace Orleans.Transactions.DynamoDB
             {
                 var resultList = new List<TResult>();
 
-                var exclusiveStartKey = new Dictionary<string, AttributeValue>();
+                Dictionary<string, AttributeValue> exclusiveStartKey = null;
 
                 while (true)
                 {
@@ -805,9 +809,13 @@ namespace Orleans.Transactions.DynamoDB
                         ConsistentRead = true,
                         FilterExpression = expression,
                         ExpressionAttributeValues = attributes,
-                        Select = Select.ALL_ATTRIBUTES,
-                        ExclusiveStartKey = exclusiveStartKey
+                        Select = Select.ALL_ATTRIBUTES
                     };
+
+                    if (exclusiveStartKey is not null && exclusiveStartKey.Count > 0)
+                    {
+                        request.ExclusiveStartKey = exclusiveStartKey;
+                    }
 
                     var response = await _ddbClient.ScanAsync(request);
 
