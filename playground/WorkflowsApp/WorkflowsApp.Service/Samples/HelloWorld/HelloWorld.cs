@@ -1,4 +1,4 @@
-﻿using System.Distributed.DurableTasks;
+using System.Distributed.DurableTasks;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace WorkflowsApp.Service.Samples.HelloWorld;
@@ -17,8 +17,10 @@ internal static class HelloWorld
         Console.WriteLine($"Workflow completed:\n\t{string.Join("\n\t", result)}");
     }
 
+    [Alias("IHelloGrain")]
     public interface IHelloGrain : IGrainWithStringKey
     {
+        [Alias("SayHelloAsync")]
         DurableTask<string> SayHelloAsync(string input);
     }
 
@@ -27,8 +29,10 @@ internal static class HelloWorld
         public DurableTask<string> SayHelloAsync(string name) => DurableTask.FromResult($"Hello, {name}!");
     }
 
+    [Alias("IHelloWorkflowGrain")]
     public interface IHelloWorkflowGrain : IGrainWithStringKey
     {
+        [Alias("RunSample")]
         DurableTask<string[]> RunSample();
     }
 
