@@ -383,7 +383,9 @@ public abstract class LogSegmentTests : IAsyncLifetime
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public bool Equals(IGrainContext? other) => throw new NotImplementedException();
         public TComponent? GetComponent<TComponent>() where TComponent : class => throw new NotImplementedException();
+        public object? GetComponent(Type componentType) => throw new NotImplementedException();
         public TTarget? GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
+        public object? GetTarget() => throw new NotImplementedException();
         public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public void ReceiveMessage(object message) => throw new NotImplementedException();
         public void Rehydrate(IRehydrationContext context) => throw new NotImplementedException();

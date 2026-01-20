@@ -100,7 +100,7 @@ public static class ServiceCollectionExtensions
         // Create static assets provider
         var assets = endpoints.ServiceProvider.GetService<EmbeddedAssetProvider>()
             ?? throw new InvalidOperationException("Orleans Dashboard services have not been registered. " +
-                "Please call AddDashboard on ISiloBuilder or AddOrleansDashboard on IClientBuilder.");
+                "Please call AddDashboard on ISiloBuilder or IClientBuilder.");
 
         // Create a route group for all dashboard endpoints
         var group = endpoints.MapGroup(routePrefix ?? "");
@@ -350,7 +350,7 @@ public static class ServiceCollectionExtensions
     /// <param name="clientBuilder">The client builder.</param>
     /// <param name="configureOptions">Optional configuration action for <see cref="DashboardOptions"/>.</param>
     /// <returns>The service collection for method chaining.</returns>
-    public static IClientBuilder AddOrleansDashboard(this IClientBuilder clientBuilder, Action<DashboardOptions>? configureOptions = null)
+    public static IClientBuilder AddDashboard(this IClientBuilder clientBuilder, Action<DashboardOptions>? configureOptions = null)
     {
         clientBuilder.Services.Configure(configureOptions ?? (x => { }));
         clientBuilder.Services.AddSingleton<DashboardLogger>();

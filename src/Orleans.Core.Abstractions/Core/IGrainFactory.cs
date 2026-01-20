@@ -4,6 +4,40 @@ using Orleans.Runtime;
 
 namespace Orleans
 {
+    public static class GrainFactoryExtensions
+    {
+        /// <summary>
+        /// Returns a reference for the provided grain id which implements the specified interface type.
+        /// </summary>
+        /// <param name="grainFactory">The grain factory.</param>
+        /// <param name="grainPrimaryKey">The primary key of the grain</param>
+        /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
+        /// <typeparam name="TGrainInterface">The grain interface type which the returned grain reference must implement.</typeparam>
+        /// <returns>
+        /// A reference for the provided grain id which implements the specified interface type.
+        /// </returns>
+        public static TGrainInterface GetGrain<TGrainInterface>(this IGrainFactory grainFactory, IdSpan grainPrimaryKey, string grainClassNamePrefix) where TGrainInterface : IGrain
+        {
+            ArgumentNullException.ThrowIfNull(grainFactory);
+            return grainFactory.GetGrain(typeof(TGrainInterface), grainPrimaryKey, grainClassNamePrefix).AsReference<TGrainInterface>();
+        }
+
+        /// <summary>
+        /// Returns a reference for the provided grain id which implements the specified interface type.
+        /// </summary>
+        /// <param name="grainFactory">The grain factory.</param>
+        /// <param name="grainPrimaryKey">The primary key of the grain</param>
+        /// <typeparam name="TGrainInterface">The grain interface type which the returned grain reference must implement.</typeparam>
+        /// <returns>
+        /// A reference for the provided grain id which implements the specified interface type.
+        /// </returns>
+        public static TGrainInterface GetGrain<TGrainInterface>(this IGrainFactory grainFactory, IdSpan grainPrimaryKey) where TGrainInterface : IGrain
+        {
+            ArgumentNullException.ThrowIfNull(grainFactory);
+            return grainFactory.GetGrain(typeof(TGrainInterface), grainPrimaryKey).AsReference<TGrainInterface>();
+        }
+    }
+
     /// <summary>
     /// Functionality for creating references to grains.
     /// </summary>
@@ -190,5 +224,26 @@ namespace Orleans
         /// A reference for the provided grain id which implements the specified interface type.
         /// </returns>
         IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType);
+
+        /// <summary>
+        /// Returns a reference for the provided grain id which implements the specified interface type.
+        /// </summary>
+        /// <param name="interfaceType">The grain interface type which the returned grain reference must implement.</param>
+        /// <param name="grainKey">The primary key of the grain</param>
+        /// <param name="grainClassNamePrefix">A class name prefix used to find the runtime type of the grain.</param>
+        /// <returns>
+        /// A reference for the provided grain id which implements the specified interface type.
+        /// </returns>
+        IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string grainClassNamePrefix);
+
+        /// <summary>
+        /// Returns a reference for the provided grain id which implements the specified interface type.
+        /// </summary>
+        /// <param name="interfaceType">The grain interface type which the returned grain reference must implement.</param>
+        /// <param name="grainKey">The primary key of the grain</param>
+        /// <returns>
+        /// A reference for the provided grain id which implements the specified interface type.
+        /// </returns>
+        IAddressable GetGrain(Type interfaceType, IdSpan grainKey);
     }
 }
