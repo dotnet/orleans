@@ -5,7 +5,7 @@ namespace Orleans.Journaling;
 
 public abstract class DurableGrain : Grain, IGrainBase
 {
-    private IDurableOutbox _outbox;
+    private readonly IDurableOutbox _outbox;
 
     protected DurableGrain()
     {
@@ -21,16 +21,6 @@ public abstract class DurableGrain : Grain, IGrainBase
 
     protected TState GetOrCreateState<TState>(string name) where TState : class, IJournaledState
         => GetOrCreateState(name, static sp => sp.GetRequiredService<TState>(), ServiceProvider);
-
-    /// <summary>
-    /// Gets the outbox for lazy initialization of delivery triggering.
-    /// </summary>
-    private IDurableOutbox? GetOutboxForDelivery()
-    {
-        // Lazy initialization - only get the outbox if it hasn't been retrieved yet
-        // This avoids always pulling it from DI when it might not be used
-        return _outbox;
-    }
 
     protected TState GetOrCreateState<TArg, TState>(string name, Func<TArg, TState> createState, TArg arg) where TState : class, IJournaledState
     {
@@ -56,6 +46,8 @@ public abstract class DurableGrain : Grain, IGrainBase
         await StateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
 
         // Then trigger delivery of any pending outbox messages
+        // TODO: ensure that we only deliver the messages which were pending prior to the write.
+        // i.e, the messages which were written.
         var outbox = _outbox;
         if (outbox is not null && outbox.Count > 0)
         {

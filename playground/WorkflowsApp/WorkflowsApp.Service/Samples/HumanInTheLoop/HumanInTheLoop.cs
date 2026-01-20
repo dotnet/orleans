@@ -1,4 +1,4 @@
-﻿using System.Distributed.DurableTasks;
+using System.Distributed.DurableTasks;
 using Orleans.Journaling;
 
 namespace WorkflowsApp.Service.Samples.HumanInTheLoop;
@@ -41,10 +41,14 @@ internal static class HumanInTheLoop
         });
     }
 
+    [Alias("WorkflowsApp.Service.Samples.HumanInTheLoop.HumanInTheLoop.IGreeterGrain")]
     public interface IGreeterGrain : IGrainWithStringKey
     {
+        [Alias("SetGreetingAsync")]
         ValueTask SetGreetingAsync(string greeting);
+        [Alias("CancelAsync")]
         ValueTask CancelAsync();
+        [Alias("GetGreetingAsync")]
         DurableTask<string> GetGreetingAsync();
     }
 

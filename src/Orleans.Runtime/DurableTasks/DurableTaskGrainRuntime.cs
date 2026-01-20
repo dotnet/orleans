@@ -214,7 +214,11 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
         catch (Exception exception)
         {
-            _shared.Logger.LogError(exception, "{Id} error invoking durable task '{DurableTask}'.", GrainId, createTask);
+            if (exception is not OperationCanceledException)
+            {
+                _shared.Logger.LogWarning(exception, "{Id} error invoking durable task '{DurableTask}'.", GrainId, createTask);
+            }
+
             await SetResponseAsync(context.TaskId, DurableTaskResponse.FromException(exception), _deactivationCts.Token);
         }
         finally

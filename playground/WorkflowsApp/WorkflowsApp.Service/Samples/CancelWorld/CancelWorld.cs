@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Distributed.DurableTasks;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -30,12 +30,14 @@ internal static class CancelWorld
         }
         catch (OperationCanceledException)
         {
-            Console.WriteLine($"Workflow successfully canceled.");
+            Console.WriteLine($"Workflow successfully canceled (completed with OperationCanceledException).");
         }
     }
 
+    [Alias("WorkflowsApp.Service.Samples.CancelWorld.CancelWorld.IBlockingGrain")]
     public interface IBlockingGrain : IGrainWithStringKey
     {
+        [Alias("BlockUntilCanceled")]
         DurableTask BlockUntilCanceled(string input);
     }
 
@@ -44,8 +46,10 @@ internal static class CancelWorld
         public DurableTask BlockUntilCanceled(string name) => DurableTask.Run(cancellation => Task.Delay(Timeout.Infinite, cancellation));
     }
 
+    [Alias("WorkflowsApp.Service.Samples.CancelWorld.CancelWorld.IBlockingWorkflowGrain")]
     public interface IBlockingWorkflowGrain : IGrainWithStringKey
     {
+        [Alias("RunSample")]
         DurableTask<string> RunSample();
     }
 

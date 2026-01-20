@@ -6,7 +6,6 @@ namespace Orleans.Journaling.Messaging;
 
 /// <summary>
 /// Durable inbox for receiving and processing messages.
-/// Uses dictionary storage (no ordering guarantees) which aids deduplication.
 /// </summary>
 public interface IDurableInbox
 {
