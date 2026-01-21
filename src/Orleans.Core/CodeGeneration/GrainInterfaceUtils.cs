@@ -5,6 +5,7 @@ using System.Reflection;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
 
+#nullable disable
 namespace Orleans.CodeGeneration
 {
     /// <summary>

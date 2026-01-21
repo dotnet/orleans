@@ -7,6 +7,7 @@ using System;
 
 namespace Orleans.CodeGenerator
 {
+    #nullable disable
     internal class MetadataGenerator
     {
         private readonly CodeGenerator _codeGenerator;

@@ -4,6 +4,7 @@ using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Runtime.Hosting.ProviderConfiguration;
 
+#nullable disable
 [assembly: RegisterProvider("Memory", "Reminders", "Silo", typeof(MemoryReminderTableBuilder))]
 
 namespace Orleans.Runtime.Hosting.ProviderConfiguration;

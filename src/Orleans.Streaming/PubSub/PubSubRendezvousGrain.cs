@@ -14,7 +14,6 @@ using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using Orleans.Streams.Core;
 
-#nullable enable
 namespace Orleans.Streams
 {
     internal sealed partial class PubSubGrainStateStorageFactory

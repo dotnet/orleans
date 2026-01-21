@@ -5,6 +5,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using Microsoft.AspNetCore.Connections;
 
+#nullable disable
 namespace Orleans.Connections.Security
 {
     public delegate bool RemoteCertificateValidator(X509Certificate2 certificate, X509Chain chain, SslPolicyErrors policyErrors);

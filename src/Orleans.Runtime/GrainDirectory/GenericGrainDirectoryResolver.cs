@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.GrainDirectory;
 using Orleans.Metadata;
 
+#nullable disable
 namespace Orleans.Runtime.GrainDirectory
 {
     internal class GenericGrainDirectoryResolver : IGrainDirectoryResolver

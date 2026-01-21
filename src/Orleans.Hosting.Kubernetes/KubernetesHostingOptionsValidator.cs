@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using System.Collections.Generic;
 
+#nullable disable
 namespace Orleans.Hosting.Kubernetes
 {
     /// <summary>

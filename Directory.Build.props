@@ -24,8 +24,7 @@
     <AnalysisLevel>preview</AnalysisLevel>
     <!-- TODO: Uncomment this and fix errors -->
     <!-- <AnalysisMode>All</AnalysisMode> -->
-    <!-- TODO: Uncomment this and fix errors -->
-    <!-- <Nullable>enable</Nullable> -->
+    <Nullable>enable</Nullable>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <DebugType>embedded</DebugType>

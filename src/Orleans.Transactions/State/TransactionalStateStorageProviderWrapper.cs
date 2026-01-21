@@ -7,7 +7,6 @@ using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.Transactions.Abstractions;
 
-#nullable enable
 namespace Orleans.Transactions
 {
     internal sealed class TransactionalStateStorageProviderWrapper<TState> : ITransactionalStateStorage<TState>

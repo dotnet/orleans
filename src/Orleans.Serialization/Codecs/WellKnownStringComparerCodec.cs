@@ -13,6 +13,7 @@ using Orleans.Serialization.WireProtocol;
 using System.Runtime.Serialization;
 #endif
 
+#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>

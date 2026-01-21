@@ -10,6 +10,7 @@ using Orleans.Dashboard.Implementation;
 using Microsoft.Extensions.Hosting;
 using Orleans.Dashboard.Core;
 
+#nullable disable
 namespace Orleans.Dashboard;
 
 internal sealed class DashboardHost(

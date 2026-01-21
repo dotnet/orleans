@@ -9,6 +9,7 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
+#nullable disable
 namespace Orleans.Streaming.EventHubs.Testing
 {
     /// <summary>

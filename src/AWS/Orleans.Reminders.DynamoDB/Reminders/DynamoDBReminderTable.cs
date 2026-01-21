@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
+#nullable disable
 namespace Orleans.Reminders.DynamoDB
 {
     /// <summary>

@@ -4,8 +4,6 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-#nullable enable
-
 namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed partial class GrainDirectoryPartition

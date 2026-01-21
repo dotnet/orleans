@@ -6,6 +6,7 @@ using System.Threading;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Http.Features;
 
+#nullable disable
 namespace Orleans.Networking.Shared
 {
     internal abstract partial class TransportConnection : ConnectionContext

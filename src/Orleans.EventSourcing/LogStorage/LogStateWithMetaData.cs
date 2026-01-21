@@ -2,6 +2,7 @@ using Orleans.EventSourcing.Common;
 using System;
 using System.Collections.Generic;
 
+#nullable disable
 namespace Orleans.EventSourcing.LogStorage
 {
     /// <summary>

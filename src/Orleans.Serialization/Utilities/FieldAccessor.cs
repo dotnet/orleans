@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using System.Reflection.Emit;
 
+#nullable disable
 namespace Orleans.Serialization.Utilities
 {
     /// <summary>

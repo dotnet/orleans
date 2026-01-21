@@ -1,5 +1,6 @@
 using System.Buffers;
 
+#nullable disable
 namespace Orleans.Serialization.Buffers.Adaptors
 {
     /// <summary>

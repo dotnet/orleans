@@ -1,5 +1,6 @@
 using System;
 
+#nullable disable
 namespace Orleans.Serialization.Serializers;
 
 /// <summary>

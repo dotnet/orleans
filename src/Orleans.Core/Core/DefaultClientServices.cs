@@ -1,4 +1,3 @@
-#nullable enable
 using Orleans.Configuration;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
