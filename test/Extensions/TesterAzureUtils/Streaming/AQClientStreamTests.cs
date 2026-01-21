@@ -76,9 +76,14 @@ namespace Tester.AzureUtils.Streaming
             try
             {
                 TestUtils.CheckForAzureStorage();
-                var serviceId = this.HostedCluster.Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
-                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(serviceId, AQStreamProviderName),
-                    new AzureQueueOptions().ConfigureTestDefaults());
+                // Guard against null client (e.g., if test failed during initialization)
+                var client = this.HostedCluster?.Client;
+                if (client != null)
+                {
+                    var serviceId = client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
+                    await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(serviceId, AQStreamProviderName),
+                        new AzureQueueOptions().ConfigureTestDefaults());
+                }
                 await TestAzureTableStorageStreamFailureHandler.DeleteAll();
             }
             catch (SkipException)
@@ -87,19 +92,20 @@ namespace Tester.AzureUtils.Streaming
             }
         }
 
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5639"), TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Streaming")]
+[SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Streaming")]
         public async Task AQStreamProducerOnDroppedClientTest()
         {
             logger.LogInformation("************************ AQStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(AQStreamProviderName, StreamNamespace);
         }
 
-        [SkippableFact(Skip = "AzureQueue has unpredictable event delivery counts - re-enable when we figure out how to handle this."), TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Streaming")]
+        [SkippableFact(Skip = "Azure Queue's at-least-once delivery semantics can cause duplicate message delivery after client disconnect/reconnect, leading to non-deterministic event counts."), TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Streaming")]
         public async Task AQStreamConsumerOnDroppedClientTest()
         {
             logger.LogInformation("************************ AQStreamConsumerOnDroppedClientTest *********************************");
             await runner.StreamConsumerOnDroppedClientTest(AQStreamProviderName, StreamNamespace, output,
-                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(AQStreamProviderName));
+                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(AQStreamProviderName),
+                    waitForRetryTimeouts: true);
         }
     }
 }

@@ -1,6 +1,10 @@
+#nullable enable
 //#define USE_SQL_SERVER
 
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Diagnostics;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -19,6 +23,35 @@ namespace UnitTests.TimerTests
     {
         public class Fixture : BaseTestClusterFixture
         {
+            /// <summary>
+            /// Shared FakeTimeProvider instance used by all silos and tests.
+            /// This enables virtual time control for fast, deterministic testing.
+            /// Static so it can be accessed by the SiloConfigurator.
+            /// </summary>
+            internal static FakeTimeProvider SharedTimeProvider { get; private set; } = null!;
+
+            /// <summary>
+            /// Collector for diagnostic events from Orleans.Reminders.
+            /// Used to wait for reminder tick events without polling.
+            /// </summary>
+            public DiagnosticEventCollector DiagnosticCollector { get; private set; } = null!;
+
+            public override async Task InitializeAsync()
+            {
+                // Create the shared FakeTimeProvider BEFORE starting the cluster
+                SharedTimeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+                // Create the diagnostic collector BEFORE starting the cluster
+                // so it captures all events from the start
+                DiagnosticCollector = new DiagnosticEventCollector("Orleans.Reminders");
+                await base.InitializeAsync();
+            }
+
+            public override async Task DisposeAsync()
+            {
+                await base.DisposeAsync();
+                DiagnosticCollector?.Dispose();
+            }
+
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
@@ -31,12 +64,18 @@ namespace UnitTests.TimerTests
                     hostBuilder.AddMemoryGrainStorageAsDefault()
                         .AddReminders()
                         .UseInMemoryReminderService();
+
+                    // Register the shared FakeTimeProvider
+                    hostBuilder.Services.AddSingleton<TimeProvider>(SharedTimeProvider);
                 }
             }
         }
 
-        public ReminderTests_TableGrain(Fixture fixture) : base(fixture)
+        private readonly Fixture _fixture;
+
+        public ReminderTests_TableGrain(Fixture fixture) : base(fixture, Fixture.SharedTimeProvider, fixture.DiagnosticCollector)
         {
+            _fixture = fixture;
             // ReminderTable.Clear() cannot be called from a non-Orleans thread,
             // so we must proxy the call through a grain.
             var controlProxy = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -57,7 +96,7 @@ namespace UnitTests.TimerTests
         /// <summary>
         /// Tests basic reminder list operations including creation and retrieval.
         /// </summary>
-        [Fact(Skip = "https://github.com/dotnet/orleans/issues/9555")]
+        [Fact]
         public async Task Rem_Grain_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
@@ -78,7 +117,7 @@ namespace UnitTests.TimerTests
         /// <summary>
         /// Tests single join scenario with multiple grains and multiple reminders.
         /// </summary>
-        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4318")]
+        [SkippableFact]
         public async Task Rem_Grain_1J_MultiGrainMultiReminders()
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();

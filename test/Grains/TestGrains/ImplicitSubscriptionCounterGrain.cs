@@ -1,3 +1,4 @@
+#nullable enable
 using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 using Orleans.Streams.Core;
@@ -10,6 +11,8 @@ namespace UnitTests.Grains
     {
         private readonly ILogger logger;
         private bool deactivateOnEvent;
+        private TaskCompletionSource<int>? _eventCountWaiter;
+        private int _expectedEventCount;
 
         [GenerateSerializer]
         public class MyState
@@ -19,7 +22,7 @@ namespace UnitTests.Grains
             [Id(1)]
             public int ErrorCounter { get; set; }
             [Id(2)]
-            public StreamSequenceToken Token { get; set; }
+            public StreamSequenceToken? Token { get; set; }
         }
 
         public ImplicitSubscriptionCounterGrain(ILoggerFactory loggerFactory)
@@ -43,6 +46,34 @@ namespace UnitTests.Grains
 
         public Task<int> GetEventCounter() => Task.FromResult(this.State.EventCounter);
 
+        public async Task<int> WaitForEventCount(int expectedCount, TimeSpan timeout)
+        {
+            // If we already have enough events, return immediately
+            if (this.State.EventCounter >= expectedCount)
+            {
+                return this.State.EventCounter;
+            }
+
+            // Set up a waiter for the expected count
+            _expectedEventCount = expectedCount;
+            _eventCountWaiter = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            using var cts = new CancellationTokenSource(timeout);
+            // Note: Cannot access this.State in the callback as it runs on a timer thread without grain context.
+            // Only capture the expectedCount which is a local variable.
+            using var registration = cts.Token.Register(() =>
+                _eventCountWaiter?.TrySetException(new TimeoutException($"Timed out waiting for event count {expectedCount}.")));
+
+            try
+            {
+                return await _eventCountWaiter.Task;
+            }
+            finally
+            {
+                _eventCountWaiter = null;
+            }
+        }
+
         public Task Deactivate()
         {
             this.DeactivateOnIdle();
@@ -61,6 +92,13 @@ namespace UnitTests.Grains
                 this.State.EventCounter++;
                 this.State.Token = token;
                 await this.WriteStateAsync();
+
+                // Signal any waiters if we've reached the expected count
+                if (_eventCountWaiter != null && this.State.EventCounter >= _expectedEventCount)
+                {
+                    _eventCountWaiter.TrySetResult(this.State.EventCounter);
+                }
+
                 if (this.deactivateOnEvent)
                 {
                     this.DeactivateOnIdle();

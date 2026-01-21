@@ -1,62 +1,137 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Tester.StreamingTests
 {
-    //Dumb queue balancer only acquire leases once, never renew it, just for testing
-    public class LeaseBasedQueueBalancerForTest : IStreamQueueBalancer
+    /// <summary>
+    /// Test queue balancer that uses a grain-based lease manager for testing pluggable queue balancer functionality.
+    /// This balancer responds to cluster membership changes to properly re-balance queues when silos join or leave.
+    /// </summary>
+    public class LeaseBasedQueueBalancerForTest : QueueBalancerBase
     {
-        private readonly string id;
-        private readonly ILeaseManagerGrain leaseManagerGrain;
-        private List<QueueId> ownedQueues;
+        private readonly string _name;
+        private readonly ILeaseManagerGrain _leaseManagerGrain;
+        private readonly string _id;
+        private readonly object _lock = new();
+        private List<QueueId> _ownedQueues = [];
+        private int _allQueuesCount;
+        private bool _initialized;
 
-        public LeaseBasedQueueBalancerForTest(string name, IGrainFactory grainFactory)
+        public LeaseBasedQueueBalancerForTest(IServiceProvider serviceProvider, string name)
+            : base(serviceProvider, serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<LeaseBasedQueueBalancerForTest>())
         {
-            this.leaseManagerGrain = grainFactory.GetGrain<ILeaseManagerGrain>(name);
-            this.id = $"{name}-{Guid.NewGuid()}";
+            _name = name;
+            var grainFactory = serviceProvider.GetRequiredService<IGrainFactory>();
+            _leaseManagerGrain = grainFactory.GetGrain<ILeaseManagerGrain>(name);
+            _id = $"{name}-{Guid.NewGuid()}";
         }
 
-        public async Task Initialize(IStreamQueueMapper queueMapper)
+        public override async Task Initialize(IStreamQueueMapper queueMapper)
         {
-            await this.leaseManagerGrain.SetQueuesAsLeases(queueMapper.GetAllQueues());
-            await GetInitialLease();
+            var allQueues = queueMapper.GetAllQueues().ToList();
+            _allQueuesCount = allQueues.Count;
+            
+            // Set up the lease manager with all queues
+            await _leaseManagerGrain.SetQueuesAsLeases(allQueues);
+            
+            // Initialize the base class (starts listening for cluster membership changes)
+            await base.Initialize(queueMapper);
+            _initialized = true;
+            
+            // Acquire initial leases
+            await AcquireLeasesToMeetResponsibility();
         }
 
-        public Task Shutdown()
+        public override IEnumerable<QueueId> GetMyQueues()
         {
-            return Task.CompletedTask;
+            lock (_lock)
+            {
+                return _ownedQueues.ToList();
+            }
         }
 
-        public IEnumerable<QueueId> GetMyQueues()
+        protected override void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos)
         {
-            return this.ownedQueues;
+            if (!_initialized || Cancellation.IsCancellationRequested)
+                return;
+
+            // Re-balance queues when membership changes
+            _ = RebalanceAsync(activeSilos.Count);
         }
 
-        private async Task GetInitialLease()
+        private async Task RebalanceAsync(int activeSiloCount)
         {
-            var responsibilty = await this.leaseManagerGrain.GetLeaseResposibility();
-            this.ownedQueues = new List<QueueId>(responsibilty);
-            for(int i = 0; i < responsibilty; i++)
+            try
+            {
+                // Release excess queues first if we have too many
+                var responsibility = _allQueuesCount / Math.Max(1, activeSiloCount);
+                
+                lock (_lock)
+                {
+                    if (_ownedQueues.Count > responsibility)
+                    {
+                        // Release excess queues (don't actually release to lease manager, just stop owning them)
+                        var excessCount = _ownedQueues.Count - responsibility;
+                        for (int i = 0; i < excessCount; i++)
+                        {
+                            var queueToRelease = _ownedQueues[_ownedQueues.Count - 1];
+                            _ownedQueues.RemoveAt(_ownedQueues.Count - 1);
+                            // Fire and forget the release
+                            _ = _leaseManagerGrain.Release(queueToRelease);
+                        }
+                    }
+                }
+
+                // Try to acquire more if needed
+                await AcquireLeasesToMeetResponsibility();
+                
+                // Notify listeners of the change
+                await NotifyListeners();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error rebalancing queues");
+            }
+        }
+
+        private async Task AcquireLeasesToMeetResponsibility()
+        {
+            var responsibility = await _leaseManagerGrain.GetLeaseResposibility();
+            
+            int currentCount;
+            lock (_lock)
+            {
+                currentCount = _ownedQueues.Count;
+            }
+            
+            var queuesTryAcquire = responsibility - currentCount;
+            
+            for (int i = 0; i < queuesTryAcquire; i++)
             {
                 try
                 {
-                    this.ownedQueues.Add(await this.leaseManagerGrain.Acquire());
+                    var queue = await _leaseManagerGrain.Acquire();
+                    lock (_lock)
+                    {
+                        _ownedQueues.Add(queue);
+                    }
                 }
                 catch (KeyNotFoundException)
-                { }   
+                {
+                    // No more queues available, that's okay
+                    break;
+                }
             }
-            await this.leaseManagerGrain.RecordBalancerResponsibility(id.ToString(), this.ownedQueues.Count);
-        }
 
-        public bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
-        {
-            //no op operation
-            return true;
-        }
-
-        public bool UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
-        {
-            //no op operation
-            return true;
+            // Record the final responsibility for test verification
+            int finalCount;
+            lock (_lock)
+            {
+                finalCount = _ownedQueues.Count;
+            }
+            await _leaseManagerGrain.RecordBalancerResponsibility(_id, finalCount);
         }
     }
 }

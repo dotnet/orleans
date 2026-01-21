@@ -110,6 +110,8 @@ namespace UnitTests.Grains
                 availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
                 rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
                 maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
+            // Invalidate the gateway's OverloadDetector cache so the next check reflects the latched values
+            overloadDetector.ForceRefresh();
             return PropagateStatisticsToCluster(GrainFactory);
         }
 
@@ -124,6 +126,8 @@ namespace UnitTests.Grains
                 availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
                 rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
                 maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
+            // Invalidate the gateway's OverloadDetector cache so the next check reflects the unlatched values
+            overloadDetector.ForceRefresh();
             return PropagateStatisticsToCluster(GrainFactory);
         }
 
@@ -138,6 +142,8 @@ namespace UnitTests.Grains
                 availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
                 rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
                 maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
+            // Invalidate the gateway's OverloadDetector cache so the next check reflects the latched values
+            overloadDetector.ForceRefresh();
             return PropagateStatisticsToCluster(GrainFactory);
         }
 
@@ -152,6 +158,77 @@ namespace UnitTests.Grains
                 availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
                 rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
                 maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
+            // Invalidate the gateway's OverloadDetector cache so the next check reflects the unlatched values
+            overloadDetector.ForceRefresh();
+            return PropagateStatisticsToCluster(GrainFactory);
+        }
+
+        public Task LatchCpuUsageOnly(float value)
+        {
+            var stats = environmentStatistics.GetEnvironmentStatistics();
+            environmentStatistics.LatchHardwareStatistics(new(
+                cpuUsagePercentage: value,
+                rawCpuUsagePercentage: value,
+                memoryUsageBytes: stats.FilteredMemoryUsageBytes,
+                rawMemoryUsageBytes: stats.RawMemoryUsageBytes,
+                availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
+                rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
+                maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
+            // Don't propagate - caller will call RefreshOverloadDetectorAndPropagateStatistics after all silos are latched
+            return Task.CompletedTask;
+        }
+
+        public Task LatchOverloadedOnly()
+        {
+            var stats = environmentStatistics.GetEnvironmentStatistics();
+            environmentStatistics.LatchHardwareStatistics(new EnvironmentStatistics(
+                cpuUsagePercentage: loadSheddingOptions.CpuThreshold + 1,
+                rawCpuUsagePercentage: loadSheddingOptions.CpuThreshold + 1,
+                memoryUsageBytes: stats.FilteredMemoryUsageBytes,
+                rawMemoryUsageBytes: stats.RawMemoryUsageBytes,
+                availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
+                rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
+                maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
+            // Don't propagate - caller will call RefreshOverloadDetectorAndPropagateStatistics after all silos are latched
+            return Task.CompletedTask;
+        }
+
+        public Task RefreshOverloadDetectorAndPropagateStatistics()
+        {
+            // Invalidate this silo's OverloadDetector cache so the next check reflects the latched values
+            overloadDetector.ForceRefresh();
+            return PropagateStatisticsToCluster(GrainFactory);
+        }
+
+        public Task LatchCpuUsageAndPropagate(float value)
+        {
+            var stats = environmentStatistics.GetEnvironmentStatistics();
+            environmentStatistics.LatchHardwareStatistics(new(
+                cpuUsagePercentage: value,
+                rawCpuUsagePercentage: value,
+                memoryUsageBytes: stats.FilteredMemoryUsageBytes,
+                rawMemoryUsageBytes: stats.RawMemoryUsageBytes,
+                availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
+                rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
+                maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
+            // Atomically refresh the OverloadDetector cache
+            overloadDetector.ForceRefresh();
+            return PropagateStatisticsToCluster(GrainFactory);
+        }
+
+        public Task LatchOverloadedAndPropagate()
+        {
+            var stats = environmentStatistics.GetEnvironmentStatistics();
+            environmentStatistics.LatchHardwareStatistics(new EnvironmentStatistics(
+                cpuUsagePercentage: loadSheddingOptions.CpuThreshold + 1,
+                rawCpuUsagePercentage: loadSheddingOptions.CpuThreshold + 1,
+                memoryUsageBytes: stats.FilteredMemoryUsageBytes,
+                rawMemoryUsageBytes: stats.RawMemoryUsageBytes,
+                availableMemoryBytes: stats.FilteredAvailableMemoryBytes,
+                rawAvailableMemoryBytes: stats.RawAvailableMemoryBytes,
+                maximumAvailableMemoryBytes: stats.MaximumAvailableMemoryBytes));
+            // Atomically refresh the OverloadDetector cache
+            overloadDetector.ForceRefresh();
             return PropagateStatisticsToCluster(GrainFactory);
         }
 

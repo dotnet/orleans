@@ -36,24 +36,22 @@ public class DynamicRebalancingTests(RebalancerFixture fixture, ITestOutputHelpe
            $"Silo3: {initialSilo3Activations}\n" +
            $"Silo4: {initialSilo4Activations}\n");
 
-        var silo1Activations = initialSilo1Activations;
-        var silo2Activations = initialSilo2Activations;
-        var silo3Activations = initialSilo3Activations;
-        var silo4Activations = initialSilo4Activations;
-
         const int extraActivationsSilo1 = 30;
         const int extraActivationsSilo2 = 3;
         const int extraActivationsSilo3 = 18;
         const int extraActivationsSilo4 = 10;
 
-        var index = 0;
         var extraRounds = 0;
+        const int targetCycles = 5;
 
-        while (index < 5)
+        // Wait for cycles using event-driven waiting, adding extra activations periodically
+        for (int cycleIndex = 0; cycleIndex < targetCycles; cycleIndex++)
         {
-            await Task.Delay(RebalancerFixture.SessionCyclePeriod);
+            // Wait for the next cycle to complete
+            await RebalancerObserver.WaitForCycleCountAsync(cycleIndex + 1, timeout: TimeSpan.FromSeconds(30));
 
-            if (index % 2 == 0)
+            // Add extra activations on even cycles (0, 2, 4)
+            if (cycleIndex % 2 == 0)
             {
                 tasks.Clear();
 
@@ -66,7 +64,7 @@ public class DynamicRebalancingTests(RebalancerFixture fixture, ITestOutputHelpe
                 await Task.WhenAll(tasks);
 
                 OutputHelper.WriteLine(
-                   $"Added extra activations on cycle {index + 1}:\n" +
+                   $"Added extra activations after cycle {cycleIndex + 1}:\n" +
                    $"Silo1: {extraActivationsSilo1}\n" +
                    $"Silo2: {extraActivationsSilo2}\n" +
                    $"Silo3: {extraActivationsSilo3}\n" +
@@ -74,16 +72,14 @@ public class DynamicRebalancingTests(RebalancerFixture fixture, ITestOutputHelpe
 
                 extraRounds++;
             }
-
-            stats = await MgmtGrain.GetDetailedGrainStatistics();
-
-            silo1Activations = GetActivationCount(stats, Silo1);
-            silo2Activations = GetActivationCount(stats, Silo2);
-            silo3Activations = GetActivationCount(stats, Silo3);
-            silo4Activations = GetActivationCount(stats, Silo4);
-
-            index++;
         }
+
+        stats = await MgmtGrain.GetDetailedGrainStatistics();
+
+        var silo1Activations = GetActivationCount(stats, Silo1);
+        var silo2Activations = GetActivationCount(stats, Silo2);
+        var silo3Activations = GetActivationCount(stats, Silo3);
+        var silo4Activations = GetActivationCount(stats, Silo4);
 
         var finalSilo1Activations = initialSilo1Activations + extraRounds * extraActivationsSilo1;
         var finalSilo2Activations = initialSilo2Activations + extraRounds * extraActivationsSilo2;
@@ -109,8 +105,9 @@ public class DynamicRebalancingTests(RebalancerFixture fixture, ITestOutputHelpe
         var preVariance = CalculateVariance([finalSilo1Activations, finalSilo2Activations, finalSilo3Activations, finalSilo4Activations]);
         var postVariance = CalculateVariance([silo1Activations, silo2Activations, silo3Activations, silo4Activations]);
 
+        var completedCycles = RebalancerObserver.GetCycleCount();
         OutputHelper.WriteLine(
-            $"Post-rebalancing activations ({index} cycles):\n" +
+            $"Post-rebalancing activations ({completedCycles} cycles):\n" +
             $"Silo1: {silo1Activations} | Expected without rebalancing: {finalSilo1Activations}\n" +
             $"Silo2: {silo2Activations} | Expected without rebalancing: {finalSilo2Activations}\n" +
             $"Silo3: {silo3Activations} | Expected without rebalancing: {finalSilo3Activations}\n" +

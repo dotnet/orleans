@@ -145,7 +145,8 @@ namespace UnitTests.General
             {
                 await VerificationScenario(PickKey(sh.SiloAddress));
             }
-            Thread.Sleep(TimeSpan.FromSeconds(15));
+            // Removed unnecessary Thread.Sleep(15s) - verification has already passed
+            // and TestClusterPerTest creates a new cluster for each test
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
@@ -388,7 +389,7 @@ namespace UnitTests.General
 
                 if (delayBetweenIterations > TimeSpan.Zero)
                 {
-                    Thread.Sleep(delayBetweenIterations);
+                    await Task.Delay(delayBetweenIterations);
                 }
             }
         }
