@@ -1,5 +1,5 @@
+#nullable enable
 using System.Net;
-using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers.StorageSerializer;
 using Orleans.Providers.Streams.Common;
@@ -52,20 +52,35 @@ namespace UnitTests.StorageTests
             _newtonSoft = ActivatorUtilities.CreateInstance<JsonGrainStorageSerializer>(_testCluster.Silos.First().ServiceProvider);
         }
 
-        private void Roundtrip<T>(T instance)
+        private void Roundtrip<T>(T instance) where T : notnull
         {
-            _systemTextJson.Deserialize<T>(_systemTextJson.Serialize(instance)).Should().BeEquivalentTo(instance);
-            _newtonSoft.Deserialize<T>(_newtonSoft.Serialize(instance)).Should().BeEquivalentTo(instance);
-            
-            _systemTextJson.Deserialize<T>(_newtonSoft.Serialize(instance)).Should().BeEquivalentTo(instance);
-            _newtonSoft.Deserialize<T>(_systemTextJson.Serialize(instance)).Should().BeEquivalentTo(instance);
-          
-            // Dictionary Key support is seperately implemented in the SystemTextJson JsonConverters so requires its own testing
-            var dict = new Dictionary<T, T>() { { instance, instance } };
-            _systemTextJson.Deserialize<Dictionary<T, T>>(_systemTextJson.Serialize(dict)).Should().BeEquivalentTo(dict);
+            AssertEquivalent(instance, _systemTextJson.Deserialize<T>(_systemTextJson.Serialize(instance)));
+            AssertEquivalent(instance, _newtonSoft.Deserialize<T>(_newtonSoft.Serialize(instance)));
 
-            // Test for default value support
-            _systemTextJson.Deserialize<T>(_systemTextJson.Serialize(default(T))).Should().BeEquivalentTo(default(T));
+            AssertEquivalent(instance, _systemTextJson.Deserialize<T>(_newtonSoft.Serialize(instance)));
+            AssertEquivalent(instance, _newtonSoft.Deserialize<T>(_systemTextJson.Serialize(instance)));
+
+            // Dictionary Key support is separately implemented in the SystemTextJson JsonConverters so requires its own testing
+            var dict = new Dictionary<T, T>() { { instance, instance } };
+            var deserializedDict = _systemTextJson.Deserialize<Dictionary<T, T>>(_systemTextJson.Serialize(dict));
+            Assert.NotNull(deserializedDict);
+            Assert.Equal(dict.Count, deserializedDict.Count);
+            foreach (var kvp in dict)
+            {
+                Assert.True(deserializedDict.ContainsKey(kvp.Key), $"Dictionary should contain key {kvp.Key}");
+                AssertEquivalent(kvp.Value, deserializedDict[kvp.Key]);
+            }
+        }
+
+        private static void AssertEquivalent<T>(T? expected, T? actual)
+        {
+            if (expected is null)
+            {
+                Assert.Null(actual);
+                return;
+            }
+            Assert.NotNull(actual);
+            Assert.Equal(expected, actual);
         }
 
         [Fact]
@@ -94,7 +109,7 @@ namespace UnitTests.StorageTests
 
         [Fact]
         public void IpEndPointConverter()
-        { 
+        {
             Roundtrip(IPEndPoint.Parse("[1234:1224:1223:1234:1234:ffff:192.168.100.228]:443"));
             Roundtrip(IPEndPoint.Parse("[1234:1224:1223:1234:1234:ffff:192.168.100.228]"));
             Roundtrip(IPEndPoint.Parse("192.168.100.228"));
@@ -102,16 +117,16 @@ namespace UnitTests.StorageTests
         }
 
         [Fact]
-        public void EventSequenceTokenV2Converter() => Roundtrip(new EventSequenceTokenV2(35242,24298));
+        public void EventSequenceTokenV2Converter() => Roundtrip(new EventSequenceTokenV2(35242, 24298));
 
         [Fact]
-        public void EventSequenceTokenConverter() => Roundtrip(new EventSequenceToken(2424,1));
+        public void EventSequenceTokenConverter() => Roundtrip(new EventSequenceToken(2424, 1));
 
         [Fact]
         public void StreamIdConverter() => Roundtrip(StreamId.Create("namespace", "key"));
 
         [Fact]
-        public void StreamIdNullNamespaceConverter() => Roundtrip(StreamId.Create(null, "key"));
+        public void StreamIdNullNamespaceConverter() => Roundtrip(StreamId.Create(null!, "key"));
 
         [Fact]
         public void QualifiedStreamIdConverter() => Roundtrip(new QualifiedStreamId("provider", StreamId.Create("namespace", "key")));
@@ -153,7 +168,7 @@ namespace UnitTests.StorageTests
             var originalValue = await propertyToCheck(instance);
             var newValue = await propertyToCheck(roundTrippedGrainReference);
 
-            originalValue.Should().Be(newValue);
+            Assert.Equal(originalValue, newValue);
         }
     }
 }

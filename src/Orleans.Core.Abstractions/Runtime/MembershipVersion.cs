@@ -124,7 +124,7 @@ namespace Orleans.Runtime
                 }
                 else
                 {
-                    return new MembershipVersion(long.Parse(reader.GetString(), CultureInfo.InvariantCulture));
+                    return new MembershipVersion(long.Parse(reader.GetString()!, CultureInfo.InvariantCulture));
                 }
             }
             else
