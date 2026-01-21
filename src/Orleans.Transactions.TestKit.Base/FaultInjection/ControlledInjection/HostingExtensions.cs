@@ -25,5 +25,10 @@ namespace Orleans.Transactions.TestKit
         {
             return builder.ConfigureServices(services => services.AddFaultInjectionAzureTableTransactionalStateStorage(name, ob => ob.Configure(configureOptions)));
         }
+
+        public static ISiloBuilder AddFaultInjectionDynamoDBTransactionalStateStorage(this ISiloBuilder builder, string name, Action<DynamoDBTransactionalStorageOptions> configureOptions)
+        {
+            return builder.ConfigureServices(services => services.AddFaultInjectionDynamoDBTransactionalStateStorage(name, ob => ob.Configure(configureOptions)));
+        }
     }
 }
