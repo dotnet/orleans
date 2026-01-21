@@ -35,7 +35,7 @@ internal sealed partial class ActivationRepartitioner : IMessageStatisticsSink
         }
 
         _pendingMessageEvent.Signal();
-        await _processPendingEdgesTask.WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        await _processPendingEdgesTask.WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         LogTraceServiceStopped(_logger, nameof(ActivationRepartitioner));
     }
