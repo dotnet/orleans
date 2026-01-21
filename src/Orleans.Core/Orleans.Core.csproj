@@ -45,6 +45,8 @@
     <PackageReference Include="Microsoft.Extensions.Logging" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="Polly" />
+    <PackageReference Include="Polly.Extensions" />
     <PackageReference Include="System.Memory.Data" />
   </ItemGroup>
 
