@@ -292,6 +292,12 @@ namespace Orleans.Journaling
         public override readonly string ToString() { throw null; }
     }
 
+    public sealed partial class StateMachineManagerOptions
+    {
+        public static readonly System.TimeSpan DEFAULT_RETIREMENT_GRACE_PERIOD;
+        public System.TimeSpan RetirementGracePeriod { get { throw null; } set { } }
+    }
+
     public readonly partial struct StateMachineStorageWriter
     {
         private readonly object _dummy;
@@ -334,7 +340,7 @@ namespace Orleans.Journaling
 
 namespace OrleansCodeGen.Orleans.Journaling
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_DurableTaskCompletionSourceState<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.DurableTaskCompletionSourceState<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Journaling.DurableTaskCompletionSourceState<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -352,7 +358,7 @@ namespace OrleansCodeGen.Orleans.Journaling
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_DurableTaskCompletionSourceStatus : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.DurableTaskCompletionSourceStatus>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -363,7 +369,7 @@ namespace OrleansCodeGen.Orleans.Journaling
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_DurableTaskCompletionSourceState<T> : global::Orleans.Serialization.Cloning.ShallowCopier<global::Orleans.Journaling.DurableTaskCompletionSourceState<T>>
