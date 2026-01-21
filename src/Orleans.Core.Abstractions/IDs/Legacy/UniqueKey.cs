@@ -352,13 +352,13 @@ namespace Orleans.Runtime
         private const int MaxBufferSize = 256;
 
         /// <inheritdoc />
-        public override UniqueKey Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override UniqueKey? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType != JsonTokenType.StartObject)
             {
                 return null;
             }
-            UniqueKey result = null;
+            UniqueKey? result = null;
             while (reader.Read())
             {
                 if (reader.TokenType == JsonTokenType.EndObject)
@@ -379,7 +379,7 @@ namespace Orleans.Runtime
             return result;
         }
 
-        private static UniqueKey GetUniqueKey(ref Utf8JsonReader reader, scoped Span<char> buffer)
+        private static UniqueKey? GetUniqueKey(ref Utf8JsonReader reader, scoped Span<char> buffer)
         {
             if (reader.HasValueSequence)
             {
@@ -399,7 +399,8 @@ namespace Orleans.Runtime
                 }
             }
 
-            return UniqueKey.Parse(reader.GetString());
+            var str = reader.GetString();
+            return str is null ? null : UniqueKey.Parse(str);
         }
 
         /// <inheritdoc />
@@ -414,7 +415,7 @@ namespace Orleans.Runtime
         public override UniqueKey ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             Span<char> buffer = stackalloc char[MaxBufferSize];
-            return GetUniqueKey(ref reader, buffer);
+            return GetUniqueKey(ref reader, buffer) ?? throw new JsonException("Failed to parse UniqueKey from property name.");
         }
 
         /// <inheritdoc />
