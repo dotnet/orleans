@@ -1,7 +1,4 @@
-using System;
 using System.Buffers;
-using System.IO;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Buffers.Adaptors
 {
@@ -12,7 +9,6 @@ namespace Orleans.Serialization.Buffers.Adaptors
     {
         private readonly Stream _stream;
         private byte[] _buffer;
-        private int _bytesWritten;
         private const int MinRequestSize = 256;
 
         /// <summary>
@@ -24,76 +20,31 @@ namespace Orleans.Serialization.Buffers.Adaptors
         {
             _stream = stream;
             _buffer = ArrayPool<byte>.Shared.Rent(Math.Max(sizeHint, MinRequestSize));
-            _bytesWritten = 0;
         }
 
         /// <inheritdoc />
-        public void Advance(int count)
-        {
-            _stream.Write(_buffer, _bytesWritten, count);
-            _bytesWritten += count;
-            if (_bytesWritten > _buffer.Length)
-            {
-                ThrowInvalidCount();
-                [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                static void ThrowInvalidCount() => throw new InvalidOperationException("Cannot advance past the end of the buffer");
-            }
-        }
+        public void Advance(int count) => _stream.Write(_buffer, 0, count);
 
         /// <inheritdoc />
-        public Memory<byte> GetMemory(int sizeHint = 0)
-        {
-            if (sizeHint < MinRequestSize)
-            {
-                sizeHint = MinRequestSize;
-            }
-
-            if (sizeHint <= _buffer.Length - _bytesWritten)
-            {
-                return _buffer.AsMemory(_bytesWritten);
-            }
-            else
-            {
-                _bytesWritten = 0;
-                Resize(sizeHint);
-                return _buffer;
-            }
-        }
+        public Memory<byte> GetMemory(int sizeHint = 0) => sizeHint <= _buffer.Length ? _buffer : Resize(sizeHint);
 
         /// <inheritdoc />
-        public Span<byte> GetSpan(int sizeHint = 0)
-        {
-            if (sizeHint < MinRequestSize)
-            {
-                sizeHint = MinRequestSize;
-            }
+        public Span<byte> GetSpan(int sizeHint = 0) => sizeHint <= _buffer.Length ? _buffer : Resize(sizeHint);
 
-            if (sizeHint <= _buffer.Length - _bytesWritten)
-            {
-                return _buffer.AsSpan(_bytesWritten);
-            }
-            else
-            {
-                _bytesWritten = 0;
-                Resize(sizeHint);
-                return _buffer;
-            }
-        }
-
-        private void Resize(int sizeHint)
+        private byte[] Resize(int sizeHint)
         {
-            var newBuffer = ArrayPool<byte>.Shared.Rent(_bytesWritten + sizeHint);
-            _buffer[0.._bytesWritten].CopyTo(newBuffer, 0);
+            var newBuffer = ArrayPool<byte>.Shared.Rent(sizeHint);
             ArrayPool<byte>.Shared.Return(_buffer);
-            _buffer = newBuffer;
+            return _buffer = newBuffer;
         }
 
         /// <inheritdoc />
-        public readonly void Dispose()
+        public void Dispose()
         {
-            if (_buffer is not null)
+            if (_buffer is { } buf)
             {
-                ArrayPool<byte>.Shared.Return(_buffer);
+                _buffer = null;
+                ArrayPool<byte>.Shared.Return(buf);
             }
         }
     }
