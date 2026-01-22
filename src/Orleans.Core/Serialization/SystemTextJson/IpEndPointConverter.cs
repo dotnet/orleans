@@ -18,8 +18,6 @@ namespace Orleans.Serialization
             IPAddress? address = null;
             var port = -1;
 
-            Span<char> propertyName = stackalloc char[8];
-
             while (reader.Read())
             {
                 if (reader.TokenType == JsonTokenType.EndObject)
@@ -27,14 +25,20 @@ namespace Orleans.Serialization
 
                 if (reader.TokenType == JsonTokenType.PropertyName)
                 {
-                    var written = reader.CopyString(propertyName);
-
-                    reader.Read();
-
-                    if (propertyName[..written] is "Address")
+                    if (reader.ValueTextEquals("Address"u8))
+                    {
+                        reader.Read();
                         address = addressConverter.Read(ref reader, typeof(IPAddress), options);
-                    else if (propertyName[..written] is "Port")
+                    }
+                    else if (reader.ValueTextEquals("Port"u8))
+                    {
+                        reader.Read();
                         _ = reader.TryGetInt32(out port); // Port is optional
+                    }
+                    else
+                    {
+                        reader.Read();
+                    }
                 }
             }
 
@@ -74,7 +78,7 @@ namespace Orleans.Serialization
         /// <inheritdoc />
         public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] IPEndPoint value, JsonSerializerOptions options)
         {
-            writer.WritePropertyName(value.ToString()); // TODO: PR for IPEndPoint to support ISpanFormattable/IUtf8SpanFormattable
+            writer.WritePropertyName(value.ToString());
         }
     }
 }

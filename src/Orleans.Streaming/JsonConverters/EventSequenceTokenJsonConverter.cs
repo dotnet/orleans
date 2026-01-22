@@ -50,7 +50,16 @@ namespace Orleans.Streaming.JsonConverters
             return sequenceNumber is null 
                 || eventIndex is null
                 ? null
-                : (StreamSequenceToken?)Activator.CreateInstance(typeToConvert,[sequenceNumber.Value, eventIndex.Value]);
+                : CreateToken(typeToConvert, sequenceNumber.Value, eventIndex.Value);
+        }
+
+        private StreamSequenceToken CreateToken(Type typeToConvert, long sequenceNumber, int eventIndex)
+        {
+            if (typeToConvert == _eventSequenceTokenType)
+                return new EventSequenceToken(sequenceNumber, eventIndex);
+            if (typeToConvert == _eventSequenceTokenTypeV2)
+                return new EventSequenceTokenV2(sequenceNumber, eventIndex);
+            throw new NotSupportedException($"Unsupported {nameof(StreamSequenceToken)} type: {typeToConvert}");
         }
 
         public override void Write(Utf8JsonWriter writer, StreamSequenceToken value, JsonSerializerOptions options) {
