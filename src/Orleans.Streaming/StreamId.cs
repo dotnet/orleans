@@ -269,7 +269,6 @@ namespace Orleans.Runtime
         public string? GetNamespace() => keyIndex == 0 ? null : Encoding.UTF8.GetString(fullKey, 0, keyIndex);
 
         internal IdSpan GetKeyIdSpan() => keyIndex == 0 ? IdSpan.UnsafeCreate(fullKey, hash) : new(fullKey.AsSpan(keyIndex).ToArray());
-       
     }
 
     public sealed class StreamIdJsonConverter : JsonConverter<StreamId>

@@ -9,6 +9,9 @@ using Orleans.Streams;
 
 namespace Orleans.Streaming.JsonConverters
 {
+    /// <summary>
+    /// A <see cref="JsonConverter{T}"/> for <see cref="IAsyncStream"/> types.
+    /// </summary>
     internal sealed class AsyncStreamConverter(IRuntimeClient runtimeClient) : JsonConverter<IAsyncStream>
     {
         private readonly Type _asyncStreamType = typeof(IAsyncStream);
