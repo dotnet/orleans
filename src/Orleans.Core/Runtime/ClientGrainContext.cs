@@ -1,20 +1,17 @@
-using System;
+#nullable enable
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime;
 
 namespace Orleans
 {
-    internal class ClientGrainContext : IGrainContext, IGrainExtensionBinder, IGrainContextAccessor
+    internal sealed class ClientGrainContext : IGrainContext, IGrainExtensionBinder, IGrainContextAccessor
     {
-        private readonly object _lockObj = new object();
+        private readonly object _lockObj = new();
         private readonly ConcurrentDictionary<Type, (object Implementation, IAddressable Reference)> _extensions = new();
         private readonly ConcurrentDictionary<Type, object> _components = new();
         private readonly OutsideRuntimeClient _runtimeClient;
-        private GrainReference _grainReference;
+        private GrainReference? _grainReference;
 
         public ClientGrainContext(OutsideRuntimeClient runtimeClient)
         {
@@ -25,7 +22,7 @@ namespace Orleans
 
         public GrainId GrainId => _runtimeClient.CurrentActivationAddress.GrainId;
 
-        public object GrainInstance => null;
+        public object? GrainInstance => null;
 
         public ActivationId ActivationId => _runtimeClient.CurrentActivationAddress.ActivationId;
 
@@ -33,48 +30,40 @@ namespace Orleans
 
         public IServiceProvider ActivationServices => _runtimeClient.ServiceProvider;
 
-        public IGrainLifecycle ObservableLifecycle => null;
+        public IGrainLifecycle ObservableLifecycle => throw new NotSupportedException();
 
         IGrainContext IGrainContextAccessor.GrainContext => this;
 
-        public IWorkItemScheduler Scheduler => throw new NotImplementedException();
+        public IWorkItemScheduler Scheduler => throw new NotSupportedException();
 
-        public bool IsExemptFromCollection => true;
+        public bool Equals(IGrainContext? other) => ReferenceEquals(this, other);
 
-        public PlacementStrategy PlacementStrategy => ClientObserversPlacement.Instance;
-
-        public bool Equals(IGrainContext other) => ReferenceEquals(this, other);
-
-        public TComponent GetComponent<TComponent>() where TComponent : class
+        public object? GetComponent(Type componentType)
         {
-            if (this is TComponent component) return component;
-            if (_components.TryGetValue(typeof(TComponent), out var result))
+            if (componentType.IsAssignableFrom(GetType())) return this;
+            if (_components.TryGetValue(componentType, out var result))
             {
-                return (TComponent)result;
+                return result;
             }
-            else if (typeof(TComponent) == typeof(PlacementStrategy))
+            else if (componentType == typeof(PlacementStrategy))
             {
-                return (TComponent)(object)ClientObserversPlacement.Instance;
+                return ClientObserversPlacement.Instance;
             }
 
             lock (_lockObj)
             {
-                if (ActivationServices.GetService<TComponent>() is { } activatedComponent)
+                if (ActivationServices.GetService(componentType) is { } activatedComponent)
                 {
-                    return (TComponent)_components.GetOrAdd(typeof(TComponent), activatedComponent);
+                    return _components.GetOrAdd(componentType, activatedComponent);
                 }
             }
 
             return default;
         }
 
-        public TTarget GetTarget<TTarget>() where TTarget : class
-        {
-            if (this is TTarget target) return target;
-            return default;
-        }
+        public object? GetTarget() => this;
 
-        public void SetComponent<TComponent>(TComponent instance) where TComponent : class
+        public void SetComponent<TComponent>(TComponent? instance) where TComponent : class
         {
             if (this is TComponent)
             {
@@ -137,7 +126,7 @@ namespace Orleans
             return false;
         }
 
-        private bool TryGetExtension<TExtensionInterface>(out TExtensionInterface result)
+        private bool TryGetExtension<TExtensionInterface>([NotNullWhen(true)] out TExtensionInterface? result)
             where TExtensionInterface : IGrainExtension
         {
             if (_extensions.TryGetValue(typeof(TExtensionInterface), out var existing))
@@ -178,12 +167,9 @@ namespace Orleans
             }
         }
 
-        public void ReceiveMessage(object message)
-        {
-            throw new NotImplementedException();
-        }
+        public void ReceiveMessage(object message) => throw new NotSupportedException();
 
-        public void Activate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) { }
+        public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) { }
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) { }
 
         public void Rehydrate(IRehydrationContext context)
@@ -192,7 +178,7 @@ namespace Orleans
             (context as IDisposable)?.Dispose();
         }
 
-        public void Migrate(Dictionary<string, object> requestContext, CancellationToken cancellationToken)
+        public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
         {
             // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
         }

@@ -112,9 +112,9 @@ namespace Orleans.Serialization
         /// <remarks>The destination stream will not be flushed by this method.</remarks>
         public void Serialize<T>(T value, Stream destination, int sizeHint = 0)
         {
+            using var session = _sessionPool.GetSession();
             if (destination is MemoryStream memoryStream)
             {
-                using var session = _sessionPool.GetSession();
                 var writer = Writer.Create(memoryStream, session);
                 var codec = session.CodecProvider.GetCodec<T>();
                 codec.WriteField(ref writer, 0, typeof(T), value);
@@ -122,7 +122,6 @@ namespace Orleans.Serialization
             }
             else
             {
-                using var session = _sessionPool.GetSession();
                 var writer = Writer.CreatePooled(destination, session, sizeHint);
                 try
                 {
@@ -150,16 +149,14 @@ namespace Orleans.Serialization
         {
             if (destination is MemoryStream memoryStream)
             {
-                var buffer = new MemoryStreamBufferWriter(memoryStream);
-                var writer = Writer.Create(buffer, session);
+                var writer = Writer.Create(memoryStream, session);
                 var codec = session.CodecProvider.GetCodec<T>();
                 codec.WriteField(ref writer, 0, typeof(T), value);
                 writer.Commit();
             }
             else
             {
-                var buffer = new PoolingStreamBufferWriter(destination, sizeHint);
-                var writer = Writer.Create(buffer, session);
+                var writer = Writer.CreatePooled(destination, session, sizeHint);
                 try
                 {
                     var codec = session.CodecProvider.GetCodec<T>();
@@ -697,18 +694,16 @@ namespace Orleans.Serialization
         /// <remarks>The destination stream will not be flushed by this method.</remarks>
         public void Serialize(T value, Stream destination, int sizeHint = 0)
         {
+            using var session = _sessionPool.GetSession();
             if (destination is MemoryStream memoryStream)
             {
-                var buffer = new MemoryStreamBufferWriter(memoryStream);
-                using var session = _sessionPool.GetSession();
-                var writer = Writer.Create(buffer, session);
+                var writer = Writer.Create(memoryStream, session);
                 _codec.WriteField(ref writer, 0, _expectedType, value);
                 writer.Commit();
             }
             else
             {
-                using var session = _sessionPool.GetSession();
-                var writer = Writer.Create(new PoolingStreamBufferWriter(destination, sizeHint), session);
+                var writer = Writer.CreatePooled(destination, session, sizeHint);
                 try
                 {
                     _codec.WriteField(ref writer, 0, _expectedType, value);
@@ -733,14 +728,13 @@ namespace Orleans.Serialization
         {
             if (destination is MemoryStream memoryStream)
             {
-                var buffer = new MemoryStreamBufferWriter(memoryStream);
-                var writer = Writer.Create(buffer, session);
+                var writer = Writer.Create(memoryStream, session);
                 _codec.WriteField(ref writer, 0, _expectedType, value);
                 writer.Commit();
             }
             else
             {
-                var writer = Writer.Create(new PoolingStreamBufferWriter(destination, sizeHint), session);
+                var writer = Writer.CreatePooled(destination, session, sizeHint);
                 try
                 {
                     _codec.WriteField(ref writer, 0, _expectedType, value);
@@ -1121,19 +1115,17 @@ namespace Orleans.Serialization
         /// <remarks>The destination stream will not be flushed by this method.</remarks>
         public void Serialize(scoped ref T value, Stream destination, int sizeHint = 0)
         {
+            using var session = _sessionPool.GetSession();
             if (destination is MemoryStream memoryStream)
             {
-                var buffer = new MemoryStreamBufferWriter(memoryStream);
-                using var session = _sessionPool.GetSession();
-                var writer = Writer.Create(buffer, session);
+                var writer = Writer.Create(memoryStream, session);
                 _codec.Serialize(ref writer, ref value);
                 writer.WriteEndObject();
                 writer.Commit();
             }
             else
             {
-                using var session = _sessionPool.GetSession();
-                var writer = Writer.Create(new PoolingStreamBufferWriter(destination, sizeHint), session);
+                var writer = Writer.CreatePooled(destination, session, sizeHint);
                 try
                 {
                     _codec.Serialize(ref writer, ref value);
@@ -1159,15 +1151,14 @@ namespace Orleans.Serialization
         {
             if (destination is MemoryStream memoryStream)
             {
-                var buffer = new MemoryStreamBufferWriter(memoryStream);
-                var writer = Writer.Create(buffer, session);
+                var writer = Writer.Create(memoryStream, session);
                 _codec.Serialize(ref writer, ref value);
                 writer.WriteEndObject();
                 writer.Commit();
             }
             else
             {
-                var writer = Writer.Create(new PoolingStreamBufferWriter(destination, sizeHint), session);
+                var writer = Writer.CreatePooled(destination, session, sizeHint);
                 try
                 {
                     _codec.Serialize(ref writer, ref value);
@@ -1383,16 +1374,15 @@ namespace Orleans.Serialization
         /// <remarks>The destination stream will not be flushed by this method.</remarks>
         public void Serialize(object value, Stream destination, Type type, int sizeHint = 0)
         {
+            using var session = _sessionPool.GetSession();
             if (destination is MemoryStream memoryStream)
             {
-                using var session = _sessionPool.GetSession();
                 var writer = Writer.Create(memoryStream, session);
                 ObjectCodec.WriteField(ref writer, 0, type, value);
                 writer.Commit();
             }
             else
             {
-                using var session = _sessionPool.GetSession();
                 var writer = Writer.CreatePooled(destination, session, sizeHint);
                 try
                 {
@@ -1419,15 +1409,13 @@ namespace Orleans.Serialization
         {
             if (destination is MemoryStream memoryStream)
             {
-                var buffer = new MemoryStreamBufferWriter(memoryStream);
-                var writer = Writer.Create(buffer, session);
+                var writer = Writer.Create(memoryStream, session);
                 ObjectCodec.WriteField(ref writer, 0, type, value);
                 writer.Commit();
             }
             else
             {
-                var buffer = new PoolingStreamBufferWriter(destination, sizeHint);
-                var writer = Writer.Create(buffer, session);
+                var writer = Writer.CreatePooled(destination, session, sizeHint);
                 try
                 {
                     ObjectCodec.WriteField(ref writer, 0, type, value);

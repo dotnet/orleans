@@ -407,10 +407,7 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(PooledBuffer), WireType.LengthPrefixed);
             writer.WriteVarUInt32((uint)value.Length);
-            foreach (var segment in value.GetEnumerator())
-            {
-                writer.Write(segment);
-            }
+            value.CopyTo(ref writer);
 
             // Dispose of the value after sending it.
             // PooledBuffer is special in this sense.

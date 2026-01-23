@@ -1,4 +1,4 @@
-﻿#pragma warning disable CS1591, RS0016, RS0041
+#pragma warning disable CS1591, RS0016, RS0041
 [assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
@@ -21,7 +21,7 @@ namespace OrleansCodeGen.TestProject
         public override string GetActivityName() => "IMyGrainWithGuidKey/GetGuidValue";
         public override global::System.Type GetInterfaceType() => typeof(global::TestProject.IMyGrainWithGuidKey);
         public override global::System.Reflection.MethodInfo GetMethod() => MethodBackingField;
-        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) => _target = holder.GetTarget<global::TestProject.IMyGrainWithGuidKey>();
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) => _target = (global::TestProject.IMyGrainWithGuidKey)holder.GetTarget();
         public override object GetTarget() => _target;
         public override void Dispose()
         {
@@ -56,7 +56,7 @@ namespace OrleansCodeGen.TestProject
         public override string GetActivityName() => "IMyGrainWithStringKey/GetStringKey";
         public override global::System.Type GetInterfaceType() => typeof(global::TestProject.IMyGrainWithStringKey);
         public override global::System.Reflection.MethodInfo GetMethod() => MethodBackingField;
-        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) => _target = holder.GetTarget<global::TestProject.IMyGrainWithStringKey>();
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) => _target = (global::TestProject.IMyGrainWithStringKey)holder.GetTarget();
         public override object GetTarget() => _target;
         public override void Dispose()
         {
@@ -91,7 +91,7 @@ namespace OrleansCodeGen.TestProject
         public override string GetActivityName() => "IMyGrainWithGuidCompoundKey/GetGuidAndStringKey";
         public override global::System.Type GetInterfaceType() => typeof(global::TestProject.IMyGrainWithGuidCompoundKey);
         public override global::System.Reflection.MethodInfo GetMethod() => MethodBackingField;
-        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) => _target = holder.GetTarget<global::TestProject.IMyGrainWithGuidCompoundKey>();
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) => _target = (global::TestProject.IMyGrainWithGuidCompoundKey)holder.GetTarget();
         public override object GetTarget() => _target;
         public override void Dispose()
         {
@@ -126,7 +126,7 @@ namespace OrleansCodeGen.TestProject
         public override string GetActivityName() => "IMyGrainWithIntegerCompoundKey/GetIntegerAndStringKey";
         public override global::System.Type GetInterfaceType() => typeof(global::TestProject.IMyGrainWithIntegerCompoundKey);
         public override global::System.Reflection.MethodInfo GetMethod() => MethodBackingField;
-        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) => _target = holder.GetTarget<global::TestProject.IMyGrainWithIntegerCompoundKey>();
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) => _target = (global::TestProject.IMyGrainWithIntegerCompoundKey)holder.GetTarget();
         public override object GetTarget() => _target;
         public override void Dispose()
         {

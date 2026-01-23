@@ -286,16 +286,21 @@ namespace Orleans.CodeGenerator
             var holderParameter = holder.Identifier;
 
             var containingInterface = methodDescription.ContainingInterface;
+            var targetType = containingInterface.ToTypeSyntax();
             var isExtension = methodDescription.Key.ProxyBase.IsExtension;
-            var getTarget = InvocationExpression(
+            var (name, args) = isExtension switch
+            {
+                true => ("GetComponent", SingletonSeparatedList(Argument(TypeOfExpression(targetType)))),
+                _ => ("GetTarget", SeparatedList<ArgumentSyntax>())
+            };
+            var getTarget = CastExpression(
+                targetType,
+                InvocationExpression(
                     MemberAccessExpression(
                         SyntaxKind.SimpleMemberAccessExpression,
                         holder,
-                        GenericName(isExtension ? "GetComponent" : "GetTarget")
-                            .WithTypeArgumentList(
-                                TypeArgumentList(
-                                    SingletonSeparatedList(containingInterface.ToTypeSyntax())))))
-                .WithArgumentList(ArgumentList());
+                        IdentifierName(name)),
+                    ArgumentList(args)));
 
             var member =
             MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "SetTarget")
@@ -322,7 +327,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private MemberDeclarationSyntax GenerateGetTargetMethod(TargetFieldDescription targetField)
+        private static MethodDeclarationSyntax GenerateGetTargetMethod(TargetFieldDescription targetField)
         {
             return MethodDeclaration(PredefinedType(Token(SyntaxKind.ObjectKeyword)), "GetTarget")
                 .WithParameterList(ParameterList())
