@@ -87,7 +87,6 @@ let settings: Settings = {
 
 // Global state.
 let dashboardCounters: any = {};
-let unfilteredDashboardCounters: any = {};
 let routeIndex = 0;
 
 function scroll() {
@@ -124,7 +123,6 @@ function setIntervalDebounced(action: () => Promise<any>, interval: number) {
 function loadDashboardCounters() {
     return http.get(`DashboardCounters${getFilter(settings)}`, function (err, data) {
     dashboardCounters = data;
-    unfilteredDashboardCounters = data;
     events.emit('dashboard-counters', dashboardCounters);
   });
 }
