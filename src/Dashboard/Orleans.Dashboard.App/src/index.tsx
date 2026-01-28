@@ -122,12 +122,9 @@ function setIntervalDebounced(action: () => Promise<any>, interval: number) {
 
 // continually poll the dashboard counters
 function loadDashboardCounters() {
-  return http.get('DashboardCounters', function (err, data) {
+    return http.get(`DashboardCounters${getFilter(settings)}`, function (err, data) {
     dashboardCounters = data;
     unfilteredDashboardCounters = data;
-    dashboardCounters.simpleGrainStats = unfilteredDashboardCounters.simpleGrainStats.filter(
-      getFilter(settings)
-    );
     events.emit('dashboard-counters', dashboardCounters);
   });
 }
@@ -202,18 +199,9 @@ function renderPage(jsx: JSX.Element, path: string) {
       loadDataIsPending = true;
       http.get('ClusterStats', function (err, data) {
         clusterStats = data;
-        http.get('TopGrainMethods', function (err, grainMethodsData) {
+          http.get(`TopGrainMethods${getFilter(settings)}`, function (err, grainMethodsData) {
           grainMethodStats = grainMethodsData;
           unfiltedMethodStats = grainMethodsData;
-          grainMethodStats.calls = unfiltedMethodStats.calls.filter(
-            getFilter(settings)
-          );
-          grainMethodStats.errors = unfiltedMethodStats.errors.filter(
-            getFilter(settings)
-          );
-          grainMethodStats.latency = unfiltedMethodStats.latency.filter(
-            getFilter(settings)
-          );
           render();
         }).finally(() => loadDataIsPending = false);
       }).catch(() => loadDataIsPending = false);
@@ -514,11 +502,7 @@ function renderPage(jsx: JSX.Element, path: string) {
       );
       settings.systemGrainsHidden = newSettings.systemGrainsHidden!;
     }
-
-    dashboardCounters.simpleGrainStats = unfilteredDashboardCounters.simpleGrainStats.filter(
-      getFilter(settings)
-    );
-    events.emit('dashboard-counters', dashboardCounters);
+    loadDashboardCounters();
   };
 
   render = function () {
@@ -594,50 +578,15 @@ function getMenu(): MenuItem[] {
   return result;
 }
 
-function getFilter(settings: Settings): (x: GrainStatItem) => boolean {
-  let filter: (x: GrainStatItem) => boolean;
+function getFilter(settings: Settings): string {
   if (settings.dashboardGrainsHidden && settings.systemGrainsHidden) {
-    filter = filterByBothDashSys;
+      return '?exclude=Orleans.Runtime&exclude=Orleans.Dashboard';
   } else if (settings.dashboardGrainsHidden) {
-    filter = filterByDashboard;
+      return '?exclude=Orleans.Dashboard';
   } else if (settings.systemGrainsHidden) {
-    filter = filterBySystem;
-  } else {
-    filter = () => true;
+      return '?exclude=Orleans.Runtime';
   }
-  return filter;
-}
-
-function filterByDashboard(x: GrainStatItem): boolean {
-  if (x.grainType == undefined) {
-    const dashboardGrain = x.grain!.startsWith('OrleansDashboard.');
-    return !dashboardGrain;
-  } else {
-    const dashboardGrain = x.grainType.startsWith('OrleansDashboard.');
-    return !dashboardGrain;
-  }
-}
-
-function filterBySystem(x: GrainStatItem): boolean {
-  if (x.grainType == undefined) {
-    const systemGrain = x.grain!.startsWith('Orleans.');
-    return !systemGrain;
-  } else {
-    const systemGrain = x.grainType.startsWith('Orleans.');
-    return !systemGrain;
-  }
-}
-
-function filterByBothDashSys(x: GrainStatItem): boolean {
-  if (x.grainType == undefined) {
-    const systemGrain = x.grain!.startsWith('Orleans.');
-    const dashboardGrain = x.grain!.startsWith('OrleansDashboard.');
-    return !systemGrain && !dashboardGrain;
-  } else {
-    const systemGrain = x.grainType.startsWith('Orleans.');
-    const dashboardGrain = x.grainType.startsWith('OrleansDashboard.');
-    return !systemGrain && !dashboardGrain;
-  }
+  return '';
 }
 
 function light() {
