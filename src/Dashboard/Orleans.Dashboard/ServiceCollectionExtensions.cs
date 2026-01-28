@@ -20,7 +20,6 @@ using System.Diagnostics.CodeAnalysis;
 using Orleans.Dashboard.Core;
 using Microsoft.AspNetCore.Mvc;
 using Orleans.Configuration.Internal;
-using System.Text;
 
 // ReSharper disable CheckNamespace
 namespace Orleans.Dashboard;
