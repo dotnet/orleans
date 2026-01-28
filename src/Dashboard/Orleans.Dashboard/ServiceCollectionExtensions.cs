@@ -343,8 +343,9 @@ public static class ServiceCollectionExtensions
     private static string[] SanitizeExclusionFilters(string[] filters)
     {
         return (filters == null || filters.Length == 0) ? [] : [.. filters
-            .Select(f => string.Concat(f.Trim(), '.'))
-            .Where(f => !string.IsNullOrEmpty(f))];
+            .Select(f => f.Trim())
+            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .Select(f => string.Concat(f, '.'))];
     }
 
     /// <summary>
