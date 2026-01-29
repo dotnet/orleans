@@ -110,7 +110,7 @@ internal sealed partial class ActivationData :
             }
             catch (Exception exception)
             {
-                SetActivityError("instance-create-failed");
+                SetActivityError(_activationActivity, exception, "instance-create-failed");
                 Deactivate(new(DeactivationReasonCode.ActivationFailed, exception, "Error constructing grain instance."), CancellationToken.None);
             }
 
@@ -1546,83 +1546,91 @@ internal sealed partial class ActivationData :
         {
             if (IsUsingGrainDirectory)
             {
-                // Start directory registration activity as a child of the activation activity
-                Activity? registerSpan = _activationActivity is not null
-                    ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.RegisterDirectoryEntry, ActivityKind.Internal, _activationActivity.Context)
-                    : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.RegisterDirectoryEntry, ActivityKind.Internal);
-                registerSpan?.SetTag("orleans.grain.id", GrainId.ToString());
-                registerSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
-                registerSpan?.SetTag("orleans.activation.id", ActivationId.ToString());
-                registerSpan?.SetTag("orleans.directory.previousRegistration.present", PreviousRegistration is not null);
-                Exception? registrationException;
-                var previousRegistration = PreviousRegistration;
                 bool success;
-                try
-                {
-                    while (true)
-                    {
-                        LogRegisteringGrain(_shared.Logger, this, previousRegistration);
+                Exception? registrationException;
 
-                        var result = await _shared.InternalRuntime.GrainLocator.Register(Address, previousRegistration).WaitAsync(cancellationToken);
-                        if (Address.Matches(result))
+                // Start directory registration activity as a child of the activation activity
+                using (var registerSpan = _activationActivity is not null
+                    ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.RegisterDirectoryEntry, ActivityKind.Internal, _activationActivity.Context)
+                    : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.RegisterDirectoryEntry, ActivityKind.Internal))
+                {
+                    registerSpan?.SetTag("orleans.grain.id", GrainId.ToString());
+                    registerSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
+                    registerSpan?.SetTag("orleans.activation.id", ActivationId.ToString());
+                    registerSpan?.SetTag("orleans.directory.previousRegistration.present",
+                        PreviousRegistration is not null);
+                    var previousRegistration = PreviousRegistration;
+                    
+                    try
+                    {
+                        while (true)
                         {
-                            Address = result;
-                            success = true;
-                            _activationActivity?.AddEvent(new ActivityEvent("directory-register-success"));
-                            registerSpan?.AddEvent(new ActivityEvent("success"));
-                            registerSpan?.SetTag("orleans.directory.registered.address", result.ToFullString());
-                        }
-                        else if (result?.SiloAddress is { } registeredSilo && registeredSilo.Equals(Address.SiloAddress))
-                        {
-                            previousRegistration = result;
-                            LogAttemptToRegisterWithPreviousActivation(_shared.Logger, GrainId, result);
-                            _activationActivity?.AddEvent(new ActivityEvent("directory-register-retry-previous"));
-                            registerSpan?.AddEvent(new ActivityEvent("retry-previous"));
-                            continue;
-                        }
-                        else
-                        {
-                            ForwardingAddress = result?.SiloAddress;
-                            if (ForwardingAddress is { } address)
+                            LogRegisteringGrain(_shared.Logger, this, previousRegistration);
+
+                            var result = await _shared.InternalRuntime.GrainLocator
+                                .Register(Address, previousRegistration).WaitAsync(cancellationToken);
+                            if (Address.Matches(result))
                             {
-                                DeactivationReason = new(DeactivationReasonCode.DuplicateActivation, $"This grain is active on another host ({address}).");
+                                Address = result;
+                                success = true;
+                                _activationActivity?.AddEvent(new ActivityEvent("directory-register-success"));
+                                registerSpan?.AddEvent(new ActivityEvent("success"));
+                                registerSpan?.SetTag("orleans.directory.registered.address", result.ToFullString());
+                            }
+                            else if (result?.SiloAddress is { } registeredSilo &&
+                                     registeredSilo.Equals(Address.SiloAddress))
+                            {
+                                previousRegistration = result;
+                                LogAttemptToRegisterWithPreviousActivation(_shared.Logger, GrainId, result);
+                                _activationActivity?.AddEvent(new ActivityEvent("directory-register-retry-previous"));
+                                registerSpan?.AddEvent(new ActivityEvent("retry-previous"));
+                                continue;
+                            }
+                            else
+                            {
+                                ForwardingAddress = result?.SiloAddress;
+                                if (ForwardingAddress is { } address)
+                                {
+                                    DeactivationReason = new(DeactivationReasonCode.DuplicateActivation,
+                                        $"This grain is active on another host ({address}).");
+                                }
+
+                                success = false;
+                                CatalogInstruments.ActivationConcurrentRegistrationAttempts.Add(1);
+                                LogDuplicateActivation(
+                                    _shared.Logger,
+                                    Address,
+                                    ForwardingAddress,
+                                    GrainInstance?.GetType(),
+                                    new(Address),
+                                    WaitingCount);
+                                _activationActivity?.AddEvent(new ActivityEvent("duplicate-activation"));
+                                registerSpan?.AddEvent(new ActivityEvent("duplicate"));
+                                if (ForwardingAddress is { } fwd)
+                                {
+                                    registerSpan?.SetTag("orleans.directory.forwarding.address", fwd.ToString());
+                                }
                             }
 
-                            success = false;
-                            CatalogInstruments.ActivationConcurrentRegistrationAttempts.Add(1);
-                            LogDuplicateActivation(
-                                _shared.Logger,
-                                Address,
-                                ForwardingAddress,
-                                GrainInstance?.GetType(),
-                                new(Address),
-                                WaitingCount);
-                            _activationActivity?.AddEvent(new ActivityEvent("duplicate-activation"));
-                            registerSpan?.AddEvent(new ActivityEvent("duplicate"));
-                            if (ForwardingAddress is { } fwd)
-                            {
-                                registerSpan?.SetTag("orleans.directory.forwarding.address", fwd.ToString());
-                            }
+                            break;
                         }
-                        break;
-                    }
 
-                    registrationException = null;
-                }
-                catch (Exception exception)
-                {
-                    registrationException = exception;
-                    if (!cancellationToken.IsCancellationRequested)
+                        registrationException = null;
+                    }
+                    catch (Exception exception)
                     {
-                        LogFailedToRegisterGrain(_shared.Logger, registrationException, this);
+                        registrationException = exception;
+                        if (!cancellationToken.IsCancellationRequested)
+                        {
+                            LogFailedToRegisterGrain(_shared.Logger, registrationException, this);
+                        }
+
+                        success = false;
+                        _activationActivity?.AddEvent(new ActivityEvent("directory-register-failed"));
+                        SetActivityError(registerSpan, exception, "directory-register-failed");
                     }
 
-                    success = false;
-                    _activationActivity?.AddEvent(new ActivityEvent("directory-register-failed"));
-                    SetActivityError(registerSpan, exception, "directory-register-failed");
                 }
-
-                registerSpan?.Stop();
                 if (!success)
                 {
                     Deactivate(new(DeactivationReasonCode.DirectoryFailure, registrationException, "Failed to register activation in grain directory."));
