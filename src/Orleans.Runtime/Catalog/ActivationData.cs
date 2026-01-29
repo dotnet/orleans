@@ -110,11 +110,7 @@ internal sealed partial class ActivationData :
             }
             catch (Exception exception)
             {
-                if (_activationActivity is not null)
-                {
-                    _activationActivity.SetStatus(ActivityStatusCode.Error);
-                    _activationActivity.AddEvent(new ActivityEvent("instance-create-failed"));
-                }
+                SetActivityError("instance-create-failed");
                 Deactivate(new(DeactivationReasonCode.ActivationFailed, exception, "Error constructing grain instance."), CancellationToken.None);
             }
 
@@ -1315,9 +1311,7 @@ internal sealed partial class ActivationData :
             catch (Exception exception)
             {
                 LogErrorDehydratingActivation(_shared.Logger, exception);
-                dehydrateSpan?.SetStatus(ActivityStatusCode.Error);
-                dehydrateSpan?.SetTag("exception.type", exception.GetType().FullName);
-                dehydrateSpan?.SetTag("exception.message", exception.Message);
+                SetActivityError(dehydrateSpan, exception, "dehydrate-error");
             }
             finally
             {
@@ -1327,6 +1321,7 @@ internal sealed partial class ActivationData :
 
         LogDehydratedActivation(_shared.Logger);
     }
+
 
     /// <summary>
     /// Handle an incoming message and queue/invoke appropriate handler
@@ -1624,10 +1619,7 @@ internal sealed partial class ActivationData :
 
                     success = false;
                     _activationActivity?.AddEvent(new ActivityEvent("directory-register-failed"));
-                    registerSpan?.SetStatus(ActivityStatusCode.Error);
-                    registerSpan?.AddEvent(new ActivityEvent("failed"));
-                    registerSpan?.SetTag("exception.type", exception.GetType().FullName);
-                    registerSpan?.SetTag("exception.message", exception.Message);
+                    SetActivityError(registerSpan, exception, "directory-register-failed");
                 }
 
                 registerSpan?.Stop();
@@ -1636,8 +1628,15 @@ internal sealed partial class ActivationData :
                     Deactivate(new(DeactivationReasonCode.DirectoryFailure, registrationException, "Failed to register activation in grain directory."));
 
                     // Activation failed.
-                    _activationActivity?.SetStatus(ActivityStatusCode.Error);
-                    _activationActivity?.AddEvent(new ActivityEvent("activation-aborted"));
+                    if (registrationException is not null)
+                    {
+                        SetActivityError(_activationActivity, registrationException, "activation-aborted");
+                    }
+                    else
+                    {
+                        SetActivityError(_activationActivity, "activation-aborted");
+                    }
+
                     return;
                 }
             }
@@ -1688,27 +1687,24 @@ internal sealed partial class ActivationData :
                     }
                     catch (Exception exception)
                     {
-                        onActivateSpan?.SetStatus(ActivityStatusCode.Error);
-                        onActivateSpan?.SetTag("exception.type", exception.GetType().FullName);
-                        onActivateSpan?.SetTag("exception.message", exception.Message);
                         LogErrorInGrainMethod(_shared.Logger, exception, nameof(IGrainBase.OnActivateAsync), this);
-                        _activationActivity?.AddEvent(new ActivityEvent("on-activate-failed"));
+                        SetActivityError(onActivateSpan, exception, "on-activate-failed");
                         throw;
                     }
                 }
 
-            lock (this)
-            {
-                if (State is ActivationState.Activating)
+                lock (this)
                 {
-                    SetState(ActivationState.Valid);
-                    _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
+                    if (State is ActivationState.Activating)
+                    {
+                        SetState(ActivationState.Valid);
+                        _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
+                    }
                 }
-            }
-            _activationActivity?.AddEvent(new ActivityEvent("state-valid"));
-            _activationActivity?.Stop();
+                _activationActivity?.AddEvent(new ActivityEvent("state-valid"));
+                _activationActivity?.Stop();
 
-            LogFinishedActivatingGrain(_shared.Logger, this);
+                LogFinishedActivatingGrain(_shared.Logger, this);
             }
             catch (Exception exception)
             {
@@ -1720,8 +1716,7 @@ internal sealed partial class ActivationData :
                     ScheduleOperation(new Command.Delay(TimeSpan.FromSeconds(5)));
                 }
                 Deactivate(new(DeactivationReasonCode.ActivationFailed, sourceException, "Failed to activate grain."));
-                _activationActivity?.SetStatus(ActivityStatusCode.Error);
-                _activationActivity?.AddEvent(new ActivityEvent("activation-failed"));
+                SetActivityError(_activationActivity, "activation-failed");
                 _activationActivity?.Stop();
                 return;
             }
@@ -1730,8 +1725,7 @@ internal sealed partial class ActivationData :
         {
             LogActivationFailed(_shared.Logger, exception, this);
             Deactivate(new(DeactivationReasonCode.ApplicationError, exception, "Failed to activate grain."));
-            _activationActivity?.SetStatus(ActivityStatusCode.Error);
-            _activationActivity?.AddEvent(new ActivityEvent("activation-error"));
+            SetActivityError(_activationActivity, "activation-error");
             _activationActivity?.Stop();
         }
         finally
@@ -1739,6 +1733,27 @@ internal sealed partial class ActivationData :
             _workSignal.Signal();
         }
     }
+
+    private void SetActivityError(Activity? erroredActivity, string errorEventName)
+    {
+        if (erroredActivity is { } activity)
+        {
+            activity.SetStatus(ActivityStatusCode.Error);
+            activity.AddEvent(new ActivityEvent(errorEventName));
+        }
+    }
+
+    private void SetActivityError(Activity? erroredActivity, Exception exception, string errorEventName)
+    {
+        if (erroredActivity is { } activity)
+        {
+            activity.SetStatus(ActivityStatusCode.Error);
+            activity.AddEvent(new ActivityEvent(errorEventName));
+            activity.SetTag("exception.type", exception.GetType().FullName);
+            activity.SetTag("exception.message", exception.Message);
+        }
+    }
+
     #endregion
 
     #region Deactivation
