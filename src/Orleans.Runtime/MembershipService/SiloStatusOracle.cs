@@ -1,6 +1,6 @@
 using System.Collections.Generic;
-using Microsoft.Extensions.Logging;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 using System.Collections.Immutable;
 
 namespace Orleans.Runtime.MembershipService
@@ -11,7 +11,11 @@ namespace Orleans.Runtime.MembershipService
         private readonly MembershipTableManager membershipTableManager;
         private readonly SiloStatusListenerManager listenerManager;
         private readonly ILogger log;
-        private readonly object cacheUpdateLock = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock cacheUpdateLock = new();
+#else
+        private readonly object cacheUpdateLock = new();
+#endif
         private MembershipTableSnapshot cachedSnapshot;
         private Dictionary<SiloAddress, SiloStatus> siloStatusCache = new Dictionary<SiloAddress, SiloStatus>();
         private Dictionary<SiloAddress, SiloStatus> siloStatusCacheOnlyActive = new Dictionary<SiloAddress, SiloStatus>();

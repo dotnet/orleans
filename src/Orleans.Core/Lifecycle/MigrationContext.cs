@@ -15,8 +15,13 @@ namespace Orleans.Runtime;
 [GenerateSerializer, Immutable, Alias("MigrationCtx")]
 internal sealed class MigrationContext : IDehydrationContext, IRehydrationContext, IDisposable, IEnumerable<string>, IBufferWriter<byte>
 {
+#if NET9_0_OR_GREATER
+    [NonSerialized]
+    private readonly Lock _lock = new();
+#else
     [NonSerialized]
     private readonly object _lock = new();
+#endif
 
     [NonSerialized]
     internal readonly SerializerSessionPool _sessionPool;

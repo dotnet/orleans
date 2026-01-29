@@ -1,13 +1,18 @@
 #nullable enable
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans
 {
     internal sealed class ClientGrainContext : IGrainContext, IGrainExtensionBinder, IGrainContextAccessor
     {
+#if NET9_0_OR_GREATER
+        private readonly Lock _lockObj = new();
+#else
         private readonly object _lockObj = new();
+#endif
         private readonly ConcurrentDictionary<Type, (object Implementation, IAddressable Reference)> _extensions = new();
         private readonly ConcurrentDictionary<Type, object> _components = new();
         private readonly OutsideRuntimeClient _runtimeClient;

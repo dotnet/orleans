@@ -16,7 +16,11 @@ namespace Orleans.TestingHost.Logging
     {
         private static readonly ConcurrentDictionary<FileLoggingOutput, object> Instances = new();
         private readonly TimeSpan flushInterval = Debugger.IsAttached ? TimeSpan.FromMilliseconds(10) : TimeSpan.FromSeconds(1);
-        private readonly object lockObj = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock lockObj = new();
+#else
+        private readonly object lockObj = new();
+#endif
         private readonly string logFileName;
         private DateTime lastFlush = DateTime.UtcNow;
         private StreamWriter logOutput;
