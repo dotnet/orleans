@@ -1,6 +1,7 @@
 namespace Orleans.Dashboard.Model;
 
 [GenerateSerializer]
+[Alias("Orleans.Dashboard.Model.SiloGrainTraceEntry")]
 internal class SiloGrainTraceEntry
 {
     [Id(0)]

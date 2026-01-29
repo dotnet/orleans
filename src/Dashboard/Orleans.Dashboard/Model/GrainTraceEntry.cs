@@ -3,6 +3,7 @@ using System;
 namespace Orleans.Dashboard.Model;
 
 [GenerateSerializer]
+[Alias("Orleans.Dashboard.Model.GrainTraceEntry")]
 internal class GrainTraceEntry
 {
     [Id(0)]

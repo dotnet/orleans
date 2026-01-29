@@ -5,6 +5,7 @@ using System.Linq;
 namespace Orleans.Dashboard.Model;
 
 [GenerateSerializer]
+[Alias("Orleans.Dashboard.Model.DashboardCounters")]
 internal class DashboardCounters
 {
     [Id(0)]

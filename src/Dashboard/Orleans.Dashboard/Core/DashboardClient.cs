@@ -13,7 +13,7 @@ internal sealed class DashboardClient(IGrainFactory grainFactory) : IDashboardCl
     private readonly IDashboardRemindersGrain _remindersGrain = grainFactory.GetGrain<IDashboardRemindersGrain>(0);
     private readonly IGrainFactory _grainFactory = grainFactory;
 
-    public async Task<Immutable<DashboardCounters>> DashboardCounters() => await _dashboardGrain.GetCounters();
+    public async Task<Immutable<DashboardCounters>> DashboardCounters(string[] exclusions) => await _dashboardGrain.GetCounters(exclusions);
 
     public async Task<Immutable<Dictionary<string, GrainTraceEntry>>> ClusterStats() => await _dashboardGrain.GetClusterTracing();
 
@@ -30,7 +30,7 @@ internal sealed class DashboardClient(IGrainFactory grainFactory) : IDashboardCl
     public async Task<Immutable<Dictionary<string, Dictionary<string, GrainTraceEntry>>>> GrainStats(
         string grainName) => await _dashboardGrain.GetGrainTracing(grainName);
 
-    public async Task<Immutable<Dictionary<string, GrainMethodAggregate[]>>> TopGrainMethods(int take) => await _dashboardGrain.TopGrainMethods(take);
+    public async Task<Immutable<Dictionary<string, GrainMethodAggregate[]>>> TopGrainMethods(int take, string[] exclusions) => await _dashboardGrain.TopGrainMethods(take, exclusions);
 
     private ISiloGrainService Silo(string siloAddress) => _grainFactory.GetGrain<ISiloGrainProxy>(siloAddress);
 
