@@ -370,36 +370,47 @@ namespace Orleans.Runtime.Placement
             {
                 await Task.Yield();
 
-                // Restore activity context from the message's request context data
-                // This ensures directory lookups are properly traced as children of the original request
-                using var restoredActivity = TryRestoreActivityContext(firstMessage.RequestContextData, ActivityNames.PlaceGrain);
+                // InnerGetOrPlaceActivationAsync may set a new activity as current from the RequestContextData,
+                // so we need to save and restore the current activity.
+                var currentActivity = Activity.Current;
+                var activationLocation = await InnerGetOrPlaceActivationAsync();
+                Activity.Current = currentActivity;
 
-                var target = new PlacementTarget(
-                    firstMessage.TargetGrain,
-                    firstMessage.RequestContextData,
-                    firstMessage.InterfaceType,
-                    firstMessage.InterfaceVersion);
+                return activationLocation;
 
-                var targetGrain = target.GrainIdentity;
-                var result = await _placementService._grainLocator.Lookup(targetGrain);
-                if (result is not null)
+                async Task<SiloAddress> InnerGetOrPlaceActivationAsync()
                 {
-                    return result.SiloAddress;
+                    // Restore activity context from the message's request context data
+                    // This ensures directory lookups are properly traced as children of the original request
+                    using var restoredActivity = TryRestoreActivityContext(firstMessage.RequestContextData, ActivityNames.PlaceGrain);
+
+                    var target = new PlacementTarget(
+                        firstMessage.TargetGrain,
+                        firstMessage.RequestContextData,
+                        firstMessage.InterfaceType,
+                        firstMessage.InterfaceVersion);
+
+                    var targetGrain = target.GrainIdentity;
+                    var result = await _placementService._grainLocator.Lookup(targetGrain);
+                    if (result is not null)
+                    {
+                        return result.SiloAddress;
+                    }
+
+                    var strategy = _placementService._strategyResolver.GetPlacementStrategy(target.GrainIdentity.Type);
+                    var director = _placementService._directorResolver.GetPlacementDirector(strategy);
+                    var siloAddress = await director.OnAddActivation(strategy, target, _placementService);
+
+                    // Give the grain locator one last chance to tell us that the grain has already been placed
+                    if (_placementService._grainLocator.TryLookupInCache(targetGrain, out result) && _placementService.CachedAddressIsValid(firstMessage, result))
+                    {
+                        return result.SiloAddress;
+                    }
+
+                    _placementService._grainLocator.InvalidateCache(targetGrain);
+                    _placementService._grainLocator.UpdateCache(targetGrain, siloAddress);
+                    return siloAddress;
                 }
-
-                var strategy = _placementService._strategyResolver.GetPlacementStrategy(target.GrainIdentity.Type);
-                var director = _placementService._directorResolver.GetPlacementDirector(strategy);
-                var siloAddress = await director.OnAddActivation(strategy, target, _placementService);
-
-                // Give the grain locator one last chance to tell us that the grain has already been placed
-                if (_placementService._grainLocator.TryLookupInCache(targetGrain, out result) && _placementService.CachedAddressIsValid(firstMessage, result))
-                {
-                    return result.SiloAddress;
-                }
-
-                _placementService._grainLocator.InvalidateCache(targetGrain);
-                _placementService._grainLocator.UpdateCache(targetGrain, siloAddress);
-                return siloAddress;
             }
 
             private class GrainPlacementWorkItem
