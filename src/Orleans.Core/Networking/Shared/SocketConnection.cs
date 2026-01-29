@@ -23,7 +23,11 @@ namespace Orleans.Networking.Shared
         private readonly SocketSender _sender;
         private readonly CancellationTokenSource _connectionClosedTokenSource = new CancellationTokenSource();
 
-        private readonly object _shutdownLock = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock _shutdownLock = new();
+#else
+        private readonly object _shutdownLock = new();
+#endif
         private volatile bool _socketDisposed;
         private volatile Exception _shutdownReason;
         private Task _processingTask;

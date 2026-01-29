@@ -22,7 +22,11 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionFactory connectionFactory;
         private readonly NetworkingTrace trace;
         private readonly CancellationTokenSource shutdownCancellation = new();
-        private readonly object lockObj = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock lockObj = new();
+#else
+        private readonly object lockObj = new();
+#endif
         private readonly TaskCompletionSource<int> closedTaskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public ConnectionManager(

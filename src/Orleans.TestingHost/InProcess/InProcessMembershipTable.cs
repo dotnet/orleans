@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Orleans.Runtime;
 using System.Globalization;
 using System.Threading.Tasks;
@@ -70,7 +71,11 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
 
     private sealed class Table
     {
+#if NET9_0_OR_GREATER
+        private readonly Lock _lock = new();
+#else
         private readonly object _lock = new();
+#endif
         private readonly Dictionary<SiloAddress, (MembershipEntry Entry, string ETag)> _table = [];
         private TableVersion _tableVersion;
         private long _lastETagCounter;
