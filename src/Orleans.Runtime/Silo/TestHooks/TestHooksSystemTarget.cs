@@ -85,8 +85,6 @@ namespace Orleans.Runtime.TestHooks
             return Task.FromResult(this.serviceProvider.GetKeyedService<IGrainStorage>(providerName) != null);
         }
 
-        public Task<int> UnregisterGrainForTesting(GrainId grain) => Task.FromResult(this.serviceProvider.GetRequiredService<Catalog>().UnregisterGrainForTesting(grain));
-
         public Task<Dictionary<SiloAddress, SiloStatus>> GetApproximateSiloStatuses() => Task.FromResult(this.siloStatusOracle.GetApproximateSiloStatuses());
     }
 }

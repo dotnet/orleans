@@ -18,9 +18,6 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         Task StopAsync();
 
-        RemoteGrainDirectory RemoteGrainDirectory { get; }
-        RemoteGrainDirectory CacheValidator { get; }
-
         /// <summary>
         /// Removes the record for an non-existing activation from the directory service.
         /// This is used when a request is received for an activation that cannot be found, 
