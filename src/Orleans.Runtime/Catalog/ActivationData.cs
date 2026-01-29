@@ -1256,6 +1256,7 @@ internal sealed partial class ActivationData :
         catch (Exception exception)
         {
             LogErrorRehydratingActivation(_shared.Logger, exception);
+            SetActivityError(rehydrateSpan, exception, "rehydrate-error");
         }
         finally
         {
