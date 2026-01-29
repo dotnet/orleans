@@ -143,7 +143,7 @@ namespace UnitTests.General
             {
                 var grain = _fixture.GrainFactory.GetGrain<IFilteredActivityGrain>(Random.Shared.Next());
                 // First call should force activation
-                var _ = await grain.GetActivityId();
+                _ = await grain.GetActivityId();
 
                 // Expect at least one activation-related activity
                 var activationActivities = Started.Where(a => a.Source.Name == ActivitySources.LifecycleActivitySourceName).ToList();
@@ -200,7 +200,7 @@ namespace UnitTests.General
             {
                 var grain = _fixture.GrainFactory.GetGrain<IPersistentStateActivityGrain>(Random.Shared.Next());
                 // First call should force activation which triggers state read
-                var _ = await grain.GetActivityId();
+                _ = await grain.GetActivityId();
 
                 // Expect at least one activation-related activity
                 var activationActivities = Started.Where(a => a.Source.Name == ActivitySources.LifecycleActivitySourceName).ToList();
