@@ -1734,21 +1734,19 @@ internal sealed partial class ActivationData :
         }
     }
 
-    private void SetActivityError(Activity? erroredActivity, string errorEventName)
+    private void SetActivityError(Activity? erroredActivity, string? errorEventName)
     {
         if (erroredActivity is { } activity)
         {
-            activity.SetStatus(ActivityStatusCode.Error);
-            activity.AddEvent(new ActivityEvent(errorEventName));
+            activity.SetStatus(ActivityStatusCode.Error, errorEventName);
         }
     }
 
-    private void SetActivityError(Activity? erroredActivity, Exception exception, string errorEventName)
+    private void SetActivityError(Activity? erroredActivity, Exception exception, string? errorEventName)
     {
         if (erroredActivity is { } activity)
         {
-            activity.SetStatus(ActivityStatusCode.Error);
-            activity.AddEvent(new ActivityEvent(errorEventName));
+            activity.SetStatus(ActivityStatusCode.Error, errorEventName);
             activity.SetTag("exception.type", exception.GetType().FullName);
             activity.SetTag("exception.message", exception.Message);
         }
