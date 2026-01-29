@@ -621,14 +621,14 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 {
                     var innerSw = ValueStopwatch.StartNew();
                     Immutable<List<GrainAddress>> result = default;
-                        if (isValidation)
-                        {
-                            result = await client.GetRegisteredActivations(version, range, isValidation: true);
-                        }
-                        else
-                        {
-                            result = await client.RecoverRegisteredActivations(version, range, _id, _partitionIndex);
-                        }
+                    if (isValidation)
+                    {
+                        result = await client.GetRegisteredActivations(version, range, isValidation: true);
+                    }
+                    else
+                    {
+                        result = await client.RecoverRegisteredActivations(version, range, _id, _partitionIndex);
+                    }
 
                     return result;
                 },
@@ -660,7 +660,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             {
                 if (ex is not OrleansMessageRejectionException)
                 {
-                    LogErrorErrorInvokingOperation(_logger, ex, operationName, siloAddress);
+                    LogWarningErrorInvokingOperation(_logger, ex, operationName, siloAddress);
                 }
 
                 await _owner.RefreshViewAsync(default, CancellationToken.None);
@@ -901,10 +901,10 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     private static partial void LogDebugRecoveredEntries(ILogger logger, int count, SiloAddress siloAddress, RingRange range, MembershipVersion version, double elapsedMilliseconds);
 
     [LoggerMessage(
-        Level = LogLevel.Error,
+        Level = LogLevel.Warning,
         Message = "Error invoking operation '{Operation}' on silo '{SiloAddress}'."
     )]
-    private static partial void LogErrorErrorInvokingOperation(ILogger logger, Exception exception, string operation, SiloAddress siloAddress);
+    private static partial void LogWarningErrorInvokingOperation(ILogger logger, Exception exception, string operation, SiloAddress siloAddress);
 
     [LoggerMessage(
         Level = LogLevel.Error,

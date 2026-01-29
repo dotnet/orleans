@@ -91,10 +91,8 @@ namespace Tester
                 siloBuilder
                 .AddMemoryGrainStorage("MemoryStore")
                 .UseLocalhostClustering(baseSiloPort, baseGatewayPort);
-#pragma warning disable ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
                 // Distributed grain directory allows grain activations across multiple silos
                 siloBuilder.AddDistributedGrainDirectory();
-#pragma warning restore ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             }).Build();
 
             // Silo 2: Secondary silo that connects to the primary
@@ -104,9 +102,7 @@ namespace Tester
                 siloBuilder
                 .AddMemoryGrainStorage("MemoryStore")
                 .UseLocalhostClustering(baseSiloPort + 1, baseGatewayPort + 1, new IPEndPoint(IPAddress.Loopback, baseSiloPort));
-#pragma warning disable ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
                 siloBuilder.AddDistributedGrainDirectory();
-#pragma warning restore ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             }).Build();
 
             // Client configured with multiple gateway ports for load balancing/failover
