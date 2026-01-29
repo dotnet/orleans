@@ -242,7 +242,11 @@ namespace Orleans.Runtime.Placement
 #pragma warning disable IDE0052 // Remove unread private members. Justification: retained for debugging purposes
             private readonly Task _processLoopTask;
 #pragma warning restore IDE0052 // Remove unread private members
+#if NET9_0_OR_GREATER
+            private readonly Lock _lockObj = new();
+#else
             private readonly object _lockObj = new();
+#endif
             private readonly PlacementService _placementService;
             private List<(Message Message, TaskCompletionSource Completion)> _messages = new();
 

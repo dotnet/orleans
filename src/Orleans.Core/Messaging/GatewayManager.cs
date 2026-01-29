@@ -22,7 +22,11 @@ namespace Orleans.Messaging
     /// </summary>
     internal partial class GatewayManager : IDisposable
     {
-        private readonly object lockable = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock lockable = new();
+#else
+        private readonly object lockable = new();
+#endif
         private readonly Dictionary<SiloAddress, DateTime> knownDead = new Dictionary<SiloAddress, DateTime>();
         private readonly Dictionary<SiloAddress, DateTime> knownMasked = new Dictionary<SiloAddress, DateTime>();
         private readonly IGatewayListProvider gatewayListProvider;
