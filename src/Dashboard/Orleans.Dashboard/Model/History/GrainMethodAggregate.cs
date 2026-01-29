@@ -1,6 +1,7 @@
 namespace Orleans.Dashboard.Model.History;
 
 [GenerateSerializer]
+[Alias("Orleans.Dashboard.Model.History.GrainMethodAggregate")]
 internal struct GrainMethodAggregate
 {
     [Id(0)]
