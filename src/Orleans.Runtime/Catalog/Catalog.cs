@@ -173,13 +173,13 @@ namespace Orleans.Runtime
                 : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal);
             if (activationActivity is not null)
             {
-                activationActivity.SetTag("orleans.grain.id", grainId.ToString());
-                activationActivity.SetTag("orleans.grain.type", grainId.Type.ToString());
-                activationActivity.SetTag("orleans.silo.id", Silo.ToString());
-                activationActivity.SetTag("orleans.activation.cause", rehydrationContext is null ? "new" : "rehydrate");
+                activationActivity.SetTag(ActivityTagKeys.GrainId, grainId.ToString());
+                activationActivity.SetTag(ActivityTagKeys.GrainType, grainId.Type.ToString());
+                activationActivity.SetTag(ActivityTagKeys.SiloId, Silo.ToString());
+                activationActivity.SetTag(ActivityTagKeys.ActivationCause, rehydrationContext is null ? "new" : "rehydrate");
                 if (result is ActivationData act)
                 {
-                    activationActivity.SetTag("orleans.activation.id", act.ActivationId.ToString());
+                    activationActivity.SetTag(ActivityTagKeys.ActivationId, act.ActivationId.ToString());
                     act.SetActivationActivity(activationActivity);
                     activationActivity.AddEvent(new ActivityEvent("creating"));
                 }

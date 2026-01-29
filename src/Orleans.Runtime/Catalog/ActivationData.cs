@@ -66,6 +66,21 @@ internal sealed partial class ActivationData :
 
     private Activity? _activationActivity;
 
+    /// <summary>
+    /// Constants for activity error event names used during activation lifecycle.
+    /// </summary>
+    private static class ActivityErrorEvents
+    {
+        public const string InstanceCreateFailed = "instance-create-failed";
+        public const string DirectoryRegisterFailed = "directory-register-failed";
+        public const string ActivationAborted = "activation-aborted";
+        public const string ActivationFailed = "activation-failed";
+        public const string ActivationError = "activation-error";
+        public const string OnActivateFailed = "on-activate-failed";
+        public const string RehydrateError = "rehydrate-error";
+        public const string DehydrateError = "dehydrate-error";
+    }
+
     public ActivationData(
         GrainAddress grainAddress,
         Func<IGrainContext, WorkItemGroup> createWorkItemGroup,
@@ -112,7 +127,7 @@ internal sealed partial class ActivationData :
             }
             catch (Exception exception)
             {
-                SetActivityError(_activationActivity, exception, "instance-create-failed");
+                SetActivityError(_activationActivity, exception, ActivityErrorEvents.InstanceCreateFailed);
                 Deactivate(new(DeactivationReasonCode.ActivationFailed, exception, "Error constructing grain instance."), CancellationToken.None);
             }
 
@@ -1214,10 +1229,10 @@ internal sealed partial class ActivationData :
                         ActivityKind.Internal, _activationActivity.Context)
                     : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivationRehydrate,
                         ActivityKind.Internal);
-                rehydrateSpan?.SetTag("orleans.grain.id", GrainId.ToString());
-                rehydrateSpan?.SetTag("orleans.grain.type", _shared.GrainTypeName);
-                rehydrateSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
-                rehydrateSpan?.SetTag("orleans.activation.id", ActivationId.ToString());
+                rehydrateSpan?.SetTag(ActivityTagKeys.GrainId, GrainId.ToString());
+                rehydrateSpan?.SetTag(ActivityTagKeys.GrainType, _shared.GrainTypeName);
+                rehydrateSpan?.SetTag(ActivityTagKeys.SiloId, _shared.Runtime.SiloAddress.ToString());
+                rehydrateSpan?.SetTag(ActivityTagKeys.ActivationId, ActivationId.ToString());
             }
 
             lock (this)
@@ -1225,8 +1240,8 @@ internal sealed partial class ActivationData :
                 if (State != ActivationState.Creating)
                 {
                     LogIgnoringRehydrateAttempt(_shared.Logger, this, State);
-                    rehydrateSpan?.SetTag("orleans.rehydrate.ignored", true);
-                    rehydrateSpan?.SetTag("orleans.rehydrate.ignored.reason", $"State is {State}");
+                    rehydrateSpan?.SetTag(ActivityTagKeys.RehydrateIgnored, true);
+                    rehydrateSpan?.SetTag(ActivityTagKeys.RehydrateIgnoredReason, $"State is {State}");
                     return;
                 }
 
@@ -1235,7 +1250,7 @@ internal sealed partial class ActivationData :
                 {
                     PreviousRegistration = previousRegistration;
                     LogPreviousActivationAddress(_shared.Logger, previousRegistration);
-                    rehydrateSpan?.SetTag("orleans.rehydrate.previousRegistration",
+                    rehydrateSpan?.SetTag(ActivityTagKeys.RehydratePreviousRegistration,
                         previousRegistration.ToFullString());
                 }
 
@@ -1256,7 +1271,7 @@ internal sealed partial class ActivationData :
         catch (Exception exception)
         {
             LogErrorRehydratingActivation(_shared.Logger, exception);
-            SetActivityError(rehydrateSpan, exception, "rehydrate-error");
+            SetActivityError(rehydrateSpan, exception, ActivityErrorEvents.RehydrateError);
         }
         finally
         {
@@ -1293,13 +1308,13 @@ internal sealed partial class ActivationData :
                             ActivityKind.Internal, parentContext.Value)
                         : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivationDehydrate,
                             ActivityKind.Internal);
-                    dehydrateSpan?.SetTag("orleans.grain.id", GrainId.ToString());
-                    dehydrateSpan?.SetTag("orleans.grain.type", _shared.GrainTypeName);
-                    dehydrateSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
-                    dehydrateSpan?.SetTag("orleans.activation.id", ActivationId.ToString());
+                    dehydrateSpan?.SetTag(ActivityTagKeys.GrainId, GrainId.ToString());
+                    dehydrateSpan?.SetTag(ActivityTagKeys.GrainType, _shared.GrainTypeName);
+                    dehydrateSpan?.SetTag(ActivityTagKeys.SiloId, _shared.Runtime.SiloAddress.ToString());
+                    dehydrateSpan?.SetTag(ActivityTagKeys.ActivationId, ActivationId.ToString());
                     if (ForwardingAddress is { } fwd)
                     {
-                        dehydrateSpan?.SetTag("orleans.migration.target.silo", fwd.ToString());
+                        dehydrateSpan?.SetTag(ActivityTagKeys.MigrationTargetSilo, fwd.ToString());
                     }
                 }
 
@@ -1317,7 +1332,7 @@ internal sealed partial class ActivationData :
             catch (Exception exception)
             {
                 LogErrorDehydratingActivation(_shared.Logger, exception);
-                SetActivityError(dehydrateSpan, exception, "dehydrate-error");
+                SetActivityError(dehydrateSpan, exception, ActivityErrorEvents.DehydrateError);
             }
             finally
             {
@@ -1560,10 +1575,10 @@ internal sealed partial class ActivationData :
                     ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.RegisterDirectoryEntry, ActivityKind.Internal, _activationActivity.Context)
                     : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.RegisterDirectoryEntry, ActivityKind.Internal))
                 {
-                    registerSpan?.SetTag("orleans.grain.id", GrainId.ToString());
-                    registerSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
-                    registerSpan?.SetTag("orleans.activation.id", ActivationId.ToString());
-                    registerSpan?.SetTag("orleans.directory.previousRegistration.present",
+                    registerSpan?.SetTag(ActivityTagKeys.GrainId, GrainId.ToString());
+                    registerSpan?.SetTag(ActivityTagKeys.SiloId, _shared.Runtime.SiloAddress.ToString());
+                    registerSpan?.SetTag(ActivityTagKeys.ActivationId, ActivationId.ToString());
+                    registerSpan?.SetTag(ActivityTagKeys.DirectoryPreviousRegistrationPresent,
                         PreviousRegistration is not null);
                     var previousRegistration = PreviousRegistration;
                     
@@ -1581,7 +1596,7 @@ internal sealed partial class ActivationData :
                                 success = true;
                                 _activationActivity?.AddEvent(new ActivityEvent("directory-register-success"));
                                 registerSpan?.AddEvent(new ActivityEvent("success"));
-                                registerSpan?.SetTag("orleans.directory.registered.address", result.ToFullString());
+                                registerSpan?.SetTag(ActivityTagKeys.DirectoryRegisteredAddress, result.ToFullString());
                             }
                             else if (result?.SiloAddress is { } registeredSilo &&
                                      registeredSilo.Equals(Address.SiloAddress))
@@ -1614,7 +1629,7 @@ internal sealed partial class ActivationData :
                                 registerSpan?.AddEvent(new ActivityEvent("duplicate"));
                                 if (ForwardingAddress is { } fwd)
                                 {
-                                    registerSpan?.SetTag("orleans.directory.forwarding.address", fwd.ToString());
+                                    registerSpan?.SetTag(ActivityTagKeys.DirectoryForwardingAddress, fwd.ToString());
                                 }
                             }
 
@@ -1633,7 +1648,7 @@ internal sealed partial class ActivationData :
 
                         success = false;
                         _activationActivity?.AddEvent(new ActivityEvent("directory-register-failed"));
-                        SetActivityError(registerSpan, exception, "directory-register-failed");
+                        SetActivityError(registerSpan, exception, ActivityErrorEvents.DirectoryRegisterFailed);
                     }
 
                 }
@@ -1644,11 +1659,11 @@ internal sealed partial class ActivationData :
                     // Activation failed.
                     if (registrationException is not null)
                     {
-                        SetActivityError(_activationActivity, registrationException, "activation-aborted");
+                        SetActivityError(_activationActivity, registrationException, ActivityErrorEvents.ActivationAborted);
                     }
                     else
                     {
-                        SetActivityError(_activationActivity, "activation-aborted");
+                        SetActivityError(_activationActivity, ActivityErrorEvents.ActivationAborted);
                     }
 
                     return;
@@ -1688,10 +1703,10 @@ internal sealed partial class ActivationData :
                     using var onActivateSpan = _activationActivity is not null
                         ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.OnActivate, ActivityKind.Internal, _activationActivity.Context)
                         : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.OnActivate, ActivityKind.Internal);
-                    onActivateSpan?.SetTag("orleans.grain.id", GrainId.ToString());
-                    onActivateSpan?.SetTag("orleans.grain.type", _shared.GrainTypeName ?? GrainInstance.GetType().FullName);
-                    onActivateSpan?.SetTag("orleans.silo.id", _shared.Runtime.SiloAddress.ToString());
-                    onActivateSpan?.SetTag("orleans.activation.id", ActivationId.ToString());
+                    onActivateSpan?.SetTag(ActivityTagKeys.GrainId, GrainId.ToString());
+                    onActivateSpan?.SetTag(ActivityTagKeys.GrainType, _shared.GrainTypeName ?? GrainInstance.GetType().FullName);
+                    onActivateSpan?.SetTag(ActivityTagKeys.SiloId, _shared.Runtime.SiloAddress.ToString());
+                    onActivateSpan?.SetTag(ActivityTagKeys.ActivationId, ActivationId.ToString());
 
                     try
                     {
@@ -1702,7 +1717,7 @@ internal sealed partial class ActivationData :
                     catch (Exception exception)
                     {
                         LogErrorInGrainMethod(_shared.Logger, exception, nameof(IGrainBase.OnActivateAsync), this);
-                        SetActivityError(onActivateSpan, exception, "on-activate-failed");
+                        SetActivityError(onActivateSpan, exception, ActivityErrorEvents.OnActivateFailed);
                         throw;
                     }
                 }
@@ -1730,7 +1745,7 @@ internal sealed partial class ActivationData :
                     ScheduleOperation(new Command.Delay(TimeSpan.FromSeconds(5)));
                 }
                 Deactivate(new(DeactivationReasonCode.ActivationFailed, sourceException, "Failed to activate grain."));
-                SetActivityError(_activationActivity, "activation-failed");
+                SetActivityError(_activationActivity, ActivityErrorEvents.ActivationFailed);
                 _activationActivity?.Stop();
                 return;
             }
@@ -1739,7 +1754,7 @@ internal sealed partial class ActivationData :
         {
             LogActivationFailed(_shared.Logger, exception, this);
             Deactivate(new(DeactivationReasonCode.ApplicationError, exception, "Failed to activate grain."));
-            SetActivityError(_activationActivity, "activation-error");
+            SetActivityError(_activationActivity, ActivityErrorEvents.ActivationError);
             _activationActivity?.Stop();
         }
         finally
@@ -1761,8 +1776,8 @@ internal sealed partial class ActivationData :
         if (erroredActivity is { } activity)
         {
             activity.SetStatus(ActivityStatusCode.Error, errorEventName);
-            activity.SetTag("exception.type", exception.GetType().FullName);
-            activity.SetTag("exception.message", exception.Message);
+            activity.SetTag(ActivityTagKeys.ExceptionType, exception.GetType().FullName);
+            activity.SetTag(ActivityTagKeys.ExceptionMessage, exception.Message);
         }
     }
 

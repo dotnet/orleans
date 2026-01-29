@@ -50,17 +50,17 @@ namespace Orleans.Runtime
             if (activity is not null)
             {
                 // rpc attributes from https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/rpc.md
-                activity.SetTag("rpc.system", RpcSystem);
-                activity.SetTag("rpc.service", context.InterfaceName);
-                activity.SetTag("rpc.method", context.MethodName);
+                activity.SetTag(ActivityTagKeys.RpcSystem, RpcSystem);
+                activity.SetTag(ActivityTagKeys.RpcService, context.InterfaceName);
+                activity.SetTag(ActivityTagKeys.RpcMethod, context.MethodName);
 
                 if (activity.IsAllDataRequested)
                 {
                     // Custom attributes
-                    activity.SetTag("rpc.orleans.target_id", context.TargetId.ToString());
+                    activity.SetTag(ActivityTagKeys.RpcOrleansTargetId, context.TargetId.ToString());
                     if (context.SourceId is GrainId sourceId)
                     {
-                        activity.SetTag("rpc.orleans.source_id", sourceId.ToString());
+                        activity.SetTag(ActivityTagKeys.RpcOrleansSourceId, sourceId.ToString());
                     }
                 }
             }
@@ -76,14 +76,14 @@ namespace Orleans.Runtime
                     activity.SetStatus(ActivityStatusCode.Error);
 
                     // exception attributes from https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/exceptions.md
-                    activity.SetTag("exception.type", e.GetType().FullName);
-                    activity.SetTag("exception.message", e.Message);
+                    activity.SetTag(ActivityTagKeys.ExceptionType, e.GetType().FullName);
+                    activity.SetTag(ActivityTagKeys.ExceptionMessage, e.Message);
 
                     // Note that "exception.stacktrace" is the full exception detail, not just the StackTrace property.
                     // See https://opentelemetry.io/docs/specs/semconv/attributes-registry/exception/
                     // and https://github.com/open-telemetry/opentelemetry-specification/pull/697#discussion_r453662519
-                    activity.SetTag("exception.stacktrace", e.ToString());
-                    activity.SetTag("exception.escaped", true);
+                    activity.SetTag(ActivityTagKeys.ExceptionStacktrace, e.ToString());
+                    activity.SetTag(ActivityTagKeys.ExceptionEscaped, true);
                 }
 
                 throw;

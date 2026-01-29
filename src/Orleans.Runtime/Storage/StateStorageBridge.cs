@@ -93,10 +93,10 @@ namespace Orleans.Core
                 using var activity = parentContext.HasValue
                     ? ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageRead, ActivityKind.Client, parentContext.Value)
                     : ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageRead, ActivityKind.Client);
-                activity?.SetTag("orleans.grain.id", _grainContext.GrainId.ToString());
-                activity?.SetTag("orleans.storage.provider", _shared.ProviderTypeName);
-                activity?.SetTag("orleans.storage.state.name", _shared.Name);
-                activity?.SetTag("orleans.storage.state.type", _shared.StateTypeName);
+                activity?.SetTag(ActivityTagKeys.GrainId, _grainContext.GrainId.ToString());
+                activity?.SetTag(ActivityTagKeys.StorageProvider, _shared.ProviderTypeName);
+                activity?.SetTag(ActivityTagKeys.StorageStateName, _shared.Name);
+                activity?.SetTag(ActivityTagKeys.StorageStateType, _shared.StateTypeName);
 
                 var sw = ValueStopwatch.StartNew();
                 await _shared.Store.ReadStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
@@ -127,10 +127,10 @@ namespace Orleans.Core
                 using var activity = parentContext.HasValue
                     ? ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageWrite, ActivityKind.Client, parentContext.Value)
                     : ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageWrite, ActivityKind.Client);
-                activity?.SetTag("orleans.grain.id", _grainContext.GrainId.ToString());
-                activity?.SetTag("orleans.storage.provider", _shared.ProviderTypeName);
-                activity?.SetTag("orleans.storage.state.name", _shared.Name);
-                activity?.SetTag("orleans.storage.state.type", _shared.StateTypeName);
+                activity?.SetTag(ActivityTagKeys.GrainId, _grainContext.GrainId.ToString());
+                activity?.SetTag(ActivityTagKeys.StorageProvider, _shared.ProviderTypeName);
+                activity?.SetTag(ActivityTagKeys.StorageStateName, _shared.Name);
+                activity?.SetTag(ActivityTagKeys.StorageStateType, _shared.StateTypeName);
 
                 var sw = ValueStopwatch.StartNew();
                 await _shared.Store.WriteStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
@@ -160,10 +160,10 @@ namespace Orleans.Core
                 using var activity = parentContext.HasValue
                     ? ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageClear, ActivityKind.Client, parentContext.Value)
                     : ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageClear, ActivityKind.Client);
-                activity?.SetTag("orleans.grain.id", _grainContext.GrainId.ToString());
-                activity?.SetTag("orleans.storage.provider", _shared.ProviderTypeName);
-                activity?.SetTag("orleans.storage.state.name", _shared.Name);
-                activity?.SetTag("orleans.storage.state.type", _shared.StateTypeName);
+                activity?.SetTag(ActivityTagKeys.GrainId, _grainContext.GrainId.ToString());
+                activity?.SetTag(ActivityTagKeys.StorageProvider, _shared.ProviderTypeName);
+                activity?.SetTag(ActivityTagKeys.StorageStateName, _shared.Name);
+                activity?.SetTag(ActivityTagKeys.StorageStateType, _shared.StateTypeName);
 
                 var sw = ValueStopwatch.StartNew();
 

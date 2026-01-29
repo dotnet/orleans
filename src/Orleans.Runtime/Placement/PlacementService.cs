@@ -123,8 +123,8 @@ namespace Orleans.Runtime.Placement
 
                     // Create a span for each filter invocation
                     using var filterSpan = ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.FilterPlacementCandidates);
-                    filterSpan?.SetTag("orleans.placement.filter.type", placementFilter.GetType().Name);
-                    filterSpan?.SetTag("orleans.grain.type", grainType.ToString());
+                    filterSpan?.SetTag(ActivityTagKeys.PlacementFilterType, placementFilter.GetType().Name);
+                    filterSpan?.SetTag(ActivityTagKeys.GrainType, grainType.ToString());
 
                     filteredSilos = director.Filter(placementFilter, target, filteredSilos);
                 }

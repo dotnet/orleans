@@ -336,7 +336,7 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
                     // Start the session activity on first enumeration call
                     // This span wraps the entire enumeration session
                     _sessionActivity = ActivitySources.ApplicationGrainSource.StartActivity(_request.GetActivityName(), ActivityKind.Client);
-                    _sessionActivity?.SetTag("orleans.async_enumerable.request_id", _requestId.ToString());
+                    _sessionActivity?.SetTag(ActivityTagKeys.AsyncEnumerableRequestId, _requestId.ToString());
 
                     // Assume the enumerator is active as soon as the call begins.
                     isActive = true;
