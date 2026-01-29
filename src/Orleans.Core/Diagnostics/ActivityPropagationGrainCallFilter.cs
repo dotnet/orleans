@@ -1,7 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading.Tasks;
+using Orleans.Diagnostics;
 
 namespace Orleans.Runtime
 {
@@ -10,21 +8,36 @@ namespace Orleans.Runtime
     /// </summary>
     internal abstract class ActivityPropagationGrainCallFilter
     {
-        protected const string TraceParentHeaderName = "traceparent";
-        protected const string TraceStateHeaderName = "tracestate";
-
         internal const string RpcSystem = "orleans";
         internal const string OrleansNamespacePrefix = "Orleans";
-        internal const string ApplicationGrainActivitySourceName = "Microsoft.Orleans.Application";
-        internal const string RuntimeActivitySourceName = "Microsoft.Orleans.Runtime";
 
-        protected static readonly ActivitySource ApplicationGrainSource = new(ApplicationGrainActivitySourceName, "1.0.0");
-        protected static readonly ActivitySource RuntimeGrainSource = new(RuntimeActivitySourceName, "1.0.0");
+        protected static ActivitySource GetActivitySource(IGrainCallContext context)
+        {
+            var interfaceType = context.Request.GetInterfaceType();
+            var interfaceTypeName = interfaceType.Name;
 
-        protected static ActivitySource GetActivitySource(IGrainCallContext context) =>
-            context.Request.GetInterfaceType().Namespace?.StartsWith(OrleansNamespacePrefix) == true
-                ? RuntimeGrainSource
-                : ApplicationGrainSource;
+            switch (interfaceTypeName)
+            {
+                // Memory storage uses grains for its implementation
+                case "IMemoryStorageGrain":
+                    return ActivitySources.StorageGrainSource;
+
+                // This extension is for explicit migrate/deactivate calls
+                case "IGrainManagementExtension":
+                // This target is for accepting migration batches
+                case "IActivationMigrationManagerSystemTarget":
+                    return ActivitySources.LifecycleGrainSource;
+
+                // These extensions are for async stream subscriptions
+                case "IAsyncEnumerableGrainExtension":
+                    return ActivitySources.ApplicationGrainSource;
+
+                default:
+                    return interfaceType.Namespace?.StartsWith(OrleansNamespacePrefix) == true
+                        ? ActivitySources.RuntimeGrainSource
+                        : ActivitySources.ApplicationGrainSource;
+            }
+        }
 
         protected static void GetRequestContextValue(object carrier, string fieldName, out string fieldValue, out IEnumerable<string> fieldValues)
         {
