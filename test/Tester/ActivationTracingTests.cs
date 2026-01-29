@@ -90,7 +90,7 @@ namespace UnitTests.General
             {
                 var grain = _fixture.GrainFactory.GetGrain<IActivityGrain>(Random.Shared.Next());
                 // First call should force activation
-                var _ = await grain.GetActivityId();
+                _ = await grain.GetActivityId();
 
                 // Expect at least one activation-related activity
                 var activationActivities = Started.Where(a => a.Source.Name == ActivitySources.LifecycleActivitySourceName).ToList();
