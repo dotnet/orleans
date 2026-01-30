@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Versions.Selector;
 
+#nullable disable
 namespace Orleans.Runtime.Versions.Selector
 {
     internal class VersionSelectorManager

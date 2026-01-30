@@ -4,7 +4,6 @@ using System.Globalization;
 using Orleans.Metadata;
 using Orleans.Placement;
 
-#nullable enable
 namespace Orleans.Runtime.Placement.Filtering;
 
 public class PreferredMatchSiloMetadataPlacementFilterStrategy(string[] orderedMetadataKeys, int minCandidates, int order)

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.ConsistentRing;
 
+#nullable disable
 namespace Orleans.Streams
 {
     internal class ConsistentRingQueueBalancer : QueueBalancerBase, IStreamQueueBalancer, IRingRangeListener

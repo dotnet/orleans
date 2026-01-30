@@ -8,6 +8,7 @@ using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.TestKit;
 
+#nullable disable
 namespace Orleans.Hosting
 {
     /// <summary>

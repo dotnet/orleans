@@ -12,6 +12,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Streams.Filtering;
 
+#nullable disable
 namespace Orleans.Streams
 {
     internal sealed partial class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent

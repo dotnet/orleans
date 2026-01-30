@@ -7,6 +7,7 @@ using Orleans.Metadata;
 
 namespace Orleans.Serialization.Codecs;
 
+#nullable disable
 /// <summary>
 /// Defines common type filtering operations.
 /// </summary>

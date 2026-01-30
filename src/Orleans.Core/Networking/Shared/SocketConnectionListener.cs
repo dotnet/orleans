@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 
+#nullable disable
 namespace Orleans.Networking.Shared
 {
     internal sealed class SocketConnectionListener : IConnectionListener

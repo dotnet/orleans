@@ -10,6 +10,7 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.Streams.Core;
 
+#nullable disable
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>

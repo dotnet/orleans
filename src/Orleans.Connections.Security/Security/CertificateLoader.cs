@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 
+#nullable disable
 namespace Orleans.Connections.Security
 {
     public static class CertificateLoader

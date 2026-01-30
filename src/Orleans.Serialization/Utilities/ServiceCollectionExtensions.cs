@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 
+#nullable disable
 namespace Orleans.Serialization.Utilities.Internal;
 
 /// <summary>

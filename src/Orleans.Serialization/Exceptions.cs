@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.Serialization;
 
+#nullable disable
 namespace Orleans.Serialization
 {
     internal static class ExceptionHelper

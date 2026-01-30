@@ -9,6 +9,7 @@ using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
 using Orleans.Storage;
 
+#nullable disable
 namespace Orleans.Configuration
 {
     public class AzureBlobStorageOptions : IStorageProviderSerializerOptions

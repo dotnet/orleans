@@ -1,5 +1,6 @@
 using Orleans.Metadata;
 
+#nullable disable
 namespace Orleans.Runtime.Placement
 {
     internal class ClientObserverPlacementStrategyResolver : IPlacementStrategyResolver

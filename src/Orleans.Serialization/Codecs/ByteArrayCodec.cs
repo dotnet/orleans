@@ -9,6 +9,7 @@ using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
+#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>

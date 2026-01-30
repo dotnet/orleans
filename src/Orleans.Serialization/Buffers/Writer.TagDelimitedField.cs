@@ -2,6 +2,7 @@ using System;
 using System.Runtime.CompilerServices;
 using Orleans.Serialization.WireProtocol;
 
+#nullable disable
 namespace Orleans.Serialization.Buffers
 {
     public ref partial struct Writer<TBufferWriter>

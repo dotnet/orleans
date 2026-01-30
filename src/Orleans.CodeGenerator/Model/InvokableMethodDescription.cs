@@ -8,6 +8,7 @@ using System.Linq;
 
 namespace Orleans.CodeGenerator
 {
+    #nullable disable
     /// <summary>
     /// Describes an invokable method.
     /// This is a method on the original interface which defined it.

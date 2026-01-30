@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.Serialization;
 
+#nullable disable
 namespace Orleans.Storage.Internal
 {
     /// <summary>Exception used to communicate with the storage provider, so that it throws this exception to its caller.</summary>

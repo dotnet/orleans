@@ -5,7 +5,6 @@ using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Runtime.CompilerServices;
 
-#nullable enable
 
 namespace Orleans.Runtime.Placement;
 

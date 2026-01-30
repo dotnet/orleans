@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.Serialization;
 
+#nullable disable
 namespace Orleans.Serialization
 {
     /// <summary>

@@ -6,6 +6,7 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using System;
 
+#nullable disable
 namespace Orleans.Configuration
 {
     /// <summary>

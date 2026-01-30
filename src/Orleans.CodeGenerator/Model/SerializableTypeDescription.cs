@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
+#nullable disable
 namespace Orleans.CodeGenerator
 {
     internal class SerializableTypeDescription : ISerializableTypeDescription

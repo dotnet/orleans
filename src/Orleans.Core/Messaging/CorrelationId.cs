@@ -1,7 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
 
-#nullable enable
 namespace Orleans.Runtime
 {
     [Serializable, GenerateSerializer, Immutable]

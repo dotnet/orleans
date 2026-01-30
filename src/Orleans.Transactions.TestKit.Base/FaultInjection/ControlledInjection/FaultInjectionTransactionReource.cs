@@ -6,6 +6,7 @@ using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.State;
 
+#nullable disable
 namespace Orleans.Transactions.TestKit
 {
     internal class FaultInjectionTransactionManager<TState> : ITransactionManager
