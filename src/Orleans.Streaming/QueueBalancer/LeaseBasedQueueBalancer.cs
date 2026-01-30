@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
+using Orleans.Diagnostics;
 using Orleans.LeaseProviders;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
@@ -32,6 +34,8 @@ public partial class LeaseBasedQueueBalancer(
     ILoggerFactory loggerFactory,
     TimeProvider timeProvider) : QueueBalancerBase(services, loggerFactory.CreateLogger($"{typeof(LeaseBasedQueueBalancer).FullName}.{name}")), IStreamQueueBalancer
 {
+    private static readonly DiagnosticListener s_diagnosticListener = new(OrleansStreamingDiagnostics.ListenerName);
+
     private sealed class AcquiredQueue(int order, QueueId queueId, AcquiredLease lease)
     {
         public int LeaseOrder { get; set; } = order;
@@ -39,6 +43,7 @@ public partial class LeaseBasedQueueBalancer(
         public AcquiredLease AcquiredLease { get; set; } = lease;
     }
 
+    private readonly string _name = name;
     private readonly LeaseBasedQueueBalancerOptions _options = options;
     private readonly ILeaseProvider _leaseProvider = leaseProvider;
     private readonly AsyncSerialExecutor _executor = new();
@@ -51,6 +56,7 @@ public partial class LeaseBasedQueueBalancer(
     private int _allQueuesCount;
     private int _responsibility;
     private int _leaseOrder;
+    private int _activeSiloCount;
 
     /// <summary>
     /// Creates a new <see cref="LeaseBasedQueueBalancer"/> instance.
@@ -384,10 +390,54 @@ public partial class LeaseBasedQueueBalancer(
         if (Cancellation.IsCancellationRequested) return Task.CompletedTask;
         var newQueues = new HashSet<QueueId>(_myQueues.Select(queue => queue.QueueId));
 
-        // If queue changed, notify listeners.
-        return !oldQueues.SetEquals(newQueues)
-            ? NotifyListeners()
-            : Task.CompletedTask;
+        // If queue changed, notify listeners and emit diagnostic event.
+        if (!oldQueues.SetEquals(newQueues))
+        {
+            // Emit diagnostic event for queue ownership change
+            if (s_diagnosticListener.IsEnabled(OrleansStreamingDiagnostics.EventNames.QueueBalancerChanged))
+            {
+                s_diagnosticListener.Write(
+                    OrleansStreamingDiagnostics.EventNames.QueueBalancerChanged,
+                    new QueueBalancerChangedEvent(
+                        _name,
+                        SiloAddress,
+                        _myQueues.Count,
+                        _responsibility,
+                        _activeSiloCount));
+            }
+
+            // Calculate acquired and released counts for more specific events
+            var acquired = newQueues.Except(oldQueues).Count();
+            var released = oldQueues.Except(newQueues).Count();
+
+            if (acquired > 0 && s_diagnosticListener.IsEnabled(OrleansStreamingDiagnostics.EventNames.QueueLeasesAcquired))
+            {
+                s_diagnosticListener.Write(
+                    OrleansStreamingDiagnostics.EventNames.QueueLeasesAcquired,
+                    new QueueLeasesAcquiredEvent(
+                        _name,
+                        SiloAddress,
+                        acquired,
+                        _myQueues.Count,
+                        _responsibility));
+            }
+
+            if (released > 0 && s_diagnosticListener.IsEnabled(OrleansStreamingDiagnostics.EventNames.QueueLeasesReleased))
+            {
+                s_diagnosticListener.Write(
+                    OrleansStreamingDiagnostics.EventNames.QueueLeasesReleased,
+                    new QueueLeasesReleasedEvent(
+                        _name,
+                        SiloAddress,
+                        released,
+                        _myQueues.Count,
+                        _responsibility));
+            }
+
+            return NotifyListeners();
+        }
+
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc/>
@@ -431,15 +481,15 @@ public partial class LeaseBasedQueueBalancer(
     private async Task UpdateResponsibilities(HashSet<SiloAddress> activeSilos)
     {
         if (Cancellation.IsCancellationRequested) return;
-        var activeSiloCount = Math.Max(1, activeSilos.Count);
-        _responsibility = _allQueuesCount / activeSiloCount;
-        var overflow = _allQueuesCount % activeSiloCount;
+        _activeSiloCount = Math.Max(1, activeSilos.Count);
+        _responsibility = _allQueuesCount / _activeSiloCount;
+        var overflow = _allQueuesCount % _activeSiloCount;
         if (overflow != 0 && ShouldBeGreedy(overflow, activeSilos))
         {
             _responsibility++;
         }
 
-        LogDebugUpdatingResponsibilities(Logger, _allQueuesCount, activeSiloCount, _responsibility, _myQueues.Count);
+        LogDebugUpdatingResponsibilities(Logger, _allQueuesCount, _activeSiloCount, _responsibility, _myQueues.Count);
 
         if (_myQueues.Count < _responsibility && _leaseAcquisitionTimer.Period == Timeout.InfiniteTimeSpan)
         {

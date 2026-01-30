@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Diagnostics;
 using Orleans.Placement;
 using Orleans.Placement.Rebalancing;
 
@@ -58,6 +59,8 @@ internal sealed partial class ActivationRebalancerWorker(
     }
 
     private const string StateKey = "REBALANCER_STATE";
+
+    private static readonly DiagnosticListener s_diagnosticListener = new(OrleansRebalancerDiagnostics.ListenerName);
 
     private int _stagnantCycles;
     private int _failedSessions;
@@ -228,141 +231,169 @@ internal sealed partial class ActivationRebalancerWorker(
 
     private async Task RunRebalancingCycle(CancellationToken cancellationToken)
     {
-        var siloCount = siloStatusOracle.GetActiveSilos().Length;
-        if (siloCount < 2)
+        var cycleStartTime = Stopwatch.GetTimestamp();
+        var cycleNumber = _rebalancingCycle + 1; // Will be incremented below
+        var siloAddress = localSiloDetails.SiloAddress;
+        var activationsMigrated = 0;
+        var sessionCompleted = false;
+
+        // Emit cycle start event
+        if (s_diagnosticListener.IsEnabled(OrleansRebalancerDiagnostics.EventNames.CycleStart))
         {
-            LogNotEnoughSilos();
-            return;
+            s_diagnosticListener.Write(OrleansRebalancerDiagnostics.EventNames.CycleStart,
+                new RebalancerCycleStartEvent(siloAddress, cycleNumber));
         }
 
-        var snapshot = _siloStatistics.ToDictionary();
-        if (snapshot.Count < 2)
+        try
         {
-            LogNotEnoughStatistics();
-            return;
-        }
+            var siloCount = siloStatusOracle.GetActiveSilos().Length;
+            if (siloCount < 2)
+            {
+                LogNotEnoughSilos();
+                return;
+            }
 
-        if (snapshot.Any(x => x.Value.MemoryUsage == 0))
-        {
-            LogInvalidSiloMemory();
-            return;
-        }
+            var snapshot = _siloStatistics.ToDictionary();
+            if (snapshot.Count < 2)
+            {
+                LogNotEnoughStatistics();
+                return;
+            }
 
-        _rebalancingCycle++;
+            if (snapshot.Any(x => x.Value.MemoryUsage == 0))
+            {
+                LogInvalidSiloMemory();
+                return;
+            }
 
-        if (_stagnantCycles >= _options.MaxStagnantCycles)
-        {
-            LogMaxStagnantCyclesReached(_stagnantCycles);
-            StopSession(StopReason.SessionStagnated);
+            _rebalancingCycle++;
 
-            return;
-        }
+            if (_stagnantCycles >= _options.MaxStagnantCycles)
+            {
+                LogMaxStagnantCyclesReached(_stagnantCycles);
+                StopSession(StopReason.SessionStagnated);
 
-        var totalActivations = snapshot.Sum(x => x.Value.ActivationCount);
-        var meanMemoryUsage = ComputeHarmonicMean(snapshot.Values);
-        var maximumEntropy = Math.Log(siloCount);
-        var currentEntropy = ComputeEntropy(snapshot.Values, totalActivations, meanMemoryUsage);
-        var allowedDeviation = ComputeAllowedEntropyDeviation(totalActivations);
-        var entropyDeviation = (maximumEntropy - currentEntropy) / maximumEntropy;
+                return;
+            }
 
-        _entropyDeviation = entropyDeviation;
+            var totalActivations = snapshot.Sum(x => x.Value.ActivationCount);
+            var meanMemoryUsage = ComputeHarmonicMean(snapshot.Values);
+            var maximumEntropy = Math.Log(siloCount);
+            var currentEntropy = ComputeEntropy(snapshot.Values, totalActivations, meanMemoryUsage);
+            var allowedDeviation = ComputeAllowedEntropyDeviation(totalActivations);
+            var entropyDeviation = (maximumEntropy - currentEntropy) / maximumEntropy;
 
-        if (entropyDeviation < allowedDeviation)
-        {
-            // The deviation from maximum is practically considered "0" i.e: we've reached maximum.
-            LogMaxEntropyDeviationReached(entropyDeviation, currentEntropy, maximumEntropy, allowedDeviation);
-            StopSession(StopReason.SessionCompleted);
+            _entropyDeviation = entropyDeviation;
 
-            return;
-        }
+            if (entropyDeviation < allowedDeviation)
+            {
+                // The deviation from maximum is practically considered "0" i.e: we've reached maximum.
+                LogMaxEntropyDeviationReached(entropyDeviation, currentEntropy, maximumEntropy, allowedDeviation);
+                sessionCompleted = true;
+                StopSession(StopReason.SessionCompleted);
 
-        // We use the normalized, absolute entropy change, because it is more useful for understanding how significant
-        // the change is, relative to the maximum possible. Values closer to 1 reflect higher significance than those closer to 0.
-        // Since max entropy is a function of the natural log of the cluster's size, this value is very robust against changes
-        // in silo number within the cluster.
+                return;
+            }
 
-        var entropyChange = Math.Abs((currentEntropy - _previousEntropy) / maximumEntropy);
-        Debug.Assert(entropyChange is >= 0 and <= 1);
+            // We use the normalized, absolute entropy change, because it is more useful for understanding how significant
+            // the change is, relative to the maximum possible. Values closer to 1 reflect higher significance than those closer to 0.
+            // Since max entropy is a function of the natural log of the cluster's size, this value is very robust against changes
+            // in silo number within the cluster.
 
-        if (entropyChange < _options.EntropyQuantum)
-        {
-            // Entropy change is too low to be considered an improvement, chances are we are reaching the maximum, or the system
-            // is dynamically changing too fast i.e. new activations are being created at a high rate with an imbalanced distribution,
-            // we need to start "cooling-down". As a matter of fact, entropy could also become negative if the current entropy is less
-            // than the previous, due to many activation changes happening during this and the previous cycle.
+            var entropyChange = Math.Abs((currentEntropy - _previousEntropy) / maximumEntropy);
+            Debug.Assert(entropyChange is >= 0 and <= 1);
 
-            LogInsufficientEntropyQuantum(entropyChange, _options.EntropyQuantum);
+            if (entropyChange < _options.EntropyQuantum)
+            {
+                // Entropy change is too low to be considered an improvement, chances are we are reaching the maximum, or the system
+                // is dynamically changing too fast i.e. new activations are being created at a high rate with an imbalanced distribution,
+                // we need to start "cooling-down". As a matter of fact, entropy could also become negative if the current entropy is less
+                // than the previous, due to many activation changes happening during this and the previous cycle.
 
-            _stagnantCycles++;
+                LogInsufficientEntropyQuantum(entropyChange, _options.EntropyQuantum);
+
+                _stagnantCycles++;
+                _previousEntropy = currentEntropy;
+
+                return;
+            }
+
+            if (_stagnantCycles > 0)
+            {
+                _stagnantCycles = 0;
+                LogStagnantCyclesReset();
+            }
+
+            if (_failedSessions > 0)
+            {
+                _failedSessions = 0;
+                LogFailedSessionsReset();
+            }
+
+            var idealDistributions = snapshot.Select(x => new ValueTuple<SiloAddress, double>
+                // n_i = (N / S) * (M_m / m_i)
+                (x.Key, ((double)totalActivations / siloCount) * (meanMemoryUsage / x.Value.MemoryUsage)))
+                .ToDictionary();
+
+            var alpha = currentEntropy / maximumEntropy;
+            var scalingFactor = ComputeAdaptiveScaling(siloCount, _rebalancingCycle);
+            var addressPairs = FormSiloPairs(snapshot);
+            var migrationTasks = new List<Task>();
+
+            for (var i = 0; i < addressPairs.Count; i++)
+            {
+                (var lowSilo, var highSilo) = addressPairs[i];
+
+                var difference = Math.Abs(
+                    (snapshot[lowSilo].ActivationCount - idealDistributions[lowSilo]) -
+                    (snapshot[highSilo].ActivationCount - idealDistributions[highSilo]));
+
+                var delta = (int)(alpha * scalingFactor * (difference / 2));
+                if (delta == 0)
+                {
+                    continue;
+                }
+
+                var lowCount = snapshot[lowSilo].ActivationCount;
+                var highCount = snapshot[highSilo].ActivationCount;
+
+                if (delta > highCount)
+                {
+                    delta = highCount;
+                }
+
+                if (delta > _options.ActivationMigrationCountLimit)
+                {
+                    delta = _options.ActivationMigrationCountLimit;
+                }
+
+                migrationTasks.Add(grainFactory
+                    .GetSystemTarget<ISiloControl>(Constants.SiloControlType, highSilo)
+                    .MigrateRandomActivations(lowSilo, delta));
+
+                activationsMigrated += delta;
+                UpdateStatistics(lowSilo, highSilo, delta);
+                LogSiloMigrations(delta, lowSilo, lowCount, lowCount + delta, highSilo, highCount, highCount - delta);
+            }
+
+            if (migrationTasks.Count > 0)
+            {
+                await Task.WhenAll(migrationTasks).WaitAsync(cancellationToken);
+            }
+
+            LogCycleOutcome(_rebalancingCycle, _stagnantCycles, _previousEntropy, currentEntropy, maximumEntropy, entropyDeviation);
             _previousEntropy = currentEntropy;
-
-            return;
         }
-
-        if (_stagnantCycles > 0)
+        finally
         {
-            _stagnantCycles = 0;
-            LogStagnantCyclesReset();
-        }
-
-        if (_failedSessions > 0)
-        {
-            _failedSessions = 0;
-            LogFailedSessionsReset();
-        }
-
-        var idealDistributions = snapshot.Select(x => new ValueTuple<SiloAddress, double>
-            // n_i = (N / S) * (M_m / m_i)
-            (x.Key, ((double)totalActivations / siloCount) * (meanMemoryUsage / x.Value.MemoryUsage)))
-            .ToDictionary();
-
-        var alpha = currentEntropy / maximumEntropy;
-        var scalingFactor = ComputeAdaptiveScaling(siloCount, _rebalancingCycle);
-        var addressPairs = FormSiloPairs(snapshot);
-        var migrationTasks = new List<Task>();
-
-        for (var i = 0; i < addressPairs.Count; i++)
-        {
-            (var lowSilo, var highSilo) = addressPairs[i];
-
-            var difference = Math.Abs(
-                (snapshot[lowSilo].ActivationCount - idealDistributions[lowSilo]) -
-                (snapshot[highSilo].ActivationCount - idealDistributions[highSilo]));
-
-            var delta = (int)(alpha * scalingFactor * (difference / 2));
-            if (delta == 0)
+            // Emit cycle stop event
+            if (s_diagnosticListener.IsEnabled(OrleansRebalancerDiagnostics.EventNames.CycleStop))
             {
-                continue;
+                var elapsed = Stopwatch.GetElapsedTime(cycleStartTime);
+                s_diagnosticListener.Write(OrleansRebalancerDiagnostics.EventNames.CycleStop,
+                    new RebalancerCycleStopEvent(siloAddress, cycleNumber, activationsMigrated, _entropyDeviation, elapsed, sessionCompleted));
             }
-
-            var lowCount = snapshot[lowSilo].ActivationCount;
-            var highCount = snapshot[highSilo].ActivationCount;
-
-            if (delta > highCount)
-            {
-                delta = highCount;
-            }
-
-            if (delta > _options.ActivationMigrationCountLimit)
-            {
-                delta = _options.ActivationMigrationCountLimit;
-            }
-
-            migrationTasks.Add(grainFactory
-                .GetSystemTarget<ISiloControl>(Constants.SiloControlType, highSilo)
-                .MigrateRandomActivations(lowSilo, delta));
-
-            UpdateStatistics(lowSilo, highSilo, delta);
-            LogSiloMigrations(delta, lowSilo, lowCount, lowCount + delta, highSilo, highCount, highCount - delta);
         }
-
-        if (migrationTasks.Count > 0)
-        {
-            await Task.WhenAll(migrationTasks).WaitAsync(cancellationToken);
-        }
-
-        LogCycleOutcome(_rebalancingCycle, _stagnantCycles, _previousEntropy, currentEntropy, maximumEntropy, entropyDeviation);
-        _previousEntropy = currentEntropy;
     }
 
     private void UpdateStatistics(SiloAddress lowSilo, SiloAddress highSilo, int delta)
@@ -479,6 +510,13 @@ internal sealed partial class ActivationRebalancerWorker(
     {
         StopSession(StopReason.SessionStarting);
 
+        // Emit session start event
+        if (s_diagnosticListener.IsEnabled(OrleansRebalancerDiagnostics.EventNames.SessionStart))
+        {
+            s_diagnosticListener.Write(OrleansRebalancerDiagnostics.EventNames.SessionStart,
+                new RebalancerSessionStartEvent(localSiloDetails.SiloAddress));
+        }
+
         _sessionTimer = this.RegisterGrainTimer(RunRebalancingCycle, new()
         {
             DueTime = TimeSpan.Zero,
@@ -490,6 +528,9 @@ internal sealed partial class ActivationRebalancerWorker(
 
     private void StopSession(StopReason reason, TimeSpan? duration = null)
     {
+        var totalCycles = _rebalancingCycle;
+        var wasActive = _sessionTimer != null;
+
         _previousEntropy = 0;
         _rebalancingCycle = 0;
         _stagnantCycles = 0;
@@ -529,6 +570,14 @@ internal sealed partial class ActivationRebalancerWorker(
                     }
                 }
                 break;
+        }
+
+        // Emit session stop event (only if there was an active session)
+        if (wasActive && reason != StopReason.SessionStarting &&
+            s_diagnosticListener.IsEnabled(OrleansRebalancerDiagnostics.EventNames.SessionStop))
+        {
+            s_diagnosticListener.Write(OrleansRebalancerDiagnostics.EventNames.SessionStop,
+                new RebalancerSessionStopEvent(localSiloDetails.SiloAddress, reason.ToString(), totalCycles));
         }
 
         LogSessionStopped();

@@ -1,11 +1,12 @@
 using TestExtensions;
+using Xunit;
 using Xunit.Abstractions;
 using Orleans.TestingHost;
 using Orleans.Runtime.Placement;
 
 namespace UnitTests.ActivationRebalancingTests;
 
-public abstract class RebalancingTestBase<TFixture>
+public abstract class RebalancingTestBase<TFixture> : IAsyncLifetime
     where TFixture : BaseInProcessTestClusterFixture
 {
     protected InProcessTestCluster Cluster { get; }
@@ -18,6 +19,12 @@ public abstract class RebalancingTestBase<TFixture>
     internal ITestOutputHelper OutputHelper { get; }
     internal IInternalGrainFactory GrainFactory { get; }
     internal IManagementGrain MgmtGrain { get; }
+
+    /// <summary>
+    /// Observer for rebalancer diagnostic events. Use this for event-driven waiting
+    /// instead of Task.Delay when waiting for rebalancing cycles.
+    /// </summary>
+    protected RebalancerDiagnosticObserver RebalancerObserver { get; }
 
     protected RebalancingTestBase(TFixture fixture, ITestOutputHelper output)
     {
@@ -32,6 +39,7 @@ public abstract class RebalancingTestBase<TFixture>
         OutputHelper = output;
         GrainFactory = (IInternalGrainFactory)fixture.HostedCluster.Client;
         MgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
+        RebalancerObserver = RebalancerDiagnosticObserver.Create();
     }
 
     protected static int GetActivationCount(DetailedGrainStatistic[] stats, SiloAddress silo) =>
@@ -57,9 +65,18 @@ public abstract class RebalancingTestBase<TFixture>
 
     public async Task InitializeAsync()
     {
+        // Clear any previous events from prior tests
+        RebalancerObserver.Clear();
+
         await GrainFactory
             .GetGrain<IManagementGrain>(0)
             .ForceActivationCollection(TimeSpan.Zero);
+    }
+
+    public Task DisposeAsync()
+    {
+        RebalancerObserver.Dispose();
+        return Task.CompletedTask;
     }
 }
 

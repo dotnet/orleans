@@ -87,7 +87,8 @@ namespace Tester.StreamingTests
             // Should be delivered
             await stream.OnNextAsync(interestingData);
 
-            await Task.Delay(5_000);
+            // Wait for both events to be received
+            await grain.WaitForEventCount(2, TimeSpan.FromSeconds(30));
 
             Assert.Equal(0, await grain.GetErrorCounter());
             Assert.Equal(2, await grain.GetEventCounter());
@@ -135,7 +136,8 @@ namespace Tester.StreamingTests
             // Should be delivered
             await stream.OnNextAsync(interestingData);
 
-            await Task.Delay(1000);
+            // Wait for the event to be received
+            await grain.WaitForEventCount(1, TimeSpan.FromSeconds(30));
 
             Assert.Equal(0, await grain.GetErrorCounter());
             Assert.Equal(1, await grain.GetEventCounter());

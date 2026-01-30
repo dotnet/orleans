@@ -1,6 +1,7 @@
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using NonSilo.Tests.Utilities;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
@@ -35,6 +36,7 @@ namespace NonSilo.Tests.Membership
         private readonly SiloHealthMonitor _monitor;
         private readonly SiloAddress _targetSilo;
         private readonly InMemoryMembershipTable _membershipTable;
+        private readonly FakeTimeProvider _timeProvider;
 
         public SiloHealthMonitorTests(ITestOutputHelper output)
         {
@@ -78,6 +80,7 @@ namespace NonSilo.Tests.Membership
 
             _targetSilo = Silo("127.0.0.200:100@100");
             _membershipTable = new(new TableVersion(0, "0"), Entry(_localSilo, SiloStatus.Active), Entry(_targetSilo, SiloStatus.Active));
+            _timeProvider = new FakeTimeProvider();
             _membershipService = new MembershipTableManager(
                 localSiloDetails: _localSiloDetails,
                 clusterMembershipOptions: Options.Create(_clusterMembershipOptions),
@@ -85,7 +88,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: fatalErrorHandler,
                 gossiper: membershipGossiper,
                 log: _loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(_loggerFactory),
+                timerFactory: new AsyncTimerFactory(_loggerFactory, _timeProvider),
                 lifecycle);
 
             _probeResults = Channel.CreateBounded<ProbeResult>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.Wait });
