@@ -1,13 +1,17 @@
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Orleans.Runtime
 {
     [Serializable, GenerateSerializer, Immutable]
     [SuppressReferenceTracking]
+    [JsonConverter(typeof(UniqueKeyJsonConverter))]
     public sealed class UniqueKey : IComparable<UniqueKey>, IEquatable<UniqueKey>
     {
         /// <summary>
@@ -341,5 +345,83 @@ namespace Orleans.Runtime
         }
 
         private static ulong GetTypeCodeData(Category category, long typeData = 0) => ((ulong)category << 56) + ((ulong)typeData & 0x00FFFFFFFFFFFFFF);
+    }
+
+    public sealed class UniqueKeyJsonConverter : JsonConverter<UniqueKey>
+    {
+        private const int MaxBufferSize = 256;
+
+        /// <inheritdoc />
+        public override UniqueKey? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                return null;
+            }
+            UniqueKey? result = null;
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndObject)
+                    break;
+
+                if (reader.TokenType == JsonTokenType.PropertyName)
+                {
+                    Span<char> buffer = stackalloc char[MaxBufferSize];
+                    var written = reader.CopyString(buffer);
+
+                    if (buffer[..written] is "UniqueKey" && reader.Read())
+                    {
+                        result = GetUniqueKey(ref reader, buffer);
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        private static UniqueKey? GetUniqueKey(ref Utf8JsonReader reader, scoped Span<char> buffer)
+        {
+            if (reader.HasValueSequence)
+            {
+                var valueLength = checked((int)reader.ValueSequence.Length);
+                if (valueLength < buffer.Length)
+                {
+                    var written = reader.CopyString(buffer);
+                    return UniqueKey.Parse(buffer[..written]);
+                }
+            }
+            else
+            {
+                if (reader.ValueSpan.Length < buffer.Length)
+                {
+                    var written = reader.CopyString(buffer);
+                    return UniqueKey.Parse(buffer[..written]);
+                }
+            }
+
+            var str = reader.GetString();
+            return str is null ? null : UniqueKey.Parse(str);
+        }
+
+        /// <inheritdoc />
+        public override void Write(Utf8JsonWriter writer, UniqueKey value, JsonSerializerOptions options)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("UniqueKey", value.ToHexString());
+            writer.WriteEndObject();
+        }
+
+        /// <inheritdoc />
+        public override UniqueKey ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            Span<char> buffer = stackalloc char[MaxBufferSize];
+            return GetUniqueKey(ref reader, buffer) ?? throw new JsonException("Failed to parse UniqueKey from property name.");
+        }
+
+        /// <inheritdoc />
+        public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] UniqueKey value, JsonSerializerOptions options)
+        {
+            writer.WritePropertyName(value.ToHexString());
+        }
     }
 }
