@@ -88,6 +88,8 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.9.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.9.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.9.0" />
+    <PackageVersion Include="Polly" Version="8.5.2" />
+    <PackageVersion Include="Polly.Extensions" Version="8.6.4" />
     <PackageVersion Include="protobuf-net" Version="3.2.30" />
     <PackageVersion Include="SpanJson" Version="4.0.1" />
     <PackageVersion Include="StackExchange.Redis" Version="2.9.32" />
