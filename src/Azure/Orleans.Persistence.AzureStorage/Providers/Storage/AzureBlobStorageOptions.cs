@@ -11,6 +11,23 @@ using Orleans.Storage;
 
 namespace Orleans.Configuration
 {
+    public enum AzureBlobStorageWriteMode
+    {
+        /// <summary>
+        /// Serialize to <see cref="BinaryData"/> and upload.
+        /// This uses the <see cref="IGrainStorageSerializer"/> binary path, materializing the full payload in memory.
+        /// It is typically the fastest path but can create large allocations (including LOH) for big payloads.
+        /// </summary>
+        BinaryData,
+
+        /// <summary>
+        /// Serialize using the stream serializer into a pooled in-memory stream and upload from that buffer.
+        /// This still buffers the full payload but avoids LOH churn by reusing pooled segments.
+        /// Requires <see cref="IGrainStorageStreamingSerializer"/>; otherwise the write falls back to <see cref="BinaryData"/>.
+        /// </summary>
+        BufferedStream,
+    }
+
     public class AzureBlobStorageOptions : IStorageProviderSerializerOptions
     {
         private BlobServiceClient _blobServiceClient;
@@ -56,6 +73,20 @@ namespace Orleans.Configuration
         /// Gets or sets a value indicating whether to delete the state when <see cref="IGrainStorage.ClearStateAsync"/> is called.  Defaults to true.
         /// </summary>
         public bool DeleteStateOnClear { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to use pooled buffers when reading blob contents.
+        /// The deserializer must not retain the <see cref="BinaryData"/> or underlying buffer after deserialization.
+        /// When a stream serializer is configured, pooled buffers are used only if the content length fits in an <see cref="int"/>.
+        /// When pooled buffers are used, deserialization goes through the <see cref="IGrainStorageSerializer"/> binary path.
+        /// </summary>
+        public bool UsePooledBufferForReads { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets the write path to use when a stream serializer is available.
+        /// If the stream serializer is not configured, writes always use <see cref="BinaryData"/>.
+        /// </summary>
+        public AzureBlobStorageWriteMode WriteMode { get; set; } = AzureBlobStorageWriteMode.BinaryData;
 
         /// <summary>
         /// A function for building container factory instances
@@ -149,7 +180,7 @@ namespace Orleans.Configuration
                 AzureBlobUtils.ValidateContainerName(options.ContainerName);
                 AzureBlobUtils.ValidateBlobName(this.name);
             }
-            catch(ArgumentException e)
+            catch (ArgumentException e)
             {
                 throw new OrleansConfigurationException(
                     $"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(this.options.ContainerName)} is not valid", e);
