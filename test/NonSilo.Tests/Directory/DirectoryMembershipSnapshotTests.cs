@@ -28,7 +28,7 @@ public sealed class DirectoryMembershipSnapshotTests
     });
 
     private static readonly Gen<DirectoryMembershipSnapshot> GenDirectoryMembershipSnapshot =
-        GenClusterMembershipSnapshot.SelectMany(snapshot => Gen.UInt.Array[ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS].Array[snapshot.Members.Count].Select(hashes => 
+        GenClusterMembershipSnapshot.SelectMany(snapshot => Gen.UInt.Array[DirectoryMembershipSnapshot.PartitionsPerSilo].Array[snapshot.Members.Count].Select(hashes => 
     {
         var i = 0;
         return new DirectoryMembershipSnapshot(snapshot, null!, (_, _) => hashes[i++]);

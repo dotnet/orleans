@@ -64,6 +64,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     private readonly IServiceProvider _serviceProvider;
     private readonly ImmutableArray<GrainDirectoryPartition> _partitions;
     private readonly CancellationTokenSource _stoppedCts = new();
+    private readonly ActivationDirectory _localActivations;
 
     internal CancellationToken OnStoppedToken => _stoppedCts.Token;
     internal ClusterMembershipSnapshot ClusterMembershipSnapshot => _membershipService.CurrentView.ClusterMembershipSnapshot;
@@ -77,7 +78,6 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     // for each recovery version.
     private long _recoveryMembershipVersion;
     private Task _runTask = Task.CompletedTask;
-    private ActivationDirectory _localActivations;
     private GrainDirectoryResolver? _grainDirectoryResolver;
 
     public DistributedGrainDirectory(
@@ -330,10 +330,12 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
         async Task OnShuttingDown(CancellationToken token)
         {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            cts.CancelAfter(TimeSpan.FromSeconds(10));
             var tasks = new List<Task>(_partitions.Length);
             foreach (var partition in _partitions)
             {
-                tasks.Add(partition.OnShuttingDown(token));
+                tasks.Add(partition.OnShuttingDown(cts.Token));
             }
 
             await Task.WhenAll(tasks).SuppressThrowing();
