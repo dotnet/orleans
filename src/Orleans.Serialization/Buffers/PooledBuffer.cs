@@ -53,11 +53,11 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         {
             var span = current.CommittedMemory.Span;
             span.CopyTo(resultSpan);
-            resultSpan = resultSpan[span.Length..];
+            resultSpan = resultSpan.Slice(span.Length);
             current = current.Next as SequenceSegment;
         }
 
-        if (WriteHead is not null && CurrentPosition > 0)
+        if (CurrentPosition > 0)
         {
             WriteHead.Array.AsSpan(0, CurrentPosition).CopyTo(resultSpan);
         }
@@ -69,15 +69,13 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Advance(int bytes)
     {
-        if (WriteHead is null || CurrentPosition > WriteHead.Array.Length)
+        if (WriteHead is null || CurrentPosition + bytes > WriteHead.Array.Length)
         {
             ThrowInvalidOperation();
         }
 
         CurrentPosition += bytes;
 
-        [DoesNotReturn]
-        [MethodImpl(MethodImplOptions.NoInlining)]
         static void ThrowInvalidOperation() => throw new InvalidOperationException("Attempted to advance past the end of a buffer.");
     }
 
@@ -120,12 +118,12 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Span<byte> GetSpan(int sizeHint = 0)
     {
-        if (WriteHead is null || sizeHint >= WriteHead.Array.Length - CurrentPosition)
+        if (WriteHead is { Array: var head } && sizeHint < head.Length - CurrentPosition)
         {
-            return GetSpanSlow(sizeHint);
+            return head.AsSpan(CurrentPosition);
         }
 
-        return WriteHead.Array.AsSpan(CurrentPosition);
+        return GetSpanSlow(sizeHint);
     }
 
     /// <summary>Copies the contents of this writer to a span.</summary>
@@ -141,7 +139,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             current = current.Next as SequenceSegment;
         }
 
-        if (output.Length > 0 && CurrentPosition > 0 && WriteHead is not null)
+        if (output.Length > 0 && CurrentPosition > 0)
         {
             var span = WriteHead.Array.AsSpan(0, Math.Min(output.Length, CurrentPosition));
             span.CopyTo(output);
@@ -159,7 +157,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             current = current.Next as SequenceSegment;
         }
 
-        if (CurrentPosition > 0 && WriteHead is not null)
+        if (CurrentPosition > 0)
         {
             writer.Write(WriteHead.Array.AsSpan(0, CurrentPosition));
         }
@@ -172,55 +170,13 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         while (current != null)
         {
             var span = current.CommittedMemory.Span;
-            writer.Write(span);
+            Adaptors.BufferWriterExtensions.Write(ref writer, span);
             current = current.Next as SequenceSegment;
         }
 
-        if (CurrentPosition > 0 && WriteHead is not null)
+        if (CurrentPosition > 0)
         {
-            Write(ref writer, WriteHead.Array.AsSpan(0, CurrentPosition));
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void Write<TBufferWriter>(ref TBufferWriter writer, ReadOnlySpan<byte> value) where TBufferWriter : IBufferWriter<byte>
-    {
-        Span<byte> destination = writer.GetSpan();
-
-        // Fast path, try copying to the available memory directly
-        if (value.Length <= destination.Length)
-        {
-            value.CopyTo(destination);
-            writer.Advance(value.Length);
-        }
-        else
-        {
-            WriteMultiSegment(ref writer, value, destination);
-        }
-    }
-
-    private static void WriteMultiSegment<TBufferWriter>(ref TBufferWriter writer, in ReadOnlySpan<byte> source, Span<byte> destination) where TBufferWriter : IBufferWriter<byte>
-    {
-        ReadOnlySpan<byte> input = source;
-        while (true)
-        {
-            int writeSize = Math.Min(destination.Length, input.Length);
-            input[..writeSize].CopyTo(destination);
-            writer.Advance(writeSize);
-            input = input[writeSize..];
-            if (input.Length > 0)
-            {
-                destination = writer.GetSpan();
-
-                if (destination.IsEmpty)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(writer));
-                }
-
-                continue;
-            }
-
-            return;
+            Adaptors.BufferWriterExtensions.Write(ref writer, WriteHead.Array.AsSpan(0, CurrentPosition));
         }
     }
 
@@ -296,33 +252,33 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Write(ReadOnlySpan<byte> value)
     {
-        var destination = GetSpan();
-
         // Fast path, try copying to the available memory directly
-        if (value.Length <= destination.Length)
+        if (WriteHead is { Array: { } head })
         {
-            value.CopyTo(destination);
-            Advance(value.Length);
+            var destination = head.AsSpan(CurrentPosition);
+            if ((uint)value.Length <= (uint)destination.Length)
+            {
+                value.CopyTo(destination);
+                CurrentPosition += value.Length;
+                return;
+            }
         }
-        else
-        {
-            WriteMultiSegment(value, destination);
-        }
+
+        WriteMultiSegment(value);
     }
 
-    private void WriteMultiSegment(in ReadOnlySpan<byte> source, Span<byte> destination)
+    private void WriteMultiSegment(in ReadOnlySpan<byte> source)
     {
         var input = source;
         while (true)
         {
+            var destination = GetSpan();
             var writeSize = Math.Min(destination.Length, input.Length);
             input[..writeSize].CopyTo(destination);
-            Advance(writeSize);
-            input = input[writeSize..];
+            CurrentPosition += writeSize;
+            input = input.Slice(writeSize);
             if (input.Length > 0)
             {
-                destination = GetSpan();
-
                 continue;
             }
 
@@ -635,7 +591,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         {
             foreach (var span in this)
             {
-                output.Write(span);
+                Adaptors.BufferWriterExtensions.Write(ref output, span);
             }
         }
 
@@ -905,31 +861,21 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             SequenceSegment block;
             if (size <= MinimumBlockSize)
             {
-                if (!_blocks.TryDequeue(out block))
-                {
-                    block = new SequenceSegment(size);
-                }
-            }
-            else if (_largeBlocks.TryDequeue(out block))
-            {
-                block.ResizeLargeSegment(size);
-                return block;
+                return _blocks.TryDequeue(out block) ? block : new(large: false);
             }
 
-            return block ?? new SequenceSegment(size);
+            if (!_largeBlocks.TryDequeue(out block))
+            {
+                block = new(large: true);
+            }
+            block.ResizeLargeSegment(size);
+            return block;
         }
 
         internal void Return(SequenceSegment block)
         {
             Debug.Assert(block.IsValid);
-            if (block.IsMinimumSize)
-            {
-                _blocks.Enqueue(block);
-            }
-            else
-            {
-                _largeBlocks.Enqueue(block);
-            }
+            (block.IsMinimumSize ? _blocks : _largeBlocks).Enqueue(block);
         }
     }
 
@@ -940,52 +886,38 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             Array = System.Array.Empty<byte>();
         }
 
-        internal SequenceSegment(int length)
+        internal SequenceSegment(bool large)
         {
-            InitializeArray(length);
+            if (!large)
+            {
+#if NET6_0_OR_GREATER
+                Array = GC.AllocateUninitializedArray<byte>(SequenceSegmentPool.MinimumBlockSize, pinned: true);
+#else
+                Array = new byte[SequenceSegmentPool.MinimumBlockSize];
+#endif
+            }
         }
 
         public void ResizeLargeSegment(int length)
         {
             Debug.Assert(length > SequenceSegmentPool.MinimumBlockSize);
-            InitializeArray(length);
-        }
+            // Round up to a power of two.
+            length = (int)BitOperations.RoundUpToPowerOf2((uint)length);
 
-#if NET6_0_OR_GREATER
-        [MemberNotNull(nameof(Array))]
-#endif
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void InitializeArray(int length)
-        {
-            if (length <= SequenceSegmentPool.MinimumBlockSize)
+            if (Array is { } array)
             {
-                Debug.Assert(Array is null);
-#if NET6_0_OR_GREATER
-                var array = GC.AllocateUninitializedArray<byte>(SequenceSegmentPool.MinimumBlockSize, pinned: true);
-#else
-                var array = new byte[SequenceSegmentPool.MinimumBlockSize];
-#endif
-                Array = array;
-            }
-            else
-            {
-                // Round up to a power of two.
-                length = (int)BitOperations.RoundUpToPowerOf2((uint)length);
-
-                if (Array is not null)
+                // The segment has an appropriate size already.
+                if (array.Length == length)
                 {
-                    // The segment has an appropriate size already.
-                    if (Array.Length == length)
-                    {
-                        return;
-                    }
-
-                    // The segment is being resized.
-                    ArrayPool<byte>.Shared.Return(Array);
+                    return;
                 }
 
-                Array = ArrayPool<byte>.Shared.Rent(length);
+                // The segment is being resized.
+                Array = null;
+                ArrayPool<byte>.Shared.Return(array);
             }
+
+            Array = ArrayPool<byte>.Shared.Rent(length);
         }
 
         public byte[] Array { get; private set; }

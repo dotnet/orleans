@@ -135,11 +135,11 @@ namespace Orleans.Runtime.Messaging
             innerWriter.WriteInt32(value.GetConsistentHashCode());
             WriteSiloAddressInner(ref innerWriter, value);
             innerWriter.Commit();
-
-            writer.WriteVarUInt32((uint)innerWriter.Output.Length);
-            innerWriter.Output.CopyTo(ref writer);
             var payloadArray = innerWriter.Output.ToArray();
             innerWriter.Dispose();
+
+            writer.WriteVarUInt32((uint)payloadArray.Length);
+            writer.Write(payloadArray);
 
             // Before adding this value to the private cache, intern it via the shared cache to hopefully reduce duplicates.
             (_, payloadArray) = SharedCache.GetOrAdd(value, static (key, encoded) => (key, encoded), payloadArray);
