@@ -1,12 +1,11 @@
 #nullable enable
-using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
+using Orleans.Diagnostics;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Serializers;
 using Orleans.Storage;
@@ -83,6 +82,22 @@ namespace Orleans.Core
             {
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
 
+                // Try to get the parent activity context from the current activity or from the activation's stored activity
+                var parentContext = Activity.Current?.Context;
+                if (parentContext is null && _grainContext is ActivationData activationData)
+                {
+                    // If we're in activation context and there's an activation activity, use it as parent
+                    parentContext = activationData.GetActivationActivityContext();
+                }
+
+                using var activity = parentContext.HasValue
+                    ? ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageRead, ActivityKind.Client, parentContext.Value)
+                    : ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageRead, ActivityKind.Client);
+                activity?.SetTag(ActivityTagKeys.GrainId, _grainContext.GrainId.ToString());
+                activity?.SetTag(ActivityTagKeys.StorageProvider, _shared.ProviderTypeName);
+                activity?.SetTag(ActivityTagKeys.StorageStateName, _shared.Name);
+                activity?.SetTag(ActivityTagKeys.StorageStateType, _shared.StateTypeName);
+
                 var sw = ValueStopwatch.StartNew();
                 await _shared.Store.ReadStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
                 IsStateInitialized = true;
@@ -102,6 +117,21 @@ namespace Orleans.Core
             {
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
 
+                // Try to get the parent activity context from the current activity or from the activation's stored activity
+                var parentContext = Activity.Current?.Context;
+                if (parentContext is null && _grainContext is ActivationData activationData)
+                {
+                    parentContext = activationData.GetActivationActivityContext();
+                }
+
+                using var activity = parentContext.HasValue
+                    ? ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageWrite, ActivityKind.Client, parentContext.Value)
+                    : ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageWrite, ActivityKind.Client);
+                activity?.SetTag(ActivityTagKeys.GrainId, _grainContext.GrainId.ToString());
+                activity?.SetTag(ActivityTagKeys.StorageProvider, _shared.ProviderTypeName);
+                activity?.SetTag(ActivityTagKeys.StorageStateName, _shared.Name);
+                activity?.SetTag(ActivityTagKeys.StorageStateType, _shared.StateTypeName);
+
                 var sw = ValueStopwatch.StartNew();
                 await _shared.Store.WriteStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
                 StorageInstruments.OnStorageWrite(sw.Elapsed, _shared.ProviderTypeName, _shared.Name, _shared.StateTypeName);
@@ -119,6 +149,21 @@ namespace Orleans.Core
             try
             {
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
+
+                // Try to get the parent activity context from the current activity or from the activation's stored activity
+                var parentContext = Activity.Current?.Context;
+                if (parentContext is null && _grainContext is ActivationData activationData)
+                {
+                    parentContext = activationData.GetActivationActivityContext();
+                }
+
+                using var activity = parentContext.HasValue
+                    ? ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageClear, ActivityKind.Client, parentContext.Value)
+                    : ActivitySources.StorageGrainSource.StartActivity(ActivityNames.StorageClear, ActivityKind.Client);
+                activity?.SetTag(ActivityTagKeys.GrainId, _grainContext.GrainId.ToString());
+                activity?.SetTag(ActivityTagKeys.StorageProvider, _shared.ProviderTypeName);
+                activity?.SetTag(ActivityTagKeys.StorageStateName, _shared.Name);
+                activity?.SetTag(ActivityTagKeys.StorageStateType, _shared.StateTypeName);
 
                 var sw = ValueStopwatch.StartNew();
 
