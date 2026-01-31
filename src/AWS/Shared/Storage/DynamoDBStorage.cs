@@ -28,7 +28,7 @@ namespace Orleans.Transactions.DynamoDB
     /// <summary>
     /// Wrapper around AWS DynamoDB SDK.
     /// </summary>
-    internal partial class DynamoDBStorage
+    public partial class DynamoDBStorage
     {
         private readonly string _accessKey;
         private readonly string _token;
@@ -948,6 +948,29 @@ namespace Orleans.Transactions.DynamoDB
                     transactItems.AddRange(conditionChecks.Select(c => new TransactWriteItem { ConditionCheck = c }));
                 }
 
+                var request = new TransactWriteItemsRequest
+                {
+                    TransactItems = transactItems
+                };
+
+                return _ddbClient.TransactWriteItemsAsync(request);
+            }
+            catch (Exception exc)
+            {
+                LogDebugUnableToWrite(_logger, exc);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Transactionally performs write requests
+        /// </summary>
+        /// <param name="transactItems">Transact write items to be performed</param>
+        /// <returns></returns>
+        public Task WriteTxAsync(List<TransactWriteItem> transactItems)
+        {
+            try
+            {
                 var request = new TransactWriteItemsRequest
                 {
                     TransactItems = transactItems
