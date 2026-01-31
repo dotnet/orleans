@@ -21,6 +21,11 @@ internal static class ActivityTagKeys
     public const string ActivationCause = "orleans.activation.cause";
 
     /// <summary>
+    /// The deactivation reason tag key.
+    /// </summary>
+    public const string DeactivationReason = "orleans.deactivation.reason";
+
+    /// <summary>
     /// The grain ID tag key.
     /// </summary>
     public const string GrainId = "orleans.grain.id";

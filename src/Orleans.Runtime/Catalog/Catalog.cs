@@ -167,7 +167,7 @@ namespace Orleans.Runtime
             }
 
             // Start activation span with parent context from request if available
-            var parentContext = TryGetActivityContext(requestContextData);
+            var parentContext = requestContextData.TryGetActivityContext();
             using var activationActivity = parentContext.HasValue
                 ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal, parentContext.Value)
                 : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal);
@@ -447,36 +447,5 @@ namespace Orleans.Runtime
             Message = "Failed to unregister non-existent activation {Address}"
         )]
         private partial void LogFailedToUnregisterNonExistingActivation(GrainAddress address, Exception exception);
-
-        /// <summary>
-        /// Extracts an ActivityContext from request context data if present.
-        /// </summary>
-        private static ActivityContext? TryGetActivityContext(Dictionary<string, object> requestContextData)
-        {
-            if (requestContextData is not { Count: > 0 })
-            {
-                return null;
-            }
-
-            string traceParent = null;
-            string traceState = null;
-
-            if (requestContextData.TryGetValue(OpenTelemetryHeaders.TraceParent, out var traceParentObj) && traceParentObj is string tp)
-            {
-                traceParent = tp;
-            }
-
-            if (requestContextData.TryGetValue(OpenTelemetryHeaders.TraceState, out var traceStateObj) && traceStateObj is string ts)
-            {
-                traceState = ts;
-            }
-
-            if (!string.IsNullOrEmpty(traceParent) && ActivityContext.TryParse(traceParent, traceState, isRemote: true, out var parentContext))
-            {
-                return parentContext;
-            }
-
-            return null;
-        }
     }
 }

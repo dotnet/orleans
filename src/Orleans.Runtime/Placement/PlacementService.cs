@@ -426,25 +426,9 @@ namespace Orleans.Runtime.Placement
         /// </summary>
         private static Activity TryRestoreActivityContext(Dictionary<string, object> requestContextData, string operationName)
         {
-            if (requestContextData is not { Count: > 0 })
-            {
-                return null;
-            }
+            var activityContext = requestContextData.TryGetActivityContext();
 
-            string traceParent = null;
-            string traceState = null;
-
-            if (requestContextData.TryGetValue(OpenTelemetryHeaders.TraceParent, out var traceParentObj) && traceParentObj is string tp)
-            {
-                traceParent = tp;
-            }
-
-            if (requestContextData.TryGetValue(OpenTelemetryHeaders.TraceState, out var traceStateObj) && traceStateObj is string ts)
-            {
-                traceState = ts;
-            }
-
-            if (!string.IsNullOrEmpty(traceParent) && ActivityContext.TryParse(traceParent, traceState, isRemote: true, out var parentContext))
+            if (activityContext is {} parentContext)
             {
                 // Start the activity from the Catalog's ActivitySource to properly associate it with activation tracing
                 return ActivitySources.LifecycleGrainSource.StartActivity(operationName, ActivityKind.Internal, parentContext);
