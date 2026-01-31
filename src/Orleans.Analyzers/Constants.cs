@@ -6,6 +6,9 @@ namespace Orleans.Analyzers
 
         public const string IAddressibleFullyQualifiedName = "Orleans.Runtime.IAddressable";
         public const string GrainBaseFullyQualifiedName = "Orleans.Grain";
+        public const string IGrainBaseFullyQualifiedName = "Orleans.IGrainBase";
+        public const string IGrainFullyQualifiedName = "Orleans.IGrain";
+        public const string ISystemTargetFullyQualifiedName = "Orleans.ISystemTarget";
 
         public const string IdAttributeName = "Id";
         public const string IdAttributeFullyQualifiedName = "global::Orleans.IdAttribute";

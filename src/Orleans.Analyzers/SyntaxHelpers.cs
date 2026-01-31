@@ -201,6 +201,27 @@ namespace Orleans.Analyzers
             return false;
         }
 
+        public static bool IsGrainClass(this INamedTypeSymbol typeSymbol)
+        {
+            if (typeSymbol is null || typeSymbol.TypeKind != TypeKind.Class)
+            {
+                return false;
+            }
+
+            // Check if the type implements IGrain or ISystemTarget interface
+            foreach (var interfaceSymbol in typeSymbol.AllInterfaces)
+            {
+                var interfaceName = interfaceSymbol.ToDisplayString(NullableFlowState.None);
+                if (Constants.IGrainFullyQualifiedName.Equals(interfaceName, StringComparison.Ordinal) ||
+                    Constants.ISystemTargetFullyQualifiedName.Equals(interfaceName, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public static AttributeArgumentBag<T> GetArgumentBag<T>(this AttributeSyntax attribute, SemanticModel semanticModel)
         {
             if (attribute is null)
