@@ -5,6 +5,6 @@
 Rule ID | Category | Severity | Notes
 --------|----------|----------|--------------------
 ORLEANS0014 | Usage | Info | Awaited method in OnActivateAsync should use CancellationToken overload
-ORLEANS0015 | Usage | Info | Awaited method in OnActivateAsync should use .WaitAsync(cancellationToken)
+ORLEANS0015 | Usage | Info | Awaited method in OnActivateAsync that doesn't use the activation CancellationToken should use .WaitAsync(cancellationToken)
 
 
