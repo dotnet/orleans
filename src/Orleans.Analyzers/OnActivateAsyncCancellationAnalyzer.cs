@@ -36,14 +36,14 @@ namespace Orleans.Analyzers
     public class OnActivateAsyncCancellationAnalyzer : DiagnosticAnalyzer
     {
         public const string MissingCancellationTokenOverloadDiagnosticId = "ORLEANS0014";
-        public const string MissingCancellationTokenOverloadTitle = "Awaited method should use cancellation token overload";
-        public const string MissingCancellationTokenOverloadMessageFormat = "The awaited method '{0}' has an overload that accepts a CancellationToken. Use the cancellation token from the OnActivateAsync parameter or explicitly pass CancellationToken.None.";
+        public const string MissingCancellationTokenOverloadTitle = "Awaited method should use the OnActivateAsync cancellation token overload";
+        public const string MissingCancellationTokenOverloadMessageFormat = "The awaited method '{0}' has an overload that accepts a CancellationToken. Prefer to use the cancellation token from the OnActivateAsync parameter.";
         public const string MissingCancellationTokenOverloadDescription = "Awaited methods in OnActivateAsync should propagate the cancellation token to ensure proper cancellation support during grain activation.";
 
         public const string MissingWaitAsyncDiagnosticId = "ORLEANS0015";
         public const string MissingWaitAsyncTitle = "Awaited method should use WaitAsync with cancellation token";
-        public const string MissingWaitAsyncMessageFormat = "The awaited method '{0}' does not accept a CancellationToken. Use .WaitAsync(cancellationToken) to support cancellation.";
-        public const string MissingWaitAsyncDescription = "Awaited methods in OnActivateAsync that don't support CancellationToken should use .WaitAsync(cancellationToken) to ensure proper cancellation support during grain activation.";
+        public const string MissingWaitAsyncMessageFormat = "The awaited method '{0}' does not accept a CancellationToken. Use .WaitAsync(cancellationToken) to preserve responsiveness.";
+        public const string MissingWaitAsyncDescription = "Awaited methods in OnActivateAsync that don't support CancellationToken should use .WaitAsync(cancellationToken) to ensure proper cancellation support during grain activation. Note that the awaited method will continue to execute, but OnActivateAsync will stop waiting for it.";
 
         public const string Category = "Usage";
 
@@ -83,11 +83,40 @@ namespace Orleans.Analyzers
 
         private static void AnalyzeMethodDeclaration(SyntaxNodeAnalysisContext context)
         {
-            if (!(context.Node is MethodDeclarationSyntax methodSyntax))
+            var methodSyntax = context.Node as MethodDeclarationSyntax;
+            if (methodSyntax == null)
             {
                 return;
             }
 
+            // PERF: Check method name syntactically first (cheapest check)
+            if (methodSyntax.Identifier.Text != OnActivateAsyncMethodName)
+            {
+                return;
+            }
+
+            // PERF: Check if the method has the async modifier or contains await expressions
+            // Methods without await can't have cancellation token propagation issues
+            var hasAsyncModifier = methodSyntax.Modifiers.Any(SyntaxKind.AsyncKeyword);
+            if (!hasAsyncModifier)
+            {
+                return;
+            }
+
+            // PERF: Check parameter count syntactically (OnActivateAsync has exactly 1 parameter)
+            if (methodSyntax.ParameterList.Parameters.Count != 1)
+            {
+                return;
+            }
+
+            // PERF: Check if there are any await expressions before doing semantic analysis
+            var awaitExpressions = methodSyntax.DescendantNodes().OfType<AwaitExpressionSyntax>().ToList();
+            if (awaitExpressions.Count == 0)
+            {
+                return;
+            }
+
+            // Now do semantic analysis (more expensive)
             var methodSymbol = context.SemanticModel.GetDeclaredSymbol(methodSyntax, context.CancellationToken);
             if (methodSymbol == null)
             {
@@ -100,16 +129,10 @@ namespace Orleans.Analyzers
                 return;
             }
 
-            // Find the CancellationToken parameter
-            var cancellationTokenParameter = FindCancellationTokenParameter(methodSymbol, context.Compilation);
-            if (cancellationTokenParameter == null)
-            {
-                return;
-            }
+            // The first parameter should be CancellationToken (already validated in IsOnActivateAsyncImplementation)
+            var cancellationTokenParameter = methodSymbol.Parameters[0];
 
             // Analyze all await expressions in the method body
-            var awaitExpressions = methodSyntax.DescendantNodes().OfType<AwaitExpressionSyntax>();
-
             foreach (var awaitExpression in awaitExpressions)
             {
                 AnalyzeAwaitExpression(context, awaitExpression, cancellationTokenParameter);
@@ -118,7 +141,24 @@ namespace Orleans.Analyzers
 
         private static bool IsOnActivateAsyncImplementation(IMethodSymbol methodSymbol, Compilation compilation)
         {
-            if (methodSymbol.Name != OnActivateAsyncMethodName)
+            // PERF: Method name already checked syntactically in caller
+            // PERF: Parameter count already checked syntactically in caller
+
+            // Check if the parameter is CancellationToken
+            var cancellationTokenType = compilation.GetTypeByMetadataName(CancellationTokenFullyQualifiedName);
+            if (cancellationTokenType == null)
+            {
+                return false;
+            }
+
+            if (!SymbolEqualityComparer.Default.Equals(methodSymbol.Parameters[0].Type, cancellationTokenType))
+            {
+                return false;
+            }
+
+            // Check if the containing type implements IGrainBase
+            var containingType = methodSymbol.ContainingType;
+            if (containingType == null)
             {
                 return false;
             }
@@ -129,47 +169,16 @@ namespace Orleans.Analyzers
                 return false;
             }
 
-            var containingType = methodSymbol.ContainingType;
-            if (containingType == null)
+            // Check interfaces
+            foreach (var iface in containingType.AllInterfaces)
             {
-                return false;
+                if (SymbolEqualityComparer.Default.Equals(iface, iGrainBaseType))
+                {
+                    return true;
+                }
             }
 
-            // Check if the containing type implements IGrainBase
-            var implementsIGrainBase = containingType.AllInterfaces.Any(i =>
-                SymbolEqualityComparer.Default.Equals(i, iGrainBaseType));
-
-            if (!implementsIGrainBase)
-            {
-                return false;
-            }
-
-            // Check if this method matches the signature of IGrainBase.OnActivateAsync
-            var cancellationTokenType = compilation.GetTypeByMetadataName(CancellationTokenFullyQualifiedName);
-            if (cancellationTokenType == null)
-            {
-                return false;
-            }
-
-            // OnActivateAsync should have exactly one parameter of type CancellationToken
-            if (methodSymbol.Parameters.Length != 1)
-            {
-                return false;
-            }
-
-            return SymbolEqualityComparer.Default.Equals(methodSymbol.Parameters[0].Type, cancellationTokenType);
-        }
-
-        private static IParameterSymbol FindCancellationTokenParameter(IMethodSymbol methodSymbol, Compilation compilation)
-        {
-            var cancellationTokenType = compilation.GetTypeByMetadataName(CancellationTokenFullyQualifiedName);
-            if (cancellationTokenType == null)
-            {
-                return null;
-            }
-
-            return methodSymbol.Parameters.FirstOrDefault(p =>
-                SymbolEqualityComparer.Default.Equals(p.Type, cancellationTokenType));
+            return false;
         }
 
         private static void AnalyzeAwaitExpression(
@@ -186,9 +195,20 @@ namespace Orleans.Analyzers
             // Unwrap ConfigureAwait calls to get the actual method being awaited
             var targetExpression = UnwrapConfigureAwait(expression, context.SemanticModel);
 
-            // Check if the target is a WaitAsync call
+            // Check if the target is a WaitAsync call with the correct cancellation token
+            if (IsWaitAsyncWithCorrectToken(targetExpression, context.SemanticModel, cancellationTokenParameter))
+            {
+                return;
+            }
+
+            // If it's a WaitAsync call but with the wrong token, report diagnostic
             if (IsWaitAsyncCall(targetExpression, context.SemanticModel))
             {
+                var diagnostic = Diagnostic.Create(
+                    MissingWaitAsyncRule,
+                    targetExpression.GetLocation(),
+                    "WaitAsync");
+                context.ReportDiagnostic(diagnostic);
                 return;
             }
 
@@ -397,27 +417,98 @@ namespace Orleans.Analyzers
             }
 
             var memberAccess = invocation.Expression as MemberAccessExpressionSyntax;
+            var isWaitAsync = false;
+
             if (memberAccess != null && memberAccess.Name.Identifier.Text == WaitAsyncMethodName)
             {
-                return true;
+                isWaitAsync = true;
+            }
+            else
+            {
+                // Also check the symbol to be sure
+                var symbolInfo = semanticModel.GetSymbolInfo(invocation);
+                var methodSymbol = symbolInfo.Symbol as IMethodSymbol;
+                if (methodSymbol != null && methodSymbol.Name == WaitAsyncMethodName)
+                {
+                    isWaitAsync = true;
+                }
             }
 
-            // Also check the symbol to be sure
-            var symbolInfo = semanticModel.GetSymbolInfo(invocation);
-            var methodSymbol = symbolInfo.Symbol as IMethodSymbol;
-            if (methodSymbol != null && methodSymbol.Name == WaitAsyncMethodName)
+            return isWaitAsync;
+        }
+
+        /// <summary>
+        /// Checks if a WaitAsync call uses the correct cancellation token from the OnActivateAsync parameter.
+        /// </summary>
+        private static bool IsWaitAsyncWithCorrectToken(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            IParameterSymbol expectedCancellationTokenParameter)
+        {
+            var invocation = expression as InvocationExpressionSyntax;
+            if (invocation == null)
             {
-                return true;
+                return false;
+            }
+
+            if (!IsWaitAsyncCall(expression, semanticModel))
+            {
+                return false;
+            }
+
+            // Check if the correct cancellation token is passed to WaitAsync
+            var arguments = invocation.ArgumentList.Arguments;
+            foreach (var argument in arguments)
+            {
+                if (IsExpectedCancellationTokenParameter(argument.Expression, semanticModel, expectedCancellationTokenParameter))
+                {
+                    return true;
+                }
             }
 
             return false;
         }
 
+        /// <summary>
+        /// Checks if the type is awaitable by looking for a GetAwaiter method.
+        /// </summary>
         private static bool IsAwaitableType(ITypeSymbol type)
         {
-            var typeName = type.ToDisplayString();
-            return typeName.StartsWith("System.Threading.Tasks.Task") ||
-                   typeName.StartsWith("System.Threading.Tasks.ValueTask");
+            if (type == null)
+            {
+                return false;
+            }
+
+            // Quick check for common awaitable types
+            if (type.Name == "Task" ||
+                type.OriginalDefinition.Name == "Task`1" ||
+                type.Name == "ValueTask" ||
+                type.OriginalDefinition.Name == "ValueTask`1")
+            {
+                return true;
+            }
+
+
+            // Check for GetAwaiter method (the pattern that makes a type awaitable)
+            var getAwaiterMembers = type.GetMembers("GetAwaiter");
+            foreach (var member in getAwaiterMembers)
+            {
+                var method = member as IMethodSymbol;
+                if (method != null && method.Parameters.Length == 0 && !method.ReturnsVoid)
+                {
+                    // Check if the return type has IsCompleted and GetResult
+                    var awaiterType = method.ReturnType;
+                    var hasIsCompleted = awaiterType.GetMembers("IsCompleted").OfType<IPropertySymbol>().Any(p => p.Type.SpecialType == SpecialType.System_Boolean);
+                    var hasGetResult = awaiterType.GetMembers("GetResult").OfType<IMethodSymbol>().Any(m => m.Parameters.Length == 0);
+
+                    if (hasIsCompleted && hasGetResult)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

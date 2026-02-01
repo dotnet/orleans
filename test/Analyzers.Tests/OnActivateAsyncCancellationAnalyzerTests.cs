@@ -62,10 +62,10 @@ public class MyGrain : Grain, IGrain
     }
 
     /// <summary>
-    /// Verifies that no diagnostic is reported when WaitAsync is used with cancellation token.
+    /// Verifies that no diagnostic is reported when WaitAsync is used with the correct cancellation token.
     /// </summary>
     [Fact]
-    public async Task NoDiagnostic_WhenWaitAsyncIsUsed()
+    public async Task NoDiagnostic_WhenWaitAsyncIsUsedWithCorrectToken()
     {
         await AssertNoDiagnostics(@"
 public class MyGrain : Grain, IGrain
@@ -78,6 +78,52 @@ public class MyGrain : Grain, IGrain
     private Task SomeMethodWithoutCancellation() => Task.CompletedTask;
 }
 ");
+    }
+
+    /// <summary>
+    /// Verifies that a diagnostic IS reported when WaitAsync is used with a different cancellation token.
+    /// </summary>
+    [Fact]
+    public async Task Diagnostic_WhenWaitAsyncIsUsedWithDifferentToken()
+    {
+        var (diagnostics, _) = await GetDiagnosticsAsync(@"
+public class MyGrain : Grain, IGrain
+{
+    private readonly CancellationTokenSource _cts = new CancellationTokenSource();
+
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        await SomeMethodWithoutCancellation().WaitAsync(_cts.Token);
+    }
+
+    private Task SomeMethodWithoutCancellation() => Task.CompletedTask;
+}
+");
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(OnActivateAsyncCancellationAnalyzer.MissingWaitAsyncDiagnosticId, diagnostic.Id);
+    }
+
+    /// <summary>
+    /// Verifies that a diagnostic IS reported when WaitAsync is used with CancellationToken.None.
+    /// </summary>
+    [Fact]
+    public async Task Diagnostic_WhenWaitAsyncIsUsedWithCancellationTokenNone()
+    {
+        var (diagnostics, _) = await GetDiagnosticsAsync(@"
+public class MyGrain : Grain, IGrain
+{
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        await SomeMethodWithoutCancellation().WaitAsync(CancellationToken.None);
+    }
+
+    private Task SomeMethodWithoutCancellation() => Task.CompletedTask;
+}
+");
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(OnActivateAsyncCancellationAnalyzer.MissingWaitAsyncDiagnosticId, diagnostic.Id);
     }
 
     /// <summary>
