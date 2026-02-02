@@ -8,7 +8,7 @@ namespace Orleans.Runtime;
 [GenerateSerializer]
 public sealed class ActivationCancelledException : OrleansException
 {
-    private static readonly string _message = "Activation Cancelled";
+    private const string _message = "Activation Cancelled";
     /// <summary>
     /// Initializes a new instance of the <see cref="ActivationCancelledException"/> class.
     /// </summary>
