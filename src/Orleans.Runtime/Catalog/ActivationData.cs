@@ -1584,6 +1584,7 @@ internal sealed partial class ActivationData :
                     // and makes a call that tries to resolve the scoped IServiceProvider or other type that has been disposed because of cancellation.
                     catch (ObjectDisposedException ode) when (cancellationToken.IsCancellationRequested)
                     {
+                        LogActivationDisposedObjectAccessed(_shared.Logger, ode.ObjectName, this);
                         throw new ActivationCancelledException(ode);
                     }
                     // catch OperationCanceledException only if it wasn't for a timeout.
@@ -1615,12 +1616,12 @@ internal sealed partial class ActivationData :
 
                 var exceptionToRecord = exception.InnerException ?? exception;
                 Deactivate(new(DeactivationReason.ReasonCode, exceptionToRecord, DeactivationReason.Description), CancellationToken.None);
-                // TODO
+                // TODO: after the PR for activation data activity is in, re-enable this
                 // SetActivityError(_activationActivity, exceptionToRecord, ActivityErrorEvents.ActivationCancelled);
 
                 LogActivationCancelled(_shared.Logger, this, cancellationToken.IsCancellationRequested, DeactivationReason.ReasonCode.ToString(), ForwardingAddress);
 
-                // TODO
+                // TODO: after the PR for activation data activity is in, re-enable this
                 // _activationActivity?.Stop();
                 return;
             }
@@ -2387,10 +2388,15 @@ internal sealed partial class ActivationData :
         Message = "Error activating grain {Grain}")]
     private static partial void LogErrorActivatingGrain(ILogger logger, Exception exception, ActivationData grain);
 
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Catalog_DisposedObjectAccess,
+        Level = LogLevel.Warning,
+        Message = "Disposed object {ObjectName} accessed in OnActivateAsync for grain {Grain}. Ensure the cancellationToken is passed to all async methods or they have .WaitAsync(cancellationToken) called on them.")]
+    private static partial void LogActivationDisposedObjectAccessed(ILogger logger, string objectName, ActivationData grain);
 
     [LoggerMessage(
         EventId = (int)ErrorCode.Catalog_CancelledActivate,
-        Level = LogLevel.Warning,
+        Level = LogLevel.Information,
         Message = "Activation was cancelled for {Grain}. CancellationRequested={CancellationRequested}, DeactivationReason={DeactivationReason}, ForwardingAddress={ForwardingAddress}"
     )]
     private static partial void LogActivationCancelled(ILogger logger, ActivationData grain, bool cancellationRequested, string? deactivationReason, SiloAddress? forwardingAddress);
@@ -2399,7 +2405,7 @@ internal sealed partial class ActivationData :
         Level = LogLevel.Error,
         Message = "Activation of grain {Grain} failed")]
     private static partial void LogActivationFailed(ILogger logger, Exception exception, ActivationData grain);
-
+    
     [LoggerMessage(
         Level = LogLevel.Trace,
         Message = "Completing deactivation of '{Activation}'")]

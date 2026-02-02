@@ -442,6 +442,7 @@ namespace Orleans
         Catalog_ActivationCollector_BadState_3 = CatalogBase + 46,
         Catalog_UnregisterAsync = CatalogBase + 47,
         Catalog_CancelledActivate = CatalogBase + 48,
+        Catalog_DisposedObjectAccess = CatalogBase + 49,
 
         MembershipBase = Runtime + 600,
         MembershipCantWriteLivenessDisabled = Runtime_Error_100225, // Backward compatability
