@@ -7,8 +7,6 @@ using System.Collections.Immutable;
 using System.Reflection;
 using System.Text;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CodeActions;
-using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
@@ -52,12 +50,6 @@ namespace Analyzers.Tests
         /// Can be overridden in derived classes to customize analyzer creation.
         /// </summary>
         protected virtual DiagnosticAnalyzer CreateDiagnosticAnalyzer() => new TDiagnosticAnalyzer();
-
-        /// <summary>
-        /// Creates an instance of the code fix provider to test.
-        /// Override this in derived classes to provide a code fix provider.
-        /// </summary>
-        protected virtual CodeFixProvider CreateCodeFixProvider() => null;
 
         /// <summary>
         /// Asserts that the provided source code produces no diagnostics when analyzed.
@@ -108,132 +100,6 @@ namespace Analyzers.Tests
             var diagnostics = await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
 
             return diagnostics.OrderBy(d => d.Location.SourceSpan.Start).ToArray();
-        }
-
-        /// <summary>
-        /// Asserts that a code fix is offered for the given diagnostic and verifies the fixed code.
-        /// </summary>
-        /// <param name="source">The source code with the diagnostic.</param>
-        /// <param name="expectedFixedSource">The expected source code after applying the fix.</param>
-        /// <param name="diagnosticIndex">The index of the diagnostic to fix (if multiple).</param>
-        /// <param name="codeFixIndex">The index of the code fix to apply (if multiple fixes offered).</param>
-        /// <param name="extraUsings">Additional using statements to include.</param>
-        protected async Task AssertCodeFixAsync(
-            string source,
-            string expectedFixedSource,
-            int diagnosticIndex = 0,
-            int codeFixIndex = 0,
-            params string[] extraUsings)
-        {
-            var codeFixProvider = CreateCodeFixProvider();
-            Assert.NotNull(codeFixProvider);
-
-            var sb = new StringBuilder();
-            foreach (var @using in Usings.Concat(extraUsings))
-            {
-                sb.AppendLine($"using {@using};");
-            }
-            sb.AppendLine(source);
-            var fullSource = sb.ToString();
-
-            sb.Clear();
-            foreach (var @using in Usings.Concat(extraUsings))
-            {
-                sb.AppendLine($"using {@using};");
-            }
-            sb.AppendLine(expectedFixedSource);
-            var fullExpectedFixedSource = sb.ToString();
-
-            var project = CreateProject(fullSource);
-            var document = project.Documents.First();
-            var compilation = await project.GetCompilationAsync();
-            var analyzer = this.CreateDiagnosticAnalyzer();
-
-            var compilationWithAnalyzers = compilation
-                .WithOptions(
-                    compilation.Options.WithSpecificDiagnosticOptions(
-                        analyzer.SupportedDiagnostics.ToDictionary(d => d.Id, d => ReportDiagnostic.Default)))
-                .WithAnalyzers(ImmutableArray.Create(analyzer));
-
-            var diagnostics = await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
-            var orderedDiagnostics = diagnostics.OrderBy(d => d.Location.SourceSpan.Start).ToArray();
-
-            Assert.True(orderedDiagnostics.Length > diagnosticIndex,
-                $"Expected at least {diagnosticIndex + 1} diagnostic(s), but found {orderedDiagnostics.Length}");
-
-            var diagnostic = orderedDiagnostics[diagnosticIndex];
-
-            var actions = new List<CodeAction>();
-            var context = new CodeFixContext(
-                document,
-                diagnostic,
-                (a, _) => actions.Add(a),
-                CancellationToken.None);
-
-            await codeFixProvider.RegisterCodeFixesAsync(context);
-
-            Assert.True(actions.Count > codeFixIndex,
-                $"Expected at least {codeFixIndex + 1} code fix(es), but found {actions.Count}");
-
-            var codeAction = actions[codeFixIndex];
-            var operations = await codeAction.GetOperationsAsync(CancellationToken.None);
-            var changedSolution = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution;
-            var changedDocument = changedSolution.GetDocument(document.Id);
-            var changedText = await changedDocument.GetTextAsync();
-
-            Assert.Equal(fullExpectedFixedSource, changedText.ToString());
-        }
-
-        /// <summary>
-        /// Asserts that a code fix is offered for the diagnostic.
-        /// </summary>
-        /// <param name="source">The source code with the diagnostic.</param>
-        /// <param name="expectedDiagnosticId">The expected diagnostic ID.</param>
-        /// <param name="expectedCodeFixCount">The expected number of code fixes offered.</param>
-        /// <param name="extraUsings">Additional using statements to include.</param>
-        protected async Task AssertCodeFixOfferedAsync(
-            string source,
-            string expectedDiagnosticId,
-            int expectedCodeFixCount = 1,
-            params string[] extraUsings)
-        {
-            var codeFixProvider = CreateCodeFixProvider();
-            Assert.NotNull(codeFixProvider);
-
-            var sb = new StringBuilder();
-            foreach (var @using in Usings.Concat(extraUsings))
-            {
-                sb.AppendLine($"using {@using};");
-            }
-            sb.AppendLine(source);
-            var fullSource = sb.ToString();
-
-            var project = CreateProject(fullSource);
-            var document = project.Documents.First();
-            var compilation = await project.GetCompilationAsync();
-            var analyzer = this.CreateDiagnosticAnalyzer();
-
-            var compilationWithAnalyzers = compilation
-                .WithOptions(
-                    compilation.Options.WithSpecificDiagnosticOptions(
-                        analyzer.SupportedDiagnostics.ToDictionary(d => d.Id, d => ReportDiagnostic.Default)))
-                .WithAnalyzers(ImmutableArray.Create(analyzer));
-
-            var diagnostics = await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
-            var targetDiagnostic = diagnostics.FirstOrDefault(d => d.Id == expectedDiagnosticId);
-
-            Assert.NotNull(targetDiagnostic);
-
-            var actions = new List<CodeAction>();
-            var context = new CodeFixContext(
-                document,
-                targetDiagnostic,
-                (a, _) => actions.Add(a),
-                CancellationToken.None);
-
-            await codeFixProvider.RegisterCodeFixesAsync(context);
-
-            Assert.Equal(expectedCodeFixCount, actions.Count);
         }
 
         private static Project CreateProject(string source)
