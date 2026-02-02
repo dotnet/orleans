@@ -5,11 +5,10 @@ namespace Orleans.Runtime;
 /// <summary>
 /// Indicates a lifecycle was canceled, either by request or due to observer error.
 /// </summary>
-[Serializable]
 [GenerateSerializer]
 public sealed class ActivationCancelledException : OrleansException
 {
-    private static string _message = "Activation Cancelled";
+    private static readonly string _message = "Activation Cancelled";
     /// <summary>
     /// Initializes a new instance of the <see cref="ActivationCancelledException"/> class.
     /// </summary>
