@@ -5,6 +5,7 @@ public static class ActivityNames
     public const string PlaceGrain = "place grain";
     public const string FilterPlacementCandidates = "filter placement candidates";
     public const string ActivateGrain = "activate grain";
+    public const string DeactivateGrain = "deactivate grain";
     public const string OnActivate = "execute OnActivateAsync";
     public const string OnDeactivate = "execute OnDeactivateAsync";
     public const string RegisterDirectoryEntry = "register directory entry";

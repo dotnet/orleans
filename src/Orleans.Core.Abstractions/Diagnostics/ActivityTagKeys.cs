@@ -36,6 +36,11 @@ internal static class ActivityTagKeys
     public const string GrainType = "orleans.grain.type";
 
     /// <summary>
+    /// The grain type tag key.
+    /// </summary>
+    public const string GrainState = "orleans.grain.state";
+
+    /// <summary>
     /// The silo ID tag key.
     /// </summary>
     public const string SiloId = "orleans.silo.id";

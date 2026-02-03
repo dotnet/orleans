@@ -580,33 +580,61 @@ internal sealed partial class ActivationData :
 
     public void Deactivate(DeactivationReason reason, ActivityContext? activityContext, CancellationToken cancellationToken = default)
     {
+        var deactivateActivity = activityContext is { } parent
+            ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.DeactivateGrain, ActivityKind.Internal, parentContext:parent)
+            : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.DeactivateGrain);
+        
         lock (this)
         {
-            var state = State;
-            if (state is ActivationState.Invalid)
+            try
             {
-                return;
+                var state = State;
+                if (deactivateActivity is { IsAllDataRequested: true })
+                {
+                    deactivateActivity.SetTag(ActivityTagKeys.GrainState, state);
+                }
+
+                if (state is ActivationState.Invalid)
+                {
+                    deactivateActivity?.Stop();
+                    return;
+                }
+
+                if (DeactivationReason.ReasonCode == DeactivationReasonCode.None)
+                {
+                    DeactivationReason = reason;
+                }
+
+                if (deactivateActivity is { IsAllDataRequested: true })
+                {
+                    deactivateActivity.SetTag(ActivityTagKeys.DeactivationReason, DeactivationReason);
+                }
+
+                if (!DeactivationStartTime.HasValue)
+                {
+                    DeactivationStartTime = GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime;
+                }
+
+                if (state is ActivationState.Creating or ActivationState.Activating or ActivationState.Valid)
+                {
+                    CancelPendingOperations();
+
+                    _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
+                    SetState(ActivationState.Deactivating);
+                    var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
+                    ScheduleOperation(new Command.Deactivate(cts, state, deactivateActivity));
+                }
+                else
+                {
+                    deactivateActivity?.Stop();
+                }
             }
-
-            if (DeactivationReason.ReasonCode == DeactivationReasonCode.None)
+            catch (Exception ex)
             {
-                DeactivationReason = reason;
-            }
-
-            if (!DeactivationStartTime.HasValue)
-            {
-                DeactivationStartTime = GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime;
-            }
-
-            if (state is ActivationState.Creating or ActivationState.Activating or ActivationState.Valid)
-            {
-                CancelPendingOperations();
-
-                _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
-                SetState(ActivationState.Deactivating);
-                var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
-                ScheduleOperation(new Command.Deactivate(cts, state, activityContext));
+                SetActivityError(deactivateActivity, ex, "Error deactivating grain");
+                deactivateActivity?.Stop();
+                throw;
             }
         }
     }
@@ -1816,8 +1844,8 @@ internal sealed partial class ActivationData :
                 {
                     // Start a span for OnActivateAsync execution
                     
-                    using var onDeactivateSpan = deactivateCommand.ActivityContext is not null
-                        ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.OnDeactivate, ActivityKind.Internal, parentContext:deactivateCommand.ActivityContext.Value)
+                    using var onDeactivateSpan = deactivateCommand.Activity is not null
+                        ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.OnDeactivate, ActivityKind.Internal, parentContext:deactivateCommand.Activity.Context)
                         : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.OnDeactivate, ActivityKind.Internal);
                     if (onDeactivateSpan is { IsAllDataRequested: true })
                     {
@@ -2290,10 +2318,10 @@ internal sealed partial class ActivationData :
             GC.SuppressFinalize(this);
         }
 
-        public sealed class Deactivate(CancellationTokenSource cts, ActivationState previousState, ActivityContext? activityContext) : Command(cts)
+        public sealed class Deactivate(CancellationTokenSource cts, ActivationState previousState, Activity? activity) : Command(cts)
         {
             public ActivationState PreviousState { get; } = previousState;
-            public ActivityContext? ActivityContext { get; } = activityContext;
+            public Activity? Activity { get; } = activity;
         }
 
         public sealed class Activate(Dictionary<string, object>? requestContext, CancellationTokenSource cts) : Command(cts)
