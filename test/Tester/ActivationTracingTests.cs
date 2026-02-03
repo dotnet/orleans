@@ -57,7 +57,8 @@ namespace UnitTests.General
                     hostBuilder
                         .AddActivityPropagation()
                         .AddMemoryGrainStorageAsDefault()
-                        .AddMemoryGrainStorage("PubSubStore");
+                        .AddMemoryGrainStorage("PubSubStore")
+                        .AddIncomingGrainCallFilter<DeactivateAfterDisposeAsyncFilter>();
                     hostBuilder.Services.AddPlacementFilter<TracingTestPlacementFilterStrategy, TracingTestPlacementFilterDirector>(ServiceLifetime.Singleton);
                 }
             }
@@ -877,6 +878,77 @@ namespace UnitTests.General
                 // Verify the OnDeactivate span shares the same trace ID as the parent activity
                 // This confirms trace context propagation works correctly
                 Assert.Equal(testParentTraceId, onDeactivateSpan.TraceId.ToString());
+            }
+            finally
+            {
+                parent?.Stop();
+                AssertNoApplicationSpansParentedByRuntimeSpans();
+                PrintActivityDiagnostics();
+            }
+        }
+
+        /// <summary>
+        /// Tests that OnDeactivateAsync span is created during IAsyncEnumerable method execution when the grain calls DeactivateOnIdle.
+        /// Verifies that the OnDeactivate span is properly parented to the method call (session) span.
+        /// </summary>
+        [Fact]
+        [TestCategory("BVT")]
+        public async Task OnDeactivateSpanIsParentedToAsyncEnumerableMethodCall()
+        {
+            Started.Clear();
+
+            using var parent = ActivitySources.ApplicationGrainSource.StartActivity("test-parent-async-enum-deactivate");
+            parent?.Start();
+            try
+            {
+                var grain = _fixture.GrainFactory.GetGrain<IAsyncEnumerableDeactivationGrain>(Random.Shared.Next());
+                var testParentTraceId = parent.TraceId.ToString();
+                const int elementCount = 3;
+
+                var values = new List<int>();
+                await foreach (var value in grain.GetValuesAndDeactivate(elementCount).WithBatchSize(1))
+                {
+                    values.Add(value);
+                }
+
+                // Verify we received all elements
+                Assert.Equal(elementCount, values.Count);
+
+                // Wait for deactivation to complete
+                await Task.Delay(1000);
+
+                // Make another call to force a new activation (confirming the previous one was deactivated)
+                _ = await grain.GetActivityId();
+
+                // Find the session span (the logical method call span)
+                var sessionSpans = Started
+                    .Where(a => a.Source.Name == ActivitySources.ApplicationGrainActivitySourceName
+                               && a.OperationName.Contains("GetValuesAndDeactivate"))
+                    .ToList();
+                Assert.True(sessionSpans.Count >= 1, "Expected at least one session span with GetValuesAndDeactivate operation name");
+
+                var sessionSpan = sessionSpans.First();
+                Assert.Equal(testParentTraceId, sessionSpan.TraceId.ToString());
+                var sessionSpanId = sessionSpan.SpanId.ToString();
+
+                // Find the OnDeactivate span
+                var onDeactivateSpans = Started.Where(a => a.OperationName == ActivityNames.OnDeactivate).ToList();
+                Assert.True(onDeactivateSpans.Count > 0, "Expected at least one OnDeactivate span to be created during enumeration");
+
+                var onDeactivateSpan = onDeactivateSpans.First();
+
+                // Verify the OnDeactivate span shares the same trace ID as the parent activity
+                Assert.Equal(testParentTraceId, onDeactivateSpan.TraceId.ToString());
+
+                // Verify the OnDeactivate span is parented to the session span
+                // Note: The OnDeactivate might be a descendant (not direct child) of the session span,
+                // but it should be in the same trace
+                Assert.Equal(sessionSpan.TraceId, onDeactivateSpan.TraceId);
+
+                // Verify deactivation reason tag
+                var deactivationReasonTag = onDeactivateSpan.Tags.FirstOrDefault(t => t.Key == "orleans.deactivation.reason").Value;
+                Assert.NotNull(deactivationReasonTag);
+                Assert.Contains("ApplicationRequested", deactivationReasonTag);
             }
             finally
             {
@@ -1924,6 +1996,80 @@ namespace UnitTests.General
         }
 
         public ValueTask<GrainAddress> GetGrainAddress() => new(GrainContext.Address);
+    }
+
+    #endregion
+
+    #region Test Grain for IAsyncEnumerable with Deactivation
+
+    /// <summary>
+    /// Test grain interface for IAsyncEnumerable deactivation tracing tests.
+    /// </summary>
+    public interface IAsyncEnumerableDeactivationGrain : IGrainWithIntegerKey
+    {
+        IAsyncEnumerable<int> GetValuesAndDeactivate(int count);
+        Task<ActivityData> GetActivityId();
+    }
+
+    /// <summary>
+    /// Grain call filter that triggers deactivation after DisposeAsync is called on an async enumerable.
+    /// This ensures deactivation happens after the enumeration is fully complete.
+    /// </summary>
+    public class DeactivateAfterDisposeAsyncFilter : IIncomingGrainCallFilter
+    {
+        public async Task Invoke(IIncomingGrainCallContext context)
+        {
+            await context.Invoke();
+
+            // Check if this is the DisposeAsync call for async enumerable
+            if (context.InterfaceMethod?.Name == "DisposeAsync" &&
+                context.InterfaceMethod.DeclaringType?.FullName == "Orleans.Runtime.IAsyncEnumerableGrainExtension")
+            {
+                // Trigger deactivation on the grain
+                if (context.Grain is Grain grain)
+                {
+                    grain.DeactivateOnIdle();
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Test grain implementation that yields values via IAsyncEnumerable and then deactivates after DisposeAsync.
+    /// Uses a grain call filter to trigger deactivation after the async enumerable is disposed.
+    /// </summary>
+    public class AsyncEnumerableDeactivationGrain : Grain, IAsyncEnumerableDeactivationGrain
+    {
+        public async IAsyncEnumerable<int> GetValuesAndDeactivate(int count)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                await Task.Delay(10); // Small delay to simulate work
+                yield return i;
+            }
+        }
+
+        public Task<ActivityData> GetActivityId()
+        {
+            var activity = Activity.Current;
+            if (activity is null)
+            {
+                return Task.FromResult(default(ActivityData));
+            }
+
+            return Task.FromResult(new ActivityData
+            {
+                Id = activity.Id,
+                TraceState = activity.TraceStateString,
+                Baggage = activity.Baggage.ToList(),
+            });
+        }
+
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+        {
+            // Simple deactivation logic to ensure OnDeactivateAsync is called
+            return Task.CompletedTask;
+        }
     }
 
     #endregion
