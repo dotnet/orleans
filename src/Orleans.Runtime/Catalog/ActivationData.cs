@@ -1762,12 +1762,26 @@ internal sealed partial class ActivationData :
                     catch (ObjectDisposedException ode) when (cancellationToken.IsCancellationRequested)
                     {
                         LogActivationDisposedObjectAccessed(_shared.Logger, ode.ObjectName, this);
-                        throw new ActivationCancelledException(ode);
+                        CatalogInstruments.ActivationFailedToActivate.Add(1);
+                        Deactivate(new(DeactivationReason.ReasonCode, ode, DeactivationReason.Description), CancellationToken.None);
+                        // TODO: after the PR for activation data activity is in, re-enable this
+                        // SetActivityError(_activationActivity, ode, ActivityErrorEvents.ActivationCancelled);
+                        LogActivationCancelled(_shared.Logger, this, cancellationToken.IsCancellationRequested, DeactivationReason.ReasonCode.ToString(), ForwardingAddress);
+                        // TODO: after the PR for activation data activity is in, re-enable this
+                        // _activationActivity?.Stop();
+                        return;
                     }
                     // catch OperationCanceledException only if it wasn't for a timeout.
                     catch (OperationCanceledException oce) when (cancellationToken.IsCancellationRequested && DeactivationReason.ReasonCode != DeactivationReasonCode.ActivationUnresponsive)
                     {
-                        throw new ActivationCancelledException(oce);
+                        CatalogInstruments.ActivationFailedToActivate.Add(1);
+                        Deactivate(new(DeactivationReason.ReasonCode, oce, DeactivationReason.Description), CancellationToken.None);
+                        // TODO: after the PR for activation data activity is in, re-enable this
+                        // SetActivityError(_activationActivity, oce, ActivityErrorEvents.ActivationCancelled);
+                        LogActivationCancelled(_shared.Logger, this, cancellationToken.IsCancellationRequested, DeactivationReason.ReasonCode.ToString(), ForwardingAddress);
+                        // TODO: after the PR for activation data activity is in, re-enable this
+                        // _activationActivity?.Stop();
+                        return;
                     }
                     catch (Exception exception)
                     {
@@ -1790,21 +1804,6 @@ internal sealed partial class ActivationData :
                 _activationActivity = null;
 
                 LogFinishedActivatingGrain(_shared.Logger, this);
-            }
-            catch (ActivationCancelledException exception)
-            {
-                CatalogInstruments.ActivationFailedToActivate.Add(1);
-
-                var exceptionToRecord = exception.InnerException ?? exception;
-                Deactivate(new(DeactivationReason.ReasonCode, exceptionToRecord, DeactivationReason.Description), CancellationToken.None);
-                // TODO: after the PR for activation data activity is in, re-enable this
-                // SetActivityError(_activationActivity, exceptionToRecord, ActivityErrorEvents.ActivationCancelled);
-
-                LogActivationCancelled(_shared.Logger, this, cancellationToken.IsCancellationRequested, DeactivationReason.ReasonCode.ToString(), ForwardingAddress);
-
-                // TODO: after the PR for activation data activity is in, re-enable this
-                // _activationActivity?.Stop();
-                return;
             }
             catch (Exception exception)
             {
