@@ -14,4 +14,5 @@ public static class ActivityNames
     public const string StorageClear = "clear storage";
     public const string ActivationDehydrate = "dehydrate activation";
     public const string ActivationRehydrate = "rehydrate activation";
+    public const string WaitMigration = "wait migration";
 }
