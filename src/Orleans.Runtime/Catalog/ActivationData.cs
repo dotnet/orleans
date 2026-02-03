@@ -1828,6 +1828,8 @@ internal sealed partial class ActivationData :
     /// </summary>
     private async Task FinishDeactivating(Command.Deactivate deactivateCommand, CancellationToken cancellationToken)
     {
+        using var _ = deactivateCommand.Activity;
+
         var migrating = false;
         var encounteredError = false;
         try
@@ -1928,6 +1930,7 @@ internal sealed partial class ActivationData :
         }
         catch (Exception ex)
         {
+            SetActivityError(deactivateCommand.Activity, ex, "Error in FinishDeactivating");
             LogErrorDeactivating(_shared.Logger, ex, this);
         }
 
@@ -1956,6 +1959,7 @@ internal sealed partial class ActivationData :
         }
         catch (Exception exception)
         {
+            SetActivityError(deactivateCommand.Activity, exception, "Error in FinishDeactivating");
             LogExceptionDisposing(_shared.Logger, exception, this);
         }
 
