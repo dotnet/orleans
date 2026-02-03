@@ -168,7 +168,7 @@ namespace Orleans.Runtime
 
             // Start activation span with parent context from request if available
             var parentContext = requestContextData.TryGetActivityContext();
-            using var activationActivity = parentContext.HasValue
+            var activationActivity = parentContext.HasValue
                 ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal, parentContext.Value)
                 : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal);
             if (activationActivity is not null)
