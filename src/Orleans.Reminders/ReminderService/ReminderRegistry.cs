@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
+using Orleans.Reminders.Cron.Internal;
 using Orleans.Runtime.Services;
 using Orleans.Timers;
 
@@ -23,6 +24,21 @@ namespace Orleans.Runtime.ReminderService
         }
 
         public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, TimeSpan dueTime, TimeSpan period)
+            => RegisterOrUpdateReminder(
+                callingGrainId,
+                reminderName,
+                dueTime,
+                period,
+                Runtime.ReminderPriority.Normal,
+                Runtime.MissedReminderAction.Skip);
+
+        public Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId callingGrainId,
+            string reminderName,
+            TimeSpan dueTime,
+            TimeSpan period,
+            Runtime.ReminderPriority priority,
+            Runtime.MissedReminderAction action)
         {
             // Perform input volatility checks 
             if (dueTime == Timeout.InfiniteTimeSpan)
@@ -44,8 +60,40 @@ namespace Orleans.Runtime.ReminderService
             if (string.IsNullOrEmpty(reminderName))
                 throw new ArgumentException("Cannot use null or empty name for the reminder", nameof(reminderName));
 
+            ValidatePriorityAndAction(priority, action);
+
             EnsureReminderServiceRegisteredAndInGrainContext();
-            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueTime, period);
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueTime, period, priority, action);
+        }
+
+        public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, string cronExpression)
+            => RegisterOrUpdateReminder(
+                callingGrainId,
+                reminderName,
+                cronExpression,
+                Runtime.ReminderPriority.Normal,
+                Runtime.MissedReminderAction.Skip);
+
+        public Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId callingGrainId,
+            string reminderName,
+            string cronExpression,
+            Runtime.ReminderPriority priority,
+            Runtime.MissedReminderAction action)
+        {
+            if (string.IsNullOrWhiteSpace(reminderName))
+                throw new ArgumentException("Cannot use null or empty name for the reminder", nameof(reminderName));
+
+            if (string.IsNullOrWhiteSpace(cronExpression))
+                throw new ArgumentException("Cannot use null or empty cron expression for the reminder", nameof(cronExpression));
+
+            // Parse once here to fail fast with a deterministic validation message.
+            _ = ReminderCronParser.Parse(cronExpression);
+
+            ValidatePriorityAndAction(priority, action);
+
+            EnsureReminderServiceRegisteredAndInGrainContext();
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, cronExpression, priority, action);
         }
 
         public Task UnregisterReminder(GrainId callingGrainId, IGrainReminder reminder)
@@ -84,6 +132,7 @@ namespace Orleans.Runtime.ReminderService
                     + "\n  * Microsoft.Orleans.Reminders.AzureStorage via ISiloBuilder.UseAzureTableReminderService(...)"
                     + "\n  * Microsoft.Orleans.Reminders.AdoNet via ISiloBuilder.UseAdoNetReminderService(...)"
                     + "\n  * Microsoft.Orleans.Reminders.DynamoDB via via ISiloBuilder.UseDynamoDBReminderService(...)"
+                    + "\n  * Microsoft.Orleans.Reminders via ISiloBuilder.AddAdaptiveReminderService(...)"
                     + "\n  * Microsoft.Orleans.OrleansRuntime via ISiloBuilder.UseInMemoryReminderService(...) (Note: for development purposes only)"
                     + "\n  * Others, see: https://www.nuget.org/packages?q=Microsoft.Orleans.Reminders.");
             }
@@ -96,5 +145,19 @@ namespace Orleans.Runtime.ReminderService
             throw new InvalidOperationException("Attempted to access grain from a non-grain context, such as a background thread, which is invalid."
                 + " Ensure that you are only accessing grain functionality from within the context of a grain.");
         }
+
+        private static void ValidatePriorityAndAction(Runtime.ReminderPriority priority, Runtime.MissedReminderAction action)
+        {
+            if (!Enum.IsDefined(priority))
+            {
+                throw new ArgumentOutOfRangeException(nameof(priority), priority, "Invalid reminder priority.");
+            }
+
+            if (!Enum.IsDefined(action))
+            {
+                throw new ArgumentOutOfRangeException(nameof(action), action, "Invalid missed reminder action.");
+            }
+        }
+
     }
 }

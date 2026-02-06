@@ -143,6 +143,11 @@ namespace Orleans.Tests.SqlUtils
                     //Use the GetInt64 method instead of the generic GetValue<TValue> version to retrieve the value from the data record
                     //GetValue<int> causes an InvalidCastException with oracle data provider. See https://github.com/dotnet/orleans/issues/3561
                     Period = TimeSpan.FromMilliseconds(record.GetInt64(nameof(DbStoredQueries.Columns.Period))),
+                    CronExpression = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.CronExpression)),
+                    NextDueUtc = record.GetDateTimeValueOrDefault(nameof(DbStoredQueries.Columns.NextDueUtc)),
+                    LastFireUtc = record.GetDateTimeValueOrDefault(nameof(DbStoredQueries.Columns.LastFireUtc)),
+                    Priority = ParsePriority(record.GetValue<int>(nameof(DbStoredQueries.Columns.Priority))),
+                    Action = ParseAction(record.GetValue<int>(nameof(DbStoredQueries.Columns.Action))),
                     ETag = DbStoredQueries.Converters.GetVersion(record).ToString()
                 };
             }
@@ -176,8 +181,17 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="startTime">Start time of the reminder.</param>
         /// <param name="period">Period of the reminder.</param>
         /// <returns>The new etag of the either or updated or inserted reminder row.</returns>
-        internal Task<string> UpsertReminderRowAsync(string serviceId, GrainId grainId,
-            string reminderName, DateTime startTime, TimeSpan period)
+        internal Task<string> UpsertReminderRowAsync(
+            string serviceId,
+            GrainId grainId,
+            string reminderName,
+            DateTime startTime,
+            TimeSpan period,
+            string cronExpression,
+            DateTime? nextDueUtc,
+            DateTime? lastFireUtc,
+            ReminderPriority priority,
+            MissedReminderAction action)
         {
             return ReadAsync(dbStoredQueries.UpsertReminderRowKey, DbStoredQueries.Converters.GetVersion, command =>
                 new DbStoredQueries.Columns(command)
@@ -187,9 +201,30 @@ namespace Orleans.Tests.SqlUtils
                     GrainId = grainId.ToString(),
                     ReminderName = reminderName,
                     StartTime = startTime,
-                    Period = period
+                    Period = period,
+                    CronExpression = cronExpression,
+                    NextDueUtc = nextDueUtc,
+                    LastFireUtc = lastFireUtc,
+                    Priority = (int)priority,
+                    Action = (int)action
                 }, ret => ret.First().ToString());
         }
+
+        private static ReminderPriority ParsePriority(int value) => value switch
+        {
+            (int)ReminderPriority.Critical => ReminderPriority.Critical,
+            (int)ReminderPriority.Normal => ReminderPriority.Normal,
+            (int)ReminderPriority.Background => ReminderPriority.Background,
+            _ => ReminderPriority.Normal,
+        };
+
+        private static MissedReminderAction ParseAction(int value) => value switch
+        {
+            (int)MissedReminderAction.FireImmediately => MissedReminderAction.FireImmediately,
+            (int)MissedReminderAction.Skip => MissedReminderAction.Skip,
+            (int)MissedReminderAction.Notify => MissedReminderAction.Notify,
+            _ => MissedReminderAction.Skip,
+        };
 
         /// <summary>
         /// Deletes a reminder

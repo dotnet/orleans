@@ -458,6 +458,31 @@ namespace Orleans.Tests.SqlUtils
                 set { Add(nameof(ReminderName), value); }
             }
 
+            internal string CronExpression
+            {
+                set { Add(nameof(CronExpression), value, dbType: DbType.String); }
+            }
+
+            internal DateTime? NextDueUtc
+            {
+                set { Add(nameof(NextDueUtc), value); }
+            }
+
+            internal DateTime? LastFireUtc
+            {
+                set { Add(nameof(LastFireUtc), value); }
+            }
+
+            internal int Priority
+            {
+                set { Add(nameof(Priority), value); }
+            }
+
+            internal int Action
+            {
+                set { Add(nameof(Action), value); }
+            }
+
             internal TimeSpan Period
             {
                 set

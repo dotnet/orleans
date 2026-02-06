@@ -19,4 +19,19 @@ internal static class ReminderOptionsDefaults
     /// The maximum amount of time (in minutes) to attempt to initialize reminders giving up <see cref="ReminderOptions.InitializationTimeout"/>.
     /// </summary>
     public const uint InitializationTimeoutMinutes = 5;
+
+    /// <summary>
+    /// Look-ahead window in minutes for adaptive reminder scheduling.
+    /// </summary>
+    public const uint LookAheadWindowMinutes = 5;
+
+    /// <summary>
+    /// Poll interval in seconds for adaptive reminder scheduling.
+    /// </summary>
+    public const uint PollIntervalSeconds = 30;
+
+    /// <summary>
+    /// Base adaptive bucket size.
+    /// </summary>
+    public const uint BaseBucketSize = 1024;
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure;
@@ -80,17 +81,23 @@ namespace Orleans.Runtime.ReminderService
             var remEntries = new List<ReminderEntry>();
             foreach (var entry in entries)
             {
-#pragma warning disable RCS1075 // Avoid empty catch clause that catches System.Exception.
                 try
                 {
                     ReminderEntry converted = ConvertFromTableEntry(entry.Entity, entry.ETag);
                     remEntries.Add(converted);
                 }
-                catch (Exception)
+                catch (OrleansException)
                 {
-                    // Ignoring...
+                    // Ignore reminders that are not valid for this silo/service.
                 }
-#pragma warning restore RCS1075 // Avoid empty catch clause that catches System.Exception.
+                catch (FormatException)
+                {
+                    // Ignore malformed persisted values.
+                }
+                catch (OverflowException)
+                {
+                    // Ignore malformed persisted values.
+                }
             }
             return new ReminderTableData(remEntries);
         }
@@ -104,7 +111,12 @@ namespace Orleans.Runtime.ReminderService
                     GrainId = GrainId.Parse(tableEntry.GrainReference),
                     ReminderName = tableEntry.ReminderName,
                     StartAt = LogFormatter.ParseDate(tableEntry.StartAt),
-                    Period = TimeSpan.Parse(tableEntry.Period),
+                    Period = TimeSpan.Parse(tableEntry.Period, CultureInfo.InvariantCulture),
+                    CronExpression = tableEntry.CronExpression,
+                    NextDueUtc = ParseOptionalUtcDateTime(tableEntry.NextDueUtc),
+                    LastFireUtc = ParseOptionalUtcDateTime(tableEntry.LastFireUtc),
+                    Priority = ParsePriority(tableEntry.Priority),
+                    Action = ParseAction(tableEntry.Action),
                     ETag = eTag,
                 };
             }
@@ -124,6 +136,32 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
+        private static DateTime? ParseOptionalUtcDateTime(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            return DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+        }
+
+        private static ReminderPriority ParsePriority(int value) => value switch
+        {
+            (int)ReminderPriority.Critical => ReminderPriority.Critical,
+            (int)ReminderPriority.Normal => ReminderPriority.Normal,
+            (int)ReminderPriority.Background => ReminderPriority.Background,
+            _ => ReminderPriority.Normal,
+        };
+
+        private static MissedReminderAction ParseAction(int value) => value switch
+        {
+            (int)MissedReminderAction.FireImmediately => MissedReminderAction.FireImmediately,
+            (int)MissedReminderAction.Skip => MissedReminderAction.Skip,
+            (int)MissedReminderAction.Notify => MissedReminderAction.Notify,
+            _ => MissedReminderAction.Skip,
+        };
+
         private static ReminderTableEntry ConvertToTableEntry(ReminderEntry remEntry, string serviceId, string deploymentId)
         {
             string partitionKey = ReminderTableEntry.ConstructPartitionKey(serviceId, remEntry.GrainId);
@@ -142,7 +180,12 @@ namespace Orleans.Runtime.ReminderService
                 ReminderName = remEntry.ReminderName,
 
                 StartAt = LogFormatter.PrintDate(remEntry.StartAt),
-                Period = remEntry.Period.ToString(),
+                Period = remEntry.Period.ToString("c", CultureInfo.InvariantCulture),
+                CronExpression = remEntry.CronExpression,
+                NextDueUtc = remEntry.NextDueUtc?.ToString("O", CultureInfo.InvariantCulture),
+                LastFireUtc = remEntry.LastFireUtc?.ToString("O", CultureInfo.InvariantCulture),
+                Priority = (int)remEntry.Priority,
+                Action = (int)remEntry.Action,
 
                 GrainRefConsistentHash = consistentHash.ToString("X8"),
                 ETag = new ETag(remEntry.ETag),

@@ -19,6 +19,11 @@ namespace Orleans.Runtime.ReminderService
         public string DeploymentId          { get; set; }
         public string StartAt               { get; set; }
         public string Period                { get; set; }
+        public string CronExpression        { get; set; }
+        public string NextDueUtc            { get; set; }
+        public string LastFireUtc           { get; set; }
+        public int Priority                 { get; set; } = (int)ReminderPriority.Normal;
+        public int Action                   { get; set; } = (int)MissedReminderAction.Skip;
         public string GrainRefConsistentHash { get; set; }    // Part of PartitionKey
 
         public string PartitionKey { get; set; }
@@ -57,7 +62,7 @@ namespace Orleans.Runtime.ReminderService
             return (baseKey + '_', baseKey + (char)('_' + 1));
         }
 
-        public override string ToString() => $"Reminder [PartitionKey={PartitionKey} RowKey={RowKey} GrainId={GrainReference} ReminderName={ReminderName} Deployment={DeploymentId} ServiceId={ServiceId} StartAt={StartAt} Period={Period} GrainRefConsistentHash={GrainRefConsistentHash}]";
+        public override string ToString() => $"Reminder [PartitionKey={PartitionKey} RowKey={RowKey} GrainId={GrainReference} ReminderName={ReminderName} Deployment={DeploymentId} ServiceId={ServiceId} StartAt={StartAt} Period={Period} CronExpression={CronExpression} NextDueUtc={NextDueUtc} LastFireUtc={LastFireUtc} Priority={Priority} Action={Action} GrainRefConsistentHash={GrainRefConsistentHash}]";
     }
 
     internal sealed partial class RemindersTableManager : AzureTableDataManager<ReminderTableEntry>

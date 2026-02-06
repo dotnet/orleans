@@ -105,6 +105,52 @@ namespace UnitTests.RemindersTest
             Assert.False(removeRowRes, "should have failed. reminder shouldn't exist");
         }
 
+        protected async Task ReminderCronRoundTrip()
+        {
+            var reminder = CreateReminder(MakeTestGrainReference(), "cron_roundtrip");
+            reminder.CronExpression = "0 */5 * * * *";
+            reminder.Period = TimeSpan.Zero;
+
+            await remindersTable.UpsertRow(reminder);
+            var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+
+            Assert.NotNull(readReminder);
+            Assert.Equal(reminder.CronExpression, readReminder.CronExpression);
+            Assert.Equal(TimeSpan.Zero, readReminder.Period);
+
+            reminder.ETag = readReminder.ETag;
+            reminder.CronExpression = null;
+            reminder.Period = TimeSpan.FromMinutes(2);
+
+            await remindersTable.UpsertRow(reminder);
+            readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+
+            Assert.NotNull(readReminder);
+            Assert.Null(readReminder.CronExpression);
+            Assert.Equal(TimeSpan.FromMinutes(2), readReminder.Period);
+        }
+
+        protected async Task ReminderAdaptiveFieldsRoundTrip()
+        {
+            var reminder = CreateReminder(MakeTestGrainReference(), "adaptive_roundtrip");
+            reminder.CronExpression = "0 */10 * * * *";
+            reminder.Period = TimeSpan.Zero;
+            reminder.NextDueUtc = DateTime.UtcNow.AddMinutes(10);
+            reminder.LastFireUtc = DateTime.UtcNow.AddMinutes(-2);
+            reminder.Priority = ReminderPriority.Critical;
+            reminder.Action = MissedReminderAction.FireImmediately;
+
+            await remindersTable.UpsertRow(reminder);
+            var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+
+            Assert.NotNull(readReminder);
+            Assert.Equal(reminder.CronExpression, readReminder.CronExpression);
+            Assert.Equal(reminder.NextDueUtc?.ToUniversalTime(), readReminder.NextDueUtc?.ToUniversalTime());
+            Assert.Equal(reminder.LastFireUtc?.ToUniversalTime(), readReminder.LastFireUtc?.ToUniversalTime());
+            Assert.Equal(reminder.Priority, readReminder.Priority);
+            Assert.Equal(reminder.Action, readReminder.Action);
+        }
+
         protected async Task RemindersRange(int iterations = 1000)
         {
             await Task.WhenAll(Enumerable.Range(1, iterations).Select(async i =>

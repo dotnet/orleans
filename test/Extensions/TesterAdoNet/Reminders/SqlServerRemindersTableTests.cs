@@ -71,5 +71,17 @@ namespace UnitTests.RemindersTest
         {
             await ReminderSimple();
         }
+
+        [SkippableFact]
+        public async Task RemindersTable_SqlServer_ReminderCronRoundTrip()
+        {
+            await ReminderCronRoundTrip();
+        }
+
+        [SkippableFact]
+        public async Task RemindersTable_SqlServer_ReminderAdaptiveFieldsRoundTrip()
+        {
+            await ReminderAdaptiveFieldsRoundTrip();
+        }
     }
 }
