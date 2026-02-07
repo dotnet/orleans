@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Runtime;
@@ -34,16 +35,10 @@ public class ReminderStressTests
             Status = ReminderQueryStatus.Upcoming,
         };
 
-        var expectedCount = 0;
-        foreach (var reminder in reminders)
-        {
-            if (reminder.Priority == ReminderPriority.High
-                && !string.IsNullOrWhiteSpace(reminder.CronExpression)
-                && (reminder.NextDueUtc ?? reminder.StartAt) > now.UtcDateTime)
-            {
-                expectedCount++;
-            }
-        }
+        var expectedCount = reminders.Count(reminder =>
+            reminder.Priority == ReminderPriority.High
+            && !string.IsNullOrWhiteSpace(reminder.CronExpression)
+            && (reminder.NextDueUtc ?? reminder.StartAt) > now.UtcDateTime);
 
         var observedCount = 0;
         var seenReminderNames = new HashSet<string>(StringComparer.Ordinal);

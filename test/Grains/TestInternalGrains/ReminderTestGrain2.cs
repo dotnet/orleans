@@ -80,7 +80,7 @@ namespace UnitTests.Grains
         public async Task<IGrainReminder> StartReminderWithOptions(
             string reminderName,
             TimeSpan dueTime,
-            TimeSpan period,
+            TimeSpan reminderPeriod,
             ReminderPriority priority = ReminderPriority.Normal,
             MissedReminderAction action = MissedReminderAction.Skip,
             bool validate = false)
@@ -88,11 +88,11 @@ namespace UnitTests.Grains
             IGrainReminder reminder;
             if (validate)
             {
-                reminder = await this.RegisterOrUpdateReminder(reminderName, dueTime, period, priority, action);
+                reminder = await this.RegisterOrUpdateReminder(reminderName, dueTime, reminderPeriod, priority, action);
             }
             else
             {
-                reminder = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, dueTime, period, priority, action);
+                reminder = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, dueTime, reminderPeriod, priority, action);
             }
 
             this.allReminders[reminderName] = new(reminder);
@@ -107,7 +107,7 @@ namespace UnitTests.Grains
         public async Task<IGrainReminder> StartReminderAtUtc(
             string reminderName,
             DateTime dueAtUtc,
-            TimeSpan period,
+            TimeSpan reminderPeriod,
             ReminderPriority priority = ReminderPriority.Normal,
             MissedReminderAction action = MissedReminderAction.Skip,
             bool validate = false)
@@ -115,11 +115,11 @@ namespace UnitTests.Grains
             IGrainReminder reminder;
             if (validate)
             {
-                reminder = await this.RegisterOrUpdateReminder(reminderName, dueAtUtc, period, priority, action);
+                reminder = await this.RegisterOrUpdateReminder(reminderName, dueAtUtc, reminderPeriod, priority, action);
             }
             else
             {
-                reminder = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, dueAtUtc, period, priority, action);
+                reminder = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, dueAtUtc, reminderPeriod, priority, action);
             }
 
             this.allReminders[reminderName] = new(reminder);
@@ -160,7 +160,7 @@ namespace UnitTests.Grains
         public async Task UpsertRawReminderEntry(
             string reminderName,
             DateTime startAtUtc,
-            TimeSpan period,
+            TimeSpan reminderPeriod,
             string cronExpression,
             DateTime? nextDueUtc,
             ReminderPriority priority,
@@ -171,7 +171,7 @@ namespace UnitTests.Grains
                 GrainId = this.GrainId,
                 ReminderName = reminderName,
                 StartAt = startAtUtc,
-                Period = period,
+                Period = reminderPeriod,
                 CronExpression = cronExpression,
                 NextDueUtc = nextDueUtc,
                 LastFireUtc = null,

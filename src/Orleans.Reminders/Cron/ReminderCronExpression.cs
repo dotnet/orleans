@@ -100,38 +100,7 @@ public sealed class ReminderCronExpression : IEquatable<ReminderCronExpression>
 
     public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(ExpressionText);
 
-    private static CronFormat DetectFormat(string expression)
-    {
-        var trimmed = expression.Trim();
-        if (trimmed.StartsWith("@", StringComparison.Ordinal))
-        {
-            return CronFormat.Standard;
-        }
-
-        var fieldCount = 0;
-        var inToken = false;
-        foreach (var ch in trimmed)
-        {
-            if (char.IsWhiteSpace(ch))
-            {
-                inToken = false;
-                continue;
-            }
-
-            if (!inToken)
-            {
-                fieldCount++;
-                inToken = true;
-            }
-        }
-
-        return fieldCount switch
-        {
-            5 => CronFormat.Standard,
-            6 => CronFormat.IncludeSeconds,
-            _ => throw new CronFormatException($"The given cron expression has an invalid format. Expected 5 or 6 fields, but got {fieldCount}.")
-        };
-    }
+    private static CronFormat DetectFormat(string expression) => ReminderCronParser.DetectFormat(expression);
 
     private static void EnsureUtc(DateTime value, string argumentName)
     {

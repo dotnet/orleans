@@ -598,6 +598,21 @@ namespace Orleans.Runtime.ReminderService
             return true;
         }
 
+        private void ScheduleRemoveLocalReminder(ReminderIdentity identity, LocalReminderData expectedReminder)
+        {
+            _ = this.QueueTask(() =>
+            {
+                if (localReminders.TryGetValue(identity, out var currentReminder)
+                    && ReferenceEquals(currentReminder, expectedReminder))
+                {
+                    currentReminder.StopReminder();
+                    localReminders.Remove(identity);
+                }
+
+                return Task.CompletedTask;
+            });
+        }
+
         private Task DoResponsibilitySanityCheck(GrainId grainId, string debugInfo)
         {
             switch (Status)
@@ -664,6 +679,7 @@ namespace Orleans.Runtime.ReminderService
         private sealed class LocalReminderData
         {
             private readonly IRemindable remindable;
+            private readonly LocalReminderService reminderService;
             private readonly DateTime firstTickTime; // time for the first tick of this reminder
             private readonly TimeSpan period;
             private readonly ReminderScheduleKind scheduleKind;
@@ -678,6 +694,7 @@ namespace Orleans.Runtime.ReminderService
             internal LocalReminderData(ReminderEntry entry, LocalReminderService reminderService)
             {
                 Identity = new ReminderIdentity(entry.GrainId, entry.ReminderName);
+                this.reminderService = reminderService;
                 firstTickTime = entry.StartAt;
                 period = entry.Period;
                 remindable = reminderService.GetGrain(entry.GrainId);
@@ -733,7 +750,7 @@ namespace Orleans.Runtime.ReminderService
             private async Task RunAsync()
             {
                 TimeSpan? dueTimeSpan = CalculateDueTime();
-                while (await this.timer.NextTick(dueTimeSpan))
+                while (dueTimeSpan is not null && await this.timer.NextTick(dueTimeSpan))
                 {
                     try
                     {
@@ -747,9 +764,19 @@ namespace Orleans.Runtime.ReminderService
 
                     dueTimeSpan = CalculateDueTime();
                 }
+
+                if (dueTimeSpan is null)
+                {
+                    LogWarningCronReminderHasNoFutureOccurrence(
+                        logger,
+                        Identity.ReminderName,
+                        Identity.GrainId,
+                        cronExpression.ToString());
+                    reminderService.ScheduleRemoveLocalReminder(Identity, this);
+                }
             }
 
-            private TimeSpan CalculateDueTime()
+            private TimeSpan? CalculateDueTime()
             {
                 if (scheduleKind == ReminderScheduleKind.Cron)
                 {
@@ -757,7 +784,7 @@ namespace Orleans.Runtime.ReminderService
                     var next = cronExpression.GetNextOccurrence(currentUtc);
                     if (next is null)
                     {
-                        return TimeSpan.FromDays(365);
+                        return null;
                     }
 
                     var due = next.Value - currentUtc;
@@ -828,7 +855,7 @@ namespace Orleans.Runtime.ReminderService
                     var after = timeProvider.GetUtcNow().UtcDateTime;
                     var nextExpected = scheduleKind == ReminderScheduleKind.Interval
                         ? after + period
-                        : after + CalculateDueTime();
+                        : after + (CalculateDueTime() ?? TimeSpan.Zero);
                     LogTraceTickTriggered(logger, this, (after - before).TotalSeconds, nextExpected);
                 }
                 catch (Exception exc)
@@ -836,7 +863,7 @@ namespace Orleans.Runtime.ReminderService
                     var after = timeProvider.GetUtcNow().UtcDateTime;
                     var nextExpected = scheduleKind == ReminderScheduleKind.Interval
                         ? after + period
-                        : after + CalculateDueTime();
+                        : after + (CalculateDueTime() ?? TimeSpan.Zero);
                     LogErrorDeliveringReminderTick(logger, this, nextExpected, exc);
                     // What to do with repeated failures to deliver a reminder's ticks?
                 }
@@ -1105,6 +1132,12 @@ namespace Orleans.Runtime.ReminderService
             Message = "Exception firing reminder \"{ReminderName}\" for grain {GrainId}"
         )]
         private static partial void LogWarningFiringReminder(ILogger logger, string reminderName, GrainId grainId, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Stopping cron reminder \"{ReminderName}\" for grain {GrainId}: expression \"{CronExpression}\" has no future occurrences."
+        )]
+        private static partial void LogWarningCronReminderHasNoFutureOccurrence(ILogger logger, string reminderName, GrainId grainId, string cronExpression);
 
         [LoggerMessage(
             Level = LogLevel.Trace,

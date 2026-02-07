@@ -168,6 +168,7 @@ public class ReminderManagementGrainExtensionsTests
         {
             await foreach (var _ in ReminderManagementGrainExtensions.EnumerateAllAsync(null!))
             {
+                // The enumeration should fail before yielding any item.
             }
         });
     }

@@ -84,7 +84,8 @@ namespace Orleans
             string ReminderName { get; }
 
             /// <summary>
-            /// Gets the cron expression for this reminder, if any.
+            /// Gets the cron expression for this reminder.
+            /// Returns <see langword="null"/> for interval-based reminders.
             /// </summary>
             string CronExpression { get; }
 

@@ -158,12 +158,9 @@ internal sealed class AdaptiveReminderService : GrainService, IReminderService, 
             tasks.Add(_repairTask);
         }
 
-        foreach (var workerTask in _workerTasks)
+        foreach (var workerTask in _workerTasks.Where(static task => task is not null))
         {
-            if (workerTask is not null)
-            {
-                tasks.Add(workerTask);
-            }
+            tasks.Add(workerTask);
         }
         await Task.WhenAll(tasks);
 
@@ -781,12 +778,9 @@ internal sealed class AdaptiveReminderService : GrainService, IReminderService, 
 
     private void RemoveOutOfRangeQueuedReminders()
     {
-        foreach (var item in _enqueuedReminders)
+        foreach (var item in _enqueuedReminders.Where(item => !RingRange.InRange(item.Key.GrainId)))
         {
-            if (!RingRange.InRange(item.Key.GrainId))
-            {
-                _enqueuedReminders.TryRemove(item.Key, out _);
-            }
+            _enqueuedReminders.TryRemove(item.Key, out _);
         }
     }
 

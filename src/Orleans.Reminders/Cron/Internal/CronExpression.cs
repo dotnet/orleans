@@ -370,10 +370,10 @@ namespace Orleans.Reminders.Cron.Internal
                 hashCode = (hashCode * 397) ^ _minute.GetHashCode();
                 hashCode = (hashCode * 397) ^ _hour.GetHashCode();
                 hashCode = (hashCode * 397) ^ _dayOfMonth.GetHashCode();
-                hashCode = (hashCode * 397) ^ _month.GetHashCode();
-                hashCode = (hashCode * 397) ^ _dayOfWeek.GetHashCode();
-                hashCode = (hashCode * 397) ^ _nthDayOfWeek.GetHashCode();
-                hashCode = (hashCode * 397) ^ _lastMonthOffset.GetHashCode();
+                hashCode = (hashCode * 397) ^ (int)_month;
+                hashCode = (hashCode * 397) ^ (int)_dayOfWeek;
+                hashCode = (hashCode * 397) ^ (int)_nthDayOfWeek;
+                hashCode = (hashCode * 397) ^ _lastMonthOffset;
                 hashCode = (hashCode * 397) ^ (int)_flags;
 
                 return hashCode;

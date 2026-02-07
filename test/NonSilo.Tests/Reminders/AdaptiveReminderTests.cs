@@ -23,13 +23,14 @@ public class AdaptiveReminderTests
     [Fact]
     public async Task StartInBackground_WhenInitialPollFails_ThrowsAndFaultsStartedTask()
     {
+        using var stoppedCts = new CancellationTokenSource();
         var service = CreateServiceForInternals(new ReminderOptions());
         SetField(service, "_logger", NullLogger<AdaptiveReminderService>.Instance);
         SetField(service, "_timeProvider", TimeProvider.System);
         SetField(service, "_environmentStatisticsProvider", Substitute.For<IEnvironmentStatisticsProvider>());
         SetField(service, "_activationWorkingSet", Substitute.For<IActivationWorkingSet>());
         SetField(service, "_reminderTable", Substitute.For<IReminderTable>());
-        SetField(service, "<StoppedCancellationTokenSource>k__BackingField", new CancellationTokenSource());
+        SetField(service, "<StoppedCancellationTokenSource>k__BackingField", stoppedCts);
         SetField(service, "_startedTask", new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously));
 
         var exception = await Assert.ThrowsAsync<OrleansException>(() => InvokePrivateAsync(service, "StartInBackground"));

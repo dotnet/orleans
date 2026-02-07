@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Net;
@@ -935,12 +936,12 @@ public class AdaptiveReminderServiceFunctionalTests
         var observers = CaptureLifecycleObservers(out var lifecycle);
         ((ILifecycleParticipant<ISiloLifecycle>)service).Participate(lifecycle);
 
-        Assert.True(observers.ContainsKey(ServiceLifecycleStage.BecomeActive));
-        Assert.True(observers.ContainsKey(ServiceLifecycleStage.Active));
+        Assert.True(observers.TryGetValue(ServiceLifecycleStage.BecomeActive, out var becomeActiveObserver));
+        Assert.True(observers.TryGetValue(ServiceLifecycleStage.Active, out var activeObserver));
 
-        await observers[ServiceLifecycleStage.BecomeActive].OnStart(CancellationToken.None);
-        await observers[ServiceLifecycleStage.Active].OnStart(CancellationToken.None);
-        await observers[ServiceLifecycleStage.BecomeActive].OnStop(CancellationToken.None);
+        await becomeActiveObserver!.OnStart(CancellationToken.None);
+        await activeObserver!.OnStart(CancellationToken.None);
+        await becomeActiveObserver.OnStop(CancellationToken.None);
     }
 
     [Fact]
@@ -1078,7 +1079,7 @@ public class AdaptiveReminderServiceFunctionalTests
         SetField(service, "ring", ringProvider);
         SetField(service, "Logger", NullLogger.Instance);
         SetField(service, "typeName", nameof(AdaptiveReminderService));
-        SetField(service, "<StoppedCancellationTokenSource>k__BackingField", new CancellationTokenSource());
+        SetField(service, "<StoppedCancellationTokenSource>k__BackingField", CreateStoppedCancellationTokenSource());
         SetField(service, "<RingRange>k__BackingField", effectiveRingRange);
         SetField(service, "<RangeSerialNumber>k__BackingField", 0);
         SetServiceStatus(service, statusName);
@@ -1144,6 +1145,9 @@ public class AdaptiveReminderServiceFunctionalTests
             ringProvider: ringProvider,
             shared: shared);
     }
+
+    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "Owned by the test service instance via StoppedCancellationTokenSource.")]
+    private static CancellationTokenSource CreateStoppedCancellationTokenSource() => new();
 
     private static void SetServiceStatus(AdaptiveReminderService service, string statusName)
     {
