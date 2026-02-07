@@ -368,8 +368,8 @@ namespace Orleans.Reminders.Cron.Internal
             {
                 var hashCode = _second.GetHashCode();
                 hashCode = (hashCode * 397) ^ _minute.GetHashCode();
-                hashCode = (hashCode * 397) ^ _hour.GetHashCode();
-                hashCode = (hashCode * 397) ^ _dayOfMonth.GetHashCode();
+                hashCode = (hashCode * 397) ^ (int)_hour;
+                hashCode = (hashCode * 397) ^ (int)_dayOfMonth;
                 hashCode = (hashCode * 397) ^ (int)_month;
                 hashCode = (hashCode * 397) ^ (int)_dayOfWeek;
                 hashCode = (hashCode * 397) ^ (int)_nthDayOfWeek;

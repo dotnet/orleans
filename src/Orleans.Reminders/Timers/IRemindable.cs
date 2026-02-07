@@ -85,7 +85,7 @@ namespace Orleans
 
             /// <summary>
             /// Gets the cron expression for this reminder.
-            /// Returns <see langword="null"/> for interval-based reminders.
+            /// Returns <see cref="string.Empty"/> for interval-based reminders.
             /// </summary>
             string CronExpression { get; }
 

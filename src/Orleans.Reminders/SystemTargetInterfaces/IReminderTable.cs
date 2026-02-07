@@ -191,7 +191,7 @@ namespace Orleans
 
         /// <summary>
         /// Gets or sets the cron expression for this reminder.
-        /// If null, the reminder uses <see cref="StartAt"/> and <see cref="Period"/> interval semantics.
+        /// If null or empty, the reminder uses <see cref="StartAt"/> and <see cref="Period"/> interval semantics.
         /// </summary>
         [Id(5)]
         public string CronExpression { get; set; }
@@ -251,14 +251,14 @@ namespace Orleans
             GrainId grainId,
             string reminderName,
             string eTag,
-            string cronExpression = null,
+            string cronExpression = "",
             Runtime.ReminderPriority priority = Runtime.ReminderPriority.Normal,
             Runtime.MissedReminderAction action = Runtime.MissedReminderAction.Skip)
         {
             GrainId = grainId;
             ReminderName = reminderName;
             ETag = eTag;
-            CronExpression = cronExpression;
+            CronExpression = cronExpression ?? string.Empty;
             Priority = priority;
             Action = action;
         }

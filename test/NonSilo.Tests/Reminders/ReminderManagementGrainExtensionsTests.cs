@@ -166,10 +166,8 @@ public class ReminderManagementGrainExtensionsTests
     {
         await Assert.ThrowsAsync<ArgumentNullException>(async () =>
         {
-            await foreach (var _ in ReminderManagementGrainExtensions.EnumerateAllAsync(null!))
-            {
-                // The enumeration should fail before yielding any item.
-            }
+            await using var enumerator = ReminderManagementGrainExtensions.EnumerateAllAsync(null!).GetAsyncEnumerator();
+            await enumerator.MoveNextAsync();
         });
     }
 

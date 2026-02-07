@@ -97,6 +97,22 @@ public class AdaptiveReminderTests
     }
 
     [Fact]
+    public void ReminderEntry_ToIGrainReminder_NormalizesNullCronExpression()
+    {
+        var entry = new ReminderEntry
+        {
+            GrainId = GrainId.Create("test", "key"),
+            ReminderName = "rem",
+            ETag = "etag",
+            CronExpression = null,
+        };
+
+        var reminder = entry.ToIGrainReminder();
+
+        Assert.Equal(string.Empty, reminder.CronExpression);
+    }
+
+    [Fact]
     public void CompareReminderEntries_WhenPriorityEnabled_OrdersByPriorityThenDue()
     {
         var service = CreateServiceForInternals(new ReminderOptions { EnablePriority = true });
