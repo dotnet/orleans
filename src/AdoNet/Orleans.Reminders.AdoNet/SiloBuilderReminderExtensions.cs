@@ -50,7 +50,7 @@ namespace Orleans.Hosting
         /// </remarks>
         public static IServiceCollection UseAdoNetReminderService(this IServiceCollection services, Action<OptionsBuilder<AdoNetReminderTableOptions>> configureOptions)
         {
-            services.AddReminders();
+            services.AddAdaptiveReminderService();
             services.AddSingleton<IReminderTable, AdoNetReminderTable>();
             services.ConfigureFormatter<AdoNetReminderTableOptions>();
             services.AddSingleton<IConfigurationValidator, AdoNetReminderTableOptionsValidator>();
