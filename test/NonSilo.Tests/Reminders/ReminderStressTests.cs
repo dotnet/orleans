@@ -29,7 +29,7 @@ public class ReminderStressTests
 
         var filter = new ReminderQueryFilter
         {
-            Priority = ReminderPriority.Critical,
+            Priority = ReminderPriority.High,
             ScheduleKind = ReminderScheduleKind.Cron,
             Status = ReminderQueryStatus.Upcoming,
         };
@@ -37,7 +37,7 @@ public class ReminderStressTests
         var expectedCount = 0;
         foreach (var reminder in reminders)
         {
-            if (reminder.Priority == ReminderPriority.Critical
+            if (reminder.Priority == ReminderPriority.High
                 && !string.IsNullOrWhiteSpace(reminder.CronExpression)
                 && (reminder.NextDueUtc ?? reminder.StartAt) > now.UtcDateTime)
             {
@@ -58,7 +58,7 @@ public class ReminderStressTests
             {
                 observedCount++;
                 Assert.True(seenReminderNames.Add(reminder.ReminderName), $"Duplicate reminder '{reminder.ReminderName}' in filtered paging output.");
-                Assert.Equal(ReminderPriority.Critical, reminder.Priority);
+                Assert.Equal(ReminderPriority.High, reminder.Priority);
                 Assert.False(string.IsNullOrWhiteSpace(reminder.CronExpression));
                 Assert.True((reminder.NextDueUtc ?? reminder.StartAt) > now.UtcDateTime);
             }
@@ -133,9 +133,9 @@ public class ReminderStressTests
                 CronExpression = i % 2 == 0 ? "*/5 * * * * *" : null,
                 Priority = (i % 3) switch
                 {
-                    0 => ReminderPriority.Critical,
+                    0 => ReminderPriority.High,
                     1 => ReminderPriority.Normal,
-                    _ => ReminderPriority.Background,
+                    _ => ReminderPriority.Normal,
                 },
                 Action = (i % 3) switch
                 {

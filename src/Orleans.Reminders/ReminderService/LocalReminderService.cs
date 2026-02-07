@@ -174,6 +174,15 @@ namespace Orleans.Runtime.ReminderService
                 ReminderPriority.Normal,
                 MissedReminderAction.Skip);
 
+        public async Task<IGrainReminder> RegisterOrUpdateReminder(GrainId grainId, string reminderName, DateTime dueAtUtc, TimeSpan period)
+            => await RegisterOrUpdateReminder(
+                grainId,
+                reminderName,
+                dueAtUtc,
+                period,
+                ReminderPriority.Normal,
+                MissedReminderAction.Skip);
+
         public async Task<IGrainReminder> RegisterOrUpdateReminder(
             GrainId grainId,
             string reminderName,
@@ -183,15 +192,31 @@ namespace Orleans.Runtime.ReminderService
             MissedReminderAction action)
         {
             var dueAt = UtcNow.Add(dueTime);
+            return await RegisterOrUpdateReminder(grainId, reminderName, dueAt, period, priority, action);
+        }
+
+        public async Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId grainId,
+            string reminderName,
+            DateTime dueAtUtc,
+            TimeSpan period,
+            ReminderPriority priority,
+            MissedReminderAction action)
+        {
+            if (dueAtUtc.Kind != DateTimeKind.Utc)
+            {
+                throw new ArgumentException("Due timestamp must use DateTimeKind.Utc.", nameof(dueAtUtc));
+            }
+
             var entry = new ReminderEntry
             {
                 GrainId = grainId,
                 ReminderName = reminderName,
-                StartAt = dueAt,
+                StartAt = dueAtUtc,
                 Period = period,
                 Priority = priority,
                 Action = action,
-                NextDueUtc = dueAt,
+                NextDueUtc = dueAtUtc,
             };
 
             LogDebugRegisterOrUpdateReminder(entry);

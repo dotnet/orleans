@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Data.Common;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -273,7 +274,7 @@ namespace Orleans.Tests.SqlUtils
             try
             {
                 var ordinal = record.GetOrdinal(fieldName);
-                return record.GetInt32(ordinal);
+                return Convert.ToInt32(record.GetValue(ordinal), CultureInfo.InvariantCulture);
             }
             catch (IndexOutOfRangeException e)
             {
@@ -318,7 +319,7 @@ namespace Orleans.Tests.SqlUtils
                 if (value == DBNull.Value)
                     return null;
 
-                return Convert.ToInt32(value);
+                return Convert.ToInt32(value, CultureInfo.InvariantCulture);
             }
             catch (IndexOutOfRangeException e)
             {

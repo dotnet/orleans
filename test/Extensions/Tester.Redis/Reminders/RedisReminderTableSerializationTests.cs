@@ -30,7 +30,7 @@ public class RedisReminderTableSerializationTests
             CronExpression = "*/5 * * * * *",
             NextDueUtc = DateTime.UtcNow.AddSeconds(5),
             LastFireUtc = DateTime.UtcNow,
-            Priority = ReminderPriority.Background,
+            Priority = ReminderPriority.Normal,
             Action = MissedReminderAction.Notify,
         };
 
@@ -38,7 +38,7 @@ public class RedisReminderTableSerializationTests
         var segments = ParseSegments(payload);
 
         Assert.Equal(JTokenType.Integer, segments[9]!.Type);
-        Assert.Equal((int)ReminderPriority.Background, segments[9]!.Value<int>());
+        Assert.Equal((int)ReminderPriority.Normal, segments[9]!.Value<int>());
         Assert.Equal(JTokenType.Integer, segments[10]!.Type);
         Assert.Equal((int)MissedReminderAction.Notify, segments[10]!.Value<int>());
     }
@@ -68,19 +68,35 @@ public class RedisReminderTableSerializationTests
     }
 
     [Fact]
+    public void ConvertToEntry_PreservesUtcTimestampsWithoutTimezoneShift()
+    {
+        var grainId = GrainId.Create("test", "redis-utc-roundtrip");
+        const string startAtText = "2026-02-07T00:26:41.7666380Z";
+        const string nextDueUtcText = "2026-02-07T00:27:41.7666380Z";
+        const string lastFireUtcText = "2026-02-07T00:25:41.7666380Z";
+        var payload = BuildPayloadWithCustomTimestamps(grainId, startAtText, nextDueUtcText, lastFireUtcText);
+
+        var entry = InvokeConvertToEntry(payload);
+
+        Assert.Equal(DateTime.Parse(startAtText, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind), entry.StartAt);
+        Assert.Equal(DateTime.Parse(nextDueUtcText, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind), entry.NextDueUtc);
+        Assert.Equal(DateTime.Parse(lastFireUtcText, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind), entry.LastFireUtc);
+    }
+
+    [Fact]
     public void ConvertToEntry_ParsesNumericPriorityAndAction()
     {
         var grainId = GrainId.Create("test", "redis-parse-numeric");
         var payload = BuildPayload(
             grainId,
-            ReminderPriority.Critical,
+            ReminderPriority.High,
             MissedReminderAction.FireImmediately,
             numericEnums: true);
 
         var entry = InvokeConvertToEntry(payload);
 
         Assert.Equal(grainId, entry.GrainId);
-        Assert.Equal(ReminderPriority.Critical, entry.Priority);
+        Assert.Equal(ReminderPriority.High, entry.Priority);
         Assert.Equal(MissedReminderAction.FireImmediately, entry.Action);
     }
 
@@ -161,6 +177,27 @@ public class RedisReminderTableSerializationTests
 
     private static string BuildPayloadWithCustomEnums(GrainId grainId, object priorityToken, object actionToken)
         => BuildPayloadWithCustomEnums(grainId, includeEnums: true, priorityToken, actionToken);
+
+    private static string BuildPayloadWithCustomTimestamps(GrainId grainId, string startAtText, string nextDueUtcText, string lastFireUtcText)
+    {
+        var grainHash = grainId.GetUniformHashCode().ToString("X8", CultureInfo.InvariantCulture);
+        var segments = new object[]
+        {
+            grainHash,
+            grainId.ToString(),
+            "reminder",
+            "etag",
+            startAtText,
+            TimeSpan.FromSeconds(10).ToString("c", CultureInfo.InvariantCulture),
+            "*/5 * * * * *",
+            nextDueUtcText,
+            lastFireUtcText,
+            (int)ReminderPriority.Normal,
+            (int)MissedReminderAction.Skip
+        };
+
+        return JsonConvert.SerializeObject(segments)[1..^1];
+    }
 
     private static string BuildPayloadWithCustomEnums(GrainId grainId, bool includeEnums, object priorityToken = null, object actionToken = null)
     {

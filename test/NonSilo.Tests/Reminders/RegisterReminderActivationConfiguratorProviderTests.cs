@@ -31,7 +31,7 @@ internal interface IActivationCronRegistrationTestGrain : IGrainWithGuidKey
 [RegisterReminder(
     "cron-activation-registration",
     "0 9 * * MON-FRI",
-    priority: ReminderPriority.Critical,
+    priority: ReminderPriority.High,
     action: MissedReminderAction.FireImmediately)]
 internal sealed class ActivationCronRegistrationTestGrain : Grain, IActivationCronRegistrationTestGrain, IRemindable
 {
@@ -161,7 +161,7 @@ public class RegisterReminderActivationConfiguratorProviderTests
             grainId,
             "cron-activation-registration",
             "0 9 * * MON-FRI",
-            ReminderPriority.Critical,
+            ReminderPriority.High,
             MissedReminderAction.FireImmediately);
     }
 

@@ -265,7 +265,7 @@ namespace Orleans.Tests.SqlUtils
 
             internal static int GetVersion(IDataRecord record)
             {
-                return Convert.ToInt32(record.GetValue<object>(nameof(Version)));
+                return record.GetInt32(nameof(Version));
             }
 
             internal static Uri GetGatewayUri(IDataRecord record)

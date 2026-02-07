@@ -32,6 +32,15 @@ namespace Orleans.Runtime.ReminderService
                 Runtime.ReminderPriority.Normal,
                 Runtime.MissedReminderAction.Skip);
 
+        public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, DateTime dueAtUtc, TimeSpan period)
+            => RegisterOrUpdateReminder(
+                callingGrainId,
+                reminderName,
+                dueAtUtc,
+                period,
+                Runtime.ReminderPriority.Normal,
+                Runtime.MissedReminderAction.Skip);
+
         public Task<IGrainReminder> RegisterOrUpdateReminder(
             GrainId callingGrainId,
             string reminderName,
@@ -64,6 +73,36 @@ namespace Orleans.Runtime.ReminderService
 
             EnsureReminderServiceRegisteredAndInGrainContext();
             return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueTime, period, priority, action);
+        }
+
+        public Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId callingGrainId,
+            string reminderName,
+            DateTime dueAtUtc,
+            TimeSpan period,
+            Runtime.ReminderPriority priority,
+            Runtime.MissedReminderAction action)
+        {
+            if (dueAtUtc.Kind != DateTimeKind.Utc)
+                throw new ArgumentException("Due timestamp must use DateTimeKind.Utc.", nameof(dueAtUtc));
+
+            if (period == Timeout.InfiniteTimeSpan)
+                throw new ArgumentOutOfRangeException(nameof(period), "Cannot use InfiniteTimeSpan period to create a reminder");
+
+            if (period.Ticks < 0)
+                throw new ArgumentOutOfRangeException(nameof(period), "Cannot use negative period to create a reminder");
+
+            var minReminderPeriod = options.MinimumReminderPeriod;
+            if (period < minReminderPeriod)
+                throw new ArgumentException($"Cannot register reminder {reminderName} as requested period ({period}) is less than minimum allowed reminder period ({minReminderPeriod})");
+
+            if (string.IsNullOrEmpty(reminderName))
+                throw new ArgumentException("Cannot use null or empty name for the reminder", nameof(reminderName));
+
+            ValidatePriorityAndAction(priority, action);
+
+            EnsureReminderServiceRegisteredAndInGrainContext();
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueAtUtc, period, priority, action);
         }
 
         public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, string cronExpression)

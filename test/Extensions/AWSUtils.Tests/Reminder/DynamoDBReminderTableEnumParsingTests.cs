@@ -50,9 +50,8 @@ public class DynamoDBReminderTableEnumParsingTests
     }
 
     [Theory]
-    [InlineData((int)ReminderPriority.Critical, ReminderPriority.Critical)]
+    [InlineData((int)ReminderPriority.High, ReminderPriority.High)]
     [InlineData((int)ReminderPriority.Normal, ReminderPriority.Normal)]
-    [InlineData((int)ReminderPriority.Background, ReminderPriority.Background)]
     public void ReadPriority_ReturnsExpectedValue_WhenValid(int rawValue, ReminderPriority expected)
     {
         var item = new Dictionary<string, AttributeValue>

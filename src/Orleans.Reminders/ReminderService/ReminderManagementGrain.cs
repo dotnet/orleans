@@ -624,7 +624,7 @@ public sealed class ReminderManagementGrain(IReminderTable reminderTable, TimePr
                 return 1;
             }
 
-            var priorityCompare = x.Priority.CompareTo(y.Priority);
+            var priorityCompare = y.Priority.CompareTo(x.Priority);
             if (priorityCompare != 0)
             {
                 return priorityCompare;

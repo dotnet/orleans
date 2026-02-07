@@ -9,8 +9,8 @@ CREATE TABLE OrleansRemindersTable
     CronExpression varchar(200) NULL,
     NextDueUtc timestamptz(3) NULL,
     LastFireUtc timestamptz(3) NULL,
-    Priority smallint NOT NULL,
-    Action smallint NOT NULL,
+    Priority smallint NOT NULL DEFAULT 0,
+    Action smallint NOT NULL DEFAULT 0,
     GrainHash integer NOT NULL,
     Version integer NOT NULL,
 
@@ -95,12 +95,12 @@ VALUES
         @GrainId,
         @ReminderName,
         @StartTime,
-        @Period,
+        @Period::bigint,
         @CronExpression,
         @NextDueUtc,
         @LastFireUtc,
-        @Priority,
-        @Action,
+        @Priority::smallint,
+        @Action::smallint,
         @GrainHash
     );
 ');

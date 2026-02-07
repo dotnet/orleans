@@ -38,7 +38,7 @@ public class ReminderRegistrationExtensionsTests
                 grainId,
                 "r",
                 "*/5 * * * *",
-                ReminderPriority.Critical,
+                ReminderPriority.High,
                 MissedReminderAction.Notify)
             .Returns(Task.FromResult(reminder));
 
@@ -46,7 +46,7 @@ public class ReminderRegistrationExtensionsTests
             grainId,
             "r",
             expression,
-            ReminderPriority.Critical,
+            ReminderPriority.High,
             MissedReminderAction.Notify);
 
         Assert.Same(reminder, result);
@@ -54,7 +54,7 @@ public class ReminderRegistrationExtensionsTests
             grainId,
             "r",
             "*/5 * * * *",
-            ReminderPriority.Critical,
+            ReminderPriority.High,
             MissedReminderAction.Notify);
     }
 
@@ -83,7 +83,7 @@ public class ReminderRegistrationExtensionsTests
                 grainId,
                 "r",
                 "0 */2 * * * *",
-                ReminderPriority.Background,
+                ReminderPriority.Normal,
                 MissedReminderAction.Skip)
             .Returns(Task.FromResult(reminder));
 
@@ -91,7 +91,7 @@ public class ReminderRegistrationExtensionsTests
             grainId,
             "r",
             expression,
-            ReminderPriority.Background,
+            ReminderPriority.Normal,
             MissedReminderAction.Skip);
 
         Assert.Same(reminder, result);
@@ -99,7 +99,7 @@ public class ReminderRegistrationExtensionsTests
             grainId,
             "r",
             "0 */2 * * * *",
-            ReminderPriority.Background,
+            ReminderPriority.Normal,
             MissedReminderAction.Skip);
     }
 
@@ -139,7 +139,7 @@ public class ReminderRegistrationExtensionsTests
                 grainId,
                 "r",
                 "0 0 * * *",
-                ReminderPriority.Critical,
+                ReminderPriority.High,
                 MissedReminderAction.FireImmediately)
             .Returns(Task.FromResult(reminder));
         var grain = CreateRemindableGrain(grainId, registry);
@@ -147,7 +147,7 @@ public class ReminderRegistrationExtensionsTests
         var result = await grain.RegisterOrUpdateReminder(
             "r",
             ReminderCronBuilder.DailyAt(0, 0),
-            ReminderPriority.Critical,
+            ReminderPriority.High,
             MissedReminderAction.FireImmediately);
 
         Assert.Same(reminder, result);
@@ -155,7 +155,72 @@ public class ReminderRegistrationExtensionsTests
             grainId,
             "r",
             "0 0 * * *",
-            ReminderPriority.Critical,
+            ReminderPriority.High,
+            MissedReminderAction.FireImmediately);
+    }
+
+    [Fact]
+    public async Task GrainExtension_WithAbsoluteDueUtc_DelegatesToRegistry()
+    {
+        var grainId = GrainId.Create("test", "grain-absolute-due");
+        var registry = Substitute.For<IReminderRegistry>();
+        var reminder = Substitute.For<IGrainReminder>();
+        var dueAtUtc = new DateTime(2026, 2, 1, 10, 5, 0, DateTimeKind.Utc);
+        var period = TimeSpan.FromMinutes(2);
+        registry.RegisterOrUpdateReminder(
+                grainId,
+                "r",
+                dueAtUtc,
+                period,
+                ReminderPriority.Normal,
+                MissedReminderAction.Skip)
+            .Returns(Task.FromResult(reminder));
+        var grain = CreateRemindableGrain(grainId, registry);
+
+        var result = await grain.RegisterOrUpdateReminder("r", dueAtUtc, period);
+
+        Assert.Same(reminder, result);
+        await registry.Received(1).RegisterOrUpdateReminder(
+            grainId,
+            "r",
+            dueAtUtc,
+            period,
+            ReminderPriority.Normal,
+            MissedReminderAction.Skip);
+    }
+
+    [Fact]
+    public async Task GrainExtension_WithPriorityAndAbsoluteDueUtc_DelegatesToRegistry()
+    {
+        var grainId = GrainId.Create("test", "grain-priority-absolute-due");
+        var registry = Substitute.For<IReminderRegistry>();
+        var reminder = Substitute.For<IGrainReminder>();
+        var dueAtUtc = new DateTime(2026, 2, 1, 11, 0, 0, DateTimeKind.Utc);
+        var period = TimeSpan.FromMinutes(1);
+        registry.RegisterOrUpdateReminder(
+                grainId,
+                "r",
+                dueAtUtc,
+                period,
+                ReminderPriority.High,
+                MissedReminderAction.FireImmediately)
+            .Returns(Task.FromResult(reminder));
+        var grain = CreateRemindableGrain(grainId, registry);
+
+        var result = await grain.RegisterOrUpdateReminder(
+            "r",
+            dueAtUtc,
+            period,
+            ReminderPriority.High,
+            MissedReminderAction.FireImmediately);
+
+        Assert.Same(reminder, result);
+        await registry.Received(1).RegisterOrUpdateReminder(
+            grainId,
+            "r",
+            dueAtUtc,
+            period,
+            ReminderPriority.High,
             MissedReminderAction.FireImmediately);
     }
 

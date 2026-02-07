@@ -20,13 +20,14 @@ BEGIN
 
     SELECT COUNT(*) INTO v_count FROM user_tab_columns WHERE table_name = 'ORLEANSREMINDERSTABLE' AND column_name = 'PRIORITY';
     IF v_count = 0 THEN
-        EXECUTE IMMEDIATE 'ALTER TABLE OrleansRemindersTable ADD (Priority NUMBER(3,0) DEFAULT 1 NOT NULL)';
+        EXECUTE IMMEDIATE 'ALTER TABLE OrleansRemindersTable ADD (Priority NUMBER(3,0) DEFAULT 0 NOT NULL)';
     END IF;
 
     SELECT COUNT(*) INTO v_count FROM user_tab_columns WHERE table_name = 'ORLEANSREMINDERSTABLE' AND column_name = 'ACTION';
     IF v_count = 0 THEN
-        EXECUTE IMMEDIATE 'ALTER TABLE OrleansRemindersTable ADD (Action NUMBER(3,0) DEFAULT 1 NOT NULL)';
+        EXECUTE IMMEDIATE 'ALTER TABLE OrleansRemindersTable ADD (Action NUMBER(3,0) DEFAULT 0 NOT NULL)';
     END IF;
+
 END;
 /
 

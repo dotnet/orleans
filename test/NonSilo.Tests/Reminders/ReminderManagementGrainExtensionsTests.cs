@@ -118,7 +118,7 @@ public class ReminderManagementGrainExtensionsTests
             Status = ReminderQueryStatus.Overdue | ReminderQueryStatus.Missed,
             OverdueBy = TimeSpan.FromMinutes(2),
             MissedBy = TimeSpan.FromMinutes(1),
-            Priority = ReminderPriority.Critical,
+            Priority = ReminderPriority.High,
         };
 
         var managementGrain = Substitute.For<IReminderManagementGrain>();

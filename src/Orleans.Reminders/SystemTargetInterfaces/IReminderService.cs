@@ -34,6 +34,16 @@ namespace Orleans
         Task<IGrainReminder> RegisterOrUpdateReminder(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period);
 
         /// <summary>
+        /// Registers a new reminder or updates an existing one with an absolute UTC due timestamp.
+        /// </summary>
+        /// <param name="grainId">A reference to the grain which the reminder is being registered or updated on behalf of.</param>
+        /// <param name="reminderName">The reminder name.</param>
+        /// <param name="dueAtUtc">The UTC timestamp when the reminder should fire initially.</param>
+        /// <param name="period">The time interval between invocations of the reminder.</param>
+        /// <returns>The reminder.</returns>
+        Task<IGrainReminder> RegisterOrUpdateReminder(GrainId grainId, string reminderName, DateTime dueAtUtc, TimeSpan period);
+
+        /// <summary>
         /// Registers a new reminder or updates an existing one with adaptive delivery options.
         /// </summary>
         /// <param name="grainId">A reference to the grain which the reminder is being registered or updated on behalf of.</param>
@@ -47,6 +57,24 @@ namespace Orleans
             GrainId grainId,
             string reminderName,
             TimeSpan dueTime,
+            TimeSpan period,
+            Runtime.ReminderPriority priority,
+            Runtime.MissedReminderAction action);
+
+        /// <summary>
+        /// Registers a new reminder or updates an existing one with an absolute UTC due timestamp and adaptive delivery options.
+        /// </summary>
+        /// <param name="grainId">A reference to the grain which the reminder is being registered or updated on behalf of.</param>
+        /// <param name="reminderName">The reminder name.</param>
+        /// <param name="dueAtUtc">The UTC timestamp when the reminder should fire initially.</param>
+        /// <param name="period">The time interval between invocations of the reminder.</param>
+        /// <param name="priority">The reminder priority.</param>
+        /// <param name="action">The missed reminder action.</param>
+        /// <returns>The reminder.</returns>
+        Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId grainId,
+            string reminderName,
+            DateTime dueAtUtc,
             TimeSpan period,
             Runtime.ReminderPriority priority,
             Runtime.MissedReminderAction action);

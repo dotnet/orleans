@@ -85,6 +85,39 @@ public class ReminderRegistryValidationTests
     }
 
     [Fact]
+    public async Task RegisterAbsolute_RejectsNonUtcDueTimestamp()
+    {
+        var registry = CreateRegistry();
+        var grainId = GrainId.Create("test", "g");
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            async () => await registry.RegisterOrUpdateReminder(grainId, "r", DateTime.Now, TimeSpan.FromMinutes(2)));
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            async () => await registry.RegisterOrUpdateReminder(
+                grainId,
+                "r",
+                new DateTime(2026, 2, 1, 10, 0, 0, DateTimeKind.Unspecified),
+                TimeSpan.FromMinutes(2),
+                ReminderPriority.Normal,
+                MissedReminderAction.Skip));
+    }
+
+    [Fact]
+    public async Task RegisterAbsolute_RejectsInvalidPriorityOrAction()
+    {
+        var registry = CreateRegistry();
+        var grainId = GrainId.Create("test", "g");
+        var dueAtUtc = new DateTime(2026, 2, 1, 10, 0, 0, DateTimeKind.Utc);
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            async () => await registry.RegisterOrUpdateReminder(grainId, "r", dueAtUtc, TimeSpan.FromMinutes(2), (ReminderPriority)255, MissedReminderAction.Skip));
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            async () => await registry.RegisterOrUpdateReminder(grainId, "r", dueAtUtc, TimeSpan.FromMinutes(2), ReminderPriority.Normal, (MissedReminderAction)255));
+    }
+
+    [Fact]
     public async Task RegisterCron_RejectsEmptyName()
     {
         var registry = CreateRegistry();
@@ -142,6 +175,18 @@ public class ReminderRegistryValidationTests
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await registry.RegisterOrUpdateReminder(GrainId.Create("test", "g"), "r", "*/5 * * * *"));
+
+        Assert.Contains("non-grain context", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RegisterAbsolute_WithValidInputOutsideGrainContext_ThrowsInvalidOperation()
+    {
+        var registry = CreateRegistry();
+        var dueAtUtc = new DateTime(2026, 2, 1, 10, 0, 0, DateTimeKind.Utc);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await registry.RegisterOrUpdateReminder(GrainId.Create("test", "g"), "r", dueAtUtc, TimeSpan.FromMinutes(2)));
 
         Assert.Contains("non-grain context", exception.Message, StringComparison.Ordinal);
     }

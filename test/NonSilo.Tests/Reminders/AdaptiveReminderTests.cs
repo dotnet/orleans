@@ -83,7 +83,7 @@ public class AdaptiveReminderTests
             ReminderName = "rem",
             ETag = "etag",
             CronExpression = "0 */5 * * * *",
-            Priority = ReminderPriority.Critical,
+            Priority = ReminderPriority.High,
             Action = MissedReminderAction.FireImmediately,
         };
 
@@ -99,7 +99,7 @@ public class AdaptiveReminderTests
     public void CompareReminderEntries_WhenPriorityEnabled_OrdersByPriorityThenDue()
     {
         var service = CreateServiceForInternals(new ReminderOptions { EnablePriority = true });
-        var critical = CreateEntry("critical", ReminderPriority.Critical, new DateTime(2026, 1, 1, 10, 30, 0, DateTimeKind.Utc));
+        var critical = CreateEntry("critical", ReminderPriority.High, new DateTime(2026, 1, 1, 10, 30, 0, DateTimeKind.Utc));
         var normal = CreateEntry("normal", ReminderPriority.Normal, new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc));
 
         var result = InvokePrivate<int>(service, "CompareReminderEntries", critical, normal);
@@ -111,7 +111,7 @@ public class AdaptiveReminderTests
     public void CompareReminderEntries_WhenPriorityDisabled_OrdersByDueTime()
     {
         var service = CreateServiceForInternals(new ReminderOptions { EnablePriority = false });
-        var critical = CreateEntry("critical", ReminderPriority.Critical, new DateTime(2026, 1, 1, 10, 30, 0, DateTimeKind.Utc));
+        var critical = CreateEntry("critical", ReminderPriority.High, new DateTime(2026, 1, 1, 10, 30, 0, DateTimeKind.Utc));
         var normal = CreateEntry("normal", ReminderPriority.Normal, new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc));
 
         var result = InvokePrivate<int>(service, "CompareReminderEntries", critical, normal);
@@ -384,7 +384,7 @@ public class AdaptiveReminderTests
             enablePriority: true);
 
         Assert.Equal(selectionLimit, selected.Count);
-        Assert.All(selected, entry => Assert.Equal(ReminderPriority.Critical, entry.Priority));
+        Assert.All(selected, entry => Assert.Equal(ReminderPriority.High, entry.Priority));
         Assert.Equal(baseDueUtc, selected[0].NextDueUtc);
         Assert.All(selected, entry => Assert.InRange(entry.NextDueUtc!.Value, baseDueUtc, baseDueUtc.AddMinutes(2)));
         Assert.True(IsOrderedByPriorityAndDue(selected, enablePriority: true));
@@ -400,7 +400,7 @@ public class AdaptiveReminderTests
             enablePriority: true);
 
         Assert.Equal(64, selected.Count);
-        Assert.All(selected, entry => Assert.Equal(ReminderPriority.Critical, entry.Priority));
+        Assert.All(selected, entry => Assert.Equal(ReminderPriority.High, entry.Priority));
         Assert.All(selected, entry => Assert.InRange(entry.NextDueUtc!.Value, baseDueUtc, baseDueUtc.AddMinutes(2)));
         Assert.True(selected.Select(entry => entry.NextDueUtc!.Value).Distinct().Count() > 1);
         Assert.True(IsOrderedByPriorityAndDue(selected, enablePriority: true));
@@ -523,9 +523,7 @@ public class AdaptiveReminderTests
 
             reusable.GrainId = grainIds[slot];
             reusable.ReminderName = reminderNames[slot];
-            reusable.Priority = i % 10 == 0 ? ReminderPriority.Critical
-                : i % 10 == 1 ? ReminderPriority.Background
-                : ReminderPriority.Normal;
+            reusable.Priority = i % 10 == 0 ? ReminderPriority.High : ReminderPriority.Normal;
             reusable.StartAt = due;
             reusable.NextDueUtc = due;
             reusable.LastFireUtc = null;
@@ -546,7 +544,7 @@ public class AdaptiveReminderTests
             var previousDue = previous.NextDueUtc ?? previous.StartAt;
             var currentDue = current.NextDueUtc ?? current.StartAt;
 
-            if (previousPriority > currentPriority)
+            if (previousPriority < currentPriority)
             {
                 return false;
             }

@@ -4,8 +4,8 @@ ALTER TABLE OrleansRemindersTable
     ADD COLUMN IF NOT EXISTS CronExpression varchar(200),
     ADD COLUMN IF NOT EXISTS NextDueUtc timestamptz(3),
     ADD COLUMN IF NOT EXISTS LastFireUtc timestamptz(3),
-    ADD COLUMN IF NOT EXISTS Priority smallint NOT NULL DEFAULT 1,
-    ADD COLUMN IF NOT EXISTS Action smallint NOT NULL DEFAULT 1;
+    ADD COLUMN IF NOT EXISTS Priority smallint NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS Action smallint NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS IX_RemindersTable_NextDueUtc_Priority
     ON OrleansRemindersTable(ServiceId, NextDueUtc, Priority);
@@ -83,12 +83,12 @@ SET QueryText = '
         @GrainId,
         @ReminderName,
         @StartTime,
-        @Period,
+        @Period::bigint,
         @CronExpression,
         @NextDueUtc,
         @LastFireUtc,
-        @Priority,
-        @Action,
+        @Priority::smallint,
+        @Action::smallint,
         @GrainHash
     );
 '

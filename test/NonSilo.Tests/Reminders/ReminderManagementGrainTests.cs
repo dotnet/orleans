@@ -35,7 +35,7 @@ public class ReminderManagementGrainTests
             {
                 GrainId = GrainId.Create("test", "c2"),
                 ReminderName = "critical-later",
-                Priority = ReminderPriority.Critical,
+                Priority = ReminderPriority.High,
                 NextDueUtc = now.UtcDateTime.AddMinutes(3),
                 StartAt = now.UtcDateTime.AddMinutes(3),
                 Period = TimeSpan.FromMinutes(1),
@@ -44,7 +44,7 @@ public class ReminderManagementGrainTests
             {
                 GrainId = GrainId.Create("test", "c1"),
                 ReminderName = "critical-first",
-                Priority = ReminderPriority.Critical,
+                Priority = ReminderPriority.High,
                 NextDueUtc = now.UtcDateTime.AddMinutes(1),
                 StartAt = now.UtcDateTime.AddMinutes(1),
                 Period = TimeSpan.FromMinutes(1),
@@ -53,7 +53,7 @@ public class ReminderManagementGrainTests
             {
                 GrainId = GrainId.Create("test", "bg"),
                 ReminderName = "out-of-range",
-                Priority = ReminderPriority.Background,
+                Priority = ReminderPriority.Normal,
                 NextDueUtc = now.UtcDateTime.AddMinutes(20),
                 StartAt = now.UtcDateTime.AddMinutes(20),
                 Period = TimeSpan.FromMinutes(1),
@@ -298,7 +298,7 @@ public class ReminderManagementGrainTests
                 CronExpression = "*/5 * * * * *",
                 NextDueUtc = now.UtcDateTime.AddMinutes(-10),
                 LastFireUtc = now.UtcDateTime.AddMinutes(-20),
-                Priority = ReminderPriority.Critical,
+                Priority = ReminderPriority.High,
                 Action = MissedReminderAction.FireImmediately,
             },
             new ReminderEntry
@@ -310,7 +310,7 @@ public class ReminderManagementGrainTests
                 CronExpression = null,
                 NextDueUtc = now.UtcDateTime.AddMinutes(-5),
                 LastFireUtc = now.UtcDateTime.AddMinutes(-1),
-                Priority = ReminderPriority.Critical,
+                Priority = ReminderPriority.High,
                 Action = MissedReminderAction.FireImmediately,
             },
             new ReminderEntry
@@ -334,7 +334,7 @@ public class ReminderManagementGrainTests
                 CronExpression = null,
                 NextDueUtc = now.UtcDateTime.AddMinutes(2),
                 LastFireUtc = null,
-                Priority = ReminderPriority.Critical,
+                Priority = ReminderPriority.High,
                 Action = MissedReminderAction.FireImmediately,
             });
 
@@ -342,7 +342,7 @@ public class ReminderManagementGrainTests
         {
             DueFromUtcInclusive = now.UtcDateTime.AddMinutes(-15),
             DueToUtcInclusive = now.UtcDateTime.AddMinutes(-1),
-            Priority = ReminderPriority.Critical,
+            Priority = ReminderPriority.High,
             Action = MissedReminderAction.FireImmediately,
             ScheduleKind = ReminderScheduleKind.Cron,
             Status = ReminderQueryStatus.Overdue | ReminderQueryStatus.Missed,
@@ -444,7 +444,7 @@ public class ReminderManagementGrainTests
         table.ReadRow(Arg.Any<GrainId>(), Arg.Any<string>()).Returns(Task.FromResult<ReminderEntry>(null!));
         var grain = new ReminderManagementGrain(table, new FakeTimeProvider());
 
-        await grain.SetPriorityAsync(GrainId.Create("test", "g"), "r", ReminderPriority.Critical);
+        await grain.SetPriorityAsync(GrainId.Create("test", "g"), "r", ReminderPriority.High);
 
         Assert.DoesNotContain(table.ReceivedCalls(), call => call.GetMethodInfo().Name == nameof(IReminderTable.UpsertRow));
     }
@@ -466,10 +466,10 @@ public class ReminderManagementGrainTests
         table.UpsertRow(Arg.Do<ReminderEntry>(value => upserted = value)).Returns(Task.FromResult("etag-2"));
 
         var grain = new ReminderManagementGrain(table, new FakeTimeProvider());
-        await grain.SetPriorityAsync(entry.GrainId, entry.ReminderName, ReminderPriority.Critical);
+        await grain.SetPriorityAsync(entry.GrainId, entry.ReminderName, ReminderPriority.High);
 
         Assert.NotNull(upserted);
-        Assert.Equal(ReminderPriority.Critical, upserted!.Priority);
+        Assert.Equal(ReminderPriority.High, upserted!.Priority);
         Assert.Equal("etag-2", entry.ETag);
     }
 
@@ -490,7 +490,7 @@ public class ReminderManagementGrainTests
 
         var grain = new ReminderManagementGrain(table, new FakeTimeProvider());
         await Assert.ThrowsAsync<ReminderException>(
-            () => grain.SetPriorityAsync(entry.GrainId, entry.ReminderName, ReminderPriority.Critical));
+            () => grain.SetPriorityAsync(entry.GrainId, entry.ReminderName, ReminderPriority.High));
     }
 
     [Fact]

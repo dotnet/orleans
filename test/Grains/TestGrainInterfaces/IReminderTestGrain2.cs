@@ -29,6 +29,13 @@ namespace UnitTests.GrainInterfaces
             ReminderPriority priority = ReminderPriority.Normal,
             MissedReminderAction action = MissedReminderAction.Skip,
             bool validate = false);
+        Task<IGrainReminder> StartReminderAtUtc(
+            string reminderName,
+            DateTime dueAtUtc,
+            TimeSpan period,
+            ReminderPriority priority = ReminderPriority.Normal,
+            MissedReminderAction action = MissedReminderAction.Skip,
+            bool validate = false);
         Task<IGrainReminder> StartCronReminder(
             string reminderName,
             string cronExpression,

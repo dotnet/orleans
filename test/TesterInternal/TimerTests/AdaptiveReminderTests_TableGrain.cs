@@ -83,6 +83,37 @@ namespace UnitTests.TimerTests
         }
 
         [Fact]
+        public async Task Adaptive_AbsoluteUtcReminder_FiresAndPersistsStartAt()
+        {
+            var grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            const string reminderName = "absolute-meta";
+            var period = TimeSpan.FromMilliseconds(700);
+            var dueAtUtc = DateTime.UtcNow.AddSeconds(2);
+
+            await grain.StartReminderAtUtc(
+                reminderName,
+                dueAtUtc,
+                period,
+                priority: ReminderPriority.High,
+                action: MissedReminderAction.Skip);
+
+            var firstTick = await WaitForFirstTick(grain, reminderName, WaitTimeout);
+            Assert.Equal(ReminderScheduleKind.Interval, firstTick.ScheduleKind);
+            Assert.Equal(period, firstTick.Period);
+            Assert.True(firstTick.FirstTickTime >= dueAtUtc.AddSeconds(-1));
+            Assert.True(firstTick.FirstTickTime <= dueAtUtc.AddSeconds(1));
+
+            var entry = await grain.GetReminderEntry(reminderName);
+            Assert.NotNull(entry);
+            Assert.Equal(ReminderPriority.High, entry.Priority);
+            Assert.Equal(MissedReminderAction.Skip, entry.Action);
+            Assert.True(entry.StartAt >= dueAtUtc.AddSeconds(-1));
+            Assert.True(entry.StartAt <= dueAtUtc.AddSeconds(1));
+
+            await grain.StopReminder(reminderName);
+        }
+
+        [Fact]
         public async Task Adaptive_CronReminder_UsesCronStatusAndPersistsCronExpression()
         {
             var grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -92,7 +123,7 @@ namespace UnitTests.TimerTests
             await grain.StartCronReminder(
                 reminderName,
                 cron,
-                priority: ReminderPriority.Critical,
+                priority: ReminderPriority.High,
                 action: MissedReminderAction.Skip);
 
             var firstTick = await WaitForFirstTick(grain, reminderName, WaitTimeout);
@@ -107,7 +138,7 @@ namespace UnitTests.TimerTests
             Assert.NotNull(entry.LastFireUtc);
             Assert.NotNull(entry.NextDueUtc);
             Assert.True(entry.NextDueUtc > entry.LastFireUtc);
-            Assert.Equal(ReminderPriority.Critical, entry.Priority);
+            Assert.Equal(ReminderPriority.High, entry.Priority);
 
             await grain.StopReminder(reminderName);
         }
@@ -131,7 +162,7 @@ namespace UnitTests.TimerTests
                 longPeriod,
                 string.Empty,
                 overdue,
-                ReminderPriority.Critical,
+                ReminderPriority.High,
                 MissedReminderAction.FireImmediately);
 
             await grain.UpsertRawReminderEntry(
@@ -149,7 +180,7 @@ namespace UnitTests.TimerTests
                 longPeriod,
                 string.Empty,
                 overdue,
-                ReminderPriority.Background,
+                ReminderPriority.Normal,
                 MissedReminderAction.Notify);
 
             _ = await WaitForFirstTick(grain, fireName, WaitTimeout);
@@ -191,35 +222,35 @@ namespace UnitTests.TimerTests
             var dueAtUtc = DateTime.UtcNow.AddSeconds(5);
             var longPeriod = TimeSpan.FromMinutes(10);
 
-            const string backgroundName = "priority-background";
+            const string normalSecondaryName = "priority-normal-secondary";
             const string normalName = "priority-normal";
-            const string criticalName = "priority-critical";
+            const string highName = "priority-high";
 
             // Insert all rows with identical NextDueUtc to remove due-time skew and verify pure priority ordering.
-            await grain.UpsertRawReminderEntry(backgroundName, dueAtUtc, longPeriod, string.Empty, dueAtUtc, ReminderPriority.Background, MissedReminderAction.FireImmediately);
+            await grain.UpsertRawReminderEntry(normalSecondaryName, dueAtUtc, longPeriod, string.Empty, dueAtUtc, ReminderPriority.Normal, MissedReminderAction.FireImmediately);
             await grain.UpsertRawReminderEntry(normalName, dueAtUtc, longPeriod, string.Empty, dueAtUtc, ReminderPriority.Normal, MissedReminderAction.FireImmediately);
-            await grain.UpsertRawReminderEntry(criticalName, dueAtUtc, longPeriod, string.Empty, dueAtUtc, ReminderPriority.Critical, MissedReminderAction.FireImmediately);
+            await grain.UpsertRawReminderEntry(highName, dueAtUtc, longPeriod, string.Empty, dueAtUtc, ReminderPriority.High, MissedReminderAction.FireImmediately);
 
             var records = await WaitForRemindersToTick(
                 grain,
-                new[] { criticalName, normalName, backgroundName },
+                new[] { highName, normalName, normalSecondaryName },
                 WaitTimeout);
 
-            Assert.Contains(records, record => record.ReminderName == criticalName);
+            Assert.Contains(records, record => record.ReminderName == highName);
             Assert.Contains(records, record => record.ReminderName == normalName);
-            Assert.Contains(records, record => record.ReminderName == backgroundName);
+            Assert.Contains(records, record => record.ReminderName == normalSecondaryName);
 
-            var criticalEntry = await grain.GetReminderEntry(criticalName);
+            var highEntry = await grain.GetReminderEntry(highName);
             var normalEntry = await grain.GetReminderEntry(normalName);
-            var backgroundEntry = await grain.GetReminderEntry(backgroundName);
+            var normalSecondaryEntry = await grain.GetReminderEntry(normalSecondaryName);
 
-            Assert.Equal(ReminderPriority.Critical, criticalEntry.Priority);
+            Assert.Equal(ReminderPriority.High, highEntry.Priority);
             Assert.Equal(ReminderPriority.Normal, normalEntry.Priority);
-            Assert.Equal(ReminderPriority.Background, backgroundEntry.Priority);
+            Assert.Equal(ReminderPriority.Normal, normalSecondaryEntry.Priority);
 
-            await grain.StopReminder(criticalName);
+            await grain.StopReminder(highName);
             await grain.StopReminder(normalName);
-            await grain.StopReminder(backgroundName);
+            await grain.StopReminder(normalSecondaryName);
         }
 
         [Fact]
@@ -290,7 +321,7 @@ namespace UnitTests.TimerTests
                 TimeSpan.Zero,
                 "*/1 * * * * *",
                 now.AddMinutes(-3),
-                ReminderPriority.Critical,
+                ReminderPriority.High,
                 MissedReminderAction.Skip);
 
             await grain.UpsertRawReminderEntry(
@@ -307,7 +338,7 @@ namespace UnitTests.TimerTests
                 Status = ReminderQueryStatus.Overdue | ReminderQueryStatus.Missed,
                 OverdueBy = TimeSpan.FromSeconds(1),
                 MissedBy = TimeSpan.FromSeconds(1),
-                Priority = ReminderPriority.Critical,
+                Priority = ReminderPriority.High,
             };
 
             var firstPage = await management.ListFilteredAsync(filter, pageSize: 10);
@@ -325,6 +356,37 @@ namespace UnitTests.TimerTests
 
             await grain.StopReminder(missedCritical);
             await grain.StopReminder(overdueNormal);
+        }
+
+        [Fact]
+        public async Task Adaptive_ManagementCanUpdateAndDeleteReminder()
+        {
+            var grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            var management = this.GrainFactory.GetGrain<IReminderManagementGrain>(Guid.Empty);
+            const string reminderName = "mgmt-update-delete";
+
+            await grain.StartReminderWithOptions(
+                reminderName,
+                dueTime: TimeSpan.FromMilliseconds(300),
+                period: TimeSpan.FromSeconds(5),
+                priority: ReminderPriority.Normal,
+                action: MissedReminderAction.Skip);
+
+            var created = await grain.GetReminderEntry(reminderName);
+            Assert.NotNull(created);
+
+            await management.SetPriorityAsync(created.GrainId, reminderName, ReminderPriority.High);
+            await management.SetActionAsync(created.GrainId, reminderName, MissedReminderAction.FireImmediately);
+
+            var updated = await grain.GetReminderEntry(reminderName);
+            Assert.NotNull(updated);
+            Assert.Equal(ReminderPriority.High, updated.Priority);
+            Assert.Equal(MissedReminderAction.FireImmediately, updated.Action);
+
+            await management.DeleteAsync(created.GrainId, reminderName);
+
+            var deleted = await grain.GetReminderEntry(reminderName);
+            Assert.Null(deleted);
         }
 
         private static async Task<ReminderTickRecord> WaitForFirstTick(

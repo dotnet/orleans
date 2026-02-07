@@ -17,12 +17,41 @@ END;
 
 IF COL_LENGTH('OrleansRemindersTable', 'Priority') IS NULL
 BEGIN
-    ALTER TABLE OrleansRemindersTable ADD Priority TINYINT NOT NULL CONSTRAINT DF_OrleansRemindersTable_Priority DEFAULT (1);
+    ALTER TABLE OrleansRemindersTable ADD Priority TINYINT NOT NULL CONSTRAINT DF_OrleansRemindersTable_Priority DEFAULT (0);
 END;
 
 IF COL_LENGTH('OrleansRemindersTable', 'Action') IS NULL
 BEGIN
-    ALTER TABLE OrleansRemindersTable ADD Action TINYINT NOT NULL CONSTRAINT DF_OrleansRemindersTable_Action DEFAULT (1);
+    ALTER TABLE OrleansRemindersTable ADD Action TINYINT NOT NULL CONSTRAINT DF_OrleansRemindersTable_Action DEFAULT (0);
+END;
+
+DECLARE @priorityConstraintName SYSNAME;
+DECLARE @actionConstraintName SYSNAME;
+
+SELECT
+    @priorityConstraintName = dc.name
+FROM sys.default_constraints dc
+INNER JOIN sys.columns c ON c.default_object_id = dc.object_id
+INNER JOIN sys.tables t ON t.object_id = c.object_id
+WHERE t.name = 'OrleansRemindersTable' AND c.name = 'Priority';
+
+SELECT
+    @actionConstraintName = dc.name
+FROM sys.default_constraints dc
+INNER JOIN sys.columns c ON c.default_object_id = dc.object_id
+INNER JOIN sys.tables t ON t.object_id = c.object_id
+WHERE t.name = 'OrleansRemindersTable' AND c.name = 'Action';
+
+IF @priorityConstraintName IS NULL
+BEGIN
+    ALTER TABLE OrleansRemindersTable
+        ADD CONSTRAINT DF_OrleansRemindersTable_Priority DEFAULT (0) FOR Priority;
+END;
+
+IF @actionConstraintName IS NULL
+BEGIN
+    ALTER TABLE OrleansRemindersTable
+        ADD CONSTRAINT DF_OrleansRemindersTable_Action DEFAULT (0) FOR Action;
 END;
 
 IF NOT EXISTS (

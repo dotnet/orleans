@@ -42,19 +42,14 @@ namespace Orleans
         public enum ReminderPriority : byte
         {
             /// <summary>
-            /// Highest priority reminders.
-            /// </summary>
-            Critical = 0,
-
-            /// <summary>
             /// Default priority reminders.
             /// </summary>
-            Normal = 1,
+            Normal = 0,
 
             /// <summary>
-            /// Lowest priority reminders.
+            /// High priority reminders.
             /// </summary>
-            Background = 2,
+            High = 1,
         }
 
         /// <summary>
@@ -63,14 +58,14 @@ namespace Orleans
         public enum MissedReminderAction : byte
         {
             /// <summary>
-            /// Fire the reminder immediately.
-            /// </summary>
-            FireImmediately = 0,
-
-            /// <summary>
             /// Skip missed ticks and move to the next due occurrence.
             /// </summary>
-            Skip = 1,
+            Skip = 0,
+
+            /// <summary>
+            /// Fire the reminder immediately.
+            /// </summary>
+            FireImmediately = 1,
 
             /// <summary>
             /// Notify about the miss without firing the reminder.

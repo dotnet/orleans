@@ -9,8 +9,8 @@ CREATE TABLE OrleansRemindersTable
     CronExpression NVARCHAR(200) NULL,
     NextDueUtc DATETIME NULL,
     LastFireUtc DATETIME NULL,
-    Priority TINYINT NOT NULL,
-    Action TINYINT NOT NULL,
+    Priority TINYINT NOT NULL DEFAULT 0,
+    Action TINYINT NOT NULL DEFAULT 0,
     GrainHash INT NOT NULL,
     Version INT NOT NULL,
 

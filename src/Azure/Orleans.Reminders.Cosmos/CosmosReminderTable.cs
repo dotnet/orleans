@@ -379,9 +379,8 @@ internal partial class CosmosReminderTable : IReminderTable
 
     private static ReminderPriority ParsePriority(int value) => value switch
     {
-        (int)ReminderPriority.Critical => ReminderPriority.Critical,
+        (int)ReminderPriority.High => ReminderPriority.High,
         (int)ReminderPriority.Normal => ReminderPriority.Normal,
-        (int)ReminderPriority.Background => ReminderPriority.Background,
         _ => ReminderPriority.Normal,
     };
 

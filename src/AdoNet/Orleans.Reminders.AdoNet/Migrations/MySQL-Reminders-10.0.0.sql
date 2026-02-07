@@ -1,96 +1,14 @@
 -- Run this migration for upgrading MySQL reminder tables created before 10.0.0.
 
-SET @orleans_col_exists = (
-    SELECT COUNT(*)
-    FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME = 'OrleansRemindersTable'
-      AND COLUMN_NAME = 'CronExpression'
-);
-SET @orleans_col_sql = IF(
-    @orleans_col_exists = 0,
-    'ALTER TABLE OrleansRemindersTable ADD COLUMN CronExpression NVARCHAR(200) NULL',
-    'SELECT 1');
-PREPARE orleans_stmt FROM @orleans_col_sql;
-EXECUTE orleans_stmt;
-DEALLOCATE PREPARE orleans_stmt;
+ALTER TABLE OrleansRemindersTable
+    ADD COLUMN IF NOT EXISTS CronExpression NVARCHAR(200) NULL,
+    ADD COLUMN IF NOT EXISTS NextDueUtc DATETIME NULL,
+    ADD COLUMN IF NOT EXISTS LastFireUtc DATETIME NULL,
+    ADD COLUMN IF NOT EXISTS Priority TINYINT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS Action TINYINT NOT NULL DEFAULT 0;
 
-SET @orleans_col_exists = (
-    SELECT COUNT(*)
-    FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME = 'OrleansRemindersTable'
-      AND COLUMN_NAME = 'NextDueUtc'
-);
-SET @orleans_col_sql = IF(
-    @orleans_col_exists = 0,
-    'ALTER TABLE OrleansRemindersTable ADD COLUMN NextDueUtc DATETIME NULL',
-    'SELECT 1');
-PREPARE orleans_stmt FROM @orleans_col_sql;
-EXECUTE orleans_stmt;
-DEALLOCATE PREPARE orleans_stmt;
-
-SET @orleans_col_exists = (
-    SELECT COUNT(*)
-    FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME = 'OrleansRemindersTable'
-      AND COLUMN_NAME = 'LastFireUtc'
-);
-SET @orleans_col_sql = IF(
-    @orleans_col_exists = 0,
-    'ALTER TABLE OrleansRemindersTable ADD COLUMN LastFireUtc DATETIME NULL',
-    'SELECT 1');
-PREPARE orleans_stmt FROM @orleans_col_sql;
-EXECUTE orleans_stmt;
-DEALLOCATE PREPARE orleans_stmt;
-
-SET @orleans_col_exists = (
-    SELECT COUNT(*)
-    FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME = 'OrleansRemindersTable'
-      AND COLUMN_NAME = 'Priority'
-);
-SET @orleans_col_sql = IF(
-    @orleans_col_exists = 0,
-    'ALTER TABLE OrleansRemindersTable ADD COLUMN Priority TINYINT NOT NULL DEFAULT 1',
-    'SELECT 1');
-PREPARE orleans_stmt FROM @orleans_col_sql;
-EXECUTE orleans_stmt;
-DEALLOCATE PREPARE orleans_stmt;
-
-SET @orleans_col_exists = (
-    SELECT COUNT(*)
-    FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME = 'OrleansRemindersTable'
-      AND COLUMN_NAME = 'Action'
-);
-SET @orleans_col_sql = IF(
-    @orleans_col_exists = 0,
-    'ALTER TABLE OrleansRemindersTable ADD COLUMN Action TINYINT NOT NULL DEFAULT 1',
-    'SELECT 1');
-PREPARE orleans_stmt FROM @orleans_col_sql;
-EXECUTE orleans_stmt;
-DEALLOCATE PREPARE orleans_stmt;
-
-SET @orleans_idx_exists = (
-    SELECT COUNT(*)
-    FROM INFORMATION_SCHEMA.STATISTICS
-    WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME = 'OrleansRemindersTable'
-      AND INDEX_NAME = 'IX_RemindersTable_NextDueUtc_Priority'
-);
-
-SET @orleans_idx_sql = IF(
-    @orleans_idx_exists = 0,
-    'CREATE INDEX IX_RemindersTable_NextDueUtc_Priority ON OrleansRemindersTable(ServiceId, NextDueUtc, Priority)',
-    'SELECT 1');
-
-PREPARE orleans_stmt FROM @orleans_idx_sql;
-EXECUTE orleans_stmt;
-DEALLOCATE PREPARE orleans_stmt;
+CREATE INDEX IF NOT EXISTS IX_RemindersTable_NextDueUtc_Priority
+    ON OrleansRemindersTable(ServiceId, NextDueUtc, Priority);
 
 UPDATE OrleansQuery
 SET QueryText = '

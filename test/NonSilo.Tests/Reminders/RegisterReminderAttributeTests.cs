@@ -14,14 +14,14 @@ public class RegisterReminderAttributeTests
             "interval-reminder",
             dueSeconds: 15,
             periodSeconds: 60,
-            priority: ReminderPriority.Critical,
+            priority: ReminderPriority.High,
             action: MissedReminderAction.FireImmediately);
 
         Assert.Equal("interval-reminder", attribute.Name);
         Assert.Equal(TimeSpan.FromSeconds(15), attribute.Due);
         Assert.Equal(TimeSpan.FromSeconds(60), attribute.Period);
         Assert.Null(attribute.Cron);
-        Assert.Equal(ReminderPriority.Critical, attribute.Priority);
+        Assert.Equal(ReminderPriority.High, attribute.Priority);
         Assert.Equal(MissedReminderAction.FireImmediately, attribute.Action);
     }
 
@@ -43,14 +43,14 @@ public class RegisterReminderAttributeTests
         var attribute = new RegisterReminderAttribute(
             "cron-reminder",
             "0 9 * * MON-FRI",
-            priority: ReminderPriority.Background,
+            priority: ReminderPriority.Normal,
             action: MissedReminderAction.Notify);
 
         Assert.Equal("cron-reminder", attribute.Name);
         Assert.Equal("0 9 * * MON-FRI", attribute.Cron);
         Assert.Null(attribute.Due);
         Assert.Null(attribute.Period);
-        Assert.Equal(ReminderPriority.Background, attribute.Priority);
+        Assert.Equal(ReminderPriority.Normal, attribute.Priority);
         Assert.Equal(MissedReminderAction.Notify, attribute.Action);
     }
 

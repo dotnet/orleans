@@ -146,8 +146,8 @@ namespace Orleans.Tests.SqlUtils
                     CronExpression = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.CronExpression)),
                     NextDueUtc = record.GetDateTimeValueOrDefault(nameof(DbStoredQueries.Columns.NextDueUtc)),
                     LastFireUtc = record.GetDateTimeValueOrDefault(nameof(DbStoredQueries.Columns.LastFireUtc)),
-                    Priority = ParsePriority(record.GetValue<int>(nameof(DbStoredQueries.Columns.Priority))),
-                    Action = ParseAction(record.GetValue<int>(nameof(DbStoredQueries.Columns.Action))),
+                    Priority = ParsePriority(record.GetInt32(nameof(DbStoredQueries.Columns.Priority))),
+                    Action = ParseAction(record.GetInt32(nameof(DbStoredQueries.Columns.Action))),
                     ETag = DbStoredQueries.Converters.GetVersion(record).ToString()
                 };
             }
@@ -212,9 +212,8 @@ namespace Orleans.Tests.SqlUtils
 
         private static ReminderPriority ParsePriority(int value) => value switch
         {
-            (int)ReminderPriority.Critical => ReminderPriority.Critical,
+            (int)ReminderPriority.High => ReminderPriority.High,
             (int)ReminderPriority.Normal => ReminderPriority.Normal,
-            (int)ReminderPriority.Background => ReminderPriority.Background,
             _ => ReminderPriority.Normal,
         };
 

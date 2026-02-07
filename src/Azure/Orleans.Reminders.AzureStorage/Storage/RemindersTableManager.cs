@@ -139,7 +139,7 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
-                return await UpsertTableEntryAsync(reminderEntry);
+                return await UpsertTableEntryAsync(reminderEntry, TableUpdateMode.Replace);
             }
             catch(Exception exc)
             {

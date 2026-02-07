@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -191,7 +192,7 @@ namespace Orleans.Reminders.Redis
 
         private static ReminderEntry ConvertToEntry(string reminderValue)
         {
-            var segments = JArray.Parse($"[{reminderValue}]");
+            var segments = ParseSegments(reminderValue);
 
             return new ReminderEntry
             {
@@ -206,6 +207,17 @@ namespace Orleans.Reminders.Redis
                 Priority = ReadReminderPriority(segments, 9),
                 Action = ReadMissedReminderAction(segments, 10),
             };
+        }
+
+        private static JArray ParseSegments(string reminderValue)
+        {
+            // Keep timestamp segments as raw strings so DateTime parsing stays explicit and invariant.
+            using var stringReader = new StringReader($"[{reminderValue}]");
+            using var jsonReader = new JsonTextReader(stringReader)
+            {
+                DateParseHandling = DateParseHandling.None,
+            };
+            return JArray.Load(jsonReader);
         }
 
         private static string ReadRequiredString(JArray segments, int index)
@@ -275,9 +287,8 @@ namespace Orleans.Reminders.Redis
 
         private static ReminderPriority ParsePriority(int value) => value switch
         {
-            (int)ReminderPriority.Critical => ReminderPriority.Critical,
+            (int)ReminderPriority.High => ReminderPriority.High,
             (int)ReminderPriority.Normal => ReminderPriority.Normal,
-            (int)ReminderPriority.Background => ReminderPriority.Background,
             _ => ReminderPriority.Normal,
         };
 

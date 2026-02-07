@@ -104,6 +104,33 @@ namespace UnitTests.Grains
             return reminder;
         }
 
+        public async Task<IGrainReminder> StartReminderAtUtc(
+            string reminderName,
+            DateTime dueAtUtc,
+            TimeSpan period,
+            ReminderPriority priority = ReminderPriority.Normal,
+            MissedReminderAction action = MissedReminderAction.Skip,
+            bool validate = false)
+        {
+            IGrainReminder reminder;
+            if (validate)
+            {
+                reminder = await this.RegisterOrUpdateReminder(reminderName, dueAtUtc, period, priority, action);
+            }
+            else
+            {
+                reminder = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, dueAtUtc, period, priority, action);
+            }
+
+            this.allReminders[reminderName] = new(reminder);
+            this.sequence[reminderName] = 0;
+
+            var fileName = GetFileName(reminderName);
+            File.Delete(fileName);
+            this.logger.LogInformation("Started absolute-due reminder {Reminder}", reminder);
+            return reminder;
+        }
+
         public async Task<IGrainReminder> StartCronReminder(
             string reminderName,
             string cronExpression,
@@ -555,6 +582,11 @@ namespace UnitTests.Grains
             return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueTime, period);
         }
 
+        public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, DateTime dueAtUtc, TimeSpan period)
+        {
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueAtUtc, period);
+        }
+
         public Task<IGrainReminder> RegisterOrUpdateReminder(
             GrainId callingGrainId,
             string reminderName,
@@ -564,6 +596,17 @@ namespace UnitTests.Grains
             MissedReminderAction action)
         {
             return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueTime, period, priority, action);
+        }
+
+        public Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId callingGrainId,
+            string reminderName,
+            DateTime dueAtUtc,
+            TimeSpan period,
+            ReminderPriority priority,
+            MissedReminderAction action)
+        {
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueAtUtc, period, priority, action);
         }
 
         public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, string cronExpression)

@@ -182,7 +182,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="data">Data to be inserted or replaced in the table.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
-        public async Task<string> UpsertTableEntryAsync(T data)
+        public async Task<string> UpsertTableEntryAsync(T data, TableUpdateMode updateMode = TableUpdateMode.Merge)
         {
             const string operation = "UpsertTableEntry";
             var startTime = DateTime.UtcNow;
@@ -191,7 +191,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 try
                 {
-                    var opResult = await Table.UpsertEntityAsync(data);
+                    var opResult = await Table.UpsertEntityAsync(data, updateMode);
                     return opResult.Headers.ETag.GetValueOrDefault().ToString();
                 }
                 catch (Exception exc)

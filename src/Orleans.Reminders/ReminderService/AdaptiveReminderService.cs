@@ -209,6 +209,9 @@ internal sealed class AdaptiveReminderService : GrainService, IReminderService, 
     public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period)
         => RegisterOrUpdateReminder(grainId, reminderName, dueTime, period, ReminderPriority.Normal, MissedReminderAction.Skip);
 
+    public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId grainId, string reminderName, DateTime dueAtUtc, TimeSpan period)
+        => RegisterOrUpdateReminder(grainId, reminderName, dueAtUtc, period, ReminderPriority.Normal, MissedReminderAction.Skip);
+
     public async Task<IGrainReminder> RegisterOrUpdateReminder(
         GrainId grainId,
         string reminderName,
@@ -218,16 +221,31 @@ internal sealed class AdaptiveReminderService : GrainService, IReminderService, 
         MissedReminderAction action)
     {
         var dueUtc = UtcNow.Add(dueTime);
+        return await RegisterOrUpdateReminder(grainId, reminderName, dueUtc, period, priority, action);
+    }
+
+    public async Task<IGrainReminder> RegisterOrUpdateReminder(
+        GrainId grainId,
+        string reminderName,
+        DateTime dueAtUtc,
+        TimeSpan period,
+        ReminderPriority priority,
+        MissedReminderAction action)
+    {
+        if (dueAtUtc.Kind != DateTimeKind.Utc)
+        {
+            throw new ArgumentException("Due timestamp must use DateTimeKind.Utc.", nameof(dueAtUtc));
+        }
 
         var entry = new ReminderEntry
         {
             GrainId = grainId,
             ReminderName = reminderName,
-            StartAt = dueUtc,
+            StartAt = dueAtUtc,
             Period = period,
             Priority = priority,
             Action = action,
-            NextDueUtc = dueUtc,
+            NextDueUtc = dueAtUtc,
             LastFireUtc = null,
             CronExpression = null,
         };
@@ -935,7 +953,7 @@ internal sealed class AdaptiveReminderService : GrainService, IReminderService, 
         var leftPriority = enablePriority ? left.Priority : ReminderPriority.Normal;
         var rightPriority = enablePriority ? right.Priority : ReminderPriority.Normal;
 
-        var priorityCompare = leftPriority.CompareTo(rightPriority);
+        var priorityCompare = rightPriority.CompareTo(leftPriority);
         if (priorityCompare != 0)
         {
             return priorityCompare;
