@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Diagnostics;
+using Orleans.Placement;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Placement.Filtering;
@@ -116,17 +117,20 @@ namespace Orleans.Runtime.Placement
             var filters = _filterStrategyResolver.GetPlacementFilterStrategies(grainType);
             if (filters.Length > 0)
             {
+                // Capture the parent activity context now so each filter span is parented to the
+                // current activity (e.g. PlaceGrain) rather than to sibling filter spans that may
+                // be active during deferred enumeration.
+                var parentActivityContext = Activity.Current?.Context;
+
                 IEnumerable<SiloAddress> filteredSilos = compatibleSilos;
                 foreach (var placementFilter in filters)
                 {
                     var director = _placementFilterDirectoryResolver.GetFilterDirector(placementFilter);
-
-                    // Create a span for each filter invocation
-                    using var filterSpan = ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.FilterPlacementCandidates);
-                    filterSpan?.SetTag(ActivityTagKeys.PlacementFilterType, placementFilter.GetType().Name);
-                    filterSpan?.SetTag(ActivityTagKeys.GrainType, grainType.ToString());
-
-                    filteredSilos = director.Filter(placementFilter, target, filteredSilos);
+                    filteredSilos = InstrumentFilteredSilos(
+                        director.Filter(placementFilter, target, filteredSilos),
+                        placementFilter,
+                        grainType,
+                        parentActivityContext);
                 }
 
                 compatibleSilos = filteredSilos.ToArray();
@@ -222,11 +226,12 @@ namespace Orleans.Runtime.Placement
         /// <param name="requestContextData">The request context, which will be available to the placement strategy.</param>
         /// <param name="placementStrategy">The placement strategy to use.</param>
         /// <returns>A location for the new activation.</returns>
-        public Task<SiloAddress> PlaceGrainAsync(GrainId grainId, Dictionary<string, object> requestContextData, PlacementStrategy placementStrategy)
+        public async Task<SiloAddress> PlaceGrainAsync(GrainId grainId, Dictionary<string, object> requestContextData, PlacementStrategy placementStrategy)
         {
+            using var placeGrainActivity = TryRestoreActivityContext(requestContextData, ActivityNames.PlaceGrain);
             var target = new PlacementTarget(grainId, requestContextData, default, 0);
             var director = _directorResolver.GetPlacementDirector(placementStrategy);
-            return director.OnAddActivation(placementStrategy, target, this);
+            return await director.OnAddActivation(placementStrategy, target, this);
         }
 
         private class PlacementWorker
@@ -422,10 +427,38 @@ namespace Orleans.Runtime.Placement
         }
 
         /// <summary>
+        /// Wraps a filter's output enumerable so that an Activity span is created when the
+        /// sequence is actually enumerated, not when the filter is composed. This avoids
+        /// per-filter array materialization while still giving accurate span timings.
+        /// </summary>
+        private static IEnumerable<SiloAddress> InstrumentFilteredSilos(
+            IEnumerable<SiloAddress> silos,
+            PlacementFilterStrategy filter,
+            GrainType grainType,
+            ActivityContext? parentActivityContext)
+        {
+            using var filterSpan = parentActivityContext is { } parentContext
+                ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.FilterPlacementCandidates, ActivityKind.Internal, parentContext)
+                : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.FilterPlacementCandidates);
+            filterSpan?.SetTag(ActivityTagKeys.PlacementFilterType, filter.GetType().Name);
+            filterSpan?.SetTag(ActivityTagKeys.GrainType, grainType.ToString());
+
+            foreach (var silo in silos)
+            {
+                yield return silo;
+            }
+        }
+
+        /// <summary>
         /// Attempts to restore the parent activity context from request context data.
         /// </summary>
         private static Activity TryRestoreActivityContext(Dictionary<string, object> requestContextData, string operationName)
         {
+            if (requestContextData is null)
+            {
+                return null;
+            }
+
             var activityContext = requestContextData.TryGetActivityContext();
 
             if (activityContext is {} parentContext)

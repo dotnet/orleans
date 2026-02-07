@@ -580,6 +580,7 @@ internal sealed partial class ActivationData :
 
     public void Deactivate(DeactivationReason reason, ActivityContext? activityContext, CancellationToken cancellationToken = default)
     {
+        var currentActivity = Activity.Current;
         var deactivateActivity = activityContext is { } parent
             ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.DeactivateGrain, ActivityKind.Internal, parentContext:parent)
             : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.DeactivateGrain);
@@ -635,6 +636,10 @@ internal sealed partial class ActivationData :
                 SetActivityError(deactivateActivity, ex, "Error deactivating grain");
                 deactivateActivity?.Stop();
                 throw;
+            }
+            finally
+            {
+                Activity.Current = currentActivity;
             }
         }
     }
