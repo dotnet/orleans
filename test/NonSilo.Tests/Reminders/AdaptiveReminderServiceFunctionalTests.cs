@@ -544,6 +544,79 @@ public class AdaptiveReminderServiceFunctionalTests
     }
 
     [Fact]
+    public async Task RegisterOrUpdateReminder_WhenBucketAlreadyPulled_NewReminderIsQueuedViaPublicApi()
+    {
+        var now = new DateTimeOffset(2026, 2, 1, 14, 0, 0, TimeSpan.Zero);
+        var timeProvider = new FakeTimeProvider();
+        timeProvider.SetUtcNow(now);
+
+        var activationWorkingSet = Substitute.For<IActivationWorkingSet>();
+        activationWorkingSet.Count.Returns(5_000_000); // Force adaptive bucket size down to 1.
+
+        var table = new InMemoryReminderTable();
+        table.Seed(new ReminderEntry
+        {
+            GrainId = GrainId.Create("test", "bucket-existing-1"),
+            ReminderName = "bucket-existing-1",
+            StartAt = now.UtcDateTime.AddMinutes(4),
+            NextDueUtc = now.UtcDateTime.AddMinutes(4),
+            Period = TimeSpan.FromMinutes(10),
+            Priority = ReminderPriority.Normal,
+            Action = MissedReminderAction.Skip,
+            ETag = "etag-existing-1",
+        });
+        table.Seed(new ReminderEntry
+        {
+            GrainId = GrainId.Create("test", "bucket-existing-2"),
+            ReminderName = "bucket-existing-2",
+            StartAt = now.UtcDateTime.AddMinutes(4),
+            NextDueUtc = now.UtcDateTime.AddMinutes(4),
+            Period = TimeSpan.FromMinutes(10),
+            Priority = ReminderPriority.Normal,
+            Action = MissedReminderAction.Skip,
+            ETag = "etag-existing-2",
+        });
+
+        var service = CreateOperationalService(
+            reminderTable: table,
+            activationWorkingSet: activationWorkingSet,
+            timeProvider: timeProvider,
+            options: new ReminderOptions
+            {
+                PollInterval = TimeSpan.FromMinutes(1),
+                LookAheadWindow = TimeSpan.FromMinutes(5),
+                BaseBucketSize = 1,
+                EnablePriority = true,
+            });
+        activationWorkingSet.Count.Returns(5_000_000);
+
+        // 14:00 poll pulls the first bucket.
+        await InvokePrivateAsync(service, "PollAndQueueDueReminders");
+        var queuedBeforeRegister = GetEnqueuedCount(service);
+        Assert.True(queuedBeforeRegister > 0);
+
+        // 14:01 a new reminder is registered via public API with due at 14:02.
+        timeProvider.Advance(TimeSpan.FromMinutes(1));
+        await service.RegisterOrUpdateReminder(
+            GrainId.Create("test", "new-via-public-api"),
+            "new-via-public-api",
+            dueTime: TimeSpan.FromMinutes(1),
+            period: TimeSpan.FromMinutes(1),
+            priority: ReminderPriority.Normal,
+            action: MissedReminderAction.Skip);
+
+        Assert.Equal(queuedBeforeRegister + 1, GetEnqueuedCount(service));
+        var queue = GetFieldValue<Channel<ReminderEntry>>(service, "_deliveryQueue");
+        var queuedNames = new HashSet<string>(StringComparer.Ordinal);
+        while (queue.Reader.TryRead(out var queued))
+        {
+            queuedNames.Add(queued.ReminderName);
+        }
+
+        Assert.Contains("new-via-public-api", queuedNames);
+    }
+
+    [Fact]
     public async Task ProcessReminderAsync_WhenUpsertThrows_DoesNotPropagateAndCleansQueueState()
     {
         var now = new DateTimeOffset(2026, 2, 1, 10, 0, 0, TimeSpan.Zero);
