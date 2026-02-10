@@ -260,11 +260,11 @@ public static class ServiceCollectionExtensions
             }
         });
 
-        group.MapGet("/GrainTypes", async ([FromServices] IDashboardClient client) =>
+        group.MapGet("/GrainTypes", async (string[] exclude, [FromServices] IDashboardClient client) =>
         {
             try
             {
-                var result = await client.GetGrainTypes();
+                var result = await client.GetGrainTypes(SanitizeExclusionFilters(exclude));
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)

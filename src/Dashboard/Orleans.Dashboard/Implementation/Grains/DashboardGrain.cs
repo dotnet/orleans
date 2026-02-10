@@ -354,9 +354,11 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         }).AsImmutable();
     }
 
-    public Task<Immutable<string[]>> GetGrainTypes()
+    public Task<Immutable<string[]>> GetGrainTypes(string[] exclusions)
     {
         return Task.FromResult(_typeManifestOptions.InterfaceImplementations
+            .Where(s => s.GetInterfaces().Any(i => i == typeof(IGrain) || i == typeof(ISystemTarget)))
+            .Where(s => exclusions == null || !exclusions.Any(e => s.FullName.StartsWith(e, StringComparison.OrdinalIgnoreCase)))
             .Select(s => s.FullName)
             .ToArray()
             .AsImmutable());

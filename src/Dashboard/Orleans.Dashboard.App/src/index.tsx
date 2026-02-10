@@ -190,7 +190,6 @@ function renderPage(jsx: JSX.Element, path: string) {
 
   let clusterStats: any = {};
   let grainMethodStats: any = [];
-  let unfiltedMethodStats: any = [];
   let loadDataIsPending = false;
   const loadData = function (cb?: any) {
     if (!loadDataIsPending) {
@@ -199,7 +198,6 @@ function renderPage(jsx: JSX.Element, path: string) {
         clusterStats = data;
           http.get(`TopGrainMethods${getFilter(settings)}`, function (err, grainMethodsData) {
           grainMethodStats = grainMethodsData;
-          unfiltedMethodStats = grainMethodsData;
           render();
         }).finally(() => loadDataIsPending = false);
       }).catch(() => loadDataIsPending = false);
@@ -402,7 +400,7 @@ function renderPage(jsx: JSX.Element, path: string) {
   let loadDataIsPending = false;
   const loadData = function (cb?: any) {
     if (!loadDataIsPending) {
-      http.get('GrainTypes', function (err, data) {
+      http.get(`GrainTypes${getFilter(settings)}`, function (err, data) {
         grainTypes = data;
         render();
       }).finally(() => loadDataIsPending = false);
@@ -412,9 +410,7 @@ function renderPage(jsx: JSX.Element, path: string) {
   render = function () {
     if (routeIndex != thisRouteIndex) return;
     renderPage(
-      <GrainDetails
-        grainTypes={grainTypes}
-      />,
+      <GrainDetails grainTypes={grainTypes} />,
       '#/grainState'
     );
   };
@@ -578,11 +574,11 @@ function getMenu(): MenuItem[] {
 
 function getFilter(settings: Settings): string {
   if (settings.dashboardGrainsHidden && settings.systemGrainsHidden) {
-      return '?exclude=Orleans.Runtime&exclude=Orleans.Streams&exclude=Orleans.Dashboard';
+      return '?exclude=Orleans.Runtime&exclude=Orleans.Streams&exclude=Orleans.Storage&exclude=Orleans.Dashboard';
   } else if (settings.dashboardGrainsHidden) {
       return '?exclude=Orleans.Dashboard';
   } else if (settings.systemGrainsHidden) {
-      return '?exclude=Orleans.Runtime&exclude=Orleans.Streams';
+      return '?exclude=Orleans.Runtime&exclude=Orleans.Streams&exclude=Orleans.Storage';
   }
   return '';
 }

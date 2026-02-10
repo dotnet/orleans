@@ -29,5 +29,5 @@ internal interface IDashboardClient
 
     Task<Immutable<string>> GetGrainState(string id, string grainType);
 
-    Task<Immutable<string[]>> GetGrainTypes();
+    Task<Immutable<string[]>> GetGrainTypes(string[] exclusions = null);
 }

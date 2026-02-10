@@ -36,5 +36,5 @@ internal interface IDashboardGrain : IGrainWithIntegerKey
     Task<Immutable<string>> GetGrainState(string id, string grainType);
 
     [Alias("GetGrainTypes")]
-    Task<Immutable<string[]>> GetGrainTypes();
+    Task<Immutable<string[]>> GetGrainTypes(string[] exclusions = null);
 }
