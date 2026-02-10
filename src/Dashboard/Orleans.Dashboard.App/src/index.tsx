@@ -574,11 +574,11 @@ function getMenu(): MenuItem[] {
 
 function getFilter(settings: Settings): string {
   if (settings.dashboardGrainsHidden && settings.systemGrainsHidden) {
-      return '?exclude=Orleans.Runtime&exclude=Orleans.Streams&exclude=Orleans.Storage&exclude=Orleans.Dashboard';
+      return '?exclude=Orleans.Runtime&exclude=Orleans.Streams&exclude=Orleans.Storage&exclude=Orleans.Providers&exclude=Orleans.Dashboard';
   } else if (settings.dashboardGrainsHidden) {
       return '?exclude=Orleans.Dashboard';
   } else if (settings.systemGrainsHidden) {
-      return '?exclude=Orleans.Runtime&exclude=Orleans.Streams&exclude=Orleans.Storage';
+      return '?exclude=Orleans.Runtime&exclude=Orleans.Streams&exclude=Orleans.Storage&exclude=Orleans.Providers';
   }
   return '';
 }
