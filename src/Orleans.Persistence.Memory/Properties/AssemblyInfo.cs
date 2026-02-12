@@ -1,8 +1,8 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("NonSilo.Tests")]
-[assembly: InternalsVisibleTo("Tester.AzureUtils")]
-[assembly: InternalsVisibleTo("Tester.AdoNet")]
-[assembly: InternalsVisibleTo("TesterInternal")]
+[assembly: InternalsVisibleTo("Orleans.Core.Tests")]
+[assembly: InternalsVisibleTo("Orleans.Azure.Tests")]
+[assembly: InternalsVisibleTo("Orleans.AdoNet.Tests")]
+[assembly: InternalsVisibleTo("Orleans.Runtime.Internal.Tests")]
 [assembly: InternalsVisibleTo("TestExtensions")]
-[assembly: InternalsVisibleTo("DefaultCluster.Tests")]
+[assembly: InternalsVisibleTo("Orleans.DefaultCluster.Tests")]

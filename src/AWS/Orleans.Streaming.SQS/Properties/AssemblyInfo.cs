@@ -1,3 +1,3 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("AWSUtils.Tests")]
+[assembly: InternalsVisibleTo("Orleans.AWS.Tests")]
