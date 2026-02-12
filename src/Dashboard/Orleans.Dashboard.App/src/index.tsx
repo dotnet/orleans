@@ -144,7 +144,7 @@ function getVersion() {
         />
         <a
           style={{ color: '#b8c7ce', textDecoration: 'underline' }}
-          href="https://github.com/OrleansContrib/OrleansDashboard/"
+          href="https://github.com/dotnet/orleans/tree/main/src/Dashboard/Orleans.Dashboard"
         >
           Source
         </a>
