@@ -21,6 +21,7 @@ internal sealed partial class ShardExecutor
     private readonly DurableJobsOptions _options;
     private readonly SemaphoreSlim _jobConcurrencyLimiter;
     private readonly IOverloadDetector _overloadDetector;
+    private int _currentCapacity;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ShardExecutor"/> class.
@@ -38,8 +39,18 @@ internal sealed partial class ShardExecutor
         _grainFactory = grainFactory;
         _logger = logger;
         _options = options.Value;
-        _jobConcurrencyLimiter = new SemaphoreSlim(_options.MaxConcurrentJobsPerSilo);
         _overloadDetector = overloadDetector;
+
+        if (_options.ConcurrencySlowStartEnabled && _options.SlowStartInitialConcurrency < _options.MaxConcurrentJobsPerSilo)
+        {
+            _currentCapacity = _options.SlowStartInitialConcurrency;
+        }
+        else
+        {
+            _currentCapacity = _options.MaxConcurrentJobsPerSilo;
+        }
+
+        _jobConcurrencyLimiter = new SemaphoreSlim(_currentCapacity);
     }
 
     /// <summary>
@@ -51,6 +62,11 @@ internal sealed partial class ShardExecutor
     public async Task RunShardAsync(IJobShard shard, CancellationToken cancellationToken)
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        if (_currentCapacity < _options.MaxConcurrentJobsPerSilo)
+        {
+            _ = Task.Run(SlowStartRampUpAsync);
+        }
 
         var tasks = new ConcurrentDictionary<string, Task>();
         try
@@ -97,6 +113,45 @@ internal sealed partial class ShardExecutor
             // Wait for all jobs to complete
             await Task.WhenAll(tasks.Values);
         }
+    }
+
+    private async Task SlowStartRampUpAsync()
+    {
+        var targetCapacity = _options.MaxConcurrentJobsPerSilo;
+        LogSlowStartBegin(_logger, _currentCapacity, targetCapacity, _options.SlowStartInterval);
+
+        try
+        {
+            while (_currentCapacity < targetCapacity)
+            {
+                await Task.Delay(_options.SlowStartInterval);
+
+                var newCapacity = (int)Math.Min((long)_currentCapacity * 2, targetCapacity);
+                var toRelease = newCapacity - _currentCapacity;
+
+                if (toRelease > 0)
+                {
+                    _jobConcurrencyLimiter.Release(toRelease);
+                    _currentCapacity = newCapacity;
+                    LogSlowStartConcurrencyIncreased(_logger, _currentCapacity, targetCapacity);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // If the ramp-up fails for any reason, release all remaining capacity to avoid being stuck at low concurrency.
+            var remaining = targetCapacity - _currentCapacity;
+            if (remaining > 0)
+            {
+                _jobConcurrencyLimiter.Release(remaining);
+                _currentCapacity = targetCapacity;
+            }
+
+            LogSlowStartError(_logger, ex);
+            return;
+        }
+
+        LogSlowStartComplete(_logger, _currentCapacity);
     }
 
     private async Task RunJobAsync(
