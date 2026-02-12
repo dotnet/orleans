@@ -27,7 +27,11 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
     private readonly ILogger<AzureStorageJobShardManager> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly AzureStorageJobShardOptions _options;
+    private readonly DurableJobsOptions _durableJobsOptions;
     private long _shardCounter = 0; // For generating unique shard IDs
+
+    private const string StolenCountKey = "StolenCount";
+    private const string LastStolenTimeKey = "LastStolenTime";
 
     public AzureStorageJobShardManager(
         SiloAddress siloAddress,
@@ -35,6 +39,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         string containerName,
         string blobPrefix,
         AzureStorageJobShardOptions options,
+        DurableJobsOptions durableJobsOptions,
         IClusterMembershipService clusterMembership,
         ILoggerFactory loggerFactory)
         : base(siloAddress)
@@ -46,14 +51,16 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         _logger = loggerFactory.CreateLogger<AzureStorageJobShardManager>();
         _loggerFactory = loggerFactory;
         _options = options;
+        _durableJobsOptions = durableJobsOptions;
     }
 
     public AzureStorageJobShardManager(
         ILocalSiloDetails localSiloDetails,
         IOptions<AzureStorageJobShardOptions> options,
+        IOptions<DurableJobsOptions> durableJobsOptions,
         IClusterMembershipService clusterMembership,
         ILoggerFactory loggerFactory)
-        : this(localSiloDetails.SiloAddress, options.Value.BlobServiceClient, options.Value.ContainerName, localSiloDetails.ClusterId,  options.Value, clusterMembership, loggerFactory)
+        : this(localSiloDetails.SiloAddress, options.Value.BlobServiceClient, options.Value.ContainerName, localSiloDetails.ClusterId, options.Value, durableJobsOptions.Value, clusterMembership, loggerFactory)
     {
     }
 
@@ -112,27 +119,27 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                 LogShardStillOwned(_logger, blob.Name, owner!);
                 continue;
             }
-            else
+
+            // Determine if this is a stolen shard (taken from dead owner) vs orphaned (gracefully released)
+            var isStolen = owner is not null && ownerStatus == SiloStatus.Dead;
+
+            // Try to claim orphaned or stolen shard
+            LogClaimingShard(_logger, blob.Name, SiloAddress, owner);
+            var blobClient = _client.GetAppendBlobClient(blob.Name);
+            var metadata = blob.Metadata;
+            var orphanedShard = new AzureStorageJobShard(blob.Name, shardStartTime, maxDueTime, blobClient, metadata, blob.Properties.ETag, _options, _loggerFactory.CreateLogger<AzureStorageJobShard>());
+            if (!await TryTakeOwnership(orphanedShard, metadata, SiloAddress, isStolen, cancellationToken))
             {
-                // Try to claim orphaned shard
-                LogClaimingShard(_logger, blob.Name, SiloAddress, owner);
-                var blobClient = _client.GetAppendBlobClient(blob.Name);
-                var metadata = blob.Metadata;
-                var orphanedShard = new AzureStorageJobShard(blob.Name, shardStartTime, maxDueTime, blobClient, metadata, blob.Properties.ETag, _options, _loggerFactory.CreateLogger<AzureStorageJobShard>());
-                if (!await TryTakeOwnership(orphanedShard, metadata, SiloAddress, cancellationToken))
-                {
-                    // Someone else took over the shard, dispose and continue
-                    await orphanedShard.DisposeAsync();
-                    LogShardOwnershipConflict(_logger, blob.Name, SiloAddress);
-                    continue;
-                }
-                await orphanedShard.InitializeAsync(cancellationToken);
-                // We don't want to add new jobs to shards that we just took ownership of
-                await orphanedShard.MarkAsCompleteAsync(cancellationToken);
-                _jobShardCache[blob.Name] = orphanedShard;
-                LogShardAssigned(_logger, blob.Name, SiloAddress);
-                result.Add(orphanedShard);
+                // Either poisoned shard or someone else took ownership - dispose and continue
+                await orphanedShard.DisposeAsync();
+                continue;
             }
+            await orphanedShard.InitializeAsync(cancellationToken);
+            // We don't want to add new jobs to shards that we just took ownership of
+            await orphanedShard.MarkAsCompleteAsync(cancellationToken);
+            _jobShardCache[blob.Name] = orphanedShard;
+            LogShardAssigned(_logger, blob.Name, SiloAddress);
+            result.Add(orphanedShard);
         }
         
         LogAssignmentCompleted(_logger, result.Count, SiloAddress);
@@ -146,6 +153,9 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                 var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
                 var metadata = properties.Value.Metadata;
                 metadata.Remove("Owner");
+                // Reset stolen count since we're gracefully releasing
+                metadata.Remove(StolenCountKey);
+                metadata.Remove(LastStolenTimeKey);
                 await blobClient.SetMetadataAsync(metadata, new BlobRequestConditions { IfMatch = properties.Value.ETag }, cancellationToken);
             }
             catch (Exception ex)
@@ -155,10 +165,28 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
             }
         }
 
-        async Task<bool> TryTakeOwnership(AzureStorageJobShard shard, IDictionary<string, string> metadata, SiloAddress newOwner, CancellationToken ct)
+        async Task<bool> TryTakeOwnership(AzureStorageJobShard shard, IDictionary<string, string> metadata, SiloAddress newOwner, bool isStolen, CancellationToken ct)
         {
+            if (isStolen)
+            {
+                // Increment stolen count for shards taken from dead owners
+                var stolenCount = GetStolenCount(metadata) + 1;
+
+                if (stolenCount > _durableJobsOptions.MaxStolenCount)
+                {
+                    // Shard is poisoned - don't claim it
+                    LogPoisonedShardDetected(_logger, shard.Id, stolenCount, _durableJobsOptions.MaxStolenCount);
+                    return false;
+                }
+
+                metadata[StolenCountKey] = stolenCount.ToString(CultureInfo.InvariantCulture);
+                metadata[LastStolenTimeKey] = DateTimeOffset.UtcNow.ToString("o");
+                LogShardStolen(_logger, shard.Id, newOwner, stolenCount);
+            }
+
             metadata["Owner"] = newOwner.ToParsableString();
             metadata["MembershipVersion"] = _clusterMembership.CurrentSnapshot.Version.Value.ToString();
+
             try
             {
                 await shard.UpdateBlobMetadata(metadata, ct);
@@ -171,6 +199,11 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                 LogOwnershipFailed(_logger, ex, shard.Id, newOwner);
                 return false;
             }
+        }
+
+        static int GetStolenCount(IDictionary<string, string> metadata)
+        {
+            return metadata.TryGetValue(StolenCountKey, out var countStr) && int.TryParse(countStr, out var count) ? count : 0;
         }
     }
 
@@ -244,9 +277,12 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
 
         if (count > 0)
         {
-            // There are still jobs in the shard, unregister it
+            // There are still jobs in the shard, release ownership gracefully.
             metadata.Remove("Owner");
-            var response = await azureShard.BlobClient.SetMetadataAsync(metadata, conditions, cancellationToken);
+            // Reset stolen count since we're gracefully releasing (not crashing)
+            metadata.Remove(StolenCountKey);
+            metadata.Remove(LastStolenTimeKey);
+            await azureShard.BlobClient.SetMetadataAsync(metadata, conditions, cancellationToken);
             _jobShardCache.TryRemove(shard.Id, out _);
             LogShardOwnershipReleased(_logger, shard.Id, SiloAddress, count);
         }
@@ -414,4 +450,16 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         Message = "Deleted shard '{ShardId}' by silo {SiloAddress} (no jobs remaining)"
     )]
     private static partial void LogShardDeleted(ILogger logger, string shardId, SiloAddress siloAddress);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Poisoned shard detected: '{ShardId}' has been stolen {StolenCount} times (max allowed: {MaxStolenCount}). Shard will not be assigned."
+    )]
+    private static partial void LogPoisonedShardDetected(ILogger logger, string shardId, int stolenCount, int maxStolenCount);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Shard '{ShardId}' stolen by silo {SiloAddress} (stolen count: {StolenCount})"
+    )]
+    private static partial void LogShardStolen(ILogger logger, string shardId, SiloAddress siloAddress, int stolenCount);
 }
