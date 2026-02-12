@@ -93,7 +93,7 @@ namespace Orleans.Serialization.UnitTests
                         typesWithCodecs.Add(typeArg);
                     }
 
-                    if (gtd == typeof(IDeepCopier<>) && gtd.GenericTypeArguments[0] is { IsArray: false })
+                    if (gtd == typeof(IDeepCopier<>) && iface.GenericTypeArguments[0] is { IsArray: false })
                     {
                         var typeArg = iface.GenericTypeArguments[0] switch
                         {
