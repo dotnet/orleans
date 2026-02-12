@@ -115,7 +115,7 @@ internal sealed partial class ShardExecutor
 
             var target = _grainFactory.GetGrain<IDurableJobReceiverExtension>(jobContext.Job.TargetGrainId);
 
-            var result = await target.DeliverDurableJobAsync(jobContext, cancellationToken);
+            var result = await target.HandleDurableJobAsync(jobContext, cancellationToken);
 
             // Handle the result based on status
             while (result.IsPending)
@@ -125,7 +125,7 @@ internal sealed partial class ShardExecutor
                 
                 await Task.Delay(result.PollAfterDelay.Value, cancellationToken);
                 
-                result = await target.CheckJobStatusAsync(jobContext, cancellationToken);
+                result = await target.HandleDurableJobAsync(jobContext, cancellationToken);
             }
 
             if (result.Status == DurableJobRunStatus.Completed)

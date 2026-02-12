@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -13,21 +14,15 @@ namespace Orleans.DurableJobs;
 internal interface IDurableJobReceiverExtension : IGrainExtension
 {
     /// <summary>
-    /// Delivers a durable job to the grain for execution.
+    /// Handles a durable job by either starting execution or checking the status of an already running job.
+    /// If the job identified by <see cref="IDurableJobContext.RunId"/> has not been started, it will be executed.
+    /// If it is already running, the current status is returned.
     /// </summary>
     /// <param name="context">The context containing information about the durable job.</param>
     /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
     /// <returns>A task that represents the asynchronous operation and contains the job execution result.</returns>
     [AlwaysInterleave]
-    Task<DurableJobRunResult> DeliverDurableJobAsync(IDurableJobContext context, CancellationToken cancellationToken);
-
-    /// <summary>
-    /// Checks the status of a durable job currently being polled.
-    /// </summary>
-    /// <param name="context">The context containing information about the durable job.</param>
-    /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-    /// <returns>A task that represents the asynchronous operation and contains the job execution result.</returns>
-    Task<DurableJobRunResult> CheckJobStatusAsync(IDurableJobContext context, CancellationToken cancellationToken);
+    Task<DurableJobRunResult> HandleDurableJobAsync(IDurableJobContext context, CancellationToken cancellationToken);
 }
 
 /// <inheritdoc />
@@ -35,6 +30,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
 {
     private readonly IGrainContext _grain;
     private readonly ILogger<DurableJobReceiverExtension> _logger;
+    private readonly ConcurrentDictionary<string, Task> _runningJobs = new();
 
     public DurableJobReceiverExtension(IGrainContext grain, ILogger<DurableJobReceiverExtension> logger)
     {
@@ -42,40 +38,52 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         _logger = logger;
     }
 
-    public async Task<DurableJobRunResult> DeliverDurableJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
+    /// <inheritdoc />
+    public Task<DurableJobRunResult> HandleDurableJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
     {
-        if (_grain.GrainInstance is IDurableJobHandler handler)
+        if (_runningJobs.TryGetValue(context.RunId, out var runningTask))
         {
-            try
-            {
-                await handler.ExecuteJobAsync(context, cancellationToken);
-                return DurableJobRunResult.Completed;
-            }
-            catch (Exception ex)
-            {
-                LogErrorExecutingDurableJob(ex, context.Job.Id, _grain.GrainId);
-                return DurableJobRunResult.Failed(ex);
-            }
+            return GetJobStatus(context, runningTask);
         }
-        else
+
+        return StartJobAsync(context, cancellationToken);
+    }
+
+    private Task<DurableJobRunResult> StartJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
+    {
+        if (_grain.GrainInstance is not IDurableJobHandler handler)
         {
             LogGrainDoesNotImplementHandler(_grain.GrainId);
             throw new InvalidOperationException($"Grain {_grain.GrainId} does not implement IDurableJobHandler");
         }
+
+        var task = handler.ExecuteJobAsync(context, cancellationToken);
+        _runningJobs[context.RunId] = task;
+
+        return GetJobStatus(context, task);
     }
 
-    public Task<DurableJobRunResult> CheckJobStatusAsync(IDurableJobContext context, CancellationToken cancellationToken)
+    private Task<DurableJobRunResult> GetJobStatus(IDurableJobContext context, Task task)
     {
-        // TODO: Need to properly check job status and return appropriate result (Completed, PollAfter, or Failed)
-        // For now, always return Completed
-        return Task.FromResult(DurableJobRunResult.Completed);
+        if (task.IsCompletedSuccessfully)
+        {
+            _runningJobs.TryRemove(context.RunId, out _);
+            return Task.FromResult(DurableJobRunResult.Completed);
+        }
+
+        if (task.IsFaulted)
+        {
+            _runningJobs.TryRemove(context.RunId, out _);
+            var ex = task.Exception!.InnerException ?? task.Exception;
+            LogErrorExecutingDurableJob(ex, context.Job.Id, _grain.GrainId);
+            return Task.FromResult(DurableJobRunResult.Failed(ex));
+        }
+
+        return Task.FromResult(DurableJobRunResult.PollAfter(TimeSpan.FromSeconds(1)));
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Error executing durable job {JobId} on grain {GrainId}")]
     private partial void LogErrorExecutingDurableJob(Exception exception, string jobId, GrainId grainId);
-
-    [LoggerMessage(Level = LogLevel.Error, Message = "Error checking status of durable job {JobId} on grain {GrainId}")]
-    private partial void LogErrorCheckingJobStatus(Exception exception, string jobId, GrainId grainId);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Grain {GrainId} does not implement IDurableJobHandler")]
     private partial void LogGrainDoesNotImplementHandler(GrainId grainId);
