@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace Orleans.DurableJobs;
@@ -17,6 +18,7 @@ internal interface IDurableJobReceiverExtension : IGrainExtension
     /// <param name="context">The context containing information about the durable job.</param>
     /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
     /// <returns>A task that represents the asynchronous operation and contains the job execution result.</returns>
+    [AlwaysInterleave]
     Task<DurableJobRunResult> DeliverDurableJobAsync(IDurableJobContext context, CancellationToken cancellationToken);
 
     /// <summary>
