@@ -62,48 +62,66 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests, IAsyncDi
     /// This test is delegated to the runner for reuse across providers.
     /// </summary>
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
-    public Task AzureStorageJobShardManager_Creation_Assignation()
-        => _runner.ShardCreationAndAssignment();
+    public async Task AzureStorageJobShardManager_Creation_Assignation()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.ShardCreationAndAssignment(cts.Token);
+    }
 
     /// <summary>
     /// Tests reading and consuming jobs from a frozen shard after ownership transfer.
     /// This test is delegated to the runner for reuse across providers.
     /// </summary>
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
-    public Task AzureStorageJobShardManager_ReadFrozenShard()
-        => _runner.ReadFrozenShard();
+    public async Task AzureStorageJobShardManager_ReadFrozenShard()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.ReadFrozenShard(cts.Token);
+    }
 
     /// <summary>
     /// Tests consuming jobs from a live shard.
     /// This test is delegated to the runner for reuse across providers.
     /// </summary>
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
-    public Task AzureStorageJobShardManager_LiveShard()
-        => _runner.LiveShard();
+    public async Task AzureStorageJobShardManager_LiveShard()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.LiveShard(cts.Token);
+    }
 
     /// <summary>
     /// Tests job metadata persistence across ownership transfers.
     /// This test is delegated to the runner for reuse across providers.
     /// </summary>
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
-    public Task AzureStorageJobShardManager_JobMetadata()
-        => _runner.JobMetadata();
+    public async Task AzureStorageJobShardManager_JobMetadata()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.JobMetadata(cts.Token);
+    }
 
     /// <summary>
     /// Tests concurrent shard assignment to verify ownership conflict resolution.
     /// This test is delegated to the runner for reuse across providers.
     /// </summary>
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
-    public Task AzureStorageJobShardManager_ConcurrentShardAssignment_OwnershipConflicts()
-        => _runner.ConcurrentShardAssignment_OwnershipConflicts();
+    public async Task AzureStorageJobShardManager_ConcurrentShardAssignment_OwnershipConflicts()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.ConcurrentShardAssignment_OwnershipConflicts(cts.Token);
+    }
 
     /// <summary>
     /// Tests shard metadata preservation across ownership transfers.
     /// This test is delegated to the runner for reuse across providers.
     /// </summary>
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
-    public Task AzureStorageJobShardManager_ShardMetadataMerge()
-        => _runner.ShardMetadataMerge();
+    public async Task AzureStorageJobShardManager_ShardMetadataMerge()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.ShardMetadataMerge(cts.Token);
+    }
 
     #endregion
 
@@ -112,38 +130,53 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests, IAsyncDi
     /// This test is delegated to the runner for reuse across providers.
     /// </summary>
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
-    public Task AzureStorageJobShardManager_StopProcessingShard()
-        => _runner.StopProcessingShard();
+    public async Task AzureStorageJobShardManager_StopProcessingShard()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.StopProcessingShard(cts.Token);
+    }
 
     /// <summary>
     /// Tests retrying a job with a new due time.
     /// This test is delegated to the runner for reuse across providers.
     /// </summary>
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
-    public Task AzureStorageJobShardManager_RetryJobLater()
-        => _runner.RetryJobLater();
+    public async Task AzureStorageJobShardManager_RetryJobLater()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.RetryJobLater(cts.Token);
+    }
 
     /// <summary>
     /// Tests job cancellation before and during processing.
     /// This test is delegated to the runner for reuse across providers.
     /// </summary>
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
-    public Task AzureStorageJobShardManager_JobCancellation()
-        => _runner.JobCancellation();
+    public async Task AzureStorageJobShardManager_JobCancellation()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.JobCancellation(cts.Token);
+    }
 
     /// <summary>
     /// Tests that multiple shard registrations with the same time range produce unique IDs.
     /// This test is delegated to the runner for reuse across providers.
     /// </summary>
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
-    public Task AzureStorageJobShardManager_ShardRegistrationRetry_IdCollisions()
-        => _runner.ShardRegistrationRetry_IdCollisions();
+    public async Task AzureStorageJobShardManager_ShardRegistrationRetry_IdCollisions()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.ShardRegistrationRetry_IdCollisions(cts.Token);
+    }
 
     /// <summary>
     /// Tests that unregistering a shard with remaining jobs preserves the shard for reassignment.
     /// This test is delegated to the runner for reuse across providers.
     /// </summary>
     [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
-    public Task AzureStorageJobShardManager_UnregisterShard_WithJobsRemaining()
-        => _runner.UnregisterShard_WithJobsRemaining();
+    public async Task AzureStorageJobShardManager_UnregisterShard_WithJobsRemaining()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.UnregisterShard_WithJobsRemaining(cts.Token);
+    }
 }

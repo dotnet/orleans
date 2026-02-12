@@ -54,7 +54,7 @@ public class JobShardManagerTestsRunner
     /// Tests basic shard creation and assignment workflow.
     /// Verifies that shards are created with unique IDs and correctly assigned to their creator silo.
     /// </summary>
-    public async Task ShardCreationAndAssignment()
+    public async Task ShardCreationAndAssignment(CancellationToken cancellationToken)
     {
         var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
@@ -69,26 +69,26 @@ public class JobShardManagerTestsRunner
 
         // Register multiple shards and ensure they are distinct
         // two of them have the same time range
-        var shard1 = await silo1Manager.CreateShardAsync(date, maxDate, _testMetadata, CancellationToken.None);
-        var shard2 = await silo1Manager.CreateShardAsync(date, maxDate, _testMetadata, CancellationToken.None);
-        var shard3 = await silo1Manager.CreateShardAsync(date.AddHours(2), maxDate, _testMetadata, CancellationToken.None);
+        var shard1 = await silo1Manager.CreateShardAsync(date, maxDate, _testMetadata, cancellationToken);
+        var shard2 = await silo1Manager.CreateShardAsync(date, maxDate, _testMetadata, cancellationToken);
+        var shard3 = await silo1Manager.CreateShardAsync(date.AddHours(2), maxDate, _testMetadata, cancellationToken);
 
         Assert.Distinct([shard1.Id, shard2.Id, shard3.Id]);
 
         // All shards are now assigned to the creator silo
-        var assignedShards = await silo1Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), CancellationToken.None);
+        var assignedShards = await silo1Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), cancellationToken);
         Assert.Equal(3, assignedShards.Count);
         Assert.Contains(shard1.Id, assignedShards.Select(s => s.Id));
         Assert.Contains(shard2.Id, assignedShards.Select(s => s.Id));
         Assert.Contains(shard3.Id, assignedShards.Select(s => s.Id));
-        var emptyShards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), CancellationToken.None);
+        var emptyShards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), cancellationToken);
         Assert.Empty(emptyShards);
 
         // Mark the local silo as dead
         SetSiloStatus(silo1Address, SiloStatus.Dead);
 
         // Now we can take over all three shards
-        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), CancellationToken.None);
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), cancellationToken);
         Assert.Equal(3, shards.Count);
         Assert.Contains(shard1.Id, shards.Select(s => s.Id));
         Assert.Contains(shard2.Id, shards.Select(s => s.Id));
@@ -100,14 +100,14 @@ public class JobShardManagerTestsRunner
         var silo3Manager = CreateManager(silo3Address);
 
         // No unassigned shards
-        Assert.Empty(await silo3Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None));
+        Assert.Empty(await silo3Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken));
     }
 
     /// <summary>
     /// Tests reading and consuming jobs from a shard after ownership transfer.
     /// Verifies that jobs are preserved during failover and can be consumed by the new owner.
     /// </summary>
-    public async Task ReadFrozenShard()
+    public async Task ReadFrozenShard(CancellationToken cancellationToken)
     {
         var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
@@ -117,42 +117,41 @@ public class JobShardManagerTestsRunner
         var silo2Manager = CreateManager(silo2Address);
 
         var date = DateTime.UtcNow;
-        var shard1 = await silo1Manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, CancellationToken.None);
+        var shard1 = await silo1Manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, cancellationToken);
 
         // Schedule some jobs
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", date.AddSeconds(1), null, CancellationToken.None);
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job3", date.AddSeconds(3), null, CancellationToken.None);
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", date.AddSeconds(2), null, CancellationToken.None);
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job4", date.AddSeconds(4), null, CancellationToken.None);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", date.AddSeconds(1), null, cancellationToken);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job3", date.AddSeconds(3), null, cancellationToken);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", date.AddSeconds(2), null, cancellationToken);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job4", date.AddSeconds(4), null, cancellationToken);
 
         // Mark the silo1 as dead, and create a new incarnation
         SetSiloStatus(silo1Address, SiloStatus.Dead);
 
         // Take over the shard
-        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None);
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken);
         Assert.Single(shards);
         shard1 = shards[0];
 
         var counter = 1;
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cancellationToken))
         {
             Assert.Equal($"job{counter}", jobCtx.Job.Name);
-            await shard1.RemoveJobAsync(jobCtx.Job.Id, cts.Token);
+            await shard1.RemoveJobAsync(jobCtx.Job.Id, cancellationToken);
             counter++;
         }
         Assert.Equal(5, counter);
-        await silo2Manager.UnregisterShardAsync(shard1, CancellationToken.None);
+        await silo2Manager.UnregisterShardAsync(shard1, cancellationToken);
 
         // No unassigned shards
-        Assert.Empty(await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None));
+        Assert.Empty(await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken));
     }
 
     /// <summary>
     /// Tests consuming jobs from a live shard (one that continues to accept new jobs).
     /// Verifies job scheduling, consumption, and cancellation during processing.
     /// </summary>
-    public async Task LiveShard()
+    public async Task LiveShard(CancellationToken cancellationToken)
     {
         var startTime = DateTime.UtcNow;
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
@@ -160,37 +159,36 @@ public class JobShardManagerTestsRunner
         var manager = CreateManager(localAddress);
 
         var date = DateTime.UtcNow;
-        var shard1 = await manager.CreateShardAsync(date, date.AddYears(1), _testMetadata, CancellationToken.None);
+        var shard1 = await manager.CreateShardAsync(date, date.AddYears(1), _testMetadata, cancellationToken);
 
         // Schedule some jobs
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job0", startTime.AddSeconds(1), null, CancellationToken.None);
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job2", startTime.AddSeconds(3), null, CancellationToken.None);
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job1", startTime.AddSeconds(2), null, CancellationToken.None);
-        var lastJob = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job3", startTime.AddSeconds(4), null, CancellationToken.None);
-        var jobToCancel = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job4", startTime.AddSeconds(5), null, CancellationToken.None);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job0", startTime.AddSeconds(1), null, cancellationToken);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job2", startTime.AddSeconds(3), null, cancellationToken);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job1", startTime.AddSeconds(2), null, cancellationToken);
+        var lastJob = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job3", startTime.AddSeconds(4), null, cancellationToken);
+        var jobToCancel = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job4", startTime.AddSeconds(5), null, cancellationToken);
 
         var counter = 0;
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        await shard1.MarkAsCompleteAsync(CancellationToken.None);
-        await shard1.RemoveJobAsync(jobToCancel.Id, CancellationToken.None);
-        await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
+        await shard1.MarkAsCompleteAsync(cancellationToken);
+        await shard1.RemoveJobAsync(jobToCancel.Id, cancellationToken);
+        await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cancellationToken))
         {
             Assert.Equal($"job{counter}", jobCtx.Job.Name);
-            await shard1.RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
+            await shard1.RemoveJobAsync(jobCtx.Job.Id, cancellationToken);
             counter++;
         }
         Assert.Equal(4, counter);
         Assert.True(lastJob.DueTime <= DateTimeOffset.UtcNow);
-        await manager.UnregisterShardAsync(shard1, CancellationToken.None);
+        await manager.UnregisterShardAsync(shard1, cancellationToken);
 
         // No unassigned shards
-        Assert.Empty(await manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None));
+        Assert.Empty(await manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken));
     }
 
     /// <summary>
     /// Tests job metadata persistence and retrieval across shard ownership transfer.
     /// </summary>
-    public async Task JobMetadata()
+    public async Task JobMetadata(CancellationToken cancellationToken)
     {
         // Initialize 2 silos with two managers
         var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
@@ -202,7 +200,7 @@ public class JobShardManagerTestsRunner
         var silo2Manager = CreateManager(silo2Address);
 
         var date = DateTime.UtcNow;
-        var shard = await silo1Manager.CreateShardAsync(date, date.AddYears(1), _testMetadata, CancellationToken.None);
+        var shard = await silo1Manager.CreateShardAsync(date, date.AddYears(1), _testMetadata, cancellationToken);
 
         // Schedule jobs with different metadata on a single shard
         var jobMetadata1 = new Dictionary<string, string>
@@ -217,9 +215,9 @@ public class JobShardManagerTestsRunner
             { "Category", "Notification" }
         };
 
-        var job1 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(1), jobMetadata1, CancellationToken.None);
-        var job2 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(2), jobMetadata2, CancellationToken.None);
-        var job3 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddSeconds(3), null, CancellationToken.None);
+        var job1 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(1), jobMetadata1, cancellationToken);
+        var job2 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(2), jobMetadata2, cancellationToken);
+        var job3 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddSeconds(3), null, cancellationToken);
 
         // Verify metadata is set on the durable jobs
         Assert.Equal(jobMetadata1, job1.Metadata);
@@ -230,17 +228,16 @@ public class JobShardManagerTestsRunner
         SetSiloStatus(silo1Address, SiloStatus.Dead);
 
         // Take over the shard with the other silo
-        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None);
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken);
         Assert.Single(shards);
         shard = shards[0];
 
         // Consume jobs and verify metadata is preserved
         var consumedJobs = new List<DurableJob>();
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await foreach (var jobCtx in shard.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shard.ConsumeDurableJobsAsync().WithCancellation(cancellationToken))
         {
             consumedJobs.Add(jobCtx.Job);
-            await shard.RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
+            await shard.RemoveJobAsync(jobCtx.Job.Id, cancellationToken);
         }
 
         Assert.Equal(3, consumedJobs.Count);
@@ -253,13 +250,13 @@ public class JobShardManagerTestsRunner
         Assert.Equal(jobMetadata2, consumedJob2.Metadata);
         Assert.Null(consumedJob3.Metadata);
 
-        await silo2Manager.UnregisterShardAsync(shard, CancellationToken.None);
+        await silo2Manager.UnregisterShardAsync(shard, cancellationToken);
     }
 
     /// <summary>
     /// Tests concurrent shard assignment to verify that only one silo can claim ownership of an orphaned shard.
     /// </summary>
-    public async Task ConcurrentShardAssignment_OwnershipConflicts()
+    public async Task ConcurrentShardAssignment_OwnershipConflicts(CancellationToken cancellationToken)
     {
         // Initialize 3 silos with 3 managers
         var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
@@ -276,15 +273,15 @@ public class JobShardManagerTestsRunner
         var date = DateTime.UtcNow;
 
         // Create two shards on the first silo
-        var shard1 = await silo1Manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, CancellationToken.None);
-        var shard2 = await silo1Manager.CreateShardAsync(date, date.AddHours(2), _testMetadata, CancellationToken.None);
+        var shard1 = await silo1Manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, cancellationToken);
+        var shard2 = await silo1Manager.CreateShardAsync(date, date.AddHours(2), _testMetadata, cancellationToken);
 
         // Mark the first silo as dead
         SetSiloStatus(silo1Address, SiloStatus.Dead);
 
         // Concurrently try to assign shards from silo2 and silo3
-        var assignTask2 = silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), CancellationToken.None);
-        var assignTask3 = silo3Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), CancellationToken.None);
+        var assignTask2 = silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), cancellationToken);
+        var assignTask3 = silo3Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), cancellationToken);
 
         await Task.WhenAll(assignTask2, assignTask3);
 
@@ -304,7 +301,7 @@ public class JobShardManagerTestsRunner
     /// <summary>
     /// Tests that shard metadata is correctly preserved and merged during ownership transfers.
     /// </summary>
-    public async Task ShardMetadataMerge()
+    public async Task ShardMetadataMerge(CancellationToken cancellationToken)
     {
         // Initialize 2 silos with 2 managers
         var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
@@ -324,7 +321,7 @@ public class JobShardManagerTestsRunner
             { "TenantId", "tenant-123" }
         };
 
-        var shard = await silo1Manager.CreateShardAsync(date, date.AddHours(1), customMetadata, CancellationToken.None);
+        var shard = await silo1Manager.CreateShardAsync(date, date.AddHours(1), customMetadata, cancellationToken);
         Assert.NotNull(shard.Metadata);
         Assert.All(customMetadata, kvp =>
         {
@@ -333,12 +330,12 @@ public class JobShardManagerTestsRunner
         });
 
         // Schedule a job to ensure shard persistence
-        await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
+        await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, cancellationToken);
 
         SetSiloStatus(silo1Address, SiloStatus.Dead);
 
         // Take over the shard from silo2 and verify the metadata is preserved
-        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None);
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken);
         Assert.Single(shards);
         shard = shards[0];
 
@@ -353,35 +350,34 @@ public class JobShardManagerTestsRunner
     /// <summary>
     /// Tests stopping shard processing and verifying jobs remain for reassignment.
     /// </summary>
-    public async Task StopProcessingShard()
+    public async Task StopProcessingShard(CancellationToken cancellationToken)
     {
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         SetSiloStatus(localAddress, SiloStatus.Active);
         var manager = CreateManager(localAddress);
 
         var date = DateTime.UtcNow;
-        var shard1 = await manager.CreateShardAsync(date, date.AddYears(1), _testMetadata, CancellationToken.None);
+        var shard1 = await manager.CreateShardAsync(date, date.AddYears(1), _testMetadata, cancellationToken);
 
         // Schedule some jobs
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, CancellationToken.None);
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job3", DateTime.UtcNow.AddSeconds(10), null, CancellationToken.None);
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(6), null, CancellationToken.None);
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job4", DateTime.UtcNow.AddSeconds(15), null, CancellationToken.None);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, cancellationToken);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job3", DateTime.UtcNow.AddSeconds(10), null, cancellationToken);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(6), null, cancellationToken);
+        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job4", DateTime.UtcNow.AddSeconds(15), null, cancellationToken);
 
         var counter = 1;
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(40));
-        await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cancellationToken))
         {
             Assert.Equal($"job{counter}", jobCtx.Job.Name);
             if (counter == 2)
                 break;
-            await shard1.RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
+            await shard1.RemoveJobAsync(jobCtx.Job.Id, cancellationToken);
             counter++;
         }
         Assert.Equal(2, counter);
-        await manager.UnregisterShardAsync(shard1, CancellationToken.None);
+        await manager.UnregisterShardAsync(shard1, cancellationToken);
 
-        var shards = await manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None);
+        var shards = await manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken);
         Assert.Single(shards);
         Assert.Equal(shard1.Id, shards[0].Id);
     }
@@ -389,41 +385,40 @@ public class JobShardManagerTestsRunner
     /// <summary>
     /// Tests retrying a job with a new due time.
     /// </summary>
-    public async Task RetryJobLater()
+    public async Task RetryJobLater(CancellationToken cancellationToken)
     {
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         SetSiloStatus(localAddress, SiloStatus.Active);
         var manager = CreateManager(localAddress);
         var date = DateTime.UtcNow;
-        var shard1 = await manager.CreateShardAsync(date, date.AddYears(1), _testMetadata, CancellationToken.None);
+        var shard1 = await manager.CreateShardAsync(date, date.AddYears(1), _testMetadata, cancellationToken);
 
         // Schedule a job
-        var job = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(1), null, CancellationToken.None);
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(40));
-        await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
+        var job = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(1), null, cancellationToken);
+        await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cancellationToken))
         {
             Assert.Equal("job1", jobCtx.Job.Name);
             var newDueTime = DateTimeOffset.UtcNow.AddSeconds(1);
-            await shard1.RetryJobLaterAsync(jobCtx, newDueTime, CancellationToken.None);
+            await shard1.RetryJobLaterAsync(jobCtx, newDueTime, cancellationToken);
             break;
         }
 
         // Consume again
-        await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cancellationToken))
         {
             Assert.Equal("job1", jobCtx.Job.Name);
             Assert.NotEqual(job.DueTime, jobCtx.Job.DueTime);
-            await shard1.RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
+            await shard1.RemoveJobAsync(jobCtx.Job.Id, cancellationToken);
             break;
         }
-        await manager.UnregisterShardAsync(shard1, CancellationToken.None);
+        await manager.UnregisterShardAsync(shard1, cancellationToken);
     }
     
 
     /// <summary>
     /// Tests job cancellation before and during processing.
     /// </summary>
-    public async Task JobCancellation()
+    public async Task JobCancellation(CancellationToken cancellationToken)
     {
         // Initialize 2 silos with two managers
         var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
@@ -435,32 +430,31 @@ public class JobShardManagerTestsRunner
         var silo2Manager = CreateManager(silo2Address);
 
         var date = DateTime.UtcNow;
-        var shard = await silo1Manager.CreateShardAsync(date, date.AddYears(1), _testMetadata, CancellationToken.None);
+        var shard = await silo1Manager.CreateShardAsync(date, date.AddYears(1), _testMetadata, cancellationToken);
 
         // Schedule multiple jobs in a single shard
-        var job1 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddMilliseconds(500), null, CancellationToken.None);
-        var job2 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddMilliseconds(1000), null, CancellationToken.None);
-        var job3 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddMilliseconds(1500), null, CancellationToken.None);
-        var job4 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target4"), "job4", DateTime.UtcNow.AddMilliseconds(2000), null, CancellationToken.None);
+        var job1 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddMilliseconds(500), null, cancellationToken);
+        var job2 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddMilliseconds(1000), null, cancellationToken);
+        var job3 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddMilliseconds(1500), null, cancellationToken);
+        var job4 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target4"), "job4", DateTime.UtcNow.AddMilliseconds(2000), null, cancellationToken);
 
         // Cancel job2 before processing starts
-        await shard.RemoveJobAsync(job2.Id, CancellationToken.None);
+        await shard.RemoveJobAsync(job2.Id, cancellationToken);
 
         // Start consuming jobs
         var consumedJobs = new List<string>();
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-        await foreach (var jobCtx in shard.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shard.ConsumeDurableJobsAsync().WithCancellation(cancellationToken))
         {
             consumedJobs.Add(jobCtx.Job.Name);
 
             // Cancel job4 during processing (after job1 is consumed)
             if (jobCtx.Job.Name == "job1")
             {
-                await shard.RemoveJobAsync(job4.Id, CancellationToken.None);
+                await shard.RemoveJobAsync(job4.Id, cancellationToken);
             }
 
-            await shard.RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
+            await shard.RemoveJobAsync(jobCtx.Job.Id, cancellationToken);
 
             if (consumedJobs.Count >= 2)
             {
@@ -478,12 +472,13 @@ public class JobShardManagerTestsRunner
         // Mark the shard owner silo as dead and reassign to verify cancelled jobs are not in storage
         SetSiloStatus(silo1Address, SiloStatus.Dead);
 
-        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None);
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken);
         Assert.Single(shards);
         shard = shards[0];
 
         var hasJobs = false;
-        cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(5));
         await foreach (var jobCtx in shard.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
         {
             hasJobs = true;
@@ -491,13 +486,13 @@ public class JobShardManagerTestsRunner
         }
 
         Assert.False(hasJobs);
-        await silo2Manager.UnregisterShardAsync(shard, CancellationToken.None);
+        await silo2Manager.UnregisterShardAsync(shard, cancellationToken);
     }
 
     /// <summary>
     /// Tests that multiple shard registrations with the same time range produce unique IDs.
     /// </summary>
-    public async Task ShardRegistrationRetry_IdCollisions()
+    public async Task ShardRegistrationRetry_IdCollisions(CancellationToken cancellationToken)
     {
         var localAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         SetSiloStatus(localAddress, SiloStatus.Active);
@@ -506,9 +501,9 @@ public class JobShardManagerTestsRunner
 
         var date = DateTime.UtcNow;
 
-        var shard1 = await manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, CancellationToken.None);
-        var shard2 = await manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, CancellationToken.None);
-        var shard3 = await manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, CancellationToken.None);
+        var shard1 = await manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, cancellationToken);
+        var shard2 = await manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, cancellationToken);
+        var shard3 = await manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, cancellationToken);
 
         Assert.Distinct([shard1.Id, shard2.Id, shard3.Id]);
     }
@@ -516,7 +511,7 @@ public class JobShardManagerTestsRunner
     /// <summary>
     /// Tests that unregistering a shard with remaining jobs preserves the shard for reassignment.
     /// </summary>
-    public async Task UnregisterShard_WithJobsRemaining()
+    public async Task UnregisterShard_WithJobsRemaining(CancellationToken cancellationToken)
     {
         // Initialize 2 silos with 2 managers
         var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
@@ -528,34 +523,33 @@ public class JobShardManagerTestsRunner
         var silo2Manager = CreateManager(silo2Address);
 
         var date = DateTime.UtcNow;
-        var shard = await silo1Manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, CancellationToken.None);
+        var shard = await silo1Manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, cancellationToken);
 
         // Create a shard on silo1, schedule some jobs, then unregister the shard
-        await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(1), null, CancellationToken.None);
-        await shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(2), null, CancellationToken.None);
+        await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(1), null, cancellationToken);
+        await shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(2), null, cancellationToken);
 
-        await silo1Manager.UnregisterShardAsync(shard, CancellationToken.None);
+        await silo1Manager.UnregisterShardAsync(shard, cancellationToken);
 
         // The shard should NOT have been deleted since there were jobs remaining
         SetSiloStatus(silo1Address, SiloStatus.Dead);
 
         // Take over the shard from silo2 and consume the jobs
-        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), CancellationToken.None);
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken);
         Assert.Single(shards);
         Assert.Equal(shard.Id, shards[0].Id);
 
         var consumedJobs = new List<string>();
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        await foreach (var jobCtx in shards[0].ConsumeDurableJobsAsync().WithCancellation(cts.Token))
+        await foreach (var jobCtx in shards[0].ConsumeDurableJobsAsync().WithCancellation(cancellationToken))
         {
             consumedJobs.Add(jobCtx.Job.Name);
-            await shards[0].RemoveJobAsync(jobCtx.Job.Id, CancellationToken.None);
+            await shards[0].RemoveJobAsync(jobCtx.Job.Id, cancellationToken);
         }
 
         Assert.Equal(2, consumedJobs.Count);
         Assert.Contains("job1", consumedJobs);
         Assert.Contains("job2", consumedJobs);
-        await silo2Manager.UnregisterShardAsync(shards[0], CancellationToken.None);
+        await silo2Manager.UnregisterShardAsync(shards[0], cancellationToken);
     }
 
     /// <summary>
