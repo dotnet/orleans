@@ -60,14 +60,20 @@ internal class InMemoryJobShardManager : JobShardManager
     private static readonly Dictionary<string, ShardOwnership> _globalShardStore = new();
     private static readonly SemaphoreSlim _asyncLock = new(1, 1);
     private readonly IClusterMembershipService? _membershipService;
+    private readonly int _maxStolenCount;
 
-    public InMemoryJobShardManager(SiloAddress siloAddress) : base(siloAddress)
+    public InMemoryJobShardManager(SiloAddress siloAddress) : this(siloAddress, null, 3)
     {
     }
 
-    public InMemoryJobShardManager(SiloAddress siloAddress, IClusterMembershipService membershipService) : base(siloAddress)
+    public InMemoryJobShardManager(SiloAddress siloAddress, IClusterMembershipService? membershipService) : this(siloAddress, membershipService, 3)
+    {
+    }
+
+    public InMemoryJobShardManager(SiloAddress siloAddress, IClusterMembershipService? membershipService, int maxStolenCount) : base(siloAddress)
     {
         _membershipService = membershipService;
+        _maxStolenCount = maxStolenCount;
     }
 
     /// <summary>
@@ -79,6 +85,66 @@ internal class InMemoryJobShardManager : JobShardManager
         try
         {
             _globalShardStore.Clear();
+        }
+        finally
+        {
+            _asyncLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Gets ownership info for a shard. For testing purposes only.
+    /// </summary>
+    internal static async Task<(string? Owner, int StolenCount)?> GetOwnershipInfoAsync(string shardId)
+    {
+        await _asyncLock.WaitAsync();
+        try
+        {
+            if (_globalShardStore.TryGetValue(shardId, out var ownership))
+            {
+                return (ownership.OwnerSiloAddress, ownership.StolenCount);
+            }
+            return null;
+        }
+        finally
+        {
+            _asyncLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Gets debug info for testing. For testing purposes only.
+    /// </summary>
+    internal static async Task<string> GetDebugInfoAsync(string shardId, IClusterMembershipService? membershipService)
+    {
+        await _asyncLock.WaitAsync();
+        try
+        {
+            var sb = new System.Text.StringBuilder();
+            
+            if (!_globalShardStore.TryGetValue(shardId, out var ownership))
+            {
+                return "Shard not found in store";
+            }
+            
+            sb.AppendLine($"Owner: '{ownership.OwnerSiloAddress}'");
+            sb.AppendLine($"StolenCount: {ownership.StolenCount}");
+            
+            var snapshot = membershipService?.CurrentSnapshot;
+            if (snapshot is null)
+            {
+                sb.AppendLine("Snapshot is null");
+            }
+            else
+            {
+                sb.AppendLine($"Snapshot has {snapshot.Members.Count} members");
+                foreach (var member in snapshot.Members.Values)
+                {
+                    sb.AppendLine($"  Member: '{member.SiloAddress}' ({member.SiloAddress.ToString()}) Status: {member.Status}");
+                }
+            }
+            
+            return sb.ToString();
         }
         finally
         {
@@ -121,12 +187,31 @@ internal class InMemoryJobShardManager : JobShardManager
                     {
                         alreadyOwnedShards.Add(ownership.Shard);
                     }
+                    continue;
                 }
-                // Take over orphaned shards or shards from dead silos
-                else if (ownership.OwnerSiloAddress is null || deadSilos.Contains(ownership.OwnerSiloAddress))
+
+                // Check if this is an orphaned shard (gracefully released) or stolen (from dead silo)
+                var isOrphaned = ownership.OwnerSiloAddress is null;
+                var ownerAddress = ownership.OwnerSiloAddress;
+                var isFromDeadSilo = ownerAddress is not null && deadSilos.Contains(ownerAddress);
+
+                if (isOrphaned || isFromDeadSilo)
                 {
                     if (ownership.Shard.StartTime <= maxDueTime)
                     {
+                        // If stolen from dead silo, increment stolen count
+                        if (isFromDeadSilo)
+                        {
+                            ownership.StolenCount++;
+
+                            // Check if shard is poisoned
+                            if (ownership.StolenCount > _maxStolenCount)
+                            {
+                                // Shard is poisoned - don't assign it
+                                continue;
+                            }
+                        }
+
                         ownership.OwnerSiloAddress = SiloAddress.ToString();
                         stolenShards.Add(ownership.Shard);
                     }
@@ -187,6 +272,8 @@ internal class InMemoryJobShardManager : JobShardManager
                 {
                     // Mark as unowned so another silo can pick it up
                     ownership.OwnerSiloAddress = null;
+                    // Reset stolen count since we're gracefully releasing (not crashing)
+                    ownership.StolenCount = 0;
                 }
             }
         }
@@ -200,5 +287,6 @@ internal class InMemoryJobShardManager : JobShardManager
     {
         public required IJobShard Shard { get; init; }
         public string? OwnerSiloAddress { get; set; }
+        public int StolenCount { get; set; }
     }
 }
