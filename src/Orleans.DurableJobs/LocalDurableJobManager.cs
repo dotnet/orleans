@@ -52,21 +52,21 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     }
 
     /// <inheritdoc/>
-    public async Task<DurableJob> ScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)
+    public async Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
     {
-        LogSchedulingJob(_logger, jobName, target, dueTime);
+        LogSchedulingJob(_logger, request.JobName, request.Target, request.DueTime);
 
-        var shardKey = GetShardKey(dueTime);
+        var shardKey = GetShardKey(request.DueTime);
 
         while (true)
         {
             // Fast path: shard already exists
             if (_writeableShards.TryGetValue(shardKey, out var existingShard))
             {
-                var job = await existingShard.TryScheduleJobAsync(target, jobName, dueTime, metadata, cancellationToken);
+                var job = await existingShard.TryScheduleJobAsync(request, cancellationToken);
                 if (job is not null)
                 {
-                    LogJobScheduled(_logger, jobName, job.Id, existingShard.Id, target);
+                    LogJobScheduled(_logger, request.JobName, job.Id, existingShard.Id, request.Target);
                     return job;
                 }
 

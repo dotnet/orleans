@@ -86,14 +86,11 @@ public interface IJobShard : IAsyncDisposable
     /// <summary>
     /// Attempts to schedule a new job on this shard.
     /// </summary>
-    /// <param name="target">The grain identifier of the target grain that will execute the job.</param>
-    /// <param name="jobName">The name of the job to schedule.</param>
-    /// <param name="dueTime">The time when the job should be executed.</param>
-    /// <param name="metadata">Optional metadata to associate with the job.</param>
+    /// <param name="request">The request containing the job scheduling parameters.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A task that represents the asynchronous operation. The task result contains the durable job if successful, or null if the job could not be scheduled (e.g., the shard was marked as complete).</returns>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the due time is outside the shard's time range.</exception>
-    Task<DurableJob?> TryScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken);
+    Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -142,30 +139,30 @@ public abstract class JobShard : IJobShard
     }
 
     /// <inheritdoc/>
-    public async Task<DurableJob?> TryScheduleJobAsync(GrainId target, string jobName, DateTimeOffset dueTime, IReadOnlyDictionary<string, string>? metadata, CancellationToken cancellationToken)
+    public async Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
     {
         if (IsAddingCompleted)
         {
             return null;
         }
 
-        if (dueTime < StartTime || dueTime > EndTime)
+        if (request.DueTime < StartTime || request.DueTime > EndTime)
         {
-            throw new ArgumentOutOfRangeException(nameof(dueTime), "Scheduled time is out of shard bounds.");
+            throw new ArgumentOutOfRangeException(nameof(request), "Scheduled time is out of shard bounds.");
         }
 
         var jobId = Guid.NewGuid().ToString();
         var job = new DurableJob
         {
             Id = jobId,
-            TargetGrainId = target,
-            Name = jobName,
-            DueTime = dueTime,
+            TargetGrainId = request.Target,
+            Name = request.JobName,
+            DueTime = request.DueTime,
             ShardId = Id,
-            Metadata = metadata
+            Metadata = request.Metadata
         };
 
-        await PersistAddJobAsync(jobId, jobName, dueTime, target, metadata, cancellationToken);
+        await PersistAddJobAsync(jobId, request.JobName, request.DueTime, request.Target, request.Metadata, cancellationToken);
         _jobQueue.Enqueue(job, 0);
         return job;
     }
