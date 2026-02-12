@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Internal;
@@ -23,7 +24,7 @@ public class DurableJobTestsRunner
         _grainFactory = grainFactory;
     }
 
-    public async Task DurableJobGrain()
+    public async Task DurableJobGrain(CancellationToken cancellationToken)
     {
         var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-job-grain");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(5);
@@ -53,7 +54,7 @@ public class DurableJobTestsRunner
         Assert.False(await grain.HasJobRan(canceledJob.Id));
     }
 
-    public async Task JobExecutionOrder()
+    public async Task JobExecutionOrder(CancellationToken cancellationToken)
     {
         var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-execution-order");
         var baseTime = DateTimeOffset.UtcNow.AddSeconds(2);
@@ -74,7 +75,7 @@ public class DurableJobTestsRunner
         Assert.True(time2 < time3, $"Job2 executed at {time2}, Job3 at {time3}");
     }
 
-    public async Task PastDueTime()
+    public async Task PastDueTime(CancellationToken cancellationToken)
     {
         var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-past-due");
         var pastTime = DateTimeOffset.UtcNow.AddSeconds(-5);
@@ -86,7 +87,7 @@ public class DurableJobTestsRunner
         Assert.True(await grain.HasJobRan(job.Id));
     }
 
-    public async Task JobWithMetadata()
+    public async Task JobWithMetadata(CancellationToken cancellationToken)
     {
         var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-metadata");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
@@ -113,7 +114,7 @@ public class DurableJobTestsRunner
         Assert.Equal("user123", context.Job.Metadata["UserId"]);
     }
 
-    public async Task MultipleGrains()
+    public async Task MultipleGrains(CancellationToken cancellationToken)
     {
         var grain1 = _grainFactory.GetGrain<IDurableJobGrain>("test-grain-1");
         var grain2 = _grainFactory.GetGrain<IDurableJobGrain>("test-grain-2");
@@ -137,7 +138,7 @@ public class DurableJobTestsRunner
         Assert.False(await grain3.HasJobRan(job1.Id));
     }
 
-    public async Task DuplicateJobNames()
+    public async Task DuplicateJobNames(CancellationToken cancellationToken)
     {
         var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-duplicate-names");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
@@ -163,7 +164,7 @@ public class DurableJobTestsRunner
         Assert.True(await grain.HasJobRan(job3.Id));
     }
 
-    public async Task CancelNonExistentJob()
+    public async Task CancelNonExistentJob(CancellationToken cancellationToken)
     {
         var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-cancel-nonexistent");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(10);
@@ -186,7 +187,7 @@ public class DurableJobTestsRunner
         Assert.False(await grain.HasJobRan(fakeJob.Id));
     }
 
-    public async Task CancelAlreadyExecutedJob()
+    public async Task CancelAlreadyExecutedJob(CancellationToken cancellationToken)
     {
         var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-cancel-executed");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(2);
@@ -200,7 +201,7 @@ public class DurableJobTestsRunner
         Assert.False(cancelResult);
     }
 
-    public async Task ConcurrentScheduling()
+    public async Task ConcurrentScheduling(CancellationToken cancellationToken)
     {
         var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-concurrent");
         var baseTime = DateTimeOffset.UtcNow.AddSeconds(5);
@@ -226,7 +227,7 @@ public class DurableJobTestsRunner
         }
     }
 
-    public async Task JobPropertiesVerification()
+    public async Task JobPropertiesVerification(CancellationToken cancellationToken)
     {
         var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-properties");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
@@ -253,7 +254,7 @@ public class DurableJobTestsRunner
         Assert.NotEmpty(context.RunId);
     }
 
-    public async Task DequeueCount()
+    public async Task DequeueCount(CancellationToken cancellationToken)
     {
         var grain = _grainFactory.GetGrain<IDurableJobGrain>("test-dequeue-count");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(3);
@@ -267,7 +268,7 @@ public class DurableJobTestsRunner
         Assert.Equal(1, context.DequeueCount);
     }
 
-    public async Task ScheduleJobOnAnotherGrain()
+    public async Task ScheduleJobOnAnotherGrain(CancellationToken cancellationToken)
     {
         var schedulerGrain = _grainFactory.GetGrain<ISchedulerGrain>("scheduler-grain");
         var targetGrain = _grainFactory.GetGrain<IDurableJobGrain>("target-grain");
@@ -289,7 +290,7 @@ public class DurableJobTestsRunner
         Assert.Equal("CrossGrainJob", context.Job.Name);
     }
 
-    public async Task JobRetry()
+    public async Task JobRetry(CancellationToken cancellationToken)
     {
         var grain = _grainFactory.GetGrain<IRetryTestGrain>("retry-test-grain");
         var dueTime = DateTimeOffset.UtcNow.AddSeconds(2);
