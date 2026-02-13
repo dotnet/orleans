@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
+using Orleans.Diagnostics;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime.GrainDirectory;
@@ -313,7 +314,15 @@ namespace Orleans.Runtime
                         ise.IsSourceActivation = false;
 
                         LogDeactivatingInconsistentState(this.invokeExceptionLogger, target, invocationException);
-                        target.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)));
+                        
+                        if (target is ActivationData ad && message.RequestContextData.TryGetActivityContext() is { } ac)
+                        {
+                            ad.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)), ac);
+                        }
+                        else
+                        {
+                            target.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)));
+                        }
                     }
                 }
 

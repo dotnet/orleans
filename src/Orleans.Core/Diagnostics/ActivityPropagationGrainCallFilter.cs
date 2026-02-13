@@ -1,7 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading.Tasks;
+using Orleans.Diagnostics;
 
 namespace Orleans.Runtime
 {
@@ -10,21 +8,36 @@ namespace Orleans.Runtime
     /// </summary>
     internal abstract class ActivityPropagationGrainCallFilter
     {
-        protected const string TraceParentHeaderName = "traceparent";
-        protected const string TraceStateHeaderName = "tracestate";
-
         internal const string RpcSystem = "orleans";
         internal const string OrleansNamespacePrefix = "Orleans";
-        internal const string ApplicationGrainActivitySourceName = "Microsoft.Orleans.Application";
-        internal const string RuntimeActivitySourceName = "Microsoft.Orleans.Runtime";
 
-        protected static readonly ActivitySource ApplicationGrainSource = new(ApplicationGrainActivitySourceName, "1.0.0");
-        protected static readonly ActivitySource RuntimeGrainSource = new(RuntimeActivitySourceName, "1.0.0");
+        protected static ActivitySource GetActivitySource(IGrainCallContext context)
+        {
+            var interfaceType = context.Request.GetInterfaceType();
+            var interfaceTypeName = interfaceType.Name;
 
-        protected static ActivitySource GetActivitySource(IGrainCallContext context) =>
-            context.Request.GetInterfaceType().Namespace?.StartsWith(OrleansNamespacePrefix) == true
-                ? RuntimeGrainSource
-                : ApplicationGrainSource;
+            switch (interfaceTypeName)
+            {
+                // Memory storage uses grains for its implementation
+                case "IMemoryStorageGrain":
+                    return ActivitySources.StorageGrainSource;
+
+                // This extension is for explicit migrate/deactivate calls
+                case "IGrainManagementExtension":
+                // This target is for accepting migration batches
+                case "IActivationMigrationManagerSystemTarget":
+                    return ActivitySources.LifecycleGrainSource;
+
+                // These extensions are for async stream subscriptions
+                case "IAsyncEnumerableGrainExtension":
+                    return ActivitySources.ApplicationGrainSource;
+
+                default:
+                    return interfaceType.Namespace?.StartsWith(OrleansNamespacePrefix) == true
+                        ? ActivitySources.RuntimeGrainSource
+                        : ActivitySources.ApplicationGrainSource;
+            }
+        }
 
         protected static void GetRequestContextValue(object carrier, string fieldName, out string fieldValue, out IEnumerable<string> fieldValues)
         {
@@ -37,17 +50,17 @@ namespace Orleans.Runtime
             if (activity is not null)
             {
                 // rpc attributes from https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/rpc.md
-                activity.SetTag("rpc.system", RpcSystem);
-                activity.SetTag("rpc.service", context.InterfaceName);
-                activity.SetTag("rpc.method", context.MethodName);
+                activity.SetTag(ActivityTagKeys.RpcSystem, RpcSystem);
+                activity.SetTag(ActivityTagKeys.RpcService, context.InterfaceName);
+                activity.SetTag(ActivityTagKeys.RpcMethod, context.MethodName);
 
                 if (activity.IsAllDataRequested)
                 {
                     // Custom attributes
-                    activity.SetTag("rpc.orleans.target_id", context.TargetId.ToString());
+                    activity.SetTag(ActivityTagKeys.RpcOrleansTargetId, context.TargetId.ToString());
                     if (context.SourceId is GrainId sourceId)
                     {
-                        activity.SetTag("rpc.orleans.source_id", sourceId.ToString());
+                        activity.SetTag(ActivityTagKeys.RpcOrleansSourceId, sourceId.ToString());
                     }
                 }
             }
@@ -63,14 +76,14 @@ namespace Orleans.Runtime
                     activity.SetStatus(ActivityStatusCode.Error);
 
                     // exception attributes from https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/exceptions.md
-                    activity.SetTag("exception.type", e.GetType().FullName);
-                    activity.SetTag("exception.message", e.Message);
+                    activity.SetTag(ActivityTagKeys.ExceptionType, e.GetType().FullName);
+                    activity.SetTag(ActivityTagKeys.ExceptionMessage, e.Message);
 
                     // Note that "exception.stacktrace" is the full exception detail, not just the StackTrace property.
                     // See https://opentelemetry.io/docs/specs/semconv/attributes-registry/exception/
                     // and https://github.com/open-telemetry/opentelemetry-specification/pull/697#discussion_r453662519
-                    activity.SetTag("exception.stacktrace", e.ToString());
-                    activity.SetTag("exception.escaped", true);
+                    activity.SetTag(ActivityTagKeys.ExceptionStacktrace, e.ToString());
+                    activity.SetTag(ActivityTagKeys.ExceptionEscaped, true);
                 }
 
                 throw;

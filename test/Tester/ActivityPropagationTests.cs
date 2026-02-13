@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
-using Orleans.Runtime;
+using Orleans.Diagnostics;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -31,7 +31,7 @@ namespace UnitTests.General
             // This listener specifically targets activities created by Orleans for grain calls
             Listener = new()
             {
-                ShouldListenTo = p => p.Name == ActivityPropagationGrainCallFilter.ApplicationGrainActivitySourceName,
+                ShouldListenTo = p => p.Name == ActivitySources.ApplicationGrainActivitySourceName,
                 Sample = Sample,
                 SampleUsingParentId = SampleUsingParentId,
             };
