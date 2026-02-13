@@ -193,6 +193,19 @@ public static class ServiceCollectionExtensions
             }
         });
 
+        group.MapGet("/SiloMetadata/{*address}", async (string address, [FromServices] IDashboardClient client) =>
+        {
+            try
+            {
+                var result = await client.SiloMetadata(address);
+                return Results.Json(result.Value, jsonOptions);
+            }
+            catch (SiloUnavailableException)
+            {
+                return CreateUnavailableResult(true);
+            }
+        });
+
         group.MapGet("/SiloStats/{*address}", async (string address, [FromServices] IDashboardClient client) =>
         {
             try

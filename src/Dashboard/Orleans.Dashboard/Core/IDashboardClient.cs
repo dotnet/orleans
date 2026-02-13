@@ -19,6 +19,8 @@ internal interface IDashboardClient
 
     Task<Immutable<Dictionary<string, string>>> SiloProperties(string siloAddress);
 
+    Task<Immutable<Dictionary<string, string>>> SiloMetadata(string siloAddress);
+
     Task<Immutable<Dictionary<string, GrainTraceEntry>>> SiloStats(string siloAddress);
 
     Task<Immutable<StatCounter[]>> GetCounters(string siloAddress);
