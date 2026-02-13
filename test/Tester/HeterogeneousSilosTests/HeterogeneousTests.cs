@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
 using Orleans.TestingHost;
@@ -118,7 +119,7 @@ namespace Tester.HeterogeneousSilosTests
             await MergeGrainResolverTestsImpl<IStatelessWorkerGrain>(typeof(PreferLocalPlacement), true, this.CallIStatelessWorkerGrainMethod, typeof(StatelessWorkerGrain));
         }
 
-        [Fact(Skip = "https://github.com/dotnet/orleans/issues/9560")]
+        [Fact]
         public async Task StatelessWorkerPlacementWithClientRefreshTests()
         {
             await MergeGrainResolverTestsImpl<IStatelessWorkerGrain>(typeof(RandomPlacement), false, this.CallIStatelessWorkerGrainMethod, typeof(StatelessWorkerGrain));
@@ -135,6 +136,32 @@ namespace Tester.HeterogeneousSilosTests
         {
             var g = grain.Cast<IStatelessWorkerGrain>();
             await g.GetCallStats();
+        }
+
+        /// <summary>
+        /// Waits for the client's cluster manifest to be updated such that it either contains or excludes
+        /// an implementation for the specified grain interface type.
+        /// </summary>
+        private async Task WaitForManifestUpdate<T>(bool expectImplementation, TimeSpan timeout) where T : IGrain
+        {
+            var resolver = this.cluster.ServiceProvider.GetRequiredService<GrainInterfaceTypeToGrainTypeResolver>();
+            var interfaceTypeResolver = this.cluster.ServiceProvider.GetRequiredService<GrainInterfaceTypeResolver>();
+            var interfaceType = interfaceTypeResolver.GetGrainInterfaceType(typeof(T));
+
+            var deadline = DateTime.UtcNow + timeout;
+            while (DateTime.UtcNow < deadline)
+            {
+                var hasImplementation = resolver.TryGetGrainType(interfaceType, out _);
+                if (hasImplementation == expectImplementation)
+                {
+                    return;
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(100));
+            }
+
+            var expectation = expectImplementation ? "to have" : "to not have";
+            throw new TimeoutException($"Timed out waiting for manifest {expectation} implementation for {typeof(T).Name}");
         }
 
         private async Task MergeGrainResolverTestsImpl<T>(Type defaultPlacementStrategy, bool restartClient, Func<IGrain, Task> func, params Type[] blackListedTypes)
@@ -160,7 +187,8 @@ namespace Tester.HeterogeneousSilosTests
             }
             else
             {
-                await Task.Delay(ClientRefreshDelay.Multiply(3));
+                // Wait for the client's manifest to be updated with the grain type
+                await WaitForManifestUpdate<T>(expectImplementation: true, timeout: TimeSpan.FromSeconds(10));
             }
 
             for (var i = 0; i < 5; i++)
@@ -182,7 +210,8 @@ namespace Tester.HeterogeneousSilosTests
             }
             else
             {
-                await Task.Delay(ClientRefreshDelay.Multiply(3));
+                // Wait for the client's manifest to be updated to remove the grain type
+                await WaitForManifestUpdate<T>(expectImplementation: false, timeout: TimeSpan.FromSeconds(10));
             }
 
             // Should fail

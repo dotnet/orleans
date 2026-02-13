@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.IO;
 using System.Linq;
@@ -7,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
+using Orleans.Diagnostics;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
@@ -16,6 +18,7 @@ namespace Orleans.Streams
 {
     internal sealed partial class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
+        private static readonly DiagnosticListener DiagnosticListener = new(OrleansStreamingDiagnostics.ListenerName);
         private const int ReadLoopRetryMax = 6;
         private const int StreamInactivityCheckFrequency = 10;
         private readonly IBackoffProvider deliveryBackoffProvider;
@@ -29,6 +32,7 @@ namespace Orleans.Streams
         private readonly IQueueAdapterCache queueAdapterCache;
         private readonly IQueueAdapter queueAdapter;
         private readonly IStreamFailureHandler streamFailureHandler;
+        private readonly TimeProvider _timeProvider;
         internal readonly QueueId QueueId;
 
         private int numMessages;
@@ -53,6 +57,7 @@ namespace Orleans.Streams
             IStreamFailureHandler streamFailureHandler,
             IBackoffProvider deliveryBackoffProvider,
             IBackoffProvider queueReaderBackoffProvider,
+            TimeProvider timeProvider,
             SystemTargetShared shared)
             : base(id, shared)
         {
@@ -69,6 +74,7 @@ namespace Orleans.Streams
             this.queueAdapterCache = queueAdapterCache;
             this.deliveryBackoffProvider = deliveryBackoffProvider;
             this.queueReaderBackoffProvider = queueReaderBackoffProvider;
+            _timeProvider = timeProvider ?? TimeProvider.System;
             numMessages = 0;
 
             logger = shared.LoggerFactory.CreateLogger($"{this.GetType().Namespace}.{streamProviderName}");
@@ -91,7 +97,7 @@ namespace Orleans.Streams
         {
             LogInfoInit(GetType().Name, GrainId, Silo, new(QueueId));
 
-            lastTimeCleanedPubSubCache = DateTime.UtcNow;
+            lastTimeCleanedPubSubCache = _timeProvider.GetUtcNow().UtcDateTime;
 
             try
             {
@@ -238,7 +244,7 @@ namespace Orleans.Streams
                 var consumerReference = this.RuntimeClient.InternalGrainFactory
                     .GetGrain(streamConsumer)
                     .AsReference<IStreamConsumerExtension>();
-                data = streamDataCollection.AddConsumer(subscriptionId, streamId, consumerReference, filterData);
+                data = streamDataCollection.AddConsumer(subscriptionId, streamId, consumerReference, filterData, _timeProvider.GetUtcNow().UtcDateTime);
             }
 
             if (await DoHandshakeWithConsumer(data, cacheToken))
@@ -399,7 +405,7 @@ namespace Orleans.Streams
                 return false;
             }
 
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             // Try to cleanup the pubsub cache at the cadence of 10 times in the configurable StreamInactivityPeriod.
             if ((now - lastTimeCleanedPubSubCache) >= this.options.StreamInactivityPeriod.Divide(StreamInactivityCheckFrequency))
             {
@@ -471,6 +477,18 @@ namespace Orleans.Streams
                 {
                     pubSubCache.Remove(tuple.Key);
                     tuple.Value.DisposeAll(logger);
+                    
+                    // Emit diagnostic event for stream inactivity
+                    if (DiagnosticListener.IsEnabled(OrleansStreamingDiagnostics.EventNames.StreamInactive))
+                    {
+                        DiagnosticListener.Write(
+                            OrleansStreamingDiagnostics.EventNames.StreamInactive,
+                            new StreamInactiveEvent(
+                                streamProviderName,
+                                tuple.Key.StreamId,
+                                options.StreamInactivityPeriod,
+                                Silo));
+                    }
                 }
             }
         }
@@ -652,6 +670,21 @@ namespace Orleans.Streams
             {
                 StreamHandshakeToken newToken = await ContextualizedDeliverBatchToConsumer(consumerData, batch);
                 consumerData.LastToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken); // this is the currently delivered token
+                
+                // Emit diagnostic event for successful message delivery
+                if (DiagnosticListener.IsEnabled(OrleansStreamingDiagnostics.EventNames.MessageDelivered))
+                {
+                    DiagnosticListener.Write(
+                        OrleansStreamingDiagnostics.EventNames.MessageDelivered,
+                        new StreamMessageDeliveredEvent(
+                            streamProviderName,
+                            consumerData.StreamId.StreamId,
+                            consumerData.SubscriptionId.Guid,
+                            consumerData.StreamConsumer.GetGrainId(),
+                            batch.SequenceToken?.ToString(),
+                            Silo));
+                }
+                
                 return newToken;
             }
             catch (Exception ex)

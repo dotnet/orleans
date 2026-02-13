@@ -37,6 +37,7 @@ namespace Orleans.Streams
         private IStreamQueueBalancer queueBalancer;
         private readonly IStreamFilter streamFilter;
         private readonly IQueueAdapterFactory adapterFactory;
+        private readonly TimeProvider _timeProvider;
         private RunState managerState;
         private IDisposable queuePrintTimer;
         private int nextAgentId;
@@ -54,6 +55,7 @@ namespace Orleans.Streams
             IQueueAdapter queueAdapter,
             IBackoffProvider deliveryBackoffProvider,
             IBackoffProvider queueReaderBackoffProvider,
+            TimeProvider timeProvider,
             SystemTargetShared shared)
             : base(managerId, shared)
         {
@@ -85,6 +87,7 @@ namespace Orleans.Streams
             this.queueAdapter = queueAdapter ?? throw new ArgumentNullException(nameof(queueAdapter));
             _deliveryBackoffProvider = deliveryBackoffProvider;
             _queueReaderBackoffProvider = queueReaderBackoffProvider;
+            _timeProvider = timeProvider ?? TimeProvider.System;
             _systemTargetShared = shared;
             queueAdapterCache = adapterFactory.GetQueueAdapterCache();
             logger = shared.LoggerFactory.CreateLogger($"{GetType().FullName}.{streamProviderName}");
@@ -250,6 +253,7 @@ namespace Orleans.Streams
                             deliveryFailureHandler,
                             _deliveryBackoffProvider,
                             _queueReaderBackoffProvider,
+                            _timeProvider,
                             _systemTargetShared);
                         queuesToAgentsMap.Add(queueId, agent);
                         agents.Add(agent);

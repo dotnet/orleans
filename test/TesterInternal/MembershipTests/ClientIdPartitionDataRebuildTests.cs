@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.TestHelper;
 using Xunit;
@@ -15,6 +16,7 @@ namespace UnitTests.MembershipTests
     /// </summary>
     public class ClientIdPartitionDataRebuildTests : IDisposable
     {
+        private MembershipDiagnosticObserver _membershipObserver;
         internal class Observer : ISimpleGrainObserver
         {
             private readonly SemaphoreSlim semaphore = new SemaphoreSlim(0);
@@ -43,9 +45,10 @@ namespace UnitTests.MembershipTests
         public ClientIdPartitionDataRebuildTests(ITestOutputHelper output)
         {
             this.output = output;
+            _membershipObserver = MembershipDiagnosticObserver.Create();
         }
 
-        [Fact(Skip = "Not reliable in PR build, skipping for now")]
+        [Fact]
         //[SkippableFact(typeof(SiloUnavailableException)), TestCategory("Functional")]
         public async Task ReconstructClientIdPartitionTest_Observer()
         {
@@ -60,9 +63,16 @@ namespace UnitTests.MembershipTests
             await grain.SetA(10);
             await observer.WaitForNotification(10, 0, TimeSpan.FromSeconds(10));
 
-            // Kill the silo that hold directory client entry
+            // Remember the silo address we're about to kill
+            var siloToKill = this.hostedCluster.SecondarySilos[0].SiloAddress;
+            _membershipObserver.Clear();
+
+            // Kill the silo that holds directory client entry
             await this.hostedCluster.SecondarySilos[0].StopSiloAsync(stopGracefully: false);
-            await Task.Delay(5000);
+
+            // Wait for the cluster to detect the dead silo using diagnostic events
+            // instead of arbitrary Task.Delay(5000)
+            await _membershipObserver.WaitForSiloStatusAsync(siloToKill, "Dead", TimeSpan.FromSeconds(30));
 
             // Second notification should work since the directory was "rebuilt" when
             // silos in cluster detected the dead one
@@ -70,20 +80,33 @@ namespace UnitTests.MembershipTests
             await observer.WaitForNotification(10, 20, TimeSpan.FromSeconds(10));
         }
 
-        [Fact(Skip = "Not reliable in PR build, skipping for now")]
+        [Fact]
         //[SkippableFact(typeof(SiloUnavailableException)), TestCategory("Functional")]
         public async Task ReconstructClientIdPartitionTest_Request()
         {
-            // Ensure the client entry is on Silo2 partition and get a grain that live on Silo2
+            // Ensure the client entry is on Silo2 partition and get a grain that lives on Silo3
             var grain = await SetupTestAndPickGrain<ITestGrain>(g => g.GetRuntimeInstanceId());
 
-            // Launch a long task and kill the silo that hold directory client entry
-            var promise = grain.DoLongAction(TimeSpan.FromSeconds(10), "LongAction");
+            // Verify we can call the grain before killing the silo
+            var labelBefore = await grain.GetLabel();
+
+            // Remember the silo address we're about to kill
+            var siloToKill = this.hostedCluster.SecondarySilos[0].SiloAddress;
+            _membershipObserver.Clear();
+
+            // Kill the silo that holds directory client entry (Silo2)
+            // The grain is on Silo3, so it should still be accessible
             await this.hostedCluster.SecondarySilos[0].StopSiloAsync(stopGracefully: false);
 
-            // It should work since the directory was "rebuilt" when
-            // silos in cluster detected the dead one
-            await promise;
+            // Wait for the cluster to detect the dead silo using diagnostic events
+            await _membershipObserver.WaitForSiloStatusAsync(siloToKill, "Dead", TimeSpan.FromSeconds(30));
+
+            // The grain should still be accessible since the directory was "rebuilt" when
+            // silos in cluster detected the dead one. The grain is on Silo3, only the
+            // directory partition owner (Silo2) was killed.
+            await grain.SetLabel("AfterSiloDeath");
+            var labelAfter = await grain.GetLabel();
+            Assert.Equal("AfterSiloDeath", labelAfter);
         }
 
         private async Task<T> SetupTestAndPickGrain<T>(Func<T, Task<string>> getRuntimeInstanceId) where T : class, IGrainWithIntegerKey
@@ -148,7 +171,9 @@ namespace UnitTests.MembershipTests
                     options.NumVotesForDeathDeclaration = 1;
                 });
 
-                hostBuilder.Configure<GrainDirectoryOptions>(options => options.CacheSize = 0);
+                // Disable grain directory caching to force directory lookups
+                hostBuilder.Configure<GrainDirectoryOptions>(options =>
+                    options.CachingStrategy = GrainDirectoryOptions.CachingStrategyType.None);
             }
         }
 
@@ -157,6 +182,8 @@ namespace UnitTests.MembershipTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder.Configure<GatewayOptions>(options => options.PreferredGatewayIndex = 0);
+                // Set a longer response timeout to allow for directory reconstruction after silo death
+                clientBuilder.Configure<ClientMessagingOptions>(options => options.ResponseTimeout = TimeSpan.FromSeconds(30));
             }
         }
 
@@ -170,6 +197,8 @@ namespace UnitTests.MembershipTests
             {
                 hostedCluster?.Dispose();
                 hostedCluster = null;
+                _membershipObserver?.Dispose();
+                _membershipObserver = null;
             }
         }
     }

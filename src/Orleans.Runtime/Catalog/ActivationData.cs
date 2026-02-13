@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Core.Internal;
+using Orleans.Diagnostics;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
 using Orleans.Runtime.Placement;
@@ -40,6 +41,8 @@ internal sealed partial class ActivationData :
     IAsyncDisposable,
     IDisposable
 {
+    private static readonly DiagnosticListener DiagnosticListener = new(OrleansGrainDiagnostics.ListenerName);
+
     private const string GrainAddressMigrationContextKey = "sys.addr";
     private readonly GrainTypeSharedContext _shared;
     private readonly IServiceScope _serviceScope;
@@ -51,8 +54,8 @@ internal sealed partial class ActivationData :
     private Queue<object>? _pendingOperations;
     private Message? _blockingRequest;
     private bool _isInWorkingSet = true;
-    private CoarseStopwatch _busyDuration;
-    private CoarseStopwatch _idleDuration;
+    private long _busyStartTimestamp;
+    private long _idleStartTimestamp;
     private GrainReference? _selfReference;
 
     // Values which are needed less frequently and do not warrant living directly on activation for object size reasons.
@@ -361,6 +364,18 @@ internal sealed partial class ActivationData :
             {
                 participant.Participate(ObservableLifecycle);
             }
+
+            // Emit diagnostic event for grain creation
+            if (DiagnosticListener.IsEnabled(OrleansGrainDiagnostics.EventNames.Created))
+            {
+                DiagnosticListener.Write(
+                    OrleansGrainDiagnostics.EventNames.Created,
+                    new GrainCreatedEvent(
+                        GrainId,
+                        ActivationId,
+                        GetGrainTypeName(),
+                        Address.SiloAddress));
+            }
         }
     }
 
@@ -436,8 +451,33 @@ internal sealed partial class ActivationData :
 
     /// <summary>
     /// Returns how long this activation has been idle.
+    /// Uses TimeProvider for deterministic testing with FakeTimeProvider.
     /// </summary>
-    public TimeSpan GetIdleness() => _idleDuration.Elapsed;
+    public TimeSpan GetIdleness()
+    {
+        var startTimestamp = _idleStartTimestamp;
+        if (startTimestamp == 0)
+        {
+            return TimeSpan.Zero;
+        }
+
+        return _shared.Runtime.TimeProvider.GetElapsedTime(startTimestamp);
+    }
+
+    /// <summary>
+    /// Returns how long this activation has been busy processing the current blocking request.
+    /// Uses TimeProvider for deterministic testing with FakeTimeProvider.
+    /// </summary>
+    private TimeSpan GetBusyDuration()
+    {
+        var startTimestamp = _busyStartTimestamp;
+        if (startTimestamp == 0)
+        {
+            return TimeSpan.Zero;
+        }
+
+        return _shared.Runtime.TimeProvider.GetElapsedTime(startTimestamp);
+    }
 
     /// <summary>
     /// Returns whether this activation has been idle long enough to be collected.
@@ -570,6 +610,21 @@ internal sealed partial class ActivationData :
 
                 _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
                 SetState(ActivationState.Deactivating);
+
+                // Emit diagnostic event for grain deactivating
+                if (DiagnosticListener.IsEnabled(OrleansGrainDiagnostics.EventNames.Deactivating))
+                {
+                    DiagnosticListener.Write(
+                        OrleansGrainDiagnostics.EventNames.Deactivating,
+                        new GrainDeactivatingEvent(
+                            GrainId,
+                            ActivationId,
+                            GetGrainTypeName(),
+                            Address.SiloAddress,
+                            reason.ReasonCode,
+                            reason.Description));
+                }
+
                 var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
                 ScheduleOperation(new Command.Deactivate(cts, state));
@@ -580,7 +635,8 @@ internal sealed partial class ActivationData :
     private void DeactivateStuckActivation()
     {
         IsStuckProcessingMessage = true;
-        var msg = $"Activation {this} has been processing request {_blockingRequest} since {_busyDuration} and is likely stuck.";
+        var busyDuration = GetBusyDuration();
+        var msg = $"Activation {this} has been processing request {_blockingRequest} for {busyDuration} and is likely stuck.";
         var reason = new DeactivationReason(DeactivationReasonCode.ActivationUnresponsive, msg);
 
         // Mark the grain as deactivating so that messages are forwarded instead of being invoked
@@ -659,7 +715,7 @@ internal sealed partial class ActivationData :
                     timeSinceQueued = waitTime.Elapsed;
                 }
 
-                var executionTime = _busyDuration.Elapsed;
+                var executionTime = GetBusyDuration();
                 if (executionTime >= slowRunningRequestDuration && !message.IsLocalOnly)
                 {
                     GetStatusList(ref diagnostics);
@@ -755,12 +811,17 @@ internal sealed partial class ActivationData :
     private string GetActivationInfoString()
     {
         var placement = PlacementStrategy?.GetType().Name;
-        var grainTypeName = _shared.GrainTypeName ?? GrainInstance switch
+        var grainTypeName = GetGrainTypeName();
+        return grainTypeName is null ? $"#Placement={placement}" : $"#GrainType={grainTypeName} Placement={placement}";
+    }
+
+    private string GetGrainTypeName()
+    {
+        return _shared.GrainTypeName ?? GrainInstance switch
         {
             { } grainInstance => RuntimeTypeNameFormatter.Format(grainInstance.GetType()),
-            _ => null
+            _ => GrainId.Type.ToString() ?? "Unknown"
         };
-        return grainTypeName is null ? $"#Placement={placement}" : $"#GrainType={grainTypeName} Placement={placement}";
     }
 
     public void Dispose() => DisposeAsync().AsTask().Wait();
@@ -872,10 +933,10 @@ internal sealed partial class ActivationData :
 
     bool IActivationWorkingSetMember.IsCandidateForRemoval(bool wouldRemove)
     {
-        const int IdlenessLowerBound = 10_000;
+        const int IdlenessLowerBoundMilliseconds = 10_000;
         lock (this)
         {
-            var inactive = IsInactive && _idleDuration.ElapsedMilliseconds > IdlenessLowerBound;
+            var inactive = IsInactive && GetIdleness().TotalMilliseconds > IdlenessLowerBoundMilliseconds;
 
             // This instance will remain in the working set if it is either not pending removal or if it is currently active.
             _isInWorkingSet = !wouldRemove || !inactive;
@@ -954,7 +1015,7 @@ internal sealed partial class ActivationData :
 
                             if (_blockingRequest != null)
                             {
-                                var currentRequestActiveTime = _busyDuration.Elapsed;
+                                var currentRequestActiveTime = GetBusyDuration();
                                 if (currentRequestActiveTime > _shared.MaxRequestProcessingTime && !IsStuckProcessingMessage)
                                 {
                                     DeactivateStuckActivation();
@@ -1027,7 +1088,7 @@ internal sealed partial class ActivationData :
             // This logic only works for non-reentrant activations
             // Consider: Handle long request detection for reentrant activations.
             _blockingRequest = message;
-            _busyDuration = stopwatch;
+            _busyStartTimestamp = _shared.Runtime.TimeProvider.GetTimestamp();
         }
 
         void ProcessRequestsToInvalidActivation()
@@ -1309,7 +1370,7 @@ internal sealed partial class ActivationData :
             // is in the activation working set.
             if (message.IsKeepAlive)
             {
-                _idleDuration = CoarseStopwatch.StartNew();
+                _idleStartTimestamp = _shared.Runtime.TimeProvider.GetTimestamp();
 
                 if (!_isInWorkingSet)
                 {
@@ -1322,7 +1383,7 @@ internal sealed partial class ActivationData :
             if (_blockingRequest is null || message.Equals(_blockingRequest))
             {
                 _blockingRequest = null;
-                _busyDuration = default;
+                _busyStartTimestamp = 0;
             }
         }
 
@@ -1469,6 +1530,8 @@ internal sealed partial class ActivationData :
             return;
         }
 
+        var activationStartTime = CoarseStopwatch.StartNew();
+
         // A chain of promises that will have to complete in order to complete the activation
         // Register with the grain directory and call the Activate method on the new activation.
         try
@@ -1593,6 +1656,19 @@ internal sealed partial class ActivationData :
                     {
                         SetState(ActivationState.Valid); // Activate calls on this activation are finished
                         _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
+
+                        // Emit diagnostic event for grain activation completed
+                        if (DiagnosticListener.IsEnabled(OrleansGrainDiagnostics.EventNames.Activated))
+                        {
+                            DiagnosticListener.Write(
+                                OrleansGrainDiagnostics.EventNames.Activated,
+                                new GrainActivatedEvent(
+                                    GrainId,
+                                    ActivationId,
+                                    GetGrainTypeName(),
+                                    Address.SiloAddress,
+                                    activationStartTime.Elapsed));
+                        }
                     }
                 }
 
@@ -1642,6 +1718,7 @@ internal sealed partial class ActivationData :
     /// </summary>
     private async Task FinishDeactivating(ActivationState previousState, CancellationToken cancellationToken)
     {
+        var deactivationStartTime = CoarseStopwatch.StartNew();
         var migrating = false;
         var encounteredError = false;
         try
@@ -1756,6 +1833,19 @@ internal sealed partial class ActivationData :
         catch (Exception exception)
         {
             LogExceptionDisposing(_shared.Logger, exception, this);
+        }
+
+        // Emit diagnostic event for grain deactivation completed
+        if (DiagnosticListener.IsEnabled(OrleansGrainDiagnostics.EventNames.Deactivated))
+        {
+            DiagnosticListener.Write(
+                OrleansGrainDiagnostics.EventNames.Deactivated,
+                new GrainDeactivatedEvent(
+                    GrainId,
+                    ActivationId,
+                    GetGrainTypeName(),
+                    Address.SiloAddress,
+                    deactivationStartTime.Elapsed));
         }
 
         // Signal deactivation

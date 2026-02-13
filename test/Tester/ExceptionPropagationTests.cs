@@ -234,9 +234,10 @@ namespace UnitTests.General
         /// <summary>
         /// Tests that when a Task is faulted with multiple exceptions, all exceptions
         /// are propagated in the AggregateException, not just the first one.
-        /// This is currently skipped pending implementation of issue #1378.
+        /// Skipped because Orleans only propagates the first exception in an AggregateException.
+        /// Issue #1378 was closed without fully implementing multi-exception propagation.
         /// </summary>
-        [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT")]
+        [Fact(Skip = "Orleans only propagates first exception in AggregateException (issue #1378 closed but not fully implemented)"), TestCategory("BVT")]
         public async Task ExceptionPropagationForwardsEntireAggregateException()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());

@@ -62,7 +62,7 @@ namespace Tester.Forwarding
             this.EnsurePreconditionsMet();
         }
 
-        [Fact(Skip = "https://github.com/dotnet/orleans/issues/6423"), TestCategory("Forward"), TestCategory("Functional")]
+        [Fact(Skip = "Pending requests timeout during graceful shutdown instead of being forwarded (issue #6423 closed but not fixed)"), TestCategory("Forward"), TestCategory("Functional")]
         public async Task SiloGracefulShutdown_ForwardPendingRequest()
         {
             var grain = await GetLongRunningTaskGrainOnSecondary<bool>();

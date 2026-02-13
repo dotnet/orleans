@@ -17,6 +17,31 @@ namespace UnitTests.GrainInterfaces
         Task UnlatchOverloaded();
         Task LatchCpuUsage(float value);
         Task UnlatchCpuUsage();
+        /// <summary>
+        /// Latches CPU usage on this silo without propagating statistics to the cluster.
+        /// Use <see cref="RefreshOverloadDetectorAndPropagateStatistics"/> after latching all silos.
+        /// </summary>
+        Task LatchCpuUsageOnly(float value);
+        /// <summary>
+        /// Latches overloaded status on this silo without propagating statistics to the cluster.
+        /// Use <see cref="RefreshOverloadDetectorAndPropagateStatistics"/> after latching all silos.
+        /// </summary>
+        Task LatchOverloadedOnly();
+        /// <summary>
+        /// Refreshes this silo's OverloadDetector cache and propagates statistics to all silos.
+        /// Call this after latching CPU/overloaded on all silos to ensure deterministic behavior.
+        /// </summary>
+        Task RefreshOverloadDetectorAndPropagateStatistics();
+        /// <summary>
+        /// Atomically latches CPU usage and refreshes OverloadDetector, then propagates statistics.
+        /// This avoids race conditions where the OverloadDetector auto-refreshes between latch and explicit refresh.
+        /// </summary>
+        Task LatchCpuUsageAndPropagate(float value);
+        /// <summary>
+        /// Atomically latches overloaded status and refreshes OverloadDetector, then propagates statistics.
+        /// This avoids race conditions where the OverloadDetector auto-refreshes between latch and explicit refresh.
+        /// </summary>
+        Task LatchOverloadedAndPropagate();
         Task<SiloAddress> GetLocation();
     }
 

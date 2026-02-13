@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Core.Messaging;
@@ -21,20 +22,25 @@ namespace Orleans.Runtime.Messaging
     /// </summary>
     internal class OverloadDetector : IOverloadDetector
     {
-        private const int RefreshIntervalMilliseconds = 1_000;
+        private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(1);
         private readonly IEnvironmentStatisticsProvider _environmentStatisticsProvider;
         private readonly LoadSheddingOptions _options;
-        private CoarseStopwatch _refreshStopwatch;
+        private readonly TimeProvider _timeProvider;
+        private long _lastRefreshTimestamp;
         private bool? _isOverloaded;
 
-        public OverloadDetector(IEnvironmentStatisticsProvider environmentStatisticsProvider, IOptions<LoadSheddingOptions> loadSheddingOptions)
+        public OverloadDetector(
+            IEnvironmentStatisticsProvider environmentStatisticsProvider,
+            IOptions<LoadSheddingOptions> loadSheddingOptions,
+            TimeProvider timeProvider = null)
         {
             _environmentStatisticsProvider = environmentStatisticsProvider;
             _options = loadSheddingOptions.Value;
+            _timeProvider = timeProvider ?? TimeProvider.System;
 
             Enabled = _options.LoadSheddingEnabled;
 
-            _refreshStopwatch = CoarseStopwatch.StartNew();
+            _lastRefreshTimestamp = _timeProvider.GetTimestamp();
         }
 
         /// <summary>
@@ -54,11 +60,14 @@ namespace Orleans.Runtime.Messaging
                     return false;
                 }
 
-                if (!_isOverloaded.HasValue || _refreshStopwatch.ElapsedMilliseconds >= RefreshIntervalMilliseconds)
+                var currentTimestamp = _timeProvider.GetTimestamp();
+                var elapsed = _timeProvider.GetElapsedTime(_lastRefreshTimestamp, currentTimestamp);
+
+                if (!_isOverloaded.HasValue || elapsed >= RefreshInterval)
                 {
                     var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
                     _isOverloaded = OverloadDetectionLogic.IsOverloaded(ref stats, _options);
-                    _refreshStopwatch.Restart();
+                    _lastRefreshTimestamp = currentTimestamp;
                 }
 
                 return _isOverloaded.Value;

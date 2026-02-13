@@ -57,6 +57,15 @@ namespace UnitTests.Grains
 
         public Task<Dictionary<string, ReminderState>> GetReminderStates() => Task.FromResult(allReminders);
 
+        public Task<int> GetReminderTickCount(string reminderName)
+        {
+            if (this.allReminders.TryGetValue(reminderName, out var state))
+            {
+                return Task.FromResult(state.Fired.Count);
+            }
+            return Task.FromResult(0);
+        }
+
         public async Task<IGrainReminder> StartReminder(string reminderName, TimeSpan? p = null, bool validate = false)
         {
             TimeSpan usePeriod = p ?? this.period;
@@ -234,6 +243,7 @@ namespace UnitTests.Grains
         private readonly IReminderRegistry unvalidatedReminderRegistry;
         private Dictionary<string, IGrainReminder> allReminders;
         private Dictionary<string, long> sequence;
+        private Dictionary<string, int> tickCounts; // Track tick counts for waiting
         private TimeSpan period;
 
         private static readonly long aCCURACY = 50 * TimeSpan.TicksPerMillisecond; // when we use ticks to compute sequence numbers, we might get wrong results as timeouts don't happen with precision of ticks  ... we keep this as a leeway
@@ -254,6 +264,7 @@ namespace UnitTests.Grains
             this.myId = new Random().Next();
             this.allReminders = new Dictionary<string, IGrainReminder>();
             this.sequence = new Dictionary<string, long>();
+            this.tickCounts = new Dictionary<string, int>();
             this.period = ReminderTestGrain2.GetDefaultPeriod(this.logger);
             this.logger.LogInformation("OnActivateAsync.");
             this.filePrefix = "gc" + this.GrainId.Key + "_";
@@ -307,6 +318,13 @@ namespace UnitTests.Grains
                 //counters.Add(reminderName, 0);
                 this.sequence.Add(reminderName, 0); // we'll get upto date to the latest sequence number while processing this tick
             }
+
+            // Track tick count for WaitForReminderTickCount
+            if (!this.tickCounts.ContainsKey(reminderName))
+            {
+                this.tickCounts[reminderName] = 0;
+            }
+            this.tickCounts[reminderName]++;
 
             // calculating tick sequence number
 
@@ -396,6 +414,15 @@ namespace UnitTests.Grains
         private string GetFileName(string reminderName)
         {
             return string.Format("{0}{1}", this.filePrefix, reminderName);
+        }
+
+        public Task<int> GetReminderTickCount(string reminderName)
+        {
+            if (this.tickCounts.TryGetValue(reminderName, out var count))
+            {
+                return Task.FromResult(count);
+            }
+            return Task.FromResult(0);
         }
     }
 

@@ -36,24 +36,16 @@ public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper
            $"Silo3: {initialSilo3Activations}\n" +
            $"Silo4: {initialSilo4Activations}\n");
 
-        var silo1Activations = initialSilo1Activations;
-        var silo2Activations = initialSilo2Activations;
-        var silo3Activations = initialSilo3Activations;
-        var silo4Activations = initialSilo4Activations;
+        // Wait for 3 rebalancing cycles using event-driven waiting instead of Task.Delay
+        // This is deterministic and faster than waiting 3x SessionCyclePeriod (9 seconds)
+        const int targetCycles = 3;
+        await RebalancerObserver.WaitForCycleCountAsync(targetCycles, timeout: TimeSpan.FromSeconds(30));
 
-        var index = 0;
-        while (index < 3)
-        {
-            await Task.Delay(RebalancerFixture.SessionCyclePeriod);
-            stats = await MgmtGrain.GetDetailedGrainStatistics();
-
-            silo1Activations = GetActivationCount(stats, Silo1);
-            silo2Activations = GetActivationCount(stats, Silo2);
-            silo3Activations = GetActivationCount(stats, Silo3);
-            silo4Activations = GetActivationCount(stats, Silo4);
-
-            index++;
-        }
+        stats = await MgmtGrain.GetDetailedGrainStatistics();
+        var silo1Activations = GetActivationCount(stats, Silo1);
+        var silo2Activations = GetActivationCount(stats, Silo2);
+        var silo3Activations = GetActivationCount(stats, Silo3);
+        var silo4Activations = GetActivationCount(stats, Silo4);
 
         Assert.True(silo1Activations < initialSilo1Activations,
             $"Did not expect Silo1 to have more activations than what it started with: " +
@@ -73,9 +65,10 @@ public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper
 
         var preVariance = CalculateVariance([initialSilo1Activations, initialSilo2Activations, initialSilo3Activations, initialSilo4Activations]);
         var postVariance = CalculateVariance([silo1Activations, silo2Activations, silo3Activations, silo4Activations]);
-        
+
+        var completedCycles = RebalancerObserver.GetCycleCount();
         OutputHelper.WriteLine(
-            $"Post-rebalancing activations ({index} cycles):\n" +
+            $"Post-rebalancing activations ({completedCycles} cycles):\n" +
             $"Silo1: {silo1Activations}\n" +
             $"Silo2: {silo2Activations}\n" +
             $"Silo3: {silo3Activations}\n" +

@@ -25,6 +25,7 @@ namespace Orleans.Runtime
         private static readonly List<ICollectibleGrainContext> nothing = new(0);
         private readonly ILogger logger;
         private int collectionNumber;
+        private readonly TimeProvider _timeProvider;
 
         // internal for testing
         internal int _activationCount;
@@ -49,24 +50,25 @@ namespace Orleans.Runtime
             ILogger<ActivationCollector> logger,
             IEnvironmentStatisticsProvider environmentStatisticsProvider)
         {
+            _timeProvider = timeProvider;
             _grainCollectionOptions = options.Value;
 
             shortestAgeLimit = new(_grainCollectionOptions.ClassSpecificCollectionAge.Values.Aggregate(_grainCollectionOptions.CollectionAge.Ticks, (a, v) => Math.Min(a, v.Ticks)));
             nextTicket = MakeTicketFromDateTime(timeProvider.GetUtcNow().UtcDateTime);
             this.logger = logger;
-            _collectionTimer = new PeriodicTimer(_grainCollectionOptions.CollectionQuantum);
+            _collectionTimer = new PeriodicTimer(_grainCollectionOptions.CollectionQuantum, timeProvider);
 
             _environmentStatisticsProvider = environmentStatisticsProvider;
             if (_grainCollectionOptions.EnableActivationSheddingOnMemoryPressure)
             {
-                _memBasedDeactivationTimer = new PeriodicTimer(_grainCollectionOptions.MemoryUsagePollingPeriod);
+                _memBasedDeactivationTimer = new PeriodicTimer(_grainCollectionOptions.MemoryUsagePollingPeriod, timeProvider);
             }
         }
 
         // Return the number of activations that were used (touched) in the last recencyPeriod.
         public int GetNumRecentlyUsed(TimeSpan recencyPeriod)
         {
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             int sum = 0;
             foreach (var bucket in buckets)
             {
@@ -170,7 +172,7 @@ namespace Orleans.Runtime
             if (IsExpired(item.CollectionTicket)) return false;
 
             DateTime oldTicket = item.CollectionTicket;
-            DateTime newTicket = MakeTicketFromTimeSpan(timeout, DateTime.UtcNow);
+            DateTime newTicket = MakeTicketFromTimeSpan(timeout, _timeProvider.GetUtcNow().UtcDateTime);
             // if the ticket value doesn't change, then the source and destination bucket are the same and there's nothing to do.
             if (newTicket.Equals(oldTicket)) return true;
 
@@ -215,7 +217,7 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public override string ToString()
         {
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             var all = buckets.ToList();
             var bucketsText = Utils.EnumerableToString(all.OrderBy(bucket => bucket.Key), bucket => $"{Utils.TimeSpanToString(bucket.Key - now)}->{bucket.Value.Items.Count} items");
             return $"<#Activations={all.Sum(b => b.Value.Items.Count)}, #Buckets={all.Count}, buckets={bucketsText}>";
@@ -227,7 +229,7 @@ namespace Orleans.Runtime
         /// <returns>A list of activations that are due for collection.</returns>
         public List<ICollectibleGrainContext> ScanStale()
         {
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             List<ICollectibleGrainContext> condemned = null;
             while (DequeueQuantum(out var activations, now))
             {
@@ -275,7 +277,7 @@ namespace Orleans.Runtime
         public List<ICollectibleGrainContext> ScanAll(TimeSpan ageLimit)
         {
             List<ICollectibleGrainContext> condemned = null;
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             foreach (var kv in buckets)
             {
                 var bucket = kv.Value;
@@ -466,7 +468,7 @@ namespace Orleans.Runtime
                 Interlocked.Increment(ref _activationCount);
                 if (activation.CollectionTicket == default)
                 {
-                    ScheduleCollection(activation, activation.CollectionAgeLimit, DateTime.UtcNow);
+                    ScheduleCollection(activation, activation.CollectionAgeLimit, _timeProvider.GetUtcNow().UtcDateTime);
                 }
                 else
                 {

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -9,6 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Diagnostics;
 using Orleans.Internal;
 using Orleans.Runtime.Utilities;
 using Orleans.Serialization.TypeSystem;
@@ -42,6 +44,8 @@ namespace Orleans.Runtime.MembershipService
 
         private readonly Task _suspectOrKillsListTask;
         private readonly Channel<SuspectOrKillRequest> _trySuspectOrKillChannel = Channel.CreateBounded<SuspectOrKillRequest>(new BoundedChannelOptions(100) { FullMode = BoundedChannelFullMode.DropOldest });
+
+        private static readonly DiagnosticListener _membershipDiagnosticListener = new(OrleansMembershipDiagnostics.ListenerName);
 
         // For testing.
         internal AutoResetEvent TestingSuspectOrKillIdle = new(false);
@@ -448,11 +452,42 @@ namespace Orleans.Runtime.MembershipService
             if (table is null) throw new ArgumentNullException(nameof(table));
             LogDebugProcessTableUpdate(this.log, caller, table);
 
+            var previousSnapshot = this.snapshot;
             if (this.updates.TryPublish(MembershipTableSnapshot.Update, table))
             {
                 this.LogMissedIAmAlives(table);
 
                 LogDebugProcessTableUpdateWithTable(this.log, caller, new(table));
+
+                // Emit diagnostic events for status changes
+                var newSnapshot = this.snapshot;
+                EmitStatusChangeEvents(previousSnapshot, newSnapshot);
+                EmitMembershipViewChangedEvent(newSnapshot);
+            }
+        }
+
+        private void EmitStatusChangeEvents(MembershipTableSnapshot previousSnapshot, MembershipTableSnapshot newSnapshot)
+        {
+            if (!_membershipDiagnosticListener.IsEnabled(OrleansMembershipDiagnostics.EventNames.SiloStatusChanged))
+            {
+                return;
+            }
+
+            // Check for status changes in existing silos
+            foreach (var (siloAddress, newEntry) in newSnapshot.Entries)
+            {
+                if (previousSnapshot.Entries.TryGetValue(siloAddress, out var previousEntry))
+                {
+                    if (previousEntry.Status != newEntry.Status)
+                    {
+                        EmitSiloStatusChangedEvent(siloAddress, previousEntry.Status, newEntry.Status);
+                    }
+                }
+                else
+                {
+                    // New silo appeared in the table
+                    EmitSiloStatusChangedEvent(siloAddress, SiloStatus.None, newEntry.Status);
+                }
             }
         }
 
@@ -752,6 +787,9 @@ namespace Orleans.Runtime.MembershipService
             var prevList = entry.SuspectTimes?.ToList() ?? new List<Tuple<SiloAddress, DateTime>>();
             entry.AddOrUpdateSuspector(myAddress, now, clusterMembershipOptions.NumVotesForDeathDeclaration);
 
+            // Emit diagnostic event for the suspicion
+            EmitSiloSuspectedEvent(silo, "Failed health probe");
+
             // Include the indirect probe silo's vote as well, if it exists.
             if (indirectProbingSilo is not null)
             {
@@ -808,6 +846,7 @@ namespace Orleans.Runtime.MembershipService
                 if (ok)
                 {
                     LogDebugSuccessfullyUpdatedStatusToDead(this.log, entry.SiloAddress);
+                    EmitSiloDeclaredDeadEvent(entry.SiloAddress, $"DeclareDead by {this.myAddress}");
 
                     var table = await membershipTableProvider.ReadAll();
                     this.ProcessTableUpdate(table, "DeclareDead");
@@ -859,6 +898,83 @@ namespace Orleans.Runtime.MembershipService
             this.membershipUpdateTimer.Dispose();
             _shutdownCts.Dispose();
         }
+
+        #region Diagnostic Event Emitters
+
+        private void EmitSiloStatusChangedEvent(SiloAddress siloAddress, SiloStatus oldStatus, SiloStatus newStatus)
+        {
+            if (_membershipDiagnosticListener.IsEnabled(OrleansMembershipDiagnostics.EventNames.SiloStatusChanged))
+            {
+                _membershipDiagnosticListener.Write(
+                    OrleansMembershipDiagnostics.EventNames.SiloStatusChanged,
+                    new SiloStatusChangedEvent(siloAddress, oldStatus.ToString(), newStatus.ToString(), this.myAddress));
+
+                // Also emit specific events for key status transitions
+                if (newStatus == SiloStatus.Active && oldStatus != SiloStatus.Active)
+                {
+                    EmitSiloBecameActiveEvent(siloAddress);
+                }
+                else if (newStatus == SiloStatus.Joining && oldStatus == SiloStatus.Created)
+                {
+                    EmitSiloJoiningEvent(siloAddress);
+                }
+            }
+        }
+
+        private void EmitMembershipViewChangedEvent(MembershipTableSnapshot snapshot)
+        {
+            if (_membershipDiagnosticListener.IsEnabled(OrleansMembershipDiagnostics.EventNames.ViewChanged))
+            {
+                int activeSiloCount = snapshot.Entries.Values.Count(e => e.Status == SiloStatus.Active);
+                int totalSiloCount = snapshot.Entries.Count;
+
+                _membershipDiagnosticListener.Write(
+                    OrleansMembershipDiagnostics.EventNames.ViewChanged,
+                    new MembershipViewChangedEvent(snapshot.Version, activeSiloCount, totalSiloCount, this.myAddress));
+            }
+        }
+
+        private void EmitSiloSuspectedEvent(SiloAddress suspectedSilo, string reason)
+        {
+            if (_membershipDiagnosticListener.IsEnabled(OrleansMembershipDiagnostics.EventNames.SiloSuspected))
+            {
+                _membershipDiagnosticListener.Write(
+                    OrleansMembershipDiagnostics.EventNames.SiloSuspected,
+                    new SiloSuspectedEvent(suspectedSilo, this.myAddress, reason));
+            }
+        }
+
+        private void EmitSiloDeclaredDeadEvent(SiloAddress deadSilo, string declaringSource)
+        {
+            if (_membershipDiagnosticListener.IsEnabled(OrleansMembershipDiagnostics.EventNames.SiloDeclaredDead))
+            {
+                _membershipDiagnosticListener.Write(
+                    OrleansMembershipDiagnostics.EventNames.SiloDeclaredDead,
+                    new SiloDeclaredDeadEvent(deadSilo, declaringSource, this.myAddress));
+            }
+        }
+
+        private void EmitSiloBecameActiveEvent(SiloAddress siloAddress)
+        {
+            if (_membershipDiagnosticListener.IsEnabled(OrleansMembershipDiagnostics.EventNames.SiloBecameActive))
+            {
+                _membershipDiagnosticListener.Write(
+                    OrleansMembershipDiagnostics.EventNames.SiloBecameActive,
+                    new SiloBecameActiveEvent(siloAddress, this.myAddress));
+            }
+        }
+
+        private void EmitSiloJoiningEvent(SiloAddress siloAddress)
+        {
+            if (_membershipDiagnosticListener.IsEnabled(OrleansMembershipDiagnostics.EventNames.SiloJoining))
+            {
+                _membershipDiagnosticListener.Write(
+                    OrleansMembershipDiagnostics.EventNames.SiloJoining,
+                    new SiloJoiningEvent(siloAddress, this.myAddress));
+            }
+        }
+
+        #endregion
 
         private readonly struct WithoutDuplicateDeadsLogValue(MembershipTableData table)
         {
