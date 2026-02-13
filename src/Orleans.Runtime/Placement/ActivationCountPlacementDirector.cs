@@ -108,8 +108,9 @@ namespace Orleans.Runtime.Placement
             }
 
             // All compatible silos have published stats and are overloaded.
-            var all = _localCache.ToList();
-            throw new SiloUnavailableException($"Unable to select a candidate from {silos.Length} compatible silos: {Utils.EnumerableToString(all, kvp => $"SiloAddress = {kvp.Key} -> {kvp.Value}")}");
+            var allSiloStats = _localCache.ToList();
+            throw new SiloUnavailableException(
+                $"Unable to select a candidate from {silos.Length} compatible silos (all are overloaded). All silo stats: {Utils.EnumerableToString(allSiloStats, kvp => $"SiloAddress = {kvp.Key} -> IsOverloaded = {kvp.Value.SiloStats.IsOverloaded}, ActivationCount = {kvp.Value.ActivationCount}, RecentlyUsedActivationCount = {kvp.Value.SiloStats.RecentlyUsedActivationCount}")}");
         }
 
         public override Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context) => Task.FromResult(OnAddActivationInternal(target, context));
@@ -127,12 +128,9 @@ namespace Orleans.Runtime.Placement
             // If the cache was not populated, place locally only if this silo is compatible.
             if (_localCache.IsEmpty)
             {
-                foreach (var silo in compatibleSilos)
+                if (compatibleSilos.Contains(_localAddress))
                 {
-                    if (silo.Equals(_localAddress))
-                    {
-                        return _localAddress;
-                    }
+                    return _localAddress;
                 }
 
                 return SelectSiloPowerOfK(compatibleSilos);
