@@ -96,19 +96,16 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public bool Equals(IdSpan obj)
         {
-            // If both are the same reference, they're equal
             if (_value == obj._value)
             {
                 return true;
             }
 
-            // If one is null and the other is not, they're not equal
             if (_value is null || obj._value is null)
             {
                 return false;
             }
 
-            // Compare the actual byte sequences
             return _value.AsSpan().SequenceEqual(obj._value);
         }
 
@@ -157,15 +154,9 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public int CompareTo(IdSpan other)
         {
-            // Handle null cases explicitly
-            if (_value is null && other._value is null)
-            {
-                return 0;
-            }
-
             if (_value is null)
             {
-                return -1;
+                return other._value is null ? 0 : -1;
             }
 
             if (other._value is null)
