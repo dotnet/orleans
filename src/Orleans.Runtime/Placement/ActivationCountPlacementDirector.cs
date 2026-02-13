@@ -41,26 +41,29 @@ namespace Orleans.Runtime.Placement
 
         private SiloAddress SelectSiloPowerOfK(SiloAddress[] silos)
         {
+            if (silos.Length == 0)
+            {
+                throw new SiloUnavailableException("Unable to select a candidate because there are no compatible silos.");
+            }
+
             // Exclude overloaded and non-compatible silos
             var relevantSilos = new List<KeyValuePair<SiloAddress, CachedLocalStat>>();
             var totalSilos = _localCache.Count;
-            var compatibleSilosWithStats = 0;
             var compatibleSilosWithoutStats = 0;
-            SiloAddress randomCompatibleSiloWithoutStats = default;
+            SiloAddress sampledCompatibleSiloWithoutStats = default;
             foreach (var silo in silos)
             {
                 if (!_localCache.TryGetValue(silo, out var localSiloStat))
                 {
                     compatibleSilosWithoutStats++;
-                    if (Random.Shared.Next(compatibleSilosWithoutStats) == 0)
+                    if (compatibleSilosWithoutStats == 1 || Random.Shared.Next(compatibleSilosWithoutStats) == 0)
                     {
-                        randomCompatibleSiloWithoutStats = silo;
+                        sampledCompatibleSiloWithoutStats = silo;
                     }
 
                     continue;
                 }
 
-                compatibleSilosWithStats++;
                 if (localSiloStat.SiloStats.IsOverloaded) continue;
 
                 relevantSilos.Add(new(silo, localSiloStat));
@@ -98,21 +101,15 @@ namespace Orleans.Runtime.Placement
                 return minLoadedSilo.Key;
             }
 
-            // If there are no stats for any compatible silos, fall back to random placement.
-            if (compatibleSilosWithStats == 0)
-            {
-                return silos[Random.Shared.Next(silos.Length)];
-            }
-
             // Some compatible silos might not have published statistics yet.
             if (compatibleSilosWithoutStats > 0)
             {
-                return randomCompatibleSiloWithoutStats;
+                return sampledCompatibleSiloWithoutStats;
             }
 
-            // There are no compatible, non-overloaded silos.
+            // All compatible silos have published stats and are overloaded.
             var all = _localCache.ToList();
-            throw new SiloUnavailableException($"Unable to select a candidate from {all.Count} silos: {Utils.EnumerableToString(all, kvp => $"SiloAddress = {kvp.Key} -> {kvp.Value}")}");
+            throw new SiloUnavailableException($"Unable to select a candidate from {silos.Length} compatible silos: {Utils.EnumerableToString(all, kvp => $"SiloAddress = {kvp.Key} -> {kvp.Value}")}");
         }
 
         public override Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context) => Task.FromResult(OnAddActivationInternal(target, context));
