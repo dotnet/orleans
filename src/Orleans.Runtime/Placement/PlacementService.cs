@@ -228,7 +228,7 @@ namespace Orleans.Runtime.Placement
         /// <returns>A location for the new activation.</returns>
         public async Task<SiloAddress> PlaceGrainAsync(GrainId grainId, Dictionary<string, object> requestContextData, PlacementStrategy placementStrategy)
         {
-            using var placeGrainActivity = TryRestoreActivityContext(requestContextData, ActivityNames.PlaceGrain);
+            using var _ = TryRestoreActivityContext(requestContextData, ActivityNames.PlaceGrain);
             var target = new PlacementTarget(grainId, requestContextData, default, 0);
             var director = _directorResolver.GetPlacementDirector(placementStrategy);
             return await director.OnAddActivation(placementStrategy, target, this);
