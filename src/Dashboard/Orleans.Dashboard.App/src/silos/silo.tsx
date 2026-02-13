@@ -169,9 +169,7 @@ export default class Silo extends React.Component<SiloProps> {
     };
 
     if (this.props.siloProperties.orleansVersion) {
-      configuration[
-        'Orleans version'
-      ] = this.props.siloProperties.orleansVersion;
+      configuration['Orleans version'] = this.props.siloProperties.orleansVersion;
     }
 
     if (this.props.siloProperties.hostVersion) {
