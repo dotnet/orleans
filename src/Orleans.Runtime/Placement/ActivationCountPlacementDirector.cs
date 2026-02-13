@@ -25,6 +25,7 @@ namespace Orleans.Runtime.Placement
         
         // Track created activations on this silo between statistic intervals.
         private readonly ConcurrentDictionary<SiloAddress, CachedLocalStat> _localCache = new();
+        private readonly SiloAddress _localAddress;
         private readonly int _chooseHowMany;
 
         public ActivationCountPlacementDirector(
@@ -32,7 +33,7 @@ namespace Orleans.Runtime.Placement
             DeploymentLoadPublisher deploymentLoadPublisher, 
             IOptions<ActivationCountBasedPlacementOptions> options)
         {
-            _ = localSiloDetails;
+            _localAddress = localSiloDetails.SiloAddress;
             _chooseHowMany = options.Value.ChooseOutOf;
             if (_chooseHowMany <= 0) throw new ArgumentException($"{nameof(ActivationCountBasedPlacementOptions)}.{nameof(ActivationCountBasedPlacementOptions.ChooseOutOf)} is {_chooseHowMany}. It must be greater than zero.");
             deploymentLoadPublisher?.SubscribeToStatisticsChangeEvents(this);
@@ -126,10 +127,10 @@ namespace Orleans.Runtime.Placement
                 return placementHint;
             }
 
-            // If there are no statistics yet, fall back to random placement.
+            // If the cache was not populated, just place locally.
             if (_localCache.IsEmpty)
             {
-                return compatibleSilos[Random.Shared.Next(compatibleSilos.Length)];
+                return _localAddress;
             }
 
             return SelectSiloPowerOfK(compatibleSilos);
