@@ -4,4 +4,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Orleans.Runtime")]
 
 [assembly: InternalsVisibleTo("LoadTestGrains")]
-[assembly: InternalsVisibleTo("TesterInternal")]
+[assembly: InternalsVisibleTo("Orleans.Runtime.Internal.Tests")]

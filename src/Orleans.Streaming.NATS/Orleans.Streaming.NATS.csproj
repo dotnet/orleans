@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="NATS.Tests" />
+    <InternalsVisibleTo Include="Orleans.Streaming.NATS.Tests" />
   </ItemGroup>
 
   <ItemGroup>

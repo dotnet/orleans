@@ -20,7 +20,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Tester.AdoNet" />
+    <InternalsVisibleTo Include="Orleans.AdoNet.Tests" />
     <InternalsVisibleTo Include="Benchmarks.AdoNet" />
   </ItemGroup>
 
