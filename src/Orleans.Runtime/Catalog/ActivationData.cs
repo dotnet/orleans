@@ -1774,7 +1774,8 @@ internal sealed partial class ActivationData :
                     }
                 }
                 _activationActivity?.AddEvent(new ActivityEvent("state-valid"));
-                _activationActivity?.Stop();
+                _activationActivity?.Dispose();
+                _activationActivity = null;
 
                 LogFinishedActivatingGrain(_shared.Logger, this);
             }
@@ -1789,7 +1790,8 @@ internal sealed partial class ActivationData :
                 }
                 Deactivate(new(DeactivationReasonCode.ActivationFailed, sourceException, "Failed to activate grain."), CancellationToken.None);
                 SetActivityError(_activationActivity, ActivityErrorEvents.ActivationFailed);
-                _activationActivity?.Stop();
+                _activationActivity?.Dispose();
+                _activationActivity = null;
                 return;
             }
         }
@@ -1798,7 +1800,8 @@ internal sealed partial class ActivationData :
             LogActivationFailed(_shared.Logger, exception, this);
             Deactivate(new(DeactivationReasonCode.ApplicationError, exception, "Failed to activate grain."), CancellationToken.None);
             SetActivityError(_activationActivity, ActivityErrorEvents.ActivationError);
-            _activationActivity?.Stop();
+            _activationActivity?.Dispose();
+            _activationActivity = null;
         }
         finally
         {
