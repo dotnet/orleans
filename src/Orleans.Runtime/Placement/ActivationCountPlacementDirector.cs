@@ -124,10 +124,18 @@ namespace Orleans.Runtime.Placement
                 return placementHint;
             }
 
-            // If the cache was not populated, just place locally.
+            // If the cache was not populated, place locally only if this silo is compatible.
             if (_localCache.IsEmpty)
             {
-                return _localAddress;
+                foreach (var silo in compatibleSilos)
+                {
+                    if (silo.Equals(_localAddress))
+                    {
+                        return _localAddress;
+                    }
+                }
+
+                return SelectSiloPowerOfK(compatibleSilos);
             }
 
             return SelectSiloPowerOfK(compatibleSilos);
