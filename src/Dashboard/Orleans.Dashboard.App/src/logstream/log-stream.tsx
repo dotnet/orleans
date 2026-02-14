@@ -102,8 +102,7 @@ export default class LogStream extends React.Component<LogStreamProps, LogStream
           className="log"
           style={{
             overflowY: 'auto',
-            width: '100%',
-            height: 'calc(100vh - 100px)',
+            height: 'calc(100vh - 60px)',
             whiteSpace: 'pre-wrap'
           }}
         >
@@ -114,9 +113,9 @@ export default class LogStream extends React.Component<LogStreamProps, LogStream
           onClick={this.toggle}
           className="btn btn-default"
           style={{
-            marginLeft: '-80px',
+            marginLeft: '-100px',
             position: 'fixed',
-            top: '95px',
+            top: '70px',
             left: '100%'
           }}
         >

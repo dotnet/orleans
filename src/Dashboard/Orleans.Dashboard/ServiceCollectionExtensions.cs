@@ -60,16 +60,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IGrainProfiler, GrainProfiler>();
         services.AddSingleton(c => (ILifecycleParticipant<ISiloLifecycle>)c.GetRequiredService<IGrainProfiler>());
         services.AddSingleton<IIncomingGrainCallFilter, GrainProfilerFilter>();
-
         services.AddSingleton<ISiloGrainClient, SiloGrainClient>();
 
-        services.AddSingleton<ISiloDetailsProvider>(c
-            => c.GetService<IMembershipTable>() switch
-            {
-                not null =>
-                c.GetRequiredService<MembershipTableSiloDetailsProvider>(),
-                null => c.GetRequiredService<SiloStatusOracleSiloDetailsProvider>(),
-            });
+        services.AddSingleton<ISiloDetailsProvider>(c => c.GetService<IMembershipTable>() switch
+        {
+            not null => c.GetRequiredService<MembershipTableSiloDetailsProvider>(),
+            null => c.GetRequiredService<SiloStatusOracleSiloDetailsProvider>(),
+        });
 
         services.TryAddSingleton(GrainProfilerFilter.DefaultGrainMethodFormatter);
 
@@ -141,11 +138,11 @@ public static class ServiceCollectionExtensions
             new { version = typeof(EmbeddedAssetProvider).Assembly.GetName().Version?.ToString() },
             jsonOptions));
 
-        group.MapGet("/DashboardCounters", async ([FromServices] IDashboardClient client) =>
+        group.MapGet("/DashboardCounters", async (string[] exclude, [FromServices] IDashboardClient client) =>
         {
             try
             {
-                var result = await client.DashboardCounters();
+                var result = await client.DashboardCounters(SanitizeExclusionFilters(exclude));
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -196,6 +193,19 @@ public static class ServiceCollectionExtensions
             }
         });
 
+        group.MapGet("/SiloMetadata/{*address}", async (string address, [FromServices] IDashboardClient client) =>
+        {
+            try
+            {
+                var result = await client.SiloMetadata(address);
+                return Results.Json(result.Value, jsonOptions);
+            }
+            catch (SiloUnavailableException)
+            {
+                return CreateUnavailableResult(true);
+            }
+        });
+
         group.MapGet("/SiloStats/{*address}", async (string address, [FromServices] IDashboardClient client) =>
         {
             try
@@ -235,11 +245,11 @@ public static class ServiceCollectionExtensions
             }
         });
 
-        group.MapGet("/TopGrainMethods", async ([FromServices] IDashboardClient client) =>
+        group.MapGet("/TopGrainMethods", async (string[] exclude, [FromServices] IDashboardClient client) =>
         {
             try
             {
-                var result = await client.TopGrainMethods(take: 5);
+                var result = await client.TopGrainMethods(take: 5, SanitizeExclusionFilters(exclude));
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -263,11 +273,11 @@ public static class ServiceCollectionExtensions
             }
         });
 
-        group.MapGet("/GrainTypes", async ([FromServices] IDashboardClient client) =>
+        group.MapGet("/GrainTypes", async (string[] exclude, [FromServices] IDashboardClient client) =>
         {
             try
             {
-                var result = await client.GetGrainTypes();
+                var result = await client.GetGrainTypes(SanitizeExclusionFilters(exclude));
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -341,6 +351,14 @@ public static class ServiceCollectionExtensions
             : "The dashboard is still trying to connect to the Orleans cluster";
 
         return Results.Text(message, "text/plain", statusCode: 503);
+    }
+
+    private static string[] SanitizeExclusionFilters(string[] filters)
+    {
+        return (filters == null || filters.Length == 0) ? [] : [.. filters
+            .Select(f => f.Trim())
+            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .Select(f => string.Concat(f, '.'))];
     }
 
     /// <summary>

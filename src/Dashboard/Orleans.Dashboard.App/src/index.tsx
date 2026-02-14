@@ -87,7 +87,6 @@ let settings: Settings = {
 
 // Global state.
 let dashboardCounters: any = {};
-let unfilteredDashboardCounters: any = {};
 let routeIndex = 0;
 
 function scroll() {
@@ -122,12 +121,8 @@ function setIntervalDebounced(action: () => Promise<any>, interval: number) {
 
 // continually poll the dashboard counters
 function loadDashboardCounters() {
-  return http.get('DashboardCounters', function (err, data) {
+    return http.get(`DashboardCounters${getFilter(settings)}`, function (err, data) {
     dashboardCounters = data;
-    unfilteredDashboardCounters = data;
-    dashboardCounters.simpleGrainStats = unfilteredDashboardCounters.simpleGrainStats.filter(
-      getFilter(settings)
-    );
     events.emit('dashboard-counters', dashboardCounters);
   });
 }
@@ -195,25 +190,14 @@ function renderPage(jsx: JSX.Element, path: string) {
 
   let clusterStats: any = {};
   let grainMethodStats: any = [];
-  let unfiltedMethodStats: any = [];
   let loadDataIsPending = false;
   const loadData = function (cb?: any) {
     if (!loadDataIsPending) {
       loadDataIsPending = true;
       http.get('ClusterStats', function (err, data) {
         clusterStats = data;
-        http.get('TopGrainMethods', function (err, grainMethodsData) {
+          http.get(`TopGrainMethods${getFilter(settings)}`, function (err, grainMethodsData) {
           grainMethodStats = grainMethodsData;
-          unfiltedMethodStats = grainMethodsData;
-          grainMethodStats.calls = unfiltedMethodStats.calls.filter(
-            getFilter(settings)
-          );
-          grainMethodStats.errors = unfiltedMethodStats.errors.filter(
-            getFilter(settings)
-          );
-          grainMethodStats.latency = unfiltedMethodStats.latency.filter(
-            getFilter(settings)
-          );
           render();
         }).finally(() => loadDataIsPending = false);
       }).catch(() => loadDataIsPending = false);
@@ -290,6 +274,7 @@ function renderPage(jsx: JSX.Element, path: string) {
   renderLoading();
 
   let siloProperties: any = {};
+  let siloMetadata: any = {};
 
   let siloData: any[] = [];
   let siloStats: any[] = [];
@@ -332,6 +317,7 @@ function renderPage(jsx: JSX.Element, path: string) {
           silo={host}
           data={siloData}
           siloProperties={siloProperties}
+          siloMetadata={siloMetadata}
           dashboardCounters={dashboardCounters}
           siloStats={siloStats}
         />
@@ -345,6 +331,11 @@ function renderPage(jsx: JSX.Element, path: string) {
 
   http.get('SiloProperties/' + host, function (err, data) {
     siloProperties = data;
+    loadData();
+  });
+
+  http.get('SiloMetadata/' + host, function (err, data) {
+    siloMetadata = data;
     loadData();
   });
 });
@@ -416,7 +407,7 @@ function renderPage(jsx: JSX.Element, path: string) {
   let loadDataIsPending = false;
   const loadData = function (cb?: any) {
     if (!loadDataIsPending) {
-      http.get('GrainTypes', function (err, data) {
+      http.get(`GrainTypes${getFilter(settings)}`, function (err, data) {
         grainTypes = data;
         render();
       }).finally(() => loadDataIsPending = false);
@@ -426,9 +417,7 @@ function renderPage(jsx: JSX.Element, path: string) {
   render = function () {
     if (routeIndex != thisRouteIndex) return;
     renderPage(
-      <GrainDetails
-        grainTypes={grainTypes}
-      />,
+      <GrainDetails grainTypes={grainTypes} />,
       '#/grainState'
     );
   };
@@ -514,11 +503,7 @@ function renderPage(jsx: JSX.Element, path: string) {
       );
       settings.systemGrainsHidden = newSettings.systemGrainsHidden!;
     }
-
-    dashboardCounters.simpleGrainStats = unfilteredDashboardCounters.simpleGrainStats.filter(
-      getFilter(settings)
-    );
-    events.emit('dashboard-counters', dashboardCounters);
+    loadDashboardCounters();
   };
 
   render = function () {
@@ -594,50 +579,15 @@ function getMenu(): MenuItem[] {
   return result;
 }
 
-function getFilter(settings: Settings): (x: GrainStatItem) => boolean {
-  let filter: (x: GrainStatItem) => boolean;
+function getFilter(settings: Settings): string {
   if (settings.dashboardGrainsHidden && settings.systemGrainsHidden) {
-    filter = filterByBothDashSys;
+      return '?exclude=Orleans.Runtime&exclude=Orleans.Streams&exclude=Orleans.Storage&exclude=Orleans.Providers&exclude=Orleans.Dashboard';
   } else if (settings.dashboardGrainsHidden) {
-    filter = filterByDashboard;
+      return '?exclude=Orleans.Dashboard';
   } else if (settings.systemGrainsHidden) {
-    filter = filterBySystem;
-  } else {
-    filter = () => true;
+      return '?exclude=Orleans.Runtime&exclude=Orleans.Streams&exclude=Orleans.Storage&exclude=Orleans.Providers';
   }
-  return filter;
-}
-
-function filterByDashboard(x: GrainStatItem): boolean {
-  if (x.grainType == undefined) {
-    const dashboardGrain = x.grain!.startsWith('OrleansDashboard.');
-    return !dashboardGrain;
-  } else {
-    const dashboardGrain = x.grainType.startsWith('OrleansDashboard.');
-    return !dashboardGrain;
-  }
-}
-
-function filterBySystem(x: GrainStatItem): boolean {
-  if (x.grainType == undefined) {
-    const systemGrain = x.grain!.startsWith('Orleans.');
-    return !systemGrain;
-  } else {
-    const systemGrain = x.grainType.startsWith('Orleans.');
-    return !systemGrain;
-  }
-}
-
-function filterByBothDashSys(x: GrainStatItem): boolean {
-  if (x.grainType == undefined) {
-    const systemGrain = x.grain!.startsWith('Orleans.');
-    const dashboardGrain = x.grain!.startsWith('OrleansDashboard.');
-    return !systemGrain && !dashboardGrain;
-  } else {
-    const systemGrain = x.grainType.startsWith('Orleans.');
-    const dashboardGrain = x.grainType.startsWith('OrleansDashboard.');
-    return !systemGrain && !dashboardGrain;
-  }
+  return '';
 }
 
 function light() {
