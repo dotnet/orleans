@@ -247,13 +247,6 @@ export default class Silo extends React.Component<SiloProps> {
         </div>
       );
     }
-    if (this.props.siloMetadata && Object.keys(this.props.siloMetadata).length > 0) {
-      metadata = (
-        <Panel title="Silo Metadata">
-          <PropertiesWidget data={this.props.siloMetadata} />
-        </Panel>
-      );
-    }
 
     return (
       <div>
@@ -319,13 +312,15 @@ export default class Silo extends React.Component<SiloProps> {
             </Panel>
           </div>
           <div className="col-md-6">
-            <Panel title="Silo Properties">
-              <PropertiesWidget data={configuration} />
+            <Panel title="Silo Metadata">
+              <PropertiesWidget data={this.props.siloMetadata} />
             </Panel>
           </div>
         </div>
 
-        {metadata}
+        <Panel title="Silo Properties">
+          <PropertiesWidget data={configuration} />
+        </Panel>
 
         <Panel title="Activations by Type">
           <GrainBreakdown data={grainStats} silo={this.props.silo} />
@@ -334,26 +329,3 @@ export default class Silo extends React.Component<SiloProps> {
     );
   }
 }
-/*
-
-dateTime: "2015-12-30T17:02:32.6695724Z"
-
-cpuUsage: 11.8330326
-activationCount: 4
-availableMemory: 4301320000
-totalPhysicalMemory: 8589934592
-memoryUsage: 8618116
-recentlyUsedActivationCount: 2
-
-
-clientCount: 0
-isOverloaded: false
-
-receiveQueueLength: 0
-requestQueueLength: 0
-sendQueueLength: 0
-
-receivedMessages: 0
-sentMessages: 0
-
-*/
