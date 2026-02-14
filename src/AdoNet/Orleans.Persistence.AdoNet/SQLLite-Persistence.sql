@@ -66,12 +66,11 @@ CREATE TABLE OrleansStorage
     -- Informational field, no other use.
     ModifiedOn DATETIME NOT NULL,
     -- The version of the stored payload.
-    Version INT NULL,
+    Version INT NULL
     -- The following would in principle be the primary key, but it would be too thick
     -- to be indexed, so the values are hashed and only collisions will be solved
     -- by using the fields. That is, after the indexed queries have pinpointed the right
     -- rows down to [0, n] relevant ones, n being the number of collided value pairs.
-    CONSTRAINT PK_OrleansStorage PRIMARY KEY (GrainIdHash, GrainIdN0, GrainIdN1, GrainTypeHash, ServiceId)
 );
 
 CREATE INDEX IX_OrleansStorage ON OrleansStorage(GrainIdHash, GrainTypeHash);
@@ -80,6 +79,15 @@ CREATE INDEX IX_OrleansStorage ON OrleansStorage(GrainIdHash, GrainTypeHash);
 -- Updates an existing grain state with optimistic concurrency control or inserts it if it does not exist.
 INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES 
 ('WriteToStorageKey', '
+    BEGIN TRANSACTION;
+
+    CREATE TEMP TABLE IF NOT EXISTS OrleansStorageWriteState
+    (
+        TotalChangesBefore INT NOT NULL
+    );
+    DELETE FROM OrleansStorageWriteState;
+    INSERT INTO OrleansStorageWriteState (TotalChangesBefore) VALUES (total_changes() + 1);
+
     UPDATE OrleansStorage
     SET
         PayloadBinary = @PayloadBinary,
@@ -95,20 +103,30 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
 
     INSERT INTO OrleansStorage (GrainIdHash, GrainIdN0, GrainIdN1, GrainTypeHash, GrainTypeString, GrainIdExtensionString, ServiceId, PayloadBinary, ModifiedOn, Version)
     SELECT @GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @PayloadBinary, datetime(''now''), 1
-    WHERE changes() = 0 
+    WHERE changes() = 0
+      AND @GrainStateVersion IS NULL
       AND NOT EXISTS (
-        SELECT 1 FROM OrleansStorage 
+        SELECT 1 FROM OrleansStorage
         WHERE GrainIdHash = @GrainIdHash AND GrainTypeHash = @GrainTypeHash
         AND GrainIdN0 = @GrainIdN0 AND GrainIdN1 = @GrainIdN1
         AND GrainTypeString = @GrainTypeString
+        AND (GrainIdExtensionString = @GrainIdExtensionString OR (GrainIdExtensionString IS NULL AND @GrainIdExtensionString IS NULL))
         AND ServiceId = @ServiceId
     );
 
     SELECT Version AS NewGrainStateVersion FROM OrleansStorage
-    WHERE GrainIdHash = @GrainIdHash AND GrainTypeHash = @GrainTypeHash
+    WHERE total_changes() > (SELECT TotalChangesBefore FROM OrleansStorageWriteState LIMIT 1)
+        AND GrainIdHash = @GrainIdHash AND GrainTypeHash = @GrainTypeHash
         AND GrainIdN0 = @GrainIdN0 AND GrainIdN1 = @GrainIdN1
         AND GrainTypeString = @GrainTypeString
+        AND (GrainIdExtensionString = @GrainIdExtensionString OR (GrainIdExtensionString IS NULL AND @GrainIdExtensionString IS NULL))
         AND ServiceId = @ServiceId;
+
+    SELECT @GrainStateVersion AS NewGrainStateVersion
+    WHERE total_changes() = (SELECT TotalChangesBefore FROM OrleansStorageWriteState LIMIT 1)
+        AND @GrainStateVersion IS NOT NULL;
+
+    COMMIT;
 ');
 
 -- Retrieves the binary payload and the current version of a specific grain state.
@@ -140,6 +158,7 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
         GrainIdHash = @GrainIdHash AND GrainTypeHash = @GrainTypeHash
         AND GrainIdN0 = @GrainIdN0 AND GrainIdN1 = @GrainIdN1
         AND GrainTypeString = @GrainTypeString
+        AND (GrainIdExtensionString = @GrainIdExtensionString OR (GrainIdExtensionString IS NULL AND @GrainIdExtensionString IS NULL))
         AND ServiceId = @ServiceId
         AND Version = @GrainStateVersion;
 
@@ -147,5 +166,6 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
     WHERE GrainIdHash = @GrainIdHash AND GrainTypeHash = @GrainTypeHash
         AND GrainIdN0 = @GrainIdN0 AND GrainIdN1 = @GrainIdN1
         AND GrainTypeString = @GrainTypeString
+        AND (GrainIdExtensionString = @GrainIdExtensionString OR (GrainIdExtensionString IS NULL AND @GrainIdExtensionString IS NULL))
         AND ServiceId = @ServiceId;
 ');
