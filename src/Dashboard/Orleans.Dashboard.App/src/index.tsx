@@ -274,6 +274,7 @@ function renderPage(jsx: JSX.Element, path: string) {
   renderLoading();
 
   let siloProperties: any = {};
+  let siloMetadata: any = {};
 
   let siloData: any[] = [];
   let siloStats: any[] = [];
@@ -316,6 +317,7 @@ function renderPage(jsx: JSX.Element, path: string) {
           silo={host}
           data={siloData}
           siloProperties={siloProperties}
+          siloMetadata={siloMetadata}
           dashboardCounters={dashboardCounters}
           siloStats={siloStats}
         />
@@ -329,6 +331,11 @@ function renderPage(jsx: JSX.Element, path: string) {
 
   http.get('SiloProperties/' + host, function (err, data) {
     siloProperties = data;
+    loadData();
+  });
+
+  http.get('SiloMetadata/' + host, function (err, data) {
+    siloMetadata = data;
     loadData();
   });
 });

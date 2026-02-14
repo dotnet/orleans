@@ -53,10 +53,15 @@ interface SiloProperties {
   hostVersion?: string;
 }
 
+interface SiloMetadata {
+  [key: string]: string;
+}
+
 interface SiloProps {
   silo: string;
   data: (SiloDataPoint | null)[];
   siloProperties: SiloProperties;
+  siloMetadata: (SiloMetadata | null)[];
   dashboardCounters: DashboardCounters;
   siloStats: SiloStatsData;
 }
@@ -178,6 +183,7 @@ export default class Silo extends React.Component<SiloProps> {
 
     let cpuGauge: React.ReactNode;
     let memGauge: React.ReactNode;
+    let metadata: React.ReactNode;
 
     if (this.hasSeries(x => (x.cpuUsage || 0) > 0)) {
       cpuGauge = (
@@ -239,6 +245,13 @@ export default class Silo extends React.Component<SiloProps> {
           </div>
           <div style={{ height: '80px' }}></div>
         </div>
+      );
+    }
+    if (this.props.siloMetadata && Object.keys(this.props.siloMetadata).length > 0) {
+      metadata = (
+        <Panel title="Silo Metadata">
+          <PropertiesWidget data={this.props.siloMetadata} />
+        </Panel>
       );
     }
 
@@ -311,6 +324,8 @@ export default class Silo extends React.Component<SiloProps> {
             </Panel>
           </div>
         </div>
+
+        {metadata}
 
         <Panel title="Activations by Type">
           <GrainBreakdown data={grainStats} silo={this.props.silo} />
