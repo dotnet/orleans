@@ -95,8 +95,8 @@
 .log {
   position: absolute;
   top: 50px;
-  left: 230px;
-  right: 0;
+  left: 10px;
+  right: 10px;
   border: 0;
   bottom: 0;
   margin: 0;
@@ -187,7 +187,7 @@ h3 {
 .box {
   border-radius: .25rem;
   box-shadow: 0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2);
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   height: 100%;
 }
 
@@ -203,11 +203,7 @@ h3 {
 
 /* Ensure proper row spacing */
 .row {
-  margin-bottom: 1.5rem;
-}
-
-.row:last-child {
-  margin-bottom: 0;
+    --bs-gutter-x: 1rem;
 }
 
 /* Make cards in rows have equal heights */
