@@ -41,7 +41,13 @@ namespace UnitTests.Grains
                 throw new InvalidOperationException();
 
 
-            return Task.Run(() => mre.Wait(1000));
+            return Task.Run(() =>
+            {
+                if (!mre.Wait(TimeSpan.FromSeconds(10)))
+                {
+                    throw new TimeoutException("Timed out waiting for grain deactivation to start.");
+                }
+            });
         }
 
         public static void SetDeactivationStarted(GrainId key)
