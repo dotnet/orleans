@@ -12,6 +12,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("ServiceBus.Tests")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
 [assembly: InternalsVisibleTo("AWSUtils.Tests")]
+[assembly: InternalsVisibleTo("Tester")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("TestInternalGrainInterfaces")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]

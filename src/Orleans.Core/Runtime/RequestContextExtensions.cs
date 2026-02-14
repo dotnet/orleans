@@ -1,7 +1,6 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Diagnostics;
+using Orleans.Diagnostics;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime
@@ -52,6 +51,37 @@ namespace Orleans.Runtime
             if (contextData is not { Count: > 0 }) return Guid.Empty;
             _ = contextData.TryGetValue(RequestContext.CALL_CHAIN_REENTRANCY_HEADER, out var reentrancyId);
             return reentrancyId is Guid guid ? guid : Guid.Empty;
+        }
+
+        /// <summary>
+        /// Extracts an ActivityContext from request context data if present.
+        /// </summary>
+        internal static ActivityContext? TryGetActivityContext(this Dictionary<string, object>? requestContextData)
+        {
+            if (requestContextData is not { Count: > 0 })
+            {
+                return null;
+            }
+
+            string? traceParent = null;
+            string? traceState = null;
+
+            if (requestContextData.TryGetValue(OpenTelemetryHeaders.TraceParent, out var traceParentObj) && traceParentObj is string tp)
+            {
+                traceParent = tp;
+            }
+
+            if (requestContextData.TryGetValue(OpenTelemetryHeaders.TraceState, out var traceStateObj) && traceStateObj is string ts)
+            {
+                traceState = ts;
+            }
+
+            if (!string.IsNullOrEmpty(traceParent) && ActivityContext.TryParse(traceParent, traceState, isRemote: true, out var parentContext))
+            {
+                return parentContext;
+            }
+
+            return null;
         }
     }
 }

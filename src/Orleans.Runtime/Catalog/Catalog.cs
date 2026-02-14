@@ -1,12 +1,10 @@
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.GrainDirectory;
+using System.Diagnostics;
+using Orleans.Diagnostics;
 
 namespace Orleans.Runtime
 {
@@ -166,6 +164,25 @@ namespace Orleans.Runtime
             {
                 rehydrationContext?.Dispose();
                 return UnableToCreateActivation(this, grainId);
+            }
+
+            // Start activation span with parent context from request if available
+            var parentContext = requestContextData.TryGetActivityContext();
+            var activationActivity = parentContext.HasValue
+                ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal, parentContext.Value)
+                : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal);
+            if (activationActivity is not null)
+            {
+                activationActivity.SetTag(ActivityTagKeys.GrainId, grainId.ToString());
+                activationActivity.SetTag(ActivityTagKeys.GrainType, grainId.Type.ToString());
+                activationActivity.SetTag(ActivityTagKeys.SiloId, Silo.ToString());
+                activationActivity.SetTag(ActivityTagKeys.ActivationCause, rehydrationContext is null ? "new" : "rehydrate");
+                if (result is ActivationData act)
+                {
+                    activationActivity.SetTag(ActivityTagKeys.ActivationId, act.ActivationId.ToString());
+                    act.SetActivationActivity(activationActivity);
+                    activationActivity.AddEvent(new ActivityEvent("creating"));
+                }
             }
 
             CatalogInstruments.ActivationsCreated.Add(1);
@@ -430,6 +447,5 @@ namespace Orleans.Runtime
             Message = "Failed to unregister non-existent activation {Address}"
         )]
         private partial void LogFailedToUnregisterNonExistingActivation(GrainAddress address, Exception exception);
-
     }
 }
