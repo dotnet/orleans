@@ -12,7 +12,6 @@ siloHostBuilder.UseOrleans(builder =>
 {
     builder.UseDevelopmentClustering(options => options.PrimarySiloEndpoint = new IPEndPoint(IPAddress.Loopback, 11111));
     builder.UseInMemoryReminderService();
-    builder.UseSiloMetadata(new Dictionary<string, string> { { "cloud.region", "EU"}, { "Location", "Lisbon" } });
     builder.AddMemoryGrainStorageAsDefault();
     builder.ConfigureEndpoints(IPAddress.Loopback, 11111, 30000);
     builder.AddDashboard();
