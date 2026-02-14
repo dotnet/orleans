@@ -84,10 +84,32 @@ namespace Orleans.EventSourcing.Common
             throw new NotSupportedException();
         }
 
+        /// <summary>
+        /// Clear the persisted log stream completely.
+        /// </summary>
+        protected virtual Task ClearPrimaryLogAsync(CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
         /// <inheritdoc/>
         public virtual Task ClearLogAsync(CancellationToken cancellationToken)
         {
-            throw new NotSupportedException();
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (clearLogRequest is null || clearLogRequest.Task.IsCompleted)
+            {
+                clearLogCancellationToken = cancellationToken;
+                clearLogRequest = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+
+            worker.Notify();
+
+            var clearLogTask = clearLogRequest.Task;
+
+            return cancellationToken.CanBeCanceled
+                ? clearLogTask.WaitAsync(cancellationToken)
+                : clearLogTask;
         }
 
         /// <summary>
@@ -248,6 +270,12 @@ namespace Orleans.EventSourcing.Common
         /// A flag that indicates that we have not read global state at all yet, and should do so
         /// </summary>
         private bool needInitialRead;
+
+        /// <summary>
+        /// A pending clear-log request to be processed by the worker.
+        /// </summary>
+        private TaskCompletionSource<bool> clearLogRequest;
+        private CancellationToken clearLogCancellationToken;
 
         /// <summary>
         /// Background worker which asynchronously sends operations to the leader
@@ -533,6 +561,48 @@ namespace Orleans.EventSourcing.Common
             CalculateTentativeState();
         }
 
+        private async Task ProcessClearLogRequest()
+        {
+            var clearLogTask = clearLogRequest;
+            if (clearLogTask is null || clearLogTask.Task.IsCompleted)
+                return;
+
+            try
+            {
+                clearLogCancellationToken.ThrowIfCancellationRequested();
+
+                await ClearPrimaryLogAsync(clearLogCancellationToken);
+
+                InitializeConfirmedView(this.Initialstate);
+                ResetTentativeState();
+                needRefresh = needInitialRead = false;
+
+                try
+                {
+                    Host.OnViewChanged(true, true);
+                }
+                catch (Exception e)
+                {
+                    Services.CaughtUserCodeException("OnViewChanged", nameof(ProcessClearLogRequest), e);
+                }
+
+                clearLogTask.TrySetResult(true);
+            }
+            catch (OperationCanceledException) when (clearLogCancellationToken.IsCancellationRequested)
+            {
+                clearLogTask.TrySetCanceled(clearLogCancellationToken);
+            }
+            catch (Exception exception)
+            {
+                clearLogTask.TrySetException(exception);
+            }
+            finally
+            {
+                if (ReferenceEquals(clearLogRequest, clearLogTask))
+                    clearLogRequest = null;
+            }
+        }
+
 
         /// <summary>
         /// batch worker performs reads from and writes to global state.
@@ -540,6 +610,8 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         internal async Task Work()
         {
+            await ProcessClearLogRequest();
+
             Services.Log(LogLevel.Debug, "<1 ProcessNotifications");
 
             var version = GetConfirmedVersion();

@@ -63,12 +63,11 @@ namespace Orleans.EventSourcing.LogStorage
             ConfirmedVersionInternal = 0;
         }
 
-        public override async Task ClearLogAsync(CancellationToken cancellationToken)
+        protected override Task ClearPrimaryLogAsync(CancellationToken cancellationToken)
         {
-            await this.globalGrainStorage.ClearStateAsync(grainTypeName, Services.GrainId, GlobalLog);
-            InitializeConfirmedView(this.Initialstate);
-            ResetTentativeState();
-            await Synchronize();
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return this.globalGrainStorage.ClearStateAsync(grainTypeName, Services.GrainId, GlobalLog);
         }
 
         private void UpdateConfirmedView()

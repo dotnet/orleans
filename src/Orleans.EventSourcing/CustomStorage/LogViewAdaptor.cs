@@ -54,12 +54,11 @@ namespace Orleans.EventSourcing.CustomStorage
         }
 
         /// <inheritdoc/>
-        public override async Task ClearLogAsync(CancellationToken cancellationToken)
+        protected override Task ClearPrimaryLogAsync(CancellationToken cancellationToken)
         {
-            await this.customGrainStorage.ClearStoredState();
-            InitializeConfirmedView(this.Initialstate);
-            ResetTentativeState();
-            await Synchronize();
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return this.customGrainStorage.ClearStoredState();
         }
 
         /// <inheritdoc/>

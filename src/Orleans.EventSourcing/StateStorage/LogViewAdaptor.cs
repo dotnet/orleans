@@ -55,12 +55,11 @@ namespace Orleans.EventSourcing.StateStorage
             GlobalStateCache = new GrainStateWithMetaDataAndETag<TLogView>(initialstate);
         }
 
-        public override async Task ClearLogAsync(CancellationToken cancellationToken)
+        protected override Task ClearPrimaryLogAsync(CancellationToken cancellationToken)
         {
-            await this.globalGrainStorage.ClearStateAsync(grainTypeName, Services.GrainId, GlobalStateCache);
-            InitializeConfirmedView(this.Initialstate);
-            ResetTentativeState();
-            await Synchronize();
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return this.globalGrainStorage.ClearStateAsync(grainTypeName, Services.GrainId, GlobalStateCache);
         }
 
         // no special tagging is required, thus we create a plain submission entry
