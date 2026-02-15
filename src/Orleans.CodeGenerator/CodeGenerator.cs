@@ -18,11 +18,10 @@ namespace Orleans.CodeGenerator
 {
     public class CodeGeneratorOptions
     {
-        public List<string> GenerateSerializerAttributes { get; } = new() { "Orleans.GenerateSerializerAttribute" };
-        public List<string> IdAttributes { get; } = new() { "Orleans.IdAttribute" };
-        public List<string> AliasAttributes { get; } = new() { "Orleans.AliasAttribute" };
-        public List<string> ImmutableAttributes { get; } = new() { "Orleans.ImmutableAttribute" };
-        public List<string> ConstructorAttributes { get; } = new() { "Orleans.OrleansConstructorAttribute", "Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute" };
+        public const string IdAttribute = "Orleans.IdAttribute";
+        public const string AliasAttribute = "Orleans.AliasAttribute";
+        public const string ImmutableAttribute = "Orleans.ImmutableAttribute";
+        public static readonly IReadOnlyList<string> ConstructorAttributes = ["Orleans.OrleansConstructorAttribute", "Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute"];
         public GenerateFieldIds GenerateFieldIds { get; set; }
         public bool GenerateCompatibilityInvokers { get; set; }
     }
@@ -62,22 +61,15 @@ namespace Orleans.CodeGenerator
 
         public CompilationUnitSyntax GenerateCode(CancellationToken cancellationToken)
         {
-            var referencedAssemblies = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
             var assembliesToExamine = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
             var compilationAsm = LibraryTypes.Compilation.Assembly;
             ComputeAssembliesToExamine(compilationAsm, assembliesToExamine);
 
             // Expand the set of referenced assemblies
-            referencedAssemblies.Add(compilationAsm);
             MetadataModel.ApplicationParts.Add(compilationAsm.MetadataName);
             foreach (var reference in LibraryTypes.Compilation.References)
             {
                 if (LibraryTypes.Compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol asm)
-                {
-                    continue;
-                }
-
-                if (!referencedAssemblies.Add(asm))
                 {
                     continue;
                 }
@@ -97,10 +89,10 @@ namespace Orleans.CodeGenerator
 
             foreach (var asm in assembliesToExamine)
             {
+                var containingAssemblyAttributes = asm.GetAttributes();
+
                 foreach (var symbol in asm.GetDeclaredTypes())
                 {
-                    var containingAssemblyAttributes = symbol.ContainingAssembly.GetAttributes();
-
                     if (GetWellKnownTypeId(symbol) is uint wellKnownTypeId)
                     {
                         MetadataModel.WellKnownTypeIds.Add((symbol.ToOpenTypeSyntax(), wellKnownTypeId));
@@ -283,7 +275,7 @@ namespace Orleans.CodeGenerator
                         return GenerateFieldIds.None;
                     }
 
-                    bool ShouldGenerateSerializer(INamedTypeSymbol t) => t.HasAnyAttribute(LibraryTypes.GenerateSerializerAttributes);
+                    bool ShouldGenerateSerializer(INamedTypeSymbol t) => t.HasAttribute(LibraryTypes.GenerateSerializerAttribute);
 
                     bool ShouldIncludePrimaryConstructorParameters(INamedTypeSymbol t)
                     {
@@ -308,12 +300,9 @@ namespace Orleans.CodeGenerator
                             return null;
                         }
 
-                        foreach (var attr in LibraryTypes.GenerateSerializerAttributes)
+                        if (TestGenerateSerializerAttribute(t, LibraryTypes.GenerateSerializerAttribute) is bool res)
                         {
-                            if (TestGenerateSerializerAttribute(t, attr) is bool res)
-                            {
-                                return res;
-                            }
+                            return res;
                         }
 
                         // Default to true for records.
@@ -514,7 +503,7 @@ namespace Orleans.CodeGenerator
 
         internal static uint? GetId(LibraryTypes libraryTypes, ISymbol memberSymbol)
         {
-            return memberSymbol.GetAnyAttribute(libraryTypes.IdAttributeTypes) is { } attr
+            return memberSymbol.GetAttribute(libraryTypes.IdAttributeType) is { } attr
                 ? (uint)attr.ConstructorArguments.First().Value
                 : null;
         }
