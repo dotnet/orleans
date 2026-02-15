@@ -62,7 +62,7 @@ public class InMemoryJobQueueTests
         queue.Enqueue(job2, 0);
         queue.MarkAsComplete();
 
-        var results = new List<IDurableJobContext>();
+        var results = new List<IJobRunContext>();
         await foreach (var context in queue.WithCancellation(CancellationToken.None))
         {
             results.Add(context);
@@ -252,7 +252,7 @@ public class InMemoryJobQueueTests
         queue.CancelJob("job2");
         queue.MarkAsComplete();
 
-        var results = new List<IDurableJobContext>();
+        var results = new List<IJobRunContext>();
         await foreach (var context in queue.WithCancellation(CancellationToken.None))
         {
             results.Add(context);
@@ -338,9 +338,9 @@ public class InMemoryJobQueueTests
         };
     }
 
-    private static IDurableJobContext CreateJobContext(DurableJob job, string runId, int dequeueCount)
+    private static IJobRunContext CreateJobContext(DurableJob job, string runId, int dequeueCount)
     {
-        var context = Substitute.For<IDurableJobContext>();
+        var context = Substitute.For<IJobRunContext>();
         context.Job.Returns(job);
         context.RunId.Returns(runId);
         context.DequeueCount.Returns(dequeueCount);

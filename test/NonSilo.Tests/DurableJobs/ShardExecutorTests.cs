@@ -202,7 +202,7 @@ public class ShardExecutorTests
         Assert.Single(failedJobs);
         
         await shard.Received(1).RetryJobLaterAsync(
-            Arg.Is<IDurableJobContext>(ctx => ctx.Job.Id == "job-0"),
+            Arg.Is<IJobRunContext>(ctx => ctx.Job.Id == "job-0"),
             Arg.Any<DateTimeOffset>(),
             Arg.Any<CancellationToken>());
         
@@ -272,7 +272,7 @@ public class ShardExecutorTests
     private static IOptions<DurableJobsOptions> CreateOptions(
         int maxConcurrentJobs = 10,
         TimeSpan? overloadBackoffDelay = null,
-        Func<IDurableJobContext, Exception, DateTimeOffset?> shouldRetry = null)
+        Func<IJobRunContext, Exception, DateTimeOffset?> shouldRetry = null)
     {
         var options = new DurableJobsOptions
         {
@@ -345,11 +345,11 @@ public class ShardExecutorTests
         return shard;
     }
 
-    private static async IAsyncEnumerable<IDurableJobContext> CreateJobContexts(List<DurableJob> jobs)
+    private static async IAsyncEnumerable<IJobRunContext> CreateJobContexts(List<DurableJob> jobs)
     {
         foreach (var job in jobs)
         {
-            var context = Substitute.For<IDurableJobContext>();
+            var context = Substitute.For<IJobRunContext>();
             context.Job.Returns(job);
             context.RunId.Returns(Guid.NewGuid().ToString());
             context.DequeueCount.Returns(1);
@@ -359,7 +359,7 @@ public class ShardExecutorTests
         await Task.CompletedTask;
     }
 
-    private static async IAsyncEnumerable<IDurableJobContext> CreateJobContextsWithDelay(
+    private static async IAsyncEnumerable<IJobRunContext> CreateJobContextsWithDelay(
         List<DurableJob> jobs, 
         TimeSpan delay)
     {
@@ -367,7 +367,7 @@ public class ShardExecutorTests
         {
             await Task.Delay(delay);
             
-            var context = Substitute.For<IDurableJobContext>();
+            var context = Substitute.For<IJobRunContext>();
             context.Job.Returns(job);
             context.RunId.Returns(Guid.NewGuid().ToString());
             context.DequeueCount.Returns(1);
@@ -380,7 +380,7 @@ public class ShardExecutorTests
         var factory = Substitute.For<IInternalGrainFactory>();
         
         var extension = Substitute.For<IDurableJobReceiverExtension>();
-        extension.DeliverDurableJobAsync(Arg.Any<IDurableJobContext>(), Arg.Any<CancellationToken>())
+        extension.DeliverDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
         
         factory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
@@ -393,10 +393,10 @@ public class ShardExecutorTests
         List<string> completedJobs)
     {
         var extension = Substitute.For<IDurableJobReceiverExtension>();
-        extension.DeliverDurableJobAsync(Arg.Any<IDurableJobContext>(), Arg.Any<CancellationToken>())
+        extension.DeliverDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                var context = callInfo.ArgAt<IDurableJobContext>(0);
+                var context = callInfo.ArgAt<IJobRunContext>(0);
                 lock (completedJobs)
                 {
                     completedJobs.Add(context.Job.Id);
@@ -412,7 +412,7 @@ public class ShardExecutorTests
         Func<Task> executionAction)
     {
         var extension = Substitute.For<IDurableJobReceiverExtension>();
-        extension.DeliverDurableJobAsync(Arg.Any<IDurableJobContext>(), Arg.Any<CancellationToken>())
+        extension.DeliverDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(callInfo => executionAction());
         
         factory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
@@ -427,10 +427,10 @@ public class ShardExecutorTests
         var executionCount = jobExecutionCount;
         
         var extension = Substitute.For<IDurableJobReceiverExtension>();
-        extension.DeliverDurableJobAsync(Arg.Any<IDurableJobContext>(), Arg.Any<CancellationToken>())
+        extension.DeliverDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                var context = callInfo.ArgAt<IDurableJobContext>(0);
+                var context = callInfo.ArgAt<IJobRunContext>(0);
                 var currentExecution = Interlocked.Increment(ref executionCount);
                 
                 // First job fails

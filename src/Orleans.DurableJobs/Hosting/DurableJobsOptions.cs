@@ -45,9 +45,9 @@ public sealed class DurableJobsOptions
     /// the time when the job should be retried, or <see langword="null"/> if the job should not be retried.
     /// Default: Retry up to 5 times with exponential backoff (2^n seconds).
     /// </summary>
-    public Func<IDurableJobContext, Exception, DateTimeOffset?> ShouldRetry { get; set; } = DefaultShouldRetry;
+    public Func<IJobRunContext, Exception, DateTimeOffset?> ShouldRetry { get; set; } = DefaultShouldRetry;
 
-    private static DateTimeOffset? DefaultShouldRetry(IDurableJobContext jobContext, Exception ex)
+    private static DateTimeOffset? DefaultShouldRetry(IJobRunContext jobContext, Exception ex)
     {
         // Default retry logic: retry up to 5 times with exponential backoff
         if (jobContext.DequeueCount >= 5)
