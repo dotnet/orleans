@@ -125,6 +125,48 @@ BEGIN
     COMMIT;
 END$$
 
+CREATE PROCEDURE DeleteStorage
+(
+    in _GrainIdHash INT,
+    in _GrainIdN0 BIGINT,
+    in _GrainIdN1 BIGINT,
+    in _GrainTypeHash INT,
+    in _GrainTypeString NVARCHAR(512),
+    in _GrainIdExtensionString NVARCHAR(512),
+    in _ServiceId NVARCHAR(150),
+    in _GrainStateVersion INT
+)
+BEGIN
+    DECLARE _newGrainStateVersion INT;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN ROLLBACK; RESIGNAL; END;
+    DECLARE EXIT HANDLER FOR SQLWARNING BEGIN ROLLBACK; RESIGNAL; END;
+
+    SET _newGrainStateVersion = _GrainStateVersion;
+
+    -- Default level is REPEATABLE READ and may cause Gap Lock issues
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    START TRANSACTION;
+    DELETE FROM OrleansStorage
+    WHERE
+        GrainIdHash = _GrainIdHash AND _GrainIdHash IS NOT NULL
+        AND GrainTypeHash = _GrainTypeHash AND _GrainTypeHash IS NOT NULL
+        AND GrainIdN0 = _GrainIdN0 AND _GrainIdN0 IS NOT NULL
+        AND GrainIdN1 = _GrainIdN1 AND _GrainIdN1 IS NOT NULL
+        AND GrainTypeString = _GrainTypeString AND _GrainTypeString IS NOT NULL
+        AND ((_GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = _GrainIdExtensionString) OR _GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
+        AND ServiceId = _ServiceId AND _ServiceId IS NOT NULL
+        AND Version IS NOT NULL AND Version = _GrainStateVersion AND _GrainStateVersion IS NOT NULL
+        LIMIT 1;
+
+    IF ROW_COUNT() > 0
+    THEN
+        SET _newGrainStateVersion = _GrainStateVersion + 1;
+    END IF;
+
+    SELECT _newGrainStateVersion AS NewGrainStateVersion;
+    COMMIT;
+END$$
+
 DELIMITER $$
 CREATE PROCEDURE WriteToStorage
 (
@@ -281,4 +323,11 @@ VALUES
 (
     'ClearStorageKey','
     call ClearStorage(@GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @GrainStateVersion);'
+);
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'DeleteStorageKey','
+    call DeleteStorage(@GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @GrainStateVersion);'
 );

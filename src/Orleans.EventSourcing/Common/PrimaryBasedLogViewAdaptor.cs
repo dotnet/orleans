@@ -68,7 +68,7 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// Whether this cluster supports submitting updates
         /// </summary>
-        protected virtual bool SupportSubmissions {  get { return true;  } }
+        protected virtual bool SupportSubmissions { get { return true; } }
 
         /// <summary>
         /// Handle protocol messages.
@@ -85,11 +85,39 @@ namespace Orleans.EventSourcing.Common
         }
 
         /// <summary>
+        /// Clear the persisted log stream completely.
+        /// </summary>
+        protected virtual Task ClearPrimaryLogAsync(CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        /// <inheritdoc/>
+        public virtual Task ClearLogAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (clearLogRequest is null || clearLogRequest.Task.IsCompleted)
+            {
+                clearLogCancellationToken = cancellationToken;
+                clearLogRequest = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+
+            worker.Notify();
+
+            var clearLogTask = clearLogRequest.Task;
+
+            return cancellationToken.CanBeCanceled
+                ? clearLogTask.WaitAsync(cancellationToken)
+                : clearLogTask;
+        }
+
+        /// <summary>
         /// Handle notification messages. Override this to handle notification subtypes.
         /// </summary>
         protected virtual void OnNotificationReceived(INotificationMessage payload)
-        {        
-            var msg = payload as VersionNotificationMessage; 
+        {
+            var msg = payload as VersionNotificationMessage;
             if (msg != null)
             {
                 if (msg.Version > lastVersionNotified)
@@ -150,12 +178,15 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// Construct an instance, for the given parameters.
         /// </summary>
-        protected PrimaryBasedLogViewAdaptor(ILogViewAdaptorHost<TLogView, TLogEntry> host, 
-            TLogView initialstate, ILogConsistencyProtocolServices services)
+        protected PrimaryBasedLogViewAdaptor(
+            ILogViewAdaptorHost<TLogView, TLogEntry> host,
+            TLogView initialstate,
+            ILogConsistencyProtocolServices services)
         {
             Debug.Assert(host != null && services != null && initialstate != null);
             this.Host = host;
             this.Services = services;
+            this.InitialState = Services.DeepCopy(initialstate);
             InitializeConfirmedView(initialstate);
             worker = new BatchWorkerFromDelegate(Work);
         }
@@ -241,12 +272,20 @@ namespace Orleans.EventSourcing.Common
         private bool needInitialRead;
 
         /// <summary>
+        /// A pending clear-log request to be processed by the worker.
+        /// </summary>
+        private TaskCompletionSource<bool> clearLogRequest;
+        private CancellationToken clearLogCancellationToken;
+
+        /// <summary>
         /// Background worker which asynchronously sends operations to the leader
         /// </summary>
         private readonly BatchWorker worker;
 
-
-
+        /// <summary>
+        /// Cached version of initial state used during initialization. And for resetting.
+        /// </summary>
+        protected TLogView InitialState { init; get => Services.DeepCopy(field); }
 
         /// statistics gathering. Is null unless stats collection is turned on.
         protected LogConsistencyStatistics stats = null;
@@ -512,6 +551,59 @@ namespace Orleans.EventSourcing.Common
                 }
         }
 
+        /// <summary>
+        /// Clears the pending operations and resets the tentative state.
+        /// </summary>
+        internal void ResetTentativeState()
+        {
+            this.pending.Clear();
+
+            CalculateTentativeState();
+        }
+
+        private async Task ProcessClearLogRequest()
+        {
+            var clearLogTask = clearLogRequest;
+            if (clearLogTask is null || clearLogTask.Task.IsCompleted)
+                return;
+
+            try
+            {
+                clearLogCancellationToken.ThrowIfCancellationRequested();
+
+                await ClearPrimaryLogAsync(clearLogCancellationToken);
+
+                InitializeConfirmedView(this.InitialState);
+                ResetTentativeState();
+                needRefresh = needInitialRead = false;
+                lastVersionNotified = 0;
+
+                try
+                {
+                    Host.OnViewChanged(true, true);
+                }
+                catch (Exception e)
+                {
+                    Services.CaughtUserCodeException("OnViewChanged", nameof(ProcessClearLogRequest), e);
+                }
+
+                clearLogTask.TrySetResult(true);
+            }
+            catch (OperationCanceledException) when (clearLogCancellationToken.IsCancellationRequested)
+            {
+                clearLogTask.TrySetCanceled(clearLogCancellationToken);
+            }
+            catch (Exception exception)
+            {
+                clearLogTask.TrySetException(exception);
+            }
+            finally
+            {
+                if (ReferenceEquals(clearLogRequest, clearLogTask))
+                    clearLogRequest = null;
+            }
+        }
+
 
         /// <summary>
         /// batch worker performs reads from and writes to global state.
@@ -519,6 +611,8 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         internal async Task Work()
         {
+            await ProcessClearLogRequest();
+
             Services.Log(LogLevel.Debug, "<1 ProcessNotifications");
 
             var version = GetConfirmedVersion();
@@ -631,7 +725,7 @@ namespace Orleans.EventSourcing.Common
                 }
             }
         }
-        
+
 
         private void NotifyViewChanges(ref int version, int numWritten = 0)
         {
@@ -659,7 +753,7 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         protected RecordedConnectionIssue LastPrimaryIssue;
 
-     
+
 
         /// <inheritdoc />
         public async Task Synchronize()

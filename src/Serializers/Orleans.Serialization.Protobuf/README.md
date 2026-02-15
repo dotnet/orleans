@@ -1,7 +1,7 @@
 # Microsoft Orleans Serialization for Protobuf
 
 ## Introduction
-Microsoft Orleans Serialization for Protobuf provides Protocol Buffers (Protobuf) serialization support for Microsoft Orleans. Protobuf is a compact, efficient binary serialization format developed by Google, which is ideal for high-performance scenarios requiring efficient serialization and deserialization.
+Microsoft Orleans Serialization for Protobuf provides Protocol Buffers (Protobuf) serialization support for Microsoft Orleans using **Google.Protobuf**. This package integrates Google's official `Google.Protobuf` library with Orleans, allowing you to use Protocol Buffers messages in your grain interfaces and implementations.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -30,26 +30,15 @@ var builder = Host.CreateApplicationBuilder(args)
 await builder.RunAsync();
 ```
 
-## Example - Using Protobuf with a Custom Type
+## Using Protobuf Types with Orleans
+This package supports types generated from `.proto` files using Google.Protobuf. For detailed information on creating Protobuf messages and configuring your project, see [Create Protobuf messages for .NET apps](https://learn.microsoft.com/en-us/aspnet/core/grpc/protobuf).
+
+Once you have defined your Protobuf messages and configured code generation, you can use them directly in your grain interfaces:
+
 ```csharp
 using Orleans;
-using ProtoBuf;
+using MyApp.Models;
 
-// Define a class with Protobuf attributes
-[ProtoContract]
-public class MyProtobufClass
-{
-    [ProtoMember(1)]
-    public string Name { get; set; }
-    
-    [ProtoMember(2)]
-    public int Age { get; set; }
-    
-    [ProtoMember(3)]
-    public List<string> Tags { get; set; }
-}
-
-// You can use it directly in your grain interfaces and implementation
 public interface IMyGrain : IGrainWithStringKey
 {
     Task<MyProtobufClass> GetData();
@@ -60,11 +49,7 @@ public class MyGrain : Grain, IMyGrain
 {
     private MyProtobufClass _data;
 
-    public Task<MyProtobufClass> GetData()
-    {
-        return Task.FromResult(_data);
-    }
-
+    public Task<MyProtobufClass> GetData() => Task.FromResult(_data);
     public Task SetData(MyProtobufClass data)
     {
         _data = data;
@@ -73,56 +58,13 @@ public class MyGrain : Grain, IMyGrain
 }
 ```
 
-## Example - Using .proto Files
-You can also use standard .proto files and generate C# classes:
-
-```proto
-// MyData.proto
-syntax = "proto3";
-
-option csharp_namespace = "MyApp.Protos";
-
-message Person {
-  string name = 1;
-  int32 age = 2;
-  repeated string tags = 3;
-}
-```
-
-Then reference the generated classes in your Orleans code:
-
-```csharp
-using MyApp.Protos;
-using Orleans;
-
-public interface IPersonGrain : IGrainWithStringKey
-{
-    Task<Person> GetPerson();
-    Task SetPerson(Person person);
-}
-
-public class PersonGrain : Grain, IPersonGrain
-{
-    private Person _person;
-
-    public Task<Person> GetPerson()
-    {
-        return Task.FromResult(_person);
-    }
-
-    public Task SetPerson(Person person)
-    {
-        _person = person;
-        return Task.CompletedTask;
-    }
-}
-```
+**Note:** Google.Protobuf collection types (`RepeatedField<T>`, `MapField<TKey, TValue>`, and `ByteString`) are automatically supported.
 
 ## Documentation
 For more comprehensive documentation, please refer to:
+- [Create Protobuf messages for .NET apps](https://learn.microsoft.com/en-us/aspnet/core/grpc/protobuf) - Official guide for working with Protobuf in .NET
 - [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Orleans Serialization](https://learn.microsoft.com/en-us/dotnet/orleans/host/configuration-guide/serialization)
-- [Protocol Buffers Documentation](https://developers.google.com/protocol-buffers/docs/overview)
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

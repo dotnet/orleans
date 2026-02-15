@@ -38,7 +38,6 @@ var builder = Host.CreateApplicationBuilder(args)
                     options.Invariant = "Microsoft.Data.SqlClient";  // Or other providers like "MySql.Data.MySqlClient", "Npgsql", etc.
                     options.ConnectionString = "Server=localhost;Database=OrleansStorage;User Id=myUsername;******;";
                     // Optional: Configure custom queries
-                    options.UseJsonFormat = true; // Store as JSON instead of binary
                 });
     });
 
@@ -93,6 +92,7 @@ Before using the ADO.NET provider, you need to set up the necessary database tab
 - [MySQL Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/MySQL-Persistence.sql)
 - [PostgreSQL Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/PostgreSQL-Persistence.sql)
 - [Oracle Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/Oracle-Persistence.sql)
+- [SQLite Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/Sqlite-Persistence.sql)
 
 ## Documentation
 For more comprehensive documentation, please refer to:

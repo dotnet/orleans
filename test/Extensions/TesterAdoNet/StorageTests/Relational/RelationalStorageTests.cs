@@ -32,10 +32,10 @@ namespace UnitTests.StorageTests.Relational
         public string GrainCountQuery { get; } = "SELECT COUNT(*) AS Count FROM Storage WHERE GrainTypeString = N'{0}';";
 
 
-        public RelationalStorageTests(string adoNetInvariant, CommonFixture fixture)
+        public RelationalStorageTests(string adoNetInvariant, CommonFixture fixture, bool deleteStateOnClear = false)
         {
             Fixture = fixture;
-            var persistenceStorage = fixture.GetStorageProvider(adoNetInvariant).GetAwaiter().GetResult();
+            var persistenceStorage = fixture.GetStorageProvider(adoNetInvariant, deleteStateOnClear).GetAwaiter().GetResult();
             if(persistenceStorage != null)
             {
                 PersistenceStorageTests = new CommonStorageTests(persistenceStorage);

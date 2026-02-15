@@ -60,6 +60,11 @@ namespace TestGrains
             var kvp = await GetStorageGrain().Read();
             return new KeyValuePair<int, MyGrainState>(kvp.Key, (MyGrainState)kvp.Value);
         }
+
+        public Task ClearStoredState()
+        {
+            return GetStorageGrain().Clear();
+        }
     }
 
     // use the explictly specified "CustomStorage" log-consistency provider with access from primary cluster only
@@ -117,6 +122,13 @@ namespace TestGrains
                 version = 0;
             }
             return Task.FromResult(new KeyValuePair<int, MyGrainState>(version, this.copier.Copy(state)));
+        }
+
+        public Task ClearStoredState()
+        {
+            state = null;
+            version = 0;
+            return Task.CompletedTask;
         }
     }
 
