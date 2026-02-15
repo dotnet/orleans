@@ -211,6 +211,34 @@ CREATE OR REPLACE FUNCTION ClearStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAIN
   END;
 /
 
+CREATE OR REPLACE FUNCTION DeleteStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAINIDN0 IN NUMBER, PARAM_GRAINIDN1 IN NUMBER, PARAM_GRAINTYPEHASH IN NUMBER, PARAM_GRAINTYPESTRING IN NVARCHAR2,
+                                             PARAM_GRAINIDEXTENSIONSTRING IN NVARCHAR2, PARAM_SERVICEID IN VARCHAR2, PARAM_GRAINSTATEVERSION IN NUMBER)
+  RETURN NUMBER IS
+  rowcount NUMBER;
+  newGrainStateVersion NUMBER := PARAM_GRAINSTATEVERSION;
+  PRAGMA AUTONOMOUS_TRANSACTION;
+  BEGIN
+    DELETE FROM OrleansStorage
+    WHERE GrainIdHash = PARAM_GRAINIDHASH AND PARAM_GRAINIDHASH IS NOT NULL
+      AND GrainTypeHash = PARAM_GRAINTYPEHASH AND PARAM_GRAINTYPEHASH IS NOT NULL
+      AND (GrainIdN0 = PARAM_GRAINIDN0 OR PARAM_GRAINIDN0 IS NULL)
+      AND (GrainIdN1  = PARAM_GRAINIDN1 OR PARAM_GRAINIDN1 IS NULL)
+      AND (GrainTypeString = PARAM_GRAINTYPESTRING OR PARAM_GRAINTYPESTRING IS NULL)
+      AND ((PARAM_GRAINIDEXTENSIONSTRING IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = PARAM_GRAINIDEXTENSIONSTRING) OR PARAM_GRAINIDEXTENSIONSTRING IS NULL AND GrainIdExtensionString IS NULL)
+      AND ServiceId = PARAM_SERVICEID AND PARAM_SERVICEID IS NOT NULL
+      AND Version IS NOT NULL AND Version = PARAM_GRAINSTATEVERSION AND PARAM_GRAINSTATEVERSION IS NOT NULL;
+
+    rowCount := SQL%ROWCOUNT;
+
+    IF rowCount > 0 THEN
+        newGrainStateVersion := PARAM_GRAINSTATEVERSION + 1;
+    END IF;
+
+    COMMIT;
+    RETURN(newGrainStateVersion);
+  END;
+/
+
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
@@ -226,6 +254,15 @@ VALUES
 (
     'ClearStorageKey',
     'SELECT ClearStorage(:GrainIdHash, :GrainIdN0, :GrainIdN1, :GrainTypeHash, :GrainTypeString,
+                                             :GrainIdExtensionString, :ServiceId, :GrainStateVersion) AS Version FROM DUAL'
+);
+/
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'DeleteStorageKey',
+    'SELECT DeleteStorage(:GrainIdHash, :GrainIdN0, :GrainIdN1, :GrainTypeHash, :GrainTypeString,
                                              :GrainIdExtensionString, :ServiceId, :GrainStateVersion) AS Version FROM DUAL'
 );
 /

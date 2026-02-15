@@ -67,19 +67,32 @@ namespace UnitTests.StorageTests.Relational
         /// a <em>null</em> value will be provided.</remarks>
         public async Task<IGrainStorage> GetStorageProvider(string storageInvariant)
         {
+            return await GetStorageProvider(storageInvariant, deleteStateOnClear: false);
+        }
+
+        /// <summary>
+        /// Returns a correct implementation of the persistence provider according to environment variables.
+        /// </summary>
+        /// <param name="storageInvariant">The ADO.NET invariant name for the storage provider.</param>
+        /// <param name="deleteStateOnClear">If <see langword="true"/>, the provider will delete the row from the database when clearing state.</param>
+        /// <remarks>If the environment invariants have failed to hold upon creation of the storage provider,
+        /// a <em>null</em> value will be provided.</remarks>
+        public async Task<IGrainStorage> GetStorageProvider(string storageInvariant, bool deleteStateOnClear)
+        {
             //Make sure the environment invariants hold before trying to give a functioning SUT instantiation.
             //This is done instead of the constructor to have more granularity on how the environment should be initialized.
             using (await StorageLock.LockAsync())
             {
+                var cacheKey = deleteStateOnClear ? $"{storageInvariant}_DeleteOnClear" : storageInvariant;
                 if (AdoNetInvariants.Invariants.Contains(storageInvariant))
                 {
-                    if (!StorageProviders.ContainsKey(storageInvariant))
+                    if (!StorageProviders.ContainsKey(cacheKey))
                     {
                         var connectionString = Invariants.ActiveSettings.ConnectionStrings.FirstOrDefault(i => i.StorageInvariant == storageInvariant);
 
                         if (string.IsNullOrWhiteSpace(connectionString.ConnectionString))
                         {
-                            StorageProviders.Add(storageInvariant, null);
+                            StorageProviders.Add(cacheKey, null);
                         }
                         else
                         {
@@ -89,7 +102,8 @@ namespace UnitTests.StorageTests.Relational
                             {
                                 ConnectionString = Storage.Storage.ConnectionString,
                                 Invariant = storageInvariant,
-                                GrainStorageSerializer = new JsonGrainStorageSerializer(this.DefaultProviderRuntime.ServiceProvider.GetService<OrleansJsonSerializer>())
+                                GrainStorageSerializer = new JsonGrainStorageSerializer(this.DefaultProviderRuntime.ServiceProvider.GetService<OrleansJsonSerializer>()),
+                                DeleteStateOnClear = deleteStateOnClear,
                             };
                             var clusterOptions = new ClusterOptions()
                             {
@@ -105,13 +119,14 @@ namespace UnitTests.StorageTests.Relational
                             storageProvider.Participate(siloLifeCycle);
                             await siloLifeCycle.OnStart(CancellationToken.None);
 
-                            StorageProviders[storageInvariant] = storageProvider;
+                            StorageProviders[cacheKey] = storageProvider;
                         }
                     }
                 }
             }
 
-            return StorageProviders[storageInvariant];
+            var key = deleteStateOnClear ? $"{storageInvariant}_DeleteOnClear" : storageInvariant;
+            return StorageProviders[key];
         }
     }
 }

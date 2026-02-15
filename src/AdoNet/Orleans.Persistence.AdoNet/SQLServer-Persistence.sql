@@ -262,3 +262,28 @@ WHERE NOT EXISTS
     FROM OrleansQuery oqt
     WHERE oqt.[QueryKey] = 'ReadFromStorageKey'
 );
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+SELECT
+    'DeleteStorageKey',
+    'BEGIN TRANSACTION;
+    SET XACT_ABORT, NOCOUNT ON;
+    DELETE FROM OrleansStorage OUTPUT DELETED.Version + 1
+    WHERE
+        GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
+        AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
+        AND (GrainIdN0 = @GrainIdN0 OR @GrainIdN0 IS NULL)
+        AND (GrainIdN1 = @GrainIdN1 OR @GrainIdN1 IS NULL)
+        AND (GrainTypeString = @GrainTypeString OR @GrainTypeString IS NULL)
+        AND ((@GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = @GrainIdExtensionString) OR @GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
+        AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
+        AND Version IS NOT NULL AND Version = @GrainStateVersion AND @GrainStateVersion IS NOT NULL
+        OPTION(FAST 1, OPTIMIZE FOR(@GrainIdHash UNKNOWN, @GrainTypeHash UNKNOWN));
+
+    COMMIT TRANSACTION;'
+WHERE NOT EXISTS
+(
+    SELECT 1
+    FROM OrleansQuery oqt
+    WHERE oqt.[QueryKey] = 'DeleteStorageKey'
+);
