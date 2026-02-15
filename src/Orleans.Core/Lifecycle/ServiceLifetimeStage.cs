@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -106,14 +105,25 @@ internal sealed partial class ServiceLifetimeStage(ILogger logger, string name) 
 
     public async Task NotifyCompleted(CancellationToken cancellationToken)
     {
-        Debug.Assert(!_isNotifyingOrHasCompleted, "This should not be called twice!");
-
-        List<StageParticipant> snapshot;
+        List<StageParticipant>? snapshot;
 
         lock (_lock)
         {
-            _isNotifyingOrHasCompleted = true;
-            snapshot = [.. _participants];
+            if (_isNotifyingOrHasCompleted)
+            {
+                snapshot = null;
+            }
+            else
+            {
+                _isNotifyingOrHasCompleted = true;
+                snapshot = [.. _participants];
+            }
+        }
+
+        if (snapshot is null)
+        {
+            await _tcs.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return;
         }
 
         var tasks = new List<Task>(snapshot.Count + 1)

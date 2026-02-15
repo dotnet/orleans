@@ -105,6 +105,32 @@ public class ServiceLifetimeTests
     }
 
     [Fact]
+    public async Task Stage_NotifyCompleted_IsIdempotent()
+    {
+        var stage = new ServiceLifetimeStage(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, "Started");
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var executionCount = 0;
+
+        stage.Register(async (_, _) =>
+        {
+            Interlocked.Increment(ref executionCount);
+            await gate.Task;
+        }, state: null, terminateOnError: true);
+
+        var first = stage.NotifyCompleted(CancellationToken.None);
+        var second = stage.NotifyCompleted(CancellationToken.None);
+
+        Assert.False(second.IsCompleted);
+
+        gate.SetResult();
+        await Task.WhenAll(first, second).WaitAsync(Timeout);
+
+        await stage.NotifyCompleted(CancellationToken.None).WaitAsync(Timeout);
+
+        Assert.Equal(1, executionCount);
+    }
+
+    [Fact]
     public async Task CallbackDisposal_PreventsExecution()
     {
         var (task, registration) = RegisterCallback(_lifetime.Stopping);
