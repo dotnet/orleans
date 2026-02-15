@@ -74,13 +74,19 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
             _monitorTimer = RegisterGrainTimer(async ct =>
             {
                 var elapsedSinceHeartbeat = _timeProvider.GetElapsedTime(_lastHeartbeatTimestamp);
-                if (elapsedSinceHeartbeat >= IActivationRebalancerMonitor.WorkerReportPeriod)
+                var shouldFetchReport = _latestReport.Host == SiloAddress.Zero
+                    || elapsedSinceHeartbeat >= IActivationRebalancerMonitor.WorkerReportPeriod;
+                if (shouldFetchReport)
                 {
-                    LogStartingRebalancer(elapsedSinceHeartbeat, IActivationRebalancerMonitor.WorkerReportPeriod);
+                    if (elapsedSinceHeartbeat >= IActivationRebalancerMonitor.WorkerReportPeriod)
+                    {
+                        LogStartingRebalancer(elapsedSinceHeartbeat, IActivationRebalancerMonitor.WorkerReportPeriod);
+                    }
+
                     _latestReport = await _rebalancerGrain.GetReport().AsTask().WaitAsync(ct);
                 }
 
-            }, TimerPeriod, TimerPeriod);
+            }, TimeSpan.Zero, TimerPeriod);
 
             return Task.CompletedTask;
         });
