@@ -257,7 +257,6 @@ public class OrderGrain : Grain, IOrderGrain, IDurableJobHandler
                 }
             },
             CancellationToken.None);
-            });
     }
 
     public async Task CancelOrder()

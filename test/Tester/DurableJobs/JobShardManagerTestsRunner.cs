@@ -434,9 +434,9 @@ public class JobShardManagerTestsRunner
         var shard = await silo1Manager.CreateShardAsync(date, date.AddYears(1), _testMetadata, cancellationToken);
 
         // Schedule multiple jobs in a single shard
-        var job1 = await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job1", DueTime = DateTime.UtcNow.AddMilliseconds(500), Metadata = null }, cancellationToken);
+        await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job1", DueTime = DateTime.UtcNow.AddMilliseconds(500), Metadata = null }, cancellationToken);
         var job2 = await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target2"), JobName = "job2", DueTime = DateTime.UtcNow.AddMilliseconds(1000), Metadata = null }, cancellationToken);
-        var job3 = await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target3"), JobName = "job3", DueTime = DateTime.UtcNow.AddMilliseconds(1500), Metadata = null }, cancellationToken);
+        await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target3"), JobName = "job3", DueTime = DateTime.UtcNow.AddMilliseconds(1500), Metadata = null }, cancellationToken);
         var job4 = await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target4"), JobName = "job4", DueTime = DateTime.UtcNow.AddMilliseconds(2000), Metadata = null }, cancellationToken);
 
         // Cancel job2 before processing starts

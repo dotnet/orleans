@@ -284,9 +284,6 @@ public class OrderGrain : Grain, IOrderGrain, IDurableJobHandler
                 }
             },
             CancellationToken.None);
-            {
-                ["Step"] = "OrderExpiration"
-            });
 
         _logger.LogInformation(
             "Scheduled payment reminder for {ReminderTime} and expiration for {ExpirationTime}",
