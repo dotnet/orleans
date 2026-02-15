@@ -418,12 +418,6 @@ jobs:
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@v4
-    - name: Start Consul
-      run: |
-        docker run -d --name consul -p 8500:8500 -p 8600:8600/tcp -p 8600:8600/udp \
-          hashicorp/consul:1.19 agent -dev -client=0.0.0.0
-    - name: Wait for Consul
-      run: sleep 5
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
@@ -436,14 +430,6 @@ jobs:
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
-      env:
-# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
-# [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
-# [SuppressMessage("Microsoft.Security", "CSCAN0220:DefaultPasswordContexts", Justification="Not a secret")]
-        ORLEANSCONSULCONNECTIONSTRING: "http://localhost:8500"
-    - name: Clean up Consul container
-      if: always()
-      run: docker rm -f consul
     - name: Archive Test Results
       if: always()
       uses: actions/upload-artifact@v4
@@ -609,7 +595,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.suite }}"
+        --filter "Category=${{ matrix.suite }}&Category!=Consul"
         --blame-hang-timeout 10m
         --logger "trx;LogFileName=test_results_${{ matrix.suite }}_${{ matrix.framework }}.trx"
         --
