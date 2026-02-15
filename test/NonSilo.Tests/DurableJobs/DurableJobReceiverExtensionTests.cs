@@ -13,7 +13,7 @@ public class DurableJobReceiverExtensionTests
     public async Task HandleDurableJobAsync_WhenExecutionTaskIsCanceled_PropagatesCancellation()
     {
         var handler = Substitute.For<IDurableJobHandler>();
-        handler.ExecuteJobAsync(Arg.Any<IDurableJobContext>(), Arg.Any<CancellationToken>())
+        handler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromCanceled(new CancellationToken(canceled: true)));
 
         var extension = CreateExtension(handler);
@@ -27,7 +27,7 @@ public class DurableJobReceiverExtensionTests
     {
         var executionTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = Substitute.For<IDurableJobHandler>();
-        handler.ExecuteJobAsync(Arg.Any<IDurableJobContext>(), Arg.Any<CancellationToken>())
+        handler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(executionTask.Task);
 
         var extension = CreateExtension(handler);
@@ -40,7 +40,7 @@ public class DurableJobReceiverExtensionTests
 
         Assert.True(first.IsPending);
         Assert.True(second.IsPending);
-        await handler.Received(1).ExecuteJobAsync(Arg.Any<IDurableJobContext>(), Arg.Any<CancellationToken>());
+        await handler.Received(1).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
 
         executionTask.SetResult(true);
     }
@@ -59,9 +59,9 @@ public class DurableJobReceiverExtensionTests
         return new DurableJobReceiverExtension(grainContext, NullLogger<DurableJobReceiverExtension>.Instance);
     }
 
-    private static IDurableJobContext CreateJobContext(string runId)
+    private static IJobRunContext CreateJobContext(string runId)
     {
-        var context = Substitute.For<IDurableJobContext>();
+        var context = Substitute.For<IJobRunContext>();
         context.RunId.Returns(runId);
         context.DequeueCount.Returns(1);
         context.Job.Returns(new DurableJob
@@ -76,3 +76,4 @@ public class DurableJobReceiverExtensionTests
         return context;
     }
 }
+

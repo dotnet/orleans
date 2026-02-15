@@ -15,14 +15,14 @@ internal interface IDurableJobReceiverExtension : IGrainExtension
 {
     /// <summary>
     /// Handles a durable job by either starting execution or checking the status of an already running job.
-    /// If the job identified by <see cref="IDurableJobContext.RunId"/> has not been started, it will be executed.
+    /// If the job identified by <see cref="IJobRunContext.RunId"/> has not been started, it will be executed.
     /// If it is already running, the current status is returned.
     /// </summary>
     /// <param name="context">The context containing information about the durable job.</param>
     /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
     /// <returns>A task that represents the asynchronous operation and contains the job execution result.</returns>
     [AlwaysInterleave]
-    Task<DurableJobRunResult> HandleDurableJobAsync(IDurableJobContext context, CancellationToken cancellationToken);
+    Task<DurableJobRunResult> HandleDurableJobAsync(IJobRunContext context, CancellationToken cancellationToken);
 }
 
 /// <inheritdoc />
@@ -39,7 +39,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
     }
 
     /// <inheritdoc />
-    public Task<DurableJobRunResult> HandleDurableJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
+    public Task<DurableJobRunResult> HandleDurableJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
         if (_runningJobs.TryGetValue(context.RunId, out var runningTask))
         {
@@ -49,7 +49,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         return StartJobAsync(context, cancellationToken);
     }
 
-    private Task<DurableJobRunResult> StartJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
+    private Task<DurableJobRunResult> StartJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
         if (_grain.GrainInstance is not IDurableJobHandler handler)
         {
@@ -63,7 +63,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         return GetJobStatus(context, task);
     }
 
-    private Task<DurableJobRunResult> GetJobStatus(IDurableJobContext context, Task task)
+    private Task<DurableJobRunResult> GetJobStatus(IJobRunContext context, Task task)
     {
         // Cancellation is cooperative: only terminal task state is authoritative for job outcome.
         if (!task.IsCompleted)
@@ -94,3 +94,4 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
     [LoggerMessage(Level = LogLevel.Error, Message = "Grain {GrainId} does not implement IDurableJobHandler")]
     private partial void LogGrainDoesNotImplementHandler(GrainId grainId);
 }
+
