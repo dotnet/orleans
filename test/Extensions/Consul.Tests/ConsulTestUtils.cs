@@ -10,6 +10,13 @@ namespace Consul.Tests
     {
         private static readonly ConsulContainer _container = new ConsulBuilder()
             .WithImage("hashicorp/consul:1.19")
+            .WithCreateParameterModifier(parameters =>
+            {
+                if (parameters.HostConfig is not null)
+                {
+                    parameters.HostConfig.CapAdd = ["IPC_LOCK"];
+                }
+            })
             .Build();
 
         public static string ConsulConnectionString
