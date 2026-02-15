@@ -91,8 +91,6 @@ namespace Orleans.TestingHost
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
-            if (!this.IsActive) return;
-
             if (disposing)
             {
                 try
@@ -110,8 +108,6 @@ namespace Orleans.TestingHost
         /// <inheritdoc />
         public override async ValueTask DisposeAsync()
         {
-            if (!this.IsActive) return;
-
             try
             {
                 await StopSiloAsync(true).ConfigureAwait(false);
@@ -121,6 +117,10 @@ namespace Orleans.TestingHost
                 if (this.SiloHost is IAsyncDisposable asyncDisposable)
                 {
                     await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                }
+                else if (this.SiloHost is IDisposable disposable)
+                {
+                    disposable.Dispose();
                 }
             }
         }
