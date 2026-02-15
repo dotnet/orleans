@@ -122,7 +122,7 @@ public sealed class DurableJobsOptionsValidator : IConfigurationValidator
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShouldRetry must not be null.");
         }
-        if (options.SlowStartInitialConcurrency <= 0)
+        if (options.ConcurrencySlowStartEnabled && options.SlowStartInitialConcurrency <= 0)
         {
             throw new OrleansConfigurationException("DurableJobsOptions.SlowStartInitialConcurrency must be greater than zero.");
         }

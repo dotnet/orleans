@@ -482,6 +482,21 @@ public class ShardExecutorTests
         Assert.Equal(maxConcurrency, maxObservedConcurrent);
     }
 
+    [Fact]
+    public void ValidateConfiguration_WithSlowStartDisabled_AllowsNonPositiveInitialConcurrency()
+    {
+        var options = Options.Create(new DurableJobsOptions
+        {
+            ConcurrencySlowStartEnabled = false,
+            SlowStartInitialConcurrency = 0
+        });
+        var validator = new Orleans.Hosting.DurableJobsOptionsValidator(
+            NullLogger<Orleans.Hosting.DurableJobsOptionsValidator>.Instance,
+            options);
+
+        validator.ValidateConfiguration();
+    }
+
     // Helper methods
 
     private static IOptions<DurableJobsOptions> CreateOptions(
