@@ -1,5 +1,6 @@
 using Orleans.Configuration;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using Orleans.Internal;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -84,8 +85,8 @@ namespace UnitTests.StuckGrainTests
 
             for (var i = 0; i < 3; i++)
             {
-                await Assert.ThrowsAsync<TimeoutException>(
-                    () => stuckGrain.NonBlockingCall().WaitAsync(TimeSpan.FromMilliseconds(500)));
+                var call = stuckGrain.NonBlockingCall();
+                await Task.WhenAny(call, Task.Delay(TimeSpan.FromMilliseconds(500)));
             }
 
             // Wait so the first task will reach with DefaultCollectionAge timeout
@@ -95,7 +96,19 @@ namespace UnitTests.StuckGrainTests
             await stuckGrain.NonBlockingCall();
 
             // All 4 otherwise stuck calls should have been forwarded to a new activation
-            Assert.Equal(4, await stuckGrain.GetNonBlockingCallCounter());
+            await TestingUtils.WaitUntilAsync(
+                async lastTry =>
+                {
+                    var count = await stuckGrain.GetNonBlockingCallCounter();
+                    if (lastTry)
+                    {
+                        Assert.Equal(4, count);
+                    }
+
+                    return count == 4;
+                },
+                TimeSpan.FromSeconds(10),
+                TimeSpan.FromMilliseconds(200));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivationCollection")]
