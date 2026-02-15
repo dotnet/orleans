@@ -148,7 +148,7 @@ public abstract class JobShard : IJobShard
 
         if (request.DueTime < StartTime || request.DueTime > EndTime)
         {
-            throw new ArgumentOutOfRangeException(nameof(request), "Scheduled time is out of shard bounds.");
+            throw new ArgumentOutOfRangeException(nameof(request.DueTime), "Scheduled time is out of shard bounds.");
         }
 
         var jobId = Guid.NewGuid().ToString();

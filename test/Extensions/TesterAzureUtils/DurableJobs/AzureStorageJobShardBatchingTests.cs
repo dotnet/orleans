@@ -97,7 +97,7 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
         var tasks = new List<Task>();
         for (int i = 0; i < 10; i++)
         {
-            tasks.Add(shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", $"target{i}"), JobName = $"job{i}", DueTime = date.AddMilliseconds(i*10), Metadata = null }, CancellationToken.None));
+            tasks.Add(shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", $"target{i}"), JobName = $"job{i}", DueTime = date.AddMilliseconds(i * 10d), Metadata = null }, CancellationToken.None));
         }
 
         await Task.WhenAll(tasks);
