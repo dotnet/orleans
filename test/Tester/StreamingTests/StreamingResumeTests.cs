@@ -1,4 +1,5 @@
 using Orleans.Streams;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -145,12 +146,21 @@ namespace Tester.StreamingTests
             var slowGrain = this.Client.GetGrain<ISlowImplicitSubscriptionCounterGrain>(key);
 
             await stream.OnNextAsync([1]);
-            await Task.Delay(500);
-            Assert.Equal(1, await fastGrain.GetEventCounter());
+            await TestingUtils.WaitUntilAsync(lastTry => CheckFastCounter(1, lastTry), TimeSpan.FromSeconds(30));
 
             await stream.OnNextAsync([2]);
-            await Task.Delay(500);
-            Assert.Equal(2, await fastGrain.GetEventCounter());
+            await TestingUtils.WaitUntilAsync(lastTry => CheckFastCounter(2, lastTry), TimeSpan.FromSeconds(30));
+
+            async Task<bool> CheckFastCounter(int expected, bool lastTry)
+            {
+                var actual = await fastGrain.GetEventCounter();
+                if (lastTry)
+                {
+                    Assert.Equal(expected, actual);
+                }
+
+                return actual == expected;
+            }
         }
     }
 }
