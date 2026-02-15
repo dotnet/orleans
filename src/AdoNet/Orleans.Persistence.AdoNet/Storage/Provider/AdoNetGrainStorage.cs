@@ -371,7 +371,7 @@ namespace Orleans.Storage
             //it means two grains were activated an the other one succeeded in writing its state.
             //
             //NOTE: the storage could return also the new and old ETag (Version), but currently it doesn't.
-            if (storageVersion == grainVersion || storageVersion == string.Empty)
+            if (storageVersion == grainVersion || storageVersion == string.Empty || (storageVersion is null && grainVersion is not null))
             {
                 //TODO: Note that this error message should be canonical across back-ends.
                 return new InconsistentStateException($"Version conflict ({operation}): ServiceId={serviceId} ProviderName={providerName} GrainType={normalizedGrainType} GrainId={grainId} ETag={grainVersion}.");
