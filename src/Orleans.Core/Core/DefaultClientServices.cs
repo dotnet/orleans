@@ -53,6 +53,7 @@ namespace Orleans
             // Common services
             services.AddLogging();
             services.AddOptions();
+            services.AddMetrics();
             services.TryAddSingleton<TimeProvider>(TimeProvider.System);
             services.TryAddSingleton<OrleansInstruments>();
 
