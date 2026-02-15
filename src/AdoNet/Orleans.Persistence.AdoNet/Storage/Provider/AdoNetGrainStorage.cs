@@ -59,14 +59,13 @@ namespace Orleans.Storage
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Required configuration params: <c>DataConnectionString</c>
+    /// Configuration is provided through <see cref="AdoNetGrainStorageOptions"/>.
     /// </para>
     /// <para>
-    /// Optional configuration params:
-    /// <c>AdoInvariant</c> -- defaults to <c>Microsoft.Data.SqlClient</c>
-    /// <c>UseJsonFormat</c> -- defaults to <c>false</c>
-    /// <c>UseXmlFormat</c> -- defaults to <c>false</c>
-    /// <c>UseBinaryFormat</c> -- defaults to <c>true</c>
+    /// Required configuration: <c>ConnectionString</c> - The database connection string.
+    /// </para>
+    /// <para>
+    /// Optional configuration: <c>Invariant</c> - The ADO.NET provider invariant name (defaults to <c>Microsoft.Data.SqlClient</c>).
     /// </para>
     /// </remarks>
     [DebuggerDisplay("Name = {Name}, ConnectionString = {Storage.ConnectionString}")]
