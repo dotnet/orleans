@@ -28,36 +28,29 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
         helpLinkUri: null,
         customTags: [WellKnownDiagnosticTags.CompilationEnd]);
 
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [Rule];
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [Rule];
 
     public override void Initialize(AnalysisContext context)
     {
-        context.ConfigureGeneratedCodeAnalysis(
-            GeneratedCodeAnalysisFlags.Analyze |
-            GeneratedCodeAnalysisFlags.ReportDiagnostics);
+        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
 
         context.EnableConcurrentExecution();
 
-        context.RegisterCompilationStartAction(compilationContext =>
+        context.RegisterCompilationStartAction(context =>
         {
             var aliasMap = new ConcurrentDictionary<string, ConcurrentBag<TypeAliasInfo>>();
-
-            compilationContext.RegisterSyntaxNodeAction(
-                nodeContext => CollectTypeAliases(nodeContext, aliasMap),
-                SyntaxKind.EnumDeclaration,
-                SyntaxKind.ClassDeclaration,
-                SyntaxKind.StructDeclaration,
-                SyntaxKind.RecordDeclaration,
-                SyntaxKind.InterfaceDeclaration,
-                SyntaxKind.RecordStructDeclaration);
+            var aliasAttributeSymbol = context.Compilation.GetTypeByMetadataName("Orleans.AliasAttribute");
+            context.RegisterSymbolAction(
+                context => CollectTypeAliases(context, aliasMap, aliasAttributeSymbol),
+                SymbolKind.NamedType);
 
             // We can immediately check duplicate method‐aliases in grain interfaces.
-            compilationContext.RegisterSyntaxNodeAction(
-                nodeContext => CheckMethodAliases(nodeContext, aliasMap),
-                SyntaxKind.InterfaceDeclaration);
+            context.RegisterSymbolAction(
+                context => CheckMethodAliases(context, aliasMap, aliasAttributeSymbol),
+                SymbolKind.NamedType);
 
             // Only at the very end, we do one single‐threaded scan for type‐alias clashes only.
-            compilationContext.RegisterCompilationEndAction(endContext =>
+            context.RegisterCompilationEndAction(context =>
             {
                 foreach (var kvp in aliasMap)
                 {
@@ -77,7 +70,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
                     var firstType = distinctTypes[0];
                     foreach (var info in infos.Where(i => i.TypeName != firstType))
                     {
-                        endContext.ReportDiagnostic(Diagnostic.Create(Rule, info.Location, alias, firstType));
+                        context.ReportDiagnostic(Diagnostic.Create(Rule, info.Location, alias, firstType));
                     }
                 }
             });
@@ -85,32 +78,27 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
     }
 
     private static void CollectTypeAliases(
-        SyntaxNodeAnalysisContext context,
-        ConcurrentDictionary<string, ConcurrentBag<TypeAliasInfo>> aliasMap)
+        SymbolAnalysisContext context,
+        ConcurrentDictionary<string, ConcurrentBag<TypeAliasInfo>> aliasMap,
+        INamedTypeSymbol aliasAttributeSymbol)
     {
-        if (context.Node is not BaseTypeDeclarationSyntax decl)
-            return;
-
-        var semanticModel = context.SemanticModel;
-        var typeSymbol = semanticModel.GetDeclaredSymbol(decl);
-        if (typeSymbol == null)
-        {
-            return;
-        }
-
-        if (decl is InterfaceDeclarationSyntax iface && !iface.ExtendsGrainInterface(semanticModel))
+        var typeSymbol = (INamedTypeSymbol)context.Symbol;
+        
+        if (typeSymbol.TypeKind == TypeKind.Interface && !typeSymbol.ExtendsGrainInterface())
         {
             return; // Skip interfaces that dont extend IAddressable
         }
 
-        var attrs = decl.AttributeLists.GetAttributeSyntaxes(Constants.AliasAttributeName);
-        foreach (var attr in attrs)
+        foreach (var attr in typeSymbol.GetAttributes())
         {
-            var alias = attr.GetArgumentValue(semanticModel);
+            if (!aliasAttributeSymbol.Equals(attr.AttributeClass, SymbolEqualityComparer.Default))
+                continue;
+
+            var alias = attr.ConstructorArguments.FirstOrDefault().Value as string;
             if (string.IsNullOrEmpty(alias))
                 continue;
 
-            var info = new TypeAliasInfo(typeSymbol.ToDisplayString(), attr.GetLocation());
+            var info = new TypeAliasInfo(typeSymbol.ToDisplayString(), attr.ApplicationSyntaxReference.GetSyntax().GetLocation());
 
             aliasMap.AddOrUpdate(
                 key: alias,
@@ -124,26 +112,30 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
     }
 
     private static void CheckMethodAliases(
-        SyntaxNodeAnalysisContext context,
-        ConcurrentDictionary<string, ConcurrentBag<TypeAliasInfo>> aliasMap)
+        SymbolAnalysisContext context,
+        ConcurrentDictionary<string, ConcurrentBag<TypeAliasInfo>> aliasMap,
+        INamedTypeSymbol aliasAttributeSymbol)
     {
-        if (context.Node is not InterfaceDeclarationSyntax interfaceDecl)
+        if (context.Symbol is not INamedTypeSymbol { TypeKind: TypeKind.Interface } interfaceSymbol)
         {
             return;
         }
 
-        var semanticModel = context.SemanticModel;
         var methodBags = new List<(string Alias, Location Location)>();
 
-        foreach (var method in interfaceDecl.Members.OfType<MethodDeclarationSyntax>())
+        foreach (var method in interfaceSymbol.GetMembers().OfType<IMethodSymbol>())
         {
-            var methodAttrs = method.AttributeLists.GetAttributeSyntaxes(Constants.AliasAttributeName);
-            foreach (var attr in methodAttrs)
+            foreach (var attr in method.GetAttributes())
             {
-                var alias = attr.GetArgumentValue(semanticModel);
+                if (!aliasAttributeSymbol.Equals(attr.AttributeClass, SymbolEqualityComparer.Default))
+                {
+                    continue;
+                }
+
+                var alias = attr.ConstructorArguments.FirstOrDefault().Value as string;
                 if (!string.IsNullOrEmpty(alias))
                 {
-                    methodBags.Add((alias, attr.GetLocation()));
+                    methodBags.Add((alias, attr.ApplicationSyntaxReference.GetSyntax().GetLocation()));
                 }
             }
         }
