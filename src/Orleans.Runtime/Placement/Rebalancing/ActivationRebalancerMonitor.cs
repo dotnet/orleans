@@ -69,20 +69,22 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
 
     private async Task OnStart(CancellationToken cancellationToken)
     {
-        await this.RunOrQueueTask(async () =>
+        await this.RunOrQueueTask(() =>
         {
             _monitorTimer = RegisterGrainTimer(async ct =>
             {
                 var elapsedSinceHeartbeat = _timeProvider.GetElapsedTime(_lastHeartbeatTimestamp);
-                if (elapsedSinceHeartbeat >= IActivationRebalancerMonitor.WorkerReportPeriod)
+                var shouldFetchReport = _latestReport.Host == SiloAddress.Zero
+                    || elapsedSinceHeartbeat >= IActivationRebalancerMonitor.WorkerReportPeriod;
+                if (shouldFetchReport)
                 {
                     LogStartingRebalancer(elapsedSinceHeartbeat, IActivationRebalancerMonitor.WorkerReportPeriod);
                     _latestReport = await _rebalancerGrain.GetReport().AsTask().WaitAsync(ct);
                 }
 
-            }, TimerPeriod, TimerPeriod);
+            }, TimeSpan.Zero, TimerPeriod);
 
-            _latestReport = await _rebalancerGrain.GetReport().AsTask().WaitAsync(cancellationToken);
+            return Task.CompletedTask;
         });
     }
 
