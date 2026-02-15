@@ -1,6 +1,4 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
 
@@ -25,33 +23,40 @@ public class IncorrectAttributeUseAnalyzer : DiagnosticAnalyzer
     public override void Initialize(AnalysisContext context)
     {
         context.EnableConcurrentExecution();
-        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze | GeneratedCodeAnalysisFlags.ReportDiagnostics);
-        context.RegisterSyntaxNodeAction(CheckSyntaxNode, SyntaxKind.ClassDeclaration);
+        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+
+        context.RegisterCompilationStartAction(context =>
+        {
+            var aliasAttributeSymbol = context.Compilation.GetTypeByMetadataName("Orleans.AliasAttribute");
+            var grainSymbol = context.Compilation.GetTypeByMetadataName("Orleans.Grain");
+            var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName("Orleans.GenerateSerializerAttribute");
+            if (aliasAttributeSymbol is not null && grainSymbol is not null)
+            {
+                context.RegisterSymbolAction(context => AnalyzeNamedType(context, aliasAttributeSymbol, grainSymbol, generateSerializerAttributeSymbol), SymbolKind.NamedType);
+            }
+        });
     }
 
-    private void CheckSyntaxNode(SyntaxNodeAnalysisContext context)
+    private static void AnalyzeNamedType(SymbolAnalysisContext context, INamedTypeSymbol aliasAttributeSymbol, INamedTypeSymbol grainSymbol, INamedTypeSymbol generateSerializerAttributeSymbol)
     {
-        if (context.Node is not ClassDeclarationSyntax) return;
-
-        var classDeclaration = (ClassDeclarationSyntax)context.Node;
-
-        if (!classDeclaration.InheritsGrainClass(context.SemanticModel))
+        var symbol = (INamedTypeSymbol)context.Symbol;
+        if (!symbol.DerivesFrom(grainSymbol))
         {
             return;
         }
 
-        TryReportFor(Constants.AliasAttributeName, context, classDeclaration);
-        TryReportFor(Constants.GenerateSerializerAttributeName, context, classDeclaration);
+        TryReportFor(aliasAttributeSymbol, context, symbol);
+        TryReportFor(generateSerializerAttributeSymbol, context, symbol);
     }
 
-    private static void TryReportFor(string attributeTypeName, SyntaxNodeAnalysisContext context, ClassDeclarationSyntax classDeclaration)
+    private static void TryReportFor(INamedTypeSymbol attributeSymbol, SymbolAnalysisContext context, INamedTypeSymbol symbol)
     {
-        if (classDeclaration.TryGetAttribute(attributeTypeName, out var attribute))
+        if (symbol.HasAttribute(attributeSymbol, out var location))
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 descriptor: Rule,
-                location: attribute.GetLocation(),
-                messageArgs: new object[] { attributeTypeName }));
+                location: location,
+                messageArgs: new object[] { attributeSymbol.Name }));
         }
     }
 }

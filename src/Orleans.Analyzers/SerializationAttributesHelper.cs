@@ -9,9 +9,9 @@ namespace Orleans.Analyzers
 {
     internal static class SerializationAttributesHelper
     {
-        public static bool ShouldGenerateSerializer(TypeDeclarationSyntax declaration)
+        public static bool ShouldGenerateSerializer(INamedTypeSymbol symbol, INamedTypeSymbol generateSerializerAttributeSymbol)
         {
-            if (!declaration.Modifiers.Any(m => m.IsKind(SyntaxKind.StaticKeyword)) && declaration.HasAttribute(Constants.GenerateSerializerAttributeName))
+            if (!symbol.IsStatic && symbol.HasAttribute(generateSerializerAttributeSymbol))
             {
                 return true;
             }
@@ -22,17 +22,13 @@ namespace Orleans.Analyzers
         public readonly record struct TypeAnalysis
         {
             public List<MemberDeclarationSyntax> UnannotatedMembers { get; init; }
-            public List<MemberDeclarationSyntax> AnnotatedMembers { get; init; }
             public uint NextAvailableId { get; init; }
-            public uint AnnotatedConstructorCount { get; init; }
         }
 
         public static TypeAnalysis AnalyzeTypeDeclaration(TypeDeclarationSyntax declaration)
         {
             uint nextId = 0;
-            uint annotatedConstructorCount = 0;
             var unannotatedSerializableMembers = new List<MemberDeclarationSyntax>();
-            var annotatedSerializableMembers = new List<MemberDeclarationSyntax>();
             foreach (var member in declaration.Members)
             {
                 // Skip members with existing [Id(x)] attributes, but record the highest value of x so that newly added attributes can begin from that value.
@@ -53,13 +49,11 @@ namespace Orleans.Analyzers
                         }
                     }
 
-                    annotatedSerializableMembers.Add(member);
                     continue;
                 }
 
                 if (member is ConstructorDeclarationSyntax constructorDeclaration && constructorDeclaration.HasAttribute(Constants.GenerateSerializerAttributeName))
                 {
-                    annotatedConstructorCount++;
                     continue;
                 }
 
@@ -75,9 +69,7 @@ namespace Orleans.Analyzers
             return new TypeAnalysis
             {
                 UnannotatedMembers = unannotatedSerializableMembers,
-                AnnotatedMembers = annotatedSerializableMembers,
                 NextAvailableId = nextId,
-                AnnotatedConstructorCount = annotatedConstructorCount
             };
         }
     }

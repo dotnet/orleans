@@ -25,27 +25,42 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
     public override void Initialize(AnalysisContext context)
     {
         context.EnableConcurrentExecution();
-        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze | GeneratedCodeAnalysisFlags.ReportDiagnostics);
-        context.RegisterSyntaxNodeAction(CheckSyntaxNode,
-            SyntaxKind.InterfaceDeclaration,
-            SyntaxKind.ClassDeclaration,
-            SyntaxKind.StructDeclaration,
-            SyntaxKind.RecordDeclaration,
-            SyntaxKind.RecordStructDeclaration);
+        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+        context.RegisterCompilationStartAction(context =>
+        {
+            var aliasAttributeSymbol = context.Compilation.GetTypeByMetadataName("Orleans.AliasAttribute");
+            var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName("Orleans.GenerateSerializerAttribute");
+            var grainSymbol = context.Compilation.GetTypeByMetadataName("Orleans.Grain");
+            if (aliasAttributeSymbol is not null && generateSerializerAttributeSymbol is not null)
+            {
+                context.RegisterSymbolAction(context => AnalyzeNamedType(context, aliasAttributeSymbol, generateSerializerAttributeSymbol, grainSymbol), SymbolKind.NamedType);
+            }
+        });
     }
 
-    private void CheckSyntaxNode(SyntaxNodeAnalysisContext context)
+    private void AnalyzeNamedType(
+        SymbolAnalysisContext context,
+        INamedTypeSymbol aliasAttributeSymbol,
+        INamedTypeSymbol generateSerializerAttributeSymbol,
+        INamedTypeSymbol grainSymbol)
     {
+        var symbol = (INamedTypeSymbol)context.Symbol;
+
         // Interface types and their methods
-        if (context.Node is InterfaceDeclarationSyntax { } interfaceDeclaration)
+        if (symbol.TypeKind == TypeKind.Interface)
         {
-            if (!interfaceDeclaration.ExtendsGrainInterface(context.SemanticModel))
+            if (!symbol.ExtendsGrainInterface())
             {
                 return;
             }
 
-            if (!interfaceDeclaration.HasAttribute(Constants.AliasAttributeName))
+            if (!symbol.HasAttribute(aliasAttributeSymbol))
             {
+                if (!TryGetDeclarationSyntax(symbol, out InterfaceDeclarationSyntax interfaceDeclaration))
+                {
+                    return;
+                }
+
                 ReportFor(
                     context,
                     interfaceDeclaration.GetLocation(),
@@ -54,16 +69,21 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
                     GetNamespaceAndNesting(interfaceDeclaration));
             }
 
-            foreach (var methodDeclaration in interfaceDeclaration.Members.OfType<MethodDeclarationSyntax>())
+            foreach (var methodSymbol in symbol.GetMembers().OfType<IMethodSymbol>())
             {
-                if (methodDeclaration.IsStatic())
+                if (methodSymbol.IsStatic)
                 {
                     continue;
                 }
 
-                if (!methodDeclaration.HasAttribute(Constants.AliasAttributeName))
+                if (!methodSymbol.HasAttribute(aliasAttributeSymbol))
                 {
-                    ReportFor(context, methodDeclaration.GetLocation(), methodDeclaration.Identifier.ToString(), arity: 0, namespaceAndNesting: null);
+                    if (!TryGetDeclarationSyntax(methodSymbol, out MethodDeclarationSyntax methodDeclaration))
+                    {
+                        continue;
+                    }
+
+                    ReportFor(context, methodDeclaration.GetLocation(), methodSymbol.Name, arity: 0, namespaceAndNesting: null);
                 }
             }
 
@@ -71,20 +91,24 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         }
 
         // Rest of types: class, struct, record
-        if (context.Node is TypeDeclarationSyntax { } typeDeclaration)
+        if (symbol.TypeKind is TypeKind.Class or TypeKind.Struct)
         {
-            if (typeDeclaration is ClassDeclarationSyntax classDeclaration &&
-                classDeclaration.InheritsGrainClass(context.SemanticModel))
+            if (symbol.DerivesFrom(grainSymbol))
             {
                 return;
             }
 
-            if (!typeDeclaration.HasAttribute(Constants.GenerateSerializerAttributeName))
+            if (!symbol.HasAttribute(generateSerializerAttributeSymbol))
             {
                 return;
             }
 
-            if (typeDeclaration.HasAttribute(Constants.AliasAttributeName))
+            if (symbol.HasAttribute(aliasAttributeSymbol))
+            {
+                return;
+            }
+
+            if (!TryGetDeclarationSyntax(symbol, out TypeDeclarationSyntax typeDeclaration))
             {
                 return;
             }
@@ -144,7 +168,14 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         return sb.ToString();
     }
 
-    private static void ReportFor(SyntaxNodeAnalysisContext context, Location location, string typeName, int arity, string namespaceAndNesting)
+    private static bool TryGetDeclarationSyntax<TSyntax>(ISymbol symbol, out TSyntax syntax)
+        where TSyntax : SyntaxNode
+    {
+        syntax = symbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as TSyntax;
+        return syntax is not null;
+    }
+
+    private static void ReportFor(SymbolAnalysisContext context, Location location, string typeName, int arity, string namespaceAndNesting)
     {
         var builder = ImmutableDictionary.CreateBuilder<string, string>();
 
