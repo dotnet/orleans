@@ -51,7 +51,7 @@ public interface IJobShard : IAsyncDisposable
     /// Consumes durable jobs from this shard in order of their due time.
     /// </summary>
     /// <returns>An asynchronous enumerable of durable job contexts.</returns>
-    IAsyncEnumerable<IDurableJobContext> ConsumeDurableJobsAsync();
+    IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync();
 
     /// <summary>
     /// Gets the number of jobs currently scheduled in this shard.
@@ -81,7 +81,7 @@ public interface IJobShard : IAsyncDisposable
     /// <param name="newDueTime">The new due time for the job.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    Task RetryJobLaterAsync(IDurableJobContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken);
+    Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken);
 
     /// <summary>
     /// Attempts to schedule a new job on this shard.
@@ -136,7 +136,7 @@ public abstract class JobShard : IJobShard
     public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(_jobQueue.Count);
 
     /// <inheritdoc/>
-    public IAsyncEnumerable<IDurableJobContext> ConsumeDurableJobsAsync()
+    public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync()
     {
         return _jobQueue;
     }
@@ -186,7 +186,7 @@ public abstract class JobShard : IJobShard
     }
 
     /// <inheritdoc/>
-    public async Task RetryJobLaterAsync(IDurableJobContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken)
+    public async Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken)
     {
         await PersistRetryJobAsync(jobContext.Job.Id, newDueTime, cancellationToken);
         _jobQueue.RetryJobLater(jobContext, newDueTime);

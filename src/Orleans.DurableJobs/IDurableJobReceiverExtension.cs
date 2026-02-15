@@ -17,7 +17,7 @@ internal interface IDurableJobReceiverExtension : IGrainExtension
     /// <param name="context">The context containing information about the durable job.</param>
     /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    Task DeliverDurableJobAsync(IDurableJobContext context, CancellationToken cancellationToken);
+    Task DeliverDurableJobAsync(IJobRunContext context, CancellationToken cancellationToken);
 }
 
 /// <inheritdoc />
@@ -32,7 +32,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         _logger = logger;
     }
 
-    public async Task DeliverDurableJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
+    public async Task DeliverDurableJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
         if (_grain.GrainInstance is IDurableJobHandler handler)
         {

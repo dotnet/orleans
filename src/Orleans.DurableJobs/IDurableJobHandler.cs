@@ -6,7 +6,7 @@ namespace Orleans.DurableJobs;
 /// <summary>
 /// Provides contextual information about a durable job execution.
 /// </summary>
-public interface IDurableJobContext
+public interface IJobRunContext
 {
     /// <summary>
     /// Gets the durable job being executed.
@@ -28,7 +28,7 @@ public interface IDurableJobContext
 /// Represents the execution context for a durable job.
 /// </summary>
 [GenerateSerializer]
-internal class DurableJobContext : IDurableJobContext
+internal class JobRunContext : IJobRunContext
 {
     /// <summary>
     /// Gets the durable job being executed.
@@ -49,12 +49,12 @@ internal class DurableJobContext : IDurableJobContext
     public int DequeueCount { get; }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="DurableJobContext"/> class.
+    /// Initializes a new instance of the <see cref="JobRunContext"/> class.
     /// </summary>
     /// <param name="job">The durable job to execute.</param>
     /// <param name="runId">The unique identifier for this execution run.</param>
     /// <param name="retryCount">The number of times this job has been dequeued, including retries.</param>
-    public DurableJobContext(DurableJob job, string runId, int retryCount)
+    public JobRunContext(DurableJob job, string runId, int retryCount)
     {
         Job = job;
         RunId = runId;
@@ -76,7 +76,7 @@ internal class DurableJobContext : IDurableJobContext
 /// <code>
 /// public class MyGrain : Grain, IDurableJobHandler
 /// {
-///     public Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
+///     public Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
 ///     {
 ///         // Process the durable job
 ///         var jobName = context.Job.Name;
@@ -106,8 +106,8 @@ public interface IDurableJobHandler
     /// </para>
     /// <para>
     /// If the method throws an exception and a retry policy is configured, the job may be retried.
-    /// The <see cref="IDurableJobContext.DequeueCount"/> property can be used to determine if this is a retry attempt.
+    /// The <see cref="IJobRunContext.DequeueCount"/> property can be used to determine if this is a retry attempt.
     /// </para>
     /// </remarks>
-    Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken);
+    Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken);
 }

@@ -107,7 +107,7 @@ public class DurableJobTestsRunner
 
         await grain.WaitForJobToRun(job.Id).WithTimeout(TimeSpan.FromSeconds(10));
 
-        var context = await grain.GetJobContext(job.Id);
+        var context = await grain.GetJobRun(job.Id);
         Assert.NotNull(context);
         Assert.NotNull(context.Job.Metadata);
         Assert.Equal("user123", context.Job.Metadata["UserId"]);
@@ -245,7 +245,7 @@ public class DurableJobTestsRunner
 
         await grain.WaitForJobToRun(job.Id).WithTimeout(TimeSpan.FromSeconds(10));
 
-        var context = await grain.GetJobContext(job.Id);
+        var context = await grain.GetJobRun(job.Id);
         Assert.NotNull(context);
         Assert.Equal(job.Id, context.Job.Id);
         Assert.Equal(job.Name, context.Job.Name);
@@ -262,7 +262,7 @@ public class DurableJobTestsRunner
 
         await grain.WaitForJobToRun(job.Id).WithTimeout(TimeSpan.FromSeconds(10));
 
-        var context = await grain.GetJobContext(job.Id);
+        var context = await grain.GetJobRun(job.Id);
         Assert.NotNull(context);
         Assert.Equal(1, context.DequeueCount);
     }
@@ -283,7 +283,7 @@ public class DurableJobTestsRunner
 
         Assert.True(await targetGrain.HasJobRan(job.Id));
 
-        var context = await targetGrain.GetJobContext(job.Id);
+        var context = await targetGrain.GetJobRun(job.Id);
         Assert.NotNull(context);
         Assert.Equal(job.Id, context.Job.Id);
         Assert.Equal("CrossGrainJob", context.Job.Name);
@@ -322,7 +322,7 @@ public class DurableJobTestsRunner
         Assert.Equal(2, dequeueCountHistory[1]);
         Assert.Equal(3, dequeueCountHistory[2]);
 
-        var finalContext = await grain.GetFinalJobContext(job.Id);
+        var finalContext = await grain.GetFinalJobRun(job.Id);
         Assert.NotNull(finalContext);
         Assert.Equal(3, finalContext.DequeueCount);
         Assert.Equal(job.Id, finalContext.Job.Id);
