@@ -388,6 +388,8 @@ public class ShardExecutorTests
         var currentConcurrent = 0;
         var maxObservedConcurrent = 0;
         var concurrentLock = new object();
+        var releaseJobs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var concurrencyIncreased = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         // Enough jobs to exercise the slow start ramp-up
         var jobs = CreateJobs(20);
@@ -401,10 +403,14 @@ public class ShardExecutorTests
                 if (currentConcurrent > maxObservedConcurrent)
                 {
                     maxObservedConcurrent = currentConcurrent;
+                    if (maxObservedConcurrent > initialConcurrency)
+                    {
+                        concurrencyIncreased.TrySetResult();
+                    }
                 }
             }
 
-            await Task.Delay(150);
+            await releaseJobs.Task;
 
             lock (concurrentLock)
             {
@@ -412,7 +418,17 @@ public class ShardExecutorTests
             }
         });
 
-        await executor.RunShardAsync(shard, CancellationToken.None);
+        var runTask = executor.RunShardAsync(shard, CancellationToken.None);
+        try
+        {
+            var completedTask = await Task.WhenAny(concurrencyIncreased.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+            Assert.Same(concurrencyIncreased.Task, completedTask);
+        }
+        finally
+        {
+            releaseJobs.TrySetResult();
+            await runTask;
+        }
 
         // Slow start should limit initial concurrency, then ramp up
         Assert.True(maxObservedConcurrent <= maxConcurrency,

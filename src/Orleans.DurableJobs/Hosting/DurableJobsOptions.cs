@@ -126,13 +126,16 @@ public sealed class DurableJobsOptionsValidator : IConfigurationValidator
         {
             throw new OrleansConfigurationException("DurableJobsOptions.SlowStartInitialConcurrency must be greater than zero.");
         }
-        if (options.SlowStartInitialConcurrency > options.MaxConcurrentJobsPerSilo)
-        {
-            throw new OrleansConfigurationException("DurableJobsOptions.SlowStartInitialConcurrency must not exceed MaxConcurrentJobsPerSilo.");
-        }
         if (options.ConcurrencySlowStartEnabled && options.SlowStartInterval <= TimeSpan.Zero)
         {
             throw new OrleansConfigurationException("DurableJobsOptions.SlowStartInterval must be greater than zero when slow start is enabled.");
+        }
+        if (options.ConcurrencySlowStartEnabled && options.SlowStartInitialConcurrency > options.MaxConcurrentJobsPerSilo)
+        {
+            _logger.LogWarning(
+                "DurableJobsOptions.SlowStartInitialConcurrency ({SlowStartInitialConcurrency}) exceeds MaxConcurrentJobsPerSilo ({MaxConcurrentJobsPerSilo}); slow start will not be applied.",
+                options.SlowStartInitialConcurrency,
+                options.MaxConcurrentJobsPerSilo);
         }
         if (options.MaxAdoptedCount < 0)
         {
