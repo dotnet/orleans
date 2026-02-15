@@ -121,6 +121,9 @@ namespace Orleans.EventSourcing
         /// </summary>
         /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
         /// <returns>A task that represents the asynchronous clear operation.</returns>
-        Task ClearLogAsync(CancellationToken cancellationToken);
+        Task ClearLogAsync(CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException($"The operation {nameof(ClearLogAsync)} is not supported by this implementation of {nameof(ILogViewUpdate<TLogEntry>)}.");
+        }
     }
 }

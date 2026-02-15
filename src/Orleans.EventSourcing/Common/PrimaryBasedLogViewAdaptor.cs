@@ -186,7 +186,7 @@ namespace Orleans.EventSourcing.Common
             Debug.Assert(host != null && services != null && initialstate != null);
             this.Host = host;
             this.Services = services;
-            this.Initialstate = Services.DeepCopy(initialstate);
+            this.InitialState = Services.DeepCopy(initialstate);
             InitializeConfirmedView(initialstate);
             worker = new BatchWorkerFromDelegate(Work);
         }
@@ -285,7 +285,7 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// Cached version of initial state used during initialization. And for resetting.
         /// </summary>
-        protected TLogView Initialstate { init; get => Services.DeepCopy(field); }
+        protected TLogView InitialState { init; get => Services.DeepCopy(field); }
 
         /// statistics gathering. Is null unless stats collection is turned on.
         protected LogConsistencyStatistics stats = null;
@@ -573,9 +573,10 @@ namespace Orleans.EventSourcing.Common
 
                 await ClearPrimaryLogAsync(clearLogCancellationToken);
 
-                InitializeConfirmedView(this.Initialstate);
+                InitializeConfirmedView(this.InitialState);
                 ResetTentativeState();
                 needRefresh = needInitialRead = false;
+                lastVersionNotified = 0;
 
                 try
                 {
@@ -846,19 +847,19 @@ namespace Orleans.EventSourcing.Common
     /// </summary>
     /// <typeparam name="TLogEntry">The type of entry for this submission</typeparam>
     public class SubmissionEntry<TLogEntry>
-{
-    /// <summary> The log entry that is submitted. </summary>
-    public TLogEntry Entry;
+    {
+        /// <summary> The log entry that is submitted. </summary>
+        public TLogEntry Entry;
 
-    /// <summary> A timestamp for this submission. </summary>
-    public DateTime SubmissionTime;
+        /// <summary> A timestamp for this submission. </summary>
+        public DateTime SubmissionTime;
 
-    /// <summary> For conditional updates, a promise that resolves once it is known whether the update was successful or not.</summary>
-    public TaskCompletionSource<bool> ResultPromise;
+        /// <summary> For conditional updates, a promise that resolves once it is known whether the update was successful or not.</summary>
+        public TaskCompletionSource<bool> ResultPromise;
 
-    /// <summary> For conditional updates, the log position at which this update is supposed to be applied. </summary>
-    public int ConditionalPosition;
-}
+        /// <summary> For conditional updates, the log position at which this update is supposed to be applied. </summary>
+        public int ConditionalPosition;
+    }
 
 
 }
